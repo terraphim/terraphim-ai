@@ -1,0 +1,149 @@
+term,id,parent_id
+project blueprint,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+corporate strategy,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+"""SEMP""","""64553496-a2a7-435c-8356-c8e0cf18fcc0""",
+"""Plan project and technical management""","""6454df2e-3c48-4ec9-960a-a298823bef8d""",
+project scheduling,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+spiral,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+project outline,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+budget of a project,"""645535b6-072a-4288-8540-3c1e02e5a968""","""645535b6-88e6-47e5-9056-f189ce8ded25"""
+strategic plan,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+project proposal,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+qualified staff,"""6455219e-1a6f-4e54-9dad-9c797e36d0c4""","""6455219e-f58b-4d90-a7ac-b18563e27794"""
+sales order,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+preventive action,"""64550ea0-b1b5-4487-abee-697dbc280974""","""64550ea0-a016-49e0-a44f-addea29b4d42"""
+goals and objectives,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+"""Life cycle models""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8""",
+SWOT,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+external condition,"""645534de-e688-4fec-8e28-81e7c26e74f2""","""645534de-fbc1-4480-9d27-7ac2f68dc74d"""
+life cycle stages,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+project post-mortem,"""6455223c-0b1f-4477-8c48-d3a3b0e550a2""","""6455223c-ab59-4f7f-87bd-95cd4ee31c83"""
+QA plan,"""64551b10-8a29-400a-ae64-bc0761086048""","""64551b10-9562-4ba8-8957-87698ea43f72"""
+"""Project lessons learned""","""6455223c-ab59-4f7f-87bd-95cd4ee31c83""",
+project design,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+prohibition,"""645534de-e688-4fec-8e28-81e7c26e74f2""","""645534de-fbc1-4480-9d27-7ac2f68dc74d"""
+strategic map,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+human capital requirements,"""645524f4-3605-4e4a-804d-4e6bb0ea9c34""","""645524f4-e6cb-4236-86df-57b28f797cd1"""
+systems engineering management plan,"""64553496-4da2-454e-84a0-2498bd9246db""","""64553496-a2a7-435c-8356-c8e0cf18fcc0"""
+strategy execution,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+cash memo,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+"""Source documents""","""64550bff-775a-41fc-82af-51e482c56dc5""",
+project pipeline,"""64551b8b-a913-40b6-b914-eb1c4c5f561a""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e"""
+documentation hierarchy,"""645520ce-4888-4f9e-af7c-2ea244f698c2""","""645520ce-aa62-4e24-af82-dea0d71520d5"""
+project retrospective,"""6455223c-0b1f-4477-8c48-d3a3b0e550a2""","""6455223c-ab59-4f7f-87bd-95cd4ee31c83"""
+project infrastructure requirements,"""64551bbb-e99c-4a4b-9a7a-00739ad54423""","""64551bbb-2a05-4b70-8502-5de453bf14d6"""
+credit card sales voucher,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+limitation,"""645534de-e688-4fec-8e28-81e7c26e74f2""","""645534de-fbc1-4480-9d27-7ac2f68dc74d"""
+strategy development,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+engineering plan,"""64553496-4da2-454e-84a0-2498bd9246db""","""64553496-a2a7-435c-8356-c8e0cf18fcc0"""
+IT strategy,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+"""Acquisition need""","""645520cf-085d-4bf5-a4ec-27d2506f0358""",
+technical management plan,"""64553496-4da2-454e-84a0-2498bd9246db""","""64553496-a2a7-435c-8356-c8e0cf18fcc0"""
+"""Define the project""","""6454df28-f8f0-4578-98fd-a6323580e6c9""",
+cheque,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+planning of a project,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+project plan,"""6455355c-f12e-4d51-b756-d3a885482a48""","""6455355c-0476-4e83-a08c-4441136d252b"""
+"""Project direction""","""64552352-2c67-4428-a4c1-a376a32341b1""",
+project guidance,"""64552352-1632-476b-8315-e7f7bc654b1e""","""64552352-2c67-4428-a4c1-a376a32341b1"""
+infrastructure management plan,"""64551bbb-e99c-4a4b-9a7a-00739ad54423""","""64551bbb-2a05-4b70-8502-5de453bf14d6"""
+competent personnel,"""6455219e-1a6f-4e54-9dad-9c797e36d0c4""","""6455219e-f58b-4d90-a7ac-b18563e27794"""
+personnel needs,"""645524f4-3605-4e4a-804d-4e6bb0ea9c34""","""645524f4-e6cb-4236-86df-57b28f797cd1"""
+quality policy,"""64551b10-8a29-400a-ae64-bc0761086048""","""64551b10-9562-4ba8-8957-87698ea43f72"""
+project enabler,"""64551bbb-e99c-4a4b-9a7a-00739ad54423""","""64551bbb-2a05-4b70-8502-5de453bf14d6"""
+documentation structure,"""645520ce-4888-4f9e-af7c-2ea244f698c2""","""645520ce-aa62-4e24-af82-dea0d71520d5"""
+specify the project,"""6454df28-d3fa-4963-8bb3-00c661aedd1a""","""6454df28-f8f0-4578-98fd-a6323580e6c9"""
+"""Project constraints""","""645534de-fbc1-4480-9d27-7ac2f68dc74d""",
+documentation outline,"""645520ce-4888-4f9e-af7c-2ea244f698c2""","""645520ce-aa62-4e24-af82-dea0d71520d5"""
+set of projects,"""64551b8b-a913-40b6-b914-eb1c4c5f561a""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e"""
+"""Contents""","""2a8318b9-9c3d-450d-be3e-2ce47b692d50""",
+"""QM corrective actions""","""64550ea0-a016-49e0-a44f-addea29b4d42""",
+strategic roadmap,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+WBS,"""6455345b-dc28-44ca-a1da-e5676937b58f""","""6455345b-de73-4efb-bba0-694575e2b83f"""
+"""Project management (SFIA)""","""6454dc29-7f23-44cf-a28c-d2bf4de720f3""",
+project strategy,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+documentation archive,"""645520ce-4888-4f9e-af7c-2ea244f698c2""","""645520ce-aa62-4e24-af82-dea0d71520d5"""
+lifecycle model,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+RFP,"""645520cf-4457-42f0-8758-7d81ee6bee6b""","""645520cf-085d-4bf5-a4ec-27d2506f0358"""
+project governance,"""64552352-1632-476b-8315-e7f7bc654b1e""","""64552352-2c67-4428-a4c1-a376a32341b1"""
+PBS,"""6455345b-dc28-44ca-a1da-e5676937b58f""","""6455345b-de73-4efb-bba0-694575e2b83f"""
+"""Project planner ISO15288""","""6454d0ae-290c-43c7-9afa-f216a6cc95dd""",
+life cycle processes,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+credit note,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+documentation map,"""645520ce-4888-4f9e-af7c-2ea244f698c2""","""645520ce-aa62-4e24-af82-dea0d71520d5"""
+project funds,"""645535b6-072a-4288-8540-3c1e02e5a968""","""645535b6-88e6-47e5-9056-f189ce8ded25"""
+outline the project,"""6454df28-d3fa-4963-8bb3-00c661aedd1a""","""6454df28-f8f0-4578-98fd-a6323580e6c9"""
+project management framework tailoring,"""64550846-829e-4301-b817-b625a5f98d87""","""64550846-ece0-41e3-b383-3e5a9545f56c"""
+competitive bid request,"""645520cf-4457-42f0-8758-7d81ee6bee6b""","""645520cf-085d-4bf5-a4ec-27d2506f0358"""
+"""Quality assurance plan""","""64551b10-9562-4ba8-8957-87698ea43f72""",
+competent staff,"""6455219e-1a6f-4e54-9dad-9c797e36d0c4""","""6455219e-f58b-4d90-a7ac-b18563e27794"""
+QA corrective action,"""64550ea0-b1b5-4487-abee-697dbc280974""","""64550ea0-a016-49e0-a44f-addea29b4d42"""
+project artifacts,"""645535ec-d396-4819-a827-f9fddd8e6b39""","""645535ec-22f0-4dde-a0ed-3813552ca4f4"""
+detail the project,"""6454df28-d3fa-4963-8bb3-00c661aedd1a""","""6454df28-f8f0-4578-98fd-a6323580e6c9"""
+R&D plan,"""64553496-4da2-454e-84a0-2498bd9246db""","""64553496-a2a7-435c-8356-c8e0cf18fcc0"""
+"""Qualified personnel""","""6455219e-f58b-4d90-a7ac-b18563e27794""",
+project review,"""6455223c-0b1f-4477-8c48-d3a3b0e550a2""","""6455223c-ab59-4f7f-87bd-95cd4ee31c83"""
+human assets requirements,"""645524f4-3605-4e4a-804d-4e6bb0ea9c34""","""645524f4-e6cb-4236-86df-57b28f797cd1"""
+"""Project infrastructure needs""","""64551bbb-2a05-4b70-8502-5de453bf14d6""",
+RFQ,"""645520cf-4457-42f0-8758-7d81ee6bee6b""","""645520cf-085d-4bf5-a4ec-27d2506f0358"""
+describe the project,"""6454df28-d3fa-4963-8bb3-00c661aedd1a""","""6454df28-f8f0-4578-98fd-a6323580e6c9"""
+"""Activate the project""","""6454e013-02a9-4c90-974a-460d5fd356fd""",
+mission and vision,"""645507f1-85aa-4faa-a18e-8be2d0937e00""","""645507f1-d693-4242-b03e-9d42de285b3b"""
+project management methodology tailoring,"""64550846-829e-4301-b817-b625a5f98d87""","""64550846-ece0-41e3-b383-3e5a9545f56c"""
+regulation,"""645534de-e688-4fec-8e28-81e7c26e74f2""","""645534de-fbc1-4480-9d27-7ac2f68dc74d"""
+Ishikawa diagram,"""64550ea0-b1b5-4487-abee-697dbc280974""","""64550ea0-a016-49e0-a44f-addea29b4d42"""
+project deliverable,"""645535ec-d396-4819-a827-f9fddd8e6b39""","""645535ec-22f0-4dde-a0ed-3813552ca4f4"""
+program governance,"""64552352-1632-476b-8315-e7f7bc654b1e""","""64552352-2c67-4428-a4c1-a376a32341b1"""
+quality control plan,"""64551b10-8a29-400a-ae64-bc0761086048""","""64551b10-9562-4ba8-8957-87698ea43f72"""
+planning of projects,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+project chart,"""6455355c-f12e-4d51-b756-d3a885482a48""","""6455355c-0476-4e83-a08c-4441136d252b"""
+documentation chart,"""645520ce-4888-4f9e-af7c-2ea244f698c2""","""645520ce-aa62-4e24-af82-dea0d71520d5"""
+response management,"""64550d08-70ec-4d5c-92bf-6e3864434e22""","""64550d08-684c-4eff-ba72-5385df44c9cb"""
+"""Supply response""","""64550d08-684c-4eff-ba72-5385df44c9cb""",
+restriction,"""645534de-e688-4fec-8e28-81e7c26e74f2""","""645534de-fbc1-4480-9d27-7ac2f68dc74d"""
+program,"""64551b8b-a913-40b6-b914-eb1c4c5f561a""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e"""
+"""Strategy documents""","""64550647-7f46-43c4-9622-95f5ca770ecd""",
+planning projects,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+Vee,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+portfolio of projects,"""64551b8b-a913-40b6-b914-eb1c4c5f561a""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e"""
+systems engineering plan,"""64553496-4da2-454e-84a0-2498bd9246db""","""64553496-a2a7-435c-8356-c8e0cf18fcc0"""
+"""Project portfolio""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e""",
+"""Project schedule""","""6455355c-0476-4e83-a08c-4441136d252b""",
+quality assurance process,"""64551b10-8a29-400a-ae64-bc0761086048""","""64551b10-9562-4ba8-8957-87698ea43f72"""
+experienced personnel,"""6455219e-1a6f-4e54-9dad-9c797e36d0c4""","""6455219e-f58b-4d90-a7ac-b18563e27794"""
+"""Project planning""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07""",
+skilled staff,"""6455219e-1a6f-4e54-9dad-9c797e36d0c4""","""6455219e-f58b-4d90-a7ac-b18563e27794"""
+manpower requirements,"""645524f4-3605-4e4a-804d-4e6bb0ea9c34""","""645524f4-e6cb-4236-86df-57b28f797cd1"""
+life cycle framework,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+"""Work Breakdown Structure""","""6455345b-de73-4efb-bba0-694575e2b83f""",
+program portfolio,"""64551b8b-a913-40b6-b914-eb1c4c5f561a""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e"""
+invoice or bill,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+CAPA,"""64550ea0-b1b5-4487-abee-697dbc280974""","""64550ea0-a016-49e0-a44f-addea29b4d42"""
+planning of the project,"""6454de91-da3f-4d03-b709-fe5dc2c261fe""","""6454de91-1dd0-45a8-8c8f-c477afbc3d07"""
+quality plan,"""64551b10-8a29-400a-ae64-bc0761086048""","""64551b10-9562-4ba8-8957-87698ea43f72"""
+waterfall,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""
+"""Project budget""","""645535b6-88e6-47e5-9056-f189ce8ded25""",
+"""Project planning record""","""645535ec-22f0-4dde-a0ed-3813552ca4f4""",
+project management process tailoring,"""64550846-829e-4301-b817-b625a5f98d87""","""64550846-ece0-41e3-b383-3e5a9545f56c"""
+purchase order,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+staff resources needs,"""645524f4-3605-4e4a-804d-4e6bb0ea9c34""","""645524f4-e6cb-4236-86df-57b28f797cd1"""
+lessons learned,"""6455223c-0b1f-4477-8c48-d3a3b0e550a2""","""6455223c-ab59-4f7f-87bd-95cd4ee31c83"""
+bottleneck,"""645534de-e688-4fec-8e28-81e7c26e74f2""","""645534de-fbc1-4480-9d27-7ac2f68dc74d"""
+project calendar,"""6455355c-f12e-4d51-b756-d3a885482a48""","""6455355c-0476-4e83-a08c-4441136d252b"""
+8D,"""64550ea0-b1b5-4487-abee-697dbc280974""","""64550ea0-a016-49e0-a44f-addea29b4d42"""
+supporting documents,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+budget of a program,"""645535b6-072a-4288-8540-3c1e02e5a968""","""645535b6-88e6-47e5-9056-f189ce8ded25"""
+"""Project human resources needs""","""645524f4-e6cb-4236-86df-57b28f797cd1""",
+skilled personnel,"""6455219e-1a6f-4e54-9dad-9c797e36d0c4""","""6455219e-f58b-4d90-a7ac-b18563e27794"""
+"""Project tailoring strategy""","""64550846-ece0-41e3-b383-3e5a9545f56c""",
+project timeline,"""6455355c-f12e-4d51-b756-d3a885482a48""","""6455355c-0476-4e83-a08c-4441136d252b"""
+state the project,"""6454df28-d3fa-4963-8bb3-00c661aedd1a""","""6454df28-f8f0-4578-98fd-a6323580e6c9"""
+"""Documentation tree""","""645520ce-aa62-4e24-af82-dea0d71520d5""",
+petty cash voucher,"""64550bff-1941-4580-a91d-637c60863a40""","""64550bff-775a-41fc-82af-51e482c56dc5"""
+preventive measure,"""64550ea0-b1b5-4487-abee-697dbc280974""","""64550ea0-a016-49e0-a44f-addea29b4d42"""
+project evaluation,"""6455223c-0b1f-4477-8c48-d3a3b0e550a2""","""6455223c-ab59-4f7f-87bd-95cd4ee31c83"""
+project roadmap,"""6455355c-f12e-4d51-b756-d3a885482a48""","""6455355c-0476-4e83-a08c-4441136d252b"""
+call for proposals,"""645520cf-4457-42f0-8758-7d81ee6bee6b""","""645520cf-085d-4bf5-a4ec-27d2506f0358"""
+pipeline of projects,"""64551b8b-a913-40b6-b914-eb1c4c5f561a""","""64551b8b-8d98-4769-b61d-0fdd91d6c67e"""
+program budget,"""645535b6-072a-4288-8540-3c1e02e5a968""","""645535b6-88e6-47e5-9056-f189ce8ded25"""
+"""Organization strategic plan""","""645507f1-d693-4242-b03e-9d42de285b3b""",
+life cycle methodology,"""645523e1-1839-4f3b-9244-a37dcc2cd5cb""","""645523e1-0e2c-4e0a-b0ee-3604815d03a8"""

@@ -1,0 +1,20 @@
+[package]
+name = "terraphim_ai"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = [
+    "crates/terraphim_automata",
+    "crates/terraphim_pipeline",
+    "crates/terraphim-config-opendal"
+]
+
+[dependencies]
+
+itertools = "0.11.0"
+
+[dependencies.clap]
+features = ["derive", "env", "cargo"]
+version = "4"
