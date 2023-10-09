@@ -9,27 +9,27 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use tempfile::tempfile;
-pub type ResponseJSON = AHashMap<String, Dictionary>;
+pub type ResponseJSON <'a>= AHashMap<&'a str, Dictionary<'a>>;
 
-pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>, Box<dyn Error>> {
-    let mut dict_hash: AHashMap<String, Dictionary> = AHashMap::new();
-    fn read_url(url: &str) -> Result<String, Box<dyn Error>> {
+pub fn load_automata<'a>(url_or_file: &str) -> Result<AHashMap<&'a str, Dictionary<'a>>, Box<dyn Error>> {
+    let mut dict_hash: AHashMap<&'a str, Dictionary<'a>> = AHashMap::new();
+    fn read_url(url: &str) -> Result<Vec<u8>, Box<dyn Error + 'static>>  {
         let response = get(url)?;
         println!("Response {:?}", response);
-        let resp = response.text()?;
-        Ok(resp)
+        let resp = response.bytes()?;
+        Ok(resp.to_vec())
     }
     let contents = if url_or_file.starts_with("http") {
         read_url(url_or_file)?
     } else {
         let mut file = File::open(Path::new(url_or_file))?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents)?;
         contents
     };
 
-    // let res = std::fs::read_to_string(file).unwrap();
-    let deserializer = &mut serde_json::Deserializer::from_str(&contents);
+
+    let deserializer = &mut serde_json::Deserializer::from_slice(&contents);
     let result: Result<ResponseJSON, _> = serde_path_to_error::deserialize(deserializer);
     match result {
         Ok(_) => {

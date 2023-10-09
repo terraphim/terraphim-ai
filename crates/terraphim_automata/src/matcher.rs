@@ -6,25 +6,24 @@ use std::error::Error;
 use aho_corasick::{AhoCorasick, MatchKind};
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Matched {
-    pub term: String,
+pub struct Matched<'a> {
+    pub term: &'a str,
     pub id: u64,
-    pub nterm: String,
+    pub nterm: &'a str,
     pub pos: Option<(usize, usize)>,
 }
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Dictionary {
+pub struct Dictionary<'a> {
     pub id: u64,
-    pub nterm: String,
+    pub nterm: &'a str,
 }
 
-pub fn find_matches(
+pub fn find_matches<'a>(
     text: &str,
-    dict_hash: AHashMap<String, Dictionary>,
+    dict_hash: &'a AHashMap<&str, Dictionary>,
     return_positions: bool,
-) -> Result<Vec<Matched>, Box<dyn Error>> {
-    let patterns: Vec<String> = dict_hash.keys().cloned().collect();
+) -> Result<Vec<Matched <'a>>, Box<dyn Error>> {
+    let patterns: Vec<&str> = dict_hash.keys().cloned().collect();
 
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)
@@ -36,7 +35,7 @@ pub fn find_matches(
     for mat in ac.find_iter(text) {
         let term = &patterns[mat.pattern()];
         matches.push(Matched {
-            term: term.clone(),
+            term: term,
             id: dict_hash.get(term).unwrap().id.clone(),
             nterm: dict_hash.get(term).unwrap().nterm.clone(),
             pos: if return_positions {
@@ -64,7 +63,7 @@ pub fn find_matches_ids(
     let mut matches = Vec::new();
     for mat in ac.find_iter(text) {
         let term = &patterns[mat.pattern()];
-        matches.push(dict_hash.get(term).unwrap().id.clone());
+        matches.push(dict_hash.get(term).unwrap().id);
     }
     Ok(matches)
 }
