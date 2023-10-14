@@ -6,3 +6,43 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+redis = { version = "0.23.0", features = ["tokio-rustls-comp" ] }
+redis-derive={git="https://github.com/kkharji/redis-derive"}
+poem = "1.3.55"
+poem-openapi = { version="2.0.26", features = ["swagger-ui", "uuid"] }
+tokio = { version="1.17.0", features = ["macros", "rt-multi-thread"] }
+serde_json = "1.0.68"
+serde = { version = "1.0.130", features = ["derive"] }
+thiserror = "1.0.30"
+regex = "1.5.5"
+mime = "0.3.16"
+tracing = "0.1.29"
+tracing-subscriber = { version ="0.3.9", features = ["env-filter"] }
+chrono = { version = "0.4.19", default-features = false }
+bytes = "1.1.0"
+futures-util = "0.3.17"
+tokio-stream = "0.1.8"
+serde_yaml = "0.9.21"
+quick-xml = { version = "=0.26.0", features = [
+    "serialize",
+] } # https://github.com/tafia/quick-xml/issues/540
+base64 = "0.21.0"
+serde_urlencoded = "0.7.1"
+directories = ">= 2, < 5"
+dotenv = "0.15"
+config = "0.13.3"
+terraphim_automata = {version="0.1.0", path="../crates/terraphim_automata"}
+terraphim_pipeline = {version="0.1.0", path="../crates/terraphim_pipeline"}
+# rustls, update together
+hyper-rustls = { version = "0.24.0", default-features = false }
+rustls = "0.21.0"
+tokio-rustls = "0.24.0"
+ulid = {version = "1.0.0",features=["serde","uuid"]}
+serde_derive = "1.0.163"
+lazy_static = "1.4.0"
+redis-graph = { version = "0.4.3", features = ['tokio-comp'] }
+itertools = "0.11.0"
+
+[dependencies.clap]
+features = ["derive", "env", "cargo"]
+version = "4"

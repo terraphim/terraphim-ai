@@ -1,29 +1,30 @@
 use serde::{Deserialize, Serialize};
-
+use arcstr::ArcStr;
 use ahash::AHashMap;
 use std::error::Error;
 
 use aho_corasick::{AhoCorasick, MatchKind};
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Matched<'a> {
-    pub term: &'a str,
+#[derive(Debug, PartialEq, Clone,Deserialize)]
+pub struct Matched {
+    pub term: ArcStr,
     pub id: u64,
-    pub nterm: &'a str,
+    pub nterm: ArcStr,
     pub pos: Option<(usize, usize)>,
 }
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Dictionary<'a> {
+pub struct Dictionary {
     pub id: u64,
-    pub nterm: &'a str,
+    pub nterm: ArcStr,
 }
 
-pub fn find_matches<'a>(
+pub fn find_matches(
     text: &str,
-    dict_hash: &'a AHashMap<&str, Dictionary>,
+    dict_hash: AHashMap<String, Dictionary>,
     return_positions: bool,
-) -> Result<Vec<Matched <'a>>, Box<dyn Error>> {
-    let patterns: Vec<&str> = dict_hash.keys().cloned().collect();
+) -> Result<Vec<Matched>, Box<dyn Error>> {
+    let patterns: Vec<String> = dict_hash.keys().cloned().collect();
 
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)
@@ -35,7 +36,7 @@ pub fn find_matches<'a>(
     for mat in ac.find_iter(text) {
         let term = &patterns[mat.pattern()];
         matches.push(Matched {
-            term: term,
+            term: term.clone().into(),
             id: dict_hash.get(term).unwrap().id.clone(),
             nterm: dict_hash.get(term).unwrap().nterm.clone(),
             pos: if return_positions {
@@ -63,7 +64,7 @@ pub fn find_matches_ids(
     let mut matches = Vec::new();
     for mat in ac.find_iter(text) {
         let term = &patterns[mat.pattern()];
-        matches.push(dict_hash.get(term).unwrap().id);
+        matches.push(dict_hash.get(term).unwrap().id.clone());
     }
     Ok(matches)
 }

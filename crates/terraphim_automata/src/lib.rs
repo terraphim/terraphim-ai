@@ -9,10 +9,10 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use tempfile::tempfile;
-pub type ResponseJSON <'a>= AHashMap<&'a str, Dictionary<'a>>;
+pub type ResponseJSON = AHashMap<String, Dictionary>;
 
-pub fn load_automata<'a>(url_or_file: &str) -> Result<AHashMap<&'a str, Dictionary<'a>>, Box<dyn Error>> {
-    let mut dict_hash: AHashMap<&'a str, Dictionary<'a>> = AHashMap::new();
+pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>, Box<dyn Error>> {
+    let mut dict_hash: AHashMap<String, Dictionary> = AHashMap::new();
     fn read_url(url: &str) -> Result<Vec<u8>, Box<dyn Error + 'static>>  {
         let response = get(url)?;
         println!("Response {:?}", response);

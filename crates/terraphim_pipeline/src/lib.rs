@@ -23,7 +23,6 @@ pub struct Document {
     normalized_rank: f32,
 }
 
-
 //TODO: create top_k_nodes function where
 // sort nodes by rank
 // TODO create top_k_edges function where
