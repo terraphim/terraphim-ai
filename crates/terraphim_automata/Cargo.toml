@@ -17,3 +17,4 @@ serde_path_to_error = "0.1"
 serde_json_any_key = "2.0.0"
 ahash="0.8.1"
 arcstr = { version = "1.1.5", features = ["serde"] }
+smol_str = { version = "0.2.0", features = ["serde"] }

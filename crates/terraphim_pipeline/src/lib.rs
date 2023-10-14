@@ -3,7 +3,7 @@ use memoize::memoize;
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;
-
+use smol_str::SmolStr;
 
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches_ids, Dictionary};
@@ -39,7 +39,7 @@ pub struct RoleGraph {
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, Document>,
     automata_url: String,
-    dict_hash: AHashMap<String, Dictionary>,
+    dict_hash: AHashMap<SmolStr, Dictionary>,
 
 }
 impl RoleGraph {

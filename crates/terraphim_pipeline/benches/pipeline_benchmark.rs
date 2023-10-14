@@ -2,7 +2,7 @@ use criterion::{
     criterion_group, criterion_main, black_box, Bencher, BenchmarkGroup, Criterion, Throughput,
 };
 use criterion::BenchmarkId;
-
+use smol_str::SmolStr;
 use itertools::Itertools;
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches, find_matches_ids, replace_matches, Dictionary};
@@ -14,7 +14,7 @@ use ahash::{AHashMap, HashMap};
 // use once_cell::sync::Lazy;
 
 lazy_static! {
-    static ref AUTOMATA: AHashMap<String, Dictionary> = {
+    static ref AUTOMATA: AHashMap<SmolStr, Dictionary> = {
         let dict_hash = load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json").unwrap();
         dict_hash
     };

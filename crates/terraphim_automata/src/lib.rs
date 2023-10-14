@@ -1,6 +1,7 @@
 pub mod matcher;
 
 pub use matcher::{find_matches, replace_matches, Dictionary, Matched};
+use smol_str::SmolStr;
 use reqwest::blocking::get;
 // use std::collections::HashMap;
 use ahash::AHashMap;
@@ -11,7 +12,7 @@ use std::path::Path;
 use tempfile::tempfile;
 pub type ResponseJSON = AHashMap<String, Dictionary>;
 
-pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>, Box<dyn Error>> {
+pub fn load_automata(url_or_file: &str) -> Result<AHashMap<SmolStr, Dictionary>, Box<dyn Error>> {
     let mut dict_hash: AHashMap<String, Dictionary> = AHashMap::new();
     fn read_url(url: &str) -> Result<Vec<u8>, Box<dyn Error + 'static>>  {
         let response = get(url)?;
@@ -28,18 +29,18 @@ pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>, 
         contents
     };
 
-
-    let deserializer = &mut serde_json::Deserializer::from_slice(&contents);
-    let result: Result<ResponseJSON, _> = serde_path_to_error::deserialize(deserializer);
-    match result {
-        Ok(_) => {
-            println!("Sucessfully parsed JSON");
-            dict_hash = result.unwrap();
-        }
-        Err(err) => {
-            panic!("{}", err);
-        }
-    }
+    let dict_hash= serde_json::from_slice(&contents).unwrap();
+    // let deserializer = &mut serde_json::Deserializer::from_slice(&contents);
+    // let result: Result<ResponseJSON, _> = serde_path_to_error::deserialize(deserializer);
+    // match result {
+    //     Ok(_) => {
+    //         println!("Sucessfully parsed JSON");
+    //         dict_hash = result.unwrap();
+    //     }
+    //     Err(err) => {
+    //         panic!("{}", err);
+    //     }
+    // }
 
     Ok(dict_hash)
 }
