@@ -1,0 +1,19 @@
+global_shortcut = "Ctrl+X"
+
+[roles.Default]
+shortname = "Default"
+name = "Default"
+relevance_function = "terraphim-graph"
+theme = "Default"
+serverUrl = "https://localhost:8080"
+
+[roles.Default.kg]
+automata_url = "https://localhost/kg_url"
+kg_type = "markdown"
+kg_path = "~/pkm"
+public = true
+publish = true
+
+[[roles.Default.haystacks]]
+haystack = "localsearch"
+service = "ripgrep"
