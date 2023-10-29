@@ -5,34 +5,15 @@ use opendal::services;
 use opendal::Operator;
 use opendal::Result;
 use opendal::Scheme;
+use serde::de;
 use std::collections::HashMap;
+
+use terraphim_config::{Config, Role, KnowledgeGraph, Haystack};
 
 use std::env;
 use std::fs;
 use serde_json::Value;
 use serde::{Serialize, Deserialize};
-
-#[derive(Debug,Serialize, Deserialize)]
-pub struct Config {
-    global_shortcut: String,
-    roles: HashMap<String, Role>,
-}
-
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Role {
-    shortname: Option<String>,
-    name: String,
-    relevance_function: String,
-    theme: String,
-    #[serde(rename = "serverUrl")]
-    server_url: String,
-    automata_url: Option<String>,
-    #[serde(rename = "matcherMapUrl")]
-    matcher_map_url: Option<String>,
-    #[serde(flatten)]
-    extra: HashMap<String, Value>,
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
