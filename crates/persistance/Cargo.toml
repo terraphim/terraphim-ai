@@ -23,6 +23,7 @@ toml = "0.8.6"
 url = "2.3.1"
 
 [features]
+default = ["services-dashmap", "services-sled", "services-redis"]
 # Enable services dashmap support
 services-dashmap = ["opendal/services-dashmap"]
 # Enable services ipfs support

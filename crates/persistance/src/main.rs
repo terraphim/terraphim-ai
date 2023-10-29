@@ -52,10 +52,14 @@ async fn main() -> Result<()> {
     let cfg = Config::load(default_config_path.as_path()).unwrap();
     println!("Config loaded cfg: {:#?}", cfg);
     let profile = cfg.profiles["s3"].clone();
-    let (op, path) = cfg.parse_location("s3:///foo/1.txt").unwrap();
-    
-    println!("Op {:?}", op);
-    println!("Location {:?}", path);
+    println!("Config loaded profile: {:#?}", profile);
+    let ops = cfg.parse_profiles().await?;
+    println!("Config loaded ops: {:#?}", ops);
+    let fastest_op = ops
+    .iter()
+    .min_by_key(|op| op.1)
+    .ok_or_else(|| anyhow!("No operators provided")).unwrap();
+    println!("fastest_op: {:#?}", fastest_op);
 
     let obj = MyStruct {
         name: "Alice123".to_string(),

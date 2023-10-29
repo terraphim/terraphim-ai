@@ -1,5 +1,6 @@
 // This is a copy from opendal cli config 
 // https://raw.githubusercontent.com/apache/incubator-opendal/main/bin/oli/src/config/mod.rs
+
 // Licensed to the Apache Software Foundation (ASF) under one
 // or more contributor license agreements.  See the NOTICE file
 // distributed with this work for additional information
@@ -25,15 +26,17 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-
+use opendal::layers::LoggingLayer;
 use anyhow::anyhow;
-use anyhow::Result;
 use opendal::services;
 use opendal::Operator;
+use opendal::Result;
 use opendal::Scheme;
 use serde::Deserialize;
 use toml;
-use url::Url;
+use log::debug;
+
+use std::time::{Duration, Instant};
 
 #[derive(Deserialize, Default, Debug)]
 pub struct Config {
@@ -94,8 +97,8 @@ impl Config {
         if !config_path.exists() {
             return Ok(Config::default());
         }
-        let data = fs::read_to_string(config_path)?;
-        Ok(toml::from_str(&data)?)
+        let data = fs::read_to_string(config_path).unwrap_or_else(|_| "".to_string());
+        Ok(toml::from_str(&data).unwrap())
     }
 
     /// Load config from environment variables.
@@ -127,320 +130,130 @@ impl Config {
         Config { profiles }
     }
 
-    /// Parse `<profile>://abc/def` into `op` and `location`.
-    pub fn parse_location(&self, s: &str) -> Result<(Operator, String)> {
-        if !s.contains(":/") {
-            let mut fs_builder = services::Fs::default();
-            let fp = resolve_relative_path(Path::new(s));
-            let fp_str = fp.as_os_str().to_string_lossy();
+    
 
-            let filename = match fp_str.split_once(['/', '\\']) {
-                Some((base, filename)) => {
-                    fs_builder.root(if base.is_empty() { "/" } else { base });
-                    filename
-                }
-                _ => {
-                    fs_builder.root(".");
-                    s
-                }
-            };
-
-            return Ok((Operator::new(fs_builder)?.finish(), filename.into()));
+    pub async fn parse_profile(&self, profile_name:&str) -> Result<(Operator, u128)> {
+        async fn get_speed(op:Operator)->Result<u128>{
+            let start_time = Instant::now();
+            // let mut buf = vec![0u8; 1024*1024];
+            let buf = "test data";
+            op.write("test", buf).await?;
+            let end_time = Instant::now();
+            let save_time = end_time.duration_since(start_time).as_millis();
+            let start_time = Instant::now();
+            op.read("test").await?;
+            let end_time = Instant::now();
+            let load_time = end_time.duration_since(start_time).as_nanos();
+            Ok(load_time)
+            
         }
-
-        let location = Url::parse(s)?;
-        if location.has_host() {
-            Err(anyhow!("Host part in a location is not supported."))?;
-        }
-
-        let profile_name = location.scheme();
-        let path = location.path().to_string();
+        
         let profile = self
             .profiles
             .get(profile_name)
-            .ok_or_else(|| anyhow!("unknown profile: {}", profile_name))?;
+            .ok_or_else(|| anyhow!("unknown profile: {}", profile_name)).unwrap();
 
         let svc = profile
             .get("type")
-            .ok_or_else(|| anyhow!("missing 'type' in profile"))?;
+            .ok_or_else(|| anyhow!("missing 'type' in profile")).unwrap();
         let scheme = Scheme::from_str(svc)?;
-        match scheme {
-            Scheme::Azblob => Ok((
-                Operator::from_map::<services::Azblob>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Azdls => Ok((
-                Operator::from_map::<services::Azdls>(profile.clone())?.finish(),
-                path,
-            )),
+        let op = match scheme {
+            Scheme::Azblob => {
+                Operator::from_map::<services::Azblob>(profile.clone())?.finish()
+            },
+            Scheme::Azdls =>{ 
+                Operator::from_map::<services::Azdls>(profile.clone())?.finish()
+            },
             #[cfg(feature = "services-dashmap")]
-            Scheme::Dashmap => Ok((
-                Operator::from_map::<services::Dashmap>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Dashmap => {
+                let builder = services::Dashmap::default();
+                // Init an operator
+                let op = Operator::new(builder)?
+                    // Init with logging layer enabled.
+                    .layer(LoggingLayer::default())
+                    .finish();
+                debug!("operator: {op:?}");
+                op
+            },
             #[cfg(feature = "services-etcd")]
-            Scheme::Etcd => Ok((
-                Operator::from_map::<services::Etcd>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Gcs => Ok((
-                Operator::from_map::<services::Gcs>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Ghac => Ok((
-                Operator::from_map::<services::Ghac>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Etcd => {
+                Operator::from_map::<services::Etcd>(profile.clone())?.finish()
+            },
+            Scheme::Gcs => {
+                Operator::from_map::<services::Gcs>(profile.clone())?.finish()
+            }
+            Scheme::Ghac =>{ 
+                Operator::from_map::<services::Ghac>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-hdfs")]
-            Scheme::Hdfs => Ok((
-                Operator::from_map::<services::Hdfs>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Http => Ok((
-                Operator::from_map::<services::Http>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Hdfs => {
+                Operator::from_map::<services::Hdfs>(profile.clone())?.finish()
+            }
+            Scheme::Http => {
+                Operator::from_map::<services::Http>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-ftp")]
-            Scheme::Ftp => Ok((
-                Operator::from_map::<services::Ftp>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Ftp => {
+                Operator::from_map::<services::Ftp>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-ipfs")]
-            Scheme::Ipfs => Ok((
-                Operator::from_map::<services::Ipfs>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Ipmfs => Ok((
-                Operator::from_map::<services::Ipmfs>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Ipfs => {
+                Operator::from_map::<services::Ipfs>(profile.clone())?.finish()
+            }
+            Scheme::Ipmfs => {
+                Operator::from_map::<services::Ipmfs>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-memcached")]
-            Scheme::Memcached => Ok((
-                Operator::from_map::<services::Memcached>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Obs => Ok((
-                Operator::from_map::<services::Obs>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Oss => Ok((
-                Operator::from_map::<services::Oss>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Memcached => {
+                Operator::from_map::<services::Memcached>(profile.clone())?.finish()
+            }
+            Scheme::Obs => {
+                Operator::from_map::<services::Obs>(profile.clone())?.finish()
+            }
+            Scheme::Oss => {
+                Operator::from_map::<services::Oss>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-redis")]
-            Scheme::Redis => Ok((
-                Operator::from_map::<services::Redis>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Redis =>{ 
+                Operator::from_map::<services::Redis>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-rocksdb")]
-            Scheme::Rocksdb => Ok((
-                Operator::from_map::<services::Rocksdb>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::S3 => Ok((
-                Operator::from_map::<services::S3>(profile.clone())?.finish(),
-                path,
-            )),
+            Scheme::Rocksdb =>{ 
+                Operator::from_map::<services::Rocksdb>(profile.clone())?.finish()
+            }
+            Scheme::S3 => {
+                Operator::from_map::<services::S3>(profile.clone())?.finish()
+            }
             #[cfg(feature = "services-sled")]
-            Scheme::Sled => Ok((
-                Operator::from_map::<services::Sled>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Webdav => Ok((
-                Operator::from_map::<services::Webdav>(profile.clone())?.finish(),
-                path,
-            )),
-            Scheme::Webhdfs => Ok((
-                Operator::from_map::<services::Webhdfs>(profile.clone())?.finish(),
-                path,
-            )),
-            _ => Err(anyhow!(
-                "unknown type '{}' in profile '{}'",
-                scheme,
-                profile_name
-            )),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use opendal::Scheme;
-
-    use super::*;
-
-    #[test]
-    fn test_load_from_env() {
-        let env_vars = vec![
-            ("OLI_PROFILE_TEST1_TYPE", "s3"),
-            ("OLI_PROFILE_TEST1_ACCESS_KEY_ID", "foo"),
-            ("OLI_PROFILE_TEST2_TYPE", "oss"),
-            ("OLI_PROFILE_TEST2_ACCESS_KEY_ID", "bar"),
-        ];
-        for (k, v) in &env_vars {
-            env::set_var(k, v);
-        }
-
-        let profiles = Config::load_from_env().profiles;
-
-        let profile1 = profiles["test1"].clone();
-        assert_eq!(profile1["type"], "s3");
-        assert_eq!(profile1["access_key_id"], "foo");
-
-        let profile2 = profiles["test2"].clone();
-        assert_eq!(profile2["type"], "oss");
-        assert_eq!(profile2["access_key_id"], "bar");
-
-        for (k, _) in &env_vars {
-            env::remove_var(k);
-        }
-    }
-
-    #[test]
-    fn test_load_from_toml() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let tmpfile = dir.path().join("oli1.toml");
-        fs::write(
-            &tmpfile,
-            r#"
-[profiles.mys3]
-type = "s3"
-region = "us-east-1"
-access_key_id = "foo"
-enable_virtual_host_style = "on"
-"#,
-        )?;
-        let cfg = Config::load_from_file(&tmpfile)?;
-        let profile = cfg.profiles["mys3"].clone();
-        assert_eq!(profile["region"], "us-east-1");
-        assert_eq!(profile["access_key_id"], "foo");
-        assert_eq!(profile["enable_virtual_host_style"], "on");
-        Ok(())
-    }
-
-    #[test]
-    fn test_load_config_from_file_and_env() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let tmpfile = dir.path().join("oli2.toml");
-        fs::write(
-            &tmpfile,
-            r#"
-    [profiles.mys3]
-    type = "s3"
-    region = "us-east-1"
-    access_key_id = "foo"
-    "#,
-        )?;
-        let env_vars = vec![
-            ("OLI_PROFILE_MYS3_REGION", "us-west-1"),
-            ("OLI_PROFILE_MYS3_ENABLE_VIRTUAL_HOST_STYLE", "on"),
-        ];
-        for (k, v) in &env_vars {
-            env::set_var(k, v);
-        }
-        let cfg = Config::load(&tmpfile)?;
-        let profile = cfg.profiles["mys3"].clone();
-        assert_eq!(profile["region"], "us-west-1");
-        assert_eq!(profile["access_key_id"], "foo");
-        assert_eq!(profile["enable_virtual_host_style"], "on");
-
-        for (k, _) in &env_vars {
-            env::remove_var(k);
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_parse_fs_location() {
-        struct TestCase {
-            input: &'static str,
-            suffix: &'static str,
-        }
-        let test_cases = vec![
-            TestCase {
-                input: "./foo/1.txt",
-                suffix: "/foo/1.txt",
-            },
-            TestCase {
-                input: "/tmp/../1.txt",
-                suffix: "1.txt",
-            },
-            TestCase {
-                input: "/tmp/../../1.txt",
-                suffix: "1.txt",
-            },
-        ];
-        let cfg = Config::default();
-        for case in test_cases {
-            let (op, path) = cfg.parse_location(case.input).unwrap();
-            let info = op.info();
-            assert_eq!(Scheme::Fs, info.scheme());
-            assert_eq!("/", info.root());
-            assert!(!path.starts_with('.'));
-            assert!(path.ends_with(case.suffix));
-        }
-    }
-
-    #[test]
-    fn test_parse_s3_location() {
-        let cfg = Config {
-            profiles: HashMap::from([(
-                "mys3".into(),
-                HashMap::from([
-                    ("type".into(), "s3".into()),
-                    ("bucket".into(), "mybucket".into()),
-                    ("region".into(), "us-east-1".into()),
-                ]),
-            )]),
+            Scheme::Sled =>{ 
+                Operator::from_map::<services::Sled>(profile.clone())?.finish()
+            }
+            Scheme::Webdav =>{ 
+                Operator::from_map::<services::Webdav>(profile.clone())?.finish()
+            }
+            Scheme::Webhdfs =>{ 
+                Operator::from_map::<services::Webhdfs>(profile.clone())?.finish()
+            }
+            _ => {
+                let builder = services::Memory::default();
+                // Init an operator
+                let op = Operator::new(builder)?
+                    // Init with logging layer enabled.
+                    .layer(LoggingLayer::default())
+                    .finish();
+                op
+            }
         };
-        let (op, path) = cfg.parse_location("mys3:///foo/1.txt").unwrap();
-        assert_eq!("/foo/1.txt", path);
-        let info = op.info();
-        assert_eq!(Scheme::S3, info.scheme());
-        assert_eq!("mybucket", info.name());
+        let speed = get_speed(op.clone()).await?;
+        Ok((op, speed))
     }
-
-    #[test]
-    fn test_parse_s3_location2() {
-        let cfg = Config {
-            profiles: HashMap::from([(
-                "mys3".into(),
-                HashMap::from([
-                    ("type".into(), "s3".into()),
-                    ("bucket".into(), "mybucket".into()),
-                    ("region".into(), "us-east-1".into()),
-                ]),
-            )]),
-        };
-        let (op, path) = cfg.parse_location("mys3:/foo/1.txt").unwrap();
-        assert_eq!("/foo/1.txt", path);
-        let info = op.info();
-        assert_eq!(Scheme::S3, info.scheme());
-        assert_eq!("mybucket", info.name());
-    }
-
-    #[test]
-    fn test_parse_s3_location3() -> Result<()> {
-        let cfg = Config {
-            profiles: HashMap::from([(
-                "mys3".into(),
-                HashMap::from([
-                    ("type".into(), "s3".into()),
-                    ("bucket".into(), "mybucket".into()),
-                    ("region".into(), "us-east-1".into()),
-                ]),
-            )]),
-        };
-
-        let uri = "mys3://foo/1.txt";
-        let expected_msg = "Host part in a location is not supported.";
-        match cfg.parse_location(uri) {
-            Err(e) if e.to_string() == expected_msg => Ok(()),
-            _ => Err(anyhow!(
-                "Getting an message \"{}\" is expected when parsing {}.",
-                expected_msg,
-                uri
-            ))?,
+    pub async fn parse_profiles(&self) -> Result<Vec<(Operator, u128)>> {
+        let mut ops = Vec::new();
+        let profile_names = self.profiles.keys();
+        for profile_name in profile_names {
+            let (op, speed) = self.parse_profile(profile_name).await?;
+            ops.push((op, speed));
         }
+        Ok(ops)
     }
 }
