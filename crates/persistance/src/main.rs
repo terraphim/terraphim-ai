@@ -2,7 +2,7 @@
 use opendal::{Result, Operator};
 use serde::{Deserialize, Serialize};
 
-use persistance::{Persistable, init_operator_via_map};
+use persistance::{Persistable};
 use persistance::config::Config;
 use async_trait::async_trait;
 use dirs::config_dir;
@@ -23,15 +23,15 @@ impl Persistable for MyStruct {
     }
     
     async fn save(&self) -> Result<()> {
-        let op = init_operator_via_map().unwrap();
+        let op = &self.load_config().await?.1;
         let _= self.save_to_operator(&op).await?;
         Ok(())
     }
     
     async fn load(&mut self, key:&str) -> Result<Self> {
-        let op = init_operator_via_map().unwrap();
+        let op = &self.load_config().await?.1;
         
-        let obj = Self::load_from_operator(key, &op).await?;
+        let obj = self.load_from_operator(key, &op).await?;
         Ok(obj)
     }
     
