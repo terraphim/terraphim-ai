@@ -8,7 +8,8 @@ edition = "2021"
 members = [
     "crates/terraphim_automata",
     "crates/terraphim_pipeline",
-    "crates/terraphim-config-opendal"
+    "crates/config",
+    "crates/persistance",
 ]
 
 [dependencies]
