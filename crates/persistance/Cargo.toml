@@ -1,0 +1,40 @@
+[package]
+name = "persistance"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+opendal = { version = "0.40.0", features = ["services-dashmap", "services-redis", "services-sled"] }
+tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
+log = "0.4"
+tracing = { version = "0.1"}
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "tracing-log",
+] }
+serde = { version = "1.0.182", features = ["derive"] }
+serde_json = "1.0.104"
+async-trait = "0.1.74"
+dirs = "5.0.0"
+anyhow = "1"
+toml = "0.8.6"
+url = "2.3.1"
+async-once-cell = "0.5.3"
+
+[features]
+default = ["services-dashmap", "services-sled", "services-redis"]
+# Enable services dashmap support
+services-dashmap = ["opendal/services-dashmap"]
+# Enable services ipfs support
+services-ipfs = ["opendal/services-ipfs"]
+# Enable services redis support
+services-redis = ["opendal/services-redis"]
+# Enable services rocksdb support
+services-rocksdb = ["opendal/services-rocksdb"]
+# Enable services sled support
+services-sled = ["opendal/services-sled"]
+
+[dev-dependencies]
+tempfile = "3.7.1"

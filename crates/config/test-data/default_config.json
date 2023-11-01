@@ -4,17 +4,17 @@
       "Default": {
         "shortname": "default",
         "name": "default",
-        "relevance_function": "rust",
+        "relevance_function": "RedisSearch",
         "theme": "spacelab",
         "serverUrl":"/search",
-        "plugins": [
+        "haystacks": [
           {
             "haystack": "~/obsidian",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           },
           {
             "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           }
         ]
       },
@@ -26,14 +26,14 @@
         "serverUrl":"/rsearch",
         "matcherMapUrl":"",
         "automata_url":"https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.csv.gz",
-        "plugins": [
+        "haystacks": [
           {
             "haystack": "~/obsidian",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           },
           {
             "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           }
         ]
       },
@@ -44,14 +44,14 @@
         "theme": "nuclear",
         "serverUrl":"/rsearch",
         "automata_url":"https://terraphim-automata.s3.eu-west-2.amazonaws.com/automata_cyberattack_tolower.lzma",
-        "plugins": [
+        "haystacks": [
           {
             "haystack": "~/obsidian",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           },
           {
             "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           }
         ]
       },
@@ -62,49 +62,14 @@
         "theme": "cosmo",
         "serverUrl":"/rsearch",
         "automata_url":"https://terraphim-automata.s3.eu-west-2.amazonaws.com/automata_project_manager.csv.gz.lzma",
-        "plugins": [
+        "haystacks": [
           {
             "haystack": "~/obsidian",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           },
           {
             "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
-          }
-        ]
-      },
-      "Lazy Project Manager": {
-        "name": "Lazy Project Manager",
-        "shortname": "lazy-project-manager",
-        "relevance_function": "rust",
-        "theme": "sandstone",
-        "serverUrl":"/rsearch",
-        "automata_url":"https://terraphim-automata.s3.eu-west-2.amazonaws.com/automata_lazy_project_manager.csv.gz.lzma",
-        "plugins": [
-          {
-            "haystack": "~/obsidian",
-            "name": "terraphim-grep"
-          },
-          {
-            "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
-          }
-        ]
-      },
-      "Medical": {
-        "name": "Medical",
-        "relevance_function": "rust",
-        "theme": "minty",
-        "serverUrl":"/rsearch",
-        "automata_url":"https://s3.eu-west-2.amazonaws.com/assets.thepattern.digital/automata_fresh_semantic.pkl.lzma",
-        "plugins": [
-          {
-            "haystack": "~/obsidian",
-            "name": "terraphim-grep"
-          },
-          {
-            "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           }
         ]
       },
@@ -113,10 +78,10 @@
         "relevance_function": "rust",
         "theme": "superhero",
         "serverUrl":"/search",
-        "plugins": [
+        "haystacks": [
           {
             "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           }
         ]
       },
@@ -125,10 +90,10 @@
         "relevance_function": "rust",
         "theme": "darkly",
         "serverUrl":"/search",
-        "plugins": [
+        "haystacks": [
           {
             "haystack": "~/obsidian/World",
-            "name": "terraphim-grep"
+            "service": "terraphim-grep"
           }
         ]
       }
