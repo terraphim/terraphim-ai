@@ -1,6 +1,4 @@
 
-use std::result;
-
 use opendal::Result;
 use serde::{Deserialize, Serialize};
 

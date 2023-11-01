@@ -248,13 +248,100 @@ impl Config {
         let speed = get_speed(op.clone()).await?;
         Ok((op, speed))
     }
-    pub async fn parse_profiles(&self) -> Result<Vec<(Operator, u128)>> {
-        let mut ops = Vec::new();
+    pub async fn parse_profiles(&self) -> Result<HashMap<String,(Operator, u128)>> {
+        let mut ops = HashMap::new();
         let profile_names = self.profiles.keys();
         for profile_name in profile_names {
             let (op, speed) = self.parse_profile(profile_name).await?;
-            ops.push((op, speed));
+            ops.insert(profile_name.clone(), (op, speed));
         }
         Ok(ops)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use opendal::Scheme;
+
+    use super::*;
+
+    #[test]
+    fn test_load_from_env() {
+        let env_vars = vec![
+            ("TERRAPHIM_PROFILE_TEST1_TYPE", "s3"),
+            ("TERRAPHIM_PROFILE_TEST1_ACCESS_KEY_ID", "foo"),
+            ("TERRAPHIM_PROFILE_TEST2_TYPE", "oss"),
+            ("TERRAPHIM_PROFILE_TEST2_ACCESS_KEY_ID", "bar"),
+        ];
+        for (k, v) in &env_vars {
+            env::set_var(k, v);
+        }
+
+        let profiles = Config::load_from_env().profiles;
+
+        let profile1 = profiles["test1"].clone();
+        assert_eq!(profile1["type"], "s3");
+        assert_eq!(profile1["access_key_id"], "foo");
+
+        let profile2 = profiles["test2"].clone();
+        assert_eq!(profile2["type"], "oss");
+        assert_eq!(profile2["access_key_id"], "bar");
+
+        for (k, _) in &env_vars {
+            env::remove_var(k);
+        }
+    }
+
+    #[test]
+    fn test_load_from_toml() -> Result<()> {
+        let dir = tempfile::tempdir().unwrap();
+        let tmpfile = dir.path().join("oli1.toml");
+        fs::write(
+            &tmpfile,
+            r#"
+[profiles.mys3]
+type = "s3"
+region = "us-east-1"
+access_key_id = "foo"
+enable_virtual_host_style = "on"
+"#,
+        ).unwrap();
+        let cfg = Config::load_from_file(&tmpfile)?;
+        let profile = cfg.profiles["mys3"].clone();
+        assert_eq!(profile["region"], "us-east-1");
+        assert_eq!(profile["access_key_id"], "foo");
+        assert_eq!(profile["enable_virtual_host_style"], "on");
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_config_from_file_and_env() -> Result<()> {
+        let dir = tempfile::tempdir().unwrap();
+        let tmpfile = dir.path().join("oli2.toml");
+        fs::write(
+            &tmpfile,
+            r#"
+    [profiles.mys3]
+    type = "s3"
+    region = "us-east-1"
+    access_key_id = "foo"
+    "#,
+        ).unwrap();
+        let env_vars = vec![
+            ("TERRAPHIM_PROFILE_MYS3_REGION", "us-west-1"),
+            ("TERRAPHIM_PROFILE_MYS3_ENABLE_VIRTUAL_HOST_STYLE", "on"),
+        ];
+        for (k, v) in &env_vars {
+            env::set_var(k, v);
+        }
+        let cfg = Config::load(&tmpfile)?;
+        let profile = cfg.profiles["mys3"].clone();
+        assert_eq!(profile["region"], "us-west-1");
+        assert_eq!(profile["access_key_id"], "foo");
+        assert_eq!(profile["enable_virtual_host_style"], "on");
+
+        for (k, _) in &env_vars {
+            env::remove_var(k);
+        }
+        Ok(())
     }
 }

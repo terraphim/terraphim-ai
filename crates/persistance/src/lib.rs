@@ -3,7 +3,6 @@ use opendal::Scheme;
 use opendal::{Operator, Result};
 use std::collections::{HashMap, BTreeMap};
 use async_trait::async_trait;
-use std::env;
 use serde::{Serialize};
 use anyhow::anyhow;
 use config::Config;
@@ -13,7 +12,8 @@ use async_once_cell::OnceCell as AsyncOnceCell;
 static STATE: AsyncOnceCell<State> = AsyncOnceCell::new();
 
 pub struct State {
-    pub ops: Vec<(Operator,u128)>,
+    // TODO: turn into BTreemap
+    pub ops: HashMap<String, (Operator,u128)>,
     pub fastest_op: Operator,
 }
 
@@ -26,10 +26,10 @@ impl State {
             let cfg = Config::load(default_config_path.as_path()).unwrap();
             println!("cfg: {:?}", cfg);
             let ops = cfg.parse_profiles().await.unwrap();
-            let fastest_op = ops
-                .iter()
-                .min_by_key(|op| op.1)
-                .ok_or_else(|| anyhow!("No operators provided")).unwrap().0.clone();
+            let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
+            ops_vec.sort_by_key(|&(_, (_, speed))| speed);
+            let ops: HashMap<String, (Operator, u128)> = ops_vec.into_iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            let fastest_op = ops.values().next().ok_or_else(|| anyhow!("No operators provided")).unwrap().0.clone();
             State {
                 ops,
                 fastest_op,
@@ -38,25 +38,32 @@ impl State {
         }).await
     }
 }
+
 #[async_trait]
 pub trait Persistable: Serialize + serde::de::DeserializeOwned {
     fn new()->Self;
     async fn save(&self)->Result<()>;
+    async fn save_to_one(&self,profile_name:String) -> Result<()>;
     async fn load(&mut self, key:&str)->Result<Self> where Self: Sized;
-    async fn load_config(&self)->Result<(Vec<(Operator,u128)>,Operator)> {
-        // TODO: add for each operator save
-        // TODO add load from fastest operator
+    async fn load_config(&self)->Result<(HashMap<String, (Operator,u128)>,Operator)> {
         let state = State::instance().await;
         Ok((state.ops.clone(), state.fastest_op.clone()))
 
     }
-    async fn save_to_operator(&self, op: &Operator) -> Result<()> {
-        let (ops, fastest_op) = &self.load_config().await?;
+    async fn save_to_all(&self) -> Result<()> {
+        let (ops, _fastest_op) = &self.load_config().await?;
         let key = self.get_key();
         let serde_str=serde_json::to_string(&self).unwrap();
-        for (op, _time) in ops {
+        for (_profile, (op,_time)) in ops {
             op.write(&key, serde_str.clone()).await?;
         }
+        Ok(())
+    }
+    async fn save_to_profile(&self, profile_name:String) -> Result<()> {
+        let (ops, _fastest_op) = &self.load_config().await?;
+        let key = self.get_key();
+        let serde_str=serde_json::to_string(&self).unwrap();
+        ops.get(&profile_name).ok_or_else(|| anyhow!("unknown profile: {}", profile_name)).unwrap().0.write(&key, serde_str.clone()).await?;
         Ok(())
     }
     
