@@ -10,11 +10,13 @@ members = [
     "crates/terraphim_pipeline",
     "crates/config",
     "crates/persistance",
+    "server",
 ]
 
 [dependencies]
 
 itertools = "0.11.0"
+
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]

@@ -3,7 +3,7 @@ use memoize::memoize;
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;
-
+pub mod input;
 
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches_ids, Dictionary};

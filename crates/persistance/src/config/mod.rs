@@ -101,7 +101,7 @@ impl Config {
         let data = fs::read_to_string(config_path).unwrap_or_else(|_| "".to_string());
         Ok(toml::from_str(&data).unwrap())
     }
-
+    //  TODO: Better load https://github.com/terraphim/terraphim_cloud_openapi/blob/main/src/settings.rs
     /// Load config from environment variables.
     ///
     /// The format of each environment variable should be `TERRAPHIM_PROFILE_{PROFILE NAME}_{OPTION}`,

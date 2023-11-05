@@ -3,10 +3,12 @@ use criterion::{
 };
 use criterion::BenchmarkId;
 
+
 use itertools::Itertools;
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches, find_matches_ids, replace_matches, Dictionary};
 use terraphim_pipeline::split_paragraphs;
+use terraphim_pipeline::input::TEST_CORPUS;
 use terraphim_pipeline::{magic_pair, magic_unpair, RoleGraph};
 use ulid::Ulid;
 use lazy_static::lazy_static;
@@ -82,7 +84,7 @@ fn bench_throughput(c: &mut Criterion) {
     let article_id4= "ArticleID4".to_string();
     let mut rolegraph=ROLEGRAPH.clone();
     // for size in &[1000, 10000, 100000, 1000000, 10000000, 100000000] {
-    for size in &[1000, 10000, 100000,  1000000] {
+    for size in &[100, 1000, 2000] {
         let input = query.repeat(*size);
         group.throughput(Throughput::Bytes(input.len() as u64));
         group.bench_with_input(BenchmarkId::new("parse_document_to_pair", size), size, |b, &size| {
@@ -91,6 +93,20 @@ fn bench_throughput(c: &mut Criterion) {
     }
     group.finish();
 }
+fn bench_throughput_corpus(c: &mut Criterion) {
+    let mut group = c.benchmark_group("throughput");
+    let article_id4= "ArticleID4".to_string();
+    let mut rolegraph=ROLEGRAPH.clone();
+    for size in TEST_CORPUS {
+        let input = size.to_string();
+        group.throughput(Throughput::Bytes(input.len() as u64));
+        group.bench_with_input(BenchmarkId::new("parse_document_to_pair", size), size, |b, &size| {
+            b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), &input))
+        });
+    }
+    group.finish();
+}
+
 fn bench_query_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("query throughput");
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
@@ -119,5 +135,5 @@ fn bench_query(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_find_matches_ids,bench_find_matches,bench_split_paragraphs,bench_replace_matches,bench_parse_document_to_pair,bench_throughput, bench_query_throughput, bench_query);
+criterion_group!(benches, bench_find_matches_ids,bench_find_matches,bench_split_paragraphs,bench_replace_matches,bench_parse_document_to_pair,bench_throughput, bench_throughput_corpus, bench_query_throughput, bench_query);
 criterion_main!(benches);
