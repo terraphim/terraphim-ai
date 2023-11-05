@@ -3,8 +3,11 @@ use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches, find_matches_ids, replace_matches, Dictionary};
 use terraphim_pipeline::split_paragraphs;
 use terraphim_pipeline::{magic_pair, magic_unpair, RoleGraph};
+use terraphim_pipeline::input::TEST_CORPUS;
 use ulid::Ulid;
+
 fn main() {
+
     let paragraph = "This is the first sentence.\n\n This is the second sentence. This is the second sentence? This is the second sentence| This is the second sentence!\n\nThis is the third sentence. Mr. John Johnson Jr. was born in the U.S.A but earned his Ph.D. in Israel before joining Nike Inc. as an engineer. He also worked at craigslist.org as a business analyst.";
     println!("Sentence segmentation test");
     for sentence in split_paragraphs(paragraph) {
@@ -61,8 +64,20 @@ fn main() {
     for z in v.into_iter() {
         println!("{:?}", magic_unpair(z));
     }
-    println!("{:?}", rolegraph);
+    // println!("Role graph {:?}", rolegraph);
     println!("Query graph");
     let results_map=rolegraph.query("Life cycle concepts and project direction");
     println!("Results {:#?}", results_map);
+        // println!("Test corpus {:?} ", TEST_CORPUS);
+    for each_corpus in TEST_CORPUS {
+        let corpus_len=each_corpus.len()as u64;
+        let corpus_id = Ulid::new().to_string();
+        println!("Corpus len: {} bytes", corpus_len);
+        println!("Corpus id: {}", corpus_id);
+        rolegraph.parse_document_to_pair(corpus_id.clone(),each_corpus);
+        println!("Corpus id: {} added to Role", corpus_id);
+        
+    }
+    // println!("Role graph {:?}", rolegraph);
+
 }
