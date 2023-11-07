@@ -1,3 +1,10 @@
+//! Benchmarks for testing throughput of the pipeline.
+//! 
+//! To run a single benchmark use:
+//! ```sh
+//! cargo bench --bench pipeline_benchmark -- query
+//! ```
+//! 
 use criterion::{
     criterion_group, criterion_main, black_box, Bencher, BenchmarkGroup, Criterion, Throughput,
 };
@@ -78,13 +85,16 @@ fn bench_parse_document_to_pair(c: &mut Criterion) {
     });
 }
 
+/// Test throughput based on query string.
+/// 
+/// We want to measure if parsing from input query strings is fast.
 fn bench_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("throughput");
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4= "ArticleID4".to_string();
     let mut rolegraph=ROLEGRAPH.clone();
     // for size in &[1000, 10000, 100000, 1000000, 10000000, 100000000] {
-    for size in &[100, 1000, 2000] {
+    for size in &[100, 1000, 2000, 3000, 4000, 5000, 10000] {
         let input = query.repeat(*size);
         group.throughput(Throughput::Bytes(input.len() as u64));
         group.bench_with_input(BenchmarkId::new("parse_document_to_pair", size), size, |b, &size| {
@@ -93,14 +103,21 @@ fn bench_throughput(c: &mut Criterion) {
     }
     group.finish();
 }
+
+/// A benchmark for measuring throughput by iterating over the set of corpuses
+/// and parsing the documents. We only want to measure the throughput of the
+/// parsing part.
+///
+/// Throughput is the most important measure for parsing.
 fn bench_throughput_corpus(c: &mut Criterion) {
     let mut group = c.benchmark_group("throughput");
     let article_id4= "ArticleID4".to_string();
     let mut rolegraph=ROLEGRAPH.clone();
-    for size in TEST_CORPUS {
-        let input = size.to_string();
+    for input in TEST_CORPUS {
+        let input = input.to_string();
+        let size: usize = input.len();
         group.throughput(Throughput::Bytes(input.len() as u64));
-        group.bench_with_input(BenchmarkId::new("parse_document_to_pair", size), size, |b, &size| {
+        group.bench_with_input(BenchmarkId::new("parse_document_to_pair", size), &input, |b, input| {
             b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), &input))
         });
     }
@@ -137,3 +154,4 @@ fn bench_query(c: &mut Criterion) {
 
 criterion_group!(benches, bench_find_matches_ids,bench_find_matches,bench_split_paragraphs,bench_replace_matches,bench_parse_document_to_pair,bench_throughput, bench_throughput_corpus, bench_query_throughput, bench_query);
 criterion_main!(benches);
+
