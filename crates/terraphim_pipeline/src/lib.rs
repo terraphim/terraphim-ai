@@ -4,6 +4,7 @@ use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;
 pub mod input;
+use aho_corasick::{AhoCorasick, MatchKind};
 
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches_ids, Dictionary};
@@ -41,11 +42,29 @@ pub struct RoleGraph {
     documents: AHashMap<String, Document>,
     automata_url: String,
     dict_hash: AHashMap<String, Dictionary>,
+    //TODO: make it private once performance tests are fixed
+    pub ac_values: Vec<u64>,
+    pub ac: AhoCorasick,
 
 }
 impl RoleGraph {
     pub fn new(role: String, automata_url: &str) -> Self {
         let dict_hash = load_automata(automata_url).unwrap();
+
+        // We need to iterate over keys and values at the same time
+        // because the order of entries is not guaranteed
+        // when using `.keys()` and `.values()`.
+        let (keys, values): (Vec<&str>, Vec<u64>) = dict_hash
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.id))
+            .unzip();
+
+        let ac = AhoCorasick::builder()
+            .match_kind(MatchKind::LeftmostLongest)
+            .ascii_case_insensitive(true)
+            .build(keys)
+            .unwrap();
+
         Self {
             role,
             nodes: AHashMap::new(),
@@ -53,7 +72,8 @@ impl RoleGraph {
             documents: AHashMap::new(),
             automata_url: automata_url.to_string(),
             dict_hash: dict_hash,
-
+            ac_values: values,
+            ac: ac,
         }
     }
     //  Query the graph using a query string, returns a list of document ids ranked and weighted by weighted mean average of node rank, edge rank and document rank
@@ -94,7 +114,8 @@ impl RoleGraph {
     pub fn query(&self, query_string: &str)->Vec<(&String, Document)> {
         warn!("performing query");
         // FIXME: handle case when no matches found with empty non empty vector - otherwise all ranks will blow up
-        let nodes = find_matches_ids(query_string, &self.dict_hash).unwrap_or(Vec::from([1]));
+        let nodes = find_matches_ids(&self.ac, &self.ac_values, query_string).unwrap();
+        
         
         let mut results_map= AHashMap::new();
         for node_id in nodes.iter() {
@@ -139,7 +160,7 @@ impl RoleGraph {
   
     }
     pub fn parse_document_to_pair(&mut self, document_id: String,text:&str){
-        let matches = find_matches_ids(text, &self.dict_hash).unwrap();
+        let matches = find_matches_ids(&self.ac, &self.ac_values, text).unwrap();
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id.clone(), a, b);
         }

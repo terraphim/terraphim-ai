@@ -10,6 +10,7 @@ use criterion::{
 };
 use criterion::BenchmarkId;
 
+use aho_corasick::{AhoCorasick, MatchKind};
 
 use itertools::Itertools;
 use terraphim_automata::load_automata;
@@ -46,12 +47,15 @@ lazy_static! {
 
 fn bench_find_matches_ids(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-    
+
+        let mut rolegraph=ROLEGRAPH.clone();
+
     c.bench_function_over_inputs(
         "find_matches_ids",
         move |b, &&size| {
             let query = query.repeat(size);
-            b.iter(|| find_matches_ids(&query, &AUTOMATA).unwrap())
+            
+            b.iter(|| find_matches_ids(&rolegraph.ac, &rolegraph.ac_values, &query).unwrap())
         },
         &[1, 10, 100, 1000],
     );
@@ -110,7 +114,7 @@ fn bench_throughput(c: &mut Criterion) {
 ///
 /// Throughput is the most important measure for parsing.
 fn bench_throughput_corpus(c: &mut Criterion) {
-    let mut group = c.benchmark_group("throughput");
+    let mut group = c.benchmark_group("throughput_corpus");
     let article_id4= "ArticleID4".to_string();
     let mut rolegraph=ROLEGRAPH.clone();
     for input in TEST_CORPUS {

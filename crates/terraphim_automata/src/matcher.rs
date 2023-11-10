@@ -50,43 +50,17 @@ pub fn find_matches(
 }
 
 pub fn find_matches_ids(
+    ac: &AhoCorasick,
+    values: &Vec<u64>,
     text: &str,
-    dict_hash: &AHashMap<String, Dictionary>,
 ) -> Result<Vec<u64>, Box<dyn Error>> {
-    let patterns: Vec<String> = dict_hash.keys().cloned().collect();
-
-    // let keys = dict_hash.keys();
-    // let values = dict_hash.values().map(|dict| dict.id).collect::<Vec<u64>>();
-
-    // We need to iterate over keys and values at the same time
-    // because the order of entries is not guaranteed
-    // when using `.keys()` and `.values()`.
-    // let (keys, values): (Vec<&str>, Vec<u64>) = dict_hash
-    //     .iter()
-    //     .map(|(key, value)| (key.as_str(), value.id))
-    //     .unzip();
-
-    let ac = AhoCorasick::builder()
-        .match_kind(MatchKind::LeftmostLongest)
-        .ascii_case_insensitive(true)
-        // .build(keys)
-        .build(&patterns)
-        .unwrap();
-
-    let mut matches: Vec<u64> = Vec::new();
+    
+    let mut matches = Vec::new();
     for mat in ac.find_iter(text) {
-        let term = &patterns[mat.pattern()];
-        matches.push(dict_hash.get(term).unwrap().id.clone());
+        // println!("mat: {:?}", mat);
+        let id = values[mat.pattern()];
+        matches.push(id);
     }
-
-    // let mut matches = Vec::new();
-    // for mat in ac.find_iter(text) {
-    //     // println!("mat: {:?}", mat);
-    //     let id = values[mat.pattern()];
-    //     matches.push(id);
-    // }
-
-
     Ok(matches)
 }
 
