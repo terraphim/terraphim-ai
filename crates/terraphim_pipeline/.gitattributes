@@ -1,0 +1,9 @@
+criterion_7_11_2023_10_40/find_matches filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/query_response filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/query[[:space:]]throughput filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/split_paragraphs filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/find_matches_ids filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/parse_document_to_pair filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/replace_matches filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/report filter=lfs diff=lfs merge=lfs -text
+criterion_7_11_2023_10_40/throughput filter=lfs diff=lfs merge=lfs -text
