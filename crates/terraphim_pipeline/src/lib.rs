@@ -171,7 +171,8 @@ impl RoleGraph {
         // }
     }
 
-    pub fn query(&self, query_string: &str) -> Result<Vec<(&String, IndexedDocument)>> {
+    /// Query rolegraph without sorting
+    pub fn query_inner(&self, query_string: &str) -> Result<AHashMap<&String, IndexedDocument>> {
         warn!("performing query");
         let nodes = self.find_matches_ids(query_string);
 
@@ -217,11 +218,67 @@ impl RoleGraph {
                 }
             }
         }
-        // warn!("Results Map {:#?}", results_map);
+        Ok(results_map)
+    }
+
+    /// Query rolegraph with sorting by rank (default)
+    /// Note that there are other ways to sort the results as well.
+    /// See other methods on `RoleGraph`
+    pub fn query(&self, query_string: &str) -> Result<Vec<(&String, IndexedDocument)>> {
+        let mut results_map = self.query_inner(query_string)?;
+        // Convert into vector because the map does not have inherent order
         let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
+
+        // sort by rank by default
         hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+
         Ok(hash_vec)
     }
+
+    /// Query rolegraph with sorting by rank and return top n results
+    pub fn query_top_n<T: Ord>(
+        &self,
+        query_string: &str,
+        n: usize,
+    ) -> Result<Vec<(&String, IndexedDocument)>> {
+        let results_map = self.query_inner(query_string)?;
+        let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
+        hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+        Ok(hash_vec.into_iter().take(n).collect::<Vec<_>>())
+    }
+
+    /// Query rolegraph with sorting by rank and return bottom (last) n results
+    pub fn query_bottom_n<T: Ord>(
+        &self,
+        query_string: &str,
+        n: usize,
+    ) -> Result<Vec<(&String, IndexedDocument)>> {
+        // let results_map = self.query_inner(query_string)?;
+        // let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
+        // // Sort by rank in reverse order
+        // hash_vec.sort_by(|a, b| a.1.rank.cmp(&b.1.rank));
+        // Ok(hash_vec.into_iter().take(n).collect::<Vec<_>>())
+
+        let hash_map = self.query_inner(query_string)?;
+        SortedDocuments::new(hash_map).top_n(n).into()
+
+    }
+
+    // pub fn least_n<T: Ord>(n: usize, mut from: impl Iterator<Item = T>) -> impl Iterator<Item = T> {
+    //     let mut h = BinaryHeap::from_iter(from.by_ref().take(n));
+
+    //     for it in from {
+    //         // heap thinks the smallest is the greatest because of reverse order
+    //         let mut greatest = h.peek_mut().unwrap();
+
+    //         if it < *greatest {
+    //             // heap rebalances after the smart pointer is dropped
+    //             *greatest = it;
+    //         }
+    //     }
+    //     h.into_iter()
+    // }
+
     pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
         let matches = self.find_matches_ids(text);
         for (a, b) in matches.into_iter().tuple_windows() {

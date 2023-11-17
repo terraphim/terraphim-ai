@@ -19,36 +19,6 @@ pub struct Dictionary {
     pub nterm: String,
 }
 
-pub fn find_matches(
-    text: &str,
-    dict_hash: AHashMap<String, Dictionary>,
-    return_positions: bool,
-) -> Result<Vec<Matched>, Box<dyn Error>> {
-    let patterns: Vec<String> = dict_hash.keys().cloned().collect();
-
-    let ac = AhoCorasick::builder()
-        .match_kind(MatchKind::LeftmostLongest)
-        .ascii_case_insensitive(true)
-        .build(patterns.clone())
-        .unwrap();
-
-    let mut matches: Vec<Matched> = Vec::new();
-    for mat in ac.find_iter(text) {
-        let term = &patterns[mat.pattern()];
-        matches.push(Matched {
-            term: term.clone(),
-            id: dict_hash.get(term).unwrap().id.clone(),
-            nterm: dict_hash.get(term).unwrap().nterm.clone(),
-            pos: if return_positions {
-                Some((mat.start(), mat.end()))
-            } else {
-                None
-            },
-        });
-    }
-    Ok(matches)
-}
-
 // This function replacing instead of matching patterns
 pub fn replace_matches(
     text: &str,

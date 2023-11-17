@@ -1,6 +1,6 @@
 pub mod matcher;
 
-pub use matcher::{find_matches, replace_matches, Dictionary, Matched};
+pub use matcher::{replace_matches, Dictionary, Matched};
 use reqwest::blocking::get;
 // use std::collections::HashMap;
 use ahash::AHashMap;
