@@ -49,15 +49,7 @@ pub fn find_matches(
     Ok(matches)
 }
 
-pub fn find_matches_ids(ac: &AhoCorasick, values: &Vec<u64>, text: &str) -> Vec<u64> {
-    let mut matches = Vec::new();
-    for mat in ac.find_iter(text) {
-        // println!("mat: {:?}", mat);
-        let id = values[mat.pattern()];
-        matches.push(id);
-    }
-    matches
-}
+
 
 // This function replacing instead of matching patterns
 pub fn replace_matches(

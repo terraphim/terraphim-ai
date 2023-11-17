@@ -3,14 +3,13 @@ use itertools::Itertools;
 use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
-use std::fmt::format;
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
 use log::warn;
 use serde::{Deserialize, Serialize};
 
 use terraphim_automata::load_automata;
-use terraphim_automata::matcher::{find_matches_ids, Dictionary};
+use terraphim_automata::matcher::Dictionary;
 use thiserror::Error;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -127,6 +126,20 @@ impl RoleGraph {
             ac: ac,
         })
     }
+
+    /// Find all matches int the rolegraph for the given text
+    /// Returns a list of document ids
+    fn find_matches_ids(&self, text: &str) -> Vec<u64> {
+        let mut matches = Vec::new();
+        for mat in self.ac.find_iter(text) {
+            // println!("mat: {:?}", mat);
+            let id = self.ac_values[mat.pattern()];
+            matches.push(id);
+        }
+        matches
+    }
+
+
     //  Query the graph using a query string, returns a list of document ids ranked and weighted by weighted mean average of node rank, edge rank and document rank
 
     // node rank is a weight for edge and edge rank is a weight for document_id
@@ -161,7 +174,7 @@ impl RoleGraph {
 
     pub fn query(&self, query_string: &str) -> Result<Vec<(&String, IndexedDocument)>> {
         warn!("performing query");
-        let nodes = find_matches_ids(&self.ac, &self.ac_values, query_string);
+        let nodes = self.find_matches_ids(query_string);
 
         //  turn into hashset by implementing hash and eq traits
 
@@ -211,14 +224,14 @@ impl RoleGraph {
         Ok(hash_vec)
     }
     pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
-        let matches = find_matches_ids(&self.ac, &self.ac_values, text);
+        let matches = self.find_matches_ids(text);
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id.clone(), a, b);
         }
     }
     pub fn parse_document<T: Into<Document>>(&mut self, document_id: String, input: T) {
         let document: Document = input.into();
-        let matches = find_matches_ids(&self.ac, &self.ac_values, &document.to_string());
+        let matches = self.find_matches_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id.clone(), a, b);
         }
@@ -358,11 +371,8 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::Itertools;
     use terraphim_automata::load_automata;
-    use terraphim_automata::matcher::{
-        find_matches, find_matches_ids, replace_matches, Dictionary,
-    };
+    use terraphim_automata::matcher::replace_matches;
 
     use ulid::Ulid;
 
@@ -386,32 +396,12 @@ mod tests {
     }
 
     #[test]
-    fn test_find_matches() {
-        let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let dict_hash =
-            load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap();
-        let matches = find_matches(query, dict_hash.clone(), false).unwrap();
-        assert_eq!(matches.len(), 7);
-    }
-
-    #[test]
-    fn test_replace_matches() {
-        let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let dict_hash =
-            load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap();
-        let matches = replace_matches(query, dict_hash.clone()).unwrap();
-        assert_eq!(matches.len(), 171);
-    }
-
-    #[test]
     fn test_find_matches_ids() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let dict_hash =
-            load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap();
-        let matches = find_matches_ids(query, &dict_hash).unwrap();
+        let role = "system operator".to_string();
+        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
+        let mut rolegraph = RoleGraph::new(role, automata_url).unwrap();
+        let matches = rolegraph.find_matches_ids(query);
         assert_eq!(matches.len(), 7);
     }
 
@@ -419,23 +409,22 @@ mod tests {
     fn test_rolegraph() {
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let dict_hash = load_automata(automata_url).unwrap();
-        let mut rolegraph = RoleGraph::new(role, automata_url);
+        let mut rolegraph = RoleGraph::new(role, automata_url).unwrap();
         let article_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches = find_matches_ids(query, &dict_hash);
+        let matches = rolegraph.find_matches_ids(query);
         for (a, b) in matches.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(article_id.clone(), a, b);
         }
         let article_id2 = Ulid::new().to_string();
         let query2 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches2 = find_matches_ids(query2, &dict_hash);
+        let matches2 = rolegraph.find_matches_ids(query2);
         for (a, b) in matches2.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(article_id2.clone(), a, b);
         }
         let article_id3 = Ulid::new().to_string();
         let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches3 = find_matches_ids(query3, &dict_hash);
+        let matches3 = rolegraph.find_matches_ids(query3);
         for (a, b) in matches3.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(article_id3.clone(), a, b);
         }
@@ -443,7 +432,7 @@ mod tests {
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         rolegraph.parse_document_to_pair(article_id4, query4);
         warn!("Query graph");
-        let results_map = rolegraph.query("Life cycle concepts and project direction");
+        let results_map = rolegraph.query("Life cycle concepts and project direction").unwrap();
         assert_eq!(results_map.len(), 4);
     }
 }
