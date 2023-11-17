@@ -139,7 +139,6 @@ impl RoleGraph {
         matches
     }
 
-
     //  Query the graph using a query string, returns a list of document ids ranked and weighted by weighted mean average of node rank, edge rank and document rank
 
     // node rank is a weight for edge and edge rank is a weight for document_id
@@ -265,7 +264,7 @@ impl RoleGraph {
             Entry::Occupied(entry) => {
                 let edge = entry.into_mut();
                 *edge.doc_hash.entry(document_id).or_insert(1) += 1;
-                
+
                 edge.clone()
             }
         };
@@ -301,12 +300,10 @@ pub struct Node {
 }
 impl Node {
     fn new(id: u64, edge: Edge) -> Self {
-        let mut connected_with = Vec::new();
-        connected_with.push(edge.id);
         Self {
             id,
             rank: 1,
-            connected_with,
+            connected_with: vec![edge.id],
         }
     }
     // pub fn sort_edges_by_value(&self) {
@@ -371,8 +368,6 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
 
     use ulid::Ulid;
 
@@ -432,7 +427,9 @@ mod tests {
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         rolegraph.parse_document_to_pair(article_id4, query4);
         warn!("Query graph");
-        let results_map = rolegraph.query("Life cycle concepts and project direction").unwrap();
+        let results_map = rolegraph
+            .query("Life cycle concepts and project direction")
+            .unwrap();
         assert_eq!(results_map.len(), 4);
     }
 }

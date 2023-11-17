@@ -49,8 +49,6 @@ pub fn find_matches(
     Ok(matches)
 }
 
-
-
 // This function replacing instead of matching patterns
 pub fn replace_matches(
     text: &str,

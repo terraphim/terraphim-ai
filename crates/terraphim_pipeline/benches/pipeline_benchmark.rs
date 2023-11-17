@@ -11,8 +11,8 @@ use lazy_static::lazy_static;
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches, find_matches_ids, replace_matches, Dictionary};
 use terraphim_pipeline::input::TEST_CORPUS;
-use terraphim_pipeline::RoleGraph;
 use terraphim_pipeline::split_paragraphs;
+use terraphim_pipeline::RoleGraph;
 
 lazy_static! {
     static ref AUTOMATA: AHashMap<String, Dictionary> = {
