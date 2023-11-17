@@ -4,11 +4,9 @@ pub use matcher::{find_matches, replace_matches, Dictionary, Matched};
 use reqwest::blocking::get;
 // use std::collections::HashMap;
 use ahash::AHashMap;
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use tempfile::tempfile;
 use thiserror::Error;
 pub type ResponseJSON = AHashMap<String, Dictionary>;
 
