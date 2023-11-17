@@ -15,18 +15,17 @@
 #![deny(missing_docs)]
 
 use anyhow::{Context, Result};
-use poem_openapi::OpenApiService;
 use poem::{listener::TcpListener, EndpointExt, Route, Server};
+use poem_openapi::OpenApiService;
 use terraphim_pipeline::RoleGraph;
 use tokio::sync::Mutex;
 
 mod api;
 use api::Api;
-mod types;
 mod settings;
+mod types;
 
 use settings::Settings;
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
