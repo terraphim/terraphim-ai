@@ -121,9 +121,9 @@ impl RoleGraph {
             edges: AHashMap::new(),
             documents: AHashMap::new(),
             automata_url: automata_url.to_string(),
-            dict_hash: dict_hash,
+            dict_hash,
             ac_values: values,
-            ac: ac,
+            ac,
         })
     }
 
@@ -212,7 +212,7 @@ impl RoleGraph {
                             let document = entry.into_mut();
                             document.rank += 1;
                             document.matched_to.push(each_edge.clone());
-                            document.matched_to.dedup_by_key(|k| k.id.clone());
+                            document.matched_to.dedup_by_key(|k| k.id);
                         }
                     }
                 }
@@ -265,8 +265,8 @@ impl RoleGraph {
             Entry::Occupied(entry) => {
                 let edge = entry.into_mut();
                 *edge.doc_hash.entry(document_id).or_insert(1) += 1;
-                let edge_read = edge.clone();
-                edge_read
+                
+                edge.clone()
             }
         };
         edge
@@ -287,7 +287,7 @@ impl Edge {
         Self {
             id,
             rank: 1,
-            doc_hash: doc_hash,
+            doc_hash,
         }
     }
 }
@@ -306,7 +306,7 @@ impl Node {
         Self {
             id,
             rank: 1,
-            connected_with: connected_with,
+            connected_with,
         }
     }
     // pub fn sort_edges_by_value(&self) {
@@ -362,17 +362,17 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
     let q = (z as f32).sqrt().floor() as u64;
     let l = z - q * q;
     if l < q {
-        return (l, q);
+        (l, q)
     } else {
-        return (q, l - q);
+        (q, l - q)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_automata::load_automata;
-    use terraphim_automata::matcher::replace_matches;
+    
+    
 
     use ulid::Ulid;
 
@@ -400,7 +400,7 @@ mod tests {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let mut rolegraph = RoleGraph::new(role, automata_url).unwrap();
+        let rolegraph = RoleGraph::new(role, automata_url).unwrap();
         let matches = rolegraph.find_matches_ids(query);
         assert_eq!(matches.len(), 7);
     }
