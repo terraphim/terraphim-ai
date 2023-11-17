@@ -1,46 +1,44 @@
-use poem::{listener::TcpListener, web::Data, EndpointExt, Result, Route, Server};
-use poem_openapi::{param::Query, payload::PlainText, OpenApi, OpenApiService};
-use poem_openapi::{payload::Json, ApiResponse, Object, Tags};
+//! terraphim API server
+#![warn(clippy::all, clippy::pedantic)]
+#![warn(
+    absolute_paths_not_starting_with_crate,
+    rustdoc::invalid_html_tags,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    semicolon_in_expressions_from_macros,
+    unreachable_pub,
+    unused_extern_crates,
+    variant_size_differences,
+    clippy::missing_const_for_fn
+)]
+#![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
+#![deny(missing_docs)]
+
+use poem::{listener::TcpListener, EndpointExt, Result, Route, Server};
+use poem_openapi::OpenApiService;
 mod settings;
 use settings::Settings;
+use terraphim_pipeline::{Document, RoleGraph};
+use tokio::sync::Mutex;
 
-use terraphim_config::Config;
+mod api;
+use api::Api;
+mod types;
 
-#[derive(Tags)]
-enum ApiTags {
-    /// Config operations
-    Config,
-}
-
-
-#[derive(Default)]
-struct Api;
-
-#[OpenApi]
-impl Api {
-    #[oai(path = "/hello", method = "get")]
-    async fn index(&self, name: Query<Option<String>>) -> PlainText<String> {
-        match name.0 {
-            Some(name) => PlainText(format!("hello, {name}!")),
-            None => PlainText("hello!".to_string()),
-        }
-    }
-    #[oai(path = "/config", method = "get")]
-    async fn config(&self, name: Query<Option<String>>) -> PlainText<String> {
-        match name.0 {
-            Some(name) => PlainText(format!("hello, {name}!")),
-            None => PlainText("hello!".to_string()),
-        }
-    }
-
-}#[tokio::main]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     let settings = Settings::new().unwrap();
     println!("{:?}", settings);
     let bind_addr = settings.server_url.clone();
     let api_endpoint = settings.api_endpoint.clone();
-    let api_service = OpenApiService::new(Api, "Hello World", "1.0").server(api_endpoint);
+
+    let role = "system operator".to_string();
+    // let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
+    let automata_url = "./data/term_to_id.json";
+    let rolegraph = RoleGraph::new(role, automata_url);
+
+    let api_service = OpenApiService::new(Api { rolegraph: Mutex::new(rolegraph) }, "Hello World", "1.0").server(api_endpoint);
     let ui = api_service.swagger_ui();
     let spec = api_service.spec();
     let route = Route::new()

@@ -84,7 +84,7 @@ mod tests {
             service: "ripgrep".to_string()
         };
         let kg = KnowledgeGraph {
-            automata_url: "https://localhost/kg_url".to_string(),
+            automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json".to_string(),
             kg_type: KnowledgeGraphType::Markdown,
             kg_path: "~/pkm".to_string(),
             public: true,
