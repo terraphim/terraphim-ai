@@ -1,4 +1,4 @@
-// This is a copy from opendal cli config 
+// This is a copy from opendal cli config
 // https://raw.githubusercontent.com/apache/incubator-opendal/main/bin/oli/src/config/mod.rs
 
 // Licensed to the Apache Software Foundation (ASF) under one
@@ -18,6 +18,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use anyhow::anyhow;
+use log::debug;
+use opendal::layers::LoggingLayer;
+use opendal::services;
+use opendal::Operator;
+use opendal::Result;
+use opendal::Scheme;
+use serde::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
@@ -26,16 +34,7 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-use opendal::layers::LoggingLayer;
-use anyhow::anyhow;
-use opendal::services;
-use opendal::Operator;
-use opendal::Result;
-use opendal::Scheme;
-use serde::Deserialize;
 use toml;
-use log::debug;
-
 
 use std::time::{Duration, Instant};
 
@@ -131,10 +130,8 @@ impl Config {
         Config { profiles }
     }
 
-    
-
-    pub async fn parse_profile(&self, profile_name:&str) -> Result<(Operator, u128)> {
-        async fn get_speed(op:Operator)->Result<u128>{
+    pub async fn parse_profile(&self, profile_name: &str) -> Result<(Operator, u128)> {
+        async fn get_speed(op: Operator) -> Result<u128> {
             let start_time = Instant::now();
             // let mut buf = vec![0u8; 1024*1024];
             let buf = "test data";
@@ -146,25 +143,22 @@ impl Config {
             let end_time = Instant::now();
             let load_time = end_time.duration_since(start_time).as_nanos();
             Ok(load_time)
-            
         }
-        
+
         let profile = self
             .profiles
             .get(profile_name)
-            .ok_or_else(|| anyhow!("unknown profile: {}", profile_name)).unwrap();
+            .ok_or_else(|| anyhow!("unknown profile: {}", profile_name))
+            .unwrap();
 
         let svc = profile
             .get("type")
-            .ok_or_else(|| anyhow!("missing 'type' in profile")).unwrap();
+            .ok_or_else(|| anyhow!("missing 'type' in profile"))
+            .unwrap();
         let scheme = Scheme::from_str(svc)?;
         let op = match scheme {
-            Scheme::Azblob => {
-                Operator::from_map::<services::Azblob>(profile.clone())?.finish()
-            },
-            Scheme::Azdls =>{ 
-                Operator::from_map::<services::Azdls>(profile.clone())?.finish()
-            },
+            Scheme::Azblob => Operator::from_map::<services::Azblob>(profile.clone())?.finish(),
+            Scheme::Azdls => Operator::from_map::<services::Azdls>(profile.clone())?.finish(),
             #[cfg(feature = "services-dashmap")]
             Scheme::Dashmap => {
                 let builder = services::Dashmap::default();
@@ -175,66 +169,34 @@ impl Config {
                     .finish();
                 debug!("operator: {op:?}");
                 op
-            },
+            }
             #[cfg(feature = "services-etcd")]
-            Scheme::Etcd => {
-                Operator::from_map::<services::Etcd>(profile.clone())?.finish()
-            },
-            Scheme::Gcs => {
-                Operator::from_map::<services::Gcs>(profile.clone())?.finish()
-            }
-            Scheme::Ghac =>{ 
-                Operator::from_map::<services::Ghac>(profile.clone())?.finish()
-            }
+            Scheme::Etcd => Operator::from_map::<services::Etcd>(profile.clone())?.finish(),
+            Scheme::Gcs => Operator::from_map::<services::Gcs>(profile.clone())?.finish(),
+            Scheme::Ghac => Operator::from_map::<services::Ghac>(profile.clone())?.finish(),
             #[cfg(feature = "services-hdfs")]
-            Scheme::Hdfs => {
-                Operator::from_map::<services::Hdfs>(profile.clone())?.finish()
-            }
-            Scheme::Http => {
-                Operator::from_map::<services::Http>(profile.clone())?.finish()
-            }
+            Scheme::Hdfs => Operator::from_map::<services::Hdfs>(profile.clone())?.finish(),
+            Scheme::Http => Operator::from_map::<services::Http>(profile.clone())?.finish(),
             #[cfg(feature = "services-ftp")]
-            Scheme::Ftp => {
-                Operator::from_map::<services::Ftp>(profile.clone())?.finish()
-            }
+            Scheme::Ftp => Operator::from_map::<services::Ftp>(profile.clone())?.finish(),
             #[cfg(feature = "services-ipfs")]
-            Scheme::Ipfs => {
-                Operator::from_map::<services::Ipfs>(profile.clone())?.finish()
-            }
-            Scheme::Ipmfs => {
-                Operator::from_map::<services::Ipmfs>(profile.clone())?.finish()
-            }
+            Scheme::Ipfs => Operator::from_map::<services::Ipfs>(profile.clone())?.finish(),
+            Scheme::Ipmfs => Operator::from_map::<services::Ipmfs>(profile.clone())?.finish(),
             #[cfg(feature = "services-memcached")]
             Scheme::Memcached => {
                 Operator::from_map::<services::Memcached>(profile.clone())?.finish()
             }
-            Scheme::Obs => {
-                Operator::from_map::<services::Obs>(profile.clone())?.finish()
-            }
-            Scheme::Oss => {
-                Operator::from_map::<services::Oss>(profile.clone())?.finish()
-            }
+            Scheme::Obs => Operator::from_map::<services::Obs>(profile.clone())?.finish(),
+            Scheme::Oss => Operator::from_map::<services::Oss>(profile.clone())?.finish(),
             #[cfg(feature = "services-redis")]
-            Scheme::Redis =>{ 
-                Operator::from_map::<services::Redis>(profile.clone())?.finish()
-            }
+            Scheme::Redis => Operator::from_map::<services::Redis>(profile.clone())?.finish(),
             #[cfg(feature = "services-rocksdb")]
-            Scheme::Rocksdb =>{ 
-                Operator::from_map::<services::Rocksdb>(profile.clone())?.finish()
-            }
-            Scheme::S3 => {
-                Operator::from_map::<services::S3>(profile.clone())?.finish()
-            }
+            Scheme::Rocksdb => Operator::from_map::<services::Rocksdb>(profile.clone())?.finish(),
+            Scheme::S3 => Operator::from_map::<services::S3>(profile.clone())?.finish(),
             #[cfg(feature = "services-sled")]
-            Scheme::Sled =>{ 
-                Operator::from_map::<services::Sled>(profile.clone())?.finish()
-            }
-            Scheme::Webdav =>{ 
-                Operator::from_map::<services::Webdav>(profile.clone())?.finish()
-            }
-            Scheme::Webhdfs =>{ 
-                Operator::from_map::<services::Webhdfs>(profile.clone())?.finish()
-            }
+            Scheme::Sled => Operator::from_map::<services::Sled>(profile.clone())?.finish(),
+            Scheme::Webdav => Operator::from_map::<services::Webdav>(profile.clone())?.finish(),
+            Scheme::Webhdfs => Operator::from_map::<services::Webhdfs>(profile.clone())?.finish(),
             _ => {
                 let builder = services::Memory::default();
                 // Init an operator
@@ -248,7 +210,7 @@ impl Config {
         let speed = get_speed(op.clone()).await?;
         Ok((op, speed))
     }
-    pub async fn parse_profiles(&self) -> Result<HashMap<String,(Operator, u128)>> {
+    pub async fn parse_profiles(&self) -> Result<HashMap<String, (Operator, u128)>> {
         let mut ops = HashMap::new();
         let profile_names = self.profiles.keys();
         for profile_name in profile_names {
@@ -304,7 +266,8 @@ region = "us-east-1"
 access_key_id = "foo"
 enable_virtual_host_style = "on"
 "#,
-        ).unwrap();
+        )
+        .unwrap();
         let cfg = Config::load_from_file(&tmpfile)?;
         let profile = cfg.profiles["mys3"].clone();
         assert_eq!(profile["region"], "us-east-1");
@@ -325,7 +288,8 @@ enable_virtual_host_style = "on"
     region = "us-east-1"
     access_key_id = "foo"
     "#,
-        ).unwrap();
+        )
+        .unwrap();
         let env_vars = vec![
             ("TERRAPHIM_PROFILE_MYS3_REGION", "us-west-1"),
             ("TERRAPHIM_PROFILE_MYS3_ENABLE_VIRTUAL_HOST_STYLE", "on"),
