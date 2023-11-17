@@ -12,6 +12,7 @@ unicode-segmentation = "1.10.1"
 memoize = "0.4.0"
 ahash = {version="0.8.3", features=["serde"]}
 terraphim_automata = { path="../terraphim_automata"}
+thiserror = "1.0.30"
 itertools="0.11.0"
 ulid = {version = "1.0.0",features=["serde","uuid"]}
 log = "0.4.20"

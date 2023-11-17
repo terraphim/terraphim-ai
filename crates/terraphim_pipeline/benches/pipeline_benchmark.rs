@@ -40,21 +40,21 @@ lazy_static! {
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
         let rolegraph = RoleGraph::new(role, automata_url);
-        rolegraph
+        rolegraph.unwrap()
     };
 }
 
 fn bench_find_matches_ids(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
 
-        let mut rolegraph=ROLEGRAPH.clone();
+        let rolegraph=ROLEGRAPH.clone();
 
     c.bench_function_over_inputs(
         "find_matches_ids",
         move |b, &&size| {
             let query = query.repeat(size);
             
-            b.iter(|| find_matches_ids(&rolegraph.ac, &rolegraph.ac_values, &query).unwrap())
+            b.iter(|| find_matches_ids(&rolegraph.ac, &rolegraph.ac_values, &query))
         },
         &[1, 10, 100, 1000],
     );

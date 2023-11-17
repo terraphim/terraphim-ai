@@ -12,6 +12,27 @@ use serde::{Deserialize, Serialize};
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches_ids, Dictionary};
 use unicode_segmentation::UnicodeSegmentation;
+use thiserror::Error;
+
+type Result<T> = std::result::Result<T, TerraphimPipelineError>;
+
+
+#[derive(Error, Debug)]
+pub enum TerraphimPipelineError {
+    #[error("The given node ID was not found")]
+    NodeIdNotFound,
+    #[error("The given Edge ID was not found")]
+    EdgeIdNotFound,
+    #[error("Cannot convert IndexedDocument to JSON: {0}")]
+    JsonConversionError(#[from] serde_json::Error),
+    #[error("Error while driving terraphim automata: {0}")]
+    TerraphimAutomataError(#[from] terraphim_automata::TerraphimAutomataError),
+    #[error("Indexing error: {0}")]
+    AhoCorasickError(#[from] aho_corasick::BuildError),
+}
+
+
+
 // use tracing::{debug, error, info, span, warn, Level};
 
 /// Document that can be indexed by the `RoleGraph`.
@@ -57,8 +78,8 @@ pub struct IndexedDocument {
 }
 
 impl IndexedDocument {
-    pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(&self)
+    pub fn to_json_string(&self) -> Result<String> {
+        Ok(serde_json::to_string(&self)?)
     }
 }
 
@@ -88,8 +109,8 @@ pub struct RoleGraph {
 
 }
 impl RoleGraph {
-    pub fn new(role: String, automata_url: &str) -> Self {
-        let dict_hash = load_automata(automata_url).unwrap();
+    pub fn new(role: String, automata_url: &str) -> Result<Self> {
+        let dict_hash = load_automata(automata_url)?;
 
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
@@ -102,10 +123,9 @@ impl RoleGraph {
         let ac = AhoCorasick::builder()
             .match_kind(MatchKind::LeftmostLongest)
             .ascii_case_insensitive(true)
-            .build(keys)
-            .unwrap();
+            .build(keys)?;
 
-        Self {
+        Ok(Self {
             role,
             nodes: AHashMap::new(),
             edges: AHashMap::new(),
@@ -114,7 +134,7 @@ impl RoleGraph {
             dict_hash: dict_hash,
             ac_values: values,
             ac: ac,
-        }
+        })
     }
     //  Query the graph using a query string, returns a list of document ids ranked and weighted by weighted mean average of node rank, edge rank and document rank
 
@@ -151,22 +171,22 @@ impl RoleGraph {
     }
 
 
-    pub fn query(&self, query_string: &str)->Vec<(&String, IndexedDocument)> {
+    pub fn query(&self, query_string: &str) -> Result<Vec<(&String, IndexedDocument)>> {
         warn!("performing query");
-        // FIXME: handle case when no matches found with empty non empty vector - otherwise all ranks will blow up
-        let nodes = find_matches_ids(&self.ac, &self.ac_values, query_string).unwrap();
+        let nodes = find_matches_ids(&self.ac, &self.ac_values, query_string);
+
         //  turn into hashset by implementing hash and eq traits
         
         let mut results_map= AHashMap::new();
         for node_id in nodes.iter() {
             // warn!("Matched node {:?}", node_id);
-            // TODO: FIX crash on empty storage
-            let node = self.nodes.get(node_id).unwrap();
+            let node = self.nodes.get(node_id).ok_or(TerraphimPipelineError::NodeIdNotFound)?;
+
             let node_rank=node.rank;
             // warn!("Node Rank {}", node_rank);
             // warn!("Node connected to Edges {:?}", node.connected_with);
             for each_edge_key in node.connected_with.iter() {
-                let each_edge = self.edges.get(each_edge_key).unwrap();
+                let each_edge = self.edges.get(each_edge_key).ok_or(TerraphimPipelineError::EdgeIdNotFound)?;
                 warn!("Edge Details{:?}", each_edge);
                 let edge_rank=each_edge.rank;
                 for (document_id, rank) in each_edge.doc_hash.iter() {
@@ -196,11 +216,11 @@ impl RoleGraph {
         // warn!("Results Map {:#?}", results_map);
         let mut  hash_vec = results_map.into_iter().collect::<Vec<_>>();
         hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
-        hash_vec
+        Ok(hash_vec)
   
     }
     pub fn parse_document_to_pair(&mut self, document_id: String,text:&str){
-        let matches = find_matches_ids(&self.ac, &self.ac_values, text).unwrap();
+        let matches = find_matches_ids(&self.ac, &self.ac_values, text);
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id.clone(), a, b);
         }
@@ -208,7 +228,7 @@ impl RoleGraph {
     }
     pub fn parse_document<T: Into<Document>>(&mut self, document_id: String, input: T){
         let document: Document = input.into();
-        let matches = find_matches_ids(&self.ac, &self.ac_values, &document.to_string()).unwrap();
+        let matches = find_matches_ids(&self.ac, &self.ac_values, &document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id.clone(), a, b);
         }
@@ -401,19 +421,19 @@ mod tests {
         let mut rolegraph = RoleGraph::new(role, automata_url);
         let article_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches = find_matches_ids(query, &dict_hash).unwrap();
+        let matches = find_matches_ids(query, &dict_hash);
         for (a, b) in matches.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(article_id.clone(), a, b);
         }
         let article_id2= Ulid::new().to_string();
         let query2 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches2 = find_matches_ids(query2, &dict_hash).unwrap();
+        let matches2 = find_matches_ids(query2, &dict_hash);
         for (a, b) in matches2.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(article_id2.clone(), a, b);
         }
         let article_id3= Ulid::new().to_string();
         let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches3 = find_matches_ids(query3, &dict_hash).unwrap();
+        let matches3 = find_matches_ids(query3, &dict_hash);
         for (a, b) in matches3.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(article_id3.clone(), a, b);
         }

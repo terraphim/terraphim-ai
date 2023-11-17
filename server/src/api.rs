@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 use poem_openapi::{
     types::ToJSON, Object, NewType, types::Type,
 };
+use anyhow::{Context, Result};
 
 // This would be the correct approach, however
 // IndexDocument is not `Type` and so we can't implement `NewType` for `ApiIndexedDocument`
@@ -91,15 +92,33 @@ impl Api {
         search_query: Json<SearchQuery>,
     ) -> QueryResponse {
         let rolegraph = self.rolegraph.lock().await;
-        let documents: Vec<(&String, IndexedDocument)>  = rolegraph.query(&search_query.search_term);
+        let documents: Vec<(&String, IndexedDocument)>  = match rolegraph.query(&search_query.search_term) {
+            Ok(docs) => docs,
+            Err(e) => {
+                log::error!("Error: {}", e);
+                return QueryResponse::NotFound;
+            }
+        };
 
         match documents.len() {
             0 => QueryResponse::NotFound,
             _ => {
-                let docs: Result<Vec<String>, _> = documents.into_iter().map(|(_id, doc) | doc.to_json_string()).collect();
+                let docs: Vec<String> = match documents.into_iter().map(|(_id, doc) | doc.to_json_string()).collect() {
+                    Ok(docs) => docs,
+                    Err(e) => {
+                        log::error!("Error converting an individual document into JSON: {}", e);
+                        return QueryResponse::NotFound;
+                    }
+                };
                 // let docs: Vec<String> = documents.into_iter().map(|(_id, doc) | doc.to_string()).collect();
                 // let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc) | doc).collect();
-                let json: String = serde_json::to_string(&docs.unwrap()).unwrap();
+                let json: String = match serde_json::to_string(&docs) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        log::error!("Error converting vector of documents to JSON: {}", e);
+                        return QueryResponse::NotFound;
+                    }
+                };
                 QueryResponse::Ok(PlainText(json))
             }
         }
