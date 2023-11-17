@@ -1,9 +1,9 @@
 use itertools::Itertools;
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches, find_matches_ids, replace_matches, Dictionary};
+use terraphim_pipeline::input::TEST_CORPUS;
 use terraphim_pipeline::split_paragraphs;
 use terraphim_pipeline::{magic_pair, magic_unpair, RoleGraph};
-use terraphim_pipeline::input::TEST_CORPUS;
 use ulid::Ulid;
 
 fn main() {
@@ -36,7 +36,7 @@ fn main() {
     // let article_id2= Ulid::new().to_string();
     // let query2 = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     // let matches4 = find_matches_ids(query2, &dict_hash).unwrap();
-    
+
     // for (a, b) in matches4.into_iter().tuple_windows() {
     //     println!("a {} b {}", a, b);
     //     rolegraph.add_or_update_document(article_id2.clone(), a, b);
@@ -46,7 +46,7 @@ fn main() {
     // let article_id3= Ulid::new().to_string();
     // let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     // let matches5 = find_matches_ids(query3, &dict_hash).unwrap();
-    
+
     // for (a, b) in matches5.into_iter().tuple_windows() {
     //     println!("a {} b {}", a, b);
     //     rolegraph.add_or_update_document(article_id3.clone(), a, b);
@@ -76,8 +76,7 @@ fn main() {
     //     println!("Corpus id: {}", corpus_id);
     //     rolegraph.parse_document_to_pair(corpus_id.clone(),each_corpus);
     //     println!("Corpus id: {} added to Role", corpus_id);
-        
+
     // }
     // println!("Role graph {:?}", rolegraph);
-
 }
