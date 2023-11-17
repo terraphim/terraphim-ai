@@ -1,4 +1,3 @@
-use std::vec;
 
 pub const TEST1: &'static str =include_str!("../data/system_operator_cc/test1.md");
 pub const TEST12: &'static str =include_str!("../data/system_operator_cc/test12.md");

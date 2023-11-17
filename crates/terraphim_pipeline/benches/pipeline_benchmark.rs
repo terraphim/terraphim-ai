@@ -21,7 +21,6 @@ use terraphim_pipeline::{magic_pair, magic_unpair, RoleGraph};
 use ulid::Ulid;
 use lazy_static::lazy_static;
 use ahash::{AHashMap, HashMap};
-// use once_cell::sync::Lazy;
 
 lazy_static! {
     static ref AUTOMATA: AHashMap<String, Dictionary> = {

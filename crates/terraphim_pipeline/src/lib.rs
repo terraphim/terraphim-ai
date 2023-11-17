@@ -3,26 +3,66 @@ use memoize::memoize;
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;
+use std::fmt::format;
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
+use log::{warn};
+use serde::{Deserialize, Serialize};
 
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::{find_matches_ids, Dictionary};
 use unicode_segmentation::UnicodeSegmentation;
-use log::{ warn};
 // use tracing::{debug, error, info, span, warn, Level};
 
-
-// Reference to external storage of documents, traditional indexes use document, aka article or entity.
+/// Document that can be indexed by the `RoleGraph`.
+/// 
+/// These are all articles and entities, which have fields that can be indexed.
 #[derive(Debug, Clone)]
 pub struct Document {
-    id: String,
-    // matched to edges
-    matched_to: Vec<Edge>,
-    rank: u64,
-    //normalized rank
-    normalized_rank: f32,
+    /// Unique identifier of the document
+    pub id: String,
+    /// Title of the document
+    pub title: String,
+    /// Body of the document
+    pub body: Option<String>,
+    /// Description of the document
+    pub description: Option<String>,
 }
+
+impl ToString for Document {
+    fn to_string(&self) -> String {
+        let mut text = String::new();
+        text.push_str(&self.title);
+        if let Some(body) = &self.body {
+            text.push_str(body);
+        }
+        if let Some(description) = &self.description {
+            text.push_str(description);
+        }
+        text
+    }
+}
+
+
+/// Reference to external storage of documents, traditional indexes use
+/// document, aka article or entity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IndexedDocument {
+    /// UUID of the indexed document
+    id: String,
+    /// Matched to edges
+    matched_to: Vec<Edge>,
+    /// Graph rank (the sum of node rank, edge rank)
+    rank: u64,
+}
+
+impl IndexedDocument {
+    pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self)
+    }
+}
+
+
 
 
 //TODO: create top_k_nodes function where
@@ -39,7 +79,7 @@ pub struct RoleGraph {
     role: String,
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
-    documents: AHashMap<String, Document>,
+    documents: AHashMap<String, IndexedDocument>,
     automata_url: String,
     dict_hash: AHashMap<String, Dictionary>,
     //TODO: make it private once performance tests are fixed
@@ -111,15 +151,16 @@ impl RoleGraph {
     }
 
 
-    pub fn query(&self, query_string: &str)->Vec<(&String, Document)> {
+    pub fn query(&self, query_string: &str)->Vec<(&String, IndexedDocument)> {
         warn!("performing query");
         // FIXME: handle case when no matches found with empty non empty vector - otherwise all ranks will blow up
         let nodes = find_matches_ids(&self.ac, &self.ac_values, query_string).unwrap();
-        
+        //  turn into hashset by implementing hash and eq traits
         
         let mut results_map= AHashMap::new();
         for node_id in nodes.iter() {
             // warn!("Matched node {:?}", node_id);
+            // TODO: FIX crash on empty storage
             let node = self.nodes.get(node_id).unwrap();
             let node_rank=node.rank;
             // warn!("Node Rank {}", node_rank);
@@ -132,11 +173,10 @@ impl RoleGraph {
                     let total_rank= node_rank + edge_rank + rank;
                     match results_map.entry(document_id){
                         Entry::Vacant(_) => {
-                            let document= Document{
+                            let document= IndexedDocument{
                                 id: document_id.to_string(),
                                 matched_to: vec![each_edge.clone()],
                                 rank: total_rank,
-                                normalized_rank: 0.0,
                             };
                             
                             results_map.insert(document_id, document);
@@ -153,10 +193,10 @@ impl RoleGraph {
             }
 
         }
-            // warn!("Results Map {:#?}", results_map);
-            let mut  hash_vec = results_map.into_iter().collect::<Vec<_>>();
-            hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
-            hash_vec
+        // warn!("Results Map {:#?}", results_map);
+        let mut  hash_vec = results_map.into_iter().collect::<Vec<_>>();
+        hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+        hash_vec
   
     }
     pub fn parse_document_to_pair(&mut self, document_id: String,text:&str){
@@ -165,6 +205,13 @@ impl RoleGraph {
             self.add_or_update_document(document_id.clone(), a, b);
         }
 
+    }
+    pub fn parse_document<T: Into<Document>>(&mut self, document_id: String, input: T){
+        let document: Document = input.into();
+        let matches = find_matches_ids(&self.ac, &self.ac_values, &document.to_string()).unwrap();
+        for (a, b) in matches.into_iter().tuple_windows() {
+            self.add_or_update_document(document_id.clone(), a, b);
+        }
     }
     pub fn add_or_update_document(&mut self, document_id: String, x: u64, y: u64) {
         let edge = magic_pair(x, y);
@@ -203,7 +250,7 @@ impl RoleGraph {
         edge
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     // id of the node
     id: u64,
