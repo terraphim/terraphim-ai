@@ -100,6 +100,28 @@ mod tests {
             extra: HashMap::new(),
         };
         config.roles.insert("Default".to_string(), role);
+        let kg_engineer = KnowledgeGraph {
+            automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
+                .to_string(),
+            kg_type: KnowledgeGraphType::Markdown,
+            kg_path: "~/pkm".to_string(),
+            public: true,
+            publish: true,
+        };
+        let eng_haystack = Haystack {
+            haystack: "localsearch".to_string(),
+            service: "ripgrep".to_string(),
+        };
+        let engineer= Role {
+            shortname: Some("Engineer".to_string()),
+            name: "Engineer".to_string(),
+            relevance_function: RelevanceFunction::TerraphimGraph,
+            theme:"spacelab".to_string(),
+            server_url: "https://localhost:8080".to_string(),
+            kg: kg_engineer,
+            haystacks: vec![eng_haystack],
+            extra: HashMap::new(),
+        };
         let json_str = serde_json::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.json").unwrap();
