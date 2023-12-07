@@ -1,0 +1,46 @@
+global_shortcut = "Ctrl+X"
+
+[role.Engineer]
+name = "Engineer"
+relevance_function = "rust"
+theme = "spacelab"
+
+[[role.Engineer.plugins]]
+name = "terraphim-grep"
+hackstack = "~/obsidian"
+
+[[role.Engineer.plugins]]
+name = "terraphim-grep"
+hackstack = "~/obsidian/World"
+
+[role.Architect]
+name = "Architect"
+relevance_function = "rust"
+theme = "lumen"
+
+[[role.Architect.plugins]]
+name = "terraphim-grep"
+hackstack = "~/obsidian/World"
+
+[[role.Architect.plugins]]
+name = "terraphim-grep"
+hackstack = "~/obsidian/World"
+
+[role.Father]
+name = "Father"
+relevance_function = "rust"
+theme = "solar"
+
+[[role.Father.plugins]]
+name = "terraphim-grep"
+hackstack = "~/obsidian/World"
+
+[role.Gamer]
+name = "Gamer"
+relevance_function = "rust"
+theme = "darkly"
+
+[[role.Gamer.plugins]]
+name = "terraphim-grep"
+hackstack = "~/obsidian/World"
+

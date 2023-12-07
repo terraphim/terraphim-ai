@@ -1,0 +1,106 @@
+{
+  "package": {
+    "productName": "terraphim-search-core",
+    "version": "0.1.0"
+  },
+  "build": {
+    "distDir": "../dist",
+    "devPath": "http://localhost:5173",
+    "beforeDevCommand": "yarn dev",
+    "beforeBuildCommand": "yarn build"
+  },
+  "tauri": {
+    "cli": {
+      "description": "Tauri API example",
+      "args": [
+        {
+          "short": "c",
+          "name": "config",
+          "takesValue": true,
+          "description": "Config path"
+        },
+        {
+          "short": "t",
+          "name": "theme",
+          "takesValue": true,
+          "description": "App theme",
+          "possibleValues": ["light", "dark", "system"]
+        },
+        {
+          "short": "v",
+          "name": "verbose",
+          "multipleOccurrences": true,
+          "description": "Verbosity level"
+        }
+      ],
+      "subcommands": {
+        "update": {
+          "description": "Updates the app",
+          "args": [
+            {
+              "short": "b",
+              "name": "background",
+              "description": "Update in background"
+            }
+          ]
+        }
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.tauri.dev",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": [],
+      "externalBin": [],
+      "copyright": "",
+      "category": "DeveloperTool",
+      "shortDescription": "",
+      "longDescription": "",
+      "deb": {
+        "depends": []
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "",
+        "exceptionDomain": "",
+        "signingIdentity": null,
+        "providerShortName": null,
+        "entitlements": null
+      },
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "updater": {
+      "active": false
+    },
+    "allowlist": {
+      "all": true
+    },
+    "windows": [
+      {
+        "title": "Terraphim Search",
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "systemTray": {
+      "iconPath": "icons/icon_white.png",
+      "iconAsTemplate": true
+    }
+  }
+}

@@ -1,0 +1,69 @@
+////////////////////////////////////////////////
+// FLATLY
+////////////////////////////////////////////////
+$grey: #8c9b9d;
+$grey-light: #a9afb7;
+$grey-lighter: #dee2e5;
+$orange: #e67e22;
+$yellow: #f1b70e;
+$green: #2ecc71;
+$turquoise: #1abc9c;
+$blue: #3498db;
+$purple: #8e44ad;
+$red: #e74c3c;
+$white-ter: #ecf0f1;
+$primary: #34495e !default;
+$yellow-invert: #fff;
+
+$family-sans-serif: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI",
+  "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+$family-monospace: "Inconsolata", "Consolas", "Monaco", monospace;
+
+$radius-small: 3px;
+$radius: 0.4em;
+$radius-large: 8px;
+
+$size-7: 0.85em;
+$title-weight: 500;
+$subtitle-weight: 400;
+$subtitle-color: darken($grey, 20);
+
+$border-width: 2px;
+
+$body-size: 15px;
+$footer-background-color: $white-ter;
+
+$text: $primary;
+$text-light: lighten($primary, 10);
+$text-strong: darken($primary, 5);
+
+$box-color: $text;
+$box-background-color: $white-ter;
+$box-shadow: none;
+
+$link: $turquoise;
+$link-hover: darken($link, 10);
+$link-focus: darken($link, 10);
+$link-active: darken($link, 10);
+
+$button-color: $primary;
+$button-hover-color: darken($primary, 5); // primary-dark
+$button-focus: darken($primary, 5); // primary-dark
+$button-active-color: darken($primary, 5); // primary-dark
+
+$navbar-height: 4rem;
+$navbar-background-color: $primary;
+$navbar-item-color: $white-ter;
+$navbar-item-hover-color: $link;
+$navbar-item-hover-background-color: transparent;
+$navbar-item-active-color: $link;
+$navbar-dropdown-arrow: #fff;
+$navbar-dropdown-background-color: $white-ter;
+$navbar-divider-background-color: $grey-lighter;
+$navbar-dropdown-border-top: 1px solid $navbar-divider-background-color;
+$navbar-dropdown-item-hover-color: $link;
+$navbar-dropdown-item-hover-background-color: transparent;
+$navbar-dropdown-item-active-background-color: transparent;
+$navbar-dropdown-item-active-color: $link;
+
+$bulmaswatch-import-font: true !default;

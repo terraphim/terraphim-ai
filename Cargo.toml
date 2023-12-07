@@ -12,6 +12,7 @@ members = [
     "crates/persistance",
     "server",
     "server-axum",
+    "desktop/src-tauri",
 ]
 
 [dependencies]
