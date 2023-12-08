@@ -10,9 +10,10 @@ members = [
     "crates/terraphim_pipeline",
     "crates/config",
     "crates/persistance",
-    "server",
+    # "server",
     "server-axum",
     "desktop/src-tauri",
+    "crates/terraphim-grep"
 ]
 
 [dependencies]

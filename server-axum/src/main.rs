@@ -50,18 +50,18 @@ pub(crate) struct RoleGraphState {
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(hello_axum, create_article, search_articles), components(schemas(types::Article)))]
+#[openapi(paths(health_axum, create_article, search_articles), components(schemas(types::Article)))]
 pub struct ApiDoc;
 
 #[utoipa::path(
     get,
-    path = "/",
+    path = "/health",
     responses(
-        (status = 200, description = "Send a salute from Axum")
+        (status = 200, description = "Health Check")
     )
 )]
-pub async fn hello_axum() -> impl IntoResponse {
-    (StatusCode::OK, "Hello, Axum")
+pub async fn health_axum() -> impl IntoResponse {
+    (StatusCode::OK, "OK")
 }
 
 #[utoipa::path(
@@ -145,7 +145,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let rolegraph = Arc::new(rolegraph);
 
     let app = Router::new()
-        .route("/", get(hello_axum))
+        .route("/", get(health_axum))
         .route("/articles", get(list_articles))
         .route("/article", post(create_article))
         .route("/articles/search", get(search_articles))
