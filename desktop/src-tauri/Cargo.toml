@@ -23,7 +23,7 @@ directories = "4.0.1"
 config =  {git = "https://github.com/mehcode/config-rs.git" }
 serde_derive = "^1.0.137"
 lazy_static = "1.4"
-terraphim-grep =  {path="../../terraphim-grep" }
+terraphim-grep =  {path="../../crates/terraphim-grep" }
 
 [features]
 # by default Tauri runs in production mode

@@ -1,4 +1,4 @@
-global_shortcut = "Ctrl+X"
+global_shortcut = "Ctrl+/"
 
 [roles.Default]
 shortname = "Default"
