@@ -132,6 +132,17 @@ async fn search_articles(State(rolegraph): State<Arc<Mutex<RoleGraph>>>,search_q
     Json(docs)
 }
 
+/// Search articles by query params, subscribe to results via websocket.
+/// 
+async fn ws_handle(
+    Query(search_query): Query<types::SearchQuery>,
+    ws: WebSocketUpgrade,
+) -> Response {
+    // do something with `params`
+
+    ws.on_upgrade(handle_socket)
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
