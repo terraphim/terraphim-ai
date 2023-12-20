@@ -4,16 +4,26 @@ pub use matcher::{find_matches, replace_matches, Dictionary, Matched};
 use reqwest::blocking::get;
 // use std::collections::HashMap;
 use ahash::AHashMap;
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use tempfile::tempfile;
+use thiserror::Error;
 pub type ResponseJSON = AHashMap<String, Dictionary>;
 
-pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>, Box<dyn Error>> {
-    let mut dict_hash: AHashMap<String, Dictionary> = AHashMap::new();
-    fn read_url(url: &str) -> Result<String, Box<dyn Error>> {
+#[derive(Error, Debug)]
+pub enum TerraphimAutomataError {
+    #[error("Reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("Serde deserialization error: {0}")]
+    Serde(#[from] serde_json::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
+
+pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>> {
+    fn read_url(url: &str) -> Result<String> {
         let response = get(url)?;
         println!("Response {:?}", response);
         let resp = response.text()?;
@@ -28,19 +38,7 @@ pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>, 
         contents
     };
 
-    // let res = std::fs::read_to_string(file).unwrap();
-    let deserializer = &mut serde_json::Deserializer::from_str(&contents);
-    let result: Result<ResponseJSON, _> = serde_path_to_error::deserialize(deserializer);
-    match result {
-        Ok(_) => {
-            println!("Sucessfully parsed JSON");
-            dict_hash = result.unwrap();
-        }
-        Err(err) => {
-            panic!("{}", err);
-        }
-    }
-
+    let dict_hash = serde_json::from_str(&contents)?;
     Ok(dict_hash)
 }
 

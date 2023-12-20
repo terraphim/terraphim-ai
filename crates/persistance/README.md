@@ -1,5 +1,5 @@
-The goal of persistance crate is to crate a layer of abstraction for persistance layer using OpenDAL. 
-the idea is that writes will go everywhere in async mode, but all reads will be from fastest operator.
+The goal of persistance crate is to crate a layer of abstraction using OpenDAL. 
+The idea is that writes will go everywhere in async mode, but all reads will be from fastest operator.
 see ./examples/simple_struct.rs 
 
 save_to_one will save to single profile 

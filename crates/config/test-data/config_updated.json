@@ -1,0 +1,85 @@
+{
+  "global_shortcut": "Ctrl+X",
+  "roles": {
+    "System Operator": {
+      "shortname": "operator",
+      "name": "System Operator",
+      "relevance_function": "terraphim-graph",
+      "theme": "superhero",
+      "serverUrl": "https://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    },
+    "Father": {
+      "shortname": "farther",
+      "name": "Farther",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "serverUrl": "https://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "serverUrl": "https://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "terraphim-graph",
+      "theme": "spacelab",
+      "serverUrl": "https://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    }
+  }
+}

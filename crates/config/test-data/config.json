@@ -5,10 +5,50 @@
       "shortname": "Default",
       "name": "Default",
       "relevance_function": "terraphim-graph",
-      "theme": "Default",
+      "theme": "spacelab",
       "serverUrl": "https://localhost:8080",
       "kg": {
-        "automata_url": "https://localhost/kg_url",
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    },
+    "System Operator": {
+      "shortname": "operator",
+      "name": "System Operator",
+      "relevance_function": "terraphim-graph",
+      "theme": "superhero",
+      "serverUrl": "https://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "serverUrl": "https://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
         "kg_path": "~/pkm",
         "public": true,

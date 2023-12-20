@@ -9,12 +9,17 @@ members = [
     "crates/terraphim_automata",
     "crates/terraphim_pipeline",
     "crates/config",
+    "crates/settings",
     "crates/persistance",
+    "server-axum",
+    "desktop/src-tauri",
+    "crates/terraphim-grep"
 ]
 
 [dependencies]
 
 itertools = "0.11.0"
+
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]

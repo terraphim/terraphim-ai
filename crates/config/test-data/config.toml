@@ -4,16 +4,52 @@ global_shortcut = "Ctrl+X"
 shortname = "Default"
 name = "Default"
 relevance_function = "terraphim-graph"
-theme = "Default"
+theme = "spacelab"
 serverUrl = "https://localhost:8080"
 
 [roles.Default.kg]
-automata_url = "https://localhost/kg_url"
+automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
 kg_type = "markdown"
 kg_path = "~/pkm"
 public = true
 publish = true
 
 [[roles.Default.haystacks]]
+haystack = "localsearch"
+service = "ripgrep"
+
+[roles."System Operator"]
+shortname = "operator"
+name = "System Operator"
+relevance_function = "terraphim-graph"
+theme = "superhero"
+serverUrl = "https://localhost:8080"
+
+[roles."System Operator".kg]
+automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
+kg_type = "markdown"
+kg_path = "~/pkm"
+public = true
+publish = true
+
+[[roles."System Operator".haystacks]]
+haystack = "localsearch"
+service = "ripgrep"
+
+[roles.Engineer]
+shortname = "Engineer"
+name = "Engineer"
+relevance_function = "terraphim-graph"
+theme = "lumen"
+serverUrl = "https://localhost:8080"
+
+[roles.Engineer.kg]
+automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
+kg_type = "markdown"
+kg_path = "~/pkm"
+public = true
+publish = true
+
+[[roles.Engineer.haystacks]]
 haystack = "localsearch"
 service = "ripgrep"
