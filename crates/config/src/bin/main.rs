@@ -19,15 +19,15 @@ async fn main() -> Result<()> {
     
     println!("saved obj: {:?} to all", config);
     let (ops, fastest_op) = config.load_config().await?;
-    println!("fastest_op: {:#?}", fastest_op);
+    println!("fastest_op: {:?}", fastest_op.info());
 
     let mut obj1 = TerraphimConfig::new();
     let key = config.get_key();
-    println!("key: {}", key);
+    // println!("key: {}", key);
     obj1 = obj1.load(&key).await?;
     println!("loaded obj: {:?}", obj1);
+    assert_eq!(obj1.get_key(), config.get_key());
 
-    // println!("{:?}", loaded_obj);
 
     Ok(())
 }
