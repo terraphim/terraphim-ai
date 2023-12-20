@@ -1,9 +1,8 @@
-
 use opendal::Result;
 use serde::{Deserialize, Serialize};
 
-use persistance::Persistable;
 use async_trait::async_trait;
+use persistance::Persistable;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct MyStruct {
@@ -18,36 +17,33 @@ impl Persistable for MyStruct {
             age: 0,
         }
     }
-    
-    async fn save_to_one(&self,profile_name:String) -> Result<()> {
 
+    async fn save_to_one(&self, profile_name: String) -> Result<()> {
         self.save_to_profile(profile_name.clone()).await?;
         Ok(())
     }
     // saves to all profiles
     async fn save(&self) -> Result<()> {
         let _op = &self.load_config().await?.1;
-        let _= self.save_to_all().await?;
+        let _ = self.save_to_all().await?;
         Ok(())
     }
-    async fn load(&mut self, key:&str) -> Result<Self> {
+    async fn load(&mut self, key: &str) -> Result<Self> {
         let op = &self.load_config().await?.1;
-        
+
         let obj = self.load_from_operator(key, &op).await?;
         Ok(obj)
     }
-    
+
     fn get_key(&self) -> String {
         self.name.clone()
     }
 }
 
-
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();
 
+    let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();
 
     let obj = MyStruct {
         name: "No vampire".to_string(),
@@ -57,16 +53,14 @@ async fn main() -> Result<()> {
     obj.save_to_one(profile_name).await?;
     obj.save().await?;
     println!("saved obj: {:?} to all", obj);
-    let (ops, fastest_op)=obj.load_config().await?;
+    let (ops, fastest_op) = obj.load_config().await?;
     println!("fastest_op: {:#?}", fastest_op);
 
     let mut obj1 = MyStruct::new();
     let key = obj.get_key();
     println!("key: {}", key);
-    obj1=obj1.load(&key).await?;
+    obj1 = obj1.load(&key).await?;
     println!("loaded obj: {:?}", obj1);
-    
-    // println!("{:?}", loaded_obj);
-    
+
     Ok(())
 }

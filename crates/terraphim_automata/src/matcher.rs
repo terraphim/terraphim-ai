@@ -49,26 +49,6 @@ pub fn find_matches(
     Ok(matches)
 }
 
-pub fn find_matches_ids(
-    text: &str,
-    dict_hash: &AHashMap<String, Dictionary>,
-) -> Result<Vec<u64>, Box<dyn Error>> {
-    let patterns: Vec<String> = dict_hash.keys().cloned().collect();
-
-    let ac = AhoCorasick::builder()
-        .match_kind(MatchKind::LeftmostLongest)
-        .ascii_case_insensitive(true)
-        .build(&patterns)
-        .unwrap();
-
-    let mut matches = Vec::new();
-    for mat in ac.find_iter(text) {
-        let term = &patterns[mat.pattern()];
-        matches.push(dict_hash.get(term).unwrap().id.clone());
-    }
-    Ok(matches)
-}
-
 // This function replacing instead of matching patterns
 pub fn replace_matches(
     text: &str,
