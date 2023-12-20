@@ -42,7 +42,6 @@ impl Persistable for MyStruct {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();
 
     let obj = MyStruct {
@@ -61,6 +60,8 @@ async fn main() -> Result<()> {
     println!("key: {}", key);
     obj1 = obj1.load(&key).await?;
     println!("loaded obj: {:?}", obj1);
+
+    // println!("{:?}", loaded_obj);
 
     Ok(())
 }

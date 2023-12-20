@@ -1,33 +1,28 @@
-pub mod config;
+pub mod settings;
 use anyhow::anyhow;
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
-use config::Config;
 use dirs::config_dir;
 use opendal::Scheme;
 use opendal::{Operator, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
+use terraphim_settings::Settings;
+static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
-static STATE: AsyncOnceCell<State> = AsyncOnceCell::new();
-
-pub struct State {
-    // TODO: turn into BTreemap
+pub struct DeviceStorage {
     pub ops: HashMap<String, (Operator, u128)>,
     pub fastest_op: Operator,
 }
 
-impl State {
-    pub async fn instance() -> &'static State {
-        STATE
+impl DeviceStorage {
+    pub async fn instance() -> &'static DeviceStorage {
+        DEVICE_STORAGE
             .get_or_init(async {
-                let d = config_dir()
-                    .ok_or_else(|| anyhow!("unknown config dir"))
-                    .unwrap();
-                let default_config_path = d.join("terraphim/config.toml");
-                let cfg = Config::load(default_config_path.as_path()).unwrap();
-                println!("cfg: {:?}", cfg);
-                let ops = cfg.parse_profiles().await.unwrap();
+
+                let device_settings = Settings::load_from_env_and_file(None);
+                println!("cfg: {:?}", device_settings);
+                let ops = settings::parse_profiles(&device_settings).await.unwrap();
                 let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
                 ops_vec.sort_by_key(|&(_, (_, speed))| speed);
                 let ops: HashMap<String, (Operator, u128)> = ops_vec
@@ -41,7 +36,7 @@ impl State {
                     .unwrap()
                     .0
                     .clone();
-                State { ops, fastest_op }
+                DeviceStorage { ops, fastest_op }
             })
             .await
     }
@@ -56,7 +51,7 @@ pub trait Persistable: Serialize + serde::de::DeserializeOwned {
     where
         Self: Sized;
     async fn load_config(&self) -> Result<(HashMap<String, (Operator, u128)>, Operator)> {
-        let state = State::instance().await;
+        let state = DeviceStorage::instance().await;
         Ok((state.ops.clone(), state.fastest_op.clone()))
     }
     async fn save_to_all(&self) -> Result<()> {
