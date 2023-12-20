@@ -1,0 +1,4 @@
+redis_url = "redis://127.0.0.1:6379"
+server_url = "127.0.0.1:3000"
+redis_cluster_url="redis://127.0.0.1:30001"
+api_endpoint="http://localhost:3000/api"

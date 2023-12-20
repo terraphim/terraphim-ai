@@ -21,7 +21,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,debug_handler
+    Json, Router
 };
 use ulid::Ulid;
 use std::sync::Arc;
