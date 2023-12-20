@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 
+use opendal::Result as OpendalResult;
+use async_trait::async_trait;
+use persistance::Persistable;
+
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub enum RelevanceFunction {
@@ -25,6 +29,7 @@ enum KnowledgeGraphType {
 pub struct TerraphimConfig {
     pub global_shortcut: String,
     pub roles: HashMap<String, Role>,
+    id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
@@ -56,9 +61,11 @@ pub struct KnowledgeGraph {
     public: bool,
     publish: bool,
 }
+use ulid::Ulid;
 
 impl TerraphimConfig {
-    pub fn init() -> Self {
+    pub fn new() -> Self {
+        let id = Ulid::new().to_string();
         let mut roles=HashMap::new();
             let haystack = Haystack {
             haystack: "localsearch".to_string(),
@@ -132,6 +139,7 @@ impl TerraphimConfig {
 
 
         Self {
+            id,
             /// global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles,
@@ -144,32 +152,102 @@ impl TerraphimConfig {
 }
 
 
+
+#[async_trait]
+impl Persistable for TerraphimConfig {
+    fn new() -> Self {
+        TerraphimConfig::new()
+    }
+
+    async fn save_to_one(&self, profile_name: String) -> OpendalResult<()> {
+        self.save_to_profile(profile_name.clone()).await?;
+        Ok(())
+    }
+    // saves to all profiles
+    async fn save(&self) -> OpendalResult<()> {
+        let _op = &self.load_config().await.unwrap().1;
+        let _ = self.save_to_all().await.unwrap();
+        Ok(())
+    }
+    async fn load(&mut self, key: &str) -> OpendalResult<Self> {
+        let op = &self.load_config().await.unwrap().1;
+
+        let obj = self.load_from_operator(key, &op).await.unwrap();
+        Ok(obj)
+    }
+
+    /// retutrns ulid as key + .json
+    fn get_key(&self) -> String {
+        
+        self.id.clone() + ".json"
+        
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-
-
+    use tokio::test;
+    
     #[test]
-    fn test_write_config_to_json() {
-        let config = TerraphimConfig::init();
+    async fn test_write_config_to_json() {
+        let config = TerraphimConfig::new();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.json").unwrap();
         file.write_all(json_str.as_bytes()).unwrap();
     }
+
     #[test]
-    fn test_write_config_to_toml() {
-        let config = TerraphimConfig::init();
+    async fn test_get_key() {
+        let config = TerraphimConfig::new();
+        let json_str = serde_json::to_string_pretty(&config).unwrap();
+        println!("json_str: {}", json_str);
+        println!("key: {}", config.get_key());
+    }
+    #[tokio::test]
+    async fn test_save_all() {
+        let config = TerraphimConfig::new();
+        let json_str = serde_json::to_string_pretty(&config).unwrap();
+        println!("json_str: {}", json_str);
+        println!("key: {}", config.get_key());
+        let _ = config.save().await.unwrap();
+    }
+    #[tokio::test]
+    async fn test_save_one_s3() {
+        let config = TerraphimConfig::new();
+        let json_str = serde_json::to_string_pretty(&config).unwrap();
+        println!("json_str: {}", json_str);
+        println!("key: {}", config.get_key());
+        let profile_name = "s3".to_string();
+        config.save_to_one(profile_name).await.unwrap();
+        assert!(true);
+    }
+    #[tokio::test]
+    async fn test_save_one_sled() {
+        let config = TerraphimConfig::new();
+        let json_str = serde_json::to_string_pretty(&config).unwrap();
+        println!("json_str: {}", json_str);
+        println!("key: {}", config.get_key());
+        let profile_name = "sled".to_string();
+        config.save_to_one(profile_name).await.unwrap();
+        assert!(true);
+    }
+
+    #[test]
+    async fn test_write_config_to_toml() {
+        let config = TerraphimConfig::new();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.toml").unwrap();
         file.write_all(toml_str.as_bytes()).unwrap();
     }
     #[test]
-    fn test_init_global_config_to_toml() {
-        let mut config = TerraphimConfig::init();
+    async fn test_init_global_config_to_toml() {
+        let mut config = TerraphimConfig::new();
         config.global_shortcut="Ctrl+/".to_string();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
@@ -177,11 +255,11 @@ mod tests {
         file.write_all(toml_str.as_bytes()).unwrap();
     }
     #[test]
-    fn test_update_global() {
-        let mut config = TerraphimConfig::init();
+    async fn test_update_global() {
+        let mut config = TerraphimConfig::new();
         config.global_shortcut = "Ctrl+/".to_string();
 
-        let mut new_config = TerraphimConfig::init();
+        let mut new_config = TerraphimConfig::new();
         new_config.global_shortcut = "Ctrl+.".to_string();
 
         config.update(new_config);
@@ -189,9 +267,9 @@ mod tests {
         assert_eq!(config.global_shortcut, "Ctrl+.");
     }
     #[test]
-    fn test_update_roles(){
-        let mut config=TerraphimConfig::init();
-        let mut new_config=TerraphimConfig::init();
+    async fn test_update_roles(){
+        let mut config=TerraphimConfig::new();
+        let mut new_config=TerraphimConfig::new();
         let new_role= Role {
             shortname: Some("farther".to_string()),
             name: "Farther".to_string(),
