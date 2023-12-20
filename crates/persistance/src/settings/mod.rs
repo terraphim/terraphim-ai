@@ -74,11 +74,11 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
 
 
 pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalResult<(Operator, u128)> {
-    async fn get_speed(op: Operator) -> std::result::Result<u128, opendal::Error> {
+    async fn get_speed(op: Operator) -> OpendalResult<u128> {
         let start_time = Instant::now();
         // let mut buf = vec![0u8; 1024*1024];
         let buf = "test data";
-        op.write("test", buf).await?;
+        op.write("test", buf).await.unwrap();
         let end_time = Instant::now();
         let save_time = end_time.duration_since(start_time).as_millis();
         let start_time = Instant::now();
