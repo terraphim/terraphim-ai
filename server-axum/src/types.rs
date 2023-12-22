@@ -3,14 +3,13 @@ use ulid::Ulid;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToSchema, IntoParams};
 
-
-
-
-#[derive(Debug, Deserialize, IntoParams)]
+/// Query type for searching documents in the `RoleGraph`.
+/// It contains the search term, skip and limit parameters.
+#[derive(Debug, Serialize, Deserialize, IntoParams, ToSchema)]
 pub struct SearchQuery {
     pub(crate) search_term: String,
-    pub(crate) skip: usize,
-    pub(crate) limit: usize,
+    pub(crate) skip: Option<usize>,
+    pub(crate) limit: Option<usize>,
     pub (crate) role: Option<String>,
 }
 
