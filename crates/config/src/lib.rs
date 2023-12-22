@@ -25,10 +25,11 @@ enum KnowledgeGraphType {
     Json,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TerraphimConfig {
     pub global_shortcut: String,
     pub roles: HashMap<String, Role>,
+    pub default_role: String,
     id: String,
 }
 
@@ -54,7 +55,7 @@ pub struct Haystack {
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct KnowledgeGraph {
-    automata_url: String,
+    pub automata_url: String,
     //"markdown" or "json
     kg_type: KnowledgeGraphType,
     kg_path: String,
@@ -143,6 +144,7 @@ impl TerraphimConfig {
             /// global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles,
+            default_role: "Default".to_string(),
         }
     }
     pub fn update(&mut self, new_config: TerraphimConfig) {

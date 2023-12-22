@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use persistance::Persistable;
 use terraphim_config::TerraphimConfig;
 
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();

@@ -19,3 +19,4 @@ terraphim_pipeline={path="../crates/terraphim_pipeline"}
 ulid = {version = "1.0.0",features=["serde","uuid"]}
 log = "0.4.14"
 anyhow = "1.0.44"
+terraphim_settings={path="../crates/settings"}

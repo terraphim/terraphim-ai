@@ -20,7 +20,7 @@ aho-corasick = "1.0.2"
 # tracing = "0.1.37"
 serde = {version="1.0.192", features=["derive"]}
 serde_json = "1.0.64"
-
+tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
 [[bench]]
 name = "pipeline_benchmark"
 harness = false
