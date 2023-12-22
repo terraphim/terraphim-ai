@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-
 use ahash::AHashMap;
 use std::error::Error;
 
