@@ -29,13 +29,13 @@ use opendal::Scheme;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
-use std::fs;
+
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 use terraphim_settings::Settings;
 
 
@@ -85,7 +85,7 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
         let mut buf = vec![0u8; 1024*1024];
         op.write("test", buf).await.unwrap();
         let end_time = Instant::now();
-        let save_time = end_time.duration_since(start_time).as_millis();
+        let _save_time = end_time.duration_since(start_time).as_millis();
         let start_time = Instant::now();
         op.read("test").await?;
         let end_time = Instant::now();
@@ -148,11 +148,11 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
         _ => {
             let builder = services::Memory::default();
             // Init an operator
-            let op = Operator::new(builder)?
+            
+            Operator::new(builder)?
                 // Init with logging layer enabled.
                 .layer(LoggingLayer::default())
-                .finish();
-            op
+                .finish()
         }
     };
     let speed = get_speed(op.clone()).await?;

@@ -2,11 +2,11 @@ pub mod settings;
 use anyhow::anyhow;
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
-use dirs::config_dir;
-use opendal::Scheme;
+
+
 use opendal::{Operator, Result};
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{HashMap};
 use terraphim_settings::Settings;
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
@@ -76,11 +76,11 @@ pub trait Persistable: Serialize + serde::de::DeserializeOwned {
         Ok(())
     }
 
-    async fn load_from_operator(&self, key: &str, op: &Operator) -> Result<Self>
+    async fn load_from_operator(&self, key: &str, _op: &Operator) -> Result<Self>
     where
         Self: Sized,
     {
-        let (ops, fastest_op) = &self.load_config().await?;
+        let (_ops, fastest_op) = &self.load_config().await?;
         let bs = fastest_op.read(key).await?;
         let obj = serde_json::from_slice(&bs).unwrap();
         Ok(obj)
