@@ -4,10 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+bench = false
+path = "src/bin/main.rs"
+name = "terraphim-config"
 
 [dependencies]
-opendal = { version = "0.39.0", features = ["services-dashmap", "services-redis", "services-sled"] }
-tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
+opendal = { version = "0.41.0", features = ["services-dashmap", "services-redis", "services-sled"] }
+tokio = { version = "1.35.1", features = ["full","fs", "macros", "rt-multi-thread"] }
 log = "0.4"
 tracing = { version = "0.1"}
 tracing-subscriber = { version = "0.3", features = [
@@ -24,3 +28,4 @@ dirs = "5.0.0"
 anyhow = "1"
 url = "2.3.1"
 async-once-cell = "0.5.3"
+ulid = {version = "1.0.0",features=["serde","uuid"]}

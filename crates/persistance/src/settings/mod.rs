@@ -74,11 +74,16 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
 
 
 pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalResult<(Operator, u128)> {
-    async fn get_speed(op: Operator) -> std::result::Result<u128, opendal::Error> {
+    /// get_speed returns the time it takes to save and load a 1MB file.
+    /// It is used to determine the fastest operator.
+    /// FIXME: use a more accurate way to measure the speed.
+    async fn get_speed(op: Operator) -> OpendalResult<u128> {
         let start_time = Instant::now();
-        // let mut buf = vec![0u8; 1024*1024];
+        #[cfg(debug_assertions)]
         let buf = "test data";
-        op.write("test", buf).await?;
+        #[cfg(not(debug_assertions))]
+        let mut buf = vec![0u8; 1024*1024];
+        op.write("test", buf).await.unwrap();
         let end_time = Instant::now();
         let save_time = end_time.duration_since(start_time).as_millis();
         let start_time = Instant::now();
