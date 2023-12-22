@@ -64,6 +64,12 @@ pub struct KnowledgeGraph {
 }
 use ulid::Ulid;
 
+impl Default for TerraphimConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TerraphimConfig {
     pub fn new() -> Self {
         let id = Ulid::new().to_string();
@@ -174,7 +180,7 @@ impl Persistable for TerraphimConfig {
     async fn load(&mut self, key: &str) -> OpendalResult<Self> {
         let op = &self.load_config().await.unwrap().1;
 
-        let obj = self.load_from_operator(key, &op).await.unwrap();
+        let obj = self.load_from_operator(key, op).await.unwrap();
         Ok(obj)
     }
 
