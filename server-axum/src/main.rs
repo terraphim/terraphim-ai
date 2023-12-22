@@ -229,3 +229,71 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use tokio::test;
+    use reqwest::{StatusCode, Client};
+    use tokio::runtime::Runtime;
+    #[test]
+    async fn test_search_articles() {
+        
+            let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator").await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            // You can also test the response body if you want:
+            // let body = response.text().await.unwrap();
+            // assert!(body.contains("expected content"));
+        
+    }
+    #[test]
+    async fn test_search_articles_without_role() {
+        
+            let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10").await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            // You can also test the response body if you want:
+            // let body = response.text().await.unwrap();
+            // assert!(body.contains("expected content"));
+        
+    }
+    #[test]
+    async fn test_search_articles_without_limit() {
+        
+            let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0").await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            // You can also test the response body if you want:
+            // let body = response.text().await.unwrap();
+            // assert!(body.contains("expected content"));
+        
+    }
+    #[test]
+    async fn test_get_config() {
+        
+            let response = reqwest::get("http://localhost:8000/config").await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            // You can also test the response body if you want:
+            // let body = response.text().await.unwrap();
+            // assert!(body.contains("expected content"));
+        
+    }
+    #[test]
+    async fn test_post_article() {
+        
+        let client = Client::new();
+        let response = client.post("http://localhost:8000/article")
+            .header("Content-Type", "application/json")
+            .body(r#"
+            {
+                "title": "Title of the article",
+                "url": "url_of_the_article",
+                "body": "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction"
+            }
+            "#)
+            .send()
+            .await
+            .unwrap();
+            assert_eq!(response.status(), StatusCode::CREATED);
+            // You can also test the response body if you want:
+            // let body = response.text().await.unwrap();
+            // assert!(body.contains("expected content"));
+        }
+}
