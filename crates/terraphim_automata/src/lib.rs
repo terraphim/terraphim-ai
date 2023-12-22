@@ -1,7 +1,6 @@
 pub mod matcher;
 
 pub use matcher::{find_matches, replace_matches, Dictionary, Matched};
-use reqwest::blocking::get;
 // use std::collections::HashMap;
 use ahash::AHashMap;
 use std::fs::File;
@@ -22,15 +21,21 @@ pub enum TerraphimAutomataError {
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
-pub fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>> {
-    fn read_url(url: &str) -> Result<String> {
-        let response = get(url)?;
-        println!("Response {:?}", response);
-        let resp = response.text()?;
-        Ok(resp)
+pub async fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>> {
+    /// TODO: use async version of reqwest
+    async fn read_url(url: &str) -> Result<String> {
+        let response = reqwest::Client::new()
+        .get(url)
+        .header("Accept", "application/json")
+        .send()
+        .await?;
+
+        let text = response.text().await?;
+        
+        Ok(text)
     }
     let contents = if url_or_file.starts_with("http") {
-        read_url(url_or_file)?
+        read_url(url_or_file).await?
     } else {
         let mut file = File::open(Path::new(url_or_file))?;
         let mut contents = String::new();

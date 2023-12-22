@@ -9,7 +9,7 @@ use twelf::{config, Layer};
 #[derive(Debug, Default)]
 pub struct Settings {
     /// The address to listen on
-    pub server_url: Option<String>,
+    pub server_hostname: Option<String>,
     /// API endpoint for the server
     pub api_endpoint: Option<String>,
     /// configured storage backends available on device

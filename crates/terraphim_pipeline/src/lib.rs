@@ -60,6 +60,7 @@ impl ToString for Document {
     }
 }
 
+
 /// Reference to external storage of documents, traditional indexes use
 /// document, aka article or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -99,8 +100,8 @@ pub struct RoleGraph {
     pub ac: AhoCorasick,
 }
 impl RoleGraph {
-    pub fn new(role: String, automata_url: &str) -> Result<Self> {
-        let dict_hash = load_automata(automata_url)?;
+    pub async fn new(role: String, automata_url: &str) -> Result<Self> {
+        let dict_hash = load_automata(automata_url).await?;
 
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
@@ -171,7 +172,7 @@ impl RoleGraph {
         // }
     }
 
-    pub fn query(&self, query_string: &str) -> Result<Vec<(&String, IndexedDocument)>> {
+    pub fn query(&self, query_string: &str, offset:Option<usize>,limit:Option<usize>) -> Result<Vec<(&String, IndexedDocument)>> {
         warn!("performing query");
         let nodes = self.find_matches_ids(query_string);
 
@@ -220,6 +221,9 @@ impl RoleGraph {
         // warn!("Results Map {:#?}", results_map);
         let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
         hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+        hash_vec=hash_vec.into_iter()
+        .skip(offset.unwrap_or(0))
+        .take(limit.unwrap_or(std::usize::MAX)).collect();
         Ok(hash_vec)
     }
     pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
@@ -370,9 +374,10 @@ mod tests {
     use super::*;
 
     use ulid::Ulid;
+    use tokio::test;
 
     #[test]
-    fn test_split_paragraphs() {
+    async fn test_split_paragraphs() {
         let paragraph = "This is the first sentence.\n\n This is the second sentence. This is the second sentence? This is the second sentence| This is the second sentence!\n\nThis is the third sentence. Mr. John Johnson Jr. was born in the U.S.A but earned his Ph.D. in Israel before joining Nike Inc. as an engineer. He also worked at craigslist.org as a business analyst.";
         let sentences = split_paragraphs(paragraph);
         assert_eq!(sentences.len(), 9);
@@ -391,20 +396,20 @@ mod tests {
     }
 
     #[test]
-    fn test_find_matches_ids() {
+    async fn test_find_matches_ids() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let rolegraph = RoleGraph::new(role, automata_url).unwrap();
+        let rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
         let matches = rolegraph.find_matches_ids(query);
         assert_eq!(matches.len(), 7);
     }
 
     #[test]
-    fn test_rolegraph() {
+    async fn test_rolegraph() {
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let mut rolegraph = RoleGraph::new(role, automata_url).unwrap();
+        let mut rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
         let article_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches = rolegraph.find_matches_ids(query);
