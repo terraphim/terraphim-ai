@@ -16,8 +16,7 @@
 
 use std::{error::Error, net::SocketAddr, collections::HashMap};
 use axum::{
-    error_handling::HandleErrorLayer,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -26,7 +25,7 @@ use axum::{
 use ulid::Ulid;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use terraphim_config::TerraphimConfig;
 use terraphim_settings::Settings;
 
@@ -38,9 +37,9 @@ use utoipa::{
    OpenApi,
 };
 
-use utoipa_rapidoc::RapiDoc;
-use utoipa_redoc::{Redoc, Servable};
-use utoipa_swagger_ui::{SwaggerUi, Config};
+
+
+
 
 
 use terraphim_pipeline::{RoleGraph, IndexedDocument};
@@ -58,7 +57,7 @@ pub(crate) struct RoleGraphState {
     pub(crate) rolegraph: Arc<Mutex<RoleGraph>>,
 }
 
-#[derive(OpenApi)]
+#[derive(OpenApi, Debug)]
 #[openapi(paths(health_axum, create_article, search_articles), components(schemas(types::Article)))]
 pub struct ApiDoc;
 
@@ -93,7 +92,7 @@ async fn create_article(State(config): State<ConfigState>,Json(article): Json<ty
     } else {
         article.id.clone().unwrap()
     };
-    for (role_name,rolegraph_state) in config.roles.iter() {
+    for rolegraph_state in config.roles.values() {
         let mut rolegraph = rolegraph_state.rolegraph.lock().await;
         rolegraph.parse_document(id.clone(), article.clone());
     }
@@ -112,7 +111,7 @@ async fn create_article(State(config): State<ConfigState>,Json(article): Json<ty
 async fn list_articles(State(rolegraph): State<Arc<Mutex<RoleGraph>>>) -> impl IntoResponse {
 
     let rolegraph = rolegraph.lock().await.clone();
-    println!("{:?}",rolegraph);
+    println!("{rolegraph:?}");
 
     (StatusCode::OK, Json("Ok"))
 }
@@ -129,9 +128,9 @@ async fn list_articles(State(rolegraph): State<Arc<Mutex<RoleGraph>>>) -> impl I
         )
     )]
 async fn search_articles(State(config): State<ConfigState>,search_query: Query<types::SearchQuery>) -> Json<Vec<IndexedDocument>>{
-    println!("Searching articles with query: {:?}", search_query);
+    println!("Searching articles with query: {search_query:?}");
     let default_role = config.config.lock().await.default_role.clone();
-    /// if role is not provided, use the default role in the config
+    // if role is not provided, use the default role in the config
     let role = if search_query.role.is_none() {
         default_role.as_str()
     } else {
@@ -148,7 +147,7 @@ async fn search_articles(State(config): State<ConfigState>,search_query: Query<t
         }
     };
     let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc) | doc).collect();
-    println!("Found articles: {:?}", docs);
+    println!("Found articles: {docs:?}");
     Json(docs)
 }
 
@@ -183,8 +182,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         roles: HashMap::new()
     };
 
-    /// for each role in a config initialize a rolegraph
-    /// and add it to the config state
+    // for each role in a config initialize a rolegraph
+    // and add it to the config state
     for (role_name,each_role) in config.roles {
         let automata_url= each_role.kg.automata_url.as_str();
         println!("{} - {}",role_name.clone(),automata_url);
@@ -206,7 +205,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     config_state.roles.insert(role, RoleGraphState {
         rolegraph: Arc::new(Mutex::new(rolegraph))
     });
-    println!("cfg Roles: {:?}", config_state.roles.iter().map(|(k,_)| k).collect::<Vec<&String>>());
+    println!("cfg Roles: {:?}", config_state.roles.keys().collect::<Vec<&String>>());
     let app = Router::new()
         .route("/", get(health_axum))
         // .route("/articles", get(list_articles))
@@ -221,7 +220,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // .with_state(rolegraph)
         .with_state(config_state);
 
-    println!("listening on {}", addr);
+    println!("listening on {addr}");
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
