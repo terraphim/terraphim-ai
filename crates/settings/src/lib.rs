@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use directories::ProjectDirs;
-use twelf::reexports::serde::{Deserialize, Serialize};
+
 use twelf::{config, Layer};
 
 
@@ -27,12 +27,12 @@ impl Settings {
             }
         };
         
-        let config = Settings::with_layers(&[
+        
+        Settings::with_layers(&[
             Layer::Toml(config_file),
             Layer::Env(Some(String::from("TERRAPHIM_"))),
         ])
-        .unwrap();
-        config
+        .unwrap()
     }
 }
 
