@@ -2,6 +2,7 @@
 name = "terraphim_ai"
 version = "0.1.0"
 edition = "2021"
+default-run="terraphim-server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [workspace]
@@ -13,7 +14,8 @@ members = [
     "crates/persistance",
     "server-axum",
     "desktop/src-tauri",
-    "crates/terraphim-grep"
+    "crates/terraphim-grep",
+    "crates/middleware",
 ]
 
 [dependencies]
@@ -24,3 +26,9 @@ itertools = "0.11.0"
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
 version = "4"
+
+[[bin]]
+bench = false
+path = "server-axum/src/main.rs"
+name = "terraphim-server"
+
