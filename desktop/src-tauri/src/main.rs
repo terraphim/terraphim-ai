@@ -15,7 +15,7 @@ use tauri::{
   
 };
 
-use std::{error::Error, time::Duration};
+use std::time::Duration;
 
 use std::collections::HashMap;
 extern crate config;
@@ -31,13 +31,14 @@ mod settings;
 use crate::settings::CONFIG;
 struct Port(u16);
 
-use terraphim_server::app as terraphim_app;
+use std::{error::Error, net::SocketAddr};
+use terraphim_server::axum_server;
 
 
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
   println!("{:?}", CONFIG.global_shortcut);
-  let context = tauri::generate_context!();
+  let mut context = tauri::generate_context!();
 
   let quit = CustomMenuItem::new("quit".to_string(), "Quit");
   let tray_menu = SystemTrayMenu::new()
@@ -46,8 +47,24 @@ fn main() {
     // .add_item(show);
     let system_tray = SystemTray::new()
     .with_menu(tray_menu);
-
+  // load config
+  
+  // spawn the server in a separate thread
+  let port = portpicker::pick_unused_port().expect("failed to find unused port");
+  let addr = SocketAddr::from(([127, 0, 0, 1], port));
+  
+  // tauri::async_runtime::spawn(async move {
+  //   let mut config_state= terraphim_server::types::ConfigState::new().await.unwrap();
+  //   axum_server(addr,config_state).await;
+  // });
     let mut app = tauri::Builder::default()
+          .setup(move |app1| {
+            tauri::async_runtime::spawn(async move {
+              let mut config_state= terraphim_server::types::ConfigState::new().await.unwrap();
+              axum_server(addr,config_state).await;
+            });
+            Ok(())
+        })
       .system_tray(system_tray)
       .on_system_tray_event(|app, event| match event {
         SystemTrayEvent::MenuItemClick { id, .. } => {
@@ -72,11 +89,9 @@ fn main() {
         }
         _ => {}
       })
+      .manage(Port(port))
       .invoke_handler(tauri::generate_handler![
-        cmd::log_operation,
-        cmd::perform_request,
-        cmd::search,
-        cmd::get_config
+        get_port
       ])
       .build(context)
       .expect("error while running tauri application");
@@ -122,5 +137,11 @@ fn main() {
     }
     _ => {}
   });
+  Ok(())
   }
 
+/// A command to get the usused port, instead of 3000.
+#[tauri::command]
+fn get_port(port: tauri::State<Port>) -> Result<String, String> {
+    Ok(format!("{}", port.0))
+}

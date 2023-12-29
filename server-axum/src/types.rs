@@ -55,14 +55,14 @@ use std::collections::HashMap;
 
 
 #[derive(Debug, Clone)]
-pub(crate) struct ConfigState {
+pub struct ConfigState {
     /// Terraphim Config
-    pub(crate) config: Arc<Mutex<TerraphimConfig>>,
-    pub(crate) roles: HashMap<String, RoleGraphState>
+    pub config: Arc<Mutex<TerraphimConfig>>,
+    pub roles: HashMap<String, RoleGraphState>
 }
 
 impl ConfigState {
-    pub(crate) async fn new() -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         let config=TerraphimConfig::new();
         let mut config_state= ConfigState {
             config: Arc::new(Mutex::new(config.clone())),
@@ -85,7 +85,7 @@ impl ConfigState {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RoleGraphState {
+pub struct RoleGraphState {
     /// RoleGraph for ingesting documents
-    pub(crate) rolegraph: Arc<Mutex<RoleGraph>>,
+    pub rolegraph: Arc<Mutex<RoleGraph>>,
 }

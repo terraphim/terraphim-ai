@@ -29,48 +29,16 @@ use anyhow::{Result};
 use terraphim_config::TerraphimConfig;
 use terraphim_settings::Settings;
 
-mod types;
-mod api;
-
-use api::{create_article,search_articles,show_config,health_axum, search_articles_stream};
-
-use tokio::sync::broadcast::channel;
+use terraphim_server::axum_server;
 
 
 
 
 /// TODO: Can't get Open API docs to work with axum consistencly,given up for now.
 
-use terraphim_pipeline::{RoleGraph, IndexedDocument};
-
+use terraphim_pipeline::RoleGraph;
 use portpicker;
 
-pub async fn app(server_hostname:SocketAddr, config_state:types::ConfigState) {
-    let (tx, _rx) = channel::<IndexedDocument>(10);
-    let app = Router::new()
-    .route("/", get(health_axum))
-    .route("/health", get(health_axum))
-    // .route("/articles", get(list_articles))
-    .route("/article", post(create_article))
-    .route("/articles/search", get(search_articles))
-    .route("/config/", get(api::show_config))
-    .route("/articles/search/stream", get(search_articles_stream))
-    .with_state(config_state)
-    .layer(Extension(tx));
-     println!("listening on {server_hostname}");
-     axum::Server::bind(&server_hostname)
-     .serve(app.into_make_service())
-     .await
-     .unwrap_or_else(|_| {
-        // FIXME: this unwrap is never reached
-        // the desired behavior is to pick a new port and try again
-        let port = portpicker::pick_unused_port().expect("failed to find unused port");
-        let add=SocketAddr::from(([127, 0, 0, 1], port));
-        println!("listening on {add} with {port}");
-    });
-     
-    
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -80,7 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let port = portpicker::pick_unused_port().expect("failed to find unused port");
         SocketAddr::from(([127, 0, 0, 1], port))
     });
-    let mut config_state= types::ConfigState::new().await?;
+    let mut config_state= terraphim_server::types::ConfigState::new().await?;
 
     // Add one more for testing local KG
 
@@ -89,11 +57,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
     let automata_url = "./data/term_to_id.json";
     let rolegraph = RoleGraph::new(role.clone(), automata_url).await?;        
-    config_state.roles.insert(role, types::RoleGraphState {
+    config_state.roles.insert(role, terraphim_server::types::RoleGraphState {
         rolegraph: Arc::new(Mutex::new(rolegraph))
     });
     println!("cfg Roles: {:?}", config_state.roles.keys().collect::<Vec<&String>>());
-    app(addr, config_state).await;
+    axum_server(addr, config_state).await;
 
     Ok(())
 }
