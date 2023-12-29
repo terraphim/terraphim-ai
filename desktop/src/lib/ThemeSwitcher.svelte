@@ -4,20 +4,37 @@
   import { Field, Select } from 'svelma';
   import { CONFIG } from '../config';
   let configStore =[];
+  let port = 8000;
+  let configURL="";
   export function loadConfig() {
     try {
       if (window.__TAURI__) {
         is_tauri.set(true);
-        invoke('get_config')
-          .then(res => {
-            configStore = JSON.parse(res);
-            role.set(Object.keys(configStore)[0]);
+        // invoke('get_config')
+        //   .then(res => {
+        //     configStore = JSON.parse(res);
+        //     role.set(Object.keys(configStore)[0]);
+        //   })
+        //   .catch(e => console.error(e));
+          invoke('get_port')
+          .then(result => {
+            port = JSON.parse(result);
+            console.log("Port", port);
+            configURL = `http://localhost:${port}/config/`;
+            console.log('test configURL ', configURL);
           })
           .catch(e => console.error(e));
       } else {
-        fetch(`${CONFIG.ServerURL}/config`)
+        is_tauri.set(false);
+        // configURL = `${CONFIG.ServerURL}/config/`;
+        configURL = `http://localhost:${port}/config/`;
+        console.log('test configURL ', configURL);
+      }
+      console.log('test configURL ', configURL);
+      fetch(configURL)
           .then(response => response.json())
           .then(data => {
+            console.log('test data fetched', data);
             configStore = data.roles;
             role.set(Object.keys(configStore)[0]);
             console.log('Role', $role);
@@ -28,7 +45,6 @@
             console.log(typeof configStore);
           })
           .catch(e => console.error(e));
-      }
     } catch (error) {
       console.error(error);
     }
@@ -38,6 +54,7 @@
   configStore = loadConfig();
   console.log('test ', configStore.length);
   console.log('test CONFIG.ServerURL ', CONFIG.ServerURL);
+  
   let themes = '';
   $: if (themes) {
     role.set(themes);

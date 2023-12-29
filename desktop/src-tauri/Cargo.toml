@@ -24,6 +24,9 @@ config =  {git = "https://github.com/mehcode/config-rs.git" }
 serde_derive = "^1.0.137"
 lazy_static = "1.4"
 terraphim-grep =  {path="../../crates/terraphim-grep" }
+tokio = { version = "1.35.1", features = ["full"] }
+terraphim_settings= {path="../../crates/settings"}
+portpicker= {version = "*"}
 
 [features]
 # by default Tauri runs in production mode

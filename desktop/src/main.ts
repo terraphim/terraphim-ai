@@ -9,8 +9,8 @@ import { initStore } from '@tomic/svelte';
     // });
     const store = new Store();
     initStore(store);
-const app = new App({
-  target: document.getElementById('app')
-})
+    const app = new App({
+      target: document.getElementById('app')
+    })
 
 export default app

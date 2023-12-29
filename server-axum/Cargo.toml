@@ -22,6 +22,7 @@ anyhow = "1.0.44"
 terraphim_settings={path="../crates/settings"}
 portpicker = "0.1"
 tokio-stream = { version = "0.1.14", features = ["sync"] }
+tower-http = { version = "0.2", features = ["cors"] }
 
 [dev-dependencies]
 reqwest = "0.11"
