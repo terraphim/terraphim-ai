@@ -3,10 +3,20 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
+use thiserror::Error;
 use opendal::Result as OpendalResult;
 use async_trait::async_trait;
 use persistance::Persistable;
+
+type Result<T> = std::result::Result<T, TerraphimConfigError>;
+
+#[derive(Error, Debug)]
+pub enum TerraphimConfigError {
+    #[error("Unable to load config")]
+    NotFound,
+}
+
+
 
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
@@ -49,8 +59,8 @@ pub struct Role {
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct Haystack {
-    haystack: String,
-    service: String,
+    pub haystack: String,
+    pub service: String,
 }
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
@@ -178,9 +188,10 @@ impl Persistable for TerraphimConfig {
         Ok(())
     }
     async fn load(&mut self, key: &str) -> OpendalResult<Self> {
-        let op = &self.load_config().await.unwrap().1;
+        // FIXME: use better error handling
+        let op = &self.load_config().await?.1;
 
-        let obj = self.load_from_operator(key, op).await.unwrap();
+        let obj = self.load_from_operator(key, op).await?;
         Ok(obj)
     }
 

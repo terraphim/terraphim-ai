@@ -1,5 +1,3 @@
-use crate::types;
-
 use std::{error::Error, net::SocketAddr};
 use axum::{
     extract::{Query, State},
@@ -16,7 +14,7 @@ use anyhow::{Result};
 use terraphim_config::TerraphimConfig;
 use terraphim_settings::Settings;
 use terraphim_pipeline::{RoleGraph, IndexedDocument};
-
+use terraphim_types as types;
 
 /// health check endpoint
 pub(crate) async fn health_axum() -> impl IntoResponse {

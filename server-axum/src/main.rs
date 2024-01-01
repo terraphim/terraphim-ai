@@ -30,7 +30,7 @@ use terraphim_config::TerraphimConfig;
 use terraphim_settings::Settings;
 
 use terraphim_server::axum_server;
-
+use terraphim_types as types;
 
 
 
@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let port = portpicker::pick_unused_port().expect("failed to find unused port");
         SocketAddr::from(([127, 0, 0, 1], port))
     });
-    let mut config_state= terraphim_server::types::ConfigState::new().await?;
+    let mut config_state= types::ConfigState::new().await?;
 
     // Add one more for testing local KG
 
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
     let automata_url = "./data/term_to_id.json";
     let rolegraph = RoleGraph::new(role.clone(), automata_url).await?;        
-    config_state.roles.insert(role, terraphim_server::types::RoleGraphState {
+    config_state.roles.insert(role, types::RoleGraphState {
         rolegraph: Arc::new(Mutex::new(rolegraph))
     });
     println!("cfg Roles: {:?}", config_state.roles.keys().collect::<Vec<&String>>());

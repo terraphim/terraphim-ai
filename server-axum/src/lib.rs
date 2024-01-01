@@ -7,13 +7,15 @@ use axum::{
     routing::{get, post},
     Json, Router, Extension
 };
+
 mod api;
-pub mod types;
+use terraphim_types as types;
 use api::{create_article,search_articles,show_config,health_axum, search_articles_stream};
 use terraphim_pipeline::IndexedDocument;
 use tokio::sync::broadcast::channel;
 use portpicker;
 use tower_http::cors::{Any, CorsLayer};
+
 
 pub async fn axum_server(server_hostname:SocketAddr, config_state:types::ConfigState) {
     let (tx, _rx) = channel::<IndexedDocument>(10);
@@ -22,7 +24,9 @@ pub async fn axum_server(server_hostname:SocketAddr, config_state:types::ConfigS
     .route("/health", get(health_axum))
     // .route("/articles", get(list_articles))
     .route("/article", post(create_article))
+    .route("/article/", post(create_article))
     .route("/articles/search", get(search_articles))
+    .route("/config", get(api::show_config))
     .route("/config/", get(api::show_config))
     .route("/articles/search/stream", get(search_articles_stream))
     .with_state(config_state)
@@ -34,6 +38,7 @@ pub async fn axum_server(server_hostname:SocketAddr, config_state:types::ConfigS
         Method::PATCH,
         Method::DELETE,
     ]));
+
      println!("listening on {server_hostname}");
      axum::Server::bind(&server_hostname)
      .serve(app.into_make_service())

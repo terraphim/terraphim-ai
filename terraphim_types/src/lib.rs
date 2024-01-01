@@ -1,30 +1,29 @@
 use terraphim_pipeline::{Document};
-
 use serde::{Deserialize, Serialize};
-
-
-
+use terraphim_config::TerraphimConfig;
+use persistance::Persistable;
+use opendal::Result as OpendalResult;
 
 /// Query type for searching documents in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct SearchQuery {
-    pub(crate) search_term: String,
-    pub(crate) skip: Option<usize>,
-    pub(crate) limit: Option<usize>,
-    pub (crate) role: Option<String>,
+pub struct SearchQuery {
+    pub search_term: String,
+    pub skip: Option<usize>,
+    pub limit: Option<usize>,
+    pub  role: Option<String>,
 }
 
 /// Create article schema
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct Article {
-    pub(crate) id: Option<String>,
-    pub(crate) stub: Option<String>,
-    pub(crate) title: String,
-    pub(crate) url: String,
-    pub(crate) body: String,
-    pub(crate) description: Option<String>,
-    pub(crate) tags: Option<Vec<String>>,
+pub struct Article {
+    pub id: Option<String>,
+    pub stub: Option<String>,
+    pub title: String,
+    pub url: String,
+    pub body: String,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 impl From<Article> for Document {
@@ -47,14 +46,15 @@ impl From<Article> for Document {
 use terraphim_pipeline::{RoleGraph, IndexedDocument};
 use tokio::sync::Mutex;
 use anyhow::{Result};
-use terraphim_config::TerraphimConfig;
+
 
 use std::sync::Arc;
 use std::collections::HashMap;
 
 
-
-#[derive(Debug, Clone)]
+/// ConfigState for the Terraphim (Actor)
+/// Config state can be updated using the API or Atomic Server
+#[derive(Default, Debug, Clone)]
 pub struct ConfigState {
     /// Terraphim Config
     pub config: Arc<Mutex<TerraphimConfig>>,
@@ -62,8 +62,15 @@ pub struct ConfigState {
 }
 
 impl ConfigState {
+
     pub async fn new() -> Result<Self> {
-        let config=TerraphimConfig::new();
+
+        let mut config=TerraphimConfig::new();
+        // Try to load the existing state
+        // FIXMME: use better error handling
+        if let Ok(config)=config.load("configstate").await {
+            println!("config loaded");
+        }
         let mut config_state= ConfigState {
             config: Arc::new(Mutex::new(config.clone())),
             roles: HashMap::new()
@@ -82,6 +89,7 @@ impl ConfigState {
         }
         Ok(config_state)
     }
+
 }
 
 #[derive(Debug, Clone)]
@@ -89,3 +97,4 @@ pub struct RoleGraphState {
     /// RoleGraph for ingesting documents
     pub rolegraph: Arc<Mutex<RoleGraph>>,
 }
+
