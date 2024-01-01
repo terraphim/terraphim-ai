@@ -18,26 +18,27 @@ use tauri::{
 use std::time::Duration;
 
 use std::collections::HashMap;
-extern crate config;
-extern crate serde;
 
-#[macro_use]
-extern crate serde_derive;
-
-#[macro_use]
-extern crate lazy_static;
-
-mod settings;
-use crate::settings::CONFIG;
-struct Port(u16);
 
 use std::{error::Error, net::SocketAddr};
 use terraphim_server::axum_server;
 
+use terraphim_types::ConfigState;
+use terraphim_settings::Settings;
 
 
-fn main() -> Result<(), Box<dyn Error>> {
-  println!("{:?}", CONFIG.global_shortcut);
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+  let device_settings = Settings::load_from_env_and_file(None);
+  
+  let mut config_state= ConfigState::new().await?;
+  let current_config = config_state.config.lock().await;
+  let globbal_shortcut = current_config.global_shortcut.clone();
+  // drop mutex guard to avoid deadlock
+  drop(current_config);
+
+  println!("{:?}", config_state.config);
   let mut context = tauri::generate_context!();
 
   let quit = CustomMenuItem::new("quit".to_string(), "Quit");
@@ -47,24 +48,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // .add_item(show);
     let system_tray = SystemTray::new()
     .with_menu(tray_menu);
-  // load config
-  
-  // spawn the server in a separate thread
-  let port = portpicker::pick_unused_port().expect("failed to find unused port");
-  let addr = SocketAddr::from(([127, 0, 0, 1], port));
   
   // tauri::async_runtime::spawn(async move {
   //   let mut config_state= terraphim_server::types::ConfigState::new().await.unwrap();
   //   axum_server(addr,config_state).await;
   // });
     let mut app = tauri::Builder::default()
-          .setup(move |app1| {
-            tauri::async_runtime::spawn(async move {
-              let mut config_state= terraphim_server::types::ConfigState::new().await.unwrap();
-              axum_server(addr,config_state).await;
-            });
-            Ok(())
-        })
       .system_tray(system_tray)
       .on_system_tray_event(|app, event| match event {
         SystemTrayEvent::MenuItemClick { id, .. } => {
@@ -89,9 +78,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         _ => {}
       })
-      .manage(Port(port))
+      .manage(config_state.clone())
       .invoke_handler(tauri::generate_handler![
-        get_port
+        cmd::my_custom_command,
+        cmd::get_config,
+        cmd::log_operation,
+        cmd::perform_request,
       ])
       .build(context)
       .expect("error while running tauri application");
@@ -105,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
       window.hide().unwrap();
       app_handle
         .global_shortcut_manager()
-        .register(&CONFIG.global_shortcut, move || {
+        .register(&globbal_shortcut, move || {
 
           if window.is_visible().unwrap() {
             window.hide().unwrap();
@@ -140,8 +132,3 @@ fn main() -> Result<(), Box<dyn Error>> {
   Ok(())
   }
 
-/// A command to get the usused port, instead of 3000.
-#[tauri::command]
-fn get_port(port: tauri::State<Port>) -> Result<String, String> {
-    Ok(format!("{}", port.0))
-}

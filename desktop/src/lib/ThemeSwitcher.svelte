@@ -6,32 +6,35 @@
   let configStore =[];
   let port = 8000;
   let configURL="";
-  export function loadConfig() {
+  export async function loadConfig() {
     try {
       if (window.__TAURI__) {
         is_tauri.set(true);
-        // invoke('get_config')
-        //   .then(res => {
-        //     configStore = JSON.parse(res);
-        //     role.set(Object.keys(configStore)[0]);
-        //   })
-        //   .catch(e => console.error(e));
-          invoke('get_port')
-          .then(result => {
-            port = JSON.parse(result);
-            console.log("Port", port);
-            configURL = `http://localhost:${port}/config/`;
-            console.log('test configURL ', configURL);
+        if (is_tauri) {
+
+          console.log('test is_tauri True');
+          invoke('get_config').then((res) =>{
+              console.log(`Message: ${res.global_shortcut}`);
+              configStore = res.roles;
+              role.set(Object.keys(configStore)[0]);
+              console.log('Role', $role);
+              console.log('Value', configStore[$role]['theme']);
+              theme.set(configStore[$role]['theme']);
+              console.log(Object.keys(configStore));
+              console.log(configStore);
+              console.log(typeof configStore);
           })
-          .catch(e => console.error(e));
+            .catch((e) => console.error(e))
+        } else {
+                    console.log('test is_tauri False');
+          };
+        
       } else {
         is_tauri.set(false);
         // configURL = `${CONFIG.ServerURL}/config/`;
         configURL = `http://localhost:${port}/config/`;
         console.log('test configURL ', configURL);
-      }
-      console.log('test configURL ', configURL);
-      fetch(configURL)
+        fetch(configURL)
           .then(response => response.json())
           .then(data => {
             console.log('test data fetched', data);
@@ -45,13 +48,20 @@
             console.log(typeof configStore);
           })
           .catch(e => console.error(e));
+      }
+      console.log('test configURL ', configURL);
+
     } catch (error) {
       console.error(error);
     }
     return configStore;
   }
 
-  configStore = loadConfig();
+  async function initializeConfig() {
+    configStore = await loadConfig();
+  }
+
+  initializeConfig();
   console.log('test ', configStore.length);
   console.log('test CONFIG.ServerURL ', CONFIG.ServerURL);
   
