@@ -15,7 +15,7 @@
       console.log("Tauri config");
       console.log($input);
       invoke('search', {
-        needle: $input,
+        search_term: $input,
         skip: 0,
         limit: 10,
         role: $role,
@@ -33,7 +33,7 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          search: $input,
+          search_term: $input,
           skip: 0,
           limit: 10,
           role: $role
