@@ -1,11 +1,17 @@
 [package]
-name = "server-axum"
+name = "terraphim_server"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+terraphim_config={path="../crates/config"}
+terraphim_pipeline={path="../crates/terraphim_pipeline"}
+terraphim_types= {path="../terraphim_types"}
+terraphim_settings={path="../crates/settings"}
+persistance = {path="../crates/persistance"}
+
 axum = {version ="0.6.20", features = ["macros"]}
 tokio = { version = "1.22.0", features = ["full"] }
 serde = { version = "1.0.149", features = ["derive"] }
@@ -14,13 +20,14 @@ utoipa-swagger-ui = { features = ["axum"], version = "4.0.0" }
 utoipa-redoc = { version = "*", features = ["axum"] }
 utoipa-rapidoc = { version = "*", features = ["axum"] }
 serde_json = "1.0.108"
-terraphim_config={path="../crates/config"}
-terraphim_pipeline={path="../crates/terraphim_pipeline"}
 ulid = {version = "1.0.0",features=["serde","uuid"]}
 log = "0.4.14"
 anyhow = "1.0.44"
-terraphim_settings={path="../crates/settings"}
+portpicker = "0.1"
+tokio-stream = { version = "0.1.14", features = ["sync"] }
+tower-http = { version = "0.2", features = ["cors"] }
 
 [dev-dependencies]
-reqwest = "0.11"
+reqwest = {version = "0.11" , features = ["json"]}
 tokio = { version = "1", features = ["full"] }
+serde_json = "1.0.108"

@@ -1,12 +1,12 @@
 {
   "global_shortcut": "Ctrl+X",
   "roles": {
-    "System Operator": {
-      "shortname": "operator",
-      "name": "System Operator",
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
       "relevance_function": "terraphim-graph",
-      "theme": "superhero",
-      "serverUrl": "https://localhost:8080",
+      "theme": "spacelab",
+      "serverUrl": "http://localhost:8000/articles/search",
       "kg": {
         "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
@@ -21,12 +21,12 @@
         }
       ]
     },
-    "Default": {
-      "shortname": "Default",
-      "name": "Default",
+    "System Operator": {
+      "shortname": "operator",
+      "name": "System Operator",
       "relevance_function": "terraphim-graph",
-      "theme": "spacelab",
-      "serverUrl": "https://localhost:8080",
+      "theme": "superhero",
+      "serverUrl": "http://localhost:8000/articles/search",
       "kg": {
         "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
@@ -46,7 +46,7 @@
       "name": "Engineer",
       "relevance_function": "terraphim-graph",
       "theme": "lumen",
-      "serverUrl": "https://localhost:8080",
+      "serverUrl": "http://localhost:8000/articles/search",
       "kg": {
         "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
@@ -62,5 +62,6 @@
       ]
     }
   },
-  "id": "01HJ4AWDQG86G7PDM9X52QCVW1"
+  "default_role": "Default",
+  "id": "01HK54A3TQY4944PSJTY5K4WR5"
 }

@@ -4,20 +4,40 @@
   import { Field, Select } from 'svelma';
   import { CONFIG } from '../config';
   let configStore =[];
-  export function loadConfig() {
+  let port = 8000;
+  let configURL="";
+  export async function loadConfig() {
     try {
       if (window.__TAURI__) {
         is_tauri.set(true);
-        invoke('get_config')
-          .then(res => {
-            configStore = JSON.parse(res);
-            role.set(Object.keys(configStore)[0]);
+        if (is_tauri) {
+
+          console.log('test is_tauri True');
+          invoke('get_config').then((res) =>{
+              console.log(`Message: ${res.global_shortcut}`);
+              configStore = res.roles;
+              role.set(Object.keys(configStore)[0]);
+              console.log('Role', $role);
+              console.log('Value', configStore[$role]['theme']);
+              theme.set(configStore[$role]['theme']);
+              console.log(Object.keys(configStore));
+              console.log(configStore);
+              console.log(typeof configStore);
           })
-          .catch(e => console.error(e));
+            .catch((e) => console.error(e))
+        } else {
+                    console.log('test is_tauri False');
+          };
+        
       } else {
-        fetch(`${CONFIG.ServerURL}/config`)
+        is_tauri.set(false);
+        // configURL = `${CONFIG.ServerURL}/config/`;
+        configURL = `http://localhost:${port}/config/`;
+        console.log('test configURL ', configURL);
+        fetch(configURL)
           .then(response => response.json())
           .then(data => {
+            console.log('test data fetched', data);
             configStore = data.roles;
             role.set(Object.keys(configStore)[0]);
             console.log('Role', $role);
@@ -29,15 +49,22 @@
           })
           .catch(e => console.error(e));
       }
+      console.log('test configURL ', configURL);
+
     } catch (error) {
       console.error(error);
     }
     return configStore;
   }
 
-  configStore = loadConfig();
+  async function initializeConfig() {
+    configStore = await loadConfig();
+  }
+
+  initializeConfig();
   console.log('test ', configStore.length);
   console.log('test CONFIG.ServerURL ', CONFIG.ServerURL);
+  
   let themes = '';
   $: if (themes) {
     role.set(themes);

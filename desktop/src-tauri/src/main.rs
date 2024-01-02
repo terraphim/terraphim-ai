@@ -15,27 +15,31 @@ use tauri::{
   
 };
 
-use std::{error::Error, time::Duration};
+use std::time::Duration;
 
 use std::collections::HashMap;
-extern crate config;
-extern crate serde;
 
-#[macro_use]
-extern crate serde_derive;
 
-#[macro_use]
-extern crate lazy_static;
+use std::{error::Error, net::SocketAddr};
+use terraphim_server::axum_server;
 
-mod settings;
-use crate::settings::CONFIG;
+use terraphim_types::ConfigState;
+use terraphim_settings::Settings;
 
 
 
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+  let device_settings = Settings::load_from_env_and_file(None);
+  
+  let mut config_state= ConfigState::new().await?;
+  let current_config = config_state.config.lock().await;
+  let globbal_shortcut = current_config.global_shortcut.clone();
+  // drop mutex guard to avoid deadlock
+  drop(current_config);
 
-fn main() {
-  println!("{:?}", CONFIG.global_shortcut);
-  let context = tauri::generate_context!();
+  println!("{:?}", config_state.config);
+  let mut context = tauri::generate_context!();
 
   let quit = CustomMenuItem::new("quit".to_string(), "Quit");
   let tray_menu = SystemTrayMenu::new()
@@ -44,7 +48,11 @@ fn main() {
     // .add_item(show);
     let system_tray = SystemTray::new()
     .with_menu(tray_menu);
-
+  
+  // tauri::async_runtime::spawn(async move {
+  //   let mut config_state= terraphim_server::types::ConfigState::new().await.unwrap();
+  //   axum_server(addr,config_state).await;
+  // });
     let mut app = tauri::Builder::default()
       .system_tray(system_tray)
       .on_system_tray_event(|app, event| match event {
@@ -70,11 +78,12 @@ fn main() {
         }
         _ => {}
       })
+      .manage(config_state.clone())
       .invoke_handler(tauri::generate_handler![
+        cmd::my_custom_command,
+        cmd::get_config,
         cmd::log_operation,
         cmd::perform_request,
-        cmd::search,
-        cmd::get_config
       ])
       .build(context)
       .expect("error while running tauri application");
@@ -88,7 +97,7 @@ fn main() {
       window.hide().unwrap();
       app_handle
         .global_shortcut_manager()
-        .register(&CONFIG.global_shortcut, move || {
+        .register(&globbal_shortcut, move || {
 
           if window.is_visible().unwrap() {
             window.hide().unwrap();
@@ -120,5 +129,6 @@ fn main() {
     }
     _ => {}
   });
+  Ok(())
   }
 
