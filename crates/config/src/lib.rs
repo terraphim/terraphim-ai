@@ -101,7 +101,7 @@ impl TerraphimConfig {
             name: "Default".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "spacelab".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8000/articles/search".to_string(),
             kg,
             haystacks: vec![haystack],
             extra: HashMap::new(),
@@ -124,7 +124,7 @@ impl TerraphimConfig {
             name: "Engineer".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme:"lumen".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8000/articles/search".to_string(),
             kg: kg_engineer.clone(),
             haystacks: vec![eng_haystack.clone()],
             extra: HashMap::new(),
@@ -147,7 +147,7 @@ impl TerraphimConfig {
             name: "System Operator".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme:"superhero".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8000/articles/search".to_string(),
             kg: system_operator_kg,
             haystacks: vec![system_operator_haystack],
             extra: HashMap::new(),
@@ -166,6 +166,7 @@ impl TerraphimConfig {
     pub fn update(&mut self, new_config: TerraphimConfig) {
         self.global_shortcut = new_config.global_shortcut;
         self.roles = new_config.roles;
+        self.default_role = new_config.default_role;
     }
 }
 
@@ -294,7 +295,7 @@ mod tests {
             name: "Farther".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme:"lumen".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8080".to_string(),
             kg: KnowledgeGraph {
                 automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                     .to_string(),

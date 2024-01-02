@@ -68,6 +68,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
+    use terraphim_config::TerraphimConfig;
     use tokio::test;
     use reqwest::{StatusCode, Client};
     
@@ -81,6 +82,29 @@ mod tests {
             // assert!(body.contains("expected content"));
         
     }
+
+    // test search article with POST method 
+    #[test]
+    async fn test_post_search_article(){
+
+        let client = Client::new();
+        let response = client.post("http://localhost:8000/articles/search")
+            .header("Content-Type", "application/json")
+            .body(r#"
+            {
+                "search_term": "trained operators and maintainers",
+                "skip": 0,
+                "limit": 10,
+                "role": "system operator"
+            }
+            "#)
+            .send()
+            .await
+            .unwrap();
+        println!("response: {:?}", response);
+            assert_eq!(response.status(), StatusCode::OK);
+    }
+
     #[test]
     async fn test_search_articles_without_role() {
         
@@ -110,6 +134,31 @@ mod tests {
             // let body = response.text().await.unwrap();
             // assert!(body.contains("expected content"));
         
+    }
+
+    /// test update config 
+    #[test]
+    async fn test_post_config(){
+        use serde_json::json;
+        let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
+        let orig_config: TerraphimConfig = response.json().await.unwrap();
+        println!("orig_config: {:?}", orig_config);
+        let mut new_config = orig_config.clone();
+        new_config.default_role = "system operator".to_string();
+        new_config.global_shortcut= "Ctrl+X".to_string();
+        println!("new_config: {:?}", new_config);
+        let client = Client::new();
+        let response = client.post("http://localhost:8000/config/")
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .body(serde_json::to_string(&new_config).unwrap())
+            .send()
+            .await
+            .unwrap();
+        println!("response: {:?}", response);
+        assert_eq!(response.status(), StatusCode::OK);
+
+
     }
     #[test]
     async fn test_post_article() {
