@@ -75,8 +75,7 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
 
 pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalResult<(Operator, u128)> {
     /// get_speed returns the time it takes to save and load a 1MB file.
-    /// It is used to determine the fastest operator.
-    /// FIXME: use a more accurate way to measure the speed.
+    /// It is used to determine the fastest operator for a given profile.
     async fn get_speed(op: Operator) -> OpendalResult<u128> {
         let start_time = Instant::now();
         #[cfg(debug_assertions)]

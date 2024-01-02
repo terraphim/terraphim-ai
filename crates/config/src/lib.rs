@@ -3,10 +3,20 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
+use thiserror::Error;
 use opendal::Result as OpendalResult;
 use async_trait::async_trait;
 use persistance::Persistable;
+
+type Result<T> = std::result::Result<T, TerraphimConfigError>;
+
+#[derive(Error, Debug)]
+pub enum TerraphimConfigError {
+    #[error("Unable to load config")]
+    NotFound,
+}
+
+
 
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
@@ -49,8 +59,8 @@ pub struct Role {
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct Haystack {
-    haystack: String,
-    service: String,
+    pub haystack: String,
+    pub service: String,
 }
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
@@ -91,7 +101,7 @@ impl TerraphimConfig {
             name: "Default".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "spacelab".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8000/articles/search".to_string(),
             kg,
             haystacks: vec![haystack],
             extra: HashMap::new(),
@@ -114,7 +124,7 @@ impl TerraphimConfig {
             name: "Engineer".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme:"lumen".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8000/articles/search".to_string(),
             kg: kg_engineer.clone(),
             haystacks: vec![eng_haystack.clone()],
             extra: HashMap::new(),
@@ -137,7 +147,7 @@ impl TerraphimConfig {
             name: "System Operator".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme:"superhero".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8000/articles/search".to_string(),
             kg: system_operator_kg,
             haystacks: vec![system_operator_haystack],
             extra: HashMap::new(),
@@ -156,6 +166,7 @@ impl TerraphimConfig {
     pub fn update(&mut self, new_config: TerraphimConfig) {
         self.global_shortcut = new_config.global_shortcut;
         self.roles = new_config.roles;
+        self.default_role = new_config.default_role;
     }
 }
 
@@ -178,9 +189,10 @@ impl Persistable for TerraphimConfig {
         Ok(())
     }
     async fn load(&mut self, key: &str) -> OpendalResult<Self> {
-        let op = &self.load_config().await.unwrap().1;
+        // FIXME: use better error handling
+        let op = &self.load_config().await?.1;
 
-        let obj = self.load_from_operator(key, op).await.unwrap();
+        let obj = self.load_from_operator(key, op).await?;
         Ok(obj)
     }
 
@@ -283,7 +295,7 @@ mod tests {
             name: "Farther".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme:"lumen".to_string(),
-            server_url: "https://localhost:8080".to_string(),
+            server_url: "http://localhost:8080".to_string(),
             kg: KnowledgeGraph {
                 automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                     .to_string(),

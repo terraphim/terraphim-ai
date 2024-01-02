@@ -66,7 +66,7 @@ impl ToString for Document {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexedDocument {
     /// UUID of the indexed document
-    id: String,
+    pub id: String,
     /// Matched to edges
     matched_to: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)

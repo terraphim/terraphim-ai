@@ -1,7 +1,7 @@
 [package]
 name = "app"
 version = "0.1.0"
-description = "Privacy preserving AI assistant: Take control of the revelance"
+description = "Privacy preserving AI assistant: Take control of the relevance"
 authors = ["you"]
 license = ""
 repository = ""
@@ -15,15 +15,20 @@ rust-version = "1.57"
 tauri-build = { version = "1.5.0", features = [] }
 
 [dependencies]
+terraphim_config= {path="../../crates/config"}
+terraphim_pipeline= {path="../../crates/terraphim_pipeline"}
+terraphim_types= {path="../../terraphim_types"}
+terraphim_settings= {path="../../crates/settings"}
+terraphim_server= {path = "../../server-axum"}
+terraphim-grep =  {path="../../crates/terraphim-grep" }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.5.2", features = ["api-all", "cli", "system-tray"] }
-directories = "4.0.1"
-
-config =  {git = "https://github.com/mehcode/config-rs.git" }
 serde_derive = "^1.0.137"
 lazy_static = "1.4"
-terraphim-grep =  {path="../../crates/terraphim-grep" }
+tokio = { version = "1.35.1", features = ["full"] }
+portpicker= {version = "*"}
+anyhow = "1.0.78"
 
 [features]
 # by default Tauri runs in production mode

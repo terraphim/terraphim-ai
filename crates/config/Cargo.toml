@@ -29,3 +29,4 @@ anyhow = "1"
 url = "2.3.1"
 async-once-cell = "0.5.3"
 ulid = {version = "1.0.0",features=["serde","uuid"]}
+thiserror = "1.0.53"

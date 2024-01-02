@@ -1,12 +1,12 @@
 {
   "global_shortcut": "Ctrl+X",
   "roles": {
-    "Engineer": {
-      "shortname": "Engineer",
-      "name": "Engineer",
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
       "relevance_function": "terraphim-graph",
-      "theme": "lumen",
-      "serverUrl": "https://localhost:8080",
+      "theme": "spacelab",
+      "serverUrl": "http://localhost:8000/articles/search",
       "kg": {
         "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
@@ -26,27 +26,7 @@
       "name": "System Operator",
       "relevance_function": "terraphim-graph",
       "theme": "superhero",
-      "serverUrl": "https://localhost:8080",
-      "kg": {
-        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-        "kg_type": "markdown",
-        "kg_path": "~/pkm",
-        "public": true,
-        "publish": true
-      },
-      "haystacks": [
-        {
-          "haystack": "localsearch",
-          "service": "ripgrep"
-        }
-      ]
-    },
-    "Default": {
-      "shortname": "Default",
-      "name": "Default",
-      "relevance_function": "terraphim-graph",
-      "theme": "spacelab",
-      "serverUrl": "https://localhost:8080",
+      "serverUrl": "http://localhost:8000/articles/search",
       "kg": {
         "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
@@ -66,7 +46,27 @@
       "name": "Farther",
       "relevance_function": "terraphim-graph",
       "theme": "lumen",
-      "serverUrl": "https://localhost:8080",
+      "serverUrl": "http://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "haystack": "localsearch",
+          "service": "ripgrep"
+        }
+      ]
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "serverUrl": "http://localhost:8000/articles/search",
       "kg": {
         "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         "kg_type": "markdown",
@@ -82,5 +82,6 @@
       ]
     }
   },
-  "id": "01HJ4AWDQGPMHDDK1F5SGS7A6W"
+  "default_role": "Default",
+  "id": "01HK54A3TQR94VM7YNKJEA0ZTJ"
 }
