@@ -6,3 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = { version = "1.0.149", features = ["derive"] }
+serde_json = "1.0.110"
+tokio = { version = "1.15.0", features = ["full"] }
+tokio-stream = {version = "0.1.14", features = ["sync"]}
+terraphim_types = { path = "../../terraphim_types" }
+terraphim_pipeline = { path = "../terraphim_pipeline" }
