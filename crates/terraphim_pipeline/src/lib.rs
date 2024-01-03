@@ -89,7 +89,7 @@ impl IndexedDocument {
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     // role filter
-    role: String,
+    pub role: String,
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, IndexedDocument>,

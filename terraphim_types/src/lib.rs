@@ -15,7 +15,7 @@ pub struct SearchQuery {
 }
 
 /// Create article schema
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Article {
     pub id: Option<String>,
     pub stub: Option<String>,
@@ -88,6 +88,46 @@ impl ConfigState {
     
         }
         Ok(config_state)
+    }
+    /// Index article in all rolegraphs
+    pub async fn index_article(&mut self, article:Article) -> OpendalResult<()> {
+    
+        let mut article = article.clone();
+        let id = if article.id.is_none() {
+            let id = ulid::Ulid::new().to_string();
+            article.id = Some(id.clone());
+            id
+        } else {
+            article.id.clone().unwrap()
+        };
+        for rolegraph_state in self.roles.values() {
+            let mut rolegraph = rolegraph_state.rolegraph.lock().await;
+            rolegraph.parse_document(id.clone(), article.clone());
+        }
+        Ok(())
+    }
+    pub async fn search_articles(&self, search_query:SearchQuery)->OpendalResult<Vec<IndexedDocument>> {
+        let default_role = self.config.lock().await.default_role.clone();
+        // if role is not provided, use the default role in the config
+        let role = if search_query.role.is_none() {
+            default_role.as_str()
+        } else {
+            search_query.role.as_ref().unwrap()
+        };
+        // let role = search_query.role.as_ref().unwrap();
+        let rolegraph = self.roles.get(role).unwrap().rolegraph.lock().await;
+        let documents: Vec<(&String, IndexedDocument)> =
+        match rolegraph.query(&search_query.search_term, search_query.skip, search_query.limit) {
+            Ok(docs) => docs,
+            Err(e) => {
+                log::error!("Error: {}", e);
+                return Ok(vec![]);
+
+            }
+        };
+        
+        let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc) | doc).collect();
+        Ok(docs)
     }
 
 }
