@@ -149,10 +149,7 @@ pub async fn run_ripgrep_and_broadcast(needle: String, haystack: String) {
                         continue
                     }
                 };
-                for rolegraph_state in config_state.roles.values() {
-                    let mut rolegraph = rolegraph_state.rolegraph.lock().await;
-                    rolegraph.parse_document(id.clone(), article.clone());
-                }
+                config_state.index_article(article.clone()).await.expect("Failed to index article");
             },
             _ => {
             }
@@ -160,9 +157,9 @@ pub async fn run_ripgrep_and_broadcast(needle: String, haystack: String) {
         
     }
 
-    let rolegraph_state  = config_state.roles.values().next().unwrap();
-    let rolegraph = rolegraph_state.rolegraph.lock().await;
-    let role_name = rolegraph.role.clone();
+    
+    let role_name = "System Operator".to_string();
+    println!("{:#?}", role_name);
     println!("Searching articles with query: {needle} {role_name}");
     let search_query = SearchQuery {
         search_term: needle,
@@ -170,14 +167,8 @@ pub async fn run_ripgrep_and_broadcast(needle: String, haystack: String) {
         skip: Some(0),
         limit: Some(10),
     };
-
-    let docs: Vec<_> = match rolegraph.query(&search_query.search_term, search_query.skip, search_query.limit) {
-        Ok(docs) => docs,
-        Err(e) => {
-            println!("Error: {:#?}", e);
-            vec![]
-        }
-    };
+    
+    let docs= config_state.search_articles(search_query).await.expect("Failed to search articles");
     
     // let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc) | doc).collect();
     println!("Found articles: {docs:?}");
