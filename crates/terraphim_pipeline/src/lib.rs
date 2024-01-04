@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     async fn test_find_matches_ids_ac_values() {
-        let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
+        let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
         let rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
@@ -471,7 +471,7 @@ mod tests {
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         rolegraph.parse_document_to_pair(article_id4, query4);
         warn!("Query graph");
-        let results_map = rolegraph
+        let (results_map,_nodes) = rolegraph
             .query(
                 "Life cycle concepts and project direction",
                 Some(0),

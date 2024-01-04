@@ -190,9 +190,9 @@ pub async fn run_ripgrep_service_and_index(
     haystack: String,
 ) {
     let ripgrep_service = RipgrepService::new(
-        "/Users/alexandermikhalev/.cargo/bin/rg".to_string(),
+        "rg".to_string(),
         vec![
-            needle.clone(),
+            format!("{}", needle.clone()),
             haystack.clone(),
             "--json".to_string(),
             "--trim".to_string(),
