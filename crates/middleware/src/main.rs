@@ -7,11 +7,11 @@ use lib::run_ripgrep_service_and_index;
 
 #[tokio::main]    
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
-    let needle1 = "'life cycle framework'".to_string();
-    let needle = "trained operators and maintainers".to_string();
+    let needle = "life cycle framework".to_string();
+    // let needle = "trained operators and maintainers".to_string();
     let haystack = "../../../INCOSE-Systems-Engineering-Handbook".to_string();
     let mut config_state= ConfigState::new().await.expect("Failed to load config state");
-    run_ripgrep_service_and_index(config_state.clone(),needle1.clone(), haystack).await;
+    run_ripgrep_service_and_index(config_state.clone(),needle.clone(), haystack).await;
     let role_name = "System Operator".to_string();
     println!("{:#?}", role_name);
     println!("Searching articles with query: {needle} {role_name}");
