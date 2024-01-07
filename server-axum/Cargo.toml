@@ -11,6 +11,7 @@ terraphim_pipeline={path="../crates/terraphim_pipeline"}
 terraphim_types= {path="../terraphim_types"}
 terraphim_settings={path="../crates/settings"}
 persistance = {path="../crates/persistance"}
+terraphim_middleware={path="../crates/middleware"}
 
 axum = {version ="0.6.20", features = ["macros"]}
 tokio = { version = "1.22.0", features = ["full"] }
