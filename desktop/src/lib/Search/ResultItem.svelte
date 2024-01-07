@@ -34,7 +34,7 @@
         <div class="level-right">
           <Taglist>
             {#if item.tags}
-            {#each Object.entries(item.tags) as [tag, url]}
+            {#each Object.entries(item.tags) as [count,tag]}
             <a href="https://terraphim.github.io/terraphim-project/#/page/{tag}" target="_blank"><Tag rounded>{tag}</Tag></a>
             {/each}
             {/if}
