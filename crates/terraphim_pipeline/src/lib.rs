@@ -60,7 +60,6 @@ impl ToString for Document {
     }
 }
 
-
 /// Reference to external storage of documents, traditional indexes use
 /// document, aka article or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,10 +85,14 @@ impl IndexedDocument {
 // TODO create top_k_documents function where
 // sort document id by rank
 
+/// RoleGraph is a graph of concepts and their relationships.
+/// It is used to index documents and search for them.
+/// Currently it maps from synonyms to concepts,
+/// so only normalized term returned when reverse lookup is performed
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     // role filter
-    role: String,
+    pub role: String,
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, IndexedDocument>,
@@ -98,6 +101,8 @@ pub struct RoleGraph {
     //TODO: make it private once performance tests are fixed
     pub ac_values: Vec<u64>,
     pub ac: AhoCorasick,
+    // reverse lookup - matched id into normalized term
+    pub ac_reverse_nterm: AHashMap<u64, String>,
 }
 impl RoleGraph {
     pub async fn new(role: String, automata_url: &str) -> Result<Self> {
@@ -106,10 +111,18 @@ impl RoleGraph {
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.
-        let (keys, values): (Vec<&str>, Vec<u64>) = dict_hash
-            .iter()
-            .map(|(key, value)| (key.as_str(), value.id))
-            .unzip();
+        // let (keys, values): (Vec<&str>, Vec<u64>) = dict_hash
+        //     .iter()
+        //     .map(|(key, value)| (key.as_str(), value.id))
+        //     .unzip();
+        let mut keys = Vec::new();
+        let mut values = Vec::new();
+        let mut ac_reverse_nterm = AHashMap::new();
+        for (key, value) in dict_hash.iter() {
+            keys.push(key.as_str());
+            values.push(value.id);
+            ac_reverse_nterm.insert(value.id, value.nterm.clone());
+        }
 
         let ac = AhoCorasick::builder()
             .match_kind(MatchKind::LeftmostLongest)
@@ -125,11 +138,12 @@ impl RoleGraph {
             dict_hash,
             ac_values: values,
             ac,
+            ac_reverse_nterm,
         })
     }
 
     /// Find all matches int the rolegraph for the given text
-    /// Returns a list of document ids
+    /// Returns a list of ids of the matched nodes
     fn find_matches_ids(&self, text: &str) -> Vec<u64> {
         let mut matches = Vec::new();
         for mat in self.ac.find_iter(text) {
@@ -172,7 +186,12 @@ impl RoleGraph {
         // }
     }
 
-    pub fn query(&self, query_string: &str, offset:Option<usize>,limit:Option<usize>) -> Result<Vec<(&String, IndexedDocument)>> {
+    pub fn query(
+        &self,
+        query_string: &str,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<(Vec<(&String, IndexedDocument)>, Vec<u64>)> {
         warn!("performing query");
         let nodes = self.find_matches_ids(query_string);
 
@@ -221,10 +240,12 @@ impl RoleGraph {
         // warn!("Results Map {:#?}", results_map);
         let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
         hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
-        hash_vec=hash_vec.into_iter()
-        .skip(offset.unwrap_or(0))
-        .take(limit.unwrap_or(std::usize::MAX)).collect();
-        Ok(hash_vec)
+        hash_vec = hash_vec
+            .into_iter()
+            .skip(offset.unwrap_or(0))
+            .take(limit.unwrap_or(std::usize::MAX))
+            .collect();
+        Ok((hash_vec, nodes))
     }
     pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
         let matches = self.find_matches_ids(text);
@@ -373,8 +394,8 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 mod tests {
     use super::*;
 
-    use ulid::Ulid;
     use tokio::test;
+    use ulid::Ulid;
 
     #[test]
     async fn test_split_paragraphs() {
@@ -406,6 +427,24 @@ mod tests {
     }
 
     #[test]
+    async fn test_find_matches_ids_ac_values() {
+        let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
+        let role = "system operator".to_string();
+        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
+        let rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
+        let matches = rolegraph.find_matches_ids(&query);
+        println!("matches: {:?}", matches);
+        for each_match in matches.iter() {
+            let ac_reverse_nterm = rolegraph.ac_reverse_nterm.get(each_match).unwrap();
+            println!("{each_match} ac_reverse_nterm: {:?}", ac_reverse_nterm);
+        }
+        assert_eq!(
+            rolegraph.ac_reverse_nterm.get(&matches[0]).unwrap(),
+            "life cycle concepts"
+        );
+    }
+
+    #[test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
@@ -432,8 +471,12 @@ mod tests {
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         rolegraph.parse_document_to_pair(article_id4, query4);
         warn!("Query graph");
-        let results_map = rolegraph
-            .query("Life cycle concepts and project direction")
+        let (results_map,_nodes) = rolegraph
+            .query(
+                "Life cycle concepts and project direction",
+                Some(0),
+                Some(10),
+            )
             .unwrap();
         assert_eq!(results_map.len(), 4);
     }

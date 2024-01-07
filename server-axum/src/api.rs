@@ -151,7 +151,6 @@ pub type SearchResultsStream = Sender<IndexedDocument>;
 
 /// Search articles by query params, subscribe to results via SSE.
 /// SSE is used to stream results to the client. Code for inspiration from [Shuttle Todo](https://github.com/joshua-mo-143/shuttle-axum-htmx-ex/blob/main/src/main.rs#L7)
-// pub(crate) async fn search_articles_stream(Extension(tx): Extension<SearchResultsStream>,State(config): State<types::ConfigState>,search_query: Query<types::SearchQuery>) ->  Sse<impl Stream<Item = Result<Event, Infallible>>> {
     pub(crate) async fn search_articles_stream(Extension(tx): Extension<SearchResultsStream>,State(config): State<types::ConfigState>) ->  Sse<impl Stream<Item = Result<Event, Infallible>>> {
         let rx = tx.subscribe();
     
