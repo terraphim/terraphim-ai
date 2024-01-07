@@ -3,5 +3,5 @@ export interface SearchResult {
   title: string;
   url: string;
   body: string;
-  tags: Record <string, string>
+  tags: string[]
 }

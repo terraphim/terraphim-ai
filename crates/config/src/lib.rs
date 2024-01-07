@@ -139,7 +139,7 @@ impl TerraphimConfig {
             publish: true,
         };
         let system_operator_haystack = Haystack {
-            haystack: "localsearch".to_string(),
+            haystack: "/home/alex/projects/terraphim/INCOSE-Systems-Engineering-Handbook/".to_string(),
             service: "ripgrep".to_string(),
         };
         let system_operator= Role {
