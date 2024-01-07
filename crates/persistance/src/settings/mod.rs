@@ -116,6 +116,10 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
                 .finish();
             debug!("operator: {op:?}");
             op
+        },
+        #[cfg(feature = "services-atomicserver")]
+        Scheme::Atomicserver => {
+            Operator::from_map::<services::Atomicserver>(profile.clone())?.finish()
         }
         #[cfg(feature = "services-etcd")]
         Scheme::Etcd => Operator::from_map::<services::Etcd>(profile.clone())?.finish(),
