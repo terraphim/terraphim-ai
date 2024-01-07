@@ -64,12 +64,16 @@ impl ToString for Document {
 /// document, aka article or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexedDocument {
-    /// UUID of the indexed document
+    /// UUID of the indexed document, matching external storage id 
     pub id: String,
     /// Matched to edges
     matched_to: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
-    rank: u64,
+    pub rank: u64,
+    /// tags, which are nodes turned into concepts for human readability
+    pub tags:Vec<String>,
+    /// list of node ids for validation of matching
+    nodes: Vec<u64>,
 }
 
 impl IndexedDocument {
@@ -191,11 +195,11 @@ impl RoleGraph {
         query_string: &str,
         offset: Option<usize>,
         limit: Option<usize>,
-    ) -> Result<(Vec<(&String, IndexedDocument)>, Vec<u64>)> {
+    ) -> Result<Vec<(&String, IndexedDocument)>> {
         warn!("performing query");
         let nodes = self.find_matches_ids(query_string);
 
-        //  turn into hashset by implementing hash and eq traits
+        //  TODO: turn into BinaryHeap by implementing hash and eq traits
 
         let mut results_map = AHashMap::new();
         for node_id in nodes.iter() {
@@ -204,7 +208,8 @@ impl RoleGraph {
                 .nodes
                 .get(node_id)
                 .ok_or(TerraphimPipelineError::NodeIdNotFound)?;
-
+            let nterm= self.ac_reverse_nterm.get(node_id).unwrap();
+            println!("Normalized term {nterm}");
             let node_rank = node.rank;
             // warn!("Node Rank {}", node_rank);
             // warn!("Node connected to Edges {:?}", node.connected_with);
@@ -223,6 +228,8 @@ impl RoleGraph {
                                 id: document_id.to_string(),
                                 matched_to: vec![each_edge.clone()],
                                 rank: total_rank,
+                                tags:vec![nterm.clone()],
+                                nodes:vec![node_id.clone()],
                             };
 
                             results_map.insert(document_id, document);
@@ -245,7 +252,7 @@ impl RoleGraph {
             .skip(offset.unwrap_or(0))
             .take(limit.unwrap_or(std::usize::MAX))
             .collect();
-        Ok((hash_vec, nodes))
+        Ok((hash_vec))
     }
     pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
         let matches = self.find_matches_ids(text);
@@ -316,7 +323,7 @@ impl Edge {
     }
 }
 // Node represent single concept
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
     id: u64,
     // number of co-occureneces

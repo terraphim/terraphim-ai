@@ -9,6 +9,7 @@ edition = "2021"
 terraphim_pipeline= { path = "../crates/terraphim_pipeline"}
 terraphim_config= { path = "../crates/config"}
 persistance ={path = "../crates/persistance"}
+
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 ulid = {version = "1.0.0",features=["serde","uuid"]}

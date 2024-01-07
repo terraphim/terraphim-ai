@@ -6,7 +6,7 @@ use terraphim_pipeline::Document;
 
 /// Query type for searching documents in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SearchQuery {
     pub search_term: String,
     pub skip: Option<usize>,
@@ -23,7 +23,8 @@ pub struct Article {
     pub url: String,
     pub body: String,
     pub description: Option<String>,
-    pub tags: Option<Vec<String>>,
+    pub tags: Vec<String>,
+    pub rank: u64,
 }
 
 impl From<Article> for Document {
@@ -42,6 +43,35 @@ impl From<Article> for Document {
         }
     }
 }
+
+// impl to_atomic for Article {
+//     fn to_atomic(&self) -> anyhow::Result<atomic::Document> {
+//         let mut doc = atomic::Document::new();
+//         doc.insert("id", self.id.clone().unwrap());
+//         doc.insert("title", self.title.clone());
+//         doc.insert("body", self.body.clone().unwrap());
+//         doc.insert("description", self.description.clone().unwrap());
+//         Ok(doc)
+//     }
+    
+// }
+
+/// Merge articles from the cache and the output of query results
+pub fn merge_and_serialize(articles_cached: HashMap<String, Article>, docs: Vec<IndexedDocument>) -> Vec<Article>{
+    let mut articles: Vec<Article> = Vec::new();
+    for each_doc in docs.iter() {
+        // FIXME: use better error handling
+        println!("each_doc: {:#?}", each_doc);
+        // println!("article: {:#?}", );
+        let mut article = articles_cached.get(&each_doc.id).unwrap().clone();
+        article.tags = each_doc.tags.clone();
+        article.rank = each_doc.rank.clone();
+        articles.push(article.clone());
+        }
+    articles
+}
+
+
 
 use anyhow::Result;
 use terraphim_pipeline::{IndexedDocument, RoleGraph};
@@ -103,34 +133,38 @@ impl ConfigState {
         }
         Ok(())
     }
+    
+
     /// Search articles in rolegraph using the search query
     pub async fn search_articles(
         &self,
         search_query: SearchQuery,
-    ) -> OpendalResult<(Vec<IndexedDocument>, Vec<u64>)> {
-        let default_role = self.config.lock().await.default_role.clone();
+    ) -> OpendalResult<Vec<IndexedDocument>> {
+        let current_config_state= self.config.lock().await.clone();
+        let default_role = current_config_state.default_role.clone();
         // if role is not provided, use the default role in the config
         let role = if search_query.role.is_none() {
             default_role.as_str()
         } else {
             search_query.role.as_ref().unwrap()
         };
-        // let role = search_query.role.as_ref().unwrap();
+
+        
         let rolegraph = self.roles.get(role).unwrap().rolegraph.lock().await;
-        let (documents, nodes): (Vec<(&String, IndexedDocument)>, Vec<u64>) = match rolegraph.query(
+        let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
             &search_query.search_term,
             search_query.skip,
             search_query.limit,
         ) {
-            Ok((docs, nodes)) => (docs, nodes),
+            Ok(docs) =>docs,
             Err(e) => {
                 log::error!("Error: {}", e);
-                return Ok((vec![], vec![]));
+                return Ok((vec![]));
             }
         };
 
         let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc)| doc).collect();
-        Ok((docs, nodes))
+        Ok(docs)
     }
 }
 

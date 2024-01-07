@@ -1,12 +1,12 @@
 use serde::Deserialize;
 use serde_json as json;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
 use std::process::{ExitStatus, Stdio};
 use std::time;
-use terraphim_types::{Article, ConfigState};
+use terraphim_types::{ConfigState, SearchQuery, Article, merge_and_serialize};
 use tokio::io::AsyncBufRead;
 use tokio::process::{Child, Command};
 
@@ -184,11 +184,12 @@ impl RipgrepService {
 }
 
 /// Service to run and index output of ripgrep into TerraphimGraph
+
 pub async fn run_ripgrep_service_and_index(
     mut config_state: ConfigState,
     needle: String,
     haystack: String,
-) {
+) -> HashMap<String, Article>{
     let ripgrep_service = RipgrepService::new(
         "rg".to_string(),
         vec![
@@ -204,6 +205,8 @@ pub async fn run_ripgrep_service_and_index(
 
     let mut article = Article::default();
 
+    /// Cache of the articles already processed by index service
+    let mut cached_articles: HashMap<String, Article> = HashMap::new();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     for each_msg in msgs.iter() {
@@ -226,11 +229,13 @@ pub async fn run_ripgrep_service_and_index(
                     continue;
                 }
                 existing_paths.insert(path_text.clone());
+                
 
                 let id = calculate_hash(&path_text);
                 article.id = Some(id.clone());
                 article.title = path_text.clone();
-                article.url = path_text;
+                article.url = path_text.clone();
+                
             }
             Message::Match(match_msg) => {
                 println!("stdout: {:#?}", article);
@@ -310,18 +315,47 @@ pub async fn run_ripgrep_service_and_index(
                     .index_article(article.clone())
                     .await
                     .expect("Failed to index article");
+                cached_articles.insert(id.clone().to_string(), article.clone());
+
             }
             _ => {}
-        }
-    }
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
+        };
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
     }
+cached_articles
+}
+/// Spin ripgrep service and index output of ripgrep into Cached Articles and TerraphimGraph
+pub async fn search_haystacks(config_state:ConfigState, search_query:SearchQuery)->HashMap<String, Article>{
+    
+    let current_config_state= config_state.config.lock().await.clone();
+    let default_role = current_config_state.default_role.clone();
+    // if role is not provided, use the default role in the config
+    let role = if search_query.role.is_none() {
+        default_role.as_str()
+    } else {
+        search_query.role.as_ref().unwrap()
+    };
+            // if role have a ripgrep service, use it to spin index and search process and return cached articles
+    println!(" role: {}", role);
+    // Role config
+    // FIXME: this fails when role name arrives in lowercase
+    let role_config = current_config_state.roles.get(role).unwrap();
+    println!(" role_config: {:#?}", role_config);
+    let mut articles_cached:HashMap<String,Article> = HashMap::new();
+    for each_haystack in &role_config.haystacks {
+        println!(" each_haystack: {:#?}", each_haystack);
+        articles_cached = match each_haystack.service.as_str() {
+            "ripgrep" => {
+                let needle = search_query.search_term.clone();
+                let haystack = each_haystack.haystack.clone();
+                // return cached articles
+                run_ripgrep_service_and_index(config_state.clone(), needle, haystack).await
+            }
+            _ => {
+                println!("Haystack service not supported, hence skipping");
+                HashMap::new()
+            }
+        };
+    };
+    articles_cached
 }
