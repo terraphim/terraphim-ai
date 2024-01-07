@@ -14,7 +14,6 @@ members = [
     "crates/persistance",
     "server-axum",
     "desktop/src-tauri",
-    "crates/terraphim-grep",
     "crates/middleware",
     "terraphim_types"
 ]

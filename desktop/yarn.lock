@@ -372,10 +372,21 @@
     "@tauri-apps/cli-win32-ia32-msvc" "1.5.7"
     "@tauri-apps/cli-win32-x64-msvc" "1.5.7"
 
-"@tomic/lib@^0.35.0", "@tomic/lib@^0.35.0-beta.1":
+"@tomic/lib@^0.35.0-beta.1":
   version "0.35.2"
   resolved "https://registry.yarnpkg.com/@tomic/lib/-/lib-0.35.2.tgz#6c6ff622a56a8db6c4e2fed6774419b6460c6ef3"
   integrity sha512-Zcov7BehgDXyMr7ZeYzvX6RmMfdPZp7fRrhqjuxPuiIyu8/gNe22vRNbalbBaOmU/CccnD0Bp62mNPOdJgqafw==
+  dependencies:
+    "@noble/ed25519" "1.6.0"
+    "@noble/hashes" "^0.5.7"
+    base64-arraybuffer "^1.0.2"
+    cross-fetch "^3.1.4"
+    fast-json-stable-stringify "^2.1.0"
+
+"@tomic/lib@^0.36.0":
+  version "0.36.1"
+  resolved "https://registry.yarnpkg.com/@tomic/lib/-/lib-0.36.1.tgz#19524f40242351a5185e26aded34e5d41276c8b9"
+  integrity sha512-EnGK9o4KOzwjH9HC2bT+xt7ExT89auUvgNIkgzJ2tayp96Bz8eoaVhDtZrs1YOuXwxwA0EnGmtZ3PDveBTeLWA==
   dependencies:
     "@noble/ed25519" "1.6.0"
     "@noble/hashes" "^0.5.7"
