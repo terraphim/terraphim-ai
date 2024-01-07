@@ -25,7 +25,7 @@ async-once-cell = "0.5.3"
 terraphim_settings={path="../settings"}
 
 [features]
-default = ["services-dashmap", "services-sled", "services-redis"]
+default = ["services-dashmap", "services-sled","services-atomicserver"]
 # Enable services dashmap support
 services-dashmap = ["opendal/services-dashmap"]
 # Enable services ipfs support
@@ -36,6 +36,8 @@ services-redis = ["opendal/services-redis"]
 services-rocksdb = ["opendal/services-rocksdb"]
 # Enable services sled support
 services-sled = ["opendal/services-sled"]
+# Enable services atomic server
+services-atomicserver = ["opendal/services-atomicserver"]
 
 [dev-dependencies]
 tempfile = "3.7.1"
