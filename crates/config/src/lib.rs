@@ -3,23 +3,30 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use thiserror::Error;
-use opendal::Result as OpendalResult;
 use async_trait::async_trait;
 use persistance::Persistable;
+use thiserror::Error;
 
-type Result<T> = std::result::Result<T, TerraphimConfigError>;
+pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
+
+type PersistanceResult<T> = std::result::Result<T, persistance::Error>;
 
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
     #[error("Unable to load config")]
     NotFound,
+
+    #[error("Profile error")]
+    Profile(String),
+
+    #[error("Persistance error")]
+    Persistance(#[from] persistance::Error),
+
+    #[error("Serde JSON error")]
+    Json(#[from] serde_json::Error),
 }
 
-
-
-
-#[derive(Debug, Serialize, Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum RelevanceFunction {
     #[serde(rename = "terraphim-graph")]
     TerraphimGraph,
@@ -43,7 +50,7 @@ pub struct TerraphimConfig {
     id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Role {
     pub shortname: Option<String>,
     pub name: String,
@@ -57,13 +64,13 @@ pub struct Role {
     pub extra: HashMap<String, Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Haystack {
     pub haystack: String,
     pub service: String,
 }
 
-#[derive(Debug, Serialize, Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
     pub automata_url: String,
     //"markdown" or "json
@@ -83,8 +90,8 @@ impl Default for TerraphimConfig {
 impl TerraphimConfig {
     pub fn new() -> Self {
         let id = Ulid::new().to_string();
-        let mut roles=HashMap::new();
-            let haystack = Haystack {
+        let mut roles = HashMap::new();
+        let haystack = Haystack {
             haystack: "localsearch".to_string(),
             service: "ripgrep".to_string(),
         };
@@ -119,11 +126,11 @@ impl TerraphimConfig {
             haystack: "localsearch".to_string(),
             service: "ripgrep".to_string(),
         };
-        let engineer= Role {
+        let engineer = Role {
             shortname: Some("Engineer".to_string()),
             name: "Engineer".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
-            theme:"lumen".to_string(),
+            theme: "lumen".to_string(),
             server_url: "http://localhost:8000/articles/search".to_string(),
             kg: kg_engineer.clone(),
             haystacks: vec![eng_haystack.clone()],
@@ -139,14 +146,15 @@ impl TerraphimConfig {
             publish: true,
         };
         let system_operator_haystack = Haystack {
-            haystack: "/home/alex/projects/terraphim/INCOSE-Systems-Engineering-Handbook/".to_string(),
+            haystack: "/home/alex/projects/terraphim/INCOSE-Systems-Engineering-Handbook/"
+                .to_string(),
             service: "ripgrep".to_string(),
         };
-        let system_operator= Role {
+        let system_operator = Role {
             shortname: Some("operator".to_string()),
             name: "System Operator".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
-            theme:"superhero".to_string(),
+            theme: "superhero".to_string(),
             server_url: "http://localhost:8000/articles/search".to_string(),
             kg: system_operator_kg,
             haystacks: vec![system_operator_haystack],
@@ -154,10 +162,9 @@ impl TerraphimConfig {
         };
         roles.insert("System Operator".to_string(), system_operator);
 
-
         Self {
             id,
-            /// global shortcut for terraphim desktop
+            // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles,
             default_role: "Default".to_string(),
@@ -170,40 +177,36 @@ impl TerraphimConfig {
     }
 }
 
-
-
 #[async_trait]
 impl Persistable for TerraphimConfig {
     fn new() -> Self {
         TerraphimConfig::new()
     }
 
-    async fn save_to_one(&self, profile_name: String) -> OpendalResult<()> {
+    async fn save_to_one(&self, profile_name: String) -> PersistanceResult<()> {
         self.save_to_profile(profile_name.clone()).await?;
         Ok(())
     }
+
     // saves to all profiles
-    async fn save(&self) -> OpendalResult<()> {
-        let _op = &self.load_config().await.unwrap().1;
-        let _ = self.save_to_all().await.unwrap();
+    async fn save(&self) -> PersistanceResult<()> {
+        let _op = &self.load_config().await?.1;
+        let _ = self.save_to_all().await?;
         Ok(())
     }
-    async fn load(&mut self, key: &str) -> OpendalResult<Self> {
-        // FIXME: use better error handling
+
+    async fn load(&mut self, key: &str) -> PersistanceResult<Self> {
         let op = &self.load_config().await?.1;
 
         let obj = self.load_from_operator(key, op).await?;
         Ok(obj)
     }
 
-    /// retutrns ulid as key + .json
+    /// returns ulid as key + .json
     fn get_key(&self) -> String {
-        
         self.id.clone() + ".json"
-        
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -211,7 +214,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tokio::test;
-    
+
     #[test]
     async fn test_write_config_to_json() {
         let config = TerraphimConfig::new();
@@ -268,7 +271,7 @@ mod tests {
     #[test]
     async fn test_init_global_config_to_toml() {
         let mut config = TerraphimConfig::new();
-        config.global_shortcut="Ctrl+/".to_string();
+        config.global_shortcut = "Ctrl+/".to_string();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config_shortcut.toml").unwrap();
@@ -287,14 +290,14 @@ mod tests {
         assert_eq!(config.global_shortcut, "Ctrl+.");
     }
     #[test]
-    async fn test_update_roles(){
-        let mut config=TerraphimConfig::new();
-        let mut new_config=TerraphimConfig::new();
-        let new_role= Role {
+    async fn test_update_roles() {
+        let mut config = TerraphimConfig::new();
+        let mut new_config = TerraphimConfig::new();
+        let new_role = Role {
             shortname: Some("farther".to_string()),
             name: "Farther".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
-            theme:"lumen".to_string(),
+            theme: "lumen".to_string(),
             server_url: "http://localhost:8080".to_string(),
             kg: KnowledgeGraph {
                 automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
@@ -310,14 +313,12 @@ mod tests {
             }],
             extra: HashMap::new(),
         };
-        new_config.roles.insert("Father".to_string(),new_role);
+        new_config.roles.insert("Father".to_string(), new_role);
         config.update(new_config);
         assert!(config.roles.contains_key("Father"));
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         let mut file = File::create("test-data/config_updated.json").unwrap();
         file.write_all(json_str.as_bytes()).unwrap();
         // assert_eq!(config.roles.len(),4);
-
     }
-
 }

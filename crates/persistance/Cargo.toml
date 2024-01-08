@@ -18,11 +18,11 @@ serde = { version = "1.0.182", features = ["derive"] }
 serde_json = "1.0.104"
 async-trait = "0.1.74"
 dirs = "5.0.0"
-anyhow = "1"
 twelf = { version="0.13", features = ["json", "toml", "env","clap","shellexpand"] }
 url = "2.3.1"
 async-once-cell = "0.5.3"
 terraphim_settings={path="../settings"}
+thiserror = "1.0.56"
 
 [features]
 default = ["services-dashmap", "services-sled","services-atomicserver"]
