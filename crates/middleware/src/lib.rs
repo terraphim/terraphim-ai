@@ -1,16 +1,14 @@
 use serde::Deserialize;
 use serde_json as json;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashSet, HashMap};
-use std::fs::{self, File};
+use std::collections::{HashMap, HashSet};
+use std::fs::{self};
 use std::hash::{Hash, Hasher};
-use std::process::{ExitStatus, Stdio};
+use std::process::Stdio;
 use std::time;
-use terraphim_types::{ConfigState, SearchQuery, Article, merge_and_serialize};
-use tokio::io::AsyncBufRead;
-use tokio::process::{Child, Command};
-
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader as TokioBufferedReader};
+use terraphim_types::{Article, ConfigState, SearchQuery};
+use tokio::io::AsyncReadExt;
+use tokio::process::Command;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", content = "data")]
@@ -23,48 +21,14 @@ pub enum Message {
     Summary(Summary),
 }
 
-impl Message {
-    fn unwrap_begin(&self) -> Begin {
-        match *self {
-            Message::Begin(ref x) => x.clone(),
-            ref x => panic!("expected Message::Begin but got {:?}", x),
-        }
-    }
-
-    fn unwrap_end(&self) -> End {
-        match *self {
-            Message::End(ref x) => x.clone(),
-            ref x => panic!("expected Message::End but got {:?}", x),
-        }
-    }
-
-    fn unwrap_match(&self) -> Match {
-        match *self {
-            Message::Match(ref x) => x.clone(),
-            ref x => panic!("expected Message::Match but got {:?}", x),
-        }
-    }
-
-    fn unwrap_context(&self) -> Context {
-        match *self {
-            Message::Context(ref x) => x.clone(),
-            ref x => panic!("expected Message::Context but got {:?}", x),
-        }
-    }
-
-    fn unwrap_summary(&self) -> Summary {
-        match *self {
-            Message::Summary(ref x) => x.clone(),
-            ref x => panic!("expected Message::Summary but got {:?}", x),
-        }
-    }
-}
-
+/// The `Begin` message is sent at the beginning of each search.
+/// It contains the path that is being searched, if one exists.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Begin {
     pub path: Option<Data>,
 }
 
+/// The `End` message is sent at the end of a search.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct End {
     path: Option<Data>,
@@ -72,12 +36,14 @@ pub struct End {
     stats: Stats,
 }
 
+/// The `Summary` message is sent at the end of a search.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Summary {
     elapsed_total: Duration,
     stats: Stats,
 }
 
+/// The `Match` message is sent for each non-overlapping match of a search.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Match {
     pub path: Option<Data>,
@@ -87,6 +53,7 @@ pub struct Match {
     pub submatches: Vec<SubMatch>,
 }
 
+/// The `Context` specifies the lines surrounding a match.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Context {
     pub path: Option<Data>,
@@ -96,6 +63,7 @@ pub struct Context {
     submatches: Vec<SubMatch>,
 }
 
+/// A `SubMatch` is a match within a match.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct SubMatch {
     #[serde(rename = "match")]
@@ -104,6 +72,8 @@ pub struct SubMatch {
     end: usize,
 }
 
+/// The `Data` type is used for fields that may be either text or bytes.
+/// In contains the raw data of the field.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Data {
@@ -111,19 +81,6 @@ pub enum Data {
     // This variant is used when the data isn't valid UTF-8. The bytes are
     // base64 encoded, so using a String here is OK.
     Bytes { bytes: String },
-}
-
-impl Data {
-    fn text(s: &str) -> Data {
-        Data::Text {
-            text: s.to_string(),
-        }
-    }
-    fn bytes(s: &str) -> Data {
-        Data::Bytes {
-            bytes: s.to_string(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -160,18 +117,41 @@ fn calculate_hash<T: Hash>(t: &T) -> String {
 
 pub struct RipgrepService {
     command: String,
-    args: Vec<String>,
+    default_args: Vec<String>,
 }
-impl RipgrepService {
-    pub fn new(command: String, args: Vec<String>) -> Self {
-        Self { command, args }
+
+/// Returns a new ripgrep service with default arguments
+impl Default for RipgrepService {
+    fn default() -> Self {
+        Self {
+            command: "rg".to_string(),
+            default_args: ["--json", "--trim", "-C3", "-i"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+        }
     }
-    pub async fn run(&self) -> Result<Vec<Message>, std::io::Error> {
+}
+
+impl RipgrepService {
+    /// Run ripgrep with the given needle and haystack
+    pub async fn run(
+        &self,
+        needle: String,
+        haystack: String,
+    ) -> Result<Vec<Message>, std::io::Error> {
+        // Merge the default arguments with the needle and haystack
+        let args: Vec<String> = vec![needle, haystack]
+            .into_iter()
+            .chain(self.default_args.clone())
+            .collect();
+
         let mut child = Command::new(&self.command)
-            .args(&self.args)
+            .args(args)
             .stdout(Stdio::piped())
             .spawn()
             .unwrap();
+
         let mut stdout = child.stdout.take().expect("Stdout is not available");
         let read = async move {
             let mut data = String::new();
@@ -183,151 +163,159 @@ impl RipgrepService {
     }
 }
 
-/// Service to run and index output of ripgrep into TerraphimGraph
-
-pub async fn run_ripgrep_service_and_index(
-    mut config_state: ConfigState,
-    needle: String,
-    haystack: String,
-) -> HashMap<String, Article>{
-    let ripgrep_service = RipgrepService::new(
-        "rg".to_string(),
-        vec![
-            format!("{}", needle.clone()),
-            haystack.clone(),
-            "--json".to_string(),
-            "--trim".to_string(),
-            "-C3".to_string(),
-            "-i".to_string(),
-        ],
-    );
-    let msgs = ripgrep_service.run().await.unwrap();
-
-    let mut article = Article::default();
-
-    /// Cache of the articles already processed by index service
-    let mut cached_articles: HashMap<String, Article> = HashMap::new();
-    let mut existing_paths: HashSet<String> = HashSet::new();
-
-    for each_msg in msgs.iter() {
-        match each_msg {
-            Message::Begin(begin_msg) => {
-                println!("stdout: {:#?}", each_msg);
-                article = Article::default();
-
-                // get path
-                let path: Option<Data> = begin_msg.path.clone();
-                let path_text = match path {
-                    Some(Data::Text { text }) => text,
-                    _ => {
-                        println!("Error: path is not text");
-                        continue;
-                    }
-                };
-
-                if existing_paths.contains(&path_text) {
-                    continue;
-                }
-                existing_paths.insert(path_text.clone());
-                
-
-                let id = calculate_hash(&path_text);
-                article.id = Some(id.clone());
-                article.title = path_text.clone();
-                article.url = path_text.clone();
-                
-            }
-            Message::Match(match_msg) => {
-                println!("stdout: {:#?}", article);
-                let path = match_msg.path.clone();
-                let path = path.unwrap();
-                let path_text = match path {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: path is not text");
-                        continue;
-                    }
-                };
-                let body = fs::read_to_string(path_text).unwrap();
-                article.body = body;
-
-                let lines = match &match_msg.lines {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: lines is not text");
-                        continue;
-                    }
-                };
-                match article.description {
-                    Some(description) => {
-                        article.description = Some(description + " " + &lines);
-                    }
-                    None => {
-                        article.description = Some(lines.clone());
-                    }
-                }
-            }
-            Message::Context(context_msg) => {
-                // let article = Article::new(context_msg.clone());
-                println!("stdout: {:#?}", article);
-
-                let article_url = article.url.clone();
-                let path = context_msg.path.clone();
-                let path = path.unwrap();
-                let path_text = match path {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: path is not text");
-                        continue;
-                    }
-                };
-
-                // We got a context for a different article
-                if article_url != path_text {
-                    continue;
-                }
-
-                let lines = match &context_msg.lines {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: lines is not text");
-                        continue;
-                    }
-                };
-                match article.description {
-                    Some(description) => {
-                        article.description = Some(description + " " + &lines);
-                    }
-                    None => {
-                        article.description = Some(lines.clone());
-                    }
-                }
-            }
-            Message::End(end_msg) => {
-                println!("stdout: {:#?}", each_msg);
-                // The `End` message could be received before the `Begin` message
-                // causing the article to be empty
-                let id = match article.id {
-                    Some(ref id) => id,
-                    None => continue,
-                };
-                config_state
-                    .index_article(article.clone())
-                    .await
-                    .expect("Failed to index article");
-                cached_articles.insert(id.clone().to_string(), article.clone());
-
-            }
-            _ => {}
-        };
-
-    }
-cached_articles
+/// A Middleware is a service that can be used to index and search through
+/// haystacks. Every middleware receives a needle and a haystack and returns
+/// a HashMap of Articles.
+trait Middleware {
+    /// Index the haystack and return a HashMap of Articles
+    async fn index(&mut self, needle: String, haystack: String) -> HashMap<String, Article>;
 }
-/// Spin ripgrep service and index output of ripgrep into Cached Articles and TerraphimGraph
-pub async fn search_haystacks(config_state:ConfigState, search_query:SearchQuery)->HashMap<String, Article>{
-    
-    let current_config_state= config_state.config.lock().await.clone();
+
+/// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
+/// through haystacks.
+struct RipgrepMiddleware {
+    service: RipgrepService,
+    config_state: ConfigState,
+}
+
+impl RipgrepMiddleware {
+    pub fn new(config_state: ConfigState) -> Self {
+        Self {
+            service: RipgrepService::default(),
+            config_state,
+        }
+    }
+}
+
+impl Middleware for RipgrepMiddleware {
+    async fn index(&mut self, needle: String, haystack: String) -> HashMap<String, Article> {
+        let messages = self.service.run(needle, haystack).await.unwrap();
+        let mut article = Article::default();
+
+        // Cache of the articles already processed by index service
+        let mut cached_articles: HashMap<String, Article> = HashMap::new();
+        let mut existing_paths: HashSet<String> = HashSet::new();
+
+        for message in messages.iter() {
+            match message {
+                Message::Begin(begin_msg) => {
+                    article = Article::default();
+
+                    // get path
+                    let path: Option<Data> = begin_msg.path.clone();
+                    let path_text = match path {
+                        Some(Data::Text { text }) => text,
+                        _ => {
+                            continue;
+                        }
+                    };
+
+                    if existing_paths.contains(&path_text) {
+                        continue;
+                    }
+                    existing_paths.insert(path_text.clone());
+
+                    let id = calculate_hash(&path_text);
+                    article.id = Some(id.clone());
+                    article.title = path_text.clone();
+                    article.url = path_text.clone();
+                }
+                Message::Match(match_msg) => {
+                    let path = match_msg.path.clone();
+                    let path = path.unwrap();
+
+                    let path_text = match path {
+                        Data::Text { text } => text,
+                        _ => {
+                            println!("Error: path is not text: {path:?}");
+                            continue;
+                        }
+                    };
+                    let body = fs::read_to_string(path_text).unwrap();
+                    article.body = body;
+
+                    let lines = match &match_msg.lines {
+                        Data::Text { text } => text,
+                        _ => {
+                            println!("Error: lines is not text: {:?}", match_msg.lines);
+                            continue;
+                        }
+                    };
+                    match article.description {
+                        Some(description) => {
+                            article.description = Some(description + " " + &lines);
+                        }
+                        None => {
+                            article.description = Some(lines.clone());
+                        }
+                    }
+                }
+                Message::Context(context_msg) => {
+                    let article_url = article.url.clone();
+                    let path = context_msg.path.clone();
+                    let path = path.unwrap();
+                    let path_text = match path {
+                        Data::Text { text } => text,
+                        _ => {
+                            println!("Error: path is not text: {path:?}");
+                            continue;
+                        }
+                    };
+
+                    // We got a context for a different article
+                    if article_url != path_text {
+                        println!(
+                            "Error: Context for differrent article. article_url != path_text: {article_url:?} != {path_text:?}"
+                        );
+                        continue;
+                    }
+
+                    let lines = match &context_msg.lines {
+                        Data::Text { text } => text,
+                        _ => {
+                            println!("Error: lines is not text: {:?}", context_msg.lines);
+                            continue;
+                        }
+                    };
+                    match article.description {
+                        Some(description) => {
+                            article.description = Some(description + " " + &lines);
+                        }
+                        None => {
+                            article.description = Some(lines.clone());
+                        }
+                    }
+                }
+                Message::End(_) => {
+                    // The `End` message could be received before the `Begin`
+                    // message causing the article to be empty
+                    let id = match article.id {
+                        Some(ref id) => id,
+                        None => {
+                            println!("Error: End message received before Begin message. Skipping.");
+                            continue;
+                        }
+                    };
+                    // We are done with this article, index it
+                    self.config_state
+                        .index_article(article.clone())
+                        .await
+                        .expect("Failed to index article");
+                    cached_articles.insert(id.clone().to_string(), article.clone());
+                }
+                _ => {}
+            };
+        }
+        cached_articles
+    }
+}
+
+/// Use Middleware to search through haystacks
+pub async fn search_haystacks(
+    config_state: ConfigState,
+    search_query: SearchQuery,
+) -> HashMap<String, Article> {
+    let current_config_state = config_state.config.lock().await.clone();
     let default_role = current_config_state.default_role.clone();
     // if role is not provided, use the default role in the config
     let role = if search_query.role.is_none() {
@@ -335,27 +323,36 @@ pub async fn search_haystacks(config_state:ConfigState, search_query:SearchQuery
     } else {
         search_query.role.as_ref().unwrap()
     };
-            // if role have a ripgrep service, use it to spin index and search process and return cached articles
+    // if role have a ripgrep service, use it to spin index and search process and return cached articles
     println!(" role: {}", role);
     // Role config
     // FIXME: this fails when role name arrives in lowercase
     let role_config = current_config_state.roles.get(role).unwrap();
     println!(" role_config: {:#?}", role_config);
-    let mut articles_cached:HashMap<String,Article> = HashMap::new();
+
+    // Define all middleware to be used for searching.
+    let mut ripgrep_middleware = RipgrepMiddleware::new(config_state.clone());
+
+    let mut articles_cached: HashMap<String, Article> = HashMap::new();
     for each_haystack in &role_config.haystacks {
         println!(" each_haystack: {:#?}", each_haystack);
+
+        // Spin ripgrep service and index output of ripgrep into Cached Articles and TerraphimGraph
+        let needle = search_query.search_term.clone();
+        let haystack = each_haystack.haystack.clone();
+
         articles_cached = match each_haystack.service.as_str() {
             "ripgrep" => {
-                let needle = search_query.search_term.clone();
-                let haystack = each_haystack.haystack.clone();
                 // return cached articles
-                run_ripgrep_service_and_index(config_state.clone(), needle, haystack).await
+                ripgrep_middleware
+                    .index(needle.clone(), haystack.clone())
+                    .await
             }
             _ => {
-                println!("Haystack service not supported, hence skipping");
+                println!("Unknown middleware: {:#?}", each_haystack.service);
                 HashMap::new()
             }
         };
-    };
+    }
     articles_cached
 }
