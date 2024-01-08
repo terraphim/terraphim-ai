@@ -3,11 +3,11 @@ use terraphim_middleware::search_haystacks;
 use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
 
+use terraphim_middleware::Result;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config_state = ConfigState::new()
-        .await
-        .expect("Failed to load config state");
+async fn main() -> Result<()> {
+    let config_state = ConfigState::new().await?;
     let needle = "life cycle framework".to_string();
     // let needle = "trained operators and maintainers".to_string();
     let role_name = "System Operator".to_string();

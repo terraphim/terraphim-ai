@@ -10,6 +10,26 @@ use terraphim_types::{Article, ConfigState, SearchQuery};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Failed to load config state")]
+    ConfigStateLoad(#[from] terraphim_types::Error),
+
+    #[error("Serde deserialization error: {0}")]
+    Json(#[from] json::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Role not found: {0}")]
+    RoleNotFound(String),
+
+    #[error("Indexation error: {0}")]
+    IndexationError(String),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
@@ -101,14 +121,13 @@ struct Duration {
     human: String,
 }
 
-/// Decode JSON Lines into a Vec<Message>. If there was an error decoding,
-/// this function panics.
-pub fn json_decode(jsonlines: &str) -> Vec<Message> {
-    json::Deserializer::from_str(jsonlines)
+/// Decode JSON Lines into a Vec<Message>.
+pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
+    Ok(json::Deserializer::from_str(jsonlines)
         .into_iter()
-        .collect::<Result<Vec<Message>, _>>()
-        .unwrap()
+        .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
 }
+
 fn calculate_hash<T: Hash>(t: &T) -> String {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
@@ -135,11 +154,7 @@ impl Default for RipgrepService {
 
 impl RipgrepService {
     /// Run ripgrep with the given needle and haystack
-    pub async fn run(
-        &self,
-        needle: String,
-        haystack: String,
-    ) -> Result<Vec<Message>, std::io::Error> {
+    pub async fn run(&self, needle: String, haystack: String) -> Result<Vec<Message>> {
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle, haystack]
             .into_iter()
@@ -149,17 +164,15 @@ impl RipgrepService {
         let mut child = Command::new(&self.command)
             .args(args)
             .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
+            .spawn()?;
 
         let mut stdout = child.stdout.take().expect("Stdout is not available");
         let read = async move {
             let mut data = String::new();
             stdout.read_to_string(&mut data).await.map(|_| data)
         };
-        let output = read.await;
-        let msgs = json_decode(&output.unwrap());
-        Ok(msgs)
+        let output = read.await?;
+        json_decode(&output)
     }
 }
 
@@ -168,7 +181,12 @@ impl RipgrepService {
 /// a HashMap of Articles.
 trait Middleware {
     /// Index the haystack and return a HashMap of Articles
-    async fn index(&mut self, needle: String, haystack: String) -> HashMap<String, Article>;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the middleware fails to index the haystack
+    async fn index(&mut self, needle: String, haystack: String)
+        -> Result<HashMap<String, Article>>;
 }
 
 /// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
@@ -188,8 +206,12 @@ impl RipgrepMiddleware {
 }
 
 impl Middleware for RipgrepMiddleware {
-    async fn index(&mut self, needle: String, haystack: String) -> HashMap<String, Article> {
-        let messages = self.service.run(needle, haystack).await.unwrap();
+    async fn index(
+        &mut self,
+        needle: String,
+        haystack: String,
+    ) -> Result<HashMap<String, Article>> {
+        let messages = self.service.run(needle, haystack).await?;
         let mut article = Article::default();
 
         // Cache of the articles already processed by index service
@@ -222,7 +244,10 @@ impl Middleware for RipgrepMiddleware {
                 }
                 Message::Match(match_msg) => {
                     let path = match_msg.path.clone();
-                    let path = path.unwrap();
+                    let cloned_path = path.clone();
+                    let path = cloned_path.ok_or_else(|| {
+                        Error::IndexationError(format!("Unknown path: {:?}", path.clone()))
+                    })?;
 
                     let path_text = match path {
                         Data::Text { text } => text,
@@ -231,7 +256,7 @@ impl Middleware for RipgrepMiddleware {
                             continue;
                         }
                     };
-                    let body = fs::read_to_string(path_text).unwrap();
+                    let body = fs::read_to_string(path_text)?;
                     article.body = body;
 
                     let lines = match &match_msg.lines {
@@ -253,7 +278,11 @@ impl Middleware for RipgrepMiddleware {
                 Message::Context(context_msg) => {
                     let article_url = article.url.clone();
                     let path = context_msg.path.clone();
-                    let path = path.unwrap();
+                    let cloned_path = path.clone();
+                    let path = cloned_path.ok_or_else(|| {
+                        Error::IndexationError(format!("Unknown path: {:?}", path.clone()))
+                    })?;
+
                     let path_text = match path {
                         Data::Text { text } => text,
                         _ => {
@@ -306,7 +335,7 @@ impl Middleware for RipgrepMiddleware {
                 _ => {}
             };
         }
-        cached_articles
+        Ok(cached_articles)
     }
 }
 
@@ -314,21 +343,23 @@ impl Middleware for RipgrepMiddleware {
 pub async fn search_haystacks(
     config_state: ConfigState,
     search_query: SearchQuery,
-) -> HashMap<String, Article> {
+) -> Result<HashMap<String, Article>> {
     let current_config_state = config_state.config.lock().await.clone();
     let default_role = current_config_state.default_role.clone();
     // if role is not provided, use the default role in the config
-    let role = if search_query.role.is_none() {
-        default_role.as_str()
-    } else {
-        search_query.role.as_ref().unwrap()
+    let role = match search_query.role {
+        None => default_role.as_str(),
+        Some(ref role) => role.as_str(),
     };
     // if role have a ripgrep service, use it to spin index and search process and return cached articles
-    println!(" role: {}", role);
+    println!(" role: {:?}", role);
     // Role config
-    // FIXME: this fails when role name arrives in lowercase
-    let role_config = current_config_state.roles.get(role).unwrap();
-    println!(" role_config: {:#?}", role_config);
+    // FIXME: this fails when role name arrives in lowercase. Should we canonicalize role names to uppercase?
+    let role_config = current_config_state
+        .roles
+        .get(role)
+        .ok_or_else(|| Error::RoleNotFound(role.to_string()))?;
+    println!("role_config: {:#?}", role_config);
 
     // Define all middleware to be used for searching.
     let mut ripgrep_middleware = RipgrepMiddleware::new(config_state.clone());
@@ -346,7 +377,7 @@ pub async fn search_haystacks(
                 // return cached articles
                 ripgrep_middleware
                     .index(needle.clone(), haystack.clone())
-                    .await
+                    .await?
             }
             _ => {
                 println!("Unknown middleware: {:#?}", each_haystack.service);
@@ -354,5 +385,5 @@ pub async fn search_haystacks(
             }
         };
     }
-    articles_cached
+    Ok(articles_cached)
 }

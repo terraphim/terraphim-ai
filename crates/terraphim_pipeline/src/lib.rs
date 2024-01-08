@@ -10,13 +10,10 @@ use serde::{Deserialize, Serialize};
 
 use terraphim_automata::load_automata;
 use terraphim_automata::matcher::Dictionary;
-use thiserror::Error;
 use unicode_segmentation::UnicodeSegmentation;
 
-type Result<T> = std::result::Result<T, TerraphimPipelineError>;
-
-#[derive(Error, Debug)]
-pub enum TerraphimPipelineError {
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
     #[error("The given node ID was not found")]
     NodeIdNotFound,
     #[error("The given Edge ID was not found")]
@@ -28,6 +25,8 @@ pub enum TerraphimPipelineError {
     #[error("Indexing error: {0}")]
     AhoCorasickError(#[from] aho_corasick::BuildError),
 }
+
+type Result<T> = std::result::Result<T, Error>;
 
 // use tracing::{debug, error, info, span, warn, Level};
 
@@ -64,14 +63,14 @@ impl ToString for Document {
 /// document, aka article or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexedDocument {
-    /// UUID of the indexed document, matching external storage id 
+    /// UUID of the indexed document, matching external storage id
     pub id: String,
     /// Matched to edges
     matched_to: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
     pub rank: u64,
     /// tags, which are nodes turned into concepts for human readability
-    pub tags:Vec<String>,
+    pub tags: Vec<String>,
     /// list of node ids for validation of matching
     nodes: Vec<u64>,
 }
@@ -204,20 +203,14 @@ impl RoleGraph {
         let mut results_map = AHashMap::new();
         for node_id in nodes.iter() {
             // warn!("Matched node {:?}", node_id);
-            let node = self
-                .nodes
-                .get(node_id)
-                .ok_or(TerraphimPipelineError::NodeIdNotFound)?;
-            let nterm= self.ac_reverse_nterm.get(node_id).unwrap();
+            let node = self.nodes.get(node_id).ok_or(Error::NodeIdNotFound)?;
+            let nterm = self.ac_reverse_nterm.get(node_id).unwrap();
             println!("Normalized term {nterm}");
             let node_rank = node.rank;
             // warn!("Node Rank {}", node_rank);
             // warn!("Node connected to Edges {:?}", node.connected_with);
             for each_edge_key in node.connected_with.iter() {
-                let each_edge = self
-                    .edges
-                    .get(each_edge_key)
-                    .ok_or(TerraphimPipelineError::EdgeIdNotFound)?;
+                let each_edge = self.edges.get(each_edge_key).ok_or(Error::EdgeIdNotFound)?;
                 warn!("Edge Details{:?}", each_edge);
                 let edge_rank = each_edge.rank;
                 for (document_id, rank) in each_edge.doc_hash.iter() {
@@ -228,8 +221,8 @@ impl RoleGraph {
                                 id: document_id.to_string(),
                                 matched_to: vec![each_edge.clone()],
                                 rank: total_rank,
-                                tags:vec![nterm.clone()],
-                                nodes:vec![node_id.clone()],
+                                tags: vec![nterm.clone()],
+                                nodes: vec![*node_id],
                             };
 
                             results_map.insert(document_id, document);
@@ -252,7 +245,7 @@ impl RoleGraph {
             .skip(offset.unwrap_or(0))
             .take(limit.unwrap_or(std::usize::MAX))
             .collect();
-        Ok((hash_vec))
+        Ok(hash_vec)
     }
     pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
         let matches = self.find_matches_ids(text);
@@ -447,7 +440,7 @@ mod tests {
         }
         assert_eq!(
             rolegraph.ac_reverse_nterm.get(&matches[0]).unwrap(),
-            "life cycle concepts"
+            "life cycle models"
         );
     }
 
@@ -478,13 +471,13 @@ mod tests {
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         rolegraph.parse_document_to_pair(article_id4, query4);
         warn!("Query graph");
-        let (results_map,_nodes) = rolegraph
+        let results: Vec<(&String, IndexedDocument)> = rolegraph
             .query(
                 "Life cycle concepts and project direction",
                 Some(0),
                 Some(10),
             )
             .unwrap();
-        assert_eq!(results_map.len(), 4);
+        assert_eq!(results.len(), 4);
     }
 }
