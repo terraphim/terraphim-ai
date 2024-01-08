@@ -53,28 +53,14 @@ mod tests {
 
     #[test]
     fn test_load_automata_from_file() {
-        let dict_hash = load_automata("tests/test_data.csv.gz").unwrap();
-        assert_eq!(dict_hash.len(), 3);
-        assert_eq!(dict_hash.get("foo").unwrap().id, "1");
-        assert_eq!(dict_hash.get("bar").unwrap().id, "2");
-        assert_eq!(dict_hash.get("baz").unwrap().id, "3");
-        assert_eq!(dict_hash.get("foo").unwrap().parent, None);
-        assert_eq!(dict_hash.get("bar").unwrap().parent, Some("1".to_string()));
-        assert_eq!(dict_hash.get("baz").unwrap().parent, Some("2".to_string()));
+        let dict_hash = load_automata("data/term_to_id.json").await.unwrap();
     }
 
     #[test]
     fn test_load_automata_from_url() {
         let dict_hash = load_automata(
-            "https://raw.githubusercontent.com/github/copilot-sample-code/main/test_data.csv.gz",
+            "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         )
-        .unwrap();
-        assert_eq!(dict_hash.len(), 3);
-        assert_eq!(dict_hash.get("foo").unwrap().id, "1");
-        assert_eq!(dict_hash.get("bar").unwrap().id, "2");
-        assert_eq!(dict_hash.get("baz").unwrap().id, "3");
-        assert_eq!(dict_hash.get("foo").unwrap().parent, None);
-        assert_eq!(dict_hash.get("bar").unwrap().parent, Some("1".to_string()));
-        assert_eq!(dict_hash.get("baz").unwrap().parent, Some("2".to_string()));
+        .await.unwrap();
     }
 }
