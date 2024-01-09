@@ -18,26 +18,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use anyhow::anyhow;
-use log::debug;
 use opendal::layers::LoggingLayer;
 use opendal::services;
 use opendal::Operator;
 use opendal::Result as OpendalResult;
 use opendal::Scheme;
-// use serde::Deserialize;
+
+use log::debug;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
-
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Instant;
 
-use std::time::{Instant};
+use crate::{Error, Result};
 use terraphim_settings::Settings;
-
 
 /// resolve_relative_path turns a relative path to a absolute path.
 ///
@@ -72,8 +70,7 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
     result.into()
 }
 
-
-pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalResult<(Operator, u128)> {
+pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(Operator, u128)> {
     /// get_speed returns the time it takes to save and load a 1MB file.
     /// It is used to determine the fastest operator for a given profile.
     async fn get_speed(op: Operator) -> OpendalResult<u128> {
@@ -81,8 +78,8 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
         #[cfg(debug_assertions)]
         let buf = "test data";
         #[cfg(not(debug_assertions))]
-        let mut buf = vec![0u8; 1024*1024];
-        op.write("test", buf).await.unwrap();
+        let mut buf = vec![0u8; 1024 * 1024];
+        op.write("test", buf).await?;
         let end_time = Instant::now();
         let _save_time = end_time.duration_since(start_time).as_millis();
         let start_time = Instant::now();
@@ -95,13 +92,12 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
     let profile = settings
         .profiles
         .get(profile_name)
-        .ok_or_else(|| anyhow!("unknown profile: {}", profile_name))
-        .unwrap();
+        .ok_or_else(|| Error::Profile(format!("unknown profile: {}", profile_name)))?;
 
     let svc = profile
         .get("type")
-        .ok_or_else(|| anyhow!("missing 'type' in profile"))
-        .unwrap();
+        .ok_or_else(|| Error::Profile("type is required".to_string()))?;
+
     let scheme = Scheme::from_str(svc)?;
     let op = match scheme {
         Scheme::Azblob => Operator::from_map::<services::Azblob>(profile.clone())?.finish(),
@@ -116,7 +112,7 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
                 .finish();
             debug!("operator: {op:?}");
             op
-        },
+        }
         #[cfg(feature = "services-atomicserver")]
         Scheme::Atomicserver => {
             Operator::from_map::<services::Atomicserver>(profile.clone())?.finish()
@@ -134,9 +130,7 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
         Scheme::Ipfs => Operator::from_map::<services::Ipfs>(profile.clone())?.finish(),
         Scheme::Ipmfs => Operator::from_map::<services::Ipmfs>(profile.clone())?.finish(),
         #[cfg(feature = "services-memcached")]
-        Scheme::Memcached => {
-            Operator::from_map::<services::Memcached>(profile.clone())?.finish()
-        }
+        Scheme::Memcached => Operator::from_map::<services::Memcached>(profile.clone())?.finish(),
         Scheme::Obs => Operator::from_map::<services::Obs>(profile.clone())?.finish(),
         Scheme::Oss => Operator::from_map::<services::Oss>(profile.clone())?.finish(),
         #[cfg(feature = "services-redis")]
@@ -151,7 +145,7 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
         _ => {
             let builder = services::Memory::default();
             // Init an operator
-            
+
             Operator::new(builder)?
                 // Init with logging layer enabled.
                 .layer(LoggingLayer::default())
@@ -161,18 +155,20 @@ pub async fn parse_profile(settings:&Settings, profile_name: &str) -> OpendalRes
     let speed = get_speed(op.clone()).await?;
     Ok((op, speed))
 }
-pub async fn parse_profiles(settings:&Settings) -> OpendalResult<HashMap<String,(Operator, u128)>> {
+pub async fn parse_profiles(
+    settings: &Settings,
+) -> Result<HashMap<String, (Operator, u128)>> {
     let mut ops = HashMap::new();
     let profile_names = settings.profiles.keys();
     for profile_name in profile_names {
-        let (op, speed) = parse_profile(settings,profile_name).await?;
+        let (op, speed) = parse_profile(settings, profile_name).await?;
         ops.insert(profile_name.clone(), (op, speed));
     }
     Ok(ops)
 }
 #[cfg(test)]
 mod tests {
-    use opendal::Scheme;
+    use std::fs;
 
     use super::*;
 

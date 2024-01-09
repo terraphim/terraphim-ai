@@ -33,7 +33,7 @@ lazy_static! {
     static ref ROLEGRAPH: RoleGraph = {
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let rolegraph = RoleGraph::new(role, automata_url);
+        let rolegraph = RoleGraph::new(role, automata_url).await;
         rolegraph.unwrap()
     };
 }
@@ -136,7 +136,7 @@ fn bench_query_throughput(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(query_term.len() as u64 * *size as u64));
         group.bench_with_input(BenchmarkId::new("query", size), size, |b, &size| {
             let query_term = query_term.repeat(size);
-            b.iter(|| rolegraph.query(&query_term))
+            b.iter(|| rolegraph.query(&query_term, None, None))
         });
     }
     group.finish();
@@ -149,7 +149,7 @@ fn bench_query(c: &mut Criterion) {
     rolegraph.parse_document_to_pair(article_id4.clone(), query);
     let query_term = "Life cycle concepts and project direction".to_string();
     c.bench_function("query_response", |b| {
-        b.iter(|| rolegraph.query(&query_term))
+        b.iter(|| rolegraph.query(&query_term, None, None))
     });
 }
 

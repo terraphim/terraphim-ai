@@ -17,3 +17,4 @@ anyhow = "1.0.0"
 tokio = { version = "1.0", features = ["full"] }
 opendal = { version = "0.41.0", features = ["services-dashmap", "services-redis", "services-sled"] }
 log = "0.4.14"
+thiserror = "1.0.56"

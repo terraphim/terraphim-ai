@@ -2,7 +2,22 @@ use opendal::Result as OpendalResult;
 use persistance::Persistable;
 use serde::{Deserialize, Serialize};
 use terraphim_config::TerraphimConfig;
-use terraphim_pipeline::Document;
+use terraphim_pipeline::{Document, Error as TerraphimPipelineError};
+
+// terraphim error type based on thiserror
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Error: {0}")]
+    Article(String),
+
+    #[error("Error: {0}")]
+    Pipeline(#[from] TerraphimPipelineError),
+
+    #[error("Persistance error: {0}")]
+    Persistance(#[from] persistance::Error),
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 /// Query type for searching documents in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
@@ -53,27 +68,34 @@ impl From<Article> for Document {
 //         doc.insert("description", self.description.clone().unwrap());
 //         Ok(doc)
 //     }
-    
+
 // }
 
 /// Merge articles from the cache and the output of query results
-pub fn merge_and_serialize(articles_cached: HashMap<String, Article>, docs: Vec<IndexedDocument>) -> Vec<Article>{
+pub fn merge_and_serialize(
+    articles_cached: HashMap<String, Article>,
+    docs: Vec<IndexedDocument>,
+) -> Result<Vec<Article>> {
     let mut articles: Vec<Article> = Vec::new();
     for each_doc in docs.iter() {
-        // FIXME: use better error handling
         println!("each_doc: {:#?}", each_doc);
-        // println!("article: {:#?}", );
-        let mut article = articles_cached.get(&each_doc.id).unwrap().clone();
+        let mut article = match articles_cached.get(&each_doc.id) {
+            Some(article) => article.clone(),
+            None => {
+                return Err(Error::Article(format!(
+                    "Article with id {} not found",
+                    each_doc.id
+                )))
+            }
+        };
+
         article.tags = each_doc.tags.clone();
         article.rank = each_doc.rank.clone();
         articles.push(article.clone());
-        }
-    articles
+    }
+    Ok(articles)
 }
 
-
-
-use anyhow::Result;
 use terraphim_pipeline::{IndexedDocument, RoleGraph};
 use tokio::sync::Mutex;
 
@@ -93,10 +115,8 @@ impl ConfigState {
     pub async fn new() -> Result<Self> {
         let mut config = TerraphimConfig::new();
         // Try to load the existing state
-        // FIXMME: use better error handling
-        if let Ok(config) = config.load("configstate").await {
-            println!("config loaded");
-        }
+        let config = config.load("configstate").await?;
+        println!("Config loaded");
         let mut config_state = ConfigState {
             config: Arc::new(Mutex::new(config.clone())),
             roles: HashMap::new(),
@@ -133,14 +153,13 @@ impl ConfigState {
         }
         Ok(())
     }
-    
 
     /// Search articles in rolegraph using the search query
     pub async fn search_articles(
         &self,
         search_query: SearchQuery,
     ) -> OpendalResult<Vec<IndexedDocument>> {
-        let current_config_state= self.config.lock().await.clone();
+        let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
         // if role is not provided, use the default role in the config
         let role = if search_query.role.is_none() {
@@ -149,17 +168,16 @@ impl ConfigState {
             search_query.role.as_ref().unwrap()
         };
 
-        
         let rolegraph = self.roles.get(role).unwrap().rolegraph.lock().await;
         let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
             &search_query.search_term,
             search_query.skip,
             search_query.limit,
         ) {
-            Ok(docs) =>docs,
+            Ok(docs) => docs,
             Err(e) => {
                 log::error!("Error: {}", e);
-                return Ok((vec![]));
+                return Ok(vec![]);
             }
         };
 
