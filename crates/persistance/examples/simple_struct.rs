@@ -1,8 +1,7 @@
-use opendal::Result;
 use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
-use persistance::Persistable;
+use persistance::{Persistable, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct MyStruct {
@@ -42,7 +41,6 @@ impl Persistable for MyStruct {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();
 
     let obj = MyStruct {
@@ -53,7 +51,7 @@ async fn main() -> Result<()> {
     obj.save_to_one(profile_name).await?;
     obj.save().await?;
     println!("saved obj: {:?} to all", obj);
-    let (ops, fastest_op) = obj.load_config().await?;
+    let (_ops, fastest_op) = obj.load_config().await?;
     println!("fastest_op: {:#?}", fastest_op);
 
     let mut obj1 = MyStruct::new();
