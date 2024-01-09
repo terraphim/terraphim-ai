@@ -99,8 +99,10 @@ pub struct RoleGraph {
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, IndexedDocument>,
-    automata_url: String,
-    dict_hash: AHashMap<String, Dictionary>,
+    // TODO: Do we want to keep `automata_url` and `dict_hash`?
+    // They are currently unused.
+    pub automata_url: String,
+    pub dict_hash: AHashMap<String, Dictionary>,
     //TODO: make it private once performance tests are fixed
     pub ac_values: Vec<u64>,
     pub ac: AhoCorasick,
@@ -432,7 +434,7 @@ mod tests {
         let role = "system operator".to_string();
         let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
         let rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
-        let matches = rolegraph.find_matches_ids(&query);
+        let matches = rolegraph.find_matches_ids(query);
         println!("matches: {:?}", matches);
         for each_match in matches.iter() {
             let ac_reverse_nterm = rolegraph.ac_reverse_nterm.get(each_match).unwrap();
