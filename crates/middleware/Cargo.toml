@@ -13,3 +13,4 @@ tokio-stream = {version = "0.1.14", features = ["sync"]}
 terraphim_types = { path = "../../terraphim_types" }
 terraphim_pipeline = { path = "../terraphim_pipeline" }
 thiserror = "1.0.56"
+cached = { version = "0.47.0", features = ["async", "serde", "ahash"] }
