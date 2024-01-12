@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
         .search_articles(search_query)
         .await
         .expect("Failed to search articles");
-    let articles = merge_and_serialize(articles_cached, docs);
+    let articles = merge_and_serialize(articles_cached, docs)?;
     println!("Articles: {articles:?}");
 
     Ok(())
