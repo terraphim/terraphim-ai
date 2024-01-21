@@ -32,7 +32,7 @@ use terraphim_pipeline::RoleGraph;
 struct Args {
     /// String to search for
     #[arg(short, long)]
-    search_term: String,
+    search_term: Option<String>,
 
     /// Role to use for search
     #[arg(short, long)]
@@ -41,6 +41,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    
     let args = Args::parse();
     println!("args: {:?}", args);
     let server_settings = Settings::load_from_env_and_file(None)
@@ -57,6 +58,7 @@ async fn main() -> Result<()> {
             let port = portpicker::pick_unused_port().expect("failed to find unused port");
             SocketAddr::from(([127, 0, 0, 1], port))
         });
+    
     let mut config_state = types::ConfigState::new().await?;
 
     // Add one more for testing local KG
