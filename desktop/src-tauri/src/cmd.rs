@@ -7,8 +7,13 @@ use serde::{Serialize,Deserialize};
 use tauri::command;
 use tauri::State;
 use std::error::Error;
+use std::ops::Deref;
 use anyhow::{Context, Result};
-use terraphim_grep::scan_path;
+use terraphim_pipeline::IndexedDocument;
+use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
+
+use terraphim_middleware::search_haystacks;
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct RequestBody {
@@ -45,29 +50,19 @@ pub async fn my_custom_command(value: &str) -> Result<String, ()> {
 
 
 #[command]
-pub async fn search(config_state: State<'_, ConfigState>,needle: String, skip:Option<u8>,limit:Option<u8>,role: Option<String>) -> Result<String, TerraphimTauriError> {
-  let role=role.as_deref().unwrap_or("Engineer");
-  let current_config = config_state.config.lock().await;
-  let config_role= current_config.roles.get(role).unwrap();
-  println!("{} {}", needle, role);
-  for each_haystack in &config_role.haystacks {
-    println!("{:?}", each_haystack);
-    match each_haystack.service.as_str() {
-        "terraphim-grep" => {
-          println!("Terraphim Grep called with {needle} {:?}", each_haystack.haystack);
-        scan_path(&needle, each_haystack.haystack.clone(),None);
-        }
-        "rustb" => {
-            println!("{:?}", each_haystack.haystack);
-        }
-        _ => {
-            println!("{:?}", each_haystack.haystack);
-        }
-    }
-}
-  println!("{:?}", config_role.haystacks.len());
+pub async fn search(config_state: State<'_, ConfigState>,search_query:SearchQuery) -> Result<Vec<Article>, TerraphimTauriError> {
+  println!("Search called with {:?}", search_query);
+  let current_config_state= config_state.inner().clone();
+  let articles_cached = search_haystacks(current_config_state, search_query.clone())
+  .await
+  .context("Failed to search articles").unwrap();
+let docs: Vec<IndexedDocument> = config_state
+  .search_articles(search_query)
+  .await
+  .expect("Failed to search articles");
+  let articles = merge_and_serialize(articles_cached, docs).unwrap();
   
-  Ok("search response".into())
+  Ok(articles)
 }
 
 #[command]
@@ -89,7 +84,6 @@ pub fn get_port(port: tauri::State<Port>) -> Result<String, String> {
 use terraphim_server::axum_server;
 use std::net::SocketAddr;
 
-use terraphim_types::ConfigState;
 use terraphim_settings::Settings;
 
 #[tauri::command]

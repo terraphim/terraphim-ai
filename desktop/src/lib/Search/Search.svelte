@@ -14,12 +14,17 @@
     if ($is_tauri) {
       console.log("Tauri config");
       console.log($input);
-      invoke('search', {
+      invoke('search', { searchQuery: {
         search_term: $input,
         skip: 0,
         limit: 10,
         role: $role,
-      });
+    }})
+        .then(data => {
+          console.log(data);
+          result = data;
+        })
+        .catch(e => console.error(e));
     } else {
       console.log($input);
       console.log("Role config");
