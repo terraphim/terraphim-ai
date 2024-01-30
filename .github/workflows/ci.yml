@@ -14,21 +14,21 @@ env:
 
 jobs:
   build:
-      runs-on: ubuntu-latest
-      env:
-        EARTHLY_TOKEN: ${{ secrets.EARTHLY_TOKEN }}
-        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        FORCE_COLOR: 1
-      steps:
-        - uses: earthly/actions-setup@v1
-          with:
-            version: v0.7.23
-        - uses: actions/checkout@v2
-        - name: Docker Login
-          run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
-        - name: Run build
-          run: earthly --org applied-knowledge-systems --sat my-satellite --ci --push +docker_all
+    runs-on: ubuntu-latest
+    env:
+      EARTHLY_TOKEN: ${{ secrets.EARTHLY_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      FORCE_COLOR: 1
+    steps:
+      - uses: earthly/actions-setup@v1
+        with:
+          version: v0.7.23
+      - uses: actions/checkout@v2
+      - name: Docker Login
+        run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
+      - name: Run build
+        run: earthly --org applied-knowledge-systems --sat my-satellite --ci --push +docker-all
 
   build-and-test:
     name: Build and Test
@@ -46,13 +46,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: cargo check
-        run: cargo check --workspace --exclude terraphim_ai --exclude app
+        run: cargo check --workspace
 
       - name: cargo fmt
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace --exclude terraphim_ai --exclude app --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: cargo test
         run: cargo test --workspace --exclude terraphim_ai --exclude app --all-targets --all-features

@@ -20,5 +20,5 @@ log = "0.4.14"
 test-log = "0.2.14"
 
 [dev-dependencies]
-opendal = { version = "0.40.0", features = ["services-dashmap", "services-redis", "services-sled"] }
+opendal = { version = "0.44.2", features = ["services-dashmap", "services-redis", "services-sled"] }
 tempfile = "3.7.1"

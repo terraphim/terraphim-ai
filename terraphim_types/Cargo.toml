@@ -10,7 +10,7 @@ terraphim_pipeline = { path = "../crates/terraphim_pipeline" }
 
 anyhow = "1.0.0"
 log = "0.4.14"
-opendal = { version = "0.41.0", features = [
+opendal = { version = "0.44.2", features = [
     "services-dashmap",
     "services-redis",
     "services-sled",

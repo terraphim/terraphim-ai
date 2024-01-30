@@ -14,7 +14,7 @@ async-once-cell = "0.5.3"
 async-trait = "0.1.74"
 dirs = "5.0.0"
 log = "0.4"
-opendal = { version = "0.41.0", features = [
+opendal = { version = "0.44.2", features = [
   "services-dashmap",
   "services-redis",
   "services-sled",
