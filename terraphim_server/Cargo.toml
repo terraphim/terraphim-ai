@@ -28,6 +28,6 @@ utoipa = { features = ["axum_extras"], version = "4.1.0" }
 utoipa-rapidoc = { version = "1.0.0", features = ["axum"] }
 utoipa-redoc = { version = "1.0.0", features = ["axum"] }
 utoipa-swagger-ui = { features = ["axum"], version = "4.0.0" }
-tower = "0.4.13"
-rust-embed = "8.2.0"
 mime_guess = "2.0.4"
+tower = { version = "0.4", features = ["util"] }
+rust-embed = { version = "8.2.0", features = ["axum", "axum-ex","mime-guess"] }
