@@ -114,8 +114,8 @@ pub struct ConfigState {
 impl ConfigState {
     pub async fn new() -> Result<Self> {
         let mut config = TerraphimConfig::new();
-        // Try to load the existing state
-        let config = config.load("configstate").await?;
+        // Try to load the existing state of the config
+        let config = config.load("configstate").await.unwrap_or_default();
         println!("Config loaded");
         let mut config_state = ConfigState {
             config: Arc::new(Mutex::new(config.clone())),
