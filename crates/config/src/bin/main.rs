@@ -1,4 +1,4 @@
-use persistance::Persistable;
+use persistence::Persistable;
 use terraphim_config::TerraphimConfig;
 
 use terraphim_config::Result;

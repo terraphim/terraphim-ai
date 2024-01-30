@@ -1,31 +1,44 @@
 [package]
-name = "persistance"
+name = "persistence"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-opendal = { version = "0.41.0", features = ["services-dashmap", "services-redis", "services-sled"] }
-tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
-log = "0.4"
-tracing = { version = "0.1"}
+terraphim_settings = { path = "../settings" }
 tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "tracing-log",
 ] }
-serde = { version = "1.0.182", features = ["derive"] }
-serde_json = "1.0.104"
+
+async-once-cell = "0.5.3"
 async-trait = "0.1.74"
 dirs = "5.0.0"
-twelf = { version="0.13", features = ["json", "toml", "env","clap","shellexpand"] }
-url = "2.3.1"
-async-once-cell = "0.5.3"
-terraphim_settings={path="../settings"}
+log = "0.4"
+opendal = { version = "0.44.2", features = [
+  "services-dashmap",
+  "services-redis",
+  "services-sled",
+] }
+serde = { version = "1.0.182", features = ["derive"] }
+serde_json = "1.0.104"
 thiserror = "1.0.56"
+tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
+tracing = { version = "0.1" }
+twelf = { version = "0.13", features = [
+  "json",
+  "toml",
+  "env",
+  "clap",
+  "shellexpand",
+] }
+url = "2.3.1"
+
+[dev-dependencies]
+tempfile = "3.7.1"
+terraphim_config = { path = "../config" }
 
 [features]
-default = ["services-dashmap", "services-sled","services-atomicserver"]
+default = ["services-dashmap", "services-sled", "services-atomicserver"]
 # Enable services dashmap support
 services-dashmap = ["opendal/services-dashmap"]
 # Enable services ipfs support
@@ -39,5 +52,3 @@ services-sled = ["opendal/services-sled"]
 # Enable services atomic server
 services-atomicserver = ["opendal/services-atomicserver"]
 
-[dev-dependencies]
-tempfile = "3.7.1"

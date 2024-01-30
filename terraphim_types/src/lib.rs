@@ -1,5 +1,5 @@
 use opendal::Result as OpendalResult;
-use persistance::Persistable;
+use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use terraphim_config::TerraphimConfig;
 use terraphim_pipeline::{Document, Error as TerraphimPipelineError};
@@ -13,8 +13,8 @@ pub enum Error {
     #[error("Error: {0}")]
     Pipeline(#[from] TerraphimPipelineError),
 
-    #[error("Persistance error: {0}")]
-    Persistance(#[from] persistance::Error),
+    #[error("Persistence error: {0}")]
+    Persistence(#[from] persistence::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -90,7 +90,7 @@ pub fn merge_and_serialize(
         };
 
         article.tags = each_doc.tags.clone();
-        article.rank = each_doc.rank.clone();
+        article.rank = each_doc.rank;
         articles.push(article.clone());
     }
     Ok(articles)

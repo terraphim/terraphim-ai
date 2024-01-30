@@ -3,13 +3,11 @@ name = "terraphim_settings"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-twelf = { version="0.13", features = ["json", "toml", "env","clap"] }
-serde         = { version = "1", features = ["derive"] }
-serde_json    = "1"
-test-log = "0.2.14"
-log = "0.4.14"
 directories = "5.0.1"
+log = "0.4.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+test-log = "0.2.14"
 thiserror = "1.0.56"
+twelf = { version = "0.13", features = ["json", "toml", "env", "clap"] }

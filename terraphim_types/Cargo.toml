@@ -3,18 +3,20 @@ name = "terraphim_types"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-terraphim_pipeline= { path = "../crates/terraphim_pipeline"}
-terraphim_config= { path = "../crates/config"}
-persistance ={path = "../crates/persistance"}
+persistence = { path = "../crates/persistence" }
+terraphim_config = { path = "../crates/config" }
+terraphim_pipeline = { path = "../crates/terraphim_pipeline" }
 
+anyhow = "1.0.0"
+log = "0.4.14"
+opendal = { version = "0.44.2", features = [
+    "services-dashmap",
+    "services-redis",
+    "services-sled",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-ulid = {version = "1.0.0",features=["serde","uuid"]}
-anyhow = "1.0.0"
-tokio = { version = "1.0", features = ["full"] }
-opendal = { version = "0.41.0", features = ["services-dashmap", "services-redis", "services-sled"] }
-log = "0.4.14"
 thiserror = "1.0.56"
+tokio = { version = "1.0", features = ["full"] }
+ulid = { version = "1.0.0", features = ["serde", "uuid"] }

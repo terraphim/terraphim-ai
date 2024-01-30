@@ -1,4 +1,4 @@
-The goal of persistance crate is to crate a layer of abstraction using OpenDAL. 
+The goal of persistence crate is to crate a layer of abstraction using OpenDAL. 
 The idea is that writes will go everywhere in async mode, but all reads will be from fastest operator.
 see ./examples/simple_struct.rs 
 
@@ -7,7 +7,7 @@ save to all will save to all available profile
 load will load from fastest profile
 
 
-Config file here is to define available services for persistance layer.
+Config file here is to define available services for persistence layer.
 It is taken from: 
 https://github.com/apache/incubator-opendal/tree/main/bin/oli with minor modifications:
 prefix for env variables shall be TERRAPHIM_PROFILE instead of OLI_PROFILE

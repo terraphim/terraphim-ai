@@ -155,9 +155,7 @@ pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(O
     let speed = get_speed(op.clone()).await?;
     Ok((op, speed))
 }
-pub async fn parse_profiles(
-    settings: &Settings,
-) -> Result<HashMap<String, (Operator, u128)>> {
+pub async fn parse_profiles(settings: &Settings) -> Result<HashMap<String, (Operator, u128)>> {
     let mut ops = HashMap::new();
     let profile_names = settings.profiles.keys();
     for profile_name in profile_names {

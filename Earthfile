@@ -52,8 +52,8 @@ install:
 source:
   FROM +install
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir server-axum desktop crates terraphim_types  ./
-  COPY desktop+build/dist /code/server-axum/dist
+  COPY --keep-ts --dir terraphim-server desktop crates terraphim_types  ./
+  COPY desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args=fetch
 
 cross-build:
