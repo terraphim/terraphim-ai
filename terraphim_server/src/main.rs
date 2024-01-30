@@ -13,8 +13,8 @@
 )]
 #![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
 // #![deny(missing_docs)]
-use clap::Parser;
 use anyhow::Context;
+use clap::Parser;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use terraphim_settings::Settings;
@@ -23,8 +23,7 @@ use tokio::sync::Mutex;
 use terraphim_server::{axum_server, Result};
 use terraphim_types as types;
 
-use portpicker;
-/// TODO: Can't get Open API docs to work with axum consitently, given up for now.
+/// TODO: Can't get Open API docs to work with axum consistently, given up for now.
 use terraphim_pipeline::RoleGraph;
 
 #[derive(Parser, Debug)]
@@ -41,7 +40,6 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    
     let args = Args::parse();
     println!("args: {:?}", args);
     let server_settings = Settings::load_from_env_and_file(None)
@@ -58,7 +56,7 @@ async fn main() -> Result<()> {
             let port = portpicker::pick_unused_port().expect("failed to find unused port");
             SocketAddr::from(([127, 0, 0, 1], port))
         });
-    
+
     let mut config_state = types::ConfigState::new().await?;
 
     // Add one more for testing local KG
@@ -78,7 +76,7 @@ async fn main() -> Result<()> {
         "cfg Roles: {:?}",
         config_state.roles.keys().collect::<Vec<&String>>()
     );
-    axum_server(addr, config_state).await;
+    axum_server(addr, config_state).await?;
 
     Ok(())
 }

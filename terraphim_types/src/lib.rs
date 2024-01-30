@@ -90,7 +90,7 @@ pub fn merge_and_serialize(
         };
 
         article.tags = each_doc.tags.clone();
-        article.rank = each_doc.rank.clone();
+        article.rank = each_doc.rank;
         articles.push(article.clone());
     }
     Ok(articles)

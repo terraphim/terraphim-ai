@@ -1,4 +1,3 @@
-use terraphim_middleware;
 use terraphim_middleware::search_haystacks;
 use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};

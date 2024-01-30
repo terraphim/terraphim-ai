@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-use anyhow::Result;
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::error::Error;
 use tauri::command;
 use tauri::State;
-use terraphim_grep::scan_path;
+use terraphim_pipeline::IndexedDocument;
+use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
+
+use terraphim_middleware::search_haystacks;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -84,16 +85,15 @@ pub fn get_port(port: tauri::State<Port>) -> Result<String, String> {
 use std::net::SocketAddr;
 use terraphim_server::axum_server;
 
-use terraphim_settings::Settings;
-use terraphim_types::ConfigState;
-
 #[tauri::command]
 async fn start_server() -> Result<(), String> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let config_state = ConfigState::new().await.unwrap();
     tauri::async_runtime::spawn(async move {
-        axum_server(addr, config_state).await;
+        if let Err(e) = axum_server(addr, config_state).await {
+            println!("Failed to start axum server: {e:?}");
+        }
     });
     Ok(())
 }
