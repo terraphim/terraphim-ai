@@ -14,11 +14,11 @@ tauri-build = { version = "1.5.0", features = [] }
 
 [dependencies]
 terraphim_config= {path="../../crates/config"}
-terraphim_pipeline= {path="../../crates/terraphim_pipeline"}
-terraphim_types= {path="../../terraphim_types"}
-terraphim_settings= {path="../../crates/settings"}
-terraphim_server= {path = "../../server-axum"}
 terraphim_middleware =  {path="../../crates/middleware" }
+terraphim_pipeline= {path="../../crates/terraphim_pipeline"}
+terraphim_server= {path = "../../server-axum"}
+terraphim_settings= {path="../../crates/settings"}
+terraphim_types= {path="../../terraphim_types"}
 
 anyhow = "1.0.78"
 lazy_static = "1.4"

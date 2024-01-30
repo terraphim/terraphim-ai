@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Deserialize;
+use std::error::Error;
 use tauri::command;
 use tauri::State;
-use std::error::Error;
-use anyhow::{Context, Result};
 use terraphim_grep::scan_path;
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct RequestBody {
@@ -43,19 +44,23 @@ pub async fn my_custom_command(value: &str) -> Result<String, ()> {
 }
 
 #[command]
-pub async fn search(config_state: State<'_, ConfigState>,search_query:SearchQuery) -> Result<Vec<Article>, TerraphimTauriError> {
-  println!("Search called with {:?}", search_query);
-  let current_config_state= config_state.inner().clone();
-  let articles_cached = search_haystacks(current_config_state, search_query.clone())
-  .await
-  .context("Failed to search articles").unwrap();
-let docs: Vec<IndexedDocument> = config_state
-  .search_articles(search_query)
-  .await
-  .expect("Failed to search articles");
-  let articles = merge_and_serialize(articles_cached, docs).unwrap();
-  
-  Ok(articles)
+pub async fn search(
+    config_state: State<'_, ConfigState>,
+    search_query: SearchQuery,
+) -> Result<Vec<Article>, TerraphimTauriError> {
+    println!("Search called with {:?}", search_query);
+    let current_config_state = config_state.inner().clone();
+    let articles_cached = search_haystacks(current_config_state, search_query.clone())
+        .await
+        .context("Failed to search articles")
+        .unwrap();
+    let docs: Vec<IndexedDocument> = config_state
+        .search_articles(search_query)
+        .await
+        .expect("Failed to search articles");
+    let articles = merge_and_serialize(articles_cached, docs).unwrap();
+
+    Ok(articles)
 }
 
 #[command]
@@ -79,8 +84,8 @@ pub fn get_port(port: tauri::State<Port>) -> Result<String, String> {
 use std::net::SocketAddr;
 use terraphim_server::axum_server;
 
-use terraphim_types::ConfigState;
 use terraphim_settings::Settings;
+use terraphim_types::ConfigState;
 
 #[tauri::command]
 async fn start_server() -> Result<(), String> {
