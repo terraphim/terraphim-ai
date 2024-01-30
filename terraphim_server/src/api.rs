@@ -103,7 +103,7 @@ pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<Terra
     Json(config.clone())
 }
 
-use persistance::Persistable;
+use persistence::Persistable;
 /// API handler for Terraphim Config update
 pub async fn update_config(
     State(config): State<ConfigState>,
