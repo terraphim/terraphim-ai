@@ -3,18 +3,15 @@ name = "terraphim_automata"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+ahash = { version = "0.8.6", features = ["serde"] }
 aho-corasick = "1.0.2"
 csv = "1.2.2"
 flate2 = "1.0.26"
-reqwest = { version="0.11.18", features=["json","rustls-tls"]}
+reqwest = { version="0.11.18", features= ["json", "rustls-tls"] }
 serde = { version = "1.0.163", features = ["derive"] }
-thiserror = "1.0.30"
-serde_json="1"
-serde_path_to_error = "0.1"
+serde_json = "1"
 serde_json_any_key = "2.0.0"
-ahash="0.8.6"
-tokio = { workspace = true, features = ["full"] }
-# tokio = { version = "1", features = ["full"] }
+serde_path_to_error = "0.1"
+thiserror = "1.0.30"
+tokio = { version = "1", features = ["full"] }

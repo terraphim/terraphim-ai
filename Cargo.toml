@@ -1,78 +1,11 @@
-[package]
-name = "terraphim_ai"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
-license = "Apache-2.0"
-default-run="terraphim_server"
-repository = "https://github.com/terraphim/terraphim-ai/"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [workspace]
+resolver = "2"
 members = [
-    "crates/terraphim_automata",
-    "crates/terraphim_pipeline",
-    "crates/config",
-    "crates/settings",
-    "crates/persistance",
-    "server-axum",
+    "crates/*",
+    "terraphim_types",
+    "terraphim_server",
     "desktop/src-tauri",
-    "crates/middleware",
-    "terraphim_types"
 ]
-
-[dependencies]
-tokio = { version = "1.35.1", features = ["fs", "macros", "rt-multi-thread", "rt"] }
-itertools = "0.12.0"
-opendal = { version = "0.41.0", features = ["services-dashmap", "services-redis", "services-sled","rustls","services-redis-rustls"] }
-terraphim_config={path="crates/config"}
-terraphim_pipeline={path="crates/terraphim_pipeline"}
-terraphim_types= {path="terraphim_types"}
-terraphim_settings={path="crates/settings"}
-persistance = {path="crates/persistance"}
-terraphim_middleware={path="crates/middleware"}
-terraphim_server = {path="server-axum"}
-anyhow = "1.0.44"
-# FIXME: port picker used in axum and desktop
-portpicker = "0.1"
-rustls-pemfile = "2.0.0"
-[dev-dependencies]
-reqwest = {version = "0.11", features = ["json","rustls-tls"]}
-tokio = { version = "1", features = ["full"] }
-serde_json = "1.0.108"
-
-
-[workspace.dependencies]
-tokio = { version = "1.35.1", features = ["fs", "macros", "rt-multi-thread", "rt"] }
-
-[workspace.package]
-name = "terraphim_ai"
-homepage = "https://terraphim.ai/"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
-license = "Apache-2.0"
-default-run="terraphim_server"
-repository = "https://github.com/terraphim/terraphim-ai/"
-authors = ["Alex Mikhalev alex@terraphim.ai"]
-
-
-[dependencies.clap]
-features = ["derive", "env", "cargo"]
-version = "4"
-
-[[bin]]
-bench = false
-path = "server-axum/src/main.rs"
-name = "terraphim_server"
-
-[workspace.lints.rust]
-unsafe_code = "forbid"
-
-[lints]
-workspace = true 
-
-[features]
-default=["rustls"]
-
-rustls = ["reqwest/rustls-tls-native-roots"]
+default-members = [
+    "terraphim_server",
+]

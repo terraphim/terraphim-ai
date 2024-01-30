@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
-use persistance::{Persistable, Result};
+use persistence::{Persistable, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct MyStruct {
