@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 // TODO:
 // Default config shall be sled instead of redis
-//  settings and config from persistance shall be one
+//  settings and config from persistence shall be one
 
 /// Configuration for the server.
 /// These values are set when the server initializes, and do not change while running.

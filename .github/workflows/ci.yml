@@ -48,9 +48,8 @@ jobs:
       - name: cargo check
         run: cargo check --workspace --exclude terraphim_ai --exclude app
 
-      # TODO: Enable once formatting is fixed
-      #   - name: cargo fmt
-      #     run: cargo fmt --all -- --check
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
 
       - name: cargo clippy
         run: cargo clippy --workspace --exclude terraphim_ai --exclude app --all-targets --all-features -- -D warnings

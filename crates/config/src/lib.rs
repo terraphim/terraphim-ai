@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use async_trait::async_trait;
-use persistance::Persistable;
+use persistence::Persistable;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
-type PersistanceResult<T> = std::result::Result<T, persistance::Error>;
+type PersistenceResult<T> = std::result::Result<T, persistence::Error>;
 
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
@@ -19,8 +19,8 @@ pub enum TerraphimConfigError {
     #[error("Profile error")]
     Profile(String),
 
-    #[error("Persistance error")]
-    Persistance(#[from] persistance::Error),
+    #[error("Persistence error")]
+    Persistence(#[from] persistence::Error),
 
     #[error("Serde JSON error")]
     Json(#[from] serde_json::Error),
@@ -183,19 +183,19 @@ impl Persistable for TerraphimConfig {
         TerraphimConfig::new()
     }
 
-    async fn save_to_one(&self, profile_name: String) -> PersistanceResult<()> {
+    async fn save_to_one(&self, profile_name: String) -> PersistenceResult<()> {
         self.save_to_profile(profile_name.clone()).await?;
         Ok(())
     }
 
     // saves to all profiles
-    async fn save(&self) -> PersistanceResult<()> {
+    async fn save(&self) -> PersistenceResult<()> {
         let _op = &self.load_config().await?.1;
         let _ = self.save_to_all().await?;
         Ok(())
     }
 
-    async fn load(&mut self, key: &str) -> PersistanceResult<Self> {
+    async fn load(&mut self, key: &str) -> PersistenceResult<Self> {
         let op = &self.load_config().await?.1;
 
         let obj = self.load_from_operator(key, op).await?;

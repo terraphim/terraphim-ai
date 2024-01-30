@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-persistance = { path = "../crates/persistance" }
+persistence = { path = "../crates/persistence" }
 terraphim_config = { path = "../crates/config" }
 terraphim_pipeline = { path = "../crates/terraphim_pipeline" }
 
