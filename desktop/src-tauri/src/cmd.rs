@@ -2,52 +2,45 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-
-use serde::{Serialize,Deserialize};
+use anyhow::Result;
+use serde::Deserialize;
 use tauri::command;
 use tauri::State;
 use std::error::Error;
-use std::ops::Deref;
 use anyhow::{Context, Result};
-use terraphim_pipeline::IndexedDocument;
-use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
-
-use terraphim_middleware::search_haystacks;
-
+use terraphim_grep::scan_path;
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct RequestBody {
-  id: i32,
-  name: String,
+    id: i32,
+    name: String,
 }
-
 
 #[derive(Debug, serde::Serialize)]
 pub enum TerraphimTauriError {
-  FooError,
+    FooError,
 }
 
 #[command]
 pub fn log_operation(event: String, payload: Option<String>) {
-  println!("{} {:?}", event, payload);
+    println!("{} {:?}", event, payload);
 }
 
 #[command]
 pub fn perform_request(endpoint: String, body: RequestBody) -> String {
-  println!("{} {:?}", endpoint, body);
-  "message response".into()
+    println!("{} {:?}", endpoint, body);
+    "message response".into()
 }
 
 #[command]
 pub async fn my_custom_command(value: &str) -> Result<String, ()> {
-  // Call another async function and wait for it to finish
-  // some_async_function().await;
-  // Note that the return value must be wrapped in `Ok()` now.
-  println!("my_custom_command called with {}", value);
+    // Call another async function and wait for it to finish
+    // some_async_function().await;
+    // Note that the return value must be wrapped in `Ok()` now.
+    println!("my_custom_command called with {}", value);
 
-  Ok(format!("{}",value))
+    Ok(format!("{}", value))
 }
-
 
 #[command]
 pub async fn search(config_state: State<'_, ConfigState>,search_query:SearchQuery) -> Result<Vec<Article>, TerraphimTauriError> {
@@ -66,12 +59,14 @@ let docs: Vec<IndexedDocument> = config_state
 }
 
 #[command]
-pub async fn get_config(config_state: tauri::State<'_, ConfigState>) -> Result<terraphim_config::TerraphimConfig, ()>{
-  println!("Get config called");
-  let current_config = config_state.config.lock().await;
-  println!("Get config called with {:?}", current_config);
-  let response= current_config.clone();
-  Ok::<terraphim_config::TerraphimConfig, ()>(response)
+pub async fn get_config(
+    config_state: tauri::State<'_, ConfigState>,
+) -> Result<terraphim_config::TerraphimConfig, ()> {
+    println!("Get config called");
+    let current_config = config_state.config.lock().await;
+    println!("Get config called with {:?}", current_config);
+    let response = current_config.clone();
+    Ok::<terraphim_config::TerraphimConfig, ()>(response)
 }
 
 pub struct Port(u16);
@@ -81,18 +76,19 @@ pub fn get_port(port: tauri::State<Port>) -> Result<String, String> {
     Ok(format!("{}", port.0))
 }
 
-use terraphim_server::axum_server;
 use std::net::SocketAddr;
+use terraphim_server::axum_server;
 
+use terraphim_types::ConfigState;
 use terraphim_settings::Settings;
 
 #[tauri::command]
-async fn start_server()-> Result<(), String> {
+async fn start_server() -> Result<(), String> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let config_state= ConfigState::new().await.unwrap();
+    let config_state = ConfigState::new().await.unwrap();
     tauri::async_runtime::spawn(async move {
-        axum_server(addr,config_state).await;
+        axum_server(addr, config_state).await;
     });
-  Ok(())
+    Ok(())
 }

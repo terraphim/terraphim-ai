@@ -150,7 +150,6 @@ mod tests {
     /// test update config
     #[test]
     async fn test_post_config() {
-        use serde_json::json;
         let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
         let orig_config: TerraphimConfig = response.json().await.unwrap();
         println!("orig_config: {:?}", orig_config);
