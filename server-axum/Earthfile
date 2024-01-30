@@ -1,0 +1,65 @@
+VERSION --try --global-cache 0.7
+PROJECT applied-knowledge-systems/terraphim-project
+IMPORT ../desktop AS desktop
+IMPORT github.com/earthly/lib/rust AS rust
+FROM ubuntu:20.04
+
+ARG TARGETARCH
+ARG TARGETOS
+ARG TARGETPLATFORM
+ARG --global tag=$TARGETOS-$TARGETARCH
+ARG --global TARGETARCH
+IF [ "$TARGETARCH" = amd64 ]
+    ARG --global ARCH=x86_64
+ELSE
+    ARG --global ARCH=$TARGETARCH
+END
+
+WORKDIR /code
+
+pipeline:
+  BUILD desktop+build
+  BUILD +fmt
+  BUILD +lint
+  BUILD +test
+  BUILD +build
+
+
+install:
+  FROM rust:1.75.0-buster
+  RUN apt-get update -qq
+  RUN apt install -y musl-tools musl-dev
+  RUN update-ca-certificates
+  RUN rustup component add clippy
+  RUN rustup component add rustfmt
+  RUN cargo install cross
+  DO rust+INIT --keep_fingerprints=true
+
+source:
+  FROM +install
+  COPY --keep-ts --dir . .
+  COPY desktop+build/dist /code/server-axum/dist
+  DO rust+CARGO --args=fetch --keep-fingerprints=true
+  SAVE ARTIFACT dist as LOCAL /dist
+
+build:
+  FROM +source
+  DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
+  RUN ./target/release/terraphim_server --version
+  SAVE ARTIFACT ./target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
+
+test:
+  FROM +source
+  DO rust+CARGO --args="test"
+
+fmt:
+  FROM +source
+  DO rust+CARGO --args="fmt --check"
+
+lint:
+  FROM +source
+  DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
+
+save-fe-local:
+  COPY desktop+build/dist ./dist
+  SAVE ARTIFACT ./dist AS LOCAL ./dist
