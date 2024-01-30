@@ -13,7 +13,7 @@
 )]
 #![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
 // #![deny(missing_docs)]
-
+use clap::Parser;
 use anyhow::Context;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -27,8 +27,22 @@ use portpicker;
 /// TODO: Can't get Open API docs to work with axum consitently, given up for now.
 use terraphim_pipeline::RoleGraph;
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// String to search for
+    #[arg(short, long)]
+    search_term: String,
+
+    /// Role to use for search
+    #[arg(short, long)]
+    role: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let args = Args::parse();
+    println!("args: {:?}", args);
     let server_settings = Settings::load_from_env_and_file(None)
         .context("Failed to load settings from environment")?;
     println!(

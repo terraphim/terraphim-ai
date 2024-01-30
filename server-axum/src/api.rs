@@ -46,7 +46,7 @@ pub(crate) async fn create_article(
     (StatusCode::CREATED, response)
 }
 
-pub(crate) async fn list_articles(
+pub(crate) async fn _list_articles(
     State(rolegraph): State<Arc<Mutex<RoleGraph>>>,
 ) -> impl IntoResponse {
     let rolegraph = rolegraph.lock().await.clone();
@@ -58,7 +58,7 @@ pub(crate) async fn list_articles(
 /// Search All TerraphimGraphs defined in a config by query params.
 #[axum::debug_handler]
 pub(crate) async fn search_articles(
-    Extension(tx): Extension<SearchResultsStream>,
+    Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Query<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {
@@ -79,7 +79,7 @@ pub(crate) async fn search_articles(
 /// Search All TerraphimGraphs defined in a config by post params.
 /// FIXME: add title, url and body to search output
 pub(crate) async fn search_articles_post(
-    Extension(tx): Extension<SearchResultsStream>,
+    Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {

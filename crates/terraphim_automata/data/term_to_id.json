@@ -1,0 +1,622 @@
+{
+  "project management framework tailoring": {
+    "id": 43,
+    "nterm": "project tailoring strategy"
+  },
+  "strategy documents": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "project constraints": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "external condition": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "systems engineering management plan": {
+    "id": 48,
+    "nterm": "semp"
+  },
+  "portfolio of projects": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "qualified staff": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  },
+  "work breakdown structure": {
+    "id": 52,
+    "nterm": "work breakdown structure"
+  },
+  "project planning record": {
+    "id": 39,
+    "nterm": "project planning record"
+  },
+  "planning of the project": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "acquisition need": {
+    "id": 16,
+    "nterm": "acquisition need"
+  },
+  "program budget": {
+    "id": 31,
+    "nterm": "project budget"
+  },
+  "life cycle models": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "skilled staff": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  },
+  "state the project": {
+    "id": 22,
+    "nterm": "define the project"
+  },
+  "pm": {
+    "id": 37,
+    "nterm": "project management (sfia)"
+  },
+  "activate the project": {
+    "id": 17,
+    "nterm": "activate the project"
+  },
+  "lifecycle model": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "project retrospective": {
+    "id": 36,
+    "nterm": "project lessons learned"
+  },
+  "documentation structure": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "credit card sales voucher": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "preventive action": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "planning of a project": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "competent staff": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  },
+  "spiral": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "infrastructure management plan": {
+    "id": 35,
+    "nterm": "project infrastructure needs"
+  },
+  "project deliverable": {
+    "id": 39,
+    "nterm": "project planning record"
+  },
+  "project artifacts": {
+    "id": 39,
+    "nterm": "project planning record"
+  },
+  "qa corrective action": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "staff resources needs": {
+    "id": 34,
+    "nterm": "project human resources needs"
+  },
+  "project guidance": {
+    "id": 33,
+    "nterm": "project direction"
+  },
+  "human capital requirements": {
+    "id": 34,
+    "nterm": "project human resources needs"
+  },
+  "project portfolio": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "purchase order": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "quality policy": {
+    "id": 46,
+    "nterm": "quality assurance plan"
+  },
+  "rfp": {
+    "id": 16,
+    "nterm": "acquisition need"
+  },
+  "strategy development": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "life cycle stages": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "specify the project": {
+    "id": 22,
+    "nterm": "define the project"
+  },
+  "strategic roadmap": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "8d": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "qa plan": {
+    "id": 46,
+    "nterm": "quality assurance plan"
+  },
+  "pipeline of projects": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "documentation outline": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "personnel needs": {
+    "id": 34,
+    "nterm": "project human resources needs"
+  },
+  "project plan": {
+    "id": 42,
+    "nterm": "project schedule"
+  },
+  "strategic map": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "documentation map": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "@102 - prof. michael levin, prof. irina rish - emergence, intelligence, transhumanism.___": {
+    "id": 1,
+    "nterm": "@102 - prof. michael levin, prof. irina rish - emergence, intelligence, transhumanism.___"
+  },
+  "goals and objectives": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "project lessons learned": {
+    "id": 36,
+    "nterm": "project lessons learned"
+  },
+  "mission and vision": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "qm corrective actions": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "documentation hierarchy": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "capa": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "budget of a program": {
+    "id": 31,
+    "nterm": "project budget"
+  },
+  "project outline": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "bottleneck": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "pages_logseq_project management (sfia)": {
+    "id": 9,
+    "nterm": "pages_logseq_project management (sfia)"
+  },
+  "limitation": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "quality control plan": {
+    "id": 46,
+    "nterm": "quality assurance plan"
+  },
+  "describe the project": {
+    "id": 22,
+    "nterm": "define the project"
+  },
+  "project infrastructure needs": {
+    "id": 35,
+    "nterm": "project infrastructure needs"
+  },
+  "project management (sfia)": {
+    "id": 37,
+    "nterm": "project management (sfia)"
+  },
+  "project scheduling": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "2023_02_23": {
+    "id": 4,
+    "nterm": "2023_02_23"
+  },
+  "documentation tree": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "project direction": {
+    "id": 33,
+    "nterm": "project direction"
+  },
+  "project strategy": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "pbs": {
+    "id": 52,
+    "nterm": "work breakdown structure"
+  },
+  "project review": {
+    "id": 36,
+    "nterm": "project lessons learned"
+  },
+  "invoice or bill": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "planning projects": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "r&d plan": {
+    "id": 48,
+    "nterm": "semp"
+  },
+  "it strategy": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "restriction": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "project proposal": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "supply response": {
+    "id": 51,
+    "nterm": "supply response"
+  },
+  "petty cash voucher": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "project planning": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "quality assurance plan": {
+    "id": 46,
+    "nterm": "quality assurance plan"
+  },
+  "regulation": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "lessons learned": {
+    "id": 36,
+    "nterm": "project lessons learned"
+  },
+  "project manager": {
+    "id": 37,
+    "nterm": "project management (sfia)"
+  },
+  "project enabler": {
+    "id": 35,
+    "nterm": "project infrastructure needs"
+  },
+  "organization strategic plan": {
+    "id": 28,
+    "nterm": "organization strategic plan"
+  },
+  "project post-mortem": {
+    "id": 36,
+    "nterm": "project lessons learned"
+  },
+  "project human resources needs": {
+    "id": 34,
+    "nterm": "project human resources needs"
+  },
+  "cheque": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "engineering plan": {
+    "id": 48,
+    "nterm": "semp"
+  },
+  "life cycle framework": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "program portfolio": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "life cycle processes": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "credit note": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "qualified personnel": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  },
+  "competitive bid request": {
+    "id": 16,
+    "nterm": "acquisition need"
+  },
+  "human assets requirements": {
+    "id": 34,
+    "nterm": "project human resources needs"
+  },
+  "semp": {
+    "id": 48,
+    "nterm": "semp"
+  },
+  "set of projects": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "project infrastructure requirements": {
+    "id": 35,
+    "nterm": "project infrastructure needs"
+  },
+  "2023-06-27t09_34_56.000z.desktop": {
+    "id": 12,
+    "nterm": "2023-06-27t09_34_56.000z.desktop"
+  },
+  "project governance": {
+    "id": 33,
+    "nterm": "project direction"
+  },
+  "technical management plan": {
+    "id": 48,
+    "nterm": "semp"
+  },
+  "project budget": {
+    "id": 31,
+    "nterm": "project budget"
+  },
+  "call for proposals": {
+    "id": 16,
+    "nterm": "acquisition need"
+  },
+  "project roadmap": {
+    "id": 42,
+    "nterm": "project schedule"
+  },
+  "manpower requirements": {
+    "id": 34,
+    "nterm": "project human resources needs"
+  },
+  "quality assurance process": {
+    "id": 46,
+    "nterm": "quality assurance plan"
+  },
+  "corporate strategy": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "rfq": {
+    "id": 16,
+    "nterm": "acquisition need"
+  },
+  "outline the project": {
+    "id": 22,
+    "nterm": "define the project"
+  },
+  "quality plan": {
+    "id": 46,
+    "nterm": "quality assurance plan"
+  },
+  "life cycle methodology": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "project blueprint": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "budget of a project": {
+    "id": 31,
+    "nterm": "project budget"
+  },
+  "project timeline": {
+    "id": 42,
+    "nterm": "project schedule"
+  },
+  "preventive measure": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "response management": {
+    "id": 51,
+    "nterm": "supply response"
+  },
+  "project chart": {
+    "id": 42,
+    "nterm": "project schedule"
+  },
+  "project evaluation": {
+    "id": 36,
+    "nterm": "project lessons learned"
+  },
+  "strategy execution": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "vee": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "swot": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "project pipeline": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "prohibition": {
+    "id": 32,
+    "nterm": "project constraints"
+  },
+  "project planner iso15288": {
+    "id": 38,
+    "nterm": "project planner iso15288"
+  },
+  "detail the project": {
+    "id": 22,
+    "nterm": "define the project"
+  },
+  "project management methodology tailoring": {
+    "id": 43,
+    "nterm": "project tailoring strategy"
+  },
+  "program": {
+    "id": 41,
+    "nterm": "project portfolio"
+  },
+  "planning of projects": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "project management": {
+    "id": 37,
+    "nterm": "project management (sfia)"
+  },
+  "sales order": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "ishikawa diagram": {
+    "id": 44,
+    "nterm": "qm corrective actions"
+  },
+  "documentation chart": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "supporting documents": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "project funds": {
+    "id": 31,
+    "nterm": "project budget"
+  },
+  "cash memo": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "documentation archive": {
+    "id": 23,
+    "nterm": "documentation tree"
+  },
+  "strategic plan": {
+    "id": 50,
+    "nterm": "strategy documents"
+  },
+  "plan project and technical management": {
+    "id": 29,
+    "nterm": "plan project and technical management"
+  },
+  "waterfall": {
+    "id": 26,
+    "nterm": "life cycle models"
+  },
+  "project design": {
+    "id": 40,
+    "nterm": "project planning"
+  },
+  "experienced personnel": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  },
+  "project tailoring strategy": {
+    "id": 43,
+    "nterm": "project tailoring strategy"
+  },
+  "project management process tailoring": {
+    "id": 43,
+    "nterm": "project tailoring strategy"
+  },
+  "project schedule": {
+    "id": 42,
+    "nterm": "project schedule"
+  },
+  "define the project": {
+    "id": 22,
+    "nterm": "define the project"
+  },
+  "competent personnel": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  },
+  "project calendar": {
+    "id": 42,
+    "nterm": "project schedule"
+  },
+  "systems engineering plan": {
+    "id": 48,
+    "nterm": "semp"
+  },
+  "manager": {
+    "id": 37,
+    "nterm": "project management (sfia)"
+  },
+  "program governance": {
+    "id": 33,
+    "nterm": "project direction"
+  },
+  "source documents": {
+    "id": 49,
+    "nterm": "source documents"
+  },
+  "wbs": {
+    "id": 52,
+    "nterm": "work breakdown structure"
+  },
+  "skilled personnel": {
+    "id": 45,
+    "nterm": "qualified personnel"
+  }
+}
