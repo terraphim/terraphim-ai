@@ -13,7 +13,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     env:
       EARTHLY_TOKEN: ${{ secrets.EARTHLY_TOKEN }}
@@ -28,31 +28,4 @@ jobs:
       - name: Docker Login
         run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
       - name: Run build
-        run: earthly --org applied-knowledge-systems --sat my-satellite --ci --push +docker-all
-
-  build-and-test:
-    name: Build and Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: cargo check
-        run: cargo check --workspace
-
-      - name: cargo fmt
-        run: cargo fmt --all -- --check
-
-      - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: cargo test
-        run: cargo test --workspace --exclude terraphim_ai --exclude app --all-targets --all-features
+        run: earthly --org applied-knowledge-systems --sat my-satellite --ci --push +pipeline
