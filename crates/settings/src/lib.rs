@@ -41,7 +41,7 @@ impl Settings {
                 }
             }
         };
-
+        println!("Reading config_file: {:?}", config_file);
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
             Layer::Env(Some(String::from("TERRAPHIM_"))),
@@ -54,13 +54,16 @@ fn create_config_folder(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
         std::fs::create_dir_all(path)?;
     }
     let filename = path.join("settings.toml");
-
+    let default_config = include_str!("../default/settings.toml");
     if filename.exists() {
         log::warn!("File exists");
         log::warn!("{:?}", filename);
     } else {
         log::warn!("File does not exist");
-        std::fs::copy("default/settings.toml", &filename)?;
+        // FIXME: the logic of settings that each app - desktop or server have their own default settings.toml
+        // this is a quickfix to make testing sane
+        println!("Writing default config to: {:?}", filename);
+        std::fs::write( &filename,default_config)?;
     }
     Ok(filename)
 }
