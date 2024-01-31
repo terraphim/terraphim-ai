@@ -49,7 +49,7 @@ install:
   RUN rustup component add rustfmt
   DO rust+INIT --keep_fingerprints=true
   RUN cargo install cross
-  RUN cargo install orogene
+  #RUN cargo install orogene
   
 
 source:
@@ -82,6 +82,7 @@ build:
 build-debug:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
+  COPY desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline" --output="debug/[^/\.]+"
   RUN ./target/debug/terraphim_server --version
   SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server-debug
@@ -139,7 +140,7 @@ docker-slim:
     ENTRYPOINT ["./terraphim_server"]
     SAVE IMAGE aks/terraphim_server:buster
 
-docker-sratch:
+docker-scratch:
     FROM scratch
     COPY +build/terraphim_server terraphim_server
     EXPOSE 8000
