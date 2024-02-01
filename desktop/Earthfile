@@ -5,9 +5,9 @@ WORKDIR frontend
 
 deps:
     # COPY package.json tsconfig.json yarn.lock vite.config.ts tsconfig.node.json index.html ./
-    COPY . .
-    COPY --dir src src
-    COPY --dir public public
+    COPY --keep-ts . .
+    # COPY --dir src src
+    # COPY --dir public public
     RUN yarn
 
 build:

@@ -19,6 +19,7 @@ WORKDIR /code
 
 pipeline:
   BUILD desktop+build
+  BUILD +build-debug
   BUILD +fmt
   BUILD +lint
   BUILD +test
@@ -46,20 +47,23 @@ install:
   RUN update-ca-certificates
   RUN rustup component add clippy
   RUN rustup component add rustfmt
-  RUN cargo install cross
   DO rust+INIT --keep_fingerprints=true
+  RUN cargo install cross
+  #RUN cargo install orogene
+  
 
 source:
   FROM +install
+  WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim-server desktop crates terraphim_types  ./
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts --dir terraphim_server desktop crates terraphim_types  ./
   DO rust+CARGO --args=fetch
 
 cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
+  COPY desktop+build/dist /code/terraphim-server/dist
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
@@ -69,20 +73,33 @@ cross-build:
 
 build:
   FROM +source
+  DO rust+SET_CACHE_MOUNTS_ENV
+  COPY desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
   RUN ./target/release/terraphim_server --version
   SAVE ARTIFACT ./target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
 
-test:
+build-debug:
   FROM +source
-  DO rust+CARGO --args="test"
+  DO rust+SET_CACHE_MOUNTS_ENV
+  COPY desktop+build/dist /code/terraphim-server/dist
+  DO rust+CARGO --args="build --offline" --output="debug/[^/\.]+"
+  RUN ./target/debug/terraphim_server --version
+  SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server-debug
+
+test:
+  FROM +build-debug
+  DO rust+SET_CACHE_MOUNTS_ENV
+  COPY --chmod=0755 +build-debug/terraphim_server /terraphim_server_debug
+  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /terraphim_server_debug & sleep 2 & cargo test --offline;
+  #DO rust+CARGO --args="test --offline"
 
 fmt:
-  FROM +source
+  FROM +build-debug
   DO rust+CARGO --args="fmt --check"
 
 lint:
-  FROM +source
+  FROM +build-debug
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
 docker-musl:
@@ -122,3 +139,10 @@ docker-slim:
     EXPOSE 8000
     ENTRYPOINT ["./terraphim_server"]
     SAVE IMAGE aks/terraphim_server:buster
+
+docker-scratch:
+    FROM scratch
+    COPY +build/terraphim_server terraphim_server
+    EXPOSE 8000
+    ENTRYPOINT ["./terraphim_server"]
+    SAVE IMAGE aks/terraphim_server:scratch

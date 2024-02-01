@@ -63,8 +63,8 @@ async fn main() -> Result<()> {
 
     let addr = server_hostname;
     let role = "system operator".to_string();
-    // let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-    let automata_url = "./data/term_to_id.json";
+    let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
+    // let automata_url = "./data/term_to_id.json";
     let rolegraph = RoleGraph::new(role.clone(), automata_url).await?;
     config_state.roles.insert(
         role,
