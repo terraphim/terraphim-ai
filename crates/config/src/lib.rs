@@ -146,7 +146,7 @@ impl TerraphimConfig {
             publish: true,
         };
         let system_operator_haystack = Haystack {
-            haystack: "/home/alex/projects/terraphim/INCOSE-Systems-Engineering-Handbook/"
+            haystack: "/tmp/system_operator/pages/"
                 .to_string(),
             service: "ripgrep".to_string(),
         };

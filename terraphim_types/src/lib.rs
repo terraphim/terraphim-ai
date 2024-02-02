@@ -104,7 +104,6 @@ use terraphim_pipeline::{IndexedDocument, RoleGraph};
 use tokio::sync::Mutex;
 
 use std::collections::HashMap;
-use std::default;
 use std::sync::Arc;
 
 /// ConfigState for the Terraphim (Actor)

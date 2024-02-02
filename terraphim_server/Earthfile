@@ -38,7 +38,7 @@ install:
 source:
   FROM +install
   COPY --keep-ts --dir . .
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args=fetch --keep-fingerprints=true
   SAVE ARTIFACT dist as LOCAL /dist
 

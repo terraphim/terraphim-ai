@@ -56,7 +56,7 @@ source:
   FROM +install
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop crates terraphim_types  ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
   DO rust+CARGO --args=fetch
 
 cross-build:
@@ -83,15 +83,16 @@ build-debug:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
   COPY desktop+build/dist /code/terraphim-server/dist
-  DO rust+CARGO --args="build --offline" --output="debug/[^/\.]+"
+  DO rust+CARGO --args="build" --output="debug/[^/\.]+"
   RUN ./target/debug/terraphim_server --version
-  SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server-debug
+  SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
 
 test:
   FROM +build-debug
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --chmod=0755 +build-debug/terraphim_server /terraphim_server_debug
-  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /terraphim_server_debug & sleep 2 & cargo test --offline;
+  COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
+  GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
+  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 2 & cargo test --offline;
   #DO rust+CARGO --args="test --offline"
 
 fmt:
