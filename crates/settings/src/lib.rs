@@ -62,9 +62,10 @@ fn create_config_folder(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
     } else {
         log::warn!("File does not exist");
         let default_config_path = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let default_config_path=format!("{}/default/settings.toml", default_config_path);
         println!("Default config path: {:?}", default_config_path);
         println!("Writing default config to: {:?}", filename);
-        std::fs::copy(format!("{}/default/settings.toml", default_config_path), &filename)?;
+        std::fs::copy(default_config_path, &filename)?;
     }
     Ok(filename)
 }
