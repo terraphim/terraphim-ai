@@ -5,7 +5,7 @@ const theme = writable('spacelab');
 const role = writable('selected');
 const is_tauri = writable(false);
 const atomic_configured = writable(false);
-const serverUrl=writable(`${CONFIG.ServerURL}/search`);
+const serverUrl=writable(`${CONFIG.ServerURL}/articles/search`);
 
 let input = writable('');
 export { theme, role, is_tauri, input, serverUrl};
