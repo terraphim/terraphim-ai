@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use twelf::{config, Layer};
-
+use std::env;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("config error: {0}")]
@@ -42,6 +42,7 @@ impl Settings {
             }
         };
         println!("Reading config_file: {:?}", config_file);
+        
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
             Layer::Env(Some(String::from("TERRAPHIM_"))),
@@ -54,16 +55,17 @@ fn create_config_folder(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
         std::fs::create_dir_all(path)?;
     }
     let filename = path.join("settings.toml");
-    let default_config = include_str!("../default/settings.toml");
+    // let default_config = include_str!("../default/settings.toml");
     if filename.exists() {
         log::warn!("File exists");
         log::warn!("{:?}", filename);
     } else {
         log::warn!("File does not exist");
-        // FIXME: the logic of settings that each app - desktop or server have their own default settings.toml
-        // this is a quickfix to make testing sane
+        let default_config_path = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let default_config_path=format!("{}/default/settings.toml", default_config_path);
+        println!("Default config path: {:?}", default_config_path);
         println!("Writing default config to: {:?}", filename);
-        std::fs::write( &filename,default_config)?;
+        std::fs::copy(default_config_path, &filename)?;
     }
     Ok(filename)
 }
