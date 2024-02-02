@@ -4,11 +4,3 @@ api_endpoint="http://localhost:8000/api"
 [profiles.sled]
 type = "sled"
 datadir= "/tmp/sled"
-
-[profiles.dash]
-type = "dashmap"
-root = "/tmp/dashmaptest"
-
-[profiles.rock]
-type = "rocksdb"
-datadir = "/tmp/rocksdb" 

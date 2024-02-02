@@ -38,9 +38,10 @@ pub struct Article {
     pub url: String,
     pub body: String,
     pub description: Option<String>,
-    pub tags: Vec<String>,
-    pub rank: u64,
+    pub tags: Option<Vec<String>>,
+    pub rank: Option<u64>,
 }
+
 
 impl From<Article> for Document {
     fn from(val: Article) -> Self {
@@ -82,15 +83,18 @@ pub fn merge_and_serialize(
         let mut article = match articles_cached.get(&each_doc.id) {
             Some(article) => article.clone(),
             None => {
-                return Err(Error::Article(format!(
-                    "Article with id {} not found",
-                    each_doc.id
-                )))
+                // return Err(Error::Article(format!(
+                //     "Article with id {} not found",
+                //     each_doc.id
+                // )))
+                // FIXME: article not found in cache should not be force error but should be logged
+                println!("Article with id {} not found", each_doc.id);
+                Article::default()
             }
         };
+        article.tags =Some(each_doc.tags.clone());
 
-        article.tags = each_doc.tags.clone();
-        article.rank = each_doc.rank;
+        article.rank = Some(each_doc.rank);
         articles.push(article.clone());
     }
     Ok(articles)
@@ -100,6 +104,7 @@ use terraphim_pipeline::{IndexedDocument, RoleGraph};
 use tokio::sync::Mutex;
 
 use std::collections::HashMap;
+use std::default;
 use std::sync::Arc;
 
 /// ConfigState for the Terraphim (Actor)
@@ -126,7 +131,9 @@ impl ConfigState {
         // and add it to the config state
         for (role_name, each_role) in config.roles {
             let automata_url = each_role.kg.automata_url.as_str();
-            println!("{} - {}", role_name.clone(), automata_url);
+            let role_name = role_name.to_lowercase();
+            // FIXME: turn into log info
+            println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
             let rolegraph = RoleGraph::new(role_name.clone(), automata_url).await?;
             config_state.roles.insert(
                 role_name,
@@ -159,15 +166,17 @@ impl ConfigState {
         &self,
         search_query: SearchQuery,
     ) -> OpendalResult<Vec<IndexedDocument>> {
+        println!("search_articles: {:#?}", search_query);
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
         // if role is not provided, use the default role in the config
         let role = if search_query.role.is_none() {
             default_role.as_str()
         } else {
-            search_query.role.as_ref().unwrap()
+            search_query.role.as_ref().unwrap_or(&default_role)
         };
-
+        let role = role.to_lowercase();
+        let role = role.as_str();
         let rolegraph = self.roles.get(role).unwrap().rolegraph.lock().await;
         let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
             &search_query.search_term,
