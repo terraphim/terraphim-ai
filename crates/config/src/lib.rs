@@ -113,7 +113,7 @@ impl TerraphimConfig {
             haystacks: vec![haystack],
             extra: HashMap::new(),
         };
-        roles.insert("Default".to_string(), role);
+        roles.insert("Default".to_lowercase().to_string(), role);
         let kg_engineer = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
@@ -136,7 +136,7 @@ impl TerraphimConfig {
             haystacks: vec![eng_haystack.clone()],
             extra: HashMap::new(),
         };
-        roles.insert("Engineer".to_string(), engineer);
+        roles.insert("Engineer".to_lowercase().to_string(), engineer);
         let system_operator_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
@@ -160,7 +160,7 @@ impl TerraphimConfig {
             haystacks: vec![system_operator_haystack],
             extra: HashMap::new(),
         };
-        roles.insert("System Operator".to_string(), system_operator);
+        roles.insert("System Operator".to_lowercase().to_string(), system_operator);
 
         Self {
             id,

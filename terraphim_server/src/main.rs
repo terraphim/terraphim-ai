@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
     // Add one more for testing local KG
 
     let addr = server_hostname;
-    let role = "system operator".to_string();
+    let role = "system operator2".to_string();
     let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
     // let automata_url = "./data/term_to_id.json";
     let rolegraph = RoleGraph::new(role.clone(), automata_url).await?;

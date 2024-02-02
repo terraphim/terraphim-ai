@@ -374,15 +374,14 @@ pub async fn search_haystacks(
         None => default_role.as_str(),
         Some(ref role) => role.as_str(),
     };
+    // normalize roles to lowercase - same as term
+    let role = role.to_lowercase();
     // if role have a ripgrep service, use it to spin index and search process and return cached articles
-    println!(" role: {:?}", role);
     // Role config
-    // FIXME: this fails when role name arrives in lowercase. Should we canonicalize role names to uppercase?
     let role_config = current_config_state
         .roles
-        .get(role)
+        .get(&role)
         .ok_or_else(|| Error::RoleNotFound(role.to_string()))?;
-    println!("role_config: {:#?}", role_config);
 
     // Define all middleware to be used for searching.
     let mut ripgrep_middleware = RipgrepMiddleware::new(config_state.clone());
