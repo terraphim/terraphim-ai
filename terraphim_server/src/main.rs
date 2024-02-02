@@ -119,7 +119,30 @@ mod tests {
         println!("response: {:?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
-
+        // test search article with POST method 
+        #[test]
+        async fn test_post_search_article_lifecycle() {
+            let client = Client::new();
+            let response = client
+                .post("http://localhost:8000/articles/search")
+                .header("Content-Type", "application/json")
+                .body(
+                    r#"
+                {
+                    "search_term": "life cycle framework",
+                    "skip": 0,
+                    "limit": 10,
+                    "role": "system operator"
+                }
+                "#,
+                )
+                .send()
+                .await
+                .unwrap();
+            println!("response: {:?}", response);
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+    
     #[test]
     async fn test_search_articles_without_role() {
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10").await.unwrap();
