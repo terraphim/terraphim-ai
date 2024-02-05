@@ -11,6 +11,8 @@ additional-js = ["mermaid.min.js", "mermaid-init.js"]
 # subtitle = "How to use and contribute to Terraphim AI assistant"
 # highlight = "no-node"
 
+[output.epub]
+
 [output.typst]
 [output.typst.output]
 format = "pdf"
