@@ -10,11 +10,11 @@
   let result: SearchResult[] = [];
   
   let currentSearchUrl;
-  function handleClick() {
+  async function handleClick() {
     if ($is_tauri) {
       console.log("Tauri config");
       console.log($input);
-      invoke('search', { searchQuery: {
+      await invoke('search', { searchQuery: {
         search_term: $input,
         skip: 0,
         limit: 10,
@@ -30,33 +30,28 @@
       console.log("Role config");
       console.log($role);
       console.log('The current value is: ',$serverUrl);
-  
-      fetch($serverUrl, {
+      let json_body= JSON.stringify({
+          search_term: $input,
+          skip: 0,
+          limit: 10,
+          role: $role,
+        });
+      console.log('The current value is: ',json_body);
+
+  const response = await fetch($serverUrl, {
         method: 'POST',
         headers: {
           accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          search_term: $input,
-          skip: 0,
-          limit: 10,
-          role: $role
-        }),
-      })
-        .then(response => response.json())
-        .then(data => {
-          console.log(data);
-          result = data;
-        })
-        .catch(e => console.error(e));
-    }
+        body: json_body,
+      });
+      const data = await response.json();
+      console.log(data);
+      result=data;
+  }
   }
 
-  //  (res) => {
-  // configStore=(JSON.parse(res));
-  //                   role.set(configStore[0].name);
-  //                 }
 </script>
 
 <Field>
