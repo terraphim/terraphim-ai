@@ -1,4 +1,4 @@
-VERSION --try --global-cache 0.7
+VERSION --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
@@ -48,7 +48,7 @@ install:
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   DO rust+INIT --keep_fingerprints=true
-  RUN cargo install cross
+  # RUN cargo install cross
   #RUN cargo install orogene
   
 
@@ -58,12 +58,14 @@ source:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
   DO rust+CARGO --args=fetch
+  SAVE ARTIFACT /code/target AS LOCAL target
+  
 
 cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
@@ -74,15 +76,15 @@ cross-build:
 build:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
-  RUN ./target/release/terraphim_server --version
-  SAVE ARTIFACT ./target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
+  RUN /code/target/release/terraphim_server --version
+  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
 
 build-debug:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build" --output="debug/[^/\.]+"
   RUN ./target/debug/terraphim_server --version
   SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
