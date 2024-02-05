@@ -102,11 +102,3 @@
     </div>
   </div>
 </div>
-
-<Field grouped position="is-right">
-  <Select bind:selected={$theme}>
-    {#each Object.values($roles) as role_value}
-    <option value={role_value.theme} on:change={updateRole}>{role_value.name}</option>
-    {/each}
-  </Select>
-</Field>
