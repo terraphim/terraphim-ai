@@ -80,22 +80,16 @@ pub fn merge_and_serialize(
     let mut articles: Vec<Article> = Vec::new();
     for each_doc in docs.iter() {
         println!("each_doc: {:#?}", each_doc);
-        let mut article = match articles_cached.get(&each_doc.id) {
-            Some(article) => article.clone(),
-            None => {
-                // return Err(Error::Article(format!(
-                //     "Article with id {} not found",
-                //     each_doc.id
-                // )))
-                // FIXME: article not found in cache should not be force error but should be logged
-                println!("Article with id {} not found", each_doc.id);
-                Article::default()
-            }
-        };
-        article.tags =Some(each_doc.tags.clone());
+        if let Some(article) = articles_cached.get(&each_doc.id).cloned() {
+            // Article found in cache
+            let mut article = article;
+            article.tags =Some(each_doc.tags.clone());
 
-        article.rank = Some(each_doc.rank);
-        articles.push(article.clone());
+            article.rank = Some(each_doc.rank);
+            articles.push(article.clone());
+        } else {
+            log::warn!("Article not found in cache");
+        }
     }
     Ok(articles)
 }

@@ -105,6 +105,18 @@ lint:
   FROM +build-debug
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
+build-focal:
+  FROM ubuntu:20.04
+  ENV DEBIAN_FRONTEND noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN true
+  RUN apt-get update -qq
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  WORKDIR /code
+  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  RUN curl https://pkgx.sh | sh
+  RUN pkgx +openssl cargo build
+
 docker-musl:
   FROM alpine:3.18
   # You can pass multiple tags, space separated
@@ -121,20 +133,24 @@ docker-musl:
 
 docker-aarch64:
   FROM rust:latest
-
   RUN apt update && apt upgrade -y
-  RUN apt install -y g++-aarch64-linux-gnu libc6-dev-arm64-cross
-
+  RUN apt install -y libssl-dev g++-aarch64-linux-gnu libc6-dev-arm64-cross
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  RUN apt install -y 
   RUN rustup target add aarch64-unknown-linux-gnu
   RUN rustup toolchain install stable-aarch64-unknown-linux-gnu
 
-  WORKDIR /app
+  WORKDIR /code
+  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
-
-  CMD ["cargo", "build","--release","--target", "aarch64-unknown-linux-gnu"]
+      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ 
+  ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+  RUN cargo build --release --target aarch64-unknown-linux-gnu
+  SAVE ARTIFACT /code/target/aarch64-unknown-linux-gnu/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-aarch64
+  # CMD ["cargo", "build","--release","--target", "aarch64-unknown-linux-gnu"]
 
 docker-slim:
     FROM debian:buster-slim

@@ -5612,6 +5612,7 @@ dependencies = [
 name = "terraphim_middleware"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "cached",
  "serde",
  "serde_json",
