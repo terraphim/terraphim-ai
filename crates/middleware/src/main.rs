@@ -3,13 +3,12 @@ use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
 
 use terraphim_middleware::Result;
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let config_state = terraphim_types::ConfigState::new().await?;
     // let config_state = ConfigState::new().await?;
-    let needle = "life cycle framework".to_string();
-    // let needle = "trained operators and maintainers".to_string();
+    // let needle = "life cycle framework".to_string();
+    let needle = "trained operators and maintainers".to_string();
     let role_name = "System Operator".to_string();
     println!("{:#?}", role_name);
     println!("Searching articles with query: {needle} {role_name}");
