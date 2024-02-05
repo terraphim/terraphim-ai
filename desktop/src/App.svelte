@@ -81,7 +81,7 @@
             </i>
           </span>
         </a>
-      <a class="navbar-item" href="/fetch/json">Fetch</a>
+      <a class="navbar-item" href="/fetch/json">Configuration</a>
       <a class="navbar-item" href="/contacts">Contacts</a>
       </div>
   </nav>
