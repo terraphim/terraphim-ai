@@ -146,8 +146,7 @@ impl TerraphimConfig {
             publish: true,
         };
         let system_operator_haystack = Haystack {
-            haystack: "/tmp/system_operator/pages/"
-                .to_string(),
+            haystack: "/tmp/system_operator/pages/".to_string(),
             service: "ripgrep".to_string(),
         };
         let system_operator = Role {
@@ -160,7 +159,10 @@ impl TerraphimConfig {
             haystacks: vec![system_operator_haystack],
             extra: HashMap::new(),
         };
-        roles.insert("System Operator".to_lowercase().to_string(), system_operator);
+        roles.insert(
+            "System Operator".to_lowercase().to_string(),
+            system_operator,
+        );
 
         Self {
             id,
