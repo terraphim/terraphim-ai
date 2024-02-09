@@ -1,7 +1,7 @@
 # Terraphim AI Assistant
 
 Terraphim is a privacy-first AI assistant that works for you under your complete
-control. It begins as a local search engine, which can be configured to search
+control and is fully deterministic. It begins as a local search engine, which can be configured to search
 for different types of content, such as StackOverflow, GitHub, and the local
 filesystem with a pre-defined folder, including Markdown Files. We utilize
 modern algorithms for AI/ML, data fusion, and distributed communication
@@ -25,13 +25,12 @@ benefit.
 
 There are growing concerns about the privacy of data and the sharing of
 individuals' data across an ever-growing list of services, some of which have a
-questionable data ethics policy (e.g., Miro policy stated they could market any
-user content without permission as of Jan 2020).
+questionable data ethics policy.
 
 **Individuals** struggle to find relevant information in different knowledge repositories: [[1]](https://www.coveo.com/en/resources/reports/relevance-report-workplace),
 [[2]](https://cottrillresearch.com/various-survey-statistics-workers-spend-too-much-time-searching-for-information/),
 [[3]](https://www.forbes.com/sites/forbestechcouncil/2019/12/17/reality-check-still-spending-more-time-gathering-instead-of-analyzing/):
-personal ones like Roam Research/Obsidian/Coda/Notion, team-focused ones like
+personal ones like Roam Research/Obsidian/Coda/Notion, and team-focused ones like
 Jira/Confluence/Sharepoint, or public
 [[4]](https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/).
 
