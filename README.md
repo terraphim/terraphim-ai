@@ -1,3 +1,3 @@
-# terraphim-ai
-This is mono repo for Terraphim AI assistant; no submodules anymore
+# Terraphim AI Assistant
 
+Terraphim is a privacy-preserving AI assistant.
