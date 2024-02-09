@@ -21,7 +21,7 @@ benefit.
     </iframe>
 </div>
 
-# Why Terraphim?
+## Why Terraphim?
 
 There are growing concerns about the privacy of data and the sharing of
 individuals' data across an ever-growing list of services, some of which have a
@@ -34,22 +34,29 @@ personal ones like Roam Research/Obsidian/Coda/Notion, and team-focused ones lik
 Jira/Confluence/Sharepoint, or public
 [[4]](https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/).
 
-# Follow us
+## Getting Started
+
+In order to start the terraphim server, run the following command:
+
+```bash
+cargo run
+```
+
+## Follow us
 
 [![Discourse users](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group) 
 [![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
 
-# Terminology
+## Terminology
 
 - **Role**: A role is a set of settings that define the default behavior of the AI assistant. For example, a developer role will search for code-related content, while a father role will search for parenting-related content.
 - **Rolegraph**: A structure for ingesting documents into Terraphim.
 
-# Why "Terraphim"?
+## Why "Terraphim"?
 
 Alex Mikhalev was inspired by the [Relict series][relict] of science fiction
 novels by [Vasiliy Golovachev](https://en.wikipedia.org/wiki/Vasili_Golovachov),
 where Terraphim is an artificial intelligence living inside a spacesuit (part of
 an exocortex).
-
 
 [relict]: https://www.goodreads.com/en/book/show/196710046
