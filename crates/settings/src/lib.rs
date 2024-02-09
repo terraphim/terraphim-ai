@@ -1,9 +1,8 @@
 use directories::ProjectDirs;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-use std::env;
 use twelf::{config, Layer};
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("config error: {0}")]
@@ -19,15 +18,26 @@ pub enum Error {
 pub type SettingsResult<T> = std::result::Result<T, Error>;
 
 #[config]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Settings {
     /// The address to listen on
-    pub server_hostname: Option<String>,
+    pub server_hostname: String,
     /// API endpoint for the server
-    pub api_endpoint: Option<String>,
+    pub api_endpoint: String,
     /// configured storage backends available on device
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            server_hostname: "http://127.0.0.1:80".to_string(),
+            api_endpoint: "http://127.0.0.1:8080".to_string(),
+            profiles: HashMap::new(),
+        }
+    }
+}
+
 impl Settings {
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
         let config_file = match config_path {
