@@ -2,8 +2,8 @@ use directories::ProjectDirs;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use twelf::{config, Layer};
 use std::env;
+use twelf::{config, Layer};
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("config error: {0}")]
@@ -42,7 +42,7 @@ impl Settings {
             }
         };
         println!("Reading config_file: {:?}", config_file);
-        
+
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
             Layer::Env(Some(String::from("TERRAPHIM_"))),
@@ -61,8 +61,9 @@ fn create_config_folder(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
         log::warn!("{:?}", filename);
     } else {
         log::warn!("File does not exist");
-        let default_config_path = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-        let default_config_path=format!("{}/default/settings.toml", default_config_path);
+        let default_config_path =
+            std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let default_config_path = format!("{}/default/settings.toml", default_config_path);
         println!("Default config path: {:?}", default_config_path);
         println!("Writing default config to: {:?}", filename);
         std::fs::copy(default_config_path, &filename)?;
