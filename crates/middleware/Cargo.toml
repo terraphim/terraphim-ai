@@ -3,8 +3,6 @@ name = "terraphim_middleware"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 cached = { version = "0.47.0", features = ["async", "serde", "ahash"] }
 serde = { version = "1.0.149", features = ["derive"] }

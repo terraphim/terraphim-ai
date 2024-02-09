@@ -169,6 +169,7 @@ mod tests {
     use std::fs;
 
     use super::*;
+    use terraphim_config::Config;
 
     #[test]
     fn test_load_from_env() {
