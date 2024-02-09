@@ -28,16 +28,6 @@ pub struct Settings {
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
 
-impl Default for Settings {
-    fn default() -> Self {
-        Settings {
-            server_hostname: "http://127.0.0.1:80".to_string(),
-            api_endpoint: "http://127.0.0.1:8080".to_string(),
-            profiles: HashMap::new(),
-        }
-    }
-}
-
 impl Settings {
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
         let config_file = match config_path {
@@ -52,6 +42,13 @@ impl Settings {
             }
         };
         println!("Reading config_file: {:?}", config_file);
+
+        // If the toml file is not found, it will be created with default values
+        if !config_file.exists() {
+            log::info!("Creating default config at: {:?}", config_file);
+            let default_config = include_str!("../default/settings.toml");
+            std::fs::write(&config_file, default_config)?;
+        }
 
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),

@@ -12,6 +12,7 @@
     clippy::missing_const_for_fn
 )]
 #![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
+use anyhow::Context;
 // #![deny(missing_docs)]
 use clap::Parser;
 use std::net::SocketAddr;
@@ -41,13 +42,8 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
     println!("args: {:?}", args);
-    let server_settings = match Settings::load_from_env_and_file(None) {
-        Ok(settings) => settings,
-        Err(e) => {
-            eprintln!("Error loading settings: {e}. Using defaults.");
-            Settings::default()
-        }
-    };
+    let server_settings =
+        Settings::load_from_env_and_file(None).context("Failed to load settings")?;
 
     println!(
         "Device settings hostname: {:?}",
