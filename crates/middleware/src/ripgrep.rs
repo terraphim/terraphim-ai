@@ -27,12 +27,11 @@ impl RipgrepMiddleware {
 }
 
 impl Middleware for RipgrepMiddleware {
-    /// Index the haystack using riprgrep and return a HashMap of Articles
+    /// Index the haystack using ripgrep and return a HashMap of Articles
     ///
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-
     async fn index(
         &mut self,
         needle: String,
@@ -44,7 +43,12 @@ impl Middleware for RipgrepMiddleware {
             self.config_state
                 .index_article(article.clone())
                 .await
-                .expect("Failed to index article");
+                .map_err(|e| {
+                    crate::Error::IndexationError(format!(
+                        "Failed to index article `{}` ({}): {e:?}",
+                        article.title, article.url
+                    ))
+                })?;
         }
         Ok(articles)
     }
@@ -60,7 +64,7 @@ impl Default for RipgrepService {
     fn default() -> Self {
         Self {
             command: "rg".to_string(),
-            default_args: ["--json", "--trim", "-C3", "-i"]
+            default_args: ["--json", "--trim", "-C3", "--ignore-case"]
                 .into_iter()
                 .map(String::from)
                 .collect(),
@@ -70,6 +74,10 @@ impl Default for RipgrepService {
 
 impl RipgrepService {
     /// Run ripgrep with the given needle and haystack
+    ///
+    /// Returns a Vec of Messages, which correspond to ripgrep's internal
+    /// JSON output. Learn more about ripgrep's JSON output here:
+    /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn run(&self, needle: String, haystack: String) -> Result<Vec<Message>> {
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle, haystack]
