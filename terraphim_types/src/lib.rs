@@ -161,22 +161,16 @@ impl ConfigState {
     }
 
     /// Search articles in rolegraph using the search query
-    pub async fn search_articles(
-        &self,
-        search_query: SearchQuery,
-    ) -> OpendalResult<Vec<IndexedDocument>> {
+    pub async fn search_articles(&self, search_query: SearchQuery) -> Vec<IndexedDocument> {
         println!("search_articles: {:#?}", search_query);
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
+
         // if role is not provided, use the default role in the config
-        let role = if search_query.role.is_none() {
-            default_role.as_str()
-        } else {
-            search_query.role.as_ref().unwrap_or(&default_role)
-        };
+        let role = search_query.role.unwrap_or(default_role);
+
         let role = role.to_lowercase();
-        let role = role.as_str();
-        let rolegraph = self.roles.get(role).unwrap().rolegraph.lock().await;
+        let rolegraph = self.roles.get(&role).unwrap().lock().await;
         let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
             &search_query.search_term,
             search_query.skip,
@@ -185,12 +179,11 @@ impl ConfigState {
             Ok(docs) => docs,
             Err(e) => {
                 log::error!("Error: {}", e);
-                return Ok(vec![]);
+                return Vec::default();
             }
         };
 
-        let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc)| doc).collect();
-        Ok(docs)
+        documents.into_iter().map(|(_id, doc)| doc).collect()
     }
 }
 

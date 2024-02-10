@@ -37,9 +37,9 @@ pub(crate) async fn create_article(
     } else {
         article.id.clone().unwrap()
     };
-    for rolegraph_state in config.roles.values() {
-        let mut rolegraph = rolegraph_state.rolegraph.lock().await;
-        rolegraph.parse_document(id.clone(), article.clone());
+    for rolegraph in config.roles.values() {
+        let mut lock = rolegraph.lock().await;
+        lock.parse_document(&id, article.clone());
     }
     log::warn!("send response");
     let response = Json(article.clone());
@@ -64,14 +64,11 @@ pub(crate) async fn search_articles(
 ) -> Result<Json<Vec<Article>>> {
     println!("Searching articles with query: {search_query:?}");
     let search_query = search_query.deref().clone();
-    let articles_cached = search_haystacks(config_state.clone(), search_query.clone())
+    let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
         .await
         .context("Failed to search articles")?;
-    let docs: Vec<IndexedDocument> = config_state
-        .search_articles(search_query)
-        .await
-        .expect("Failed to search articles");
-    let articles = merge_and_serialize(articles_cached, docs)?;
+    let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
+    let articles = merge_and_serialize(cached_articles, docs)?;
     println!("Articles: {articles:?}");
     Ok(Json(articles))
 }
@@ -85,14 +82,11 @@ pub(crate) async fn search_articles_post(
 ) -> Result<Json<Vec<Article>>> {
     println!("Searching articles with query: {search_query:?}");
     let search_query = search_query.deref().clone();
-    let articles_cached = search_haystacks(config_state.clone(), search_query.clone())
+    let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
         .await
         .context("Failed to search articles")?;
-    let docs: Vec<IndexedDocument> = config_state
-        .search_articles(search_query)
-        .await
-        .expect("Failed to search articles");
-    let articles = merge_and_serialize(articles_cached, docs)?;
+    let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
+    let articles = merge_and_serialize(cached_articles, docs)?;
     println!("Articles: {articles:?}");
     Ok(Json(articles))
 }
