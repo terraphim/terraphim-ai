@@ -31,11 +31,11 @@ impl DeviceStorage {
 }
 
 async fn init_device_storage() -> Result<DeviceStorage> {
-    let device_settings = Settings::load_from_env_and_file(None)?;
-    println!("cfg: {:?}", device_settings);
+    let settings = Settings::load_from_env_and_file(None)?;
+    log::info!("Loaded settings: {:?}", settings);
 
-    let ops = settings::parse_profiles(&device_settings).await?;
-    let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
+    let operators = settings::parse_profiles(&settings).await?;
+    let mut ops_vec: Vec<(&String, &(Operator, u128))> = operators.iter().collect();
     ops_vec.sort_by_key(|&(_, (_, speed))| speed);
 
     let ops: HashMap<String, (Operator, u128)> = ops_vec
