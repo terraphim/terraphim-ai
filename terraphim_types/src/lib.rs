@@ -1,8 +1,12 @@
 use opendal::Result as OpendalResult;
-use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use terraphim_config::TerraphimConfig;
 use terraphim_pipeline::{Document, Error as TerraphimPipelineError};
+use terraphim_pipeline::{IndexedDocument, RoleGraph};
+use tokio::sync::{Mutex, MutexGuard};
+
+use std::collections::HashMap;
+use std::sync::Arc;
 
 // terraphim error type based on thiserror
 #[derive(thiserror::Error, Debug)]
@@ -42,7 +46,6 @@ pub struct Article {
     pub rank: Option<u64>,
 }
 
-
 impl From<Article> for Document {
     fn from(val: Article) -> Self {
         // If the ID is not provided, generate a new one
@@ -60,102 +63,78 @@ impl From<Article> for Document {
     }
 }
 
-// impl to_atomic for Article {
-//     fn to_atomic(&self) -> anyhow::Result<atomic::Document> {
-//         let mut doc = atomic::Document::new();
-//         doc.insert("id", self.id.clone().unwrap());
-//         doc.insert("title", self.title.clone());
-//         doc.insert("body", self.body.clone().unwrap());
-//         doc.insert("description", self.description.clone().unwrap());
-//         Ok(doc)
-//     }
-
-// }
-
 /// Merge articles from the cache and the output of query results
 pub fn merge_and_serialize(
-    articles_cached: HashMap<String, Article>,
+    cached_articles: HashMap<String, Article>,
     docs: Vec<IndexedDocument>,
 ) -> Result<Vec<Article>> {
     let mut articles: Vec<Article> = Vec::new();
-    for each_doc in docs.iter() {
-        println!("each_doc: {:#?}", each_doc);
-        let mut article = match articles_cached.get(&each_doc.id) {
+    for doc in docs {
+        println!("doc: {:#?}", doc);
+        let mut article = match cached_articles.get(&doc.id) {
             Some(article) => article.clone(),
             None => {
-                // return Err(Error::Article(format!(
-                //     "Article with id {} not found",
-                //     each_doc.id
-                // )))
-                // FIXME: article not found in cache should not be force error but should be logged
-                println!("Article with id {} not found", each_doc.id);
+                log::warn!("Article with id {} not found", doc.id);
                 Article::default()
             }
         };
-        article.tags =Some(each_doc.tags.clone());
+        article.tags = Some(doc.tags.clone());
+        article.rank = Some(doc.rank);
 
-        article.rank = Some(each_doc.rank);
         articles.push(article.clone());
     }
     Ok(articles)
 }
 
-use terraphim_pipeline::{IndexedDocument, RoleGraph};
-use tokio::sync::Mutex;
-
-use std::collections::HashMap;
-use std::sync::Arc;
-
 /// ConfigState for the Terraphim (Actor)
 /// Config state can be updated using the API or Atomic Server
-#[derive(Default, Debug, Clone)]
+///
+/// Holds the Terraphim Config and the RoleGraphs
+#[derive(Debug, Clone)]
 pub struct ConfigState {
     /// Terraphim Config
     pub config: Arc<Mutex<TerraphimConfig>>,
-    pub roles: HashMap<String, RoleGraphState>,
+    /// RoleGraphs
+    pub roles: HashMap<String, RoleGraphSync>,
 }
 
 impl ConfigState {
-    pub async fn new() -> Result<Self> {
-        let mut config = TerraphimConfig::new();
-        // Try to load the existing state of the config
-        let config = config.load("configstate").await.unwrap_or_default();
-        println!("Config loaded");
-        let mut config_state = ConfigState {
-            config: Arc::new(Mutex::new(config.clone())),
-            roles: HashMap::new(),
-        };
+    pub async fn new(config: &mut TerraphimConfig) -> Result<Self> {
+        // Try to load the existing state from the config
+        // TODO: Is this really needed? To be clarified
+        // let config = config.load("configstate").await?;
+        // println!("Config loaded");
+        // println!("{:#?}", config.roles);
 
-        // for each role in a config initialize a rolegraph
+        // For each role in a config, initialize a rolegraph
         // and add it to the config state
-        for (role_name, each_role) in config.roles {
-            let automata_url = each_role.kg.automata_url.as_str();
-            let role_name = role_name.to_lowercase();
+        let mut roles = HashMap::new();
+        for (name, role) in &config.roles {
+            let automata_url = role.kg.automata_url.as_str();
+            let role_name = name.to_lowercase();
             // FIXME: turn into log info
             println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
             let rolegraph = RoleGraph::new(role_name.clone(), automata_url).await?;
-            config_state.roles.insert(
-                role_name,
-                RoleGraphState {
-                    rolegraph: Arc::new(Mutex::new(rolegraph)),
-                },
-            );
+            roles.insert(role_name, RoleGraphSync::from(rolegraph));
         }
-        Ok(config_state)
+
+        Ok(ConfigState {
+            config: Arc::new(Mutex::new(config.clone())),
+            roles,
+        })
     }
-    /// Index article in all rolegraphs
-    pub async fn index_article(&mut self, article: Article) -> OpendalResult<()> {
-        let mut article = article.clone();
-        let id = if article.id.is_none() {
-            let id = ulid::Ulid::new().to_string();
-            article.id = Some(id.clone());
-            id
-        } else {
-            article.id.clone().unwrap()
-        };
+
+    /// Index article into all rolegraphs
+    pub async fn index_article(&mut self, mut article: Article) -> OpendalResult<()> {
+        let id = article
+            .id
+            // lazily initialize `article.id` only if it's `None`.
+            .get_or_insert_with(|| ulid::Ulid::new().to_string())
+            .clone();
+
         for rolegraph_state in self.roles.values() {
-            let mut rolegraph = rolegraph_state.rolegraph.lock().await;
-            rolegraph.parse_document(id.clone(), article.clone());
+            let mut rolegraph = rolegraph_state.lock().await;
+            rolegraph.parse_document(&id, article.clone());
         }
         Ok(())
     }
@@ -187,8 +166,23 @@ impl ConfigState {
     }
 }
 
+/// Wraps the `RoleGraph` for ingesting documents
 #[derive(Debug, Clone)]
-pub struct RoleGraphState {
-    /// RoleGraph for ingesting documents
-    pub rolegraph: Arc<Mutex<RoleGraph>>,
+pub struct RoleGraphSync {
+    inner: Arc<Mutex<RoleGraph>>,
+}
+
+impl RoleGraphSync {
+    /// Locks the rolegraph for reading and writing
+    pub async fn lock(&self) -> MutexGuard<'_, RoleGraph> {
+        self.inner.lock().await
+    }
+}
+
+impl From<RoleGraph> for RoleGraphSync {
+    fn from(rolegraph: RoleGraph) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(rolegraph)),
+        }
+    }
 }
