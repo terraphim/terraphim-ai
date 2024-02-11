@@ -158,7 +158,6 @@ impl RoleGraph {
         matches
     }
 
-
     /// This method performs several key operations to process and rank
     /// documents:
     /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
@@ -216,7 +215,7 @@ impl RoleGraph {
             // warn!("Matched node {:?}", node_id);
             let node = self.nodes.get(node_id).ok_or(Error::NodeIdNotFound)?;
             let nterm = self.ac_reverse_nterm.get(node_id).unwrap();
-            println!("Normalized term {nterm}");
+            // println!("Normalized term {nterm}");
             let node_rank = node.rank;
             // warn!("Node Rank {}", node_rank);
             // warn!("Node connected to Edges {:?}", node.connected_with);
