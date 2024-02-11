@@ -71,20 +71,19 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
 }
 
 pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(Operator, u128)> {
-    /// get_speed returns the time it takes to save and load a 1MB file.
-    /// It is used to determine the fastest operator for a given profile.
+    /// Returns the time (in nanoseconds) it takes to load a 1MB file,
+    /// used to determine the fastest operator for a given profile.
     async fn get_speed(op: Operator) -> OpendalResult<u128> {
-        let start_time = Instant::now();
         #[cfg(debug_assertions)]
         let buf = "test data";
         #[cfg(not(debug_assertions))]
         let mut buf = vec![0u8; 1024 * 1024];
         op.write("test", buf).await?;
-        let end_time = Instant::now();
-        let _save_time = end_time.duration_since(start_time).as_millis();
+
         let start_time = Instant::now();
         op.read("test").await?;
         let end_time = Instant::now();
+
         let load_time = end_time.duration_since(start_time).as_nanos();
         Ok(load_time)
     }
@@ -143,15 +142,17 @@ pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(O
         Scheme::Webdav => Operator::from_map::<services::Webdav>(profile.clone())?.finish(),
         Scheme::Webhdfs => Operator::from_map::<services::Webhdfs>(profile.clone())?.finish(),
         _ => {
+            log::info!("Got request for {scheme} operator; initializing in-memory operator.");
             let builder = services::Memory::default();
-            // Init an operator
 
+            // Init operator
             Operator::new(builder)?
                 // Init with logging layer enabled.
                 .layer(LoggingLayer::default())
                 .finish()
         }
     };
+    // Benchmark the operator I/O speed
     let speed = get_speed(op.clone()).await?;
     Ok((op, speed))
 }
