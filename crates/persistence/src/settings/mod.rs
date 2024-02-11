@@ -164,6 +164,7 @@ pub async fn parse_profiles(settings: &Settings) -> Result<HashMap<String, (Oper
     }
     Ok(ops)
 }
+
 #[cfg(test)]
 mod tests {
     use std::fs;
