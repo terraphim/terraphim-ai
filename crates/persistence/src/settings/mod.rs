@@ -166,12 +166,11 @@ pub async fn parse_profiles(settings: &Settings) -> Result<HashMap<String, (Oper
     Ok(ops)
 }
 
+// TODO: Fix tests, which fail after simplifying the settings loading
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use super::*;
-    use terraphim_config::Config;
+    use std::fs;
 
     #[test]
     fn test_load_from_env() {
@@ -185,7 +184,10 @@ mod tests {
             env::set_var(k, v);
         }
 
-        let profiles = Config::load_from_env().profiles;
+        let settings = Settings::load_from_env_and_file(None).unwrap();
+        println!("{:?}", settings);
+        let profiles = settings.profiles;
+        println!("{:?}", profiles);
 
         let profile1 = profiles["test1"].clone();
         assert_eq!(profile1["type"], "s3");
@@ -215,7 +217,7 @@ enable_virtual_host_style = "on"
 "#,
         )
         .unwrap();
-        let cfg = Config::load_from_file(&tmpfile)?;
+        let cfg = Settings::load_from_env_and_file(Some(tmpfile))?;
         let profile = cfg.profiles["mys3"].clone();
         assert_eq!(profile["region"], "us-east-1");
         assert_eq!(profile["access_key_id"], "foo");
@@ -244,8 +246,9 @@ enable_virtual_host_style = "on"
         for (k, v) in &env_vars {
             env::set_var(k, v);
         }
-        let cfg = Config::load(&tmpfile)?;
-        let profile = cfg.profiles["mys3"].clone();
+        let settings = Settings::load_from_env_and_file(Some(tmpfile))?;
+
+        let profile = settings.profiles["mys3"].clone();
         assert_eq!(profile["region"], "us-west-1");
         assert_eq!(profile["access_key_id"], "foo");
         assert_eq!(profile["enable_virtual_host_style"], "on");
