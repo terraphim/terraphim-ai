@@ -249,25 +249,29 @@ impl RoleGraph {
             .collect();
         Ok(hash_vec)
     }
-    pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
+
+    pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
         let matches = self.find_matches_ids(text);
         for (a, b) in matches.into_iter().tuple_windows() {
-            self.add_or_update_document(document_id.clone(), a, b);
+            self.add_or_update_document(document_id, a, b);
         }
     }
-    pub fn parse_document<T: Into<Document>>(&mut self, document_id: String, input: T) {
+
+    pub fn parse_document<T: Into<Document>>(&mut self, document_id: &str, input: T) {
         let document: Document = input.into();
         let matches = self.find_matches_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
-            self.add_or_update_document(document_id.clone(), a, b);
+            self.add_or_update_document(document_id, a, b);
         }
     }
-    pub fn add_or_update_document(&mut self, document_id: String, x: u64, y: u64) {
+
+    pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
         let edge = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge, document_id);
         self.init_or_update_node(x, &edge);
         self.init_or_update_node(y, &edge);
     }
+
     fn init_or_update_node(&mut self, node_id: u64, edge: &Edge) {
         match self.nodes.entry(node_id) {
             Entry::Vacant(_) => {
@@ -281,16 +285,17 @@ impl RoleGraph {
             }
         };
     }
-    fn init_or_update_edge(&mut self, edge_key: u64, document_id: String) -> Edge {
+
+    fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
         let edge = match self.edges.entry(edge_key) {
             Entry::Vacant(_) => {
-                let edge = Edge::new(edge_key, document_id);
+                let edge = Edge::new(edge_key, document_id.to_string());
                 self.edges.insert(edge.id, edge.clone());
                 edge
             }
             Entry::Occupied(entry) => {
                 let edge = entry.into_mut();
-                *edge.doc_hash.entry(document_id).or_insert(1) += 1;
+                *edge.doc_hash.entry(document_id.to_string()).or_insert(1) += 1;
 
                 edge.clone()
             }
@@ -455,23 +460,23 @@ mod tests {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches = rolegraph.find_matches_ids(query);
         for (a, b) in matches.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(article_id.clone(), a, b);
+            rolegraph.add_or_update_document(&article_id, a, b);
         }
         let article_id2 = Ulid::new().to_string();
         let query2 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches2 = rolegraph.find_matches_ids(query2);
         for (a, b) in matches2.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(article_id2.clone(), a, b);
+            rolegraph.add_or_update_document(&article_id2, a, b);
         }
         let article_id3 = Ulid::new().to_string();
         let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches3 = rolegraph.find_matches_ids(query3);
         for (a, b) in matches3.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(article_id3.clone(), a, b);
+            rolegraph.add_or_update_document(&article_id3, a, b);
         }
         let article_id4 = "ArticleID4".to_string();
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        rolegraph.parse_document_to_pair(article_id4, query4);
+        rolegraph.parse_document_to_pair(&article_id4, query4);
         warn!("Query graph");
         let results: Vec<(&String, IndexedDocument)> = rolegraph
             .query(
