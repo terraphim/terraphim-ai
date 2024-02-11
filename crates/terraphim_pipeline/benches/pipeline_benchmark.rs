@@ -1,10 +1,10 @@
-//! Benchmarks for testing throughput of the pipeline.
+//! Benchmarks for testing the throughput of the pipeline.
 //!
 //! To run a single benchmark use:
+//!
 //! ```sh
 //! cargo bench --bench pipeline_benchmark -- query
 //! ```
-//!
 use ahash::AHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use terraphim_automata::load_automata;
@@ -92,7 +92,7 @@ async fn bench_throughput(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("parse_document_to_pair", size),
             size,
-            |b, &size| b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), &input)),
+            |b, _| b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), &input)),
         );
     }
     group.finish();

@@ -357,6 +357,7 @@ extern crate lazy_static;
 lazy_static! {
     static ref RE: Regex = Regex::new(r"[?!|]\s+").unwrap();
 }
+
 pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
     let sentences = UnicodeSegmentation::split_sentence_bounds(paragraphs);
     let parts =
