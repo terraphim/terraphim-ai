@@ -149,25 +149,31 @@ impl RoleGraph {
 
     /// Find all matches int the rolegraph for the given text
     /// Returns a list of ids of the matched nodes
-    fn find_matches_ids(&self, text: &str) -> Vec<u64> {
+    pub fn find_matches_ids(&self, text: &str) -> Vec<u64> {
         let mut matches = Vec::new();
         for mat in self.ac.find_iter(text) {
-            // println!("mat: {:?}", mat);
             let id = self.ac_values[mat.pattern()];
             matches.push(id);
         }
         matches
     }
 
-    //  Query the graph using a query string, returns a list of document ids ranked and weighted by weighted mean average of node rank, edge rank and document rank
 
-    // node rank is a weight for edge and edge rank is a weight for document_id
-    // create hashmap of output with document_id, rank to dedupe documents in output
-    // normalise output rank from 1 to number of records
-    // pre-sort document_id by rank using BtreeMap
-    //  overall weighted average is calculated a weighted average of node rank and edge rank and document rank
-    //  weighted average  can be calculated: sum of (weight*rank)/sum of weights for each node, edge and document.
-    //  rank is a number of co-occurences normalised over number of documents (entities), see cleora train function
+    /// This method performs several key operations to process and rank
+    /// documents:
+    /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
+    ///   for a document ID, creating a hierarchical weighting system.
+    /// - Creates a hashmap to store outputs with document_id and rank, aiming
+    ///   to deduplicate documents in the output.
+    /// - Normalizes the output rank from 1 to the total number of records,
+    ///   ensuring a consistent ranking scale across documents.
+    /// - Pre-sorts document IDs by rank using a BTreeMap, facilitating
+    ///   efficient access and manipulation based on rank.
+    /// - Calculates the overall weighted average by computing the weighted
+    ///   average of node rank, edge rank, and document rank. This calculation
+    ///   involves summing the products of each weight with its corresponding
+    ///   rank and dividing by the sum of the weights for each node, edge, and
+    ///   document.
     // YAGNI: at the moment I don't need it, so parked
     pub fn normalise(&mut self) {
         let node_len = self.nodes.len() as u32;
@@ -191,6 +197,9 @@ impl RoleGraph {
         // }
     }
 
+    //  Query the graph using a query string, returns a list of document ids
+    //  ranked and weighted by weighted mean average of node rank, edge rank and
+    //  document rank
     pub fn query(
         &self,
         query_string: &str,
