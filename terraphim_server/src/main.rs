@@ -16,9 +16,9 @@
 use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use terraphim_config::{ServiceType, TerraphimConfig};
 use terraphim_settings::Settings;
-use tokio::sync::Mutex;
+use types::RoleGraphSync;
 
 use terraphim_server::{axum_server, Result};
 use terraphim_types as types;
@@ -41,7 +41,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    println!("args: {:?}", args);
+    println!("args: {args:?}");
     let server_settings = Settings::load_from_env_and_file(None)
         .context("Failed to load settings from environment")?;
     println!(
@@ -57,21 +57,20 @@ async fn main() -> Result<()> {
             SocketAddr::from(([127, 0, 0, 1], port))
         });
 
-    let mut config_state = types::ConfigState::new().await?;
+    // TODO: make the service type configurable
+    // For now, we only support passing in the service type as an argument
+    let mut config = TerraphimConfig::new(ServiceType::Logseq);
+    let mut config_state = types::ConfigState::new(&mut config).await?;
 
     // Add one more for testing local KG
 
     let addr = server_hostname;
     let role = "system operator2".to_string();
     let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-    // let automata_url = "./data/term_to_id.json";
     let rolegraph = RoleGraph::new(role.clone(), automata_url).await?;
-    config_state.roles.insert(
-        role,
-        types::RoleGraphState {
-            rolegraph: Arc::new(Mutex::new(rolegraph)),
-        },
-    );
+    config_state
+        .roles
+        .insert(role, RoleGraphSync::from(rolegraph));
     println!(
         "cfg Roles: {:?}",
         config_state.roles.keys().collect::<Vec<&String>>()
@@ -119,15 +118,15 @@ mod tests {
         println!("response: {:?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
-        // test search article with POST method 
-        #[test]
-        async fn test_post_search_article_lifecycle() {
-            let client = Client::new();
-            let response = client
-                .post("http://localhost:8000/articles/search")
-                .header("Content-Type", "application/json")
-                .body(
-                    r#"
+    // test search article with POST method
+    #[test]
+    async fn test_post_search_article_lifecycle() {
+        let client = Client::new();
+        let response = client
+            .post("http://localhost:8000/articles/search")
+            .header("Content-Type", "application/json")
+            .body(
+                r#"
                 {
                     "search_term": "life cycle framework",
                     "skip": 0,
@@ -135,14 +134,14 @@ mod tests {
                     "role": "system operator"
                 }
                 "#,
-                )
-                .send()
-                .await
-                .unwrap();
-            println!("response: {:?}", response);
-            assert_eq!(response.status(), StatusCode::OK);
-        }
-    
+            )
+            .send()
+            .await
+            .unwrap();
+        println!("response: {:?}", response);
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
     #[test]
     async fn test_search_articles_without_role() {
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10").await.unwrap();
