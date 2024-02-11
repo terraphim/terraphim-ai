@@ -1,3 +1,4 @@
+use logseq::LogseqMiddleware;
 use ripgrep::RipgrepMiddleware;
 use serde::Deserialize;
 use serde_json as json;
@@ -5,8 +6,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time;
+use terraphim_config::ServiceType;
 use terraphim_types::{Article, ConfigState, SearchQuery};
 
+mod logseq;
 mod ripgrep;
 
 #[derive(thiserror::Error, Debug)]
@@ -151,45 +154,44 @@ pub async fn search_haystacks(
     config_state: ConfigState,
     search_query: SearchQuery,
 ) -> Result<HashMap<String, Article>> {
-    let current_config_state = config_state.config.lock().await.clone();
-    let default_role = current_config_state.default_role.clone();
-    // if role is not provided, use the default role in the config
-    let role = match search_query.role {
-        None => default_role.as_str(),
-        Some(ref role) => role.as_str(),
-    };
-    // normalize roles to lowercase - same as term
-    let role = role.to_lowercase();
-    // if role have a ripgrep service, use it to spin index and search process and return cached articles
-    // Role config
-    let role_config = current_config_state
+    let config = config_state.config.lock().await.clone();
+
+    let search_query_role = search_query
+        .role
+        .unwrap_or(config.default_role)
+        .to_lowercase();
+
+    let role_config = config
         .roles
-        .get(&role)
-        .ok_or_else(|| Error::RoleNotFound(role.to_string()))?;
+        .get(&search_query_role)
+        .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
 
-    // Define all middleware to be used for searching.
-    let mut ripgrep_middleware = RipgrepMiddleware::new(config_state.clone());
+    // Define middleware to be used for searching.
+    let mut ripgrep = RipgrepMiddleware::new(config_state.clone());
+    let mut logseq = LogseqMiddleware::new(config_state.clone());
 
-    let mut articles_cached: HashMap<String, Article> = HashMap::new();
-    for each_haystack in &role_config.haystacks {
-        println!(" each_haystack: {:#?}", each_haystack);
+    let mut cached_articles: HashMap<String, Article> = HashMap::new();
 
-        // Spin ripgrep service and index output of ripgrep into Cached Articles and TerraphimGraph
+    for haystack in &role_config.haystacks {
+        println!("Handling haystack: {:#?}", haystack);
+
         let needle = search_query.search_term.clone();
-        let haystack = each_haystack.haystack.clone();
+        let haystack_inner = haystack.haystack.clone();
 
-        articles_cached = match each_haystack.service.as_str() {
-            "ripgrep" => {
+        cached_articles = match haystack.service {
+            ServiceType::Ripgrep => {
                 // Search through articles using ripgrep
-                ripgrep_middleware
-                    .index(needle.clone(), haystack.clone())
+                // This spins up ripgrep the service and indexes into the
+                // `TerraphimGraph` and caches the articles
+                ripgrep
+                    .index(needle.clone(), haystack_inner.clone())
                     .await?
             }
-            _ => {
-                println!("Unknown middleware: {:#?}", each_haystack.service);
-                HashMap::new()
+            ServiceType::Logseq => {
+                // Search through articles in logseq format
+                logseq.index(needle.clone(), haystack_inner.clone()).await?
             }
         };
     }
-    Ok(articles_cached)
+    Ok(cached_articles)
 }

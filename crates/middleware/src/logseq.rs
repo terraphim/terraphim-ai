@@ -10,29 +10,28 @@ use crate::Result;
 use crate::{calculate_hash, Data, Middleware};
 use crate::{json_decode, Message};
 
-/// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
+/// LogseqMiddleware is a Middleware that uses ripgrep to index and search
 /// through haystacks.
-pub struct RipgrepMiddleware {
-    service: RipgrepService,
+pub struct LogseqMiddleware {
+    service: LogseqService,
     config_state: ConfigState,
 }
 
-impl RipgrepMiddleware {
+impl LogseqMiddleware {
     pub fn new(config_state: ConfigState) -> Self {
         Self {
-            service: RipgrepService::default(),
+            service: LogseqService::default(),
             config_state,
         }
     }
 }
 
-impl Middleware for RipgrepMiddleware {
-    /// Index the haystack using riprgrep and return a HashMap of Articles
+impl Middleware for LogseqMiddleware {
+    /// Index the haystack using ripgrep and return a HashMap of Articles
     ///
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-
     async fn index(
         &mut self,
         needle: String,
@@ -44,23 +43,28 @@ impl Middleware for RipgrepMiddleware {
             self.config_state
                 .index_article(article.clone())
                 .await
-                .expect("Failed to index article");
+                .map_err(|e| {
+                    crate::Error::IndexationError(format!(
+                        "Failed to index article `{}` ({}): {e:?}",
+                        article.title, article.url
+                    ))
+                })?;
         }
         Ok(articles)
     }
 }
 
-pub struct RipgrepService {
+pub struct LogseqService {
     command: String,
     default_args: Vec<String>,
 }
 
 /// Returns a new ripgrep service with default arguments
-impl Default for RipgrepService {
+impl Default for LogseqService {
     fn default() -> Self {
         Self {
             command: "rg".to_string(),
-            default_args: ["--json", "--trim", "-C3", "-i"]
+            default_args: ["--json", "--trim", "--ignore-case"]
                 .into_iter()
                 .map(String::from)
                 .collect(),
@@ -68,9 +72,15 @@ impl Default for RipgrepService {
     }
 }
 
-impl RipgrepService {
+impl LogseqService {
     /// Run ripgrep with the given needle and haystack
+    ///
+    /// Returns a Vec of Messages, which correspond to ripgrep's internal
+    /// JSON output. Learn more about ripgrep's JSON output here:
+    /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn run(&self, needle: String, haystack: String) -> Result<Vec<Message>> {
+        println!("Running logseq with needle: {needle} and haystack: {haystack}");
+
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle, haystack]
             .into_iter()
