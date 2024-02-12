@@ -147,3 +147,20 @@ docker-scratch:
     EXPOSE 8000
     ENTRYPOINT ["./terraphim_server"]
     SAVE IMAGE aks/terraphim_server:scratch
+  
+docs-pages:
+  FROM rust:1.75.0-buster
+  RUN cargo install mdbook
+  RUN cargo install mdbook-linkcheck
+  RUN cargo install mdbook-sitemap-generator
+  RUN cargo install --git https://github.com/typst/typst typst-cli --tag v0.10.0
+  RUN cargo install mdbook-typst
+  RUN cargo install mdbook-mermaid
+  RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+  RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
+  COPY --keep-ts docs /docs
+  WORKDIR /docs
+  RUN mdbook --version
+  RUN mdbook build
+  RUN mdbook-sitemap-generator -d docs.terraphim.ai -o /docs/book/html/sitemap.xml
+  # RUN --secret NETLIFY_AUTH_TOKEN=NETLIFY_TOKEN bash -c "source $HOME/.nvm/nvm.sh && netlify deploy --dir /docs/book/html --prod --auth $NETLIFY_AUTH_TOKEN --site docs.terraphim.ai"
