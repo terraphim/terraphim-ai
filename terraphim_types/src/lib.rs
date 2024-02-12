@@ -42,7 +42,6 @@ pub struct Article {
     pub rank: Option<u64>,
 }
 
-
 impl From<Article> for Document {
     fn from(val: Article) -> Self {
         // If the ID is not provided, generate a new one
@@ -84,7 +83,6 @@ pub fn merge_and_serialize(
             // Article found in cache
             let mut article = article;
             article.tags =Some(each_doc.tags.clone());
-
             article.rank = Some(each_doc.rank);
             articles.push(article.clone());
         } else {
