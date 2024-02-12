@@ -1,9 +1,8 @@
 use directories::ProjectDirs;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-use std::env;
 use twelf::{config, Layer};
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("config error: {0}")]
@@ -19,29 +18,33 @@ pub enum Error {
 pub type SettingsResult<T> = std::result::Result<T, Error>;
 
 #[config]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Settings {
     /// The address to listen on
-    pub server_hostname: Option<String>,
+    pub server_hostname: String,
     /// API endpoint for the server
-    pub api_endpoint: Option<String>,
+    pub api_endpoint: String,
     /// configured storage backends available on device
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
+
 impl Settings {
+    /// Load settings from environment and file
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
-        let config_file = match config_path {
-            Some(path) => create_config_folder(&path)?,
+        println!("Loading settings...");
+        let config_path = match config_path {
+            Some(path) => path,
             None => {
                 if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
                     let config_dir = proj_dirs.config_dir();
-                    create_config_folder(&config_dir.to_path_buf())?
+                    config_dir.to_path_buf()
                 } else {
-                    create_config_folder(&PathBuf::from(".config/"))?
+                    PathBuf::from(".config/")
                 }
             }
         };
-        println!("Reading config_file: {:?}", config_file);
+        let config_file = init_config_file(&config_path)?;
+        println!("Using config_file: {:?}", config_file);
 
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
@@ -50,26 +53,22 @@ impl Settings {
     }
 }
 
-fn create_config_folder(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
+/// Initialize the config file if it doesn't exist
+fn init_config_file(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
+    log::info!("Initializing config file at: {:?}", path);
     if !path.exists() {
         std::fs::create_dir_all(path)?;
     }
-    let filename = path.join("settings.toml");
-    // let default_config = include_str!("../default/settings.toml");
-    if filename.exists() {
-        log::warn!("File exists");
-        log::warn!("{:?}", filename);
-    } else {
-        log::warn!("File does not exist");
-        let default_config_path =
-            std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-        let default_config_path = format!("{}/default/settings.toml", default_config_path);
-        println!("Default config path: {:?}", default_config_path);
-        println!("Writing default config to: {:?}", filename);
-        std::fs::copy(default_config_path, &filename)?;
+    log::info!("Checking for settings.toml");
+    let config_file = path.join("settings.toml");
+    if !config_file.exists() {
+        log::warn!("Creating default config at: {:?}", config_file);
+        let default_config = include_str!("../default/settings_local.toml");
+        std::fs::write(&config_file, default_config)?;
     }
-    Ok(filename)
+    Ok(config_file)
 }
+
 /// To run test with logs and variables use:
 /// RUST_LOG="info,warn" TERRAPHIM_API_ENDPOINT="test_endpoint" TERRAPHIM_PROFILE_S3_REGION="us-west-1" cargo test -- --nocapture
 #[cfg(test)]

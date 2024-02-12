@@ -58,7 +58,8 @@ pub async fn axum_server(
                 ]),
         );
 
-    println!("listening on {server_hostname}");
+    // Note: Prefixing the host with `http://` makes the URL clickable in some terminals
+    println!("listening on http://{server_hostname}");
 
     // This is the new way to start the server
     // However, we can't use it yet, because some crates have not updated

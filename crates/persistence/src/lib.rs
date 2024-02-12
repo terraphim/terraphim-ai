@@ -20,13 +20,13 @@ pub struct DeviceStorage {
 
 impl DeviceStorage {
     pub async fn instance() -> Result<&'static DeviceStorage> {
-        Ok(DEVICE_STORAGE
-            .get_or_init(async {
-                init_device_storage()
-                    .await
-                    .unwrap_or_else(|e| panic!("Failed to initialize DeviceStorage: {:?}", e))
+        let storage = DEVICE_STORAGE
+            .get_or_try_init(async {
+                let initialized_storage = init_device_storage().await?;
+                Ok::<DeviceStorage, Error>(initialized_storage)
             })
-            .await)
+            .await?;
+        Ok(storage)
     }
 }
 
