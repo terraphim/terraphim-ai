@@ -57,9 +57,11 @@
             });
             // configStore = data.roles;
             console.log('test configStore', $configStore);
-            console.log('test configStore default role ', $configStore["roles"]["default"]);
-            role.set($configStore["roles"]["default"]);
-            theme.set($role['theme']);
+            console.log('test configStore default role ', $configStore["default_role"]);
+            const role_value=$configStore["default_role"].toLowerCase();
+            role.set(role_value);
+            console.log('test role', $role);
+            theme.set($roles[$role]['theme']);
             console.log("Keys in configstore", Object.keys($configStore));
             console.log($configStore);
             console.log(typeof $configStore);

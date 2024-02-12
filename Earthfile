@@ -1,4 +1,4 @@
-VERSION --try --global-cache 0.7
+VERSION --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
@@ -49,7 +49,7 @@ install:
   RUN rustup component add rustfmt
   DO rust+INIT --keep_fingerprints=true
   RUN cargo install cross
-  #RUN cargo install orogene
+  RUN cargo install orogene
   
 
 source:
@@ -58,12 +58,14 @@ source:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
   DO rust+CARGO --args=fetch
+  SAVE ARTIFACT /code/target AS LOCAL target
+  
 
 cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
@@ -74,15 +76,15 @@ cross-build:
 build:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
-  RUN ./target/release/terraphim_server --version
-  SAVE ARTIFACT ./target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
+  RUN /code/target/release/terraphim_server --version
+  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
 
 build-debug:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build" --output="debug/[^/\.]+"
   RUN ./target/debug/terraphim_server --version
   SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
@@ -103,6 +105,18 @@ lint:
   FROM +build-debug
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
+build-focal:
+  FROM ubuntu:20.04
+  ENV DEBIAN_FRONTEND noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN true
+  RUN apt-get update -qq
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  WORKDIR /code
+  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  RUN curl https://pkgx.sh | sh
+  RUN pkgx +openssl cargo build
+
 docker-musl:
   FROM alpine:3.18
   # You can pass multiple tags, space separated
@@ -119,20 +133,24 @@ docker-musl:
 
 docker-aarch64:
   FROM rust:latest
-
   RUN apt update && apt upgrade -y
-  RUN apt install -y g++-aarch64-linux-gnu libc6-dev-arm64-cross
-
+  RUN apt install -y libssl-dev g++-aarch64-linux-gnu libc6-dev-arm64-cross
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  RUN apt install -y 
   RUN rustup target add aarch64-unknown-linux-gnu
   RUN rustup toolchain install stable-aarch64-unknown-linux-gnu
 
-  WORKDIR /app
+  WORKDIR /code
+  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
-
-  CMD ["cargo", "build","--release","--target", "aarch64-unknown-linux-gnu"]
+      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ 
+  ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+  RUN cargo build --release --target aarch64-unknown-linux-gnu
+  SAVE ARTIFACT /code/target/aarch64-unknown-linux-gnu/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-aarch64
+  # CMD ["cargo", "build","--release","--target", "aarch64-unknown-linux-gnu"]
 
 docker-slim:
     FROM debian:buster-slim
@@ -147,6 +165,7 @@ docker-scratch:
     EXPOSE 8000
     ENTRYPOINT ["./terraphim_server"]
     SAVE IMAGE aks/terraphim_server:scratch
+
   
 docs-pages:
   FROM rust:1.75.0-buster
