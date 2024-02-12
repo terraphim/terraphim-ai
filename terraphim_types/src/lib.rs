@@ -82,7 +82,7 @@ pub fn merge_and_serialize(
         if let Some(article) = articles_cached.get(&each_doc.id).cloned() {
             // Article found in cache
             let mut article = article;
-            article.tags =Some(each_doc.tags.clone());
+            article.tags = Some(each_doc.tags.clone());
             article.rank = Some(each_doc.rank);
             articles.push(article.clone());
         } else {
