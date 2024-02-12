@@ -48,8 +48,8 @@ install:
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   DO rust+INIT --keep_fingerprints=true
-  # RUN cargo install cross
-  #RUN cargo install orogene
+  RUN cargo install cross
+  RUN cargo install orogene
   
 
 source:
