@@ -1,4 +1,4 @@
-VERSION --global-cache 0.8
+VERSION --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
