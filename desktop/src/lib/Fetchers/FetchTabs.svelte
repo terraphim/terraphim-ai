@@ -6,6 +6,31 @@
   import FetchRole from './FetchRole.svelte';
   import { Switch } from 'svelma';
   import {Agent} from '@tomic/lib';
+  import { JSONEditor } from 'svelte-jsoneditor';
+  import { CONFIG } from '../../config';
+  import {configStore} from '$lib/stores';
+  let content = {
+    // text: JSON.stringify($configStore, null, 2),
+    json: $configStore,
+  };
+  function handleChange(updatedContent) {
+    console.log('contents changed:', updatedContent);
+    configStore.update(config => {
+      config = updatedContent.json;
+      return config;
+    });
+    // post to server using /api/config 
+    let configURL = `${CONFIG.ServerURL}/config/`;
+    fetch(configURL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatedContent.json),
+    });
+    content = updatedContent;
+    content
+  }
   let data;
   let isWiki=false;
   let fetchUrl = 'https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json';
@@ -55,6 +80,7 @@
     };
     syncWorker.postMessage(message);
   };
+  // This functiolity related to atomic server
   import { store } from '@tomic/svelte';
   import { getResource, getValue } from '@tomic/svelte';
   import { urls } from '@tomic/lib';
@@ -64,6 +90,7 @@
   
   const name = getValue<string>(resource1, urls.properties.name);
   const roles = getValue<string[]>(resource1, "http://localhost:9883/property/role");
+  // FIXME: update roles to configStore
   $: console.log("Print name", $name);
   $: console.log("Print roles", $roles);
 </script>
@@ -115,6 +142,13 @@
         >
     </Field>
   </Route>
+  <Route path="/editor">
+    <p><i>The best editing experience is to configure Atomic Server, in the meantime use editor below. You will need to refresh page via Command R or Ctrl-R to see changes</i></p>
+    <div class="editor">
+      
+      <JSONEditor {content} onChange={handleChange} />
+    </div>
+  </Route>
 </div>
 <hr>
 <Field grouped position="is-right">
@@ -133,7 +167,8 @@
       </i>
     </span>
   </a>
-  <a class="navbar-item" href="/fetch/json">Fetch JSON</a>
+  <a class="navbar-item" href="/fetch/json">Fetch JSON Data</a>
   <a class="navbar-item" href="/fetch/atomic">Set Atomic Server</a>
+  <a class="navbar-item" href="/fetch/editor">Edit JSON config</a>
 </div>
 </nav>
