@@ -12,8 +12,8 @@
     clippy::missing_const_for_fn
 )]
 #![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
-// #![deny(missing_docs)]
 use anyhow::Context;
+// #![deny(missing_docs)]
 use clap::Parser;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -42,15 +42,15 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
     println!("args: {:?}", args);
-    let server_settings = Settings::load_from_env_and_file(None)
-        .context("Failed to load settings from environment")?;
+    let server_settings =
+        Settings::load_from_env_and_file(None).context("Failed to load settings")?;
+
     println!(
         "Device settings hostname: {:?}",
         server_settings.server_hostname
     );
     let server_hostname = server_settings
         .server_hostname
-        .context("server_hostname not set in settings")?
         .parse::<SocketAddr>()
         .unwrap_or_else(|_| {
             let port = portpicker::pick_unused_port().expect("failed to find unused port");
@@ -119,15 +119,15 @@ mod tests {
         println!("response: {:?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
-        // test search article with POST method 
-        #[test]
-        async fn test_post_search_article_lifecycle() {
-            let client = Client::new();
-            let response = client
-                .post("http://localhost:8000/articles/search")
-                .header("Content-Type", "application/json")
-                .body(
-                    r#"
+    // test search article with POST method
+    #[test]
+    async fn test_post_search_article_lifecycle() {
+        let client = Client::new();
+        let response = client
+            .post("http://localhost:8000/articles/search")
+            .header("Content-Type", "application/json")
+            .body(
+                r#"
                 {
                     "search_term": "life cycle framework",
                     "skip": 0,
@@ -135,14 +135,14 @@ mod tests {
                     "role": "system operator"
                 }
                 "#,
-                )
-                .send()
-                .await
-                .unwrap();
-            println!("response: {:?}", response);
-            assert_eq!(response.status(), StatusCode::OK);
-        }
-    
+            )
+            .send()
+            .await
+            .unwrap();
+        println!("response: {:?}", response);
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
     #[test]
     async fn test_search_articles_without_role() {
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10").await.unwrap();

@@ -1,0 +1,23 @@
+[book]
+authors = ["AlexMikhalev"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Terraphim AI documentation"
+
+[output.html]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+# [output.compress]
+# subtitle = "How to use and contribute to Terraphim AI assistant"
+# highlight = "no-node"
+
+[output.epub]
+
+[output.typst]
+[output.typst.output]
+format = "pdf"
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
