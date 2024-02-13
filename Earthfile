@@ -47,18 +47,18 @@ install:
   RUN update-ca-certificates
   RUN rustup component add clippy
   RUN rustup component add rustfmt
-  DO rust+INIT --keep_fingerprints=true
+  # DO rust+INIT --keep_fingerprints=true
   RUN cargo install cross
   RUN cargo install orogene
-  
+  RUN curl https://pkgx.sh | sh
+  SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder:latest
 
 source:
-  FROM +install
+  FROM ghcr.io/terraphim/terraphim_builder:latest
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
   DO rust+CARGO --args=fetch
-  SAVE ARTIFACT /code/target AS LOCAL target
   
 
 cross-build:
@@ -94,7 +94,7 @@ test:
   DO rust+SET_CACHE_MOUNTS_ENV
   COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
-  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 2 & cargo test --offline;
+  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 2 & cargo test;
   #DO rust+CARGO --args="test --offline"
 
 fmt:
@@ -114,8 +114,32 @@ build-focal:
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN curl https://pkgx.sh | sh
-  RUN pkgx +openssl cargo build
+  RUN pkgx +openssl cargo build --release
+  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_focal
+
+build-bionic:
+  FROM ubuntu:18.04
+  ENV DEBIAN_FRONTEND noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN true
+  RUN apt-get update -qq
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  RUN update-ca-certificates
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  # RUN rustup toolchain install stable
+  WORKDIR /code
+  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  IF [ "$CARGO_HOME" = "" ]
+    ENV CARGO_HOME="$HOME/.cargo"
+  END
+  IF ! echo $PATH | grep -E -q "(^|:)$CARGO_HOME/bin($|:)"
+    ENV PATH="$PATH:$CARGO_HOME/bin"
+  END
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  RUN cargo build --release
+  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_bionic
 
 docker-musl:
   FROM alpine:3.18
@@ -149,7 +173,7 @@ docker-aarch64:
       CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ 
   ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
   RUN cargo build --release --target aarch64-unknown-linux-gnu
-  SAVE ARTIFACT /code/target/aarch64-unknown-linux-gnu/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-aarch64
+  SAVE ARTIFACT /code/target/aarch64-unknown-linux-gnu/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_linux-aarch64
   # CMD ["cargo", "build","--release","--target", "aarch64-unknown-linux-gnu"]
 
 docker-slim:
