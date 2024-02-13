@@ -1,24 +1,13 @@
----
-title: My Book Collection
----
+date:: [[Wed, 22.12.2021]]
+title:: @10 Best SaaS Metrics for SaaS Business Growth in 2022
+website-title:: The Product Company
+item-type:: [[webpage]]
+access-date:: 2022-10-11T13:46:59Z
+original-title:: 10 Best SaaS Metrics for SaaS Business Growth in 2022
+language:: en-US
+url:: https://theproductcompany.com/saas-metrics/
+authors:: [[Josh Fechter]]
+links:: [Local library](zotero://select/library/items/FDZDUUJY), [Web library](https://www.zotero.org/users/6520516/items/FDZDUUJY)
 
-# My Book Collection
-
-- Book:: The Catcher in the Rye
-  Author:: J.D. Salinger
-  Year:: 1951
-  Genre:: Fiction
-  Notes:: A classic novel about teenage alienation and loss.
-
-- Book:: 1984
-  Author:: George Orwell
-  Year:: 1949
-  Genre:: Dystopian
-  Notes:: A profound novel on the dangers of totalitarianism.
-
-- Book:: Sapiens: A Brief History of Humankind
-  Author:: Yuval Noah Harari
-  Year:: 2011
-  Genre:: Non-fiction, History
-  Notes:: An insightful look into the history and impact of Homo sapiens.
-
+- [[Abstract]]
+	- Along with identifying a product/market fit, you need to understand SaaS metrics to build a successful SaaS. Here are 10 key metrics to focus on in 2021.
