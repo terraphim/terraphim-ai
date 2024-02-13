@@ -59,6 +59,7 @@ mod roundtrip {
         dbg!(&config);
         let config_state = ConfigState::new(&mut config).await?;
         let role = SYSTEM_OPERATOR_ROLE_NAME.to_string();
+        // In this case, this is the synonym
         let needle = "life cycle framework".to_string();
 
         println!("Searching articles with query: {needle} {role}");
