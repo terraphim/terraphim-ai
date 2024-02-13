@@ -36,7 +36,8 @@ pub fn find_matches(
         let term = &patterns[mat.pattern()];
         let dict_term = dict_hash
             .get(term)
-            .ok_or_else(|| TerraphimAutomataError::Dict(format!("Unknown term: {}", term)))?;
+            .ok_or_else(|| TerraphimAutomataError::Dict(format!("Unknown term: {term}")))?;
+
         matches.push(Matched {
             term: term.clone(),
             id: dict_term.id,
