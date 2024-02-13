@@ -13,6 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-latest, ubuntu-20.04, windows-latest]
+    env:
+      working-directory: ./desktop
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -45,4 +47,4 @@ jobs:
           releaseBody: "See the assets to download this version and install."
           releaseDraft: true
           prerelease: false
-          projectPath: './desktop'
+          projectPath: ${{env.working-directory}}
