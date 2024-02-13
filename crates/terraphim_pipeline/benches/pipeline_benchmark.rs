@@ -13,12 +13,29 @@ use terraphim_pipeline::input::TEST_CORPUS;
 use terraphim_pipeline::split_paragraphs;
 use terraphim_pipeline::RoleGraph;
 
+// Initializes a tokio runtime for the benchmarks
+lazy_static::lazy_static! {
+    static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
+}
+
+// We can use this `block_on` function to run async code in the benchmarks
+// without having to use `async fn`, which is not supported by the `criterion` library.
+#[inline]
+pub fn block_on<F, T>(future: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    TOKIO_RUNTIME.block_on(future)
+}
+
+// Load automata for the benchmarks
 async fn get_automata() -> AHashMap<String, Dictionary> {
     load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
         .await
         .unwrap()
 }
 
+// Create a sample rolegraph for the benchmarks
 async fn get_rolegraph() -> RoleGraph {
     let role = "system operator".to_string();
     let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
@@ -26,10 +43,9 @@ async fn get_rolegraph() -> RoleGraph {
     rolegraph.unwrap()
 }
 
-async fn bench_find_matches_ids(c: &mut Criterion) {
+fn bench_find_matches_ids(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-
-    let rolegraph = get_rolegraph().await.clone();
+    let rolegraph = block_on(get_rolegraph());
 
     c.bench_function_over_inputs(
         "find_matches_ids",
@@ -42,9 +58,9 @@ async fn bench_find_matches_ids(c: &mut Criterion) {
     );
 }
 
-async fn bench_find_matches(c: &mut Criterion) {
+fn bench_find_matches(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-    let automata = get_automata().await;
+    let automata = block_on(get_automata());
 
     c.bench_function("find_matches", |b| {
         b.iter(|| find_matches(query, automata.clone(), false))
@@ -58,19 +74,19 @@ fn bench_split_paragraphs(c: &mut Criterion) {
     });
 }
 
-async fn bench_replace_matches(c: &mut Criterion) {
+fn bench_replace_matches(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-    let automata = get_automata().await;
+    let automata = block_on(get_automata());
 
     c.bench_function("replace_matches", |b| {
         b.iter(|| replace_matches(query, automata.clone()).unwrap())
     });
 }
 
-async fn bench_parse_document_to_pair(c: &mut Criterion) {
+fn bench_parse_document_to_pair(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
-    let mut rolegraph = get_rolegraph().await;
+    let mut rolegraph = block_on(get_rolegraph());
     c.bench_function("parse_document_to_pair", |b| {
         b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), query))
     });
@@ -79,11 +95,11 @@ async fn bench_parse_document_to_pair(c: &mut Criterion) {
 /// Test throughput based on query string.
 ///
 /// We want to measure if parsing from input query strings is fast.
-async fn bench_throughput(c: &mut Criterion) {
+fn bench_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("throughput");
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
-    let mut rolegraph = get_rolegraph().await;
+    let mut rolegraph = block_on(get_rolegraph());
 
     // for size in &[1000, 10000, 100000, 1000000, 10000000, 100000000] {
     for size in &[100, 1000, 2000, 3000, 4000, 5000, 10000] {
@@ -103,10 +119,10 @@ async fn bench_throughput(c: &mut Criterion) {
 /// parsing part.
 ///
 /// Throughput is the most important measure for parsing.
-async fn bench_throughput_corpus(c: &mut Criterion) {
+fn bench_throughput_corpus(c: &mut Criterion) {
     let mut group = c.benchmark_group("throughput_corpus");
     let article_id4 = "ArticleID4".to_string();
-    let mut rolegraph = get_rolegraph().await;
+    let mut rolegraph = block_on(get_rolegraph());
 
     for input in TEST_CORPUS {
         let input = input.to_string();
@@ -121,11 +137,11 @@ async fn bench_throughput_corpus(c: &mut Criterion) {
     group.finish();
 }
 
-async fn bench_query_throughput(c: &mut Criterion) {
+fn bench_query_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("query throughput");
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
-    let mut rolegraph = get_rolegraph().await;
+    let mut rolegraph = block_on(get_rolegraph());
     rolegraph.parse_document_to_pair(article_id4.clone(), query);
     let query_term = "Life cycle concepts and project direction".to_string();
 
@@ -139,10 +155,10 @@ async fn bench_query_throughput(c: &mut Criterion) {
     group.finish();
 }
 
-async fn bench_query(c: &mut Criterion) {
+fn bench_query(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
-    let mut rolegraph = get_rolegraph().await;
+    let mut rolegraph = block_on(get_rolegraph());
     rolegraph.parse_document_to_pair(article_id4.clone(), query);
     let query_term = "Life cycle concepts and project direction".to_string();
     c.bench_function("query_response", |b| {
