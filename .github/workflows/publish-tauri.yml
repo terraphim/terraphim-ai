@@ -35,8 +35,8 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
         
       - name: install frontend dependencies
-        run: cd ./desktop && yarn install # change this to npm or pnpm depending on which one you use
-
+        run: yarn install # change this to npm or pnpm depending on which one you use
+        working-directory: ${{env.working-directory}}
 
       - uses: tauri-apps/tauri-action@v0
         env:
