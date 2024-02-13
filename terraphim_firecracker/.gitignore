@@ -1,0 +1,8 @@
+bionic.vmlinux
+images/
+keypairs/
+src/
+images_test/
+kernel.bin
+atomic-server-infra/atomic-server
+vmlinux
