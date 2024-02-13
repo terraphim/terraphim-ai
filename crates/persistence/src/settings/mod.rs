@@ -78,7 +78,7 @@ pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(O
         #[cfg(debug_assertions)]
         let buf = "test data";
         #[cfg(not(debug_assertions))]
-        let mut buf = vec![0u8; 1024 * 1024];
+        let buf = vec![0u8; 1024 * 1024];
         op.write("test", buf).await?;
         let end_time = Instant::now();
         let _save_time = end_time.duration_since(start_time).as_millis();

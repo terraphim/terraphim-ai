@@ -1,0 +1,24 @@
+{
+    "boot-source": {
+      "kernel_image_path": "bionic.vmlinux",
+      "boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off random.trust_cpu=on ip=172.26.0.170::172.26.0.1:255.255.255.0::eth0:off hostname=alex.privacy.org",
+      "initrd_path": null
+    },
+    "drives": [
+      {
+        "drive_id": "rootfs",
+        "path_on_host": "images/bionic/terraphim-bionic.local.rootfs",
+        "is_root_device": true,
+        "is_read_only": false,
+        "partuuid": null,
+        "cache_type": "Unsafe",
+        "io_engine": "Sync"
+      }
+    ],
+    "machine-config": {
+      "vcpu_count": 1,
+      "mem_size_mib": 512,
+      "smt": false,
+      "track_dirty_pages": false
+    }
+  }
