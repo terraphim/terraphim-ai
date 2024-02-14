@@ -3,6 +3,7 @@ use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use terraphim_config::TerraphimConfig;
 use terraphim_pipeline::{Document, Error as TerraphimPipelineError};
+use ahash::AHashMap;
 
 // terraphim error type based on thiserror
 #[derive(thiserror::Error, Debug)]
@@ -73,7 +74,7 @@ impl From<Article> for Document {
 
 /// Merge articles from the cache and the output of query results
 pub fn merge_and_serialize(
-    articles_cached: HashMap<String, Article>,
+    articles_cached: AHashMap<String, Article>,
     docs: Vec<IndexedDocument>,
 ) -> Result<Vec<Article>> {
     let mut articles: Vec<Article> = Vec::new();
@@ -98,13 +99,15 @@ use tokio::sync::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+
 /// ConfigState for the Terraphim (Actor)
 /// Config state can be updated using the API or Atomic Server
 #[derive(Default, Debug, Clone)]
 pub struct ConfigState {
     /// Terraphim Config
     pub config: Arc<Mutex<TerraphimConfig>>,
-    pub roles: HashMap<String, RoleGraphState>,
+    pub roles: AHashMap<String, RoleGraphState>,
+    pub articles_cached: AHashMap<String, Article>
 }
 
 impl ConfigState {
@@ -115,7 +118,8 @@ impl ConfigState {
         println!("Config loaded");
         let mut config_state = ConfigState {
             config: Arc::new(Mutex::new(config.clone())),
-            roles: HashMap::new(),
+            roles: AHashMap::new(),
+            articles_cached: AHashMap::new(),
         };
 
         // for each role in a config initialize a rolegraph
@@ -149,6 +153,8 @@ impl ConfigState {
             let mut rolegraph = rolegraph_state.rolegraph.lock().await;
             rolegraph.parse_document(id.clone(), article.clone());
         }
+        // Add article to cache
+        self.articles_cached.insert(id.clone(), article);
         Ok(())
     }
 
