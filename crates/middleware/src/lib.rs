@@ -10,6 +10,7 @@ use std::time;
 use terraphim_types::{Article, ConfigState, SearchQuery};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use ahash::AHashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -187,7 +188,7 @@ trait Middleware {
     ///
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&mut self, needle: String, haystack: String)
-        -> Result<HashMap<String, Article>>;
+        -> Result<AHashMap<String, Article>>;
 }
 
 /// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
@@ -217,7 +218,7 @@ impl Middleware for RipgrepMiddleware {
         &mut self,
         needle: String,
         haystack: String,
-    ) -> Result<HashMap<String, Article>> {
+    ) -> Result<AHashMap<String, Article>> {
         let messages = self.service.run(needle, haystack).await?;
         let articles = index_inner(messages);
         for (_, article) in articles.clone().into_iter() {
@@ -231,9 +232,9 @@ impl Middleware for RipgrepMiddleware {
 }
 
 #[cached]
-fn index_inner(messages: Vec<Message>) -> HashMap<String, Article> {
+fn index_inner(messages: Vec<Message>) -> AHashMap<String, Article> {
     // Cache of the articles already processed by index service
-    let mut cached_articles: HashMap<String, Article> = HashMap::new();
+    let mut cached_articles: AHashMap<String, Article> = AHashMap::new();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     let mut article = Article::default();
@@ -366,7 +367,7 @@ fn index_inner(messages: Vec<Message>) -> HashMap<String, Article> {
 pub async fn search_haystacks(
     config_state: ConfigState,
     search_query: SearchQuery,
-) -> Result<HashMap<String, Article>> {
+) -> Result<AHashMap<String, Article>> {
     let current_config_state = config_state.config.lock().await.clone();
     let default_role = current_config_state.default_role.clone();
     // if role is not provided, use the default role in the config
@@ -386,7 +387,7 @@ pub async fn search_haystacks(
     // Define all middleware to be used for searching.
     let mut ripgrep_middleware = RipgrepMiddleware::new(config_state.clone());
 
-    let mut articles_cached: HashMap<String, Article> = HashMap::new();
+    let mut articles_cached: AHashMap<String, Article> = AHashMap::new();
     for each_haystack in &role_config.haystacks {
         println!(" each_haystack: {:#?}", each_haystack);
 
@@ -403,7 +404,7 @@ pub async fn search_haystacks(
             }
             _ => {
                 println!("Unknown middleware: {:#?}", each_haystack.service);
-                HashMap::new()
+                AHashMap::new()
             }
         };
     }
