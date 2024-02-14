@@ -54,9 +54,8 @@ cargo run
 
 ## Why "Terraphim"?
 
-Alex Mikhalev was inspired by the [Relict series][relict] of science fiction
-novels by [Vasiliy Golovachev](https://en.wikipedia.org/wiki/Vasili_Golovachov),
-where Terraphim is an artificial intelligence living inside a spacesuit (part of
-an exocortex).
+Terraphim is an artificial intelligence living inside a spacesuit (part of
+an exocortex), or inside your house or vehicle, and it is designed to help you with you tasks. You can carry it around with you. Originally taken from [Relict series][relict] of science fiction
+novels by [Vasiliy Golovachev](https://en.wikipedia.org/wiki/Vasili_Golovachov).
 
 [relict]: https://www.goodreads.com/en/book/show/196710046

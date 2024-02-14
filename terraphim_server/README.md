@@ -8,5 +8,5 @@ it will copy default/settings.toml to ~/.config/terraphim/settings.toml if it do
 To build locally, run:
 ```
 earthly +save-fe-local
-carog build
+cargo build
 ```
