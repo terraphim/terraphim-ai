@@ -50,7 +50,7 @@ cargo run
 ## Terminology
 
 - **Role**: A role is a set of settings that define the default behavior of the AI assistant. For example, a developer role will search for code-related content, while a father role will search for parenting-related content.
-- **Rolegraph**: A structure for ingesting documents into Terraphim.
+- **Rolegraph**: A structure for ingesting documents into Terraphim - knowledge graph turned into a scoring function (Aho-Corasick automata build from the knowledge graph).
 
 ## Why "Terraphim"?
 
