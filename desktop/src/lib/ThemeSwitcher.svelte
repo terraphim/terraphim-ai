@@ -21,15 +21,15 @@
                   return config;
               });
               roles.update(roles => {
-              roles = data.roles;
+              roles = $configStore["roles"];
               return roles;
             });
-              // configStore["roles"] = res.roles;
-              // FIXME: set to default role
-              role.set($configStore["roles"]["default"]);
-              theme.set($role['theme']);
+              
+              const role_value=$configStore["default_role"].toLowerCase();
+              role.set(role_value);
+              theme.set($roles[$role]['theme']);
               console.log('Role', $role);
-              theme.set(configStore[$role]['theme']);
+              console.log('Theme', $theme);
 
           })
             .catch((e) => console.error(e))
