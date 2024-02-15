@@ -5653,6 +5653,7 @@ dependencies = [
  "axum 0.6.20",
  "axum-extra",
  "clap 4.4.18",
+ "lazy_static",
  "log",
  "mime_guess",
  "persistence",
