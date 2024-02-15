@@ -30,9 +30,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c3a9648d43b9cd48db467b3f87fdd6e146bcc88ab0180006cef2179fe11d01"
+checksum = "42cd52102d3df161c77a887b608d7a4897d7cc112886a9537b738a887a03aaff"
 dependencies = [
  "cfg-if",
  "getrandom 0.2.12",
@@ -746,7 +746,7 @@ version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69b0116662497bc24e4b177c90eaf8870e39e2714c3fcfa296327a93f593fc21"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "async-trait",
  "cached_proc_macro",
  "cached_proc_macro_types",
@@ -2287,7 +2287,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "allocator-api2",
 ]
 
@@ -5572,7 +5572,7 @@ dependencies = [
 name = "terraphim_automata"
 version = "0.1.0"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "aho-corasick",
  "csv",
  "flate2",
@@ -5612,6 +5612,7 @@ dependencies = [
 name = "terraphim_middleware"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.8",
  "anyhow",
  "cached",
  "serde",
@@ -5627,7 +5628,7 @@ dependencies = [
 name = "terraphim_pipeline"
 version = "0.1.0"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "aho-corasick",
  "criterion",
  "itertools 0.11.0",
@@ -5693,7 +5694,9 @@ dependencies = [
 name = "terraphim_types"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.8",
  "anyhow",
+ "async-trait",
  "log",
  "opendal",
  "persistence",

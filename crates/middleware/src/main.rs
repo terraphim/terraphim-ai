@@ -1,11 +1,10 @@
 use terraphim_middleware::search_haystacks;
 use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
-
 use terraphim_middleware::Result;
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config_state = terraphim_types::ConfigState::new().await?;
+    let mut config_state = terraphim_types::ConfigState::new().await?;
     // let config_state = ConfigState::new().await?;
     // let needle = "life cycle framework".to_string();
     let needle = "trained operators and maintainers".to_string();
@@ -22,12 +21,14 @@ async fn main() -> Result<()> {
     // let articles_cached_left = run_ripgrep_service_and_index(config_state.clone(),needle.clone(), haystack).await;
     // println!("articles_cached_left: {:#?}", articles_cached_left.clone());
 
-    let articles_cached = search_haystacks(config_state.clone(), search_query.clone()).await?;
+    config_state.articles_cached = search_haystacks(config_state.clone(), search_query.clone()).await?;
+    
     let docs: Vec<IndexedDocument> = config_state
         .search_articles(search_query)
         .await
         .expect("Failed to search articles");
-    let articles = merge_and_serialize(articles_cached, docs)?;
+
+    let articles = merge_and_serialize(config_state.articles_cached, docs)?;
     println!("Articles: {articles:?}");
 
     Ok(())
