@@ -33,3 +33,6 @@ rust-embed = { version = "8.2.0", features = ["axum", "axum-ex","mime-guess"] }
 static-files = "0.2"
 walkdir = "2"
 dircpy = "0.3.15"
+
+[dev-dependencies]
+lazy_static = "1.4.0"
