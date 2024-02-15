@@ -83,12 +83,39 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use reqwest::{Client, StatusCode};
-    use terraphim_config::TerraphimConfig;
+    use terraphim_types as types;
     use tokio::test;
+    use std::net::SocketAddr;
+    use terraphim_server::axum_server;
 
+    lazy_static::lazy_static! {
+        static ref SERVER: String = {
+            // let port = portpicker::pick_unused_port().expect("failed to find unused port");
+            let port = 8000;
+            let addr = SocketAddr::from(([127, 0, 0, 1], port));
+
+            tokio::spawn(async move {
+                let config_state = types::ConfigState::new().await.unwrap();
+                if let Err(e) = axum_server(addr, config_state).await {
+                    println!("Failed to start axum server: {e:?}");
+                }
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                println!("Server started");
+            });
+    
+            // Wait for the server to start
+            
+    
+            // Store the server address in an environment variable so the tests can use it
+            std::env::set_var("TEST_SERVER_URL", format!("http://{}", addr));
+            addr.to_string()
+        };
+    }
     #[test]
     async fn test_search_articles() {
-        let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator").await.unwrap();
+        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator",&*SERVER);
+        println!("url: {:?}", url);
+        let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         // You can also test the response body if you want:
         // let body = response.text().await.unwrap();
@@ -160,7 +187,10 @@ mod tests {
     }
     #[test]
     async fn test_get_config() {
-        let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
+        let _ = &*SERVER;
+        let url = format!("http://{}/api/config/",&*SERVER);
+        println!("url: {:?}", url);
+        let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         // You can also test the response body if you want:
         // let body = response.text().await.unwrap();
@@ -170,6 +200,7 @@ mod tests {
     /// test update config
     #[test]
     async fn test_post_config() {
+        use terraphim_config::TerraphimConfig;
         let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
         let orig_config: TerraphimConfig = response.json().await.unwrap();
         println!("orig_config: {orig_config:?}");
