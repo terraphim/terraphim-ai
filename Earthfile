@@ -91,10 +91,12 @@ build-debug:
 
 test:
   FROM +build-debug
+  RUN apt-get update -qq
+  RUN apt install -y ripgrep
   DO rust+SET_CACHE_MOUNTS_ENV
   COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
-  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 2 & cargo test;
+  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 5 && cargo test;
   #DO rust+CARGO --args="test --offline"
 
 fmt:
