@@ -1,6 +1,6 @@
 {
   "package": {
-    "productName": "terraphim-search-core",
+    "productName": "terraphim-ai-desktop",
     "version": "0.1.0"
   },
   "build": {
@@ -11,7 +11,7 @@
   },
   "tauri": {
     "cli": {
-      "description": "Tauri API example",
+      "description": "Terraphim AI desktop app",
       "args": [
         {
           "short": "c",

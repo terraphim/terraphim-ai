@@ -15,3 +15,5 @@ vendor/
 terraphim-grep/
 artifact
 nohup.out
+.cargo/
+.desktop/package-lock.kdl

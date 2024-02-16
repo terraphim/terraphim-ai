@@ -1,11 +1,10 @@
 [package]
-name = "app"
+name = "terraphim-ai-desktop"
 version = "0.1.0"
 description = "Privacy preserving AI assistant: Take control of the relevance"
-authors = ["you"]
-license = ""
-repository = ""
-default-run = "app"
+authors = ["Alex Mikhalev"]
+license = "APACHE-2.0"
+repository = "https://github.com/terraphim/terraphim-ai/"
 edition = "2021"
 rust-version = "1.57"
 
@@ -21,11 +20,8 @@ terraphim_settings= {path="../../crates/settings"}
 terraphim_types= {path="../../terraphim_types"}
 
 anyhow = "1.0.78"
-lazy_static = "1.4"
 portpicker= {version = "*"}
 serde = { version = "1.0", features = ["derive"] }
-serde_derive = "^1.0.137"
-serde_json = "1.0"
 tauri = { version = "1.5.2", features = ["api-all", "cli", "system-tray"] }
 tokio = { version = "1.35.1", features = ["full"] }
 
