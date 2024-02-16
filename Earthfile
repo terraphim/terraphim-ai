@@ -1,4 +1,4 @@
-VERSION --global-cache 0.7
+VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
@@ -19,11 +19,19 @@ WORKDIR /code
 
 pipeline:
   BUILD desktop+build
-  BUILD +build-debug
+  BUILD +build-debug-native
   BUILD +fmt
   BUILD +lint
   BUILD +test
   BUILD +build
+
+rustlib:
+  BUILD +install
+  BUILD +build 
+
+native:
+  BUILD +install-native
+  BUILD +build-native
 
 
 # Creates a `./artifact/bin` folder with all binaries
@@ -40,26 +48,73 @@ docker-all:
   BUILD --platform=linux/arm/v7 +docker-musl --TARGET=armv7-unknown-linux-musleabihf
   BUILD --platform=linux/arm64/v8 +docker-musl --TARGET=aarch64-unknown-linux-musl
 
+# this install uses rust lib and Earthly cache
 install:
   FROM rust:1.75.0-buster
   RUN apt-get update -qq
+  RUN apt install -y musl-tools musl-dev 
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  RUN update-ca-certificates
+  RUN rustup component add clippy
+  RUN rustup component add rustfmt
+  DO rust+INIT --keep_fingerprints=true
+  RUN cargo install cross
+  RUN cargo install orogene
+  RUN cargo install ripgrep
+  RUN curl https://pkgx.sh | sh
+  RUN pkgx install yarnpkg.com
+  SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder:latest
+
+# this install doesn't use rust lib and Earthly cache
+install-native:
+  FROM rust:1.75.0-buster
+  ENV DEBIAN_FRONTEND noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN true
+  RUN apt-get update -qq
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   RUN apt install -y musl-tools musl-dev
   RUN update-ca-certificates
   RUN rustup component add clippy
   RUN rustup component add rustfmt
-  # DO rust+INIT --keep_fingerprints=true
+  RUN cargo install ripgrep
   RUN cargo install cross
   RUN cargo install orogene
   RUN curl https://pkgx.sh | sh
-  SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder:latest
+  RUN pkgx install yarnpkg.com
+  SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder_native:latest
+
+source-native:
+  FROM ghcr.io/terraphim/terraphim_builder_native:latest
+  WORKDIR /code
+  CACHE --sharing shared --persist /code/vendor
+  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  RUN mkdir -p .cargo
+  RUN cargo vendor > .cargo/config.toml
+  SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
+  SAVE ARTIFACT /code
+
+build-native:
+  FROM +source-native
+  WORKDIR /code
+  RUN cargo build --release
+  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
+
+build-debug-native:
+  FROM +source-native
+  # COPY --keep-ts +source-native/code /code
+  WORKDIR /code
+  RUN cargo build
+  SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
 
 source:
   FROM ghcr.io/terraphim/terraphim_builder:latest
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
-  DO rust+CARGO --args=fetch
-  
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  DO rust+CARGO --args=fetch  
 
 cross-build:
   FROM +source
@@ -76,7 +131,6 @@ cross-build:
 build:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
   RUN /code/target/release/terraphim_server --version
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
@@ -90,22 +144,21 @@ build-debug:
   SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
 
 test:
-  FROM +build-debug
-  RUN apt-get update -qq
-  RUN apt install -y ripgrep
-  DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
+  FROM +build-debug-native
+  # DO rust+SET_CACHE_MOUNTS_ENV
+  # COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
-  RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 5 && cargo test;
+  # RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 5 && cargo test;
+  RUN nohup /code/target/debug/terraphim_server & sleep 5 && cargo test
   #DO rust+CARGO --args="test --offline"
 
 fmt:
-  FROM +build-debug
-  DO rust+CARGO --args="fmt --check"
+  FROM +build-debug-native
+  RUN cargo fmt --check 
 
 lint:
-  FROM +build-debug
-  DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
+  FROM +build-debug-native
+  RUN cargo clippy --no-deps --all-features --all-targets
 
 build-focal:
   FROM ubuntu:20.04

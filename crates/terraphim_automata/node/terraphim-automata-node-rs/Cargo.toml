@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 aho-corasick = "1.0.1"
 # neon = "0.10.1"
 terraphim_automata = {path="../.."}
-num_cpus = "1"
+
 [dependencies.neon]
 version = "0.10.1"
 default-features = true
