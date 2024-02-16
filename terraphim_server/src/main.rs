@@ -84,37 +84,58 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use reqwest::{Client, StatusCode};
-    use terraphim_types as types;
+    
     use tokio::test;
-    use std::net::SocketAddr;
+    
     use terraphim_server::axum_server;
+    use super::*;
+    use tokio::sync::OnceCell;
 
-    lazy_static::lazy_static! {
-        static ref SERVER: String = {
-            // let port = portpicker::pick_unused_port().expect("failed to find unused port");
-            let port = 8000;
-            let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    static SERVER: OnceCell<()> = OnceCell::const_new();
+    async fn start_server (){
+        let server_settings =
+        Settings::load_from_env_and_file(None).context("Failed to load settings").unwrap();
 
-            tokio::spawn(async move {
-                let config_state = types::ConfigState::new().await.unwrap();
-                if let Err(e) = axum_server(addr, config_state).await {
-                    println!("Failed to start axum server: {e:?}");
-                }
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                println!("Server started");
-            });
-    
-            // Wait for the server to start
-            
-    
-            // Store the server address in an environment variable so the tests can use it
-            std::env::set_var("TEST_SERVER_URL", format!("http://{}", addr));
-            addr.to_string()
-        };
+    println!(
+        "Device settings inside lazy static hostname: {:?}",
+        server_settings.server_hostname
+    );
+    let server_hostname = server_settings
+        .server_hostname
+        .parse::<SocketAddr>()
+        .unwrap_or_else(|_| {
+            let port = portpicker::pick_unused_port().expect("failed to find unused port");
+            SocketAddr::from(([127, 0, 0, 1], port))
+        });
+        let config_state = types::ConfigState::new().await.unwrap();
+        tokio::spawn(async move {
+            let _ = axum_server(server_hostname, config_state).await.unwrap();
+            println!("Server started");
+        });
+
     }
+
+        
+    #[cfg(test)]
+    #[ctor::ctor]
+    fn init() {
+        // Start the server in the background and wait for it using tokio blocking
+
+        use tokio::time::{sleep, Duration};
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                start_server().await;
+                sleep(Duration::from_secs(2)).await;
+            });
+    }
+
     #[test]
     async fn test_search_articles() {
-        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator",&*SERVER);
+        SERVER.get_or_init(start_server).await;
+        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator", "localhost:8000");
         println!("url: {:?}", url);
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -126,6 +147,7 @@ mod tests {
     // test search article with POST method
     #[test]
     async fn test_post_search_article() {
+        SERVER.get_or_init(start_server).await;
         let client = Client::new();
         let response = client
             .post("http://localhost:8000/articles/search")
@@ -149,6 +171,7 @@ mod tests {
     // test search article with POST method
     #[test]
     async fn test_post_search_article_lifecycle() {
+        SERVER.get_or_init(start_server).await;
         let client = Client::new();
         let response = client
             .post("http://localhost:8000/articles/search")
@@ -172,6 +195,7 @@ mod tests {
 
     #[test]
     async fn test_search_articles_without_role() {
+        SERVER.get_or_init(start_server).await;
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10").await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         // You can also test the response body if you want:
@@ -180,6 +204,7 @@ mod tests {
     }
     #[test]
     async fn test_search_articles_without_limit() {
+        SERVER.get_or_init(start_server).await;
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0").await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         // You can also test the response body if you want:
@@ -188,9 +213,8 @@ mod tests {
     }
     #[test]
     async fn test_get_config() {
-        let _ = &*SERVER;
-        let url = format!("http://{}/api/config/",&*SERVER);
-        println!("url: {:?}", url);
+        // SERVER.get_or_init(start_server).await;
+        let url = "http://localhost:8000/config/";
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         // You can also test the response body if you want:
@@ -201,6 +225,7 @@ mod tests {
     /// test update config
     #[test]
     async fn test_post_config() {
+        SERVER.get_or_init(start_server).await;
         use terraphim_config::TerraphimConfig;
         let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
         let orig_config: TerraphimConfig = response.json().await.unwrap();
