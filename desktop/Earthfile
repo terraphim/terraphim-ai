@@ -9,7 +9,7 @@ deps:
     COPY --keep-ts . .
     # COPY --dir src src
     # COPY --dir public public
-    RUN oro apply -q >> /dev/null
+    RUN oro apply -q || true
     RUN pkgx +yarnpkg.com yarn
 
 build:

@@ -23,7 +23,7 @@ pipeline:
   BUILD +fmt
   BUILD +lint
   BUILD +test
-  BUILD +build
+  BUILD +build-native
 
 rustlib:
   BUILD +install
@@ -99,6 +99,7 @@ build-native:
   FROM +source-native
   WORKDIR /code
   RUN cargo build --release
+  RUN false
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
 
 build-debug-native:
