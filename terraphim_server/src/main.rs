@@ -41,7 +41,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    println!("args: {:?}", args);
+    println!("args: {args:?}");
     let server_settings =
         Settings::load_from_env_and_file(None).context("Failed to load settings")?;
 

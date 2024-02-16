@@ -1,7 +1,7 @@
 use terraphim_middleware::search_haystacks;
+use terraphim_middleware::Result;
 use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
-use terraphim_middleware::Result;
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut config_state = terraphim_types::ConfigState::new().await?;
@@ -21,8 +21,9 @@ async fn main() -> Result<()> {
     // let articles_cached_left = run_ripgrep_service_and_index(config_state.clone(),needle.clone(), haystack).await;
     // println!("articles_cached_left: {:#?}", articles_cached_left.clone());
 
-    config_state.articles_cached = search_haystacks(config_state.clone(), search_query.clone()).await?;
-    
+    config_state.articles_cached =
+        search_haystacks(config_state.clone(), search_query.clone()).await?;
+
     let docs: Vec<IndexedDocument> = config_state
         .search_articles(search_query)
         .await
