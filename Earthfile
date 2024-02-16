@@ -91,6 +91,8 @@ build-debug:
 
 test:
   FROM +build-debug
+  RUN apt-get update -qq
+  RUN apt install -y ripgrep
   DO rust+SET_CACHE_MOUNTS_ENV
   COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
