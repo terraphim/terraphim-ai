@@ -1,9 +1,9 @@
+use ahash::AHashMap;
 use opendal::Result as OpendalResult;
 use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use terraphim_config::TerraphimConfig;
 use terraphim_pipeline::{Document, Error as TerraphimPipelineError};
-use ahash::AHashMap;
 
 // terraphim error type based on thiserror
 #[derive(thiserror::Error, Debug)]
@@ -99,7 +99,6 @@ use tokio::sync::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-
 /// ConfigState for the Terraphim (Actor)
 /// Config state can be updated using the API or Atomic Server
 #[derive(Default, Debug, Clone)]
@@ -107,7 +106,7 @@ pub struct ConfigState {
     /// Terraphim Config
     pub config: Arc<Mutex<TerraphimConfig>>,
     pub roles: AHashMap<String, RoleGraphState>,
-    pub articles_cached: AHashMap<String, Article>
+    pub articles_cached: AHashMap<String, Article>,
 }
 
 impl ConfigState {

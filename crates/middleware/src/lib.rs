@@ -1,8 +1,9 @@
+use ahash::AHashMap;
 use cached::proc_macro::cached;
 use serde::Deserialize;
 use serde_json as json;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::{self};
 use std::hash::{Hash, Hasher};
 use std::process::Stdio;
@@ -10,7 +11,6 @@ use std::time;
 use terraphim_types::{Article, ConfigState, SearchQuery};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
-use ahash::AHashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -187,8 +187,11 @@ trait Middleware {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(&mut self, needle: String, haystack: String)
-        -> Result<AHashMap<String, Article>>;
+    async fn index(
+        &mut self,
+        needle: String,
+        haystack: String,
+    ) -> Result<AHashMap<String, Article>>;
 }
 
 /// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
