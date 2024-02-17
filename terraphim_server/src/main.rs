@@ -116,7 +116,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        println!("response: {:?}", response);
+        println!("response: {response:?}");
         assert_eq!(response.status(), StatusCode::OK);
     }
     // test search article with POST method
@@ -139,7 +139,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        println!("response: {:?}", response);
+        println!("response: {response:?}");
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -173,11 +173,11 @@ mod tests {
     async fn test_post_config() {
         let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
         let orig_config: TerraphimConfig = response.json().await.unwrap();
-        println!("orig_config: {:?}", orig_config);
+        println!("orig_config: {orig_config:?}");
         let mut new_config = orig_config.clone();
         new_config.default_role = "system operator".to_string();
         new_config.global_shortcut = "Ctrl+X".to_string();
-        println!("new_config: {:?}", new_config);
+        println!("new_config: {new_config:?}");
         let client = Client::new();
         let response = client
             .post("http://localhost:8000/config/")
@@ -187,7 +187,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        println!("response: {:?}", response);
+        println!("response: {response:?}");
         assert_eq!(response.status(), StatusCode::OK);
     }
     #[test]

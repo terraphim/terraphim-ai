@@ -96,7 +96,6 @@ pub fn merge_and_serialize(
 use terraphim_pipeline::{IndexedDocument, RoleGraph};
 use tokio::sync::Mutex;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// ConfigState for the Terraphim (Actor)

@@ -142,27 +142,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
 
 [[package]]
-name = "app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lazy_static",
- "portpicker",
- "serde",
- "serde_derive",
- "serde_json",
- "tauri",
- "tauri-build",
- "terraphim_config",
- "terraphim_middleware",
- "terraphim_pipeline",
- "terraphim_server",
- "terraphim_settings",
- "terraphim_types",
- "tokio",
-]
-
-[[package]]
 name = "arboard"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -879,6 +858,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "change-detection"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "159fa412eae48a1d94d0b9ecdb85c97ce56eb2a347c62394d3fdbf221adabc1a"
+dependencies = [
+ "path-matchers",
+ "path-slash",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1200,6 +1189,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1137cd7e7fc0fb5d3c5a8678be38ec56e819125d8d7907411fe24ccb943faca8"
+dependencies = [
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-epoch",
+ "crossbeam-queue",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1223,6 +1225,15 @@ name = "crossbeam-epoch"
 version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-queue"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df0346b5d5e76ac2fe4e327c5fd1118d6be7c51dfb18f9b7922923f287471e35"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -1445,6 +1456,17 @@ dependencies = [
  "const-oid",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "dircpy"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8466f8d28ca6da4c9dfbbef6ad4bff6f2fdd5e412d821025b0d3f0a9d74a8c1e"
+dependencies = [
+ "jwalk",
+ "log",
+ "walkdir",
 ]
 
 [[package]]
@@ -2788,6 +2810,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jwalk"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2735847566356cd2179a2a38264839308f7079fa96e6bd5a42d740460e003c56"
+dependencies = [
+ "crossbeam",
+ "rayon",
+]
+
+[[package]]
 name = "kuchikiki"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3613,6 +3645,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "path-matchers"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36cd9b72a47679ec193a5f0229d9ab686b7bd45e1fbc59ccf953c9f3d83f7b2b"
+dependencies = [
+ "glob",
+]
+
+[[package]]
+name = "path-slash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "498a099351efa4becc6a19c72aa9270598e8fd274ca47052e37455241c88b696"
+
+[[package]]
 name = "pathdiff"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3655,7 +3702,6 @@ version = "0.1.0"
 dependencies = [
  "async-once-cell",
  "async-trait",
- "dirs",
  "log",
  "opendal",
  "serde",
@@ -3665,10 +3711,7 @@ dependencies = [
  "terraphim_settings",
  "thiserror",
  "tokio",
- "tracing",
  "tracing-subscriber",
- "twelf",
- "url",
 ]
 
 [[package]]
@@ -4504,7 +4547,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rust-embed-utils",
- "shellexpand",
  "syn 2.0.46",
  "walkdir",
 ]
@@ -4770,16 +4812,6 @@ dependencies = [
  "itoa 1.0.10",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "serde_json_any_key"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2c409ca1209f6c4741028b9e1e56d973c868ffaef25ffbaf2471e486c2a74b3"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -5104,6 +5136,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbe866e1e51e8260c9eed836a042a5e7f6726bb2b411dffeaa712e19c388f23b"
 dependencies = [
  "loom",
+]
+
+[[package]]
+name = "static-files"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64712ea1e3e140010e1d9605872ba205afa2ab5bd38191cc6ebd248ae1f6a06b"
+dependencies = [
+ "change-detection",
+ "mime_guess",
+ "path-slash",
 ]
 
 [[package]]
@@ -5562,6 +5605,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim-ai-desktop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "portpicker",
+ "serde",
+ "tauri",
+ "tauri-build",
+ "terraphim_config",
+ "terraphim_middleware",
+ "terraphim_pipeline",
+ "terraphim_server",
+ "terraphim_settings",
+ "terraphim_types",
+ "tokio",
+]
+
+[[package]]
 name = "terraphim-markdown-parser"
 version = "0.1.0"
 dependencies = [
@@ -5574,13 +5635,9 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
  "aho-corasick",
- "csv",
- "flate2",
  "reqwest",
  "serde",
  "serde_json",
- "serde_json_any_key",
- "serde_path_to_error",
  "thiserror",
  "tokio",
 ]
@@ -5589,23 +5646,15 @@ dependencies = [
 name = "terraphim_config"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-once-cell",
  "async-trait",
- "dirs",
- "log",
- "opendal",
  "persistence",
  "serde",
  "serde_json",
- "serde_path_to_error",
  "thiserror",
  "tokio",
  "toml 0.8.8",
- "tracing",
  "tracing-subscriber",
  "ulid",
- "url",
 ]
 
 [[package]]
@@ -5613,7 +5662,6 @@ name = "terraphim_middleware"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
- "anyhow",
  "cached",
  "serde",
  "serde_json",
@@ -5621,7 +5669,6 @@ dependencies = [
  "terraphim_types",
  "thiserror",
  "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -5653,6 +5700,7 @@ dependencies = [
  "axum 0.6.20",
  "axum-extra",
  "clap 4.4.18",
+ "dircpy",
  "log",
  "mime_guess",
  "persistence",
@@ -5661,6 +5709,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
+ "static-files",
  "terraphim_config",
  "terraphim_middleware",
  "terraphim_pipeline",
@@ -5671,10 +5720,7 @@ dependencies = [
  "tower",
  "tower-http",
  "ulid",
- "utoipa",
- "utoipa-rapidoc",
- "utoipa-redoc",
- "utoipa-swagger-ui",
+ "walkdir",
 ]
 
 [[package]]
@@ -5683,8 +5729,6 @@ version = "0.1.0"
 dependencies = [
  "directories",
  "log",
- "serde",
- "serde_json",
  "test-log",
  "thiserror",
  "twelf",
@@ -5695,13 +5739,10 @@ name = "terraphim_types"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
- "anyhow",
- "async-trait",
  "log",
  "opendal",
  "persistence",
  "serde",
- "serde_json",
  "terraphim_config",
  "terraphim_pipeline",
  "thiserror",
@@ -6284,71 +6325,6 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
-
-[[package]]
-name = "utoipa"
-version = "4.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "272ebdfbc99111033031d2f10e018836056e4d2c8e2acda76450ec7974269fa7"
-dependencies = [
- "indexmap 2.1.0",
- "serde",
- "serde_json",
- "utoipa-gen",
-]
-
-[[package]]
-name = "utoipa-gen"
-version = "4.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3c9f4d08338c1bfa70dde39412a040a884c6f318b3d09aaaf3437a1e52027fc"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "regex",
- "syn 2.0.46",
-]
-
-[[package]]
-name = "utoipa-rapidoc"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d54a9a294323cfd98cb7e210ffa3d65ec83f3c09b17b5c49ce17d9658101e162"
-dependencies = [
- "axum 0.6.20",
- "serde",
- "serde_json",
- "utoipa",
-]
-
-[[package]]
-name = "utoipa-redoc"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c91925cf8fc316aaef77dcc6845770a62016c598d4114b63e991c3e7e5b0549"
-dependencies = [
- "axum 0.6.20",
- "serde",
- "serde_json",
- "utoipa",
-]
-
-[[package]]
-name = "utoipa-swagger-ui"
-version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "154517adf0d0b6e22e8e1f385628f14fcaa3db43531dc74303d3edef89d6dfe5"
-dependencies = [
- "axum 0.6.20",
- "mime_guess",
- "regex",
- "rust-embed",
- "serde",
- "serde_json",
- "utoipa",
- "zip",
-]
 
 [[package]]
 name = "uuid"
@@ -7273,18 +7249,6 @@ name = "zeroize"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "525b4ec142c6b68a2d10f01f7bbf6755599ca3f81ea53b8431b7dd348f5fdb2d"
-
-[[package]]
-name = "zip"
-version = "0.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
-dependencies = [
- "byteorder",
- "crc32fast",
- "crossbeam-utils",
- "flate2",
-]
 
 [[package]]
 name = "zvariant"

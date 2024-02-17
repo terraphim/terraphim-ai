@@ -7,8 +7,6 @@ edition = "2021"
 persistence = { path = "../crates/persistence" }
 terraphim_config = { path = "../crates/config" }
 terraphim_pipeline = { path = "../crates/terraphim_pipeline" }
-
-anyhow = "1.0.0"
 log = "0.4.14"
 opendal = { version = "0.44.2", features = [
     "services-dashmap",
@@ -16,9 +14,8 @@ opendal = { version = "0.44.2", features = [
     "services-sled",
 ] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 thiserror = "1.0.56"
 tokio = { version = "1.0", features = ["full"] }
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
-async-trait = "0.1.77"
+
 ahash = { version = "0.8.8", features = ["serde"] }
