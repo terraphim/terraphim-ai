@@ -51,7 +51,7 @@ pub async fn search(
 ) -> Result<Vec<Article>, TerraphimTauriError> {
     println!("Search called with {:?}", search_query);
     let current_config_state = config_state.inner().clone();
-    let articles_cached=search_haystacks(current_config_state.clone(), search_query.clone())
+    let articles_cached = search_haystacks(current_config_state.clone(), search_query.clone())
         .await
         .context("Failed to search articles")
         .unwrap();
