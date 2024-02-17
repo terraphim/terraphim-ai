@@ -1,5 +1,6 @@
-VERSION 0.7
-FROM node:21.5.0
+VERSION --cache-persist-option --global-cache 0.7
+PROJECT applied-knowledge-systems/terraphim-project
+FROM ghcr.io/terraphim/terraphim_builder_native:latest
 
 WORKDIR frontend
 
@@ -8,9 +9,10 @@ deps:
     COPY --keep-ts . .
     # COPY --dir src src
     # COPY --dir public public
-    RUN yarn
+    RUN oro apply -q || true
+    RUN pkgx +yarnpkg.com yarn
 
 build:
     FROM +deps
-    RUN yarn run build
+    RUN pkgx +yarnpkg.com yarn run build
     SAVE ARTIFACT dist /dist AS LOCAL dist
