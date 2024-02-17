@@ -14,14 +14,10 @@ RUN update-ca-certificates
 RUN rustup component add clippy
 RUN rustup component add rustfmt
 RUN cargo install ripgrep
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 16.15.1"
-RUN bash -c "source $HOME/.nvm/nvm.sh && npm install -g yarn"
-RUN bash -c "source $HOME/.nvm/nvm.sh && cd ./desktop && yarn && yarn build"
-RUN bash -c "source $HOME/.nvm/nvm.sh && cd ./terraphim-server && yarn && yarn build"
-RUN bash -c "cp -v ./desktop/build/dist /code/terraphim-server/dist"
 WORKDIR /code
 COPY . .
+RUN ./desktop/scripts/yarn_and_build.sh
+# COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
 RUN cargo build --release
 RUN git clone --depth 1 https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
 RUN BACKGROUND /code/target/release/terraphim_server 
