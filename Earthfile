@@ -180,7 +180,7 @@ build-bionic:
   ENV DEBIAN_FRONTEND noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN true
   RUN apt-get update -qq
-  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates sudo openssl libssl-dev bc wget git curl cmake pkg-config
   RUN update-ca-certificates
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   # RUN rustup toolchain install stable
@@ -193,10 +193,8 @@ build-bionic:
   IF ! echo $PATH | grep -E -q "(^|:)$CARGO_HOME/bin($|:)"
     ENV PATH="$PATH:$CARGO_HOME/bin"
   END
-  RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-  RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 16.15.1"
-  RUN bash -c "source $HOME/.nvm/nvm.sh && npm install -g yarn"
-  # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  RUN curl -fSsL https://deb.nodesource.com/setup_14.x | bash && apt-get install nodejs
+  RUN npm install -g yarn
   RUN cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_bionic
 
