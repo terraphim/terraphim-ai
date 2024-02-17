@@ -14,10 +14,9 @@ RUN update-ca-certificates
 RUN rustup component add clippy
 RUN rustup component add rustfmt
 RUN cargo install ripgrep
-RUN cargo install cross
-RUN cargo install orogene
-RUN curl https://pkgx.sh | sh
-RUN pkgx install yarnpkg.com
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 16.15.1"
+RUN bash -c "source $HOME/.nvm/nvm.sh && npm install -g yarn"
 # RUN rustup toolchain install stable
 WORKDIR /code
 COPY . .

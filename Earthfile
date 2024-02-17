@@ -193,7 +193,10 @@ build-bionic:
   IF ! echo $PATH | grep -E -q "(^|:)$CARGO_HOME/bin($|:)"
     ENV PATH="$PATH:$CARGO_HOME/bin"
   END
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+  RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 16.15.1"
+  RUN bash -c "source $HOME/.nvm/nvm.sh && npm install -g yarn"
+  # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_bionic
 
