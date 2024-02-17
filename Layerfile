@@ -1,8 +1,7 @@
 #Use an Ubuntu 18.04 base for our staging server
 FROM vm/ubuntu:18.04
 
-# To note: Layerfiles create entire VMs, *not* containers!
- 
+#Set the timezone to UTC
 ENV DEBIAN_FRONTEND noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN true
 RUN apt-get update -qq
