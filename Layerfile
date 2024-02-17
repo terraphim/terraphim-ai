@@ -14,10 +14,8 @@ RUN update-ca-certificates
 RUN rustup component add clippy
 RUN rustup component add rustfmt
 RUN cargo install ripgrep
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 16.15.1"
-RUN bash -c "source $HOME/.nvm/nvm.sh && npm install -g yarn"
-# RUN rustup toolchain install stable
+RUN curl -fSsL https://deb.nodesource.com/setup_14.x | bash && apt-get install nodejs
+RUN npm install -g yarn
 WORKDIR /code
 COPY . .
 RUN cargo build --release
