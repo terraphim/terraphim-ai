@@ -89,7 +89,7 @@ source-native:
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
@@ -98,13 +98,13 @@ source-native:
 build-native:
   FROM +source-native
   WORKDIR /code
+  RUN ./desktop/scripts/yarn_and_build.sh
   RUN cargo build --release
-  RUN false
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
 
 build-debug-native:
   FROM +source-native
-  # COPY --keep-ts +source-native/code /code
+  RUN ./desktop/scripts/yarn_and_build.sh
   WORKDIR /code
   RUN cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
