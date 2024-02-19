@@ -5635,9 +5635,12 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
  "aho-corasick",
+ "csv",
+ "flate2",
  "reqwest",
  "serde",
  "serde_json",
+ "terraphim_types",
  "thiserror",
  "tokio",
 ]
@@ -5646,15 +5649,25 @@ dependencies = [
 name = "terraphim_config"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.8",
+ "anyhow",
+ "async-once-cell",
  "async-trait",
+ "dirs",
+ "log",
+ "opendal",
  "persistence",
  "serde",
  "serde_json",
+ "terraphim_pipeline",
+ "terraphim_types",
  "thiserror",
  "tokio",
  "toml 0.8.8",
+ "tracing",
  "tracing-subscriber",
  "ulid",
+ "url",
 ]
 
 [[package]]
@@ -5665,10 +5678,13 @@ dependencies = [
  "cached",
  "serde",
  "serde_json",
+ "terraphim_config",
  "terraphim_pipeline",
  "terraphim_types",
  "thiserror",
  "tokio",
+ "tokio-stream",
+ "ulid",
 ]
 
 [[package]]
@@ -5686,6 +5702,7 @@ dependencies = [
  "serde",
  "serde_json",
  "terraphim_automata",
+ "terraphim_types",
  "thiserror",
  "tokio",
  "ulid",
@@ -5739,12 +5756,12 @@ name = "terraphim_types"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
+ "anyhow",
  "log",
  "opendal",
  "persistence",
  "serde",
- "terraphim_config",
- "terraphim_pipeline",
+ "serde_json",
  "thiserror",
  "tokio",
  "ulid",
