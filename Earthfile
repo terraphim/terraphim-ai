@@ -98,7 +98,8 @@ source-native:
 build-native:
   FROM +source-native
   WORKDIR /code
-  RUN ./desktop/scripts/yarn_and_build.sh
+  # RUN ./desktop/scripts/yarn_and_build.sh
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
 
@@ -114,7 +115,6 @@ source:
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args=fetch  
 
 cross-build:
@@ -132,6 +132,7 @@ cross-build:
 build:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
+  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
   RUN /code/target/release/terraphim_server --version
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
