@@ -203,7 +203,11 @@ pub fn merge_and_serialize(
 /// It holds a unique identifier and the normalized value.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NormalizedTerm {
+    /// Unique identifier for the normalized term
     pub id: u64,
+    /// The normalized value
+    // This field is currently called `nterm` in the JSON
+    #[serde(rename = "nterm")]
     pub value: String,
 }
 
