@@ -89,7 +89,7 @@ source-native:
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
-  # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
@@ -98,14 +98,11 @@ source-native:
 build-native:
   FROM +source-native
   WORKDIR /code
-  # RUN ./desktop/scripts/yarn_and_build.sh
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
 
 build-debug-native:
   FROM +source-native
-  RUN ./desktop/scripts/yarn_and_build.sh
   WORKDIR /code
   RUN cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
@@ -115,13 +112,14 @@ source:
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   DO rust+CARGO --args=fetch  
 
 cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
@@ -132,7 +130,6 @@ cross-build:
 build:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
   RUN /code/target/release/terraphim_server --version
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
