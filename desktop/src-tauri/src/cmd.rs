@@ -6,6 +6,8 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use tauri::command;
 use tauri::State;
+use terraphim_config::ServiceType;
+use terraphim_config::TerraphimConfig;
 use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
 
@@ -51,7 +53,7 @@ pub async fn search(
 ) -> Result<Vec<Article>, TerraphimTauriError> {
     println!("Search called with {:?}", search_query);
     let current_config_state = config_state.inner().clone();
-    let articles_cached = search_haystacks(current_config_state.clone(), search_query.clone())
+    let cached_articles = search_haystacks(current_config_state, search_query.clone())
         .await
         .context("Failed to search articles")
         .unwrap();
@@ -59,7 +61,7 @@ pub async fn search(
         .search_articles(search_query)
         .await
         .expect("Failed to search articles");
-    let articles = merge_and_serialize(articles_cached, docs).unwrap();
+    let articles = merge_and_serialize(cached_articles, docs).unwrap();
 
     Ok(articles)
 }
@@ -89,7 +91,8 @@ use terraphim_server::axum_server;
 async fn start_server() -> Result<(), String> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let config_state = ConfigState::new().await.unwrap();
+    let mut config = TerraphimConfig::new(ServiceType::Logseq);
+    let config_state = ConfigState::new(&mut config).await.unwrap();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = axum_server(addr, config_state).await {
             println!("Failed to start axum server: {e:?}");

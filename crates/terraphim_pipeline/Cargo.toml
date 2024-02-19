@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 terraphim_automata = { path = "../terraphim_automata" }
+terraphim_types = { path = "../../terraphim_types" }
 
 ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"
