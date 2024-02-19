@@ -4,24 +4,14 @@
 )]
 
 mod cmd;
-#[cfg(target_os = "linux")]
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use serde::{Deserialize, Serialize};
+use std::error::Error;
 use tauri::{
-    api::dialog::ask, http::ResponseBuilder, CustomMenuItem, GlobalShortcutManager, Manager,
-    RunEvent, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowBuilder,
-    WindowUrl,
+    CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
+    SystemTrayMenu,
 };
 
-use std::time::Duration;
-
-use std::collections::HashMap;
-
-use std::{error::Error, net::SocketAddr};
-use terraphim_server::axum_server;
-
+use terraphim_config::{ServiceType, TerraphimConfig};
 use terraphim_settings::Settings;
 use terraphim_types::ConfigState;
 
@@ -29,7 +19,8 @@ use terraphim_types::ConfigState;
 async fn main() -> Result<(), Box<dyn Error>> {
     let device_settings = Settings::load_from_env_and_file(None);
 
-    let config_state = ConfigState::new().await?;
+    let mut config = TerraphimConfig::new(ServiceType::Logseq);
+    let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let globbal_shortcut = current_config.global_shortcut.clone();
     // drop mutex guard to avoid deadlock

@@ -1,21 +1,19 @@
-use cached::proc_macro::cached;
+use logseq::LogseqMiddleware;
+use ripgrep::RipgrepMiddleware;
 use serde::Deserialize;
 use serde_json as json;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet};
-use std::fs::{self};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::process::Stdio;
 use std::time;
-use terraphim_types::{Article, ConfigState, SearchQuery};
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
+use terraphim_config::{ConfigState, ServiceType};
+use terraphim_types::{Article, SearchQuery};
+
+mod logseq;
+mod ripgrep;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Failed to load config state")]
-    ConfigStateLoad(#[from] terraphim_types::Error),
-
     #[error("Serde deserialization error: {0}")]
     Json(#[from] json::Error),
 
@@ -26,7 +24,7 @@ pub enum Error {
     RoleNotFound(String),
 
     #[error("Indexation error: {0}")]
-    IndexationError(String),
+    Indexation(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -135,48 +133,6 @@ fn calculate_hash<T: Hash>(t: &T) -> String {
     format!("{:x}", s.finish())
 }
 
-pub struct RipgrepService {
-    command: String,
-    default_args: Vec<String>,
-}
-
-/// Returns a new ripgrep service with default arguments
-impl Default for RipgrepService {
-    fn default() -> Self {
-        Self {
-            command: "rg".to_string(),
-            default_args: ["--json", "--trim", "-C3", "-i"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
-        }
-    }
-}
-
-impl RipgrepService {
-    /// Run ripgrep with the given needle and haystack
-    pub async fn run(&self, needle: String, haystack: String) -> Result<Vec<Message>> {
-        // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle, haystack]
-            .into_iter()
-            .chain(self.default_args.clone())
-            .collect();
-
-        let mut child = Command::new(&self.command)
-            .args(args)
-            .stdout(Stdio::piped())
-            .spawn()?;
-
-        let mut stdout = child.stdout.take().expect("Stdout is not available");
-        let read = async move {
-            let mut data = String::new();
-            stdout.read_to_string(&mut data).await.map(|_| data)
-        };
-        let output = read.await?;
-        json_decode(&output)
-    }
-}
-
 /// A Middleware is a service that can be used to index and search through
 /// haystacks. Every middleware receives a needle and a haystack and returns
 /// a HashMap of Articles.
@@ -190,222 +146,49 @@ trait Middleware {
         -> Result<HashMap<String, Article>>;
 }
 
-/// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
-/// through haystacks.
-struct RipgrepMiddleware {
-    service: RipgrepService,
-    config_state: ConfigState,
-}
-
-impl RipgrepMiddleware {
-    pub fn new(config_state: ConfigState) -> Self {
-        Self {
-            service: RipgrepService::default(),
-            config_state,
-        }
-    }
-}
-
-impl Middleware for RipgrepMiddleware {
-    /// Index the haystack using riprgrep and return a HashMap of Articles
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the middleware fails to index the haystack
-
-    async fn index(
-        &mut self,
-        needle: String,
-        haystack: String,
-    ) -> Result<HashMap<String, Article>> {
-        let messages = self.service.run(needle, haystack).await?;
-        let articles = index_inner(messages);
-        for (_, article) in articles.clone().into_iter() {
-            self.config_state
-                .index_article(article.clone())
-                .await
-                .expect("Failed to index article");
-        }
-        Ok(articles)
-    }
-}
-
-#[cached]
-fn index_inner(messages: Vec<Message>) -> HashMap<String, Article> {
-    // Cache of the articles already processed by index service
-    let mut cached_articles: HashMap<String, Article> = HashMap::new();
-    let mut existing_paths: HashSet<String> = HashSet::new();
-
-    let mut article = Article::default();
-    for message in messages.iter() {
-        match message {
-            Message::Begin(begin_msg) => {
-                article = Article::default();
-
-                let path: Option<Data> = begin_msg.path.clone();
-                let path_text = match path {
-                    Some(Data::Text { text }) => text,
-                    _ => {
-                        continue;
-                    }
-                };
-
-                if existing_paths.contains(&path_text) {
-                    continue;
-                }
-                existing_paths.insert(path_text.clone());
-
-                let id = calculate_hash(&path_text);
-                article.id = Some(id.clone());
-                article.title = path_text.clone();
-                article.url = path_text.clone();
-            }
-            Message::Match(match_msg) => {
-                let path = match &match_msg.path {
-                    Some(path) => path,
-                    None => {
-                        println!("Error: path is None: {:?}", match_msg.path);
-                        continue;
-                    }
-                };
-
-                let path_text = match path {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: path is not text: {path:?}");
-                        continue;
-                    }
-                };
-                let body = match fs::read_to_string(path_text) {
-                    Ok(body) => body,
-                    Err(e) => {
-                        println!("Error: Failed to read file: {:?}", e);
-                        continue;
-                    }
-                };
-                article.body = body;
-
-                let lines = match &match_msg.lines {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: lines is not text: {:?}", match_msg.lines);
-                        continue;
-                    }
-                };
-                match article.description {
-                    Some(description) => {
-                        article.description = Some(description + " " + &lines);
-                    }
-                    None => {
-                        article.description = Some(lines.clone());
-                    }
-                }
-            }
-            Message::Context(context_msg) => {
-                let article_url = article.url.clone();
-                let path = match context_msg.path {
-                    Some(ref path) => path,
-                    None => {
-                        println!("Error: path is None: {:?}", context_msg.path);
-                        continue;
-                    }
-                };
-
-                let path_text = match path {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: path is not text: {path:?}");
-                        continue;
-                    }
-                };
-
-                // We got a context for a different article
-                if article_url != *path_text {
-                    println!(
-                            "Error: Context for differrent article. article_url != path_text: {article_url:?} != {path_text:?}"
-                        );
-                    continue;
-                }
-
-                let lines = match &context_msg.lines {
-                    Data::Text { text } => text,
-                    _ => {
-                        println!("Error: lines is not text: {:?}", context_msg.lines);
-                        continue;
-                    }
-                };
-                match article.description {
-                    Some(description) => {
-                        article.description = Some(description + " " + &lines);
-                    }
-                    None => {
-                        article.description = Some(lines.clone());
-                    }
-                }
-            }
-            Message::End(_) => {
-                // The `End` message could be received before the `Begin`
-                // message causing the article to be empty
-                let id = match article.id {
-                    Some(ref id) => id,
-                    None => {
-                        println!("Error: End message received before Begin message. Skipping.");
-                        continue;
-                    }
-                };
-                cached_articles.insert(id.clone().to_string(), article.clone());
-            }
-            _ => {}
-        };
-    }
-
-    cached_articles
-}
-
 /// Use Middleware to search through haystacks
 pub async fn search_haystacks(
     config_state: ConfigState,
     search_query: SearchQuery,
 ) -> Result<HashMap<String, Article>> {
-    let current_config_state = config_state.config.lock().await.clone();
-    let default_role = current_config_state.default_role.clone();
-    // if role is not provided, use the default role in the config
-    let role = match search_query.role {
-        None => default_role.as_str(),
-        Some(ref role) => role.as_str(),
-    };
-    // normalize roles to lowercase - same as term
-    let role = role.to_lowercase();
-    // if role have a ripgrep service, use it to spin index and search process and return cached articles
-    // Role config
-    let role_config = current_config_state
+    let config = config_state.config.lock().await.clone();
+
+    let search_query_role = search_query
+        .role
+        .unwrap_or(config.default_role)
+        .to_lowercase();
+
+    let role_config = config
         .roles
-        .get(&role)
-        .ok_or_else(|| Error::RoleNotFound(role.to_string()))?;
+        .get(&search_query_role)
+        .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
 
-    // Define all middleware to be used for searching.
-    let mut ripgrep_middleware = RipgrepMiddleware::new(config_state.clone());
+    // Define middleware to be used for searching.
+    let mut ripgrep = RipgrepMiddleware::new(config_state.clone());
+    let mut logseq = LogseqMiddleware::new(config_state.clone());
 
-    let mut articles_cached: HashMap<String, Article> = HashMap::new();
-    for each_haystack in &role_config.haystacks {
-        println!(" each_haystack: {:#?}", each_haystack);
+    let mut cached_articles: HashMap<String, Article> = HashMap::new();
 
-        // Spin ripgrep service and index output of ripgrep into Cached Articles and TerraphimGraph
+    for haystack in &role_config.haystacks {
+        println!("Handling haystack: {:#?}", haystack);
+
         let needle = search_query.search_term.clone();
-        let haystack = each_haystack.haystack.clone();
+        let haystack_inner = haystack.haystack.clone();
 
-        articles_cached = match each_haystack.service.as_str() {
-            "ripgrep" => {
+        cached_articles = match haystack.service {
+            ServiceType::Ripgrep => {
                 // Search through articles using ripgrep
-                ripgrep_middleware
-                    .index(needle.clone(), haystack.clone())
+                // This spins up ripgrep the service and indexes into the
+                // `TerraphimGraph` and caches the articles
+                ripgrep
+                    .index(needle.clone(), haystack_inner.clone())
                     .await?
             }
-            _ => {
-                println!("Unknown middleware: {:#?}", each_haystack.service);
-                HashMap::new()
+            ServiceType::Logseq => {
+                // Search through articles in logseq format
+                logseq.index(needle.clone(), haystack_inner.clone()).await?
             }
         };
     }
-    Ok(articles_cached)
+    Ok(cached_articles)
 }

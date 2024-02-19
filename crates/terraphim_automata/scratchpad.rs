@@ -82,11 +82,11 @@ pub fn get_edges(
 //     .await
 //     .unwrap();
 
-// let deser_map: HashMap<String, Dictionary> = json_to_map(&res).unwrap();
+// let deser_map: HashMap<String, NormalizedTerm> = json_to_map(&res).unwrap();
 // println!("{:?}", deser_map);
-// let mut dict_hash:  = HashMap::new();
-// dict_hash = serde_json::from_str(&res).unwrap();
-// let resp200 = res.json::<HashMap<String, Dictionary>>().await?;
+// let mut thesaurus:  = HashMap::new();
+// thesaurus = serde_json::from_str(&res).unwrap();
+// let resp200 = res.json::<HashMap<String, NormalizedTerm>>().await?;
 // let resp200 = client
 //     .get(json_url)
 //     .header(CONTENT_TYPE, "application/json")

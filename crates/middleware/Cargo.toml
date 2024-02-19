@@ -3,14 +3,14 @@ name = "terraphim_middleware"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 cached = { version = "0.47.0", features = ["async", "serde", "ahash"] }
 serde = { version = "1.0.149", features = ["derive"] }
 serde_json = "1.0.110"
+terraphim_config = { path = "../config" }
 terraphim_pipeline = { path = "../terraphim_pipeline" }
 terraphim_types = { path = "../../terraphim_types" }
 thiserror = "1.0.56"
 tokio = { version = "1.15.0", features = ["full"] }
 tokio-stream = { version = "0.1.14", features = ["sync"] }
+ulid = { version = "1.0.0", features = ["serde", "uuid"] }

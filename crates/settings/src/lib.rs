@@ -2,7 +2,6 @@ use directories::ProjectDirs;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use std::env;
 use twelf::{config, Layer};
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

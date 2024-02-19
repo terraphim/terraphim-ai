@@ -5,9 +5,8 @@ edition = "2021"
 
 [dependencies]
 persistence = { path = "../crates/persistence" }
-terraphim_config = { path = "../crates/config" }
-terraphim_pipeline = { path = "../crates/terraphim_pipeline" }
 
+ahash = { version = "0.8.3", features = ["serde"] }
 anyhow = "1.0.0"
 log = "0.4.14"
 opendal = { version = "0.44.2", features = [

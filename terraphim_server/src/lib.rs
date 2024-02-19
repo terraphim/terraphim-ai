@@ -8,8 +8,8 @@ use std::net::SocketAddr;
 mod api;
 use api::{create_article, health_axum, search_articles, search_articles_post};
 use rust_embed::RustEmbed;
-use terraphim_pipeline::IndexedDocument;
-use terraphim_types as types;
+use terraphim_config::ConfigState;
+use terraphim_types::IndexedDocument;
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -24,10 +24,7 @@ static INDEX_HTML: &str = "index.html";
 #[folder = "dist/"]
 struct Assets;
 
-pub async fn axum_server(
-    server_hostname: SocketAddr,
-    config_state: types::ConfigState,
-) -> Result<()> {
+pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState) -> Result<()> {
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 

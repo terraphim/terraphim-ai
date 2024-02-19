@@ -1,13 +1,18 @@
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use persistence::Persistable;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use terraphim_pipeline::{RoleGraph, RoleGraphSync};
+use terraphim_types::{Article, IndexedDocument, SearchQuery};
 use thiserror::Error;
+use tokio::sync::Mutex;
+use ulid::Ulid;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
+
+use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, persistence::Error>;
 
@@ -24,6 +29,12 @@ pub enum TerraphimConfigError {
 
     #[error("Serde JSON error")]
     Json(#[from] serde_json::Error),
+
+    #[error("Cannot initialize tracing subscriber")]
+    TracingSubscriber(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("Pipe error")]
+    Pipe(#[from] terraphim_pipeline::Error),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -35,21 +46,17 @@ pub enum RelevanceFunction {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum KnowledgeGraphType {
+pub enum KnowledgeGraphType {
     #[serde(rename = "markdown")]
     Markdown,
     #[serde(rename = "json")]
     Json,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TerraphimConfig {
-    pub global_shortcut: String,
-    pub roles: HashMap<String, Role>,
-    pub default_role: String,
-    id: String,
-}
-
+/// A role is a collection of settings for a specific user
+///
+/// It contains a user's knowledge graph, a list of haystacks, as
+/// well as preferences for the relevance function and theme
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Role {
     pub shortname: Option<String>,
@@ -64,37 +71,66 @@ pub struct Role {
     pub extra: HashMap<String, Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Haystack {
-    pub haystack: String,
-    pub service: String,
+/// The service used for indexing documents
+///
+/// Each service assumes documents to be stored in a specific format
+/// and uses a specific indexing algorithm
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub enum ServiceType {
+    /// Use logseq as the indexing service
+    Logseq,
+    /// Use ripgrep as the indexing service
+    Ripgrep,
 }
 
+/// A haystack is a collection of documents that can be indexed and searched
+///
+/// One user can have multiple haystacks
+/// Each haystack is indexed using a specific service
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Haystack {
+    /// The path to the haystack
+    pub haystack: String,
+    /// The service used for indexing documents in the haystack
+    pub service: ServiceType,
+}
+
+/// A knowledge graph is the collection of documents which were indexed
+/// using a specific service
+// TODO: Make the fields private once `TerraphimConfig` is more flexible
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
     pub automata_url: String,
-    //"markdown" or "json
-    kg_type: KnowledgeGraphType,
-    kg_path: String,
-    public: bool,
-    publish: bool,
+    pub kg_type: KnowledgeGraphType,
+    pub kg_path: String,
+    pub public: bool,
+    pub publish: bool,
 }
-use ulid::Ulid;
 
-impl Default for TerraphimConfig {
-    fn default() -> Self {
-        Self::new()
-    }
+/// The TerraphimConfig is the main configuration for terraphim
+/// It contains the global shortcut, roles, and default role
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TerraphimConfig {
+    /// Global shortcut for terraphim desktop
+    pub global_shortcut: String,
+    /// User roles with their respective settings
+    pub roles: HashMap<String, Role>,
+    /// The default role to use if no role is specified
+    pub default_role: String,
+    /// Unique identifier for the config
+    // TODO: Make the fields private once `TerraphimConfig` is more flexible
+    pub id: String,
 }
 
 impl TerraphimConfig {
-    pub fn new() -> Self {
-        let id = Ulid::new().to_string();
+    // TODO: In order to make the config more flexible, we should pass in the
+    // roles from the outside. This way, we can define the service (ripgrep,
+    // logseq, etc) for each role. This will allow us to support different
+    // services for different roles more easily.
+    // For now, we pass in the service type and use it for all roles.
+    pub fn new(service: ServiceType) -> Self {
         let mut roles = HashMap::new();
-        let haystack = Haystack {
-            haystack: "localsearch".to_string(),
-            service: "ripgrep".to_string(),
-        };
+
         let kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
@@ -103,7 +139,11 @@ impl TerraphimConfig {
             public: true,
             publish: true,
         };
-        let role = Role {
+        let haystack = Haystack {
+            haystack: "localsearch".to_string(),
+            service,
+        };
+        let default_role = Role {
             shortname: Some("Default".to_string()),
             name: "Default".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
@@ -113,8 +153,9 @@ impl TerraphimConfig {
             haystacks: vec![haystack],
             extra: HashMap::new(),
         };
-        roles.insert("Default".to_lowercase().to_string(), role);
-        let kg_engineer = KnowledgeGraph {
+        roles.insert("Default".to_lowercase().to_string(), default_role);
+
+        let engineer_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
             kg_type: KnowledgeGraphType::Markdown,
@@ -122,21 +163,22 @@ impl TerraphimConfig {
             public: true,
             publish: true,
         };
-        let eng_haystack = Haystack {
+        let engineer_haystack = Haystack {
             haystack: "localsearch".to_string(),
-            service: "ripgrep".to_string(),
+            service,
         };
-        let engineer = Role {
+        let engineer_role = Role {
             shortname: Some("Engineer".to_string()),
             name: "Engineer".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "lumen".to_string(),
             server_url: "http://localhost:8000/articles/search".to_string(),
-            kg: kg_engineer.clone(),
-            haystacks: vec![eng_haystack.clone()],
+            kg: engineer_kg,
+            haystacks: vec![engineer_haystack],
             extra: HashMap::new(),
         };
-        roles.insert("Engineer".to_lowercase().to_string(), engineer);
+        roles.insert("Engineer".to_lowercase().to_string(), engineer_role);
+
         let system_operator_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
@@ -147,9 +189,9 @@ impl TerraphimConfig {
         };
         let system_operator_haystack = Haystack {
             haystack: "/tmp/system_operator/pages/".to_string(),
-            service: "ripgrep".to_string(),
+            service,
         };
-        let system_operator = Role {
+        let system_operator_role = Role {
             shortname: Some("operator".to_string()),
             name: "System Operator".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
@@ -161,17 +203,18 @@ impl TerraphimConfig {
         };
         roles.insert(
             "System Operator".to_lowercase().to_string(),
-            system_operator,
+            system_operator_role,
         );
 
         Self {
-            id,
+            id: Ulid::new().to_string(),
             // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles,
             default_role: "Default".to_string(),
         }
     }
+
     pub fn update(&mut self, new_config: TerraphimConfig) {
         self.global_shortcut = new_config.global_shortcut;
         self.roles = new_config.roles;
@@ -182,11 +225,11 @@ impl TerraphimConfig {
 #[async_trait]
 impl Persistable for TerraphimConfig {
     fn new() -> Self {
-        TerraphimConfig::new()
+        TerraphimConfig::new(ServiceType::Ripgrep)
     }
 
-    async fn save_to_one(&self, profile_name: String) -> PersistenceResult<()> {
-        self.save_to_profile(profile_name.clone()).await?;
+    async fn save_to_one(&self, profile_name: &str) -> PersistenceResult<()> {
+        self.save_to_profile(profile_name).await?;
         Ok(())
     }
 
@@ -199,7 +242,6 @@ impl Persistable for TerraphimConfig {
 
     async fn load(&mut self, key: &str) -> PersistenceResult<Self> {
         let op = &self.load_config().await?.1;
-
         let obj = self.load_from_operator(key, op).await?;
         Ok(obj)
     }
@@ -207,6 +249,88 @@ impl Persistable for TerraphimConfig {
     /// returns ulid as key + .json
     fn get_key(&self) -> String {
         self.id.clone() + ".json"
+    }
+}
+
+/// ConfigState for the Terraphim (Actor)
+/// Config state can be updated using the API or Atomic Server
+///
+/// Holds the Terraphim Config and the RoleGraphs
+#[derive(Debug, Clone)]
+pub struct ConfigState {
+    /// Terraphim Config
+    pub config: Arc<Mutex<TerraphimConfig>>,
+    /// RoleGraphs
+    pub roles: HashMap<String, RoleGraphSync>,
+}
+
+impl ConfigState {
+    pub async fn new(config: &mut TerraphimConfig) -> Result<Self> {
+        // Try to load the existing state from the config
+        // TODO: Is this really needed? To be clarified
+        // let config = config.load("configstate").await?;
+        // println!("Config loaded");
+        // println!("{:#?}", config.roles);
+
+        // For each role in a config, initialize a rolegraph
+        // and add it to the config state
+        let mut roles = HashMap::new();
+        for (name, role) in &config.roles {
+            let automata_url = role.kg.automata_url.as_str();
+            let role_name = name.to_lowercase();
+            // FIXME: turn into log info
+            println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
+            let rolegraph = RoleGraph::new(role_name.clone(), automata_url).await?;
+            roles.insert(role_name, RoleGraphSync::from(rolegraph));
+        }
+
+        Ok(ConfigState {
+            config: Arc::new(Mutex::new(config.clone())),
+            roles,
+        })
+    }
+
+    /// Index article into all rolegraphs
+    // TODO: This should probably be a method on the RoleGraph and/or moved to
+    // the `persistance` crate
+    pub async fn index_article(&mut self, mut article: Article) -> OpendalResult<()> {
+        let id = article
+            .id
+            // lazily initialize `article.id` only if it's `None`.
+            .get_or_insert_with(|| ulid::Ulid::new().to_string())
+            .clone();
+
+        for rolegraph_state in self.roles.values() {
+            let mut rolegraph = rolegraph_state.lock().await;
+            rolegraph.parse_document(&id, article.clone());
+        }
+        Ok(())
+    }
+
+    /// Search articles in rolegraph using the search query
+    pub async fn search_articles(&self, search_query: SearchQuery) -> Vec<IndexedDocument> {
+        println!("search_articles: {:#?}", search_query);
+        let current_config_state = self.config.lock().await.clone();
+        let default_role = current_config_state.default_role.clone();
+
+        // if role is not provided, use the default role in the config
+        let role = search_query.role.unwrap_or(default_role);
+
+        let role = role.to_lowercase();
+        let rolegraph = self.roles.get(&role).unwrap().lock().await;
+        let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
+            &search_query.search_term,
+            search_query.skip,
+            search_query.limit,
+        ) {
+            Ok(docs) => docs,
+            Err(e) => {
+                log::error!("Error: {}", e);
+                return Vec::default();
+            }
+        };
+
+        documents.into_iter().map(|(_id, doc)| doc).collect()
     }
 }
 
@@ -219,7 +343,7 @@ mod tests {
 
     #[test]
     async fn test_write_config_to_json() {
-        let config = TerraphimConfig::new();
+        let config = TerraphimConfig::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.json").unwrap();
@@ -228,14 +352,14 @@ mod tests {
 
     #[test]
     async fn test_get_key() {
-        let config = TerraphimConfig::new();
+        let config = TerraphimConfig::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
     }
     #[tokio::test]
     async fn test_save_all() {
-        let config = TerraphimConfig::new();
+        let config = TerraphimConfig::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -243,28 +367,26 @@ mod tests {
     }
     #[tokio::test]
     async fn test_save_one_s3() {
-        let config = TerraphimConfig::new();
+        let config = TerraphimConfig::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
-        let profile_name = "s3".to_string();
-        config.save_to_one(profile_name).await.unwrap();
+        config.save_to_one("s3").await.unwrap();
         assert!(true);
     }
     #[tokio::test]
     async fn test_save_one_sled() {
-        let config = TerraphimConfig::new();
+        let config = TerraphimConfig::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
-        let profile_name = "sled".to_string();
-        config.save_to_one(profile_name).await.unwrap();
+        config.save_to_one("sled").await.unwrap();
         assert!(true);
     }
 
     #[test]
     async fn test_write_config_to_toml() {
-        let config = TerraphimConfig::new();
+        let config = TerraphimConfig::new(ServiceType::Ripgrep);
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.toml").unwrap();
@@ -272,7 +394,7 @@ mod tests {
     }
     #[test]
     async fn test_init_global_config_to_toml() {
-        let mut config = TerraphimConfig::new();
+        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
         config.global_shortcut = "Ctrl+/".to_string();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
@@ -281,10 +403,10 @@ mod tests {
     }
     #[test]
     async fn test_update_global() {
-        let mut config = TerraphimConfig::new();
+        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
         config.global_shortcut = "Ctrl+/".to_string();
 
-        let mut new_config = TerraphimConfig::new();
+        let mut new_config = TerraphimConfig::new(ServiceType::Ripgrep);
         new_config.global_shortcut = "Ctrl+.".to_string();
 
         config.update(new_config);
@@ -293,8 +415,8 @@ mod tests {
     }
     #[test]
     async fn test_update_roles() {
-        let mut config = TerraphimConfig::new();
-        let mut new_config = TerraphimConfig::new();
+        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut new_config = TerraphimConfig::new(ServiceType::Ripgrep);
         let new_role = Role {
             shortname: Some("farther".to_string()),
             name: "Farther".to_string(),
@@ -311,7 +433,7 @@ mod tests {
             },
             haystacks: vec![Haystack {
                 haystack: "localsearch".to_string(),
-                service: "ripgrep".to_string(),
+                service: ServiceType::Ripgrep,
             }],
             extra: HashMap::new(),
         };

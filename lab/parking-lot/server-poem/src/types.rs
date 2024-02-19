@@ -13,14 +13,14 @@ pub struct SearchQuery {
 
 /// Create article schema
 #[derive(Deserialize, Serialize, Debug, Object)]
-pub(crate) struct Article {
-    pub(crate) id: Option<String>,
-    pub(crate) stub: Option<String>,
-    pub(crate) title: String,
-    pub(crate) url: String,
-    pub(crate) body: String,
-    pub(crate) description: Option<String>,
-    pub(crate) tags: Option<Vec<String>>,
+pub struct Article {
+    pub id: Option<String>,
+    pub stub: Option<String>,
+    pub title: String,
+    pub url: String,
+    pub body: String,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 impl Into<Document> for Article {
@@ -50,3 +50,5 @@ pub(crate) enum ApiTags {
     Search,
     Save,
 }
+
+pub type Thesaurus = AHashMap<String, NormalizedTerm>;
