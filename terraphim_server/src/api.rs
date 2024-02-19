@@ -7,10 +7,11 @@ use axum::{
 };
 use std::ops::Deref;
 use std::sync::Arc;
+use terraphim_config::ConfigState;
 use terraphim_config::TerraphimConfig;
 use terraphim_middleware::search_haystacks;
-use terraphim_pipeline::{IndexedDocument, RoleGraph};
-use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
+use terraphim_pipeline::RoleGraph;
+use terraphim_types::{merge_and_serialize, Article, IndexedDocument, SearchQuery};
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
 use ulid::Ulid;
@@ -68,7 +69,7 @@ pub(crate) async fn search_articles(
         .await
         .context("Failed to search articles")?;
     let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
-    let articles = merge_and_serialize(cached_articles, docs)?;
+    let articles = merge_and_serialize(cached_articles, docs);
     println!("Articles: {articles:?}");
     Ok(Json(articles))
 }
@@ -86,7 +87,7 @@ pub(crate) async fn search_articles_post(
         .await
         .context("Failed to search articles")?;
     let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
-    let articles = merge_and_serialize(cached_articles, docs)?;
+    let articles = merge_and_serialize(cached_articles, docs);
     println!("Articles: {articles:?}");
     Ok(Json(articles))
 }

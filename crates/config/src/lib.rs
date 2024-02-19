@@ -1,13 +1,18 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use terraphim_pipeline::{RoleGraph, RoleGraphSync};
+use terraphim_types::{Article, IndexedDocument, SearchQuery};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use ulid::Ulid;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
+
+use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, persistence::Error>;
 
@@ -26,7 +31,10 @@ pub enum TerraphimConfigError {
     Json(#[from] serde_json::Error),
 
     #[error("Cannot initialize tracing subscriber")]
-    TracingSubscriber(Box<dyn std::error::Error>),
+    TracingSubscriber(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("Pipe error")]
+    Pipe(#[from] terraphim_pipeline::Error),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -113,7 +121,6 @@ pub struct TerraphimConfig {
     // TODO: Make the fields private once `TerraphimConfig` is more flexible
     pub id: String,
 }
-
 
 impl TerraphimConfig {
     // TODO: In order to make the config more flexible, we should pass in the
@@ -242,6 +249,88 @@ impl Persistable for TerraphimConfig {
     /// returns ulid as key + .json
     fn get_key(&self) -> String {
         self.id.clone() + ".json"
+    }
+}
+
+/// ConfigState for the Terraphim (Actor)
+/// Config state can be updated using the API or Atomic Server
+///
+/// Holds the Terraphim Config and the RoleGraphs
+#[derive(Debug, Clone)]
+pub struct ConfigState {
+    /// Terraphim Config
+    pub config: Arc<Mutex<TerraphimConfig>>,
+    /// RoleGraphs
+    pub roles: HashMap<String, RoleGraphSync>,
+}
+
+impl ConfigState {
+    pub async fn new(config: &mut TerraphimConfig) -> Result<Self> {
+        // Try to load the existing state from the config
+        // TODO: Is this really needed? To be clarified
+        // let config = config.load("configstate").await?;
+        // println!("Config loaded");
+        // println!("{:#?}", config.roles);
+
+        // For each role in a config, initialize a rolegraph
+        // and add it to the config state
+        let mut roles = HashMap::new();
+        for (name, role) in &config.roles {
+            let automata_url = role.kg.automata_url.as_str();
+            let role_name = name.to_lowercase();
+            // FIXME: turn into log info
+            println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
+            let rolegraph = RoleGraph::new(role_name.clone(), automata_url).await?;
+            roles.insert(role_name, RoleGraphSync::from(rolegraph));
+        }
+
+        Ok(ConfigState {
+            config: Arc::new(Mutex::new(config.clone())),
+            roles,
+        })
+    }
+
+    /// Index article into all rolegraphs
+    // TODO: This should probably be a method on the RoleGraph and/or moved to
+    // the `persistance` crate
+    pub async fn index_article(&mut self, mut article: Article) -> OpendalResult<()> {
+        let id = article
+            .id
+            // lazily initialize `article.id` only if it's `None`.
+            .get_or_insert_with(|| ulid::Ulid::new().to_string())
+            .clone();
+
+        for rolegraph_state in self.roles.values() {
+            let mut rolegraph = rolegraph_state.lock().await;
+            rolegraph.parse_document(&id, article.clone());
+        }
+        Ok(())
+    }
+
+    /// Search articles in rolegraph using the search query
+    pub async fn search_articles(&self, search_query: SearchQuery) -> Vec<IndexedDocument> {
+        println!("search_articles: {:#?}", search_query);
+        let current_config_state = self.config.lock().await.clone();
+        let default_role = current_config_state.default_role.clone();
+
+        // if role is not provided, use the default role in the config
+        let role = search_query.role.unwrap_or(default_role);
+
+        let role = role.to_lowercase();
+        let rolegraph = self.roles.get(&role).unwrap().lock().await;
+        let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
+            &search_query.search_term,
+            search_query.skip,
+            search_query.limit,
+        ) {
+            Ok(docs) => docs,
+            Err(e) => {
+                log::error!("Error: {}", e);
+                return Vec::default();
+            }
+        };
+
+        documents.into_iter().map(|(_id, doc)| doc).collect()
     }
 }
 

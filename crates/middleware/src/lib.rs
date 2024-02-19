@@ -6,17 +6,14 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time;
-use terraphim_config::ServiceType;
-use terraphim_types::{Article, ConfigState, SearchQuery};
+use terraphim_config::{ConfigState, ServiceType};
+use terraphim_types::{Article, SearchQuery};
 
 mod logseq;
 mod ripgrep;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Failed to load config state")]
-    ConfigStateLoad(#[from] terraphim_types::Error),
-
     #[error("Serde deserialization error: {0}")]
     Json(#[from] json::Error),
 
@@ -27,7 +24,7 @@ pub enum Error {
     RoleNotFound(String),
 
     #[error("Indexation error: {0}")]
-    IndexationError(String),
+    Indexation(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

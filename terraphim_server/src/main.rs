@@ -16,12 +16,10 @@
 use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
-use terraphim_config::{ServiceType, TerraphimConfig};
-use terraphim_settings::Settings;
-use types::RoleGraphSync;
-
+use terraphim_config::{ConfigState, ServiceType, TerraphimConfig};
+use terraphim_pipeline::RoleGraphSync;
 use terraphim_server::{axum_server, Result};
-use terraphim_types as types;
+use terraphim_settings::Settings;
 
 /// TODO: Can't get Open API docs to work with axum consistently, given up for now.
 use terraphim_pipeline::RoleGraph;
@@ -60,7 +58,9 @@ async fn main() -> Result<()> {
     // TODO: make the service type configurable
     // For now, we only support passing in the service type as an argument
     let mut config = TerraphimConfig::new(ServiceType::Logseq);
-    let mut config_state = types::ConfigState::new(&mut config).await?;
+    let mut config_state = ConfigState::new(&mut config)
+        .await
+        .context("Failed to load config")?;
 
     // Add one more for testing local KG
 

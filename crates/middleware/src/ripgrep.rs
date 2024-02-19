@@ -2,7 +2,8 @@ use cached::proc_macro::cached;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self};
 use std::process::Stdio;
-use terraphim_types::{Article, ConfigState};
+use terraphim_types::Article;
+use terraphim_config::ConfigState;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
@@ -44,7 +45,7 @@ impl Middleware for RipgrepMiddleware {
                 .index_article(article.clone())
                 .await
                 .map_err(|e| {
-                    crate::Error::IndexationError(format!(
+                    crate::Error::Indexation(format!(
                         "Failed to index article `{}` ({}): {e:?}",
                         article.title, article.url
                     ))

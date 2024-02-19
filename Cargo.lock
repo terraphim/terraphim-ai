@@ -5581,6 +5581,7 @@ dependencies = [
  "serde_json",
  "serde_json_any_key",
  "serde_path_to_error",
+ "terraphim_types",
  "thiserror",
  "tokio",
 ]
@@ -5599,6 +5600,8 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
+ "terraphim_pipeline",
+ "terraphim_types",
  "thiserror",
  "tokio",
  "toml 0.8.8",
@@ -5639,6 +5642,7 @@ dependencies = [
  "serde",
  "serde_json",
  "terraphim_automata",
+ "terraphim_types",
  "thiserror",
  "tokio",
  "ulid",
@@ -5694,14 +5698,13 @@ dependencies = [
 name = "terraphim_types"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.7",
  "anyhow",
  "log",
  "opendal",
  "persistence",
  "serde",
  "serde_json",
- "terraphim_config",
- "terraphim_pipeline",
  "thiserror",
  "tokio",
  "ulid",

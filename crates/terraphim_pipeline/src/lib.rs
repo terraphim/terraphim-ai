@@ -3,13 +3,14 @@ use itertools::Itertools;
 use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
+use std::sync::Arc;
+use terraphim_types::{Document, Edge, IndexedDocument, Node, Thesaurus};
+use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
 use log::warn;
-use serde::{Deserialize, Serialize};
 
 use terraphim_automata::load_automata;
-use terraphim_automata::matcher::Dictionary;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(thiserror::Error, Debug)]
@@ -30,57 +31,6 @@ type Result<T> = std::result::Result<T, Error>;
 
 // use tracing::{debug, error, info, span, warn, Level};
 
-/// Document that can be indexed by the `RoleGraph`.
-///
-/// These are all articles and entities, which have fields that can be indexed.
-#[derive(Debug, Clone)]
-pub struct Document {
-    /// Unique identifier of the document
-    pub id: String,
-    /// Title of the document
-    pub title: String,
-    /// Body of the document
-    pub body: Option<String>,
-    /// Description of the document
-    pub description: Option<String>,
-}
-
-impl ToString for Document {
-    fn to_string(&self) -> String {
-        let mut text = String::new();
-        text.push_str(&self.title);
-        if let Some(body) = &self.body {
-            text.push_str(body);
-        }
-        if let Some(description) = &self.description {
-            text.push_str(description);
-        }
-        text
-    }
-}
-
-/// Reference to external storage of documents, traditional indexes use
-/// document, aka article or entity.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IndexedDocument {
-    /// UUID of the indexed document, matching external storage id
-    pub id: String,
-    /// Matched to edges
-    matched_to: Vec<Edge>,
-    /// Graph rank (the sum of node rank, edge rank)
-    pub rank: u64,
-    /// tags, which are nodes turned into concepts for human readability
-    pub tags: Vec<String>,
-    /// list of node ids for validation of matching
-    nodes: Vec<u64>,
-}
-
-impl IndexedDocument {
-    pub fn to_json_string(&self) -> Result<String> {
-        Ok(serde_json::to_string(&self)?)
-    }
-}
-
 //TODO: create top_k_nodes function where
 // sort nodes by rank
 // TODO create top_k_edges function where
@@ -88,7 +38,8 @@ impl IndexedDocument {
 // TODO create top_k_documents function where
 // sort document id by rank
 
-/// RoleGraph is a graph of concepts and their relationships.
+/// A `RoleGraph` is a graph of concepts and their relationships.
+///
 /// It is used to index documents and search for them.
 /// Currently it maps from synonyms to concepts,
 /// so only normalized term returned when reverse lookup is performed
@@ -99,34 +50,35 @@ pub struct RoleGraph {
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, IndexedDocument>,
-    // TODO: Do we want to keep `automata_url` and `dict_hash`?
+    // TODO: Do we want to keep `automata_url` and `thesaurus`?
     // They are currently unused.
     pub automata_url: String,
-    pub dict_hash: AHashMap<String, Dictionary>,
+    pub thesaurus: Thesaurus,
     //TODO: make it private once performance tests are fixed
     pub ac_values: Vec<u64>,
     pub ac: AhoCorasick,
     // reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<u64, String>,
 }
+
 impl RoleGraph {
     pub async fn new(role: String, automata_url: &str) -> Result<Self> {
-        let dict_hash = load_automata(automata_url).await?;
+        let thesaurus = load_automata(automata_url).await?;
 
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.
-        // let (keys, values): (Vec<&str>, Vec<u64>) = dict_hash
+        // let (keys, values): (Vec<&str>, Vec<u64>) = thesaurus
         //     .iter()
         //     .map(|(key, value)| (key.as_str(), value.id))
         //     .unzip();
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
-        for (key, value) in dict_hash.iter() {
+        for (key, normalized_term) in thesaurus.iter() {
             keys.push(key.as_str());
-            values.push(value.id);
-            ac_reverse_nterm.insert(value.id, value.nterm.clone());
+            values.push(normalized_term.id);
+            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
 
         let ac = AhoCorasick::builder()
@@ -140,14 +92,15 @@ impl RoleGraph {
             edges: AHashMap::new(),
             documents: AHashMap::new(),
             automata_url: automata_url.to_string(),
-            dict_hash,
+            thesaurus,
             ac_values: values,
             ac,
             ac_reverse_nterm,
         })
     }
 
-    /// Find all matches int the rolegraph for the given text
+    /// Find all matches in the rolegraph for the given text
+    ///
     /// Returns a list of ids of the matched nodes
     fn find_matches_ids(&self, text: &str) -> Vec<u64> {
         let mut matches = Vec::new();
@@ -165,9 +118,10 @@ impl RoleGraph {
     // create hashmap of output with document_id, rank to dedupe documents in output
     // normalise output rank from 1 to number of records
     // pre-sort document_id by rank using BtreeMap
-    //  overall weighted average is calculated a weighted average of node rank and edge rank and document rank
-    //  weighted average  can be calculated: sum of (weight*rank)/sum of weights for each node, edge and document.
-    //  rank is a number of co-occurences normalised over number of documents (entities), see cleora train function
+    // overall weighted average is calculated a weighted average of node rank and edge rank and document rank
+    // weighted average  can be calculated: sum of (weight*rank)/sum of weights for each node, edge and document.
+    // rank is a number of co-occurrences normalised over number of documents (entities), see cleora train function
+    // (https://arxiv.org/pdf/2102.02302.pdf)
     // YAGNI: at the moment I don't need it, so parked
     pub fn normalise(&mut self) {
         let node_len = self.nodes.len() as u32;
@@ -303,49 +257,26 @@ impl RoleGraph {
         edge
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Edge {
-    // id of the node
-    id: u64,
-    rank: u64,
-    // hashmap document_id, rank
-    doc_hash: AHashMap<String, u64>,
+
+/// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`
+#[derive(Debug, Clone)]
+pub struct RoleGraphSync {
+    inner: Arc<Mutex<RoleGraph>>,
 }
-impl Edge {
-    pub fn new(id: u64, document_id: String) -> Self {
-        let mut doc_hash = AHashMap::new();
-        doc_hash.insert(document_id, 1);
-        Self {
-            id,
-            rank: 1,
-            doc_hash,
-        }
+
+impl RoleGraphSync {
+    /// Locks the rolegraph for reading and writing
+    pub async fn lock(&self) -> MutexGuard<'_, RoleGraph> {
+        self.inner.lock().await
     }
 }
-// Node represent single concept
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Node {
-    id: u64,
-    // number of co-occureneces
-    rank: u64,
-    connected_with: Vec<u64>,
-}
-impl Node {
-    fn new(id: u64, edge: Edge) -> Self {
+
+impl From<RoleGraph> for RoleGraphSync {
+    fn from(rolegraph: RoleGraph) -> Self {
         Self {
-            id,
-            rank: 1,
-            connected_with: vec![edge.id],
+            inner: Arc::new(Mutex::new(rolegraph)),
         }
     }
-    // pub fn sort_edges_by_value(&self) {
-    //     // let count_b: BTreeMap<&u64, &Edge> =
-    //     // self.connected_with.iter().map(|(k, v)| (v, k)).collect();
-    //     // for (k, v) in self.connected_with.iter().map(|(k, v)| (v.rank, k)) {
-    //     // warn!("k {:?} v {:?}", k, v);
-    //     // }
-    //     warn!("Connected with {:?}", self.connected_with);
-    // }
 }
 
 #[macro_use]

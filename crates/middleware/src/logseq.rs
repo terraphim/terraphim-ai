@@ -1,8 +1,10 @@
 use cached::proc_macro::cached;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self};
+use std::io::Read;
 use std::process::Stdio;
-use terraphim_types::{Article, ConfigState};
+use terraphim_config::ConfigState;
+use terraphim_types::{Article, Thesaurus};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
@@ -26,6 +28,13 @@ impl LogseqMiddleware {
     }
 }
 
+/// A KnowledgeGraphBuilder is a service which receives a path
+/// key-value pair
+/// and returns a thesaurus (dictionary with synonyms which map to upper-level concepts)
+trait KnowledgeGraphBuilder {
+    async fn build_knowledge_graph(&self, resource: impl Read) -> Result<Thesaurus>;
+}
+
 impl Middleware for LogseqMiddleware {
     /// Index the haystack using ripgrep and return a HashMap of Articles
     ///
@@ -44,7 +53,7 @@ impl Middleware for LogseqMiddleware {
                 .index_article(article.clone())
                 .await
                 .map_err(|e| {
-                    crate::Error::IndexationError(format!(
+                    crate::Error::Indexation(format!(
                         "Failed to index article `{}` ({}): {e:?}",
                         article.title, article.url
                     ))
