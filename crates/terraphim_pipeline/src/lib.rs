@@ -3,13 +3,14 @@ use itertools::Itertools;
 use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
+use std::sync::Arc;
+use terraphim_types::{Document, Edge, IndexedDocument, Node, Thesaurus};
+use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
 use log::warn;
-use serde::{Deserialize, Serialize};
 
 use terraphim_automata::load_automata;
-use terraphim_automata::matcher::Dictionary;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(thiserror::Error, Debug)]
@@ -30,57 +31,6 @@ type Result<T> = std::result::Result<T, Error>;
 
 // use tracing::{debug, error, info, span, warn, Level};
 
-/// Document that can be indexed by the `RoleGraph`.
-///
-/// These are all articles and entities, which have fields that can be indexed.
-#[derive(Debug, Clone)]
-pub struct Document {
-    /// Unique identifier of the document
-    pub id: String,
-    /// Title of the document
-    pub title: String,
-    /// Body of the document
-    pub body: Option<String>,
-    /// Description of the document
-    pub description: Option<String>,
-}
-
-impl ToString for Document {
-    fn to_string(&self) -> String {
-        let mut text = String::new();
-        text.push_str(&self.title);
-        if let Some(body) = &self.body {
-            text.push_str(body);
-        }
-        if let Some(description) = &self.description {
-            text.push_str(description);
-        }
-        text
-    }
-}
-
-/// Reference to external storage of documents, traditional indexes use
-/// document, aka article or entity.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IndexedDocument {
-    /// UUID of the indexed document, matching external storage id
-    pub id: String,
-    /// Matched to edges
-    matched_to: Vec<Edge>,
-    /// Graph rank (the sum of node rank, edge rank)
-    pub rank: u64,
-    /// tags, which are nodes turned into concepts for human readability
-    pub tags: Vec<String>,
-    /// list of node ids for validation of matching
-    nodes: Vec<u64>,
-}
-
-impl IndexedDocument {
-    pub fn to_json_string(&self) -> Result<String> {
-        Ok(serde_json::to_string(&self)?)
-    }
-}
-
 //TODO: create top_k_nodes function where
 // sort nodes by rank
 // TODO create top_k_edges function where
@@ -88,7 +38,8 @@ impl IndexedDocument {
 // TODO create top_k_documents function where
 // sort document id by rank
 
-/// RoleGraph is a graph of concepts and their relationships.
+/// A `RoleGraph` is a graph of concepts and their relationships.
+///
 /// It is used to index documents and search for them.
 /// Currently it maps from synonyms to concepts,
 /// so only normalized term returned when reverse lookup is performed
@@ -99,34 +50,35 @@ pub struct RoleGraph {
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, IndexedDocument>,
-    // TODO: Do we want to keep `automata_url` and `dict_hash`?
+    // TODO: Do we want to keep `automata_url` and `thesaurus`?
     // They are currently unused.
     pub automata_url: String,
-    pub dict_hash: AHashMap<String, Dictionary>,
+    pub thesaurus: Thesaurus,
     //TODO: make it private once performance tests are fixed
     pub ac_values: Vec<u64>,
     pub ac: AhoCorasick,
     // reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<u64, String>,
 }
+
 impl RoleGraph {
     pub async fn new(role: String, automata_url: &str) -> Result<Self> {
-        let dict_hash = load_automata(automata_url).await?;
+        let thesaurus = load_automata(automata_url).await?;
 
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.
-        // let (keys, values): (Vec<&str>, Vec<u64>) = dict_hash
+        // let (keys, values): (Vec<&str>, Vec<u64>) = thesaurus
         //     .iter()
         //     .map(|(key, value)| (key.as_str(), value.id))
         //     .unzip();
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
-        for (key, value) in dict_hash.iter() {
+        for (key, normalized_term) in thesaurus.iter() {
             keys.push(key.as_str());
-            values.push(value.id);
-            ac_reverse_nterm.insert(value.id, value.nterm.clone());
+            values.push(normalized_term.id);
+            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
 
         let ac = AhoCorasick::builder()
@@ -140,14 +92,15 @@ impl RoleGraph {
             edges: AHashMap::new(),
             documents: AHashMap::new(),
             automata_url: automata_url.to_string(),
-            dict_hash,
+            thesaurus,
             ac_values: values,
             ac,
             ac_reverse_nterm,
         })
     }
 
-    /// Find all matches int the rolegraph for the given text
+    /// Find all matches in the rolegraph for the given text
+    ///
     /// Returns a list of ids of the matched nodes
     pub fn find_matches_ids(&self, text: &str) -> Vec<u64> {
         let mut matches = Vec::new();
@@ -257,25 +210,29 @@ impl RoleGraph {
             .collect();
         Ok(hash_vec)
     }
-    pub fn parse_document_to_pair(&mut self, document_id: String, text: &str) {
+
+    pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
         let matches = self.find_matches_ids(text);
         for (a, b) in matches.into_iter().tuple_windows() {
-            self.add_or_update_document(document_id.clone(), a, b);
+            self.add_or_update_document(document_id, a, b);
         }
     }
-    pub fn parse_document<T: Into<Document>>(&mut self, document_id: String, input: T) {
+
+    pub fn parse_document<T: Into<Document>>(&mut self, document_id: &str, input: T) {
         let document: Document = input.into();
         let matches = self.find_matches_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
-            self.add_or_update_document(document_id.clone(), a, b);
+            self.add_or_update_document(document_id, a, b);
         }
     }
-    pub fn add_or_update_document(&mut self, document_id: String, x: u64, y: u64) {
+
+    pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
         let edge = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge, document_id);
         self.init_or_update_node(x, &edge);
         self.init_or_update_node(y, &edge);
     }
+
     fn init_or_update_node(&mut self, node_id: u64, edge: &Edge) {
         match self.nodes.entry(node_id) {
             Entry::Vacant(_) => {
@@ -289,16 +246,17 @@ impl RoleGraph {
             }
         };
     }
-    fn init_or_update_edge(&mut self, edge_key: u64, document_id: String) -> Edge {
+
+    fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
         let edge = match self.edges.entry(edge_key) {
             Entry::Vacant(_) => {
-                let edge = Edge::new(edge_key, document_id);
+                let edge = Edge::new(edge_key, document_id.to_string());
                 self.edges.insert(edge.id, edge.clone());
                 edge
             }
             Entry::Occupied(entry) => {
                 let edge = entry.into_mut();
-                *edge.doc_hash.entry(document_id).or_insert(1) += 1;
+                *edge.doc_hash.entry(document_id.to_string()).or_insert(1) += 1;
 
                 edge.clone()
             }
@@ -306,49 +264,26 @@ impl RoleGraph {
         edge
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Edge {
-    // id of the node
-    id: u64,
-    rank: u64,
-    // hashmap document_id, rank
-    doc_hash: AHashMap<String, u64>,
+
+/// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`
+#[derive(Debug, Clone)]
+pub struct RoleGraphSync {
+    inner: Arc<Mutex<RoleGraph>>,
 }
-impl Edge {
-    pub fn new(id: u64, document_id: String) -> Self {
-        let mut doc_hash = AHashMap::new();
-        doc_hash.insert(document_id, 1);
-        Self {
-            id,
-            rank: 1,
-            doc_hash,
-        }
+
+impl RoleGraphSync {
+    /// Locks the rolegraph for reading and writing
+    pub async fn lock(&self) -> MutexGuard<'_, RoleGraph> {
+        self.inner.lock().await
     }
 }
-// Node represent single concept
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Node {
-    id: u64,
-    // number of co-occureneces
-    rank: u64,
-    connected_with: Vec<u64>,
-}
-impl Node {
-    fn new(id: u64, edge: Edge) -> Self {
+
+impl From<RoleGraph> for RoleGraphSync {
+    fn from(rolegraph: RoleGraph) -> Self {
         Self {
-            id,
-            rank: 1,
-            connected_with: vec![edge.id],
+            inner: Arc::new(Mutex::new(rolegraph)),
         }
     }
-    // pub fn sort_edges_by_value(&self) {
-    //     // let count_b: BTreeMap<&u64, &Edge> =
-    //     // self.connected_with.iter().map(|(k, v)| (v, k)).collect();
-    //     // for (k, v) in self.connected_with.iter().map(|(k, v)| (v.rank, k)) {
-    //     // warn!("k {:?} v {:?}", k, v);
-    //     // }
-    //     warn!("Connected with {:?}", self.connected_with);
-    // }
 }
 
 #[macro_use]
@@ -464,23 +399,23 @@ mod tests {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches = rolegraph.find_matches_ids(query);
         for (a, b) in matches.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(article_id.clone(), a, b);
+            rolegraph.add_or_update_document(&article_id, a, b);
         }
         let article_id2 = Ulid::new().to_string();
         let query2 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches2 = rolegraph.find_matches_ids(query2);
         for (a, b) in matches2.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(article_id2.clone(), a, b);
+            rolegraph.add_or_update_document(&article_id2, a, b);
         }
         let article_id3 = Ulid::new().to_string();
         let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches3 = rolegraph.find_matches_ids(query3);
         for (a, b) in matches3.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(article_id3.clone(), a, b);
+            rolegraph.add_or_update_document(&article_id3, a, b);
         }
         let article_id4 = "ArticleID4".to_string();
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        rolegraph.parse_document_to_pair(article_id4, query4);
+        rolegraph.parse_document_to_pair(&article_id4, query4);
         warn!("Query graph");
         let results: Vec<(&String, IndexedDocument)> = rolegraph
             .query(
