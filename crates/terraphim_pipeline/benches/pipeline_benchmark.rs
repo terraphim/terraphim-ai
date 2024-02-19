@@ -8,14 +8,18 @@
 use ahash::AHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use terraphim_automata::load_automata;
-use terraphim_automata::matcher::{find_matches, replace_matches, Dictionary};
+use terraphim_automata::matcher::{find_matches, replace_matches, NormalizedTerm};
 use terraphim_pipeline::input::TEST_CORPUS;
 use terraphim_pipeline::split_paragraphs;
 use terraphim_pipeline::RoleGraph;
 
-// Initializes a tokio runtime for the benchmarks
-lazy_static::lazy_static! {
-    static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
+lazy_static! {
+    static ref AUTOMATA: Thesaurus = {
+        let thesaurus =
+            load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
+                .unwrap();
+        thesaurus
+    };
 }
 
 // We can use this `block_on` function to run async code in the benchmarks

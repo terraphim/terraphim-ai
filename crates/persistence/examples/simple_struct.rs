@@ -17,16 +17,18 @@ impl Persistable for MyStruct {
         }
     }
 
-    async fn save_to_one(&self, profile_name: String) -> Result<()> {
-        self.save_to_profile(profile_name.clone()).await?;
+    async fn save_to_one(&self, profile_name: &str) -> Result<()> {
+        self.save_to_profile(profile_name).await?;
         Ok(())
     }
+
     // saves to all profiles
     async fn save(&self) -> Result<()> {
         let _op = &self.load_config().await?.1;
         let _ = self.save_to_all().await?;
         Ok(())
     }
+
     async fn load(&mut self, key: &str) -> Result<Self> {
         let op = &self.load_config().await?.1;
 
@@ -47,8 +49,7 @@ async fn main() -> Result<()> {
         name: "No vampire".to_string(),
         age: 110,
     };
-    let profile_name = "s3".to_string();
-    obj.save_to_one(profile_name).await?;
+    obj.save_to_one("s3").await?;
     obj.save().await?;
     println!("saved obj: {:?} to all", obj);
     let (_ops, fastest_op) = obj.load_config().await?;

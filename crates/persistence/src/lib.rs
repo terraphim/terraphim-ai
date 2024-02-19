@@ -30,22 +30,24 @@ impl DeviceStorage {
     }
 }
 
-// Even though we panic when we fail to initialize the DeviceStorage, we still return a Result
-// because we want to be able to use the ? operator in the async fn.
 async fn init_device_storage() -> Result<DeviceStorage> {
-    let device_settings = Settings::load_from_env_and_file(None)?;
-    println!("cfg: {:?}", device_settings);
-    let ops = settings::parse_profiles(&device_settings).await?;
-    let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
+    let settings = Settings::load_from_env_and_file(None)?;
+    log::info!("Loaded settings: {:?}", settings);
+
+    let operators = settings::parse_profiles(&settings).await?;
+    let mut ops_vec: Vec<(&String, &(Operator, u128))> = operators.iter().collect();
     ops_vec.sort_by_key(|&(_, (_, speed))| speed);
+
     let ops: HashMap<String, (Operator, u128)> = ops_vec
         .into_iter()
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
+
     let fastest_op = match ops.values().next() {
         Some((op, _)) => op.clone(),
         None => return Err(Error::NoOperator),
     };
+
     Ok(DeviceStorage { ops, fastest_op })
 }
 
@@ -55,7 +57,7 @@ pub trait Persistable: Serialize + serde::de::DeserializeOwned {
 
     async fn save(&self) -> Result<()>;
 
-    async fn save_to_one(&self, profile_name: String) -> Result<()>;
+    async fn save_to_one(&self, profile_name: &str) -> Result<()>;
 
     async fn load(&mut self, key: &str) -> Result<Self>
     where
@@ -76,13 +78,21 @@ pub trait Persistable: Serialize + serde::de::DeserializeOwned {
         Ok(())
     }
 
-    async fn save_to_profile(&self, profile_name: String) -> Result<()> {
+    async fn save_to_profile(&self, profile_name: &str) -> Result<()> {
         let (ops, _fastest_op) = &self.load_config().await?;
         let key = self.get_key();
         let serde_str = serde_json::to_string(&self)?;
 
-        ops.get(&profile_name)
-            .ok_or_else(|| Error::Profile(format!("Unknown profile name: {}", profile_name)))?
+        ops.get(profile_name)
+            .ok_or_else(|| {
+                Error::Profile(format!(
+                    "Unknown profile name: {profile_name}. Available profiles: {}",
+                    ops.keys()
+                        .map(|k| k.as_str())
+                        .collect::<Vec<&str>>()
+                        .join(", ")
+                ))
+            })?
             .0
             .write(&key, serde_str.clone())
             .await

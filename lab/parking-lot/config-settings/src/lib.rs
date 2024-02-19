@@ -1,14 +1,10 @@
 use std::path::{Path, PathBuf};
 
-
-
 use config::{Config, ConfigError, Environment, File};
 use directories::ProjectDirs;
 use serde::Deserialize;
 
-
 use std::collections::HashMap;
-
 
 /// Configuration settings for the device or server.
 /// These values are set when the server initializes, and do not change while running.
@@ -19,29 +15,29 @@ pub struct Settings {
     pub server_url: Option<String>,
     pub config_file: String,
     pub api_endpoint: Option<String>,
-    pub profiles: HashMap<String, HashMap<String, String>>,
+    pub profiles: AHashMap<String, AHashMap<String, String>>,
 }
 impl Settings {
     pub fn new(config_path: Option<PathBuf>) -> Result<Self, ConfigError> {
-        
         let config_file = match config_path {
             Some(path) => create_config_folder(&path).unwrap(),
-            None => if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
-                let config_dir = proj_dirs.config_dir();
-                create_config_folder(&config_dir.to_path_buf()).unwrap()
-            }else{
-                create_config_folder(&PathBuf::from(".config/")).unwrap()
+            None => {
+                if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
+                    let config_dir = proj_dirs.config_dir();
+                    create_config_folder(&config_dir.to_path_buf()).unwrap()
+                } else {
+                    create_config_folder(&PathBuf::from(".config/")).unwrap()
+                }
             }
         };
-            
+
         let settings = Config::builder()
-        .add_source(File::with_name(config_file.to_str().unwrap()))
-        .add_source(Environment::with_prefix("TERRAPHIM")
-        .try_parsing(true)
-        // .separator("_")
-        )
-        .set_default("config_file", config_file.to_str())?;
-        
+            .add_source(File::with_name(config_file.to_str().unwrap()))
+            .add_source(
+                Environment::with_prefix("TERRAPHIM").try_parsing(true), // .separator("_")
+            )
+            .set_default("config_file", config_file.to_str())?;
+
         match settings.build() {
             Ok(config) => {
                 log::warn!("Settings: {:?}", config);
@@ -73,17 +69,17 @@ fn create_config_folder(path: &PathBuf) -> Result<PathBuf, ConfigError> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::env;
     use super::*;
     use opendal::Result as OpenDalResult;
+    use std::env;
+    use std::fs;
     use test_log::test;
 
     #[test]
     fn test_load_from_toml() -> OpenDalResult<()> {
         let dir = tempfile::tempdir().unwrap();
         let tmpfile = dir.path().join("settings.toml");
-        println!("Info {:?}",tmpfile );
+        println!("Info {:?}", tmpfile);
         fs::write(
             &tmpfile,
             r#"
@@ -113,7 +109,7 @@ mod tests {
         )
         .unwrap();
         let settings = Settings::new(Some(dir.path().to_path_buf())).unwrap();
-        println!("{:?}", settings); 
+        println!("{:?}", settings);
         println!("Profile {:?}", settings.profiles);
         println!("Profile s3 {:?}", settings.profiles.get("s3"));
         println!("Profile mys3 {:?}", settings.profiles.get("dash"));

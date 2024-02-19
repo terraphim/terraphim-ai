@@ -1,11 +1,11 @@
 pub mod matcher;
 
-use ahash::AHashMap;
-pub use matcher::{find_matches, replace_matches, Dictionary, Matched};
+pub use matcher::{find_matches, replace_matches, Matched};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-pub type ResponseJSON = AHashMap<String, Dictionary>;
+
+use terraphim_types::Thesaurus;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TerraphimAutomataError {
@@ -27,7 +27,7 @@ pub enum TerraphimAutomataError {
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
-pub async fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Dictionary>> {
+pub async fn load_automata(url_or_file: &str) -> Result<Thesaurus> {
     async fn read_url(url: &str) -> Result<String> {
         let response = reqwest::Client::new()
             .get(url)
@@ -48,8 +48,8 @@ pub async fn load_automata(url_or_file: &str) -> Result<AHashMap<String, Diction
         contents
     };
 
-    let dict_hash = serde_json::from_str(&contents)?;
-    Ok(dict_hash)
+    let thesaurus = serde_json::from_str(&contents)?;
+    Ok(thesaurus)
 }
 
 #[cfg(test)]
@@ -58,33 +58,33 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_automata_from_file() {
-        let dict_hash = load_automata("tests/test_data.csv.gz").await.unwrap();
-        assert_eq!(dict_hash.len(), 3);
-        assert_eq!(dict_hash.get("foo").unwrap().id, 1);
-        assert_eq!(dict_hash.get("bar").unwrap().id, 2);
-        assert_eq!(dict_hash.get("baz").unwrap().id, 3);
+        let thesaurus = load_automata("tests/test_data.csv.gz").await.unwrap();
+        assert_eq!(thesaurus.len(), 3);
+        assert_eq!(thesaurus.get("foo").unwrap().id, 1);
+        assert_eq!(thesaurus.get("bar").unwrap().id, 2);
+        assert_eq!(thesaurus.get("baz").unwrap().id, 3);
 
-        // TODO: No `parent` field in type `Dictionary`
-        // assert_eq!(dict_hash.get("foo").unwrap().parent, None);
-        // assert_eq!(dict_hash.get("bar").unwrap().parent, Some("1".to_string()));
-        // assert_eq!(dict_hash.get("baz").unwrap().parent, Some("2".to_string()));
+        // TODO: No `parent` field in type `NormalizedTerm`
+        // assert_eq!(thesaurus.get("foo").unwrap().parent, None);
+        // assert_eq!(thesaurus.get("bar").unwrap().parent, Some("1".to_string()));
+        // assert_eq!(thesaurus.get("baz").unwrap().parent, Some("2".to_string()));
     }
 
     #[tokio::test]
     async fn test_load_automata_from_url() {
-        let dict_hash = load_automata(
+        let thesaurus = load_automata(
             "https://raw.githubusercontent.com/github/copilot-sample-code/main/test_data.csv.gz",
         )
         .await
         .unwrap();
-        assert_eq!(dict_hash.len(), 3);
-        assert_eq!(dict_hash.get("foo").unwrap().id, 1);
-        assert_eq!(dict_hash.get("bar").unwrap().id, 2);
-        assert_eq!(dict_hash.get("baz").unwrap().id, 3);
+        assert_eq!(thesaurus.len(), 3);
+        assert_eq!(thesaurus.get("foo").unwrap().id, 1);
+        assert_eq!(thesaurus.get("bar").unwrap().id, 2);
+        assert_eq!(thesaurus.get("baz").unwrap().id, 3);
 
-        // TODO: No `parent` field in type `Dictionary`
-        // assert_eq!(dict_hash.get("foo").unwrap().parent, None);
-        // assert_eq!(dict_hash.get("bar").unwrap().parent, Some("1".to_string()));
-        // assert_eq!(dict_hash.get("baz").unwrap().parent, Some("2".to_string()));
+        // TODO: No `parent` field in type `NormalizedTerm`
+        // assert_eq!(thesaurus.get("foo").unwrap().parent, None);
+        // assert_eq!(thesaurus.get("bar").unwrap().parent, Some("1".to_string()));
+        // assert_eq!(thesaurus.get("baz").unwrap().parent, Some("2".to_string()));
     }
 }
