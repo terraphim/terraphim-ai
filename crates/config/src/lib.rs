@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use ahash::AHashMap;
 use async_trait::async_trait;
@@ -81,7 +81,7 @@ pub enum ServiceType {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Haystack {
     /// The path to the haystack
-    pub haystack: String,
+    pub path: PathBuf,
     /// The service used for indexing documents in the haystack
     pub service: ServiceType,
 }
@@ -131,7 +131,7 @@ impl Config {
             publish: true,
         };
         let haystack = Haystack {
-            haystack: "localsearch".to_string(),
+            path: PathBuf::from("localsearch"),
             service,
         };
         let default_role = Role {
@@ -155,7 +155,7 @@ impl Config {
             publish: true,
         };
         let engineer_haystack = Haystack {
-            haystack: "localsearch".to_string(),
+            path: PathBuf::from("localsearch"),
             service,
         };
         let engineer_role = Role {
@@ -179,7 +179,7 @@ impl Config {
             publish: true,
         };
         let system_operator_haystack = Haystack {
-            haystack: "/tmp/system_operator/pages/".to_string(),
+            path: PathBuf::from("/tmp/system_operator/pages/"),
             service,
         };
         let system_operator_role = Role {
@@ -282,9 +282,10 @@ impl ConfigState {
     /// Index article into all rolegraphs
     // TODO: This should probably be a method on the RoleGraph and/or moved to
     // the `persistance` crate
-    pub async fn index_article(&mut self, mut article: Article) -> OpendalResult<()> {
+    pub async fn index_article(&mut self, article: &Article) -> OpendalResult<()> {
         let id = article
             .id
+            .clone()
             // lazily initialize `article.id` only if it's `None`.
             .get_or_insert_with(|| ulid::Ulid::new().to_string())
             .clone();
@@ -421,7 +422,7 @@ mod tests {
                 publish: true,
             },
             haystacks: vec![Haystack {
-                haystack: "localsearch".to_string(),
+                path: PathBuf::from("localsearch"),
                 service: ServiceType::Ripgrep,
             }],
             extra: AHashMap::new(),

@@ -2,24 +2,25 @@ use ahash::AHashMap;
 use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
+use std::path::Path;
 use std::process::Stdio;
 use terraphim_config::ConfigState;
 use terraphim_types::{Article, Index};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
+use super::{calculate_hash, Data, IndexMiddleware};
+use super::{json_decode, Message};
 use crate::Result;
-use crate::{calculate_hash, Data, Middleware};
-use crate::{json_decode, Message};
 
 /// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
 /// through haystacks.
-pub struct RipgrepMiddleware {
+pub struct RipgrepIndexer {
     service: RipgrepService,
     config_state: ConfigState,
 }
 
-impl RipgrepMiddleware {
+impl RipgrepIndexer {
     pub fn new(config_state: ConfigState) -> Self {
         Self {
             service: RipgrepService::default(),
@@ -28,18 +29,18 @@ impl RipgrepMiddleware {
     }
 }
 
-impl Middleware for RipgrepMiddleware {
-    /// Index the haystack using ripgrep and return a HashMap of Articles
+impl IndexMiddleware for RipgrepIndexer {
+    /// Index the haystack using ripgrep and return an index of articles
     ///
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(&mut self, needle: String, haystack: String) -> Result<Index> {
-        let messages = self.service.run(needle, haystack).await?;
+    async fn index(&mut self, needle: String, haystack: &Path) -> Result<Index> {
+        let messages = self.service.run(needle, &haystack).await?;
         let articles = index_inner(messages);
-        for (_, article) in articles.clone().into_iter() {
+        for article in articles.values() {
             self.config_state
-                .index_article(article.clone())
+                .index_article(&article)
                 .await
                 .map_err(|e| {
                     crate::Error::Indexation(format!(
@@ -71,14 +72,14 @@ impl Default for RipgrepService {
 }
 
 impl RipgrepService {
-    /// Run ripgrep with the given needle and haystack
+    /// Runs ripgrep to find `needle` in `haystack`
     ///
     /// Returns a Vec of Messages, which correspond to ripgrep's internal
     /// JSON output. Learn more about ripgrep's JSON output here:
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
-    pub async fn run(&self, needle: String, haystack: String) -> Result<Vec<Message>> {
+    pub async fn run(&self, needle: String, haystack: &Path) -> Result<Vec<Message>> {
         // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle, haystack]
+        let args: Vec<String> = vec![needle, haystack.to_string_lossy().to_string()]
             .into_iter()
             .chain(self.default_args.clone())
             .collect();
@@ -99,6 +100,8 @@ impl RipgrepService {
 }
 
 #[cached]
+/// This is the inner function that indexes the articles
+/// which allows us to cache requests to the index service
 fn index_inner(messages: Vec<Message>) -> Index {
     // Cache of the articles already processed by index service
     let mut cached_articles: Index = AHashMap::new();

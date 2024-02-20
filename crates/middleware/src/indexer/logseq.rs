@@ -1,24 +1,25 @@
 use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
+use std::path::Path;
 use std::process::Stdio;
 use terraphim_config::ConfigState;
 use terraphim_types::{Article, Index};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
+use super::{calculate_hash, Data, IndexMiddleware};
+use super::{json_decode, Message};
 use crate::Result;
-use crate::{calculate_hash, Data, Middleware};
-use crate::{json_decode, Message};
 
 /// LogseqMiddleware is a Middleware that uses ripgrep to index and search
 /// through haystacks.
-pub struct LogseqMiddleware {
+pub struct LogseqIndexer {
     service: LogseqService,
     config_state: ConfigState,
 }
 
-impl LogseqMiddleware {
+impl LogseqIndexer {
     pub fn new(config_state: ConfigState) -> Self {
         Self {
             service: LogseqService::default(),
@@ -27,18 +28,18 @@ impl LogseqMiddleware {
     }
 }
 
-impl Middleware for LogseqMiddleware {
+impl IndexMiddleware for LogseqIndexer {
     /// Index the haystack using ripgrep and return a HashMap of Articles
     ///
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(&mut self, needle: String, haystack: String) -> Result<Index> {
+    async fn index(&mut self, needle: String, haystack: &Path) -> Result<Index> {
         let messages = self.service.run(needle, haystack).await?;
         let articles = index_inner(messages);
-        for (_, article) in articles.clone().into_iter() {
+        for article in articles.values() {
             self.config_state
-                .index_article(article.clone())
+                .index_article(&article)
                 .await
                 .map_err(|e| {
                     crate::Error::Indexation(format!(
@@ -75,7 +76,8 @@ impl LogseqService {
     /// Returns a Vec of Messages, which correspond to ripgrep's internal
     /// JSON output. Learn more about ripgrep's JSON output here:
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
-    pub async fn run(&self, needle: String, haystack: String) -> Result<Vec<Message>> {
+    pub async fn run(&self, needle: String, haystack: &Path) -> Result<Vec<Message>> {
+        let haystack = haystack.to_string_lossy().to_string();
         println!("Running logseq with needle: {needle} and haystack: {haystack}");
 
         // Merge the default arguments with the needle and haystack
