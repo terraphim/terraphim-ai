@@ -24,6 +24,7 @@ mod tests {
                 let port = portpicker::pick_unused_port().expect("Failed to find unused port");
                 SocketAddr::from(([127, 0, 0, 1], port))
             });
+
         let config_state = ConfigState::new()
             .await
             .expect("Failed to create config state");
@@ -35,21 +36,9 @@ mod tests {
         });
     }
 
+    /// Initialize the server once and use it for all tests
     async fn ensure_server_started() {
         SERVER.get_or_init(|| async { start_server().await }).await;
-    }
-
-    // Example test function
-    #[tokio::test]
-    async fn test_search_articles() {
-        ensure_server_started().await;
-        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator", "localhost:8000");
-        println!("url: {:?}", url);
-        let response = reqwest::get(url).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        // You can also test the response body if you want:
-        // let body = response.text().await.unwrap();
-        // assert!(body.contains("expected content"));
     }
 
     // test search article with POST method
@@ -76,6 +65,19 @@ mod tests {
         println!("response: {:?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
+
+    #[tokio::test]
+    async fn test_search_articles() {
+        ensure_server_started().await;
+        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator", "localhost:8000");
+        println!("url: {:?}", url);
+        let response = reqwest::get(url).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // let body = response.text().await.unwrap();
+        // assert!(body.contains("expected content"));
+    }
+
     // test search article with POST method
     #[tokio::test]
     async fn test_post_search_article_lifecycle() {
@@ -106,7 +108,7 @@ mod tests {
         ensure_server_started().await;
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10").await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        // You can also test the response body if you want:
+
         // let body = response.text().await.unwrap();
         // assert!(body.contains("expected content"));
     }
@@ -116,7 +118,7 @@ mod tests {
         ensure_server_started().await;
         let response = reqwest::get("http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0").await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        // You can also test the response body if you want:
+
         // let body = response.text().await.unwrap();
         // assert!(body.contains("expected content"));
     }
@@ -127,7 +129,7 @@ mod tests {
         let url = "http://localhost:8000/config/";
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        // You can also test the response body if you want:
+
         // let body = response.text().await.unwrap();
         // assert!(body.contains("expected content"));
     }
@@ -174,7 +176,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
-        // You can also test the response body if you want:
+
         // let body = response.text().await.unwrap();
         // assert!(body.contains("expected content"));
     }

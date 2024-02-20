@@ -13,7 +13,7 @@
     clippy::missing_const_for_fn
 )]
 #![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
-// Optional: #![deny(missing_docs)]
+#![deny(missing_docs)]
 
 use anyhow::Context;
 use clap::Parser;
