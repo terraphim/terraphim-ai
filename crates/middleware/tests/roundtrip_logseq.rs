@@ -3,8 +3,7 @@ mod roundtrip {
     use std::collections::HashMap;
 
     use terraphim_config::{
-        Haystack, KnowledgeGraph, KnowledgeGraphType, RelevanceFunction, Role, ServiceType,
-        TerraphimConfig,
+        Config, Haystack, KnowledgeGraph, KnowledgeGraphInput, RelevanceFunction, Role, ServiceType,
     };
     use terraphim_middleware::search_haystacks;
     use terraphim_pipeline::IndexedDocument;
@@ -17,7 +16,7 @@ mod roundtrip {
 
     // Helper function to create a new TerraphimConfig for testing logseq.
     // Eventually, we should make the config initialization more flexible.
-    pub fn create_logseq_config() -> TerraphimConfig {
+    pub fn create_logseq_config() -> Config {
         let kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
@@ -41,7 +40,7 @@ mod roundtrip {
             extra: HashMap::new(),
         };
 
-        TerraphimConfig {
+        Config {
             id: Ulid::new().to_string(),
             // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),

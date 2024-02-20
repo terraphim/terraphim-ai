@@ -6,8 +6,8 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use tauri::command;
 use tauri::State;
+use terraphim_config::Config;
 use terraphim_config::ServiceType;
-use terraphim_config::TerraphimConfig;
 use terraphim_pipeline::IndexedDocument;
 use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
 
@@ -69,12 +69,12 @@ pub async fn search(
 #[command]
 pub async fn get_config(
     config_state: tauri::State<'_, ConfigState>,
-) -> Result<terraphim_config::TerraphimConfig, ()> {
+) -> Result<terraphim_config::Config, ()> {
     println!("Get config called");
     let current_config = config_state.config.lock().await;
     println!("Get config called with {:?}", current_config);
     let response = current_config.clone();
-    Ok::<terraphim_config::TerraphimConfig, ()>(response)
+    Ok::<terraphim_config::Config, ()>(response)
 }
 
 pub struct Port(u16);
@@ -91,7 +91,7 @@ use terraphim_server::axum_server;
 async fn start_server() -> Result<(), String> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let mut config = TerraphimConfig::new(ServiceType::Logseq);
+    let mut config = Config::new(ServiceType::Logseq);
     let config_state = ConfigState::new(&mut config).await.unwrap();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = axum_server(addr, config_state).await {

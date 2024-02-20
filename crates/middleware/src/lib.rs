@@ -9,8 +9,8 @@ use std::time;
 use terraphim_config::{ConfigState, ServiceType};
 use terraphim_types::{Index, SearchQuery};
 
-mod logseq;
-mod ripgrep;
+pub mod logseq;
+pub mod ripgrep;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

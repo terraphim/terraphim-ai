@@ -11,6 +11,7 @@ name = "terraphim-config"
 [dependencies]
 terraphim_pipeline = { path = "../terraphim_pipeline" }
 terraphim_types = { path = "../../terraphim_types" }
+terraphim_automata = { path = "../terraphim_automata" }
 
 opendal = { version = "0.44.2", features = [
   "services-dashmap",

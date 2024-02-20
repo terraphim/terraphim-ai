@@ -5,8 +5,11 @@ use async_trait::async_trait;
 use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use terraphim_automata::load_automata;
 use terraphim_pipeline::{RoleGraph, RoleGraphSync};
-use terraphim_types::{Article, IndexedDocument, SearchQuery};
+use terraphim_types::{
+    Article, IndexedDocument, KnowledgeGraphInput, RelevanceFunction, SearchQuery,
+};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use ulid::Ulid;
@@ -36,22 +39,9 @@ pub enum TerraphimConfigError {
 
     #[error("Pipe error")]
     Pipe(#[from] terraphim_pipeline::Error),
-}
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum RelevanceFunction {
-    #[serde(rename = "terraphim-graph")]
-    TerraphimGraph,
-    #[serde(rename = "redis-search")]
-    RedisSearch,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum KnowledgeGraphType {
-    #[serde(rename = "markdown")]
-    Markdown,
-    #[serde(rename = "json")]
-    Json,
+    #[error("Automata error")]
+    Automata(#[from] terraphim_automata::TerraphimAutomataError),
 }
 
 /// A role is a collection of settings for a specific user
@@ -102,16 +92,16 @@ pub struct Haystack {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
     pub automata_url: String,
-    pub kg_type: KnowledgeGraphType,
+    pub kg_type: KnowledgeGraphInput,
     pub kg_path: String,
     pub public: bool,
     pub publish: bool,
 }
 
-/// The TerraphimConfig is the main configuration for terraphim
+/// The Terraphim config is the main configuration for terraphim
 /// It contains the global shortcut, roles, and default role
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TerraphimConfig {
+pub struct Config {
     /// Global shortcut for terraphim desktop
     pub global_shortcut: String,
     /// User roles with their respective settings
@@ -123,7 +113,7 @@ pub struct TerraphimConfig {
     pub id: String,
 }
 
-impl TerraphimConfig {
+impl Config {
     // TODO: In order to make the config more flexible, we should pass in the
     // roles from the outside. This way, we can define the service (ripgrep,
     // logseq, etc) for each role. This will allow us to support different
@@ -135,7 +125,7 @@ impl TerraphimConfig {
         let kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
-            kg_type: KnowledgeGraphType::Markdown,
+            kg_type: KnowledgeGraphInput::Markdown,
             kg_path: "~/pkm".to_string(),
             public: true,
             publish: true,
@@ -159,7 +149,7 @@ impl TerraphimConfig {
         let engineer_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
-            kg_type: KnowledgeGraphType::Markdown,
+            kg_type: KnowledgeGraphInput::Markdown,
             kg_path: "~/pkm".to_string(),
             public: true,
             publish: true,
@@ -183,7 +173,7 @@ impl TerraphimConfig {
         let system_operator_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
-            kg_type: KnowledgeGraphType::Markdown,
+            kg_type: KnowledgeGraphInput::Markdown,
             kg_path: "~/pkm".to_string(),
             public: true,
             publish: true,
@@ -216,7 +206,7 @@ impl TerraphimConfig {
         }
     }
 
-    pub fn update(&mut self, new_config: TerraphimConfig) {
+    pub fn update(&mut self, new_config: Config) {
         self.global_shortcut = new_config.global_shortcut;
         self.roles = new_config.roles;
         self.default_role = new_config.default_role;
@@ -224,9 +214,9 @@ impl TerraphimConfig {
 }
 
 #[async_trait]
-impl Persistable for TerraphimConfig {
+impl Persistable for Config {
     fn new() -> Self {
-        TerraphimConfig::new(ServiceType::Ripgrep)
+        Config::new(ServiceType::Ripgrep)
     }
 
     /// Save to a single profile
@@ -262,19 +252,13 @@ impl Persistable for TerraphimConfig {
 #[derive(Debug, Clone)]
 pub struct ConfigState {
     /// Terraphim Config
-    pub config: Arc<Mutex<TerraphimConfig>>,
+    pub config: Arc<Mutex<Config>>,
     /// RoleGraphs
     pub roles: AHashMap<String, RoleGraphSync>,
 }
 
 impl ConfigState {
-    pub async fn new(config: &mut TerraphimConfig) -> Result<Self> {
-        // Try to load the existing state from the config
-        // TODO: Is this really needed? To be clarified
-        // let config = config.load("configstate").await?;
-        // println!("Config loaded");
-        // println!("{:#?}", config.roles);
-
+    pub async fn new(config: &mut Config) -> Result<Self> {
         // For each role in a config, initialize a rolegraph
         // and add it to the config state
         let mut roles = AHashMap::new();
@@ -283,7 +267,9 @@ impl ConfigState {
             let role_name = name.to_lowercase();
             // FIXME: turn into log info
             println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
-            let rolegraph = RoleGraph::new(role_name.clone(), automata_url).await?;
+
+            let thesaurus = load_automata(automata_url).await?;
+            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
             roles.insert(role_name, RoleGraphSync::from(rolegraph));
         }
 
@@ -346,7 +332,7 @@ mod tests {
 
     #[test]
     async fn test_write_config_to_json() {
-        let config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config = Config::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.json").unwrap();
@@ -355,14 +341,14 @@ mod tests {
 
     #[test]
     async fn test_get_key() {
-        let config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config = Config::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
     }
     #[tokio::test]
     async fn test_save_all() {
-        let config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config = Config::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -370,7 +356,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_save_one_s3() {
-        let config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config = Config::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -379,7 +365,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_save_one_sled() {
-        let config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config = Config::new(ServiceType::Ripgrep);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -389,7 +375,7 @@ mod tests {
 
     #[test]
     async fn test_write_config_to_toml() {
-        let config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config = Config::new(ServiceType::Ripgrep);
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.toml").unwrap();
@@ -397,7 +383,7 @@ mod tests {
     }
     #[test]
     async fn test_init_global_config_to_toml() {
-        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut config = Config::new(ServiceType::Ripgrep);
         config.global_shortcut = "Ctrl+/".to_string();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
@@ -406,10 +392,10 @@ mod tests {
     }
     #[test]
     async fn test_update_global() {
-        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut config = Config::new(ServiceType::Ripgrep);
         config.global_shortcut = "Ctrl+/".to_string();
 
-        let mut new_config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut new_config = Config::new(ServiceType::Ripgrep);
         new_config.global_shortcut = "Ctrl+.".to_string();
 
         config.update(new_config);
@@ -418,8 +404,8 @@ mod tests {
     }
     #[test]
     async fn test_update_roles() {
-        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
-        let mut new_config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut config = Config::new(ServiceType::Ripgrep);
+        let mut new_config = Config::new(ServiceType::Ripgrep);
         let new_role = Role {
             shortname: Some("farther".to_string()),
             name: "Farther".to_string(),
@@ -429,7 +415,7 @@ mod tests {
             kg: KnowledgeGraph {
                 automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                     .to_string(),
-                kg_type: KnowledgeGraphType::Markdown,
+                kg_type: KnowledgeGraphInput::Markdown,
                 kg_path: "~/pkm".to_string(),
                 public: true,
                 publish: true,

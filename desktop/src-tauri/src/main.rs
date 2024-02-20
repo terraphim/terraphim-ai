@@ -11,7 +11,7 @@ use tauri::{
     SystemTrayMenu,
 };
 
-use terraphim_config::{ServiceType, TerraphimConfig};
+use terraphim_config::{Config, ServiceType};
 use terraphim_settings::Settings;
 use terraphim_types::ConfigState;
 
@@ -19,7 +19,7 @@ use terraphim_types::ConfigState;
 async fn main() -> Result<(), Box<dyn Error>> {
     let device_settings = Settings::load_from_env_and_file(None);
 
-    let mut config = TerraphimConfig::new(ServiceType::Logseq);
+    let mut config = Config::new(ServiceType::Logseq);
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let globbal_shortcut = current_config.global_shortcut.clone();

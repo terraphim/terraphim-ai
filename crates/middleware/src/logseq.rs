@@ -1,11 +1,9 @@
-use ahash::AHashMap;
 use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
-use std::io::Read;
 use std::process::Stdio;
 use terraphim_config::ConfigState;
-use terraphim_types::{Article, Index, Thesaurus};
+use terraphim_types::{Article, Index};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
@@ -27,13 +25,6 @@ impl LogseqMiddleware {
             config_state,
         }
     }
-}
-
-/// A KnowledgeGraphBuilder is a service which receives a path containing
-/// resources (files) with key-value pairs and returns a thesaurus (a dictionary
-/// with synonyms which map to upper-level concepts)
-trait KnowledgeGraphBuilder {
-    async fn build_knowledge_graph(&self, resource: impl Read) -> Result<Thesaurus>;
 }
 
 impl Middleware for LogseqMiddleware {
