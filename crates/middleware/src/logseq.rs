@@ -5,7 +5,7 @@ use std::fs::{self};
 use std::io::Read;
 use std::process::Stdio;
 use terraphim_config::ConfigState;
-use terraphim_types::{Article, Thesaurus};
+use terraphim_types::{Article, Index, Thesaurus};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
@@ -29,9 +29,9 @@ impl LogseqMiddleware {
     }
 }
 
-/// A KnowledgeGraphBuilder is a service which receives a path
-/// key-value pair
-/// and returns a thesaurus (dictionary with synonyms which map to upper-level concepts)
+/// A KnowledgeGraphBuilder is a service which receives a path containing
+/// resources (files) with key-value pairs and returns a thesaurus (a dictionary
+/// with synonyms which map to upper-level concepts)
 trait KnowledgeGraphBuilder {
     async fn build_knowledge_graph(&self, resource: impl Read) -> Result<Thesaurus>;
 }
@@ -42,11 +42,7 @@ impl Middleware for LogseqMiddleware {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(
-        &mut self,
-        needle: String,
-        haystack: String,
-    ) -> Result<AHashMap<String, Article>> {
+    async fn index(&mut self, needle: String, haystack: String) -> Result<Index> {
         let messages = self.service.run(needle, haystack).await?;
         let articles = index_inner(messages);
         for (_, article) in articles.clone().into_iter() {
@@ -113,9 +109,9 @@ impl LogseqService {
 }
 
 #[cached]
-fn index_inner(messages: Vec<Message>) -> AHashMap<String, Article> {
+fn index_inner(messages: Vec<Message>) -> Index {
     // Cache of the articles already processed by index service
-    let mut cached_articles: AHashMap<String, Article> = AHashMap::new();
+    let mut cached_articles = Index::new();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     let mut article = Article::default();

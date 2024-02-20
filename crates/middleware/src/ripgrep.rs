@@ -34,11 +34,7 @@ impl Middleware for RipgrepMiddleware {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(
-        &mut self,
-        needle: String,
-        haystack: String,
-    ) -> Result<AHashMap<String, Article>> {
+    async fn index(&mut self, needle: String, haystack: String) -> Result<Index> {
         let messages = self.service.run(needle, haystack).await?;
         let articles = index_inner(messages);
         for (_, article) in articles.clone().into_iter() {
@@ -103,9 +99,9 @@ impl RipgrepService {
 }
 
 #[cached]
-fn index_inner(messages: Vec<Message>) -> AHashMap<String, Article> {
+fn index_inner(messages: Vec<Message>) -> Index {
     // Cache of the articles already processed by index service
-    let mut cached_articles: AHashMap<String, Article> = AHashMap::new();
+    let mut cached_articles: Index = AHashMap::new();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     let mut article = Article::default();

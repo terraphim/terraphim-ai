@@ -7,7 +7,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time;
 use terraphim_config::{ConfigState, ServiceType};
-use terraphim_types::{Article, SearchQuery};
+use terraphim_types::{Index, SearchQuery};
 
 mod logseq;
 mod ripgrep;
@@ -133,8 +133,10 @@ fn calculate_hash<T: Hash>(t: &T) -> String {
     format!("{:x}", s.finish())
 }
 
-/// A Middleware is a service that can be used to index and search through
-/// haystacks. Every middleware receives a needle and a haystack and returns
+/// A Middleware is a service that creates an index of articles from
+/// a haystack.
+///
+/// Every middleware receives a needle and a haystack and returns
 /// a HashMap of Articles.
 trait Middleware {
     /// Index the haystack and return a HashMap of Articles
@@ -142,18 +144,15 @@ trait Middleware {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(
-        &mut self,
-        needle: String,
-        haystack: String,
-    ) -> Result<AHashMap<String, Article>>;
+    async fn index(&mut self, needle: String, haystack: String) -> Result<Index>;
 }
 
-/// Use Middleware to search through haystacks
+/// Use Middleware to search through haystacks and return an index of articles
+/// that match the search query.
 pub async fn search_haystacks(
     config_state: ConfigState,
     search_query: SearchQuery,
-) -> Result<AHashMap<String, Article>> {
+) -> Result<Index> {
     let config = config_state.config.lock().await.clone();
 
     let search_query_role = search_query
@@ -170,7 +169,7 @@ pub async fn search_haystacks(
     let mut ripgrep = RipgrepMiddleware::new(config_state.clone());
     let mut logseq = LogseqMiddleware::new(config_state.clone());
 
-    let mut cached_articles: AHashMap<String, Article> = AHashMap::new();
+    let mut cached_articles: Index = AHashMap::new();
 
     for haystack in &role_config.haystacks {
         println!("Handling haystack: {:#?}", haystack);
