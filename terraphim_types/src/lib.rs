@@ -80,6 +80,7 @@ pub struct Edge {
     /// A hashmap of `document_id` to `rank`
     pub doc_hash: AHashMap<String, u64>,
 }
+
 impl Edge {
     pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
@@ -135,7 +136,7 @@ pub type Thesaurus = AHashMap<String, NormalizedTerm>;
 /// An index is a hashmap of articles
 ///
 /// It holds the articles that have been indexed
-/// and can be searched through the `RoleGraph`.
+/// and can be searched through using the `RoleGraph`.
 pub type Index = AHashMap<String, Article>;
 
 /// Reference to external storage of documents, traditional indexes use

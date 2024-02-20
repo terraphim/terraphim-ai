@@ -1,13 +1,11 @@
 #[cfg(test)]
 mod roundtrip {
-    use std::collections::HashMap;
+    use std::path::PathBuf;
 
-    use terraphim_config::{
-        Config, Haystack, KnowledgeGraph, KnowledgeGraphInput, RelevanceFunction, Role, ServiceType,
-    };
+    use ahash::AHashMap;
+    use terraphim_config::{Config, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType};
     use terraphim_middleware::search_haystacks;
-    use terraphim_pipeline::IndexedDocument;
-    use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
+    use terraphim_types::{merge_and_serialize, IndexedDocument, RelevanceFunction, SearchQuery};
 
     use terraphim_middleware::Result;
     use ulid::Ulid;
@@ -26,7 +24,7 @@ mod roundtrip {
             publish: true,
         };
         let haystack = Haystack {
-            haystack: "fixtures/logseq_haystack".to_string(),
+            path: PathBuf::from("fixtures/logseq_haystack".to_string()),
             service: ServiceType::Logseq,
         };
         let default_role = Role {
@@ -37,14 +35,14 @@ mod roundtrip {
             server_url: "http://localhost:8000/articles/search".to_string(),
             kg,
             haystacks: vec![haystack],
-            extra: HashMap::new(),
+            extra: AHashMap::new(),
         };
 
         Config {
             id: Ulid::new().to_string(),
             // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
-            roles: HashMap::from_iter(vec![(
+            roles: AHashMap::from_iter(vec![(
                 SYSTEM_OPERATOR_ROLE_NAME.to_lowercase().to_string(),
                 default_role,
             )]),
@@ -72,7 +70,7 @@ mod roundtrip {
         let articles = search_haystacks(config_state.clone(), search_query.clone()).await?;
 
         let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
-        let articles = merge_and_serialize(articles, docs)?;
+        let articles = merge_and_serialize(articles, docs);
         println!("Articles: {articles:?}");
 
         Ok(())

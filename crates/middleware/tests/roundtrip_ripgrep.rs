@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod roundtrip {
-    use terraphim_config::{Config, ServiceType};
+    use terraphim_config::{Config, ConfigState, ServiceType};
     use terraphim_middleware::search_haystacks;
-    use terraphim_pipeline::IndexedDocument;
-    use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
+    use terraphim_types::IndexedDocument;
+    use terraphim_types::{merge_and_serialize, SearchQuery};
 
     use terraphim_middleware::Result;
 
@@ -23,7 +23,7 @@ mod roundtrip {
 
         let cached_articles = search_haystacks(config_state.clone(), search_query.clone()).await?;
         let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
-        let articles = merge_and_serialize(cached_articles, docs)?;
+        let articles = merge_and_serialize(cached_articles, docs);
         println!("Articles: {articles:?}");
 
         Ok(())
