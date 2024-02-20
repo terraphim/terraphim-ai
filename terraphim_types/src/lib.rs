@@ -30,6 +30,47 @@ impl ToString for Document {
     }
 }
 
+/// An article is a piece of content that can be indexed and searched.
+///
+/// It holds the title, body, description, tags, and rank.
+/// The `id` is a unique identifier for the article.
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct Article {
+    /// Unique identifier for the article
+    pub id: Option<String>,
+    /// A short excerpt of the article
+    pub stub: Option<String>,
+    /// Title of the article
+    pub title: String,
+    /// URL of the article
+    pub url: String,
+    /// The article body
+    pub body: String,
+    /// A short description of the article
+    pub description: Option<String>,
+    /// Tags for the article
+    pub tags: Option<Vec<String>>,
+    /// Rank of the article in the search results
+    pub rank: Option<u64>,
+}
+
+impl From<Article> for Document {
+    fn from(val: Article) -> Self {
+        // If the ID is not provided, generate a new one
+        let id = match val.id {
+            Some(id) => id,
+            None => ulid::Ulid::new().to_string(),
+        };
+
+        Document {
+            id,
+            title: val.title,
+            body: Some(val.body),
+            description: val.description,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the node
@@ -149,47 +190,6 @@ pub enum KnowledgeGraphInput {
     /// A set of JSON files
     #[serde(rename = "json")]
     Json,
-}
-
-/// An article is a piece of content that can be indexed and searched.
-///
-/// It holds the title, body, description, tags, and rank.
-/// The `id` is a unique identifier for the article.
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct Article {
-    /// Unique identifier for the article
-    pub id: Option<String>,
-    /// A short excerpt of the article
-    pub stub: Option<String>,
-    /// Title of the article
-    pub title: String,
-    /// URL of the article
-    pub url: String,
-    /// The article body
-    pub body: String,
-    /// A short description of the article
-    pub description: Option<String>,
-    /// Tags for the article
-    pub tags: Option<Vec<String>>,
-    /// Rank of the article in the search results
-    pub rank: Option<u64>,
-}
-
-impl From<Article> for Document {
-    fn from(val: Article) -> Self {
-        // If the ID is not provided, generate a new one
-        let id = match val.id {
-            Some(id) => id,
-            None => ulid::Ulid::new().to_string(),
-        };
-
-        Document {
-            id,
-            title: val.title,
-            body: Some(val.body),
-            description: val.description,
-        }
-    }
 }
 
 /// Merge articles from the cache and the output of query results

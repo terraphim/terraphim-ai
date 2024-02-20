@@ -30,11 +30,11 @@ pub(crate) async fn create_article(
 ) -> impl IntoResponse {
     log::warn!("create_article");
     config
-        .index_article(article.clone())
+        .index_article(&article)
         .await
         .expect("Failed to index article");
     log::warn!("send response");
-    let response = Json(article.clone());
+    let response = Json(article);
     (StatusCode::CREATED, response)
 }
 
