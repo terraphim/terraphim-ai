@@ -27,6 +27,9 @@ pub enum TerraphimAutomataError {
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
+/// Load a thesaurus from a file or URL.
+///
+/// This loads the output of the knowledge graph builder
 pub async fn load_automata(url_or_file: &str) -> Result<Thesaurus> {
     async fn read_url(url: &str) -> Result<String> {
         let response = reqwest::Client::new()
