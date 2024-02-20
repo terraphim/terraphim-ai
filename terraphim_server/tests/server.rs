@@ -6,10 +6,10 @@
 mod tests {
     use terraphim_server::axum_server;
     use terraphim_settings::Settings;
-    use terraphim_types::ConfigState;
 
     use reqwest::{Client, StatusCode};
     use std::net::SocketAddr;
+    use terraphim_config::{ConfigState, ServiceType, TerraphimConfig};
     use tokio::sync::OnceCell;
 
     static SERVER: OnceCell<()> = OnceCell::const_new();
@@ -25,7 +25,8 @@ mod tests {
                 SocketAddr::from(([127, 0, 0, 1], port))
             });
 
-        let config_state = ConfigState::new()
+        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let config_state = ConfigState::new(&mut config)
             .await
             .expect("Failed to create config state");
 
