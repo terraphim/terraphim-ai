@@ -69,7 +69,7 @@ impl KnowledgeGraphBuilder for MarkdownKnowledgeGraphBuilder {
 /// Load a thesaurus from a file or URL
 ///
 /// This loads the output of the knowledge graph builder
-pub async fn load_automata(url_or_file: &str) -> Result<Thesaurus> {
+pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
     async fn read_url(url: &str) -> Result<String> {
         let response = reqwest::Client::new()
             .get(url)
@@ -100,7 +100,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_automata_from_file() {
-        let thesaurus = load_automata("tests/test_data.csv.gz").await.unwrap();
+        let thesaurus = load_thesaurus("tests/test_data.csv.gz").await.unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(thesaurus.get("foo").unwrap().id, 1);
         assert_eq!(thesaurus.get("bar").unwrap().id, 2);
@@ -114,7 +114,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_automata_from_url() {
-        let thesaurus = load_automata(
+        let thesaurus = load_thesaurus(
             "https://raw.githubusercontent.com/github/copilot-sample-code/main/test_data.csv.gz",
         )
         .await

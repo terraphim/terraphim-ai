@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use terraphim_automata::load_automata;
+use terraphim_automata::load_thesaurus;
 use terraphim_pipeline::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
     Article, IndexedDocument, KnowledgeGraphInput, RelevanceFunction, SearchQuery,
@@ -268,7 +268,7 @@ impl ConfigState {
             // FIXME: turn into log info
             println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
 
-            let thesaurus = load_automata(automata_url).await?;
+            let thesaurus = load_thesaurus(automata_url).await?;
             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
             roles.insert(role_name, RoleGraphSync::from(rolegraph));
         }
