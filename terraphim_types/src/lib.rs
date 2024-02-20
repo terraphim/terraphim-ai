@@ -84,6 +84,19 @@ impl Node {
     // }
 }
 
+/// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
+///
+/// It holds the normalized terms for a resource
+/// where a resource can be as diverse as a Markdown file or a document in
+/// Notion or AtomicServer
+pub type Thesaurus = AHashMap<String, NormalizedTerm>;
+
+/// An index is a hashmap of articles
+///
+/// It holds the articles that have been indexed
+/// and can be searched through the `RoleGraph`.
+pub type Index = AHashMap<String, Article>;
+
 /// Reference to external storage of documents, traditional indexes use
 /// document, aka article or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -160,10 +173,7 @@ impl From<Article> for Document {
 /// Merge articles from the cache and the output of query results
 ///
 /// Returns the merged articles
-pub fn merge_and_serialize(
-    cached_articles: AHashMap<String, Article>,
-    docs: Vec<IndexedDocument>,
-) -> Vec<Article> {
+pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -> Vec<Article> {
     let mut articles: Vec<Article> = Vec::new();
     for doc in docs {
         println!("doc: {:#?}", doc);
@@ -193,10 +203,3 @@ pub struct NormalizedTerm {
     #[serde(rename = "nterm")]
     pub value: String,
 }
-
-/// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
-///
-/// It holds the normalized terms for a resource
-/// where a resource can be as diverse as a Markdown file or a document in
-/// Notion or AtomicServer
-pub type Thesaurus = AHashMap<String, NormalizedTerm>;
