@@ -4,7 +4,7 @@ pub mod settings;
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
 use opendal::Operator;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use terraphim_settings::Settings;
 
 use std::collections::HashMap;
@@ -52,22 +52,28 @@ async fn init_device_storage() -> Result<DeviceStorage> {
 }
 
 #[async_trait]
-pub trait Persistable: Serialize + serde::de::DeserializeOwned {
+pub trait Persistable: Serialize + DeserializeOwned {
+    /// Create a new instance
     fn new() -> Self;
 
+    /// Save to all profiles
     async fn save(&self) -> Result<()>;
 
+    /// Save to a single profile
     async fn save_to_one(&self, profile_name: &str) -> Result<()>;
 
+    /// Load a key from the fastest operator
     async fn load(&mut self, key: &str) -> Result<Self>
     where
         Self: Sized;
 
+    /// Load the configuration 
     async fn load_config(&self) -> Result<(HashMap<String, (Operator, u128)>, Operator)> {
         let state = DeviceStorage::instance().await?;
         Ok((state.ops.clone(), state.fastest_op.clone()))
     }
 
+    /// Save to all profiles
     async fn save_to_all(&self) -> Result<()> {
         let (ops, _fastest_op) = &self.load_config().await?;
         let key = self.get_key();
@@ -78,6 +84,7 @@ pub trait Persistable: Serialize + serde::de::DeserializeOwned {
         Ok(())
     }
 
+    /// Save to a single profile
     async fn save_to_profile(&self, profile_name: &str) -> Result<()> {
         let (ops, _fastest_op) = &self.load_config().await?;
         let key = self.get_key();
@@ -101,6 +108,7 @@ pub trait Persistable: Serialize + serde::de::DeserializeOwned {
         Ok(())
     }
 
+    /// Load from the fastest operator
     async fn load_from_operator(&self, key: &str, _op: &Operator) -> Result<Self>
     where
         Self: Sized,

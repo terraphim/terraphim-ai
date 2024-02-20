@@ -229,18 +229,20 @@ impl Persistable for TerraphimConfig {
         TerraphimConfig::new(ServiceType::Ripgrep)
     }
 
+    /// Save to a single profile
     async fn save_to_one(&self, profile_name: &str) -> PersistenceResult<()> {
         self.save_to_profile(profile_name).await?;
         Ok(())
     }
 
-    // saves to all profiles
+    // Saves to all profiles
     async fn save(&self) -> PersistenceResult<()> {
         let _op = &self.load_config().await?.1;
         let _ = self.save_to_all().await?;
         Ok(())
     }
 
+    /// Load key from the fastest operator
     async fn load(&mut self, key: &str) -> PersistenceResult<Self> {
         let op = &self.load_config().await?.1;
         let obj = self.load_from_operator(key, op).await?;
@@ -436,7 +438,7 @@ mod tests {
                 haystack: "localsearch".to_string(),
                 service: ServiceType::Ripgrep,
             }],
-            extra: HashMap::new(),
+            extra: AHashMap::new(),
         };
         new_config.roles.insert("Father".to_string(), new_role);
         config.update(new_config);
