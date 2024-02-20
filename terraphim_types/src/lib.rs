@@ -129,6 +129,28 @@ pub struct SearchQuery {
     pub role: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum RelevanceFunction {
+    #[serde(rename = "terraphim-graph")]
+    TerraphimGraph,
+    #[serde(rename = "redis-search")]
+    RedisSearch,
+}
+
+/// Defines all supported inputs for the knowledge graph.
+///
+/// Every knowledge graph is built from a specific input, such as Markdown files
+/// or JSON files.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum KnowledgeGraphInput {
+    /// A set of Markdown files
+    #[serde(rename = "markdown")]
+    Markdown,
+    /// A set of JSON files
+    #[serde(rename = "json")]
+    Json,
+}
+
 /// An article is a piece of content that can be indexed and searched.
 ///
 /// It holds the title, body, description, tags, and rank.

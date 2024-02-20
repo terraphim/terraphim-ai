@@ -7,8 +7,8 @@ use axum::{
 };
 use std::ops::Deref;
 use std::sync::Arc;
+use terraphim_config::Config;
 use terraphim_config::ConfigState;
-use terraphim_config::TerraphimConfig;
 use terraphim_middleware::search_haystacks;
 use terraphim_pipeline::RoleGraph;
 use terraphim_types::{merge_and_serialize, Article, IndexedDocument, SearchQuery};
@@ -84,7 +84,7 @@ pub(crate) async fn search_articles_post(
 }
 
 /// API handler for Terraphim Config
-pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<TerraphimConfig> {
+pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<Config> {
     let config = config.config.lock().await;
     Json(config.clone())
 }
@@ -93,8 +93,8 @@ use persistence::Persistable;
 /// API handler for Terraphim Config update
 pub async fn update_config(
     State(config): State<ConfigState>,
-    Json(config_new): Json<TerraphimConfig>,
-) -> Result<Json<TerraphimConfig>> {
+    Json(config_new): Json<Config>,
+) -> Result<Json<Config>> {
     println!("Updating config: {config_new:?}");
     // let config = TerraphimConfig::new();
     let mut config_state = config.config.lock().await;

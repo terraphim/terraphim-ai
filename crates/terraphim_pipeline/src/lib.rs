@@ -9,8 +9,6 @@ use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
 use log::warn;
-
-use terraphim_automata::load_automata;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(thiserror::Error, Debug)]
@@ -29,15 +27,6 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-// use tracing::{debug, error, info, span, warn, Level};
-
-//TODO: create top_k_nodes function where
-// sort nodes by rank
-// TODO create top_k_edges function where
-//sort edges by rank
-// TODO create top_k_documents function where
-// sort document id by rank
-
 /// A `RoleGraph` is a graph of concepts and their relationships.
 ///
 /// It is used to index documents and search for them.
@@ -50,9 +39,6 @@ pub struct RoleGraph {
     nodes: AHashMap<u64, Node>,
     edges: AHashMap<u64, Edge>,
     documents: AHashMap<String, IndexedDocument>,
-    // TODO: Do we want to keep `automata_url` and `thesaurus`?
-    // They are currently unused.
-    pub automata_url: String,
     pub thesaurus: Thesaurus,
     //TODO: make it private once performance tests are fixed
     pub ac_values: Vec<u64>,
@@ -62,9 +48,7 @@ pub struct RoleGraph {
 }
 
 impl RoleGraph {
-    pub async fn new(role: String, automata_url: &str) -> Result<Self> {
-        let thesaurus = load_automata(automata_url).await?;
-
+    pub async fn new(role: String, thesaurus: Thesaurus) -> Result<Self> {
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.
@@ -91,7 +75,6 @@ impl RoleGraph {
             nodes: AHashMap::new(),
             edges: AHashMap::new(),
             documents: AHashMap::new(),
-            automata_url: automata_url.to_string(),
             thesaurus,
             ac_values: values,
             ac,

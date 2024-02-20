@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod roundtrip {
-    use terraphim_config::{ServiceType, TerraphimConfig};
+    use terraphim_config::{Config, ServiceType};
     use terraphim_middleware::search_haystacks;
     use terraphim_pipeline::IndexedDocument;
     use terraphim_types::{merge_and_serialize, ConfigState, SearchQuery};
@@ -9,7 +9,7 @@ mod roundtrip {
 
     #[tokio::test]
     async fn test_roundtrip() -> Result<()> {
-        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut config = Config::new(ServiceType::Ripgrep);
         let config_state = ConfigState::new(&mut config).await?;
 
         let role_name = "System Operator".to_string();

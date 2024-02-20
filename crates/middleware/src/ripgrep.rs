@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::fs::{self};
 use std::process::Stdio;
 use terraphim_config::ConfigState;
-use terraphim_types::Article;
+use terraphim_types::{Article, Index};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 

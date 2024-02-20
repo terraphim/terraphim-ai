@@ -10,6 +10,7 @@ terraphim_middleware = { path = "../crates/middleware" }
 terraphim_pipeline = { path = "../crates/terraphim_pipeline" }
 terraphim_settings = { path = "../crates/settings" }
 terraphim_types = { path = "../terraphim_types" }
+terraphim_automata = { path = "../crates/terraphim_automata" }
 
 anyhow = "1.0.40"
 axum = { version = "0.6.2", features = ["macros"] }
@@ -33,6 +34,3 @@ rust-embed = { version = "8.2.0", features = ["axum", "axum-ex", "mime-guess"] }
 static-files = "0.2"
 walkdir = "2"
 dircpy = "0.3.15"
-
-[dev-dependencies]
-lazy_static = "1.4.0"

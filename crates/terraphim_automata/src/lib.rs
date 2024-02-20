@@ -1,9 +1,9 @@
 pub mod matcher;
 
 pub use matcher::{find_matches, replace_matches, Matched};
-use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::{fs::File, path::PathBuf};
 
 use terraphim_types::Thesaurus;
 
@@ -27,7 +27,46 @@ pub enum TerraphimAutomataError {
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
-/// Load a thesaurus from a file or URL.
+/// A KnowledgeGraphBuilder receives a path containing
+/// resources (e.g. files) with key-value pairs and returns a `Thesaurus`
+/// (a dictionary with synonyms which map to higher-level concepts)
+trait KnowledgeGraphBuilder {
+    /// - `kg_path`: The path to the knowledge graph input (e.g. a directory of Markdown files)
+    // TODO: This could be generalized to take a `Read` trait object
+    // or a `Resource` or take a glob of inputs?
+    async fn build(&self, kg_path: PathBuf) -> Result<Thesaurus>;
+}
+
+/// A builder for a knowledge graph, which can handle Markdown inputs.
+struct MarkdownKnowledgeGraphBuilder {}
+
+impl MarkdownKnowledgeGraphBuilder {
+    /// Create a new knowledge graph builder from a data source.
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl KnowledgeGraphBuilder for MarkdownKnowledgeGraphBuilder {
+    /// Build the knowledge graph from the data source.
+    ///
+    /// This uses a service for parsing the data source and returns a
+    /// `Thesaurus` which is the knowledge graph
+    async fn build(&self, kg_path: PathBuf) -> Result<Thesaurus> {
+        todo!();
+        // Initialize a logseq service for parsing the data source
+        // let logseq_service = terraphim_middleware::LogseqService::default();
+        // let mut thesaurus = Thesaurus::new();
+        // let mut parser = terraphim_markdown::Parser::new();
+        // let entries = parser.parse_directory(&self.kg_path).await?;
+        // for entry in entries {
+        //     thesaurus.insert(entry);
+        // }
+        // Ok(thesaurus)
+    }
+}
+
+/// Load a thesaurus from a file or URL
 ///
 /// This loads the output of the knowledge graph builder
 pub async fn load_automata(url_or_file: &str) -> Result<Thesaurus> {
