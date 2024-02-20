@@ -103,7 +103,7 @@ impl RipgrepService {
 /// This is the inner function that indexes the articles
 /// which allows us to cache requests to the index service
 fn index_inner(messages: Vec<Message>) -> Index {
-    // Cache of the articles already processed by index service
+    // Cache of already processed articles
     let mut cached_articles: Index = AHashMap::new();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
