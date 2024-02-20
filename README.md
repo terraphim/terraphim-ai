@@ -52,11 +52,13 @@ cargo run
 - **Knowledge Graph**: A structured graph of information created from a
   haystack, where nodes represent entities and edges represent relationships
   between them.
+- **Profile**: Endpoint for persisting user data (e.g. Amazon S3, sled, or
+  rocksdb).
 - **Role**: A role is a set of settings that define the default behavior of the
   AI assistant. For example, a developer role will search for code-related
-  content, while a father role will search for parenting-related content.
-  Each Terraphim role has its own separate knowledge graph that contains
-  relevant concepts, with all synonyms.
+  content, while a father role will search for parenting-related content. Each
+  Terraphim role has its own separate knowledge graph that contains relevant
+  concepts, with all synonyms.
 - **Rolegraph**: A structure for ingesting documents into Terraphim - knowledge
   graph turned into a scoring function (Aho-Corasick automata build from the
   knowledge graph).
