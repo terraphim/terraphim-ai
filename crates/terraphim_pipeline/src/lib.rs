@@ -323,8 +323,15 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 mod tests {
     use super::*;
 
+    use terraphim_automata::load_thesaurus;
     use tokio::test;
     use ulid::Ulid;
+
+    async fn load_sample_thesaurus() -> Thesaurus {
+        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
+        let thesaurus = load_thesaurus(automata_url).await.unwrap();
+        thesaurus
+    }
 
     #[test]
     async fn test_split_paragraphs() {
@@ -349,8 +356,9 @@ mod tests {
     async fn test_find_matches_ids() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
+        let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
+            .await
+            .unwrap();
         let matches = rolegraph.find_matches_ids(query);
         assert_eq!(matches.len(), 7);
     }
@@ -359,8 +367,9 @@ mod tests {
     async fn test_find_matches_ids_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
+        let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
+            .await
+            .unwrap();
         let matches = rolegraph.find_matches_ids(query);
         println!("matches: {:?}", matches);
         for each_match in matches.iter() {
@@ -376,8 +385,9 @@ mod tests {
     #[test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
-        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let mut rolegraph = RoleGraph::new(role, automata_url).await.unwrap();
+        let mut rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
+            .await
+            .unwrap();
         let article_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches = rolegraph.find_matches_ids(query);

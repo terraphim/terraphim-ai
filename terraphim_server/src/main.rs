@@ -18,7 +18,7 @@
 use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
-use terraphim_automata::load_automata;
+use terraphim_automata::load_thesaurus;
 use terraphim_config::{Config, ConfigState, ServiceType};
 use terraphim_pipeline::RoleGraphSync;
 use terraphim_server::{axum_server, Result};
@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
     // Example of adding a role for testing
     let role = "system operator2".to_string();
     let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-    let thesaurus = load_automata(automata_url).await?;
+    let thesaurus = load_thesaurus(automata_url).await?;
     let rolegraph = RoleGraph::new(role.clone(), thesaurus).await?;
     config_state
         .roles
