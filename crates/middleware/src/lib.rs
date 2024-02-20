@@ -4,12 +4,6 @@ use ripgrep::RipgrepMiddleware;
 use serde::Deserialize;
 use serde_json as json;
 use std::collections::hash_map::DefaultHasher;
-use cached::proc_macro::cached;
-use serde::Deserialize;
-use serde_json as json;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashSet;
-use std::fs::{self};
 use std::hash::{Hash, Hasher};
 use std::time;
 use terraphim_config::{ConfigState, ServiceType};
@@ -17,9 +11,6 @@ use terraphim_types::{Article, SearchQuery};
 
 mod logseq;
 mod ripgrep;
-use terraphim_types::{Article, ConfigState, SearchQuery};
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
