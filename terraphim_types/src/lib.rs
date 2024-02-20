@@ -1,5 +1,7 @@
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
+use terraphim_config::TerraphimConfig;
+use terraphim_pipeline::{Document, Error as TerraphimPipelineError};
 
 /// Document that can be indexed by the `RoleGraph`.
 ///
