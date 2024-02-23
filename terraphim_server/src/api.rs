@@ -58,7 +58,10 @@ pub(crate) async fn search_articles(
     let search_query = search_query.deref().clone();
     let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
         .await
-        .context("Failed to search articles")?;
+        .context(format!(
+            "Failed to query haystack for `{}`",
+            search_query.search_term
+        ))?;
     let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
     let articles = merge_and_serialize(cached_articles, docs);
     println!("Articles: {articles:?}");
@@ -76,7 +79,10 @@ pub(crate) async fn search_articles_post(
     let search_query = search_query.deref().clone();
     let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
         .await
-        .context("Failed to search articles")?;
+        .context(format!(
+            "Failed to query haystack for `{}`",
+            search_query.search_term
+        ))?;
     let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
     let articles = merge_and_serialize(cached_articles, docs);
     println!("Articles: {articles:?}");

@@ -55,12 +55,14 @@ pub async fn search(
     let current_config_state = config_state.inner().clone();
     let cached_articles = search_haystacks(current_config_state, search_query.clone())
         .await
-        .context("Failed to search articles")
-        .unwrap();
+        .context(format!(
+            "Failed to query haystack for `{}`",
+            search_query.search_term
+        ))?;
     let docs: Vec<IndexedDocument> = config_state
         .search_articles(search_query)
         .await
-        .expect("Failed to search articles");
+        .expect("Failed to search haystack for articles");
     let articles = merge_and_serialize(cached_articles, docs).unwrap();
 
     Ok(articles)
