@@ -5678,6 +5678,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
  "cached",
+ "log",
  "serde",
  "serde_json",
  "terraphim_config",

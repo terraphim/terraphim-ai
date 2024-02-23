@@ -1,4 +1,4 @@
-use crate::indexer::LogseqIndexer;
+use crate::indexer::{IndexMiddleware, LogseqIndexer};
 use crate::Result;
 use std::path::PathBuf;
 use terraphim_config::{Config, ConfigState, ServiceType};
@@ -39,7 +39,12 @@ impl KnowledgeGraphBuilder for MarkdownKnowledgeGraphBuilder {
         // Initialize a logseq service for parsing the data source
         let mut config = Config::new(ServiceType::Logseq);
         let config_state = ConfigState::new(&mut config).await?;
-        let logseq_service = LogseqIndexer::new(config_state);
+        let logseq_indexer = LogseqIndexer::default();
+
+        let index = logseq_indexer.index("", &path).await?;
+        println!("{:#?}", index);
+
+        todo!();
 
         // let mut thesaurus = Thesaurus::new();
         // let mut parser = terraphim_markdown::Parser::new();
