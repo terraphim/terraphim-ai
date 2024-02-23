@@ -1,5 +1,5 @@
 [package]
-name = "terraphim_pipeline"
+name = "terraphim_rolegraph"
 version = "0.1.0"
 edition = "2021"
 
@@ -22,7 +22,7 @@ ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 unicode-segmentation = "1.10.1"
 
 [[bench]]
-name = "pipeline_benchmark"
+name = "throughput"
 harness = false
 
 [dev-dependencies]
