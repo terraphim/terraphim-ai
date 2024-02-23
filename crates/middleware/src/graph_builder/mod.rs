@@ -44,16 +44,12 @@ impl KnowledgeGraphBuilder for MarkdownKnowledgeGraphBuilder {
         let index = logseq_indexer.index("", &path).await?;
         println!("{:#?}", index);
 
-        todo!();
-
-        // let mut thesaurus = Thesaurus::new();
-        // let mut parser = terraphim_markdown::Parser::new();
-        // let entries = parser.parse_directory(&self.kg_path).await?;
-        // for entry in entries {
-        //     thesaurus.insert(entry);
-        // }
-        // Ok(thesaurus)
+        let mut thesaurus = Thesaurus::new();
 
         todo!()
+        // for article in index {
+        //     thesaurus.insert(article);
+        // }
+        // Ok(thesaurus)
     }
 }

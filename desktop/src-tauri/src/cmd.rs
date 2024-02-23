@@ -6,12 +6,10 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use tauri::command;
 use tauri::State;
-use terraphim_config::Config;
-use terraphim_config::ServiceType;
-use terraphim_pipeline::IndexedDocument;
-use terraphim_types::{merge_and_serialize, Article, ConfigState, SearchQuery};
 
+use terraphim_config::{Config, ConfigState, ServiceType};
 use terraphim_middleware::search_haystacks;
+use terraphim_types::{merge_and_serialize, Article, IndexedDocument, SearchQuery};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
