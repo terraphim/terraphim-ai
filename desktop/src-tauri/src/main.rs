@@ -11,9 +11,8 @@ use tauri::{
     SystemTrayMenu,
 };
 
-use terraphim_config::{Config, ServiceType};
+use terraphim_config::{Config, ConfigState, ServiceType};
 use terraphim_settings::Settings;
-use terraphim_types::ConfigState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
