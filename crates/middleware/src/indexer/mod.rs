@@ -198,7 +198,7 @@ pub async fn search_haystacks(
     let mut all_new_articles: Index = AHashMap::new();
 
     for haystack in &role_config.haystacks {
-        println!("Handling haystack: {:#?}", haystack);
+        log::info!("Finding articles in haystack: {:#?}", haystack);
 
         let needle = search_query.search_term.clone();
 
