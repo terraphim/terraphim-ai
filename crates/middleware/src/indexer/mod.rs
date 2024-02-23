@@ -199,8 +199,7 @@ pub async fn search_haystacks(
 
     for haystack in &role_config.haystacks {
         log::info!("Finding articles in haystack: {:#?}", haystack);
-
-        let needle = search_query.search_term.clone();
+        let needle = &search_query.search_term;
 
         let new_articles = match haystack.service {
             ServiceType::Ripgrep => {
