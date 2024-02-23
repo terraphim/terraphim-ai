@@ -12,16 +12,15 @@ use super::{calculate_hash, Data, IndexMiddleware};
 use super::{json_decode, Message};
 use crate::Result;
 
-/// RipgrepMiddleware is a Middleware that uses ripgrep to index and search
-/// through haystacks.
+/// Middleware that uses ripgrep to index Markdown haystacks.
 pub struct RipgrepIndexer {
-    service: RipgrepService,
+    service: RipgrepCommand,
 }
 
-impl RipgrepIndexer {
-    pub fn new() -> Self {
+impl Default for RipgrepIndexer {
+    fn default() -> Self {
         Self {
-            service: RipgrepService::default(),
+            service: RipgrepCommand::default(),
         }
     }
 }
@@ -36,52 +35,6 @@ impl IndexMiddleware for RipgrepIndexer {
         let messages = self.service.run(needle, &haystack).await?;
         let articles = index_inner(messages);
         Ok(articles)
-    }
-}
-
-pub struct RipgrepService {
-    command: String,
-    default_args: Vec<String>,
-}
-
-/// Returns a new ripgrep service with default arguments
-impl Default for RipgrepService {
-    fn default() -> Self {
-        Self {
-            command: "rg".to_string(),
-            default_args: ["--json", "--trim", "-C3", "--ignore-case"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
-        }
-    }
-}
-
-impl RipgrepService {
-    /// Runs ripgrep to find `needle` in `haystack`
-    ///
-    /// Returns a Vec of Messages, which correspond to ripgrep's internal
-    /// JSON output. Learn more about ripgrep's JSON output here:
-    /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
-    pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
-        // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle.to_string(), haystack.to_string_lossy().to_string()]
-            .into_iter()
-            .chain(self.default_args.clone())
-            .collect();
-
-        let mut child = Command::new(&self.command)
-            .args(args)
-            .stdout(Stdio::piped())
-            .spawn()?;
-
-        let mut stdout = child.stdout.take().expect("Stdout is not available");
-        let read = async move {
-            let mut data = String::new();
-            stdout.read_to_string(&mut data).await.map(|_| data)
-        };
-        let output = read.await?;
-        json_decode(&output)
     }
 }
 
@@ -188,4 +141,50 @@ fn index_inner(messages: Vec<Message>) -> Index {
     }
 
     cached_articles
+}
+
+pub struct RipgrepCommand {
+    command: String,
+    default_args: Vec<String>,
+}
+
+/// Returns a new ripgrep service with default arguments
+impl Default for RipgrepCommand {
+    fn default() -> Self {
+        Self {
+            command: "rg".to_string(),
+            default_args: ["--json", "--trim", "-C3", "--ignore-case"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+        }
+    }
+}
+
+impl RipgrepCommand {
+    /// Runs ripgrep to find `needle` in `haystack`
+    ///
+    /// Returns a Vec of Messages, which correspond to ripgrep's internal
+    /// JSON output. Learn more about ripgrep's JSON output here:
+    /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
+    pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
+        // Merge the default arguments with the needle and haystack
+        let args: Vec<String> = vec![needle.to_string(), haystack.to_string_lossy().to_string()]
+            .into_iter()
+            .chain(self.default_args.clone())
+            .collect();
+
+        let mut child = Command::new(&self.command)
+            .args(args)
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        let mut stdout = child.stdout.take().expect("Stdout is not available");
+        let read = async move {
+            let mut data = String::new();
+            stdout.read_to_string(&mut data).await.map(|_| data)
+        };
+        let output = read.await?;
+        json_decode(&output)
+    }
 }

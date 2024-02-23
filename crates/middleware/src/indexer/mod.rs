@@ -192,7 +192,7 @@ pub async fn search_haystacks(
         .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
 
     // Define middleware to be used for searching.
-    let ripgrep = RipgrepIndexer::new(config_state.clone());
+    let ripgrep = RipgrepIndexer::default();
     let logseq = LogseqIndexer::default();
 
     let mut all_new_articles: Index = AHashMap::new();
