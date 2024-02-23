@@ -1,16 +1,16 @@
-//! Benchmarks for testing the throughput of the pipeline.
+//! Benchmarks for testing the throughput of the rolegraph.
 //!
 //! To run a single benchmark use:
 //!
 //! ```sh
-//! cargo bench --bench pipeline_benchmark -- query
+//! cargo bench --bench throughput -- query
 //! ```
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::matcher::{find_matches, replace_matches};
-use terraphim_pipeline::input::TEST_CORPUS;
-use terraphim_pipeline::split_paragraphs;
-use terraphim_pipeline::RoleGraph;
+use terraphim_rolegraph::input::TEST_CORPUS;
+use terraphim_rolegraph::split_paragraphs;
+use terraphim_rolegraph::RoleGraph;
 use terraphim_types::Thesaurus;
 
 use tokio::runtime::Runtime;
