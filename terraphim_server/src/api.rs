@@ -10,7 +10,7 @@ use std::sync::Arc;
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_middleware::search_haystacks;
-use terraphim_pipeline::RoleGraph;
+use terraphim_rolegraph::RoleGraph;
 use terraphim_types::{merge_and_serialize, Article, IndexedDocument, SearchQuery};
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;

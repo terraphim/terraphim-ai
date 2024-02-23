@@ -5616,7 +5616,7 @@ dependencies = [
  "tauri-build",
  "terraphim_config",
  "terraphim_middleware",
- "terraphim_pipeline",
+ "terraphim_rolegraph",
  "terraphim_server",
  "terraphim_settings",
  "terraphim_types",
@@ -5661,7 +5661,7 @@ dependencies = [
  "serde",
  "serde_json",
  "terraphim_automata",
- "terraphim_pipeline",
+ "terraphim_rolegraph",
  "terraphim_types",
  "thiserror",
  "tokio",
@@ -5682,7 +5682,7 @@ dependencies = [
  "serde",
  "serde_json",
  "terraphim_config",
- "terraphim_pipeline",
+ "terraphim_rolegraph",
  "terraphim_types",
  "thiserror",
  "tokio",
@@ -5691,7 +5691,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "terraphim_pipeline"
+name = "terraphim_rolegraph"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.8",
@@ -5733,7 +5733,7 @@ dependencies = [
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
- "terraphim_pipeline",
+ "terraphim_rolegraph",
  "terraphim_settings",
  "terraphim_types",
  "tokio",

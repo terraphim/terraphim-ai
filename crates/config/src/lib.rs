@@ -6,7 +6,7 @@ use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use terraphim_automata::load_thesaurus;
-use terraphim_pipeline::{RoleGraph, RoleGraphSync};
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
     Article, IndexedDocument, KnowledgeGraphInput, RelevanceFunction, SearchQuery,
 };
@@ -38,7 +38,7 @@ pub enum TerraphimConfigError {
     TracingSubscriber(Box<dyn std::error::Error + Send + Sync>),
 
     #[error("Pipe error")]
-    Pipe(#[from] terraphim_pipeline::Error),
+    Pipe(#[from] terraphim_rolegraph::Error),
 
     #[error("Automata error")]
     Automata(#[from] terraphim_automata::TerraphimAutomataError),

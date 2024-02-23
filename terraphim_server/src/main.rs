@@ -20,12 +20,12 @@ use clap::Parser;
 use std::net::SocketAddr;
 use terraphim_automata::load_thesaurus;
 use terraphim_config::{Config, ConfigState, ServiceType};
-use terraphim_pipeline::RoleGraphSync;
+use terraphim_rolegraph::RoleGraphSync;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::Settings;
 
 /// TODO: Can't get Open API docs to work with axum consistently, given up for now.
-use terraphim_pipeline::RoleGraph;
+use terraphim_rolegraph::RoleGraph;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

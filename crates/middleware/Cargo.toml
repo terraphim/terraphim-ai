@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 terraphim_config = { path = "../config" }
-terraphim_pipeline = { path = "../terraphim_pipeline" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_types = { path = "../../terraphim_types" }
 
 ahash = { version = "0.8.8", features = ["serde"] }

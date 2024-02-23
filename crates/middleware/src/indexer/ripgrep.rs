@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
 use std::process::Stdio;
-use terraphim_config::ConfigState;
 use terraphim_types::{Article, Index};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
@@ -17,14 +16,12 @@ use crate::Result;
 /// through haystacks.
 pub struct RipgrepIndexer {
     service: RipgrepService,
-    config_state: ConfigState,
 }
 
 impl RipgrepIndexer {
-    pub fn new(config_state: ConfigState) -> Self {
+    pub fn new() -> Self {
         Self {
             service: RipgrepService::default(),
-            config_state,
         }
     }
 }
