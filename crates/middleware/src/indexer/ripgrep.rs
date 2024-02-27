@@ -3,24 +3,21 @@ use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
-use std::process::Stdio;
 use terraphim_types::{Article, Index};
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
 
-use super::{calculate_hash, Data, IndexMiddleware};
-use super::{json_decode, Message};
+use super::{calculate_hash, IndexMiddleware};
+use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
 
 /// Middleware that uses ripgrep to index Markdown haystacks.
 pub struct RipgrepIndexer {
-    service: RipgrepCommand,
+    command: RipgrepCommand,
 }
 
 impl Default for RipgrepIndexer {
     fn default() -> Self {
         Self {
-            service: RipgrepCommand::default(),
+            command: RipgrepCommand::default(),
         }
     }
 }
@@ -32,7 +29,7 @@ impl IndexMiddleware for RipgrepIndexer {
     ///
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Path) -> Result<Index> {
-        let messages = self.service.run(needle, &haystack).await?;
+        let messages = self.command.run(needle, &haystack).await?;
         let articles = index_inner(messages);
         Ok(articles)
     }
@@ -47,7 +44,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     let mut article = Article::default();
-    for message in messages.iter() {
+    for message in messages {
         match message {
             Message::Begin(message) => {
                 article = Article::default();
@@ -141,50 +138,4 @@ fn index_inner(messages: Vec<Message>) -> Index {
     }
 
     cached_articles
-}
-
-pub struct RipgrepCommand {
-    command: String,
-    default_args: Vec<String>,
-}
-
-/// Returns a new ripgrep service with default arguments
-impl Default for RipgrepCommand {
-    fn default() -> Self {
-        Self {
-            command: "rg".to_string(),
-            default_args: ["--json", "--trim", "-C3", "--ignore-case"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
-        }
-    }
-}
-
-impl RipgrepCommand {
-    /// Runs ripgrep to find `needle` in `haystack`
-    ///
-    /// Returns a Vec of Messages, which correspond to ripgrep's internal
-    /// JSON output. Learn more about ripgrep's JSON output here:
-    /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
-    pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
-        // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle.to_string(), haystack.to_string_lossy().to_string()]
-            .into_iter()
-            .chain(self.default_args.clone())
-            .collect();
-
-        let mut child = Command::new(&self.command)
-            .args(args)
-            .stdout(Stdio::piped())
-            .spawn()?;
-
-        let mut stdout = child.stdout.take().expect("Stdout is not available");
-        let read = async move {
-            let mut data = String::new();
-            stdout.read_to_string(&mut data).await.map(|_| data)
-        };
-        let output = read.await?;
-        json_decode(&output)
-    }
 }

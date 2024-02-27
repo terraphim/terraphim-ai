@@ -59,8 +59,8 @@ impl RoleGraph {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
-        for (key, normalized_term) in thesaurus.iter() {
-            keys.push(key.as_str());
+        for (key, normalized_term) in &thesaurus {
+            keys.push(key);
             values.push(normalized_term.id);
             ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
@@ -110,7 +110,7 @@ impl RoleGraph {
     ///   rank and dividing by the sum of the weights for each node, edge, and
     ///   document.
     // YAGNI: at the moment I don't need it, so parked
-    pub fn normalise(&mut self) {
+    pub fn normalize(&mut self) {
         let node_len = self.nodes.len() as u32;
         warn!("Node Length {}", node_len);
         let edge_len = self.edges.len() as u32;

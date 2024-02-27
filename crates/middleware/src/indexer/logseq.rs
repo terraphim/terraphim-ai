@@ -20,8 +20,8 @@ use terraphim_types::{Article, Index};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
-use super::{calculate_hash, Data, IndexMiddleware};
-use super::{json_decode, Message};
+use super::{calculate_hash, IndexMiddleware};
+use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Result;
 
 /// In Logseq, `::` serves as a delimiter between the property name and its
@@ -114,13 +114,17 @@ impl LogseqService {
 }
 
 #[cached]
+/// Indexes the articles from raw ripgrep messages
+///
+/// This is a free-standing function because it's a requirement for caching the
+/// results
 fn index_inner(messages: Vec<Message>) -> Index {
     // Cache of the articles already processed by index service
     let mut cached_articles = Index::new();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     let mut article = Article::default();
-    for message in messages.iter() {
+    for message in messages {
         match message {
             Message::Begin(message) => {
                 article = Article::default();

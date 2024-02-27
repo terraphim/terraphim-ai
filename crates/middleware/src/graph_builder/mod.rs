@@ -46,10 +46,15 @@ impl KnowledgeGraphBuilder for MarkdownKnowledgeGraphBuilder {
 
         let mut thesaurus = Thesaurus::new();
 
-        todo!()
-        // for article in index {
-        //     thesaurus.insert(article);
+        // for (id, article) in index {
+        //     // Generate a normalized term from the article
+        //     // and insert it into the thesaurus
+        //     let normalized_term = article.to_normalized_term();
+
+        //     thesaurus.insert(id, article);
         // }
         // Ok(thesaurus)
+
+        todo!()
     }
 }
