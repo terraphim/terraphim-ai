@@ -2,7 +2,7 @@ use serde_json as json;
 use terraphim_config::TerraphimConfigError;
 
 mod command;
-pub mod graph_builder;
+pub mod thesaurus;
 pub mod indexer;
 
 pub use indexer::search_haystacks;

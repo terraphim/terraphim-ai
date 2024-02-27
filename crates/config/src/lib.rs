@@ -68,8 +68,6 @@ pub struct Role {
 /// and uses a specific indexing algorithm
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum ServiceType {
-    /// Use logseq as the indexing service
-    Logseq,
     /// Use ripgrep as the indexing service
     Ripgrep,
 }
@@ -308,7 +306,7 @@ impl ConfigState {
 
         let role = role.to_lowercase();
         let rolegraph = self.roles.get(&role).unwrap().lock().await;
-        let documents: Vec<(&String, IndexedDocument)> = match rolegraph.query(
+        let documents: Vec<(String, IndexedDocument)> = match rolegraph.query(
             &search_query.search_term,
             search_query.skip,
             search_query.limit,

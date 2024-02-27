@@ -7,10 +7,8 @@ use terraphim_types::{Index, SearchQuery};
 
 use crate::{Error, Result};
 
-mod logseq;
 mod ripgrep;
 
-pub use logseq::LogseqIndexer;
 pub use ripgrep::RipgrepIndexer;
 
 fn calculate_hash<T: Hash>(t: &T) -> String {
@@ -58,7 +56,6 @@ pub async fn search_haystacks(
 
     // Define middleware to be used for searching.
     let ripgrep = RipgrepIndexer::default();
-    let logseq = LogseqIndexer::default();
 
     let mut all_new_articles: Index = AHashMap::new();
 
@@ -72,10 +69,6 @@ pub async fn search_haystacks(
                 // This spins up ripgrep the service and indexes into the
                 // `TerraphimGraph` and caches the articles
                 ripgrep.index(&needle, &haystack.path).await?
-            }
-            ServiceType::Logseq => {
-                // Search through articles in logseq format
-                logseq.index(&needle, &haystack.path).await?
             }
         };
 
