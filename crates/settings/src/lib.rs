@@ -17,6 +17,11 @@ pub enum Error {
 // which gets used by the `#[config]` macro below.
 pub type SettingsResult<T> = std::result::Result<T, Error>;
 
+/// Configuration settings for the device or server.
+///
+/// These values are set when the server initializes, and do not change while
+/// running. These are constructed from default or local files and ENV
+/// variables.
 #[config]
 #[derive(Debug)]
 pub struct Settings {
