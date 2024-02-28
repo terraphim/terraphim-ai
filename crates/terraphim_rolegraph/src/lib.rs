@@ -30,21 +30,27 @@ type Result<T> = std::result::Result<T, Error>;
 /// A `RoleGraph` is a graph of concepts and their relationships.
 ///
 /// It is used to index documents and search for them.
-/// Currently it maps from synonyms to concepts,
-/// so only normalized term returned when reverse lookup is performed
+/// Currently it maps from synonyms to concepts, so only the normalized term
+/// gets returned when a reverse lookup is performed.
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
-    // role filter
+    /// The role of the graph
     pub role: String,
+    /// A mapping from node IDs to nodes
     nodes: AHashMap<Id, Node>,
+    /// A mapping from edge IDs to edges
     // TODO: Should this be a ULID?
     edges: AHashMap<Id, Edge>,
+    /// A mapping from document IDs to indexed documents
     documents: AHashMap<String, IndexedDocument>,
+    /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
-    //TODO: make it private once performance tests are fixed
+    /// Aho-Corasick values
+    // TODO: make it private once performance tests are fixed
     pub ac_values: Vec<Id>,
+    /// Aho-Corasick automata
     pub ac: AhoCorasick,
-    // reverse lookup - matched id into normalized term
+    /// reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<Id, NormalizedTermValue>,
 }
 
