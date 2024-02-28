@@ -24,7 +24,6 @@
 use crate::Result;
 use cached::proc_macro::cached;
 use std::collections::HashSet;
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -34,8 +33,6 @@ use tokio::process::Command;
 
 use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
-
-use terraphim_config::{Config, ConfigState, ServiceType};
 
 /// A ThesaurusBuilder receives a path containing
 /// resources (e.g. files) with key-value pairs and returns a `Thesaurus`
@@ -61,50 +58,24 @@ const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 /// A builder for a knowledge graph, which knows how to handle Logseq input.
-struct LogseqKnowledgeGraph {}
-
-impl LogseqKnowledgeGraph {
-    /// Build the knowledge graph from the data source
-    /// and store it in each rolegraph.
-    async fn build(&self, haystack: PathBuf) -> Result<()> {
-        // Initialize a logseq service for parsing the data source
-        let mut config = Config::new(ServiceType::Ripgrep);
-        let config_state = ConfigState::new(&mut config).await?;
-
-        let logseq = Logseq::default();
-        let thesaurus = logseq.build(haystack).await?;
-        println!("{:#?}", thesaurus);
-
-        // Iterate over the roles and store the thesaurus in each rolegraph
-        for role in config_state.config.lock().await.roles.values() {
-            todo!()
-        }
-
-        Ok(())
-    }
-}
-
-/// LogseqMiddleware is a Middleware that uses ripgrep to index and search
-/// through haystacks.
 #[derive(Default)]
-pub struct Logseq {
+struct Logseq {
     service: LogseqService,
 }
 
 impl ThesaurusBuilder for Logseq {
-    /// Build a thesaurus from a Logseq haystack
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the middleware fails to create the thesaurus
+    /// Build the knowledge graph from the data source
+    /// and store it in each rolegraph.
     async fn build(&self, haystack: PathBuf) -> Result<Thesaurus> {
         let messages = self
             .service
             .get_raw_messages(LOGSEQ_KEY_VALUE_DELIMITER, &haystack)
             .await?;
 
-        let articles = index_inner(messages);
-        Ok(articles)
+        let thesaurus = index_inner(messages);
+        println!("{:#?}", thesaurus);
+
+        Ok(thesaurus)
     }
 }
 
@@ -157,7 +128,6 @@ impl LogseqService {
     }
 }
 
-#[cached]
 /// Creates a `term_to_id` structure, which maps terms to their corresponding
 /// concept IDs.
 ///
@@ -188,6 +158,7 @@ impl LogseqService {
 ///
 // This is a free-standing function because it's a requirement for caching the
 // results
+#[cached]
 fn index_inner(messages: Vec<Message>) -> Thesaurus {
     let mut thesaurus = Thesaurus::new();
     let mut current_concept: Option<Concept> = None;
@@ -208,7 +179,7 @@ fn index_inner(messages: Vec<Message>) -> Thesaurus {
                 }
                 existing_paths.insert(path.clone());
 
-                // The path is the concept
+                // Use the path as the concept
                 let concept = match concept_from_path(path) {
                     Ok(concept) => concept,
                     Err(e) => {
@@ -220,17 +191,17 @@ fn index_inner(messages: Vec<Message>) -> Thesaurus {
                 current_concept = Some(concept);
             }
             Message::Match(message) => {
-                let Some(path) = message.path() else {
+                if message.path().is_none() {
                     continue;
                 };
 
-                let body = match fs::read_to_string(path) {
-                    Ok(body) => body,
-                    Err(e) => {
-                        println!("Error: Failed to read file: {:?}. Skipping", e);
-                        continue;
-                    }
-                };
+                // let body = match fs::read_to_string(path) {
+                //     Ok(body) => body,
+                //     Err(e) => {
+                //         println!("Error: Failed to read file: {:?}. Skipping", e);
+                //         continue;
+                //     }
+                // };
 
                 let lines = match &message.lines {
                     Data::Text { text } => text,
@@ -268,17 +239,6 @@ fn index_inner(messages: Vec<Message>) -> Thesaurus {
                     let nterm = NormalizedTerm::new(concept.id.clone(), synonym.into());
                     thesaurus.insert(concept.id.clone(), nterm);
                 }
-            }
-            Message::End(_) => {
-                // The `End` message could be received before the `Begin`
-                // message causing the concept to be empty
-                let concept = match current_concept {
-                    Some(ref concept) => concept,
-                    None => {
-                        println!("Error: End message received before Begin message. Skipping");
-                        continue;
-                    }
-                };
             }
             _ => {}
         };
