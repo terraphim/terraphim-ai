@@ -158,10 +158,7 @@ impl RoleGraph {
             // warn!("Node Rank {}", node_rank);
             // warn!("Node connected to Edges {:?}", node.connected_with);
             for each_edge_key in &node.connected_with {
-                let each_edge = self
-                    .edges
-                    .get(&each_edge_key)
-                    .ok_or(Error::EdgeIdNotFound)?;
+                let each_edge = self.edges.get(each_edge_key).ok_or(Error::EdgeIdNotFound)?;
                 warn!("Edge Details{:?}", each_edge);
                 let edge_rank = each_edge.rank;
                 for (document_id, rank) in &each_edge.doc_hash {

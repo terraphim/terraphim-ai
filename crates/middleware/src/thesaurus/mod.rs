@@ -86,16 +86,9 @@ impl LogseqKnowledgeGraph {
 
 /// LogseqMiddleware is a Middleware that uses ripgrep to index and search
 /// through haystacks.
+#[derive(Default)]
 pub struct Logseq {
     service: LogseqService,
-}
-
-impl Default for Logseq {
-    fn default() -> Self {
-        Self {
-            service: LogseqService::default(),
-        }
-    }
 }
 
 impl ThesaurusBuilder for Logseq {
