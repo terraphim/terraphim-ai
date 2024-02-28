@@ -1,5 +1,5 @@
 use aho_corasick::{AhoCorasick, MatchKind};
-use terraphim_types::{Id, NormalizedTerm, Thesaurus};
+use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 use crate::{Result, TerraphimAutomataError};
 
@@ -15,7 +15,7 @@ pub fn find_matches(
     thesaurus: Thesaurus,
     return_positions: bool,
 ) -> Result<Vec<Matched>> {
-    let patterns: Vec<Id> = thesaurus.keys().cloned().collect();
+    let patterns: Vec<NormalizedTermValue> = thesaurus.keys().cloned().collect();
 
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)
