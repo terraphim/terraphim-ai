@@ -4,7 +4,7 @@ use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
-use terraphim_types::{Document, Edge, IndexedDocument, Node, Thesaurus};
+use terraphim_types::{Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Thesaurus};
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
@@ -36,23 +36,25 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct RoleGraph {
     // role filter
     pub role: String,
-    nodes: AHashMap<u64, Node>,
-    edges: AHashMap<u64, Edge>,
+    nodes: AHashMap<Id, Node>,
+    // TODO: Should this be a ULID?
+    edges: AHashMap<Id, Edge>,
     documents: AHashMap<String, IndexedDocument>,
     pub thesaurus: Thesaurus,
     //TODO: make it private once performance tests are fixed
-    pub ac_values: Vec<u64>,
+    pub ac_values: Vec<Id>,
     pub ac: AhoCorasick,
     // reverse lookup - matched id into normalized term
-    pub ac_reverse_nterm: AHashMap<u64, String>,
+    pub ac_reverse_nterm: AHashMap<Id, NormalizedTermValue>,
 }
 
 impl RoleGraph {
+    /// Creates a new `RoleGraph` with the given role and thesaurus
     pub async fn new(role: String, thesaurus: Thesaurus) -> Result<Self> {
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.
-        // let (keys, values): (Vec<&str>, Vec<u64>) = thesaurus
+        // let (keys, values): (Vec<&str>, Vec<Id>) = thesaurus
         //     .iter()
         //     .map(|(key, value)| (key.as_str(), value.id))
         //     .unzip();
@@ -61,8 +63,8 @@ impl RoleGraph {
         let mut ac_reverse_nterm = AHashMap::new();
         for (key, normalized_term) in &thesaurus {
             keys.push(key);
-            values.push(normalized_term.id);
-            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
+            values.push(normalized_term.id.clone());
+            ac_reverse_nterm.insert(normalized_term.id.clone(), normalized_term.value.clone());
         }
 
         let ac = AhoCorasick::builder()
@@ -84,12 +86,12 @@ impl RoleGraph {
 
     /// Find all matches in the rolegraph for the given text
     ///
-    /// Returns a list of ids of the matched nodes
-    pub fn find_matches_ids(&self, text: &str) -> Vec<u64> {
+    /// Returns a list of IDs of the matched nodes
+    pub fn find_matches_ids(&self, text: &str) -> Vec<Id> {
         let mut matches = Vec::new();
         for mat in self.ac.find_iter(text) {
-            let id = self.ac_values[mat.pattern()];
-            matches.push(id);
+            let id = &self.ac_values[mat.pattern()];
+            matches.push(id.clone());
         }
         matches
     }
@@ -140,44 +142,47 @@ impl RoleGraph {
         query_string: &str,
         offset: Option<usize>,
         limit: Option<usize>,
-    ) -> Result<Vec<(&String, IndexedDocument)>> {
+    ) -> Result<Vec<(String, IndexedDocument)>> {
         warn!("performing query");
         let nodes = self.find_matches_ids(query_string);
 
         //  TODO: turn into BinaryHeap by implementing hash and eq traits
 
-        let mut results_map = AHashMap::new();
-        for node_id in nodes.iter() {
+        let mut results_map: AHashMap<String, IndexedDocument> = AHashMap::new();
+        for node_id in nodes {
             // warn!("Matched node {:?}", node_id);
-            let node = self.nodes.get(node_id).ok_or(Error::NodeIdNotFound)?;
-            let nterm = self.ac_reverse_nterm.get(node_id).unwrap();
+            let node = self.nodes.get(&node_id).ok_or(Error::NodeIdNotFound)?;
+            let nterm = self.ac_reverse_nterm.get(&node_id).unwrap();
             // println!("Normalized term {nterm}");
             let node_rank = node.rank;
             // warn!("Node Rank {}", node_rank);
             // warn!("Node connected to Edges {:?}", node.connected_with);
-            for each_edge_key in node.connected_with.iter() {
-                let each_edge = self.edges.get(each_edge_key).ok_or(Error::EdgeIdNotFound)?;
+            for each_edge_key in &node.connected_with {
+                let each_edge = self
+                    .edges
+                    .get(&each_edge_key)
+                    .ok_or(Error::EdgeIdNotFound)?;
                 warn!("Edge Details{:?}", each_edge);
                 let edge_rank = each_edge.rank;
-                for (document_id, rank) in each_edge.doc_hash.iter() {
+                for (document_id, rank) in &each_edge.doc_hash {
                     let total_rank = node_rank + edge_rank + rank;
-                    match results_map.entry(document_id) {
+                    match results_map.entry(document_id.clone()) {
                         Entry::Vacant(_) => {
                             let document = IndexedDocument {
                                 id: document_id.to_string(),
                                 matched_to: vec![each_edge.clone()],
                                 rank: total_rank,
-                                tags: vec![nterm.clone()],
-                                nodes: vec![*node_id],
+                                tags: vec![nterm.to_string()],
+                                nodes: vec![node_id.clone()],
                             };
 
-                            results_map.insert(document_id, document);
+                            results_map.insert(document_id.clone(), document);
                         }
                         Entry::Occupied(entry) => {
                             let document = entry.into_mut();
                             document.rank += 1;
                             document.matched_to.push(each_edge.clone());
-                            document.matched_to.dedup_by_key(|k| k.id);
+                            document.matched_to.dedup_by_key(|k| k.id.clone());
                         }
                     }
                 }
@@ -197,6 +202,8 @@ impl RoleGraph {
     pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
         let matches = self.find_matches_ids(text);
         for (a, b) in matches.into_iter().tuple_windows() {
+            // cast to Id
+            let a = a as Id;
             self.add_or_update_document(document_id, a, b);
         }
     }
@@ -209,32 +216,32 @@ impl RoleGraph {
         }
     }
 
-    pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
-        let edge = magic_pair(x, y);
-        let edge = self.init_or_update_edge(edge, document_id);
+    pub fn add_or_update_document(&mut self, document_id: &str, x: Id, y: Id) {
+        let edge = magic_pair(x.as_u128(), y.as_u128());
+        let edge = self.init_or_update_edge(Id::from(edge), document_id);
         self.init_or_update_node(x, &edge);
         self.init_or_update_node(y, &edge);
     }
 
-    fn init_or_update_node(&mut self, node_id: u64, edge: &Edge) {
-        match self.nodes.entry(node_id) {
+    fn init_or_update_node(&mut self, node_id: Id, edge: &Edge) {
+        match self.nodes.entry(node_id.clone()) {
             Entry::Vacant(_) => {
-                let node = Node::new(node_id, edge.clone());
-                self.nodes.insert(node.id, node);
+                let node = Node::new(node_id.clone(), edge.clone());
+                self.nodes.insert(node.id.clone(), node);
             }
             Entry::Occupied(entry) => {
                 let node = entry.into_mut();
                 node.rank += 1;
-                node.connected_with.push(edge.id);
+                node.connected_with.push(edge.id.clone());
             }
         };
     }
 
-    fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
-        let edge = match self.edges.entry(edge_key) {
+    fn init_or_update_edge(&mut self, edge_key: Id, document_id: &str) -> Edge {
+        let edge = match self.edges.entry(edge_key.clone()) {
             Entry::Vacant(_) => {
                 let edge = Edge::new(edge_key, document_id.to_string());
-                self.edges.insert(edge.id, edge.clone());
+                self.edges.insert(edge.id.clone(), edge.clone());
                 edge
             }
             Entry::Occupied(entry) => {
@@ -289,7 +296,7 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 /// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
 /// also using memoize macro with Ahash hasher
 #[memoize(CustomHasher: ahash::AHashMap)]
-pub fn magic_pair(x: u64, y: u64) -> u64 {
+pub fn magic_pair(x: u128, y: u128) -> u128 {
     if x >= y {
         x * x + x + y
     } else {
@@ -309,8 +316,8 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 //   return q, l - q
 // }
 #[memoize(CustomHasher: ahash::AHashMap)]
-pub fn magic_unpair(z: u64) -> (u64, u64) {
-    let q = (z as f32).sqrt().floor() as u64;
+pub fn magic_unpair(z: u128) -> (u128, u128) {
+    let q = (z as f32).sqrt().floor() as u128;
     let l = z - q * q;
     if l < q {
         (l, q)

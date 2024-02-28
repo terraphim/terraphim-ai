@@ -1,5 +1,5 @@
 use aho_corasick::{AhoCorasick, MatchKind};
-use terraphim_types::{NormalizedTerm, Thesaurus};
+use terraphim_types::{Id, NormalizedTerm, Thesaurus};
 
 use crate::{Result, TerraphimAutomataError};
 
@@ -15,7 +15,7 @@ pub fn find_matches(
     thesaurus: Thesaurus,
     return_positions: bool,
 ) -> Result<Vec<Matched>> {
-    let patterns: Vec<String> = thesaurus.keys().cloned().collect();
+    let patterns: Vec<Id> = thesaurus.keys().cloned().collect();
 
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)
@@ -27,10 +27,10 @@ pub fn find_matches(
         let term = &patterns[mat.pattern()];
         let normalized_term = thesaurus
             .get(term)
-            .ok_or_else(|| TerraphimAutomataError::Dict(format!("Unknown term: {term}")))?;
+            .ok_or_else(|| TerraphimAutomataError::Dict(format!("Unknown term {term}")))?;
 
         matches.push(Matched {
-            term: term.clone(),
+            term: term.to_string(),
             normalized_term: normalized_term.clone(),
             pos: if return_positions {
                 Some((mat.start(), mat.end()))
@@ -42,19 +42,19 @@ pub fn find_matches(
     Ok(matches)
 }
 
-// This function replacing instead of matching patterns
-pub fn replace_matches(text: &str, thesaurus: Thesaurus) -> Result<Vec<u8>> {
-    let mut patterns: Vec<String> = Vec::new();
-    let mut replace_with: Vec<String> = Vec::new();
-    for (key, value) in thesaurus.iter() {
-        patterns.push(key.clone());
-        replace_with.push(value.clone().id.clone().to_string());
-    }
-    let ac = AhoCorasick::builder()
-        .match_kind(MatchKind::LeftmostLongest)
-        .ascii_case_insensitive(true)
-        .build(patterns)?;
+// // This function replacing instead of matching patterns
+// pub fn replace_matches(text: &str, thesaurus: Thesaurus) -> Result<Vec<u8>> {
+//     let mut patterns: Vec<String> = Vec::new();
+//     let mut replace_with: Vec<String> = Vec::new();
+//     for (key, value) in thesaurus.iter() {
+//         patterns.push(key.to_string());
+//         replace_with.push(value.clone().id.clone().to_string());
+//     }
+//     let ac = AhoCorasick::builder()
+//         .match_kind(MatchKind::LeftmostLongest)
+//         .ascii_case_insensitive(true)
+//         .build(patterns)?;
 
-    let result = ac.replace_all_bytes(text.as_bytes(), &replace_with);
-    Ok(result)
-}
+//     let result = ac.replace_all_bytes(text.as_bytes(), &replace_with);
+//     Ok(result)
+// }
