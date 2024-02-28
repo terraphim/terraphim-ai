@@ -52,7 +52,7 @@ docker-all:
 install:
   FROM rust:1.75.0-buster
   RUN apt-get update -qq
-  RUN apt install -y musl-tools musl-dev 
+  RUN apt install -y apt install dnsutils 
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   RUN update-ca-certificates
   RUN rustup component add clippy
