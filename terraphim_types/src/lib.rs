@@ -1,5 +1,146 @@
+use std::fmt::{self, Display, Formatter};
+
 use ahash::AHashMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use ulid::Ulid;
+
+/// A unique ID. The underlying type is an implementation detail and subject to change.
+///
+/// Currently, this is a wrapper around the `ulid` crate's `Ulid` type.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id {
+    /// A Ulid is a unique 128-bit lexicographically sortable identifier
+    ulid: Ulid,
+    /// Bytes of the ULID (for use in the `AsRef<[u8]>` trait)
+    bytes: Vec<u8>,
+}
+
+impl Id {
+    pub fn new() -> Self {
+        let ulid = Ulid::new();
+        let bytes = ulid.to_string().into_bytes();
+        Id { ulid, bytes }
+    }
+
+    pub fn as_u128(&self) -> u128 {
+        self.ulid.into()
+    }
+}
+
+impl AsRef<[u8]> for Id {
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+impl From<Ulid> for Id {
+    fn from(ulid: Ulid) -> Self {
+        Self {
+            ulid,
+            bytes: ulid.to_string().into_bytes(),
+        }
+    }
+}
+
+impl From<u128> for Id {
+    fn from(id: u128) -> Self {
+        let ulid = Ulid::from(id);
+        Self {
+            ulid,
+            bytes: ulid.to_string().into_bytes(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Id {
+    fn deserialize<D>(deserializer: D) -> Result<Id, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let ulid = Ulid::deserialize(deserializer)?;
+        Ok(Id::from(ulid))
+    }
+}
+
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.ulid)
+    }
+}
+
+/// The value of a normalized term
+///
+/// This is a string that has been normalized to lowercase and trimmed.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NormalizedTermValue(String);
+
+impl NormalizedTermValue {
+    pub fn new(term: String) -> Self {
+        let value = term.trim().to_lowercase();
+        Self(value)
+    }
+}
+
+impl From<String> for NormalizedTermValue {
+    fn from(term: String) -> Self {
+        Self::new(term)
+    }
+}
+
+impl Display for NormalizedTermValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// A normalized term is a higher-level term that has been normalized
+///
+/// It holds a unique identifier to an underlying and the normalized value.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NormalizedTerm {
+    /// Unique identifier for the normalized term
+    pub id: Id,
+    /// The normalized value
+    // This field is currently called `nterm` in the JSON
+    #[serde(rename = "nterm")]
+    pub value: NormalizedTermValue,
+}
+
+impl NormalizedTerm {
+    pub fn new(id: Id, value: NormalizedTermValue) -> Self {
+        Self { id, value }
+    }
+}
+
+/// A concept is a higher-level, normalized term.
+///
+/// It describes a unique, abstract idea in a machine-readable format.
+///
+/// An example of a concept is "machine learning" which is normalized from
+/// "Machine Learning"
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Concept {
+    /// A unique identifier for the concept
+    pub id: Id,
+    /// The normalized concept
+    pub value: NormalizedTermValue,
+}
+
+impl Concept {
+    pub fn new(value: NormalizedTermValue) -> Self {
+        Self {
+            id: Id::new(),
+            value,
+        }
+    }
+}
+
+impl From<String> for Concept {
+    fn from(concept: String) -> Self {
+        let concept = NormalizedTermValue::new(concept);
+        Self::new(concept)
+    }
+}
 
 /// Document that can be indexed by the `RoleGraph`.
 ///
@@ -73,8 +214,8 @@ impl From<Article> for Document {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
-    /// ID of the node
-    pub id: u64,
+    /// ID of the edge
+    pub id: Id,
     /// Rank of the edge
     pub rank: u64,
     /// A hashmap of `document_id` to `rank`
@@ -82,7 +223,7 @@ pub struct Edge {
 }
 
 impl Edge {
-    pub fn new(id: u64, document_id: String) -> Self {
+    pub fn new(id: Id, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
         Self {
@@ -93,22 +234,22 @@ impl Edge {
     }
 }
 
-/// A `Node` represents single concept
+/// A `Node` represents single concept and its connections to other concepts.
 ///
 /// Each node can have multiple edges to other nodes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
     /// Unique identifier of the node
-    pub id: u64,
+    pub id: Id,
     /// Number of co-occurrences
     pub rank: u64,
     /// List of connected nodes
-    pub connected_with: Vec<u64>,
+    pub connected_with: Vec<Id>,
 }
 
 impl Node {
     /// Create a new node with a given id and edge
-    pub fn new(id: u64, edge: Edge) -> Self {
+    pub fn new(id: Id, edge: Edge) -> Self {
         Self {
             id,
             rank: 1,
@@ -131,7 +272,7 @@ impl Node {
 /// It holds the normalized terms for a resource
 /// where a resource can be as diverse as a Markdown file or a document in
 /// Notion or AtomicServer
-pub type Thesaurus = AHashMap<String, NormalizedTerm>;
+pub type Thesaurus = AHashMap<Id, NormalizedTerm>;
 
 /// An index is a hashmap of articles
 ///
@@ -152,7 +293,7 @@ pub struct IndexedDocument {
     /// tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
     /// list of node ids for validation of matching
-    pub nodes: Vec<u64>,
+    pub nodes: Vec<Id>,
 }
 
 impl IndexedDocument {
@@ -211,18 +352,4 @@ pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -
         }
     }
     articles
-}
-
-/// A normalized term is a term that has been normalized to a concept, which is
-/// a higher-level term.
-///
-/// It holds a unique identifier and the normalized value.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NormalizedTerm {
-    /// Unique identifier for the normalized term
-    pub id: u64,
-    /// The normalized value
-    // This field is currently called `nterm` in the JSON
-    #[serde(rename = "nterm")]
-    pub value: String,
 }

@@ -1,6 +1,6 @@
 pub mod matcher;
 
-pub use matcher::{find_matches, replace_matches, Matched};
+pub use matcher::{find_matches, Matched};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
