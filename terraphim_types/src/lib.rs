@@ -1,17 +1,18 @@
 use std::fmt::{self, Display, Formatter};
 
 use ahash::AHashMap;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ulid::Ulid;
 
 /// A unique ID. The underlying type is an implementation detail and subject to change.
 ///
 /// Currently, this is a wrapper around the `ulid` crate's `Ulid` type.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id {
     /// A Ulid is a unique 128-bit lexicographically sortable identifier
     ulid: Ulid,
-    /// Bytes of the ULID (for use in the `AsRef<[u8]>` trait)
+    // Bytes of the ULID (for use in the `AsRef<[u8]>` trait, which is used in
+    // aho-corasick)
     bytes: Vec<u8>,
 }
 
@@ -30,6 +31,15 @@ impl Id {
 impl Default for Id {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// Custom Debug implementation to hide the `bytes` field
+impl fmt::Debug for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Convert the ulid to its u128 representation
+        let ulid_as_u128: u128 = self.ulid.into();
+        write!(f, "{}", ulid_as_u128)
     }
 }
 
@@ -74,10 +84,20 @@ impl Display for Id {
     }
 }
 
+impl Serialize for Id {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Serialize the ulid field as a string directly
+        serializer.serialize_str(&self.ulid.to_string())
+    }
+}
+
 /// The value of a normalized term
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
@@ -96,6 +116,12 @@ impl From<String> for NormalizedTermValue {
 impl Display for NormalizedTermValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<[u8]> for NormalizedTermValue {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 }
 
@@ -145,6 +171,12 @@ impl From<String> for Concept {
     fn from(concept: String) -> Self {
         let concept = NormalizedTermValue::new(concept);
         Self::new(concept)
+    }
+}
+
+impl Display for Concept {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
@@ -278,7 +310,7 @@ impl Node {
 /// It holds the normalized terms for a resource
 /// where a resource can be as diverse as a Markdown file or a document in
 /// Notion or AtomicServer
-pub type Thesaurus = AHashMap<Id, NormalizedTerm>;
+pub type Thesaurus = AHashMap<NormalizedTermValue, NormalizedTerm>;
 
 /// An index is a hashmap of articles
 ///

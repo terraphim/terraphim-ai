@@ -37,12 +37,12 @@ use crate::Error;
 /// A ThesaurusBuilder receives a path containing
 /// resources (e.g. files) with key-value pairs and returns a `Thesaurus`
 /// (a dictionary with synonyms which map to higher-level concepts)
-trait ThesaurusBuilder {
+pub trait ThesaurusBuilder {
     /// `haystack` is the root directory for building the thesaurus
     /// (e.g. a directory of Logseq files)
     // This could be generalized (e.g. to take a `Read` trait object
     // or a `Resource` or a glob of inputs)
-    async fn build(&self, haystack: PathBuf) -> Result<Thesaurus>;
+    async fn build<P: Into<PathBuf> + Send>(&self, haystack: P) -> Result<Thesaurus>;
 }
 
 /// In Logseq, `::` serves as a delimiter between the property name and its
@@ -59,22 +59,21 @@ const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 /// A builder for a knowledge graph, which knows how to handle Logseq input.
 #[derive(Default)]
-struct Logseq {
+pub struct Logseq {
     service: LogseqService,
 }
 
 impl ThesaurusBuilder for Logseq {
     /// Build the knowledge graph from the data source
     /// and store it in each rolegraph.
-    async fn build(&self, haystack: PathBuf) -> Result<Thesaurus> {
+    async fn build<P: Into<PathBuf> + Send>(&self, haystack: P) -> Result<Thesaurus> {
+        let haystack = haystack.into();
         let messages = self
             .service
             .get_raw_messages(LOGSEQ_KEY_VALUE_DELIMITER, &haystack)
             .await?;
 
         let thesaurus = index_inner(messages);
-        println!("{:#?}", thesaurus);
-
         Ok(thesaurus)
     }
 }
@@ -105,7 +104,7 @@ impl LogseqService {
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         let haystack = haystack.to_string_lossy().to_string();
-        println!("Running logseq with needle: {needle} and haystack: {haystack}");
+        println!("Running logseq with needle `{needle}` and haystack `{haystack}`");
 
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle.to_string(), haystack]
@@ -187,7 +186,7 @@ fn index_inner(messages: Vec<Message>) -> Thesaurus {
                         continue;
                     }
                 };
-                println!("Found concept: {concept:?}");
+                println!("Found concept: {concept}");
                 current_concept = Some(concept);
             }
             Message::Match(message) => {
@@ -237,7 +236,7 @@ fn index_inner(messages: Vec<Message>) -> Thesaurus {
                 };
                 for synonym in synonyms {
                     let nterm = NormalizedTerm::new(concept.id.clone(), synonym.into());
-                    thesaurus.insert(concept.id.clone(), nterm);
+                    thesaurus.insert(concept.value.clone(), nterm);
                 }
             }
             _ => {}

@@ -3,6 +3,7 @@ title:: @10 Best SaaS Metrics for SaaS Business Growth in 2022
 website-title:: The Product Company
 item-type:: [[webpage]]
 access-date:: 2022-10-11T13:46:59Z
+synonyms:: example foo, example bar
 original-title:: 10 Best SaaS Metrics for SaaS Business Growth in 2022
 language:: en-US
 url:: https://theproductcompany.com/saas-metrics/

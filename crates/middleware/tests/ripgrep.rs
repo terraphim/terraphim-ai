@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod roundtrip {
+mod tests {
     use terraphim_config::{Config, ConfigState, ServiceType};
     use terraphim_middleware::search_haystacks;
     use terraphim_types::IndexedDocument;
