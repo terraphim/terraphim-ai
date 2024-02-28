@@ -10,16 +10,9 @@ use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
 
 /// Middleware that uses ripgrep to index Markdown haystacks.
+#[derive(Default)]
 pub struct RipgrepIndexer {
     command: RipgrepCommand,
-}
-
-impl Default for RipgrepIndexer {
-    fn default() -> Self {
-        Self {
-            command: RipgrepCommand::default(),
-        }
-    }
 }
 
 impl IndexMiddleware for RipgrepIndexer {
@@ -29,7 +22,7 @@ impl IndexMiddleware for RipgrepIndexer {
     ///
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Path) -> Result<Index> {
-        let messages = self.command.run(needle, &haystack).await?;
+        let messages = self.command.run(needle, haystack).await?;
         let articles = index_inner(messages);
         Ok(articles)
     }

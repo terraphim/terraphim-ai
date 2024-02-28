@@ -68,12 +68,12 @@ pub async fn search_haystacks(
                 // Search through articles using ripgrep
                 // This spins up ripgrep the service and indexes into the
                 // `TerraphimGraph` and caches the articles
-                ripgrep.index(&needle, &haystack.path).await?
+                ripgrep.index(needle, &haystack.path).await?
             }
         };
 
         for new_article in new_articles.values() {
-            if let Err(e) = config_state.index_article(&new_article).await {
+            if let Err(e) = config_state.index_article(new_article).await {
                 log::warn!(
                     "Failed to index article `{}` ({}): {e:?}",
                     new_article.title,

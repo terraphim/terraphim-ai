@@ -27,6 +27,12 @@ impl Id {
     }
 }
 
+impl Default for Id {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AsRef<[u8]> for Id {
     fn as_ref(&self) -> &[u8] {
         &self.bytes
