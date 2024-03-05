@@ -28,8 +28,6 @@ pub enum TerraphimAutomataError {
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
 /// Load a thesaurus from a file or URL
-///
-/// This loads the output of the knowledge graph builder
 pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
     async fn read_url(url: &str) -> Result<String> {
         let response = reqwest::Client::new()
@@ -57,37 +55,41 @@ pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
 
 #[cfg(test)]
 mod tests {
+    use terraphim_types::{Id, NormalizedTermValue};
+
     use super::*;
 
     #[tokio::test]
-    async fn test_load_automata_from_file() {
-        let thesaurus = load_thesaurus("tests/test_data.csv.gz").await.unwrap();
+    async fn test_load_thesaurus_from_file() {
+        let thesaurus = load_thesaurus("data/term_to_id_simple.json").await.unwrap();
         assert_eq!(thesaurus.len(), 3);
-        assert_eq!(thesaurus.get("foo").unwrap().id, 1);
-        assert_eq!(thesaurus.get("bar").unwrap().id, 2);
-        assert_eq!(thesaurus.get("baz").unwrap().id, 3);
-
-        // TODO: No `parent` field in type `NormalizedTerm`
-        // assert_eq!(thesaurus.get("foo").unwrap().parent, None);
-        // assert_eq!(thesaurus.get("bar").unwrap().parent, Some("1".to_string()));
-        // assert_eq!(thesaurus.get("baz").unwrap().parent, Some("2".to_string()));
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
+            Id::from(1)
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
+            Id::from(2)
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
+            Id::from(1)
+        );
     }
 
     #[tokio::test]
-    async fn test_load_automata_from_url() {
-        let thesaurus = load_thesaurus(
-            "https://raw.githubusercontent.com/github/copilot-sample-code/main/test_data.csv.gz",
-        )
-        .await
-        .unwrap();
-        assert_eq!(thesaurus.len(), 3);
-        assert_eq!(thesaurus.get("foo").unwrap().id, 1);
-        assert_eq!(thesaurus.get("bar").unwrap().id, 2);
-        assert_eq!(thesaurus.get("baz").unwrap().id, 3);
-
-        // TODO: No `parent` field in type `NormalizedTerm`
-        // assert_eq!(thesaurus.get("foo").unwrap().parent, None);
-        // assert_eq!(thesaurus.get("bar").unwrap().parent, Some("1".to_string()));
-        // assert_eq!(thesaurus.get("baz").unwrap().parent, Some("2".to_string()));
+    async fn test_load_thesaurus_from_url() {
+        let thesaurus =
+            load_thesaurus("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
+                .await
+                .unwrap();
+        assert_eq!(thesaurus.len(), 1725);
+        assert_eq!(
+            thesaurus
+                .get(&NormalizedTermValue::from("@risk a user guide"))
+                .unwrap()
+                .id,
+            Id::from(661)
+        );
     }
 }
