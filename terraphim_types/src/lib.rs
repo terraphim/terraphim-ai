@@ -325,7 +325,7 @@ impl Node {
 /// It holds the normalized terms for a resource
 /// where a resource can be as diverse as a Markdown file or a document in
 /// Notion or AtomicServer
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Thesaurus(AHashMap<NormalizedTermValue, NormalizedTerm>);
 
 impl Thesaurus {
@@ -342,6 +342,11 @@ impl Thesaurus {
     /// Get the length of the thesaurus
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    /// Check if the thesaurus is empty
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     /// Custom `get` method for the thesaurus, which accepts a
