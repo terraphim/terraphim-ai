@@ -2,6 +2,8 @@ use std::fmt::{self, Display, Formatter};
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::hash_map::Iter;
+use std::iter::IntoIterator;
 use ulid::Ulid;
 
 /// A unique ID. The underlying type is an implementation detail and subject to change.
@@ -68,16 +70,6 @@ impl From<u128> for Id {
     }
 }
 
-impl<'de> Deserialize<'de> for Id {
-    fn deserialize<D>(deserializer: D) -> Result<Id, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let ulid = Ulid::deserialize(deserializer)?;
-        Ok(Id::from(ulid))
-    }
-}
-
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.ulid)
@@ -89,8 +81,25 @@ impl Serialize for Id {
     where
         S: Serializer,
     {
-        // Serialize the ulid field as a string directly
-        serializer.serialize_str(&self.ulid.to_string())
+        // Serialize the ulid field as u128
+        serializer.serialize_u128(self.ulid.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for Id {
+    fn deserialize<D>(deserializer: D) -> Result<Id, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // We expect the ULID to be serialized as a u128
+        let ulid = u128::deserialize(deserializer)?;
+        Ok(Id::from(ulid))
+
+        // // TODO
+        // // let ulid = Ulid::deserialize(deserializer)?;
+        // // Ok(Id::from(ulid))
+
+        // Ok(Id::new())
     }
 }
 
@@ -110,6 +119,12 @@ impl NormalizedTermValue {
 impl From<String> for NormalizedTermValue {
     fn from(term: String) -> Self {
         Self::new(term)
+    }
+}
+
+impl From<&str> for NormalizedTermValue {
+    fn from(term: &str) -> Self {
+        Self::new(term.to_string())
     }
 }
 
@@ -310,7 +325,46 @@ impl Node {
 /// It holds the normalized terms for a resource
 /// where a resource can be as diverse as a Markdown file or a document in
 /// Notion or AtomicServer
-pub type Thesaurus = AHashMap<NormalizedTermValue, NormalizedTerm>;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Thesaurus(AHashMap<NormalizedTermValue, NormalizedTerm>);
+
+impl Thesaurus {
+    /// Create a new, empty thesaurus
+    pub fn new() -> Self {
+        Self(AHashMap::new())
+    }
+
+    /// Inserts a key-value pair into the thesaurus.
+    pub fn insert(&mut self, key: NormalizedTermValue, value: NormalizedTerm) {
+        self.0.insert(key, value);
+    }
+
+    /// Get the length of the thesaurus
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Custom `get` method for the thesaurus, which accepts a
+    /// `NormalizedTermValue` or a `&str` and returns a reference to the
+    /// `NormalizedTerm`.
+    pub fn get(&self, key: &NormalizedTermValue) -> Option<&NormalizedTerm> {
+        self.0.get(key)
+    }
+
+    pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
+        self.0.keys()
+    }
+}
+
+// Implement `IntoIterator` for a reference to `Thesaurus`
+impl<'a> IntoIterator for &'a Thesaurus {
+    type Item = (&'a NormalizedTermValue, &'a NormalizedTerm);
+    type IntoIter = Iter<'a, NormalizedTermValue, NormalizedTerm>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
 
 /// An index is a hashmap of articles
 ///
