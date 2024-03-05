@@ -42,7 +42,10 @@ pub trait ThesaurusBuilder {
     /// (e.g. a directory of Logseq files)
     // This could be generalized (e.g. to take a `Read` trait object
     // or a `Resource` or a glob of inputs)
-    async fn build<P: Into<PathBuf> + Send>(&self, haystack: P) -> Result<Thesaurus>;
+    fn build<P: Into<PathBuf> + Send>(
+        &self,
+        haystack: P,
+    ) -> impl std::future::Future<Output = Result<Thesaurus>> + Send;
 }
 
 /// In Logseq, `::` serves as a delimiter between the property name and its
