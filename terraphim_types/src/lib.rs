@@ -437,7 +437,7 @@ pub enum KnowledgeGraphInput {
 pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -> Vec<Article> {
     let mut articles: Vec<Article> = Vec::new();
     for doc in docs {
-        println!("doc: {:#?}", doc);
+        log::trace!("doc: {:#?}", doc);
         if let Some(article) = cached_articles.get(&doc.id).cloned() {
             // Article found in cache
             let mut article = article;

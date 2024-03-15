@@ -119,18 +119,18 @@ impl RoleGraph {
     // YAGNI: at the moment I don't need it, so parked
     pub fn normalize(&mut self) {
         let node_len = self.nodes.len() as u32;
-        log::debug!("Node Length {}", node_len);
+        log::trace!("Node Length {}", node_len);
         let edge_len = self.edges.len() as u32;
-        log::debug!("Edge Length {}", edge_len);
+        log::trace!("Edge Length {}", edge_len);
         let document_count = self.documents.len() as u32;
-        log::debug!("document Length {}", document_count);
+        log::trace!("document Length {}", document_count);
         let normalizer = f32::from_bits(node_len + edge_len + document_count);
         let weight_node = f32::from_bits(node_len) / normalizer;
         let weight_edge = f32::from_bits(edge_len) / normalizer;
         let weight_document = f32::from_bits(document_count) / normalizer;
-        log::debug!("Weight Node {}", weight_node);
-        log::debug!("Weight Edge {}", weight_edge);
-        log::debug!("Weight document {}", weight_document);
+        log::trace!("Weight Node {}", weight_node);
+        log::trace!("Weight Edge {}", weight_edge);
+        log::trace!("Weight document {}", weight_document);
         // for each node for each edge for each document
         // for (document_id,rank) in self.documents.iter(){
         //     let weighted_rank=(weight_node*node_rank as f32)+(weight_edge*edge_rank as f32)+(weight_document*rank as f32)/(weight_node+weight_edge+weight_document);
@@ -164,7 +164,7 @@ impl RoleGraph {
             // log::debug!("Node connected to Edges {:?}", node.connected_with);
             for each_edge_key in &node.connected_with {
                 let each_edge = self.edges.get(each_edge_key).ok_or(Error::EdgeIdNotFound)?;
-                log::debug!("Edge Details{:?}", each_edge);
+                log::trace!("Edge Details {:?}", each_edge);
                 let edge_rank = each_edge.rank;
                 for (document_id, rank) in &each_edge.doc_hash {
                     let total_rank = node_rank + edge_rank + rank;
