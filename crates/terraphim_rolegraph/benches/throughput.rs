@@ -52,15 +52,15 @@ fn bench_find_matches_ids(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let rolegraph = block_on(get_rolegraph());
 
-    c.bench_function_over_inputs(
-        "find_matches_ids",
-        move |b, &&size| {
-            let query = query.repeat(size);
-
-            b.iter(|| rolegraph.find_matches_ids(&query))
-        },
-        &[1, 10, 100, 1000],
-    );
+    let sizes = &[1, 10, 100, 1000];
+    for size in sizes {
+        let input = query.repeat(*size);
+        c.benchmark_group("find_matches_ids").bench_with_input(
+            BenchmarkId::new("find_matches_ids", size),
+            size,
+            |b, _| b.iter(|| rolegraph.find_matches_ids(&input)),
+        );
+    }
 }
 
 fn bench_find_matches(c: &mut Criterion) {
