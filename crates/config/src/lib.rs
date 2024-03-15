@@ -107,7 +107,6 @@ pub struct Config {
     /// The default role to use if no role is specified
     pub default_role: String,
     /// Unique identifier for the config
-    // TODO: Make the fields private once `TerraphimConfig` is more flexible
     pub id: String,
 }
 
@@ -116,7 +115,6 @@ impl Config {
     // roles from the outside. This way, we can define the service (ripgrep,
     // logseq, etc) for each role. This will allow us to support different
     // services for different roles more easily.
-    // For now, we pass in the service type and use it for all roles.
     pub fn new() -> Self {
         let mut roles = AHashMap::new();
 

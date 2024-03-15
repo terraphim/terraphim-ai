@@ -48,6 +48,7 @@ impl Settings {
                 }
             }
         };
+        log::debug!("Using config path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
         log::info!("Using config_file: {:?}", config_file);
 
