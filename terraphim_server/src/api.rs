@@ -56,6 +56,12 @@ pub(crate) async fn search_articles(
 ) -> Result<Json<Vec<Article>>> {
     println!("Searching articles with query: {search_query:?}");
     let search_query = search_query.deref().clone();
+    // Return on empty search term
+    if search_query.search_term.is_empty() {
+        log::debug!("Empty search term. Returning early");
+        return Ok(Json(vec![]));
+    }
+
     let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
         .await
         .context(format!(
@@ -96,6 +102,7 @@ pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<Confi
 }
 
 use persistence::Persistable;
+
 /// API handler for Terraphim Config update
 pub async fn update_config(
     State(config): State<ConfigState>,

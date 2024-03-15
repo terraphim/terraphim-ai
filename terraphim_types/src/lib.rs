@@ -314,9 +314,9 @@ impl Node {
     //     // let count_b: BTreeMap<&u64, &Edge> =
     //     // self.connected_with.iter().map(|(k, v)| (v, k)).collect();
     //     // for (k, v) in self.connected_with.iter().map(|(k, v)| (v.rank, k)) {
-    //     // warn!("k {:?} v {:?}", k, v);
+    //     // log::warn!("k {:?} v {:?}", k, v);
     //     // }
-    //     warn!("Connected with {:?}", self.connected_with);
+    //     log::warn!("Connected with {:?}", self.connected_with);
     // }
 }
 

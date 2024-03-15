@@ -8,7 +8,7 @@ use terraphim_types::{Document, Edge, Id, IndexedDocument, Node, NormalizedTermV
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
-use log::warn;
+use log;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(thiserror::Error, Debug)]
@@ -120,22 +120,22 @@ impl RoleGraph {
     // YAGNI: at the moment I don't need it, so parked
     pub fn normalize(&mut self) {
         let node_len = self.nodes.len() as u32;
-        warn!("Node Length {}", node_len);
+        log::debug!("Node Length {}", node_len);
         let edge_len = self.edges.len() as u32;
-        warn!("Edge Length {}", edge_len);
+        log::debug!("Edge Length {}", edge_len);
         let document_count = self.documents.len() as u32;
-        warn!("document Length {}", document_count);
+        log::debug!("document Length {}", document_count);
         let normalizer = f32::from_bits(node_len + edge_len + document_count);
         let weight_node = f32::from_bits(node_len) / normalizer;
         let weight_edge = f32::from_bits(edge_len) / normalizer;
         let weight_document = f32::from_bits(document_count) / normalizer;
-        warn!("Weight Node {}", weight_node);
-        warn!("Weight Edge {}", weight_edge);
-        warn!("Weight document {}", weight_document);
+        log::debug!("Weight Node {}", weight_node);
+        log::debug!("Weight Edge {}", weight_edge);
+        log::debug!("Weight document {}", weight_document);
         // for each node for each edge for each document
         // for (document_id,rank) in self.documents.iter(){
         //     let weighted_rank=(weight_node*node_rank as f32)+(weight_edge*edge_rank as f32)+(weight_document*rank as f32)/(weight_node+weight_edge+weight_document);
-        //     warn!("document id {} Weighted Rank {}", document_id, weighted_rank);
+        //     log::debug!("document id {} Weighted Rank {}", document_id, weighted_rank);
         //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
         // }
     }
@@ -149,23 +149,23 @@ impl RoleGraph {
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Vec<(String, IndexedDocument)>> {
-        warn!("performing query");
+        log::debug!("performing query");
         let nodes = self.find_matches_ids(query_string);
 
         //  TODO: turn into BinaryHeap by implementing hash and eq traits
 
         let mut results_map: AHashMap<String, IndexedDocument> = AHashMap::new();
         for node_id in nodes {
-            // warn!("Matched node {:?}", node_id);
+            // log::debug!("Matched node {:?}", node_id);
             let node = self.nodes.get(&node_id).ok_or(Error::NodeIdNotFound)?;
             let nterm = self.ac_reverse_nterm.get(&node_id).unwrap();
             // println!("Normalized term {nterm}");
             let node_rank = node.rank;
-            // warn!("Node Rank {}", node_rank);
-            // warn!("Node connected to Edges {:?}", node.connected_with);
+            // log::debug!("Node Rank {}", node_rank);
+            // log::debug!("Node connected to Edges {:?}", node.connected_with);
             for each_edge_key in &node.connected_with {
                 let each_edge = self.edges.get(each_edge_key).ok_or(Error::EdgeIdNotFound)?;
-                warn!("Edge Details{:?}", each_edge);
+                log::debug!("Edge Details{:?}", each_edge);
                 let edge_rank = each_edge.rank;
                 for (document_id, rank) in &each_edge.doc_hash {
                     let total_rank = node_rank + edge_rank + rank;
@@ -191,7 +191,7 @@ impl RoleGraph {
                 }
             }
         }
-        // warn!("Results Map {:#?}", results_map);
+        log::debug!("Results Map {:#?}", results_map);
         let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
         hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
         hash_vec = hash_vec
@@ -388,7 +388,7 @@ mod tests {
         }
         assert_eq!(
             rolegraph.ac_reverse_nterm.get(&matches[0]).unwrap(),
-            "life cycle models"
+            &NormalizedTermValue::new("life cycle models".to_string())
         );
     }
 
@@ -419,8 +419,8 @@ mod tests {
         let article_id4 = "ArticleID4".to_string();
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         rolegraph.parse_document_to_pair(&article_id4, query4);
-        warn!("Query graph");
-        let results: Vec<(&String, IndexedDocument)> = rolegraph
+        log::debug!("Query graph");
+        let results: Vec<(String, IndexedDocument)> = rolegraph
             .query(
                 "Life cycle concepts and project direction",
                 Some(0),
