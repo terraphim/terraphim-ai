@@ -66,8 +66,7 @@ pub async fn search_haystacks(
         let new_articles = match haystack.service {
             ServiceType::Ripgrep => {
                 // Search through articles using ripgrep
-                // This spins up ripgrep the service and indexes into the
-                // `TerraphimGraph` and caches the articles
+                // This indexes the haystack using the ripgrep middleware
                 ripgrep.index(needle, &haystack.path).await?
             }
         };

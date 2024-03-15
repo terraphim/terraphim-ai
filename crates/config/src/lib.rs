@@ -283,13 +283,12 @@ impl ConfigState {
     }
 
     /// Index article into all rolegraphs
-    // TODO: This should probably be a method on the RoleGraph and/or moved to
-    // the `persistance` crate
+    // TODO: This should probably be  moved to the `persistance` crate
     pub async fn index_article(&mut self, article: &Article) -> OpendalResult<()> {
         let id = article
             .id
             .clone()
-            // lazily initialize `article.id` only if it's `None`.
+            // Initialize article ID if it's `None`
             .get_or_insert_with(|| ulid::Ulid::new().to_string())
             .clone();
 
@@ -306,7 +305,7 @@ impl ConfigState {
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
 
-        // if role is not provided, use the default role in the config
+        // if role is not provided, use the default role from the config
         let role = search_query.role.unwrap_or(default_role);
         log::debug!("Role for search_articles: {:#?}", role);
 
