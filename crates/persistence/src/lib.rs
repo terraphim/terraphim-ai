@@ -67,7 +67,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
     where
         Self: Sized;
 
-    /// Load the configuration 
+    /// Load the configuration
     async fn load_config(&self) -> Result<(HashMap<String, (Operator, u128)>, Operator)> {
         let state = DeviceStorage::instance().await?;
         Ok((state.ops.clone(), state.fastest_op.clone()))

@@ -2,8 +2,8 @@ use serde_json as json;
 use terraphim_config::TerraphimConfigError;
 
 mod command;
-pub mod thesaurus;
 pub mod indexer;
+pub mod thesaurus;
 
 pub use indexer::search_haystacks;
 
