@@ -88,7 +88,7 @@ use terraphim_server::axum_server;
 async fn start_server() -> Result<(), String> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let mut config = Config::new(ServiceType::Logseq);
+    let mut config = Config::new(ServiceType::Ripgrep);
     let config_state = ConfigState::new(&mut config).await.unwrap();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = axum_server(addr, config_state).await {

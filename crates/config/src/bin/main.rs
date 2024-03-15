@@ -8,7 +8,7 @@ async fn main() -> Result<()> {
         .try_init()
         .map_err(|e| TerraphimConfigError::TracingSubscriber(e));
 
-    let config = Config::new(ServiceType::Logseq);
+    let config = Config::new(ServiceType::Ripgrep);
     let json_str = serde_json::to_string_pretty(&config)?;
     println!("json_str: {:?}", json_str);
 

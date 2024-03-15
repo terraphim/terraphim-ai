@@ -303,6 +303,7 @@ impl ConfigState {
 
         // if role is not provided, use the default role in the config
         let role = search_query.role.unwrap_or(default_role);
+        log::debug!("Role for search_articles: {:#?}", role);
 
         let role = role.to_lowercase();
         let rolegraph = self.roles.get(&role).unwrap().lock().await;

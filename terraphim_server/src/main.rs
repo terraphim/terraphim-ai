@@ -41,6 +41,9 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Set up logger for the server
+    env_logger::init();
+
     let args = Args::parse();
     println!("args: {args:?}");
     let server_settings =

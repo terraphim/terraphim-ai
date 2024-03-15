@@ -27,6 +27,13 @@ pub enum TerraphimAutomataError {
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
+/// `load_automata` loads output of the knowledge graph builder
+// pub async fn load_automata(url_or_file: &str) -> Result<matcher::Automata> {
+//     let thesaurus = load_thesaurus(url_or_file).await?;
+//     let automata = Automata::new(thesaurus);
+//     Ok(automata)
+// }
+
 /// Load a thesaurus from a file or URL
 pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
     async fn read_url(url: &str) -> Result<String> {

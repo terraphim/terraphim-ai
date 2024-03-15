@@ -18,7 +18,7 @@ use terraphim_settings::Settings;
 async fn main() -> Result<(), Box<dyn Error>> {
     let device_settings = Settings::load_from_env_and_file(None);
 
-    let mut config = Config::new(ServiceType::Logseq);
+    let mut config = Config::new(ServiceType::Ripgrep);
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let globbal_shortcut = current_config.global_shortcut.clone();
