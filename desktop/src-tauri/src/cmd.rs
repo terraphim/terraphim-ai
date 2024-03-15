@@ -19,9 +19,7 @@ pub struct RequestBody {
 }
 
 #[derive(Debug, serde::Serialize)]
-pub enum TerraphimTauriError {
-    FooError,
-}
+pub enum TerraphimTauriError {}
 
 #[command]
 pub fn log_operation(event: String, payload: Option<String>) {
@@ -76,7 +74,7 @@ pub async fn get_config(
 
 pub struct Port(u16);
 
-/// A command to get the usused port, instead of 3000.
+/// A command to get the unused port instead of 3000.
 #[tauri::command]
 pub fn get_port(port: tauri::State<Port>) -> Result<String, String> {
     Ok(format!("{}", port.0))

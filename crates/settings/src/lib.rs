@@ -36,7 +36,7 @@ pub struct Settings {
 impl Settings {
     /// Load settings from environment and file
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
-        println!("Loading settings...");
+        log::info!("Loading device settings...");
         let config_path = match config_path {
             Some(path) => path,
             None => {
@@ -49,7 +49,7 @@ impl Settings {
             }
         };
         let config_file = init_config_file(&config_path)?;
-        println!("Using config_file: {:?}", config_file);
+        log::info!("Using config_file: {:?}", config_file);
 
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
