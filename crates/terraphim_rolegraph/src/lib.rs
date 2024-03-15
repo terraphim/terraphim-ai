@@ -38,15 +38,13 @@ pub struct RoleGraph {
     /// A mapping from node IDs to nodes
     nodes: AHashMap<Id, Node>,
     /// A mapping from edge IDs to edges
-    // TODO: Should this be a ULID?
     edges: AHashMap<Id, Edge>,
     /// A mapping from document IDs to indexed documents
     documents: AHashMap<String, IndexedDocument>,
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values
-    // TODO: make it private once performance tests are fixed
-    pub ac_values: Vec<Id>,
+    ac_values: Vec<Id>,
     /// Aho-Corasick automata
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
