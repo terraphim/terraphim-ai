@@ -45,10 +45,10 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     let args = Args::parse();
-    println!("args: {args:?}");
+    log::info!("Commandline arguments: {args:?}");
     let server_settings =
         Settings::load_from_env_and_file(None).context("Failed to load settings")?;
-    println!(
+    log::info!(
         "Device settings hostname: {:?}",
         server_settings.server_hostname
     );
@@ -76,8 +76,8 @@ async fn main() -> Result<()> {
     config_state
         .roles
         .insert(role, RoleGraphSync::from(rolegraph));
-    println!(
-        "cfg Roles: {:?}",
+    log::info!(
+        "Config Roles: {:?}",
         config_state.roles.keys().collect::<Vec<&String>>()
     );
 
