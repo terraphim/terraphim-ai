@@ -1,7 +1,7 @@
 {
   "global_shortcut": "Ctrl+X",
   "roles": {
-    "Default": {
+    "default": {
       "shortname": "Default",
       "name": "Default",
       "relevance_function": "terraphim-graph",
@@ -16,52 +16,12 @@
       },
       "haystacks": [
         {
-          "haystack": "localsearch",
-          "service": "ripgrep"
+          "path": "localsearch",
+          "service": "Ripgrep"
         }
       ]
     },
-    "System Operator": {
-      "shortname": "operator",
-      "name": "System Operator",
-      "relevance_function": "terraphim-graph",
-      "theme": "superhero",
-      "serverUrl": "http://localhost:8000/articles/search",
-      "kg": {
-        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-        "kg_type": "markdown",
-        "kg_path": "~/pkm",
-        "public": true,
-        "publish": true
-      },
-      "haystacks": [
-        {
-          "haystack": "localsearch",
-          "service": "ripgrep"
-        }
-      ]
-    },
-    "Father": {
-      "shortname": "farther",
-      "name": "Farther",
-      "relevance_function": "terraphim-graph",
-      "theme": "lumen",
-      "serverUrl": "http://localhost:8080",
-      "kg": {
-        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-        "kg_type": "markdown",
-        "kg_path": "~/pkm",
-        "public": true,
-        "publish": true
-      },
-      "haystacks": [
-        {
-          "haystack": "localsearch",
-          "service": "ripgrep"
-        }
-      ]
-    },
-    "Engineer": {
+    "engineer": {
       "shortname": "Engineer",
       "name": "Engineer",
       "relevance_function": "terraphim-graph",
@@ -76,12 +36,52 @@
       },
       "haystacks": [
         {
-          "haystack": "localsearch",
-          "service": "ripgrep"
+          "path": "localsearch",
+          "service": "Ripgrep"
+        }
+      ]
+    },
+    "Father": {
+      "shortname": "father",
+      "name": "Father",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "serverUrl": "http://localhost:8080",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "path": "localsearch",
+          "service": "Ripgrep"
+        }
+      ]
+    },
+    "system operator": {
+      "shortname": "operator",
+      "name": "System Operator",
+      "relevance_function": "terraphim-graph",
+      "theme": "superhero",
+      "serverUrl": "http://localhost:8000/articles/search",
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "kg_type": "markdown",
+        "kg_path": "~/pkm",
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "path": "/tmp/system_operator/pages/",
+          "service": "Ripgrep"
         }
       ]
     }
   },
   "default_role": "Default",
-  "id": "01HK54A3TQR94VM7YNKJEA0ZTJ"
+  "id": "01HS22KA49ZVN6N49XP0BJY1AE"
 }
