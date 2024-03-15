@@ -1,5 +1,5 @@
 use persistence::Persistable;
-use terraphim_config::{Config, Result, ServiceType, TerraphimConfigError};
+use terraphim_config::{Config, Result, TerraphimConfigError};
 
 #[tokio::main]
 async fn main() -> Result<()> {

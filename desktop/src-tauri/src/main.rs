@@ -11,7 +11,7 @@ use tauri::{
     SystemTrayMenu,
 };
 
-use terraphim_config::{Config, ConfigState, ServiceType};
+use terraphim_config::{Config, ConfigState};
 use terraphim_settings::Settings;
 
 #[tokio::main]
