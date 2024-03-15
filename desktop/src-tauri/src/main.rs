@@ -16,7 +16,8 @@ use terraphim_settings::Settings;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let device_settings = Settings::load_from_env_and_file(None);
+    // TODO: Use the device settings to load the config
+    let _device_settings = Settings::load_from_env_and_file(None);
 
     let mut config = Config::new();
     let config_state = ConfigState::new(&mut config).await?;
@@ -25,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // drop mutex guard to avoid deadlock
     drop(current_config);
 
-    println!("{:?}", config_state.config);
+    log::debug!("{:?}", config_state.config);
     let context = tauri::generate_context!();
 
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");

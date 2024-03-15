@@ -269,8 +269,7 @@ impl ConfigState {
         for (name, role) in &config.roles {
             let automata_url = role.kg.automata_url.as_str();
             let role_name = name.to_lowercase();
-            // FIXME: turn into log info
-            println!("Loading Role {} - Url {}", role_name.clone(), automata_url);
+            log::info!("Loading Role {} - Url {}", role_name.clone(), automata_url);
 
             let thesaurus = load_thesaurus(automata_url).await?;
             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;

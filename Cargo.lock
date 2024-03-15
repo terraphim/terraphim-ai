@@ -5742,6 +5742,7 @@ name = "terraphim-ai-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "log",
  "portpicker",
  "serde",
  "tauri",

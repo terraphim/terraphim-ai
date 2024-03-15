@@ -44,10 +44,7 @@ pub(crate) async fn _list_articles(
     let rolegraph = rolegraph.lock().await.clone();
     println!("{rolegraph:?}");
 
-    let articles = rolegraph.articles();
-
-
-    (StatusCode::OK, Json(articles))
+    (StatusCode::OK, Json("Ok"))
 }
 
 /// Search All TerraphimGraphs defined in a config by query params.
