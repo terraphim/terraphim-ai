@@ -211,6 +211,12 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl Persistable for Config {
     fn new() -> Self {
