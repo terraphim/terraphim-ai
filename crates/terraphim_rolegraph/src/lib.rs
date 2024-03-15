@@ -8,7 +8,6 @@ use terraphim_types::{Document, Edge, Id, IndexedDocument, Node, NormalizedTermV
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
-use log;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(thiserror::Error, Debug)]
