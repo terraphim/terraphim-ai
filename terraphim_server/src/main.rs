@@ -19,7 +19,7 @@ use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
 use terraphim_automata::load_thesaurus;
-use terraphim_config::{Config, ConfigState, ServiceType};
+use terraphim_config::{Config, ConfigState};
 use terraphim_rolegraph::RoleGraphSync;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::Settings;
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 
     // TODO: make the service type configurable
     // For now, we only support passing in the service type as an argument
-    let mut config = Config::new(ServiceType::Ripgrep);
+    let mut config = Config::new();
     let mut config_state = ConfigState::new(&mut config)
         .await
         .context("Failed to load config")?;

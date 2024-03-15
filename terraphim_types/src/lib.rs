@@ -350,7 +350,7 @@ impl Thesaurus {
     }
 
     /// Custom `get` method for the thesaurus, which accepts a
-    /// `NormalizedTermValue` or a `&str` and returns a reference to the
+    /// `NormalizedTermValue` and returns a reference to the
     /// `NormalizedTerm`.
     pub fn get(&self, key: &NormalizedTermValue) -> Option<&NormalizedTerm> {
         self.0.get(key)
