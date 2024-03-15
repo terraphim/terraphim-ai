@@ -9,7 +9,7 @@ mod tests {
 
     use reqwest::{Client, StatusCode};
     use std::net::SocketAddr;
-    use terraphim_config::{ConfigState, ServiceType, TerraphimConfig};
+    use terraphim_config::{Config, ConfigState};
     use tokio::sync::OnceCell;
 
     static SERVER: OnceCell<()> = OnceCell::const_new();
@@ -25,7 +25,7 @@ mod tests {
                 SocketAddr::from(([127, 0, 0, 1], port))
             });
 
-        let mut config = TerraphimConfig::new(ServiceType::Ripgrep);
+        let mut config = Config::new();
         let config_state = ConfigState::new(&mut config)
             .await
             .expect("Failed to create config state");
@@ -138,10 +138,12 @@ mod tests {
     /// test update config
     #[tokio::test]
     async fn test_post_config() {
+        use terraphim_config::Config;
+
         ensure_server_started().await;
-        use terraphim_config::TerraphimConfig;
+
         let response = reqwest::get("http://localhost:8000/config/").await.unwrap();
-        let orig_config: TerraphimConfig = response.json().await.unwrap();
+        let orig_config: Config = response.json().await.unwrap();
         println!("orig_config: {:?}", orig_config);
         let mut new_config = orig_config.clone();
         new_config.default_role = "system operator".to_string();

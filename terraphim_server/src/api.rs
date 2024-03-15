@@ -70,7 +70,7 @@ pub(crate) async fn search_articles(
         ))?;
     let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
     let articles = merge_and_serialize(cached_articles, docs);
-    println!("Articles: {articles:?}");
+    log::trace!("Final articles: {articles:?}");
     Ok(Json(articles))
 }
 
@@ -81,7 +81,7 @@ pub(crate) async fn search_articles_post(
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {
-    println!("Searching articles with query: {search_query:?}");
+    log::debug!("Searching articles with query: {search_query:?}");
     let search_query = search_query.deref().clone();
     let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
         .await
@@ -91,7 +91,7 @@ pub(crate) async fn search_articles_post(
         ))?;
     let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
     let articles = merge_and_serialize(cached_articles, docs);
-    println!("Articles: {articles:?}");
+    log::trace!("Final articles: {articles:?}");
     Ok(Json(articles))
 }
 

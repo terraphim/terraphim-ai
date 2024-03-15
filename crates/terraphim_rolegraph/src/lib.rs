@@ -191,7 +191,6 @@ impl RoleGraph {
                 }
             }
         }
-        log::debug!("Results Map {:#?}", results_map);
         let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
         hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
         hash_vec = hash_vec

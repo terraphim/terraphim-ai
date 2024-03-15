@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use tauri::command;
 use tauri::State;
 
-use terraphim_config::{Config, ConfigState, ServiceType};
+use terraphim_config::{Config, ConfigState};
 use terraphim_middleware::search_haystacks;
 use terraphim_types::{merge_and_serialize, Article, IndexedDocument, SearchQuery};
 
@@ -75,6 +75,7 @@ pub async fn get_config(
 }
 
 pub struct Port(u16);
+
 /// A command to get the usused port, instead of 3000.
 #[tauri::command]
 pub fn get_port(port: tauri::State<Port>) -> Result<String, String> {
@@ -88,7 +89,7 @@ use terraphim_server::axum_server;
 async fn start_server() -> Result<(), String> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let mut config = Config::new(ServiceType::Ripgrep);
+    let mut config = Config::new();
     let config_state = ConfigState::new(&mut config).await.unwrap();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = axum_server(addr, config_state).await {

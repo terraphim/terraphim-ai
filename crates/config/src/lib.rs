@@ -91,7 +91,7 @@ pub struct Haystack {
 pub struct KnowledgeGraph {
     pub automata_url: String,
     pub kg_type: KnowledgeGraphInput,
-    pub kg_path: String,
+    pub kg_path: PathBuf,
     pub public: bool,
     pub publish: bool,
 }
@@ -117,20 +117,20 @@ impl Config {
     // logseq, etc) for each role. This will allow us to support different
     // services for different roles more easily.
     // For now, we pass in the service type and use it for all roles.
-    pub fn new(service: ServiceType) -> Self {
+    pub fn new() -> Self {
         let mut roles = AHashMap::new();
 
         let kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
             kg_type: KnowledgeGraphInput::Markdown,
-            kg_path: "~/pkm".to_string(),
+            kg_path: PathBuf::from("~/pkm"),
             public: true,
             publish: true,
         };
         let haystack = Haystack {
             path: PathBuf::from("localsearch"),
-            service,
+            service: ServiceType::Ripgrep,
         };
         let default_role = Role {
             shortname: Some("Default".to_string()),
@@ -148,13 +148,13 @@ impl Config {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
             kg_type: KnowledgeGraphInput::Markdown,
-            kg_path: "~/pkm".to_string(),
+            kg_path: PathBuf::from("~/pkm"),
             public: true,
             publish: true,
         };
         let engineer_haystack = Haystack {
             path: PathBuf::from("localsearch"),
-            service,
+            service: ServiceType::Ripgrep,
         };
         let engineer_role = Role {
             shortname: Some("Engineer".to_string()),
@@ -172,13 +172,13 @@ impl Config {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
             kg_type: KnowledgeGraphInput::Markdown,
-            kg_path: "~/pkm".to_string(),
+            kg_path: PathBuf::from("~/pkm"),
             public: true,
             publish: true,
         };
         let system_operator_haystack = Haystack {
             path: PathBuf::from("/tmp/system_operator/pages/"),
-            service,
+            service: ServiceType::Ripgrep,
         };
         let system_operator_role = Role {
             shortname: Some("operator".to_string()),
@@ -214,7 +214,7 @@ impl Config {
 #[async_trait]
 impl Persistable for Config {
     fn new() -> Self {
-        Config::new(ServiceType::Ripgrep)
+        Config::new()
     }
 
     /// Save to a single profile
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     async fn test_write_config_to_json() {
-        let config = Config::new(ServiceType::Ripgrep);
+        let config = Config::new();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.json").unwrap();
@@ -341,14 +341,14 @@ mod tests {
 
     #[test]
     async fn test_get_key() {
-        let config = Config::new(ServiceType::Ripgrep);
+        let config = Config::new();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
     }
     #[tokio::test]
     async fn test_save_all() {
-        let config = Config::new(ServiceType::Ripgrep);
+        let config = Config::new();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -356,7 +356,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_save_one_s3() {
-        let config = Config::new(ServiceType::Ripgrep);
+        let config = Config::new();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -365,7 +365,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_save_one_sled() {
-        let config = Config::new(ServiceType::Ripgrep);
+        let config = Config::new();
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         println!("json_str: {}", json_str);
         println!("key: {}", config.get_key());
@@ -375,7 +375,7 @@ mod tests {
 
     #[test]
     async fn test_write_config_to_toml() {
-        let config = Config::new(ServiceType::Ripgrep);
+        let config = Config::new();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
         let mut file = File::create("test-data/config.toml").unwrap();
@@ -383,7 +383,7 @@ mod tests {
     }
     #[test]
     async fn test_init_global_config_to_toml() {
-        let mut config = Config::new(ServiceType::Ripgrep);
+        let mut config = Config::new();
         config.global_shortcut = "Ctrl+/".to_string();
         let toml_str = toml::to_string_pretty(&config).unwrap();
 
@@ -392,10 +392,10 @@ mod tests {
     }
     #[test]
     async fn test_update_global() {
-        let mut config = Config::new(ServiceType::Ripgrep);
+        let mut config = Config::new();
         config.global_shortcut = "Ctrl+/".to_string();
 
-        let mut new_config = Config::new(ServiceType::Ripgrep);
+        let mut new_config = Config::new();
         new_config.global_shortcut = "Ctrl+.".to_string();
 
         config.update(new_config);
@@ -404,8 +404,8 @@ mod tests {
     }
     #[test]
     async fn test_update_roles() {
-        let mut config = Config::new(ServiceType::Ripgrep);
-        let mut new_config = Config::new(ServiceType::Ripgrep);
+        let mut config = Config::new();
+        let mut new_config = Config::new();
         let new_role = Role {
             shortname: Some("farther".to_string()),
             name: "Farther".to_string(),
@@ -416,7 +416,7 @@ mod tests {
                 automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                     .to_string(),
                 kg_type: KnowledgeGraphInput::Markdown,
-                kg_path: "~/pkm".to_string(),
+                kg_path: PathBuf::from("~/pkm"),
                 public: true,
                 publish: true,
             },

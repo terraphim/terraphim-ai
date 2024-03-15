@@ -7,7 +7,7 @@
 //! ```
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use terraphim_automata::load_thesaurus;
-use terraphim_automata::matcher::{find_matches, replace_matches};
+use terraphim_automata::matcher::find_matches;
 use terraphim_rolegraph::input::TEST_CORPUS;
 use terraphim_rolegraph::split_paragraphs;
 use terraphim_rolegraph::RoleGraph;
@@ -75,14 +75,6 @@ fn bench_split_paragraphs(c: &mut Criterion) {
     let paragraph = "This is the first sentence.\n\n This is the second sentence. This is the second sentence? This is the second sentence| This is the second sentence!\n\nThis is the third sentence. Mr. John Johnson Jr. was born in the U.S.A but earned his Ph.D. in Israel before joining Nike Inc. as an engineer. He also worked at craigslist.org as a business analyst.";
     c.bench_function("split_paragraphs", |b| {
         b.iter(|| split_paragraphs(paragraph))
-    });
-}
-
-fn bench_replace_matches(c: &mut Criterion) {
-    let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-
-    c.bench_function("replace_matches", |b| {
-        b.iter(|| replace_matches(query, load_sample_thesaurus()).unwrap())
     });
 }
 
@@ -174,7 +166,6 @@ criterion_group!(
     bench_find_matches_ids,
     bench_find_matches,
     bench_split_paragraphs,
-    bench_replace_matches,
     bench_parse_document_to_pair,
     bench_throughput,
     bench_throughput_corpus,

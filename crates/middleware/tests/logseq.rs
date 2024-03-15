@@ -4,6 +4,7 @@ mod tests {
     use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
 
     use terraphim_middleware::Result;
+    use terraphim_types::NormalizedTermValue;
 
     #[tokio::test]
     /// Test creating a thesaurus from a Logseq haystack (Markdown files)
@@ -27,10 +28,20 @@ mod tests {
         // }
 
         assert_eq!(thesaurus.len(), 2);
-        assert_eq!(thesaurus.get("example").unwrap().value, "example bar");
+
         assert_eq!(
-            thesaurus.get("ai").unwrap().value,
-            "artificial intelligence"
+            thesaurus
+                .get(&NormalizedTermValue::new("example".to_string()))
+                .unwrap()
+                .value,
+            NormalizedTermValue::new("example bar".to_string())
+        );
+        assert_eq!(
+            thesaurus
+                .get(&NormalizedTermValue::new("ai".to_string()))
+                .unwrap()
+                .value,
+            NormalizedTermValue::new("artificial intelligence".to_string())
         );
 
         Ok(())
