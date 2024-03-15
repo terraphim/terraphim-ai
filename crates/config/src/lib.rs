@@ -413,8 +413,8 @@ mod tests {
         let mut config = Config::new();
         let mut new_config = Config::new();
         let new_role = Role {
-            shortname: Some("farther".to_string()),
-            name: "Farther".to_string(),
+            shortname: Some("father".to_string()),
+            name: "Father".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "lumen".to_string(),
             server_url: "http://localhost:8080".to_string(),
@@ -435,9 +435,11 @@ mod tests {
         new_config.roles.insert("Father".to_string(), new_role);
         config.update(new_config);
         assert!(config.roles.contains_key("Father"));
+        assert_eq!(config.roles.len(), 4);
+
+        // Test serialization
         let json_str = serde_json::to_string_pretty(&config).unwrap();
         let mut file = File::create("test-data/config_updated.json").unwrap();
         file.write_all(json_str.as_bytes()).unwrap();
-        // assert_eq!(config.roles.len(),4);
     }
 }
