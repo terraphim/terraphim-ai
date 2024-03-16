@@ -27,12 +27,50 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
+use terraphim_config::ConfigState;
+use terraphim_config::Role;
+use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
+
+pub async fn create_thesaurus_from_haystack(
+    config_state: ConfigState,
+    search_query: SearchQuery,
+) -> Result<()> {
+    let role_name = search_query.role.unwrap_or_default();
+    let role: &mut Role = &mut config_state
+        .config
+        .lock()
+        .await
+        .roles
+        .get(&role_name)
+        .ok_or_else(|| Error::RoleNotFound(role_name))?
+        .to_owned();
+    for haystack in &role.haystacks {
+        log::debug!(
+            "Building thesaurus using logseq for haystack: {:#?}",
+            haystack
+        );
+
+        let logseq = Logseq::default();
+        let thesaurus = logseq.build(&haystack.path).await?;
+
+        // Write thesaurus to local file (for now)
+        let thesaurus_path = haystack.path.join("thesaurus.json");
+
+        let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
+        tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
+        log::debug!("Thesaurus written to {:#?}", thesaurus_path);
+
+        // Put into knowledge graph of role
+        role.kg.automata_url = thesaurus_path.to_string_lossy().to_string();
+    }
+    Ok(())
+}
 
 /// A ThesaurusBuilder receives a path containing
 /// resources (e.g. files) with key-value pairs and returns a `Thesaurus`

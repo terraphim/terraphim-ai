@@ -8,7 +8,7 @@ use serde_json::Value;
 use terraphim_automata::load_thesaurus;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Article, IndexedDocument, KnowledgeGraphInput, RelevanceFunction, SearchQuery,
+    Article, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -89,9 +89,10 @@ pub struct Haystack {
 // TODO: Make the fields private once `TerraphimConfig` is more flexible
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
+    // TODO: Convert to `url::Url` type
     pub automata_url: String,
-    pub kg_type: KnowledgeGraphInput,
-    pub kg_path: PathBuf,
+    pub input_type: KnowledgeGraphInputType,
+    pub path: PathBuf,
     pub public: bool,
     pub publish: bool,
 }
@@ -121,8 +122,8 @@ impl Config {
         let kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
-            kg_type: KnowledgeGraphInput::Markdown,
-            kg_path: PathBuf::from("~/pkm"),
+            input_type: KnowledgeGraphInputType::Markdown,
+            path: PathBuf::from("~/pkm"),
             public: true,
             publish: true,
         };
@@ -145,8 +146,8 @@ impl Config {
         let engineer_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
-            kg_type: KnowledgeGraphInput::Markdown,
-            kg_path: PathBuf::from("~/pkm"),
+            input_type: KnowledgeGraphInputType::Markdown,
+            path: PathBuf::from("~/pkm"),
             public: true,
             publish: true,
         };
@@ -169,8 +170,8 @@ impl Config {
         let system_operator_kg = KnowledgeGraph {
             automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                 .to_string(),
-            kg_type: KnowledgeGraphInput::Markdown,
-            kg_path: PathBuf::from("~/pkm"),
+            input_type: KnowledgeGraphInputType::Markdown,
+            path: PathBuf::from("~/pkm"),
             public: true,
             publish: true,
         };
@@ -417,8 +418,8 @@ mod tests {
             kg: KnowledgeGraph {
                 automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
                     .to_string(),
-                kg_type: KnowledgeGraphInput::Markdown,
-                kg_path: PathBuf::from("~/pkm"),
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("~/pkm"),
                 public: true,
                 publish: true,
             },

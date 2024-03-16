@@ -49,7 +49,7 @@ pub async fn search_haystacks(
         .unwrap_or(config.default_role)
         .to_lowercase();
 
-    let role_config = config
+    let role = config
         .roles
         .get(&search_query_role)
         .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
@@ -59,7 +59,7 @@ pub async fn search_haystacks(
 
     let mut all_new_articles: Index = AHashMap::new();
 
-    for haystack in &role_config.haystacks {
+    for haystack in &role.haystacks {
         log::info!("Finding articles in haystack: {:#?}", haystack);
         let needle = &search_query.search_term;
 
