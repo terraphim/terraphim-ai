@@ -422,7 +422,7 @@ pub enum RelevanceFunction {
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum KnowledgeGraphInput {
+pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]
     Markdown,
