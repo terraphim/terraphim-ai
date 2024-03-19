@@ -10,9 +10,8 @@ mod tests {
     use reqwest::{Client, StatusCode};
     use std::{net::SocketAddr, time::Duration};
     use terraphim_config::{Config, ConfigState};
-    use tokio::sync::OnceCell;
 
-    static SERVER: OnceCell<SocketAddr> = OnceCell::const_new();
+    use serial_test::serial;
 
     async fn start_server() -> SocketAddr {
         let server_settings =
@@ -64,18 +63,19 @@ mod tests {
 
     /// Initialize the server once and use it for all tests
     async fn ensure_server_started() -> SocketAddr {
-        let server_addr = *SERVER.get_or_init(|| async { start_server().await }).await;
+        let server_addr = start_server().await;
         wait_for_server_ready(server_addr).await;
         server_addr
     }
 
     // test search article with POST method
     #[tokio::test]
+    #[serial]
     async fn test_post_search_article() {
-        ensure_server_started().await;
+        let server = ensure_server_started().await;
         let client = Client::new();
         let response = client
-            .post(format!("http://{}/articles/search", SERVER.get().unwrap()))
+            .post(format!("http://{server}/articles/search"))
             .header("Content-Type", "application/json")
             .body(
                 r#"
@@ -90,14 +90,14 @@ mod tests {
             .send()
             .await
             .unwrap();
-        println!("response: {:?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_articles() {
-        ensure_server_started().await;
-        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator", "localhost:8000");
+        let server = ensure_server_started().await;
+        let url = format!("http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator");
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
@@ -107,11 +107,12 @@ mod tests {
 
     // test search article with POST method
     #[tokio::test]
+    #[serial]
     async fn test_post_search_article_lifecycle() {
-        ensure_server_started().await;
+        let server = ensure_server_started().await;
         let client = Client::new();
         let response = client
-            .post(format!("http://{}/articles/search", SERVER.get().unwrap()))
+            .post(format!("http://{server}/articles/search"))
             .header("Content-Type", "application/json")
             .body(
                 r#"
@@ -126,14 +127,14 @@ mod tests {
             .send()
             .await
             .unwrap();
-        println!("response: {:?}", response);
         assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_articles_without_role() {
-        ensure_server_started().await;
-        let url = format!("http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10", SERVER.get().unwrap());
+        let server = ensure_server_started().await;
+        let url = format!("http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10");
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
@@ -142,26 +143,25 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_articles_without_limit() {
-        ensure_server_started().await;
+        let server = ensure_server_started().await;
         let response = reqwest::get(format!(
-            "http://{}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0",
-            SERVER.get().unwrap()
+            "http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0",
         ))
         .await
         .unwrap();
 
-        let body = response.text().await.unwrap();
-        println!("body: {:?}", body);
-        // assert_eq!(response.status(), StatusCode::OK);
-
+        assert_eq!(response.status(), StatusCode::OK);
+        // let body = response.text().await.unwrap();
         // assert!(body.contains("expected content"));
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_get_config() {
-        ensure_server_started().await;
-        let response = reqwest::get(format!("http://{}/config", SERVER.get().unwrap()))
+        let server = ensure_server_started().await;
+        let response = reqwest::get(format!("http://{server}/config"))
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -175,10 +175,10 @@ mod tests {
 
     /// test update config
     #[tokio::test]
+    #[serial]
     async fn test_post_config() {
-        ensure_server_started().await;
-
-        let config_url = format!("http://{}/config", SERVER.get().unwrap());
+        let server = ensure_server_started().await;
+        let config_url = format!("http://{server}/config");
 
         let response = reqwest::get(&config_url).await.unwrap();
         let orig_config: Config = response.json().await.unwrap();
@@ -205,10 +205,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_post_article() {
-        ensure_server_started().await;
+        let server = ensure_server_started().await;
         let client = Client::new();
-        let response = client.post(format!("http://{}/article", SERVER.get().unwrap()))
+        let response = client.post(format!("http://{server}/article"))
             .header("Content-Type", "application/json")
             .body(r#"
             {
