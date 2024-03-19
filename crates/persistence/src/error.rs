@@ -16,6 +16,9 @@ pub enum Error {
 
     #[error("Settings error: {0}")]
     Settings(#[from] terraphim_settings::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -12,18 +12,20 @@ rust-version = "1.57"
 tauri-build = { version = "1.5.0", features = [] }
 
 [dependencies]
-terraphim_config= {path="../../crates/config"}
-terraphim_middleware =  {path="../../crates/middleware" }
-terraphim_pipeline= {path="../../crates/terraphim_pipeline"}
-terraphim_server= {path = "../../terraphim_server"}
-terraphim_settings= {path="../../crates/settings"}
-terraphim_types= {path="../../terraphim_types"}
+terraphim_config = { path = "../../crates/config" }
+terraphim_middleware = { path = "../../crates/middleware" }
+terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph" }
+terraphim_server = { path = "../../terraphim_server" }
+terraphim_settings = { path = "../../crates/settings" }
+terraphim_types = { path = "../../terraphim_types" }
 
 anyhow = "1.0.78"
-portpicker= {version = "*"}
+log = "0.4.0"
+portpicker = { version = "*" }
 serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.5.2", features = ["api-all", "cli", "system-tray"] }
 tokio = { version = "1.35.1", features = ["full"] }
+thiserror = "1.0.58"
 
 [features]
 # by default Tauri runs in production mode

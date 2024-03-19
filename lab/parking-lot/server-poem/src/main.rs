@@ -17,7 +17,7 @@
 use anyhow::{Context, Result};
 use poem::{listener::TcpListener, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
-use terraphim_pipeline::RoleGraph;
+use terraphim_rolegraph::RoleGraph;
 use tokio::sync::Mutex;
 
 mod api;

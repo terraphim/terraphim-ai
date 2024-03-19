@@ -1,5 +1,5 @@
 use persistence::Persistable;
-use terraphim_config::{Result, ServiceType, TerraphimConfig, TerraphimConfigError};
+use terraphim_config::{Config, Result, TerraphimConfigError};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -8,7 +8,7 @@ async fn main() -> Result<()> {
         .try_init()
         .map_err(|e| TerraphimConfigError::TracingSubscriber(e));
 
-    let config = TerraphimConfig::new(ServiceType::Logseq);
+    let config = Config::new();
     let json_str = serde_json::to_string_pretty(&config)?;
     println!("json_str: {:?}", json_str);
 
@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     let (_ops, fastest_op) = config.load_config().await?;
     println!("fastest_op: {:?}", fastest_op.info());
 
-    let mut obj1 = TerraphimConfig::new(ServiceType::Ripgrep);
+    let mut obj1 = Config::new();
     let key = config.get_key();
     // println!("key: {}", key);
     obj1 = obj1.load(&key).await?;

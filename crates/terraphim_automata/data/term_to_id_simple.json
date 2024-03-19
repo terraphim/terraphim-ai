@@ -1,0 +1,14 @@
+{
+  "foo": {
+    "id": 1,
+    "nterm": "foo"
+  },
+  "bar": {
+    "id": 2,
+    "nterm": "bar"
+  },
+  "baz": {
+    "id": 1,
+    "nterm": "foo"
+  }
+}

@@ -17,6 +17,11 @@ pub enum Error {
 // which gets used by the `#[config]` macro below.
 pub type SettingsResult<T> = std::result::Result<T, Error>;
 
+/// Configuration settings for the device or server.
+///
+/// These values are set when the server initializes, and do not change while
+/// running. These are constructed from default or local files and ENV
+/// variables.
 #[config]
 #[derive(Debug)]
 pub struct Settings {
@@ -31,7 +36,7 @@ pub struct Settings {
 impl Settings {
     /// Load settings from environment and file
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
-        println!("Loading settings...");
+        log::info!("Loading device settings...");
         let config_path = match config_path {
             Some(path) => path,
             None => {
@@ -43,8 +48,9 @@ impl Settings {
                 }
             }
         };
+        log::debug!("Using config path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
-        println!("Using config_file: {:?}", config_file);
+        log::info!("Using config_file: {:?}", config_file);
 
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),

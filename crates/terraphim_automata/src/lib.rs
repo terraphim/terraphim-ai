@@ -1,6 +1,6 @@
 pub mod matcher;
 
-pub use matcher::{find_matches, replace_matches, Matched};
+pub use matcher::{find_matches, Matched};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -27,7 +27,15 @@ pub enum TerraphimAutomataError {
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
-pub async fn load_automata(url_or_file: &str) -> Result<Thesaurus> {
+/// `load_automata` loads output of the knowledge graph builder
+// pub async fn load_automata(url_or_file: &str) -> Result<matcher::Automata> {
+//     let thesaurus = load_thesaurus(url_or_file).await?;
+//     let automata = Automata::new(thesaurus);
+//     Ok(automata)
+// }
+
+/// Load a thesaurus from a file or URL
+pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
     async fn read_url(url: &str) -> Result<String> {
         let response = reqwest::Client::new()
             .get(url)
@@ -54,37 +62,41 @@ pub async fn load_automata(url_or_file: &str) -> Result<Thesaurus> {
 
 #[cfg(test)]
 mod tests {
+    use terraphim_types::{Id, NormalizedTermValue};
+
     use super::*;
 
     #[tokio::test]
-    async fn test_load_automata_from_file() {
-        let thesaurus = load_automata("tests/test_data.csv.gz").await.unwrap();
+    async fn test_load_thesaurus_from_file() {
+        let thesaurus = load_thesaurus("data/term_to_id_simple.json").await.unwrap();
         assert_eq!(thesaurus.len(), 3);
-        assert_eq!(thesaurus.get("foo").unwrap().id, 1);
-        assert_eq!(thesaurus.get("bar").unwrap().id, 2);
-        assert_eq!(thesaurus.get("baz").unwrap().id, 3);
-
-        // TODO: No `parent` field in type `NormalizedTerm`
-        // assert_eq!(thesaurus.get("foo").unwrap().parent, None);
-        // assert_eq!(thesaurus.get("bar").unwrap().parent, Some("1".to_string()));
-        // assert_eq!(thesaurus.get("baz").unwrap().parent, Some("2".to_string()));
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
+            Id::from(1)
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
+            Id::from(2)
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
+            Id::from(1)
+        );
     }
 
     #[tokio::test]
-    async fn test_load_automata_from_url() {
-        let thesaurus = load_automata(
-            "https://raw.githubusercontent.com/github/copilot-sample-code/main/test_data.csv.gz",
-        )
-        .await
-        .unwrap();
-        assert_eq!(thesaurus.len(), 3);
-        assert_eq!(thesaurus.get("foo").unwrap().id, 1);
-        assert_eq!(thesaurus.get("bar").unwrap().id, 2);
-        assert_eq!(thesaurus.get("baz").unwrap().id, 3);
-
-        // TODO: No `parent` field in type `NormalizedTerm`
-        // assert_eq!(thesaurus.get("foo").unwrap().parent, None);
-        // assert_eq!(thesaurus.get("bar").unwrap().parent, Some("1".to_string()));
-        // assert_eq!(thesaurus.get("baz").unwrap().parent, Some("2".to_string()));
+    async fn test_load_thesaurus_from_url() {
+        let thesaurus =
+            load_thesaurus("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
+                .await
+                .unwrap();
+        assert_eq!(thesaurus.len(), 1725);
+        assert_eq!(
+            thesaurus
+                .get(&NormalizedTermValue::from("@risk a user guide"))
+                .unwrap()
+                .id,
+            Id::from(661)
+        );
     }
 }

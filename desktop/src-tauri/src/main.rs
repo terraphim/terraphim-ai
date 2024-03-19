@@ -11,22 +11,22 @@ use tauri::{
     SystemTrayMenu,
 };
 
-use terraphim_config::{ServiceType, TerraphimConfig};
+use terraphim_config::{Config, ConfigState};
 use terraphim_settings::Settings;
-use terraphim_types::ConfigState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let device_settings = Settings::load_from_env_and_file(None);
+    // TODO: Use the device settings to load the config
+    let _device_settings = Settings::load_from_env_and_file(None);
 
-    let mut config = TerraphimConfig::new(ServiceType::Logseq);
+    let mut config = Config::new();
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let globbal_shortcut = current_config.global_shortcut.clone();
     // drop mutex guard to avoid deadlock
     drop(current_config);
 
-    println!("{:?}", config_state.config);
+    log::debug!("{:?}", config_state.config);
     let context = tauri::generate_context!();
 
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");

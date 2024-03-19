@@ -7,7 +7,7 @@ use ulid::Ulid;
 use crate::types::{ApiTags, Article, SearchQuery};
 use anyhow::{Context, Result};
 use poem_openapi::{types::ToJSON, types::Type, NewType, Object};
-use terraphim_pipeline::{Document, IndexedDocument, RoleGraph};
+use terraphim_types::{Document, IndexedDocument, RoleGraph};
 use tokio::sync::Mutex;
 
 // This would be the correct approach, however
@@ -136,7 +136,7 @@ impl Api {
 // #[cfg(test)]
 // mod test {
 //     use super::*;
-//     use terraphim_pipeline::{Document, IndexedDocument, RoleGraph};
+//     use terraphim_rolegraph::{Document, IndexedDocument, RoleGraph};
 
 //     #[test]
 //     fn test_serialization() {
