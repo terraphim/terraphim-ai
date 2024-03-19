@@ -119,13 +119,8 @@ pub async fn update_config(
     State(config): State<ConfigState>,
     Json(config_new): Json<Config>,
 ) -> Result<Json<Config>> {
-    println!("Updating config: {config_new:?}");
-    // let config = TerraphimConfig::new();
     let mut config_state = config.config.lock().await;
-    println!("Lock acquired");
     config_state.update(config_new.clone());
     config_state.save().await.context("Failed to save config")?;
-    println!("Config updated");
-    println!("Config: {config_state:?}");
     Ok(Json(config_state.clone()))
 }

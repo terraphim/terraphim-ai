@@ -42,13 +42,14 @@ pub async fn create_thesaurus_from_haystack(
     search_query: SearchQuery,
 ) -> Result<()> {
     let role_name = search_query.role.unwrap_or_default();
-    let role: &mut Role = &mut config_state
-        .config
-        .lock()
-        .await
-        .roles
+
+    let config = config_state.config.lock().await;
+    let roles = config.roles.clone();
+    let default_role = config.default_role.clone();
+
+    let role: &mut Role = &mut roles
         .get(&role_name)
-        .ok_or_else(|| Error::RoleNotFound(role_name))?
+        .unwrap_or(&config.roles[&default_role])
         .to_owned();
     for haystack in &role.haystacks {
         log::debug!(

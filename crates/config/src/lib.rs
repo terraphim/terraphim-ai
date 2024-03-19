@@ -199,7 +199,7 @@ impl Config {
             // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles,
-            default_role: "Default".to_string(),
+            default_role: "default".to_string(),
         }
     }
 
