@@ -224,11 +224,11 @@ fn index_inner(messages: Vec<Message>) -> Thesaurus {
                 let concept = match concept_from_path(path) {
                     Ok(concept) => concept,
                     Err(e) => {
-                        println!("Error: Failed to get concept from path: {:?}. Skipping", e);
+                        log::info!("Failed to get concept from path: {:?}. Skipping", e);
                         continue;
                     }
                 };
-                println!("Found concept: {concept}");
+                log::trace!("Found concept: {concept}");
                 current_concept = Some(concept);
             }
             Message::Match(message) => {
