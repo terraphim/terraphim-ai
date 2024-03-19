@@ -1,25 +1,22 @@
-//! Benchmarks for testing the throughput of the pipeline.
+//! Benchmarks for testing the throughput of the rolegraph.
 //!
 //! To run a single benchmark use:
 //!
 //! ```sh
-//! cargo bench --bench pipeline_benchmark -- query
+//! cargo bench --bench throughput -- query
 //! ```
-use ahash::AHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use terraphim_automata::load_automata;
-use terraphim_automata::matcher::{find_matches, replace_matches, NormalizedTerm};
-use terraphim_pipeline::input::TEST_CORPUS;
-use terraphim_pipeline::split_paragraphs;
-use terraphim_pipeline::RoleGraph;
+use terraphim_automata::load_thesaurus;
+use terraphim_automata::matcher::find_matches;
+use terraphim_rolegraph::input::TEST_CORPUS;
+use terraphim_rolegraph::split_paragraphs;
+use terraphim_rolegraph::RoleGraph;
+use terraphim_types::Thesaurus;
 
-lazy_static! {
-    static ref AUTOMATA: Thesaurus = {
-        let thesaurus =
-            load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap();
-        thesaurus
-    };
+use tokio::runtime::Runtime;
+
+lazy_static::lazy_static! {
+    static ref TOKIO_RUNTIME: Runtime = Runtime::new().unwrap();
 }
 
 // We can use this `block_on` function to run async code in the benchmarks
@@ -32,42 +29,45 @@ where
     TOKIO_RUNTIME.block_on(future)
 }
 
-// Load automata for the benchmarks
-async fn get_automata() -> AHashMap<String, Dictionary> {
-    load_automata("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-        .await
-        .unwrap()
-}
-
 // Create a sample rolegraph for the benchmarks
 async fn get_rolegraph() -> RoleGraph {
     let role = "system operator".to_string();
-    let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-    let rolegraph = RoleGraph::new(role, automata_url).await;
+    let thesaurus =
+        load_thesaurus("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
+            .await
+            .unwrap();
+    let rolegraph = RoleGraph::new(role, thesaurus).await;
     rolegraph.unwrap()
+}
+
+/// Loads a sample thesaurus
+fn load_sample_thesaurus() -> Thesaurus {
+    let thesaurus = block_on(load_thesaurus(
+        "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+    ));
+    thesaurus.unwrap()
 }
 
 fn bench_find_matches_ids(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let rolegraph = block_on(get_rolegraph());
 
-    c.bench_function_over_inputs(
-        "find_matches_ids",
-        move |b, &&size| {
-            let query = query.repeat(size);
-
-            b.iter(|| rolegraph.find_matches_ids(&query))
-        },
-        &[1, 10, 100, 1000],
-    );
+    let sizes = &[1, 10, 100, 1000];
+    for size in sizes {
+        let input = query.repeat(*size);
+        c.benchmark_group("find_matches_ids").bench_with_input(
+            BenchmarkId::new("find_matches_ids", size),
+            size,
+            |b, _| b.iter(|| rolegraph.find_matches_ids(&input)),
+        );
+    }
 }
 
 fn bench_find_matches(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-    let automata = block_on(get_automata());
 
     c.bench_function("find_matches", |b| {
-        b.iter(|| find_matches(query, automata.clone(), false))
+        b.iter(|| find_matches(query, load_sample_thesaurus(), false))
     });
 }
 
@@ -78,21 +78,12 @@ fn bench_split_paragraphs(c: &mut Criterion) {
     });
 }
 
-fn bench_replace_matches(c: &mut Criterion) {
-    let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-    let automata = block_on(get_automata());
-
-    c.bench_function("replace_matches", |b| {
-        b.iter(|| replace_matches(query, automata.clone()).unwrap())
-    });
-}
-
 fn bench_parse_document_to_pair(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
     let mut rolegraph = block_on(get_rolegraph());
     c.bench_function("parse_document_to_pair", |b| {
-        b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), query))
+        b.iter(|| rolegraph.parse_document_to_pair(&article_id4, query))
     });
 }
 
@@ -112,7 +103,7 @@ fn bench_throughput(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("parse_document_to_pair", size),
             size,
-            |b, _| b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), &input)),
+            |b, _| b.iter(|| rolegraph.parse_document_to_pair(&article_id4, &input)),
         );
     }
     group.finish();
@@ -135,7 +126,7 @@ fn bench_throughput_corpus(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("parse_document_to_pair", size),
             &input,
-            |b, input| b.iter(|| rolegraph.parse_document_to_pair(article_id4.clone(), &input)),
+            |b, input| b.iter(|| rolegraph.parse_document_to_pair(&article_id4, &input)),
         );
     }
     group.finish();
@@ -146,7 +137,7 @@ fn bench_query_throughput(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
     let mut rolegraph = block_on(get_rolegraph());
-    rolegraph.parse_document_to_pair(article_id4.clone(), query);
+    rolegraph.parse_document_to_pair(&article_id4, query);
     let query_term = "Life cycle concepts and project direction".to_string();
 
     for size in &[1, 10, 100, 1000] {
@@ -163,7 +154,7 @@ fn bench_query(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let article_id4 = "ArticleID4".to_string();
     let mut rolegraph = block_on(get_rolegraph());
-    rolegraph.parse_document_to_pair(article_id4.clone(), query);
+    rolegraph.parse_document_to_pair(&article_id4, query);
     let query_term = "Life cycle concepts and project direction".to_string();
     c.bench_function("query_response", |b| {
         b.iter(|| rolegraph.query(&query_term, None, None))
@@ -175,7 +166,6 @@ criterion_group!(
     bench_find_matches_ids,
     bench_find_matches,
     bench_split_paragraphs,
-    bench_replace_matches,
     bench_parse_document_to_pair,
     bench_throughput,
     bench_throughput_corpus,

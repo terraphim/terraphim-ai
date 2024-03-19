@@ -7,8 +7,10 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 /// Configuration settings for the device or server.
-/// These values are set when the server initializes, and do not change while running.
-/// These are constructed from default or local files and ENV variables.
+///
+/// These values are set when the server initializes, and do not change while
+/// running. These are constructed from default or local files and ENV
+/// variables.
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct Settings {
     /// The address to listen on
@@ -17,6 +19,7 @@ pub struct Settings {
     pub api_endpoint: Option<String>,
     pub profiles: AHashMap<String, AHashMap<String, String>>,
 }
+
 impl Settings {
     pub fn new(config_path: Option<PathBuf>) -> Result<Self, ConfigError> {
         let config_file = match config_path {

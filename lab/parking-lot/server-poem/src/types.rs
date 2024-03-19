@@ -1,7 +1,7 @@
 use poem_openapi::types::ToJSON;
 use poem_openapi::{Object, Tags};
 use serde::{Deserialize, Serialize};
-use terraphim_pipeline::{Document, IndexedDocument};
+use terraphim_types::{Document, IndexedDocument};
 
 #[derive(Debug, Object)]
 pub struct SearchQuery {

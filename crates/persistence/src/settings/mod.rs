@@ -156,6 +156,7 @@ pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(O
     let speed = get_speed(op.clone()).await?;
     Ok((op, speed))
 }
+
 pub async fn parse_profiles(settings: &Settings) -> Result<HashMap<String, (Operator, u128)>> {
     let mut ops = HashMap::new();
     let profile_names = settings.profiles.keys();
@@ -204,34 +205,43 @@ mod tests {
 
     #[test]
     fn test_load_from_toml() -> Result<()> {
-        let dir = tempfile::tempdir().unwrap();
-        let tmpfile = dir.path().join("oli1.toml");
+        let dir = tempfile::tempdir()?;
+        let tmpfile = dir.path().join("settings.toml");
         fs::write(
             &tmpfile,
             r#"
-[profiles.mys3]
-type = "s3"
-region = "us-east-1"
-access_key_id = "foo"
-enable_virtual_host_style = "on"
-"#,
-        )
-        .unwrap();
-        let cfg = Settings::load_from_env_and_file(Some(tmpfile))?;
-        let profile = cfg.profiles["mys3"].clone();
-        assert_eq!(profile["region"], "us-east-1");
-        assert_eq!(profile["access_key_id"], "foo");
-        assert_eq!(profile["enable_virtual_host_style"], "on");
+    server_hostname = "127.0.0.1:8000"
+    api_endpoint = "127.0.0.1:8000/api"
+
+    [profiles.mys3]
+    type = "s3"
+    region = "us-east-1"
+    access_key_id = "foo"
+    enable_virtual_host_style = "on"
+    "#,
+        )?;
+        let settings = Settings::load_from_env_and_file(Some(dir.into_path()))?;
+        let profile = settings
+            .profiles
+            .get("mys3")
+            .expect("Profile mys3 not found");
+        assert_eq!(profile.get("region").unwrap(), "us-east-1");
+        assert_eq!(profile.get("access_key_id").unwrap(), "foo");
+        assert_eq!(profile.get("enable_virtual_host_style").unwrap(), "on");
         Ok(())
     }
 
+    // TODO: This test is currently failing. I don't know exactly why
     #[test]
     fn test_load_config_from_file_and_env() -> Result<()> {
         let dir = tempfile::tempdir().unwrap();
-        let tmpfile = dir.path().join("oli2.toml");
+        let tmpfile = dir.path().join("settings.toml");
         fs::write(
             &tmpfile,
             r#"
+    server_hostname = "127.0.0.1:8000"
+    api_endpoint = "127.0.0.1:8000/api"
+
     [profiles.mys3]
     type = "s3"
     region = "us-east-1"
@@ -246,12 +256,12 @@ enable_virtual_host_style = "on"
         for (k, v) in &env_vars {
             env::set_var(k, v);
         }
-        let settings = Settings::load_from_env_and_file(Some(tmpfile))?;
+        let settings = Settings::load_from_env_and_file(Some(dir.into_path()))?;
 
-        let profile = settings.profiles["mys3"].clone();
-        assert_eq!(profile["region"], "us-west-1");
-        assert_eq!(profile["access_key_id"], "foo");
-        assert_eq!(profile["enable_virtual_host_style"], "on");
+        let mys3 = settings.profiles["mys3"].clone();
+        assert_eq!(mys3["region"], "us-west-1");
+        assert_eq!(mys3["access_key_id"], "foo");
+        assert_eq!(mys3["enable_virtual_host_style"], "on");
 
         for (k, _) in &env_vars {
             env::remove_var(k);

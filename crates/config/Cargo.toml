@@ -9,8 +9,9 @@ path = "src/bin/main.rs"
 name = "terraphim-config"
 
 [dependencies]
-terraphim_pipeline = { path = "../terraphim_pipeline" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_types = { path = "../../terraphim_types" }
+terraphim_automata = { path = "../terraphim_automata" }
 
 opendal = { version = "0.44.2", features = [
   "services-dashmap",
