@@ -8,8 +8,9 @@ mod tests {
     use terraphim_settings::Settings;
 
     use reqwest::{Client, StatusCode};
-    use std::{net::SocketAddr, time::Duration};
-    use terraphim_config::{Config, ConfigState};
+    use std::{net::SocketAddr, path::PathBuf, time::Duration};
+    use terraphim_config::{Config, ConfigState, Haystack, ServiceType};
+    use terraphim_types::Article;
 
     use serial_test::serial;
 
@@ -134,27 +135,121 @@ mod tests {
     #[serial]
     async fn test_search_articles_without_role() {
         let server = ensure_server_started().await;
+
+        // Overwrite config for test
+        let config_url = format!("http://{server}/config");
+        let response = reqwest::get(&config_url).await.unwrap();
+        let mut config: Config = response.json().await.unwrap();
+        // For each role, overwrite the haystack path to "test_dir"
+        for role in config.roles.values_mut() {
+            role.haystacks = vec![Haystack {
+                path: PathBuf::from("fixtures/haystack"),
+                service: ServiceType::Ripgrep,
+            }]
+        }
+
+        let client = Client::new();
+        let response = client
+            .post(&config_url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .body(serde_json::to_string(&config).unwrap())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
         let url = format!("http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10");
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
-        // let body = response.text().await.unwrap();
-        // assert!(body.contains("expected content"));
+        // The response body should be of this form:
+        // [
+        //     {
+        //         "id": "981a5fdaa157cec9",
+        //         "stub": null,
+        //         "title": "fixtures/haystack/Transition.md",
+        //         "url": "fixtures/haystack/Transition.md",
+        //         "body": "Trained operators and maintainers",
+        //         "tags": [
+        //             "trained operators and maintainers"
+        //         ],
+        //         "rank": 10
+        //     }
+        // ]
+        let articles: Vec<Article> = response.json().await.unwrap();
+        let first_article = &articles[0];
+        assert_eq!(first_article.title, "fixtures/haystack/Transition.md");
+        assert_eq!(first_article.url, "fixtures/haystack/Transition.md");
+        assert!(first_article
+            .body
+            .contains("Trained operators and maintainers"));
+        assert_eq!(
+            first_article.tags,
+            Some(vec!["trained operators and maintainers".to_string()])
+        );
     }
 
     #[tokio::test]
     #[serial]
     async fn test_search_articles_without_limit() {
         let server = ensure_server_started().await;
+
+        // Overwrite config for test
+        let config_url = format!("http://{server}/config");
+        let response = reqwest::get(&config_url).await.unwrap();
+        let mut config: Config = response.json().await.unwrap();
+        // For each role, overwrite the haystack path to "test_dir"
+        for role in config.roles.values_mut() {
+            role.haystacks = vec![Haystack {
+                path: PathBuf::from("fixtures/haystack"),
+                service: ServiceType::Ripgrep,
+            }]
+        }
+
+        let client = Client::new();
+        let response = client
+            .post(&config_url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .body(serde_json::to_string(&config).unwrap())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
         let response = reqwest::get(format!(
             "http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0",
         ))
         .await
         .unwrap();
-
         assert_eq!(response.status(), StatusCode::OK);
-        // let body = response.text().await.unwrap();
-        // assert!(body.contains("expected content"));
+
+        // The response body should be of this form:
+        // [
+        //     {
+        //         "id": "981a5fdaa157cec9",
+        //         "stub": null,
+        //         "title": "fixtures/haystack/Transition.md",
+        //         "url": "fixtures/haystack/Transition.md",
+        //         "body": "Trained operators and maintainers",
+        //         "tags": [
+        //             "trained operators and maintainers"
+        //         ],
+        //         "rank": 10
+        //     }
+        // ]
+        let articles: Vec<Article> = response.json().await.unwrap();
+        let first_article = &articles[0];
+        assert_eq!(first_article.title, "fixtures/haystack/Transition.md");
+        assert_eq!(first_article.url, "fixtures/haystack/Transition.md");
+        assert!(first_article
+            .body
+            .contains("Trained operators and maintainers"));
+        assert_eq!(
+            first_article.tags,
+            Some(vec!["trained operators and maintainers".to_string()])
+        );
     }
 
     #[tokio::test]
