@@ -8,17 +8,27 @@
   import {Agent} from '@tomic/lib';
   import { JSONEditor } from 'svelte-jsoneditor';
   import { CONFIG } from '../../config';
-  import {configStore} from '$lib/stores';
+  import { invoke } from '@tauri-apps/api/tauri';
+  import {configStore, is_tauri} from '$lib/stores';
   let content = {
     // text: JSON.stringify($configStore, null, 2),
     json: $configStore,
   };
   function handleChange(updatedContent) {
     console.log('contents changed:', updatedContent);
+    console.log("is tauri", $is_tauri);
     configStore.update(config => {
       config = updatedContent.json;
       return config;
     });
+    if (is_tauri){
+      console.log("Updating config on server");
+            invoke('update_config', { configNew: updatedContent.json })
+              .then((res) => {
+                    console.log(`Message: ${res}`);
+                })
+              .catch((e) => console.error(e));
+    }else{
     // post to server using /api/config 
     let configURL = `${CONFIG.ServerURL}/config/`;
     fetch(configURL, {
@@ -28,6 +38,7 @@
       },
       body: JSON.stringify(updatedContent.json),
     });
+  }
     content = updatedContent;
     content
   }
