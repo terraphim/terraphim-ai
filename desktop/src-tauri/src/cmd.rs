@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde::Serializer;
 use tauri::command;
 use tauri::State;
+use anyhow::Context;
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_middleware::search_haystacks;
@@ -42,26 +43,7 @@ impl Serialize for TerraphimTauriError {
 
 pub type Result<T> = anyhow::Result<T, TerraphimTauriError>;
 
-#[command]
-pub fn log_operation(event: String, payload: Option<String>) {
-    println!("{} {:?}", event, payload);
-}
 
-#[command]
-pub fn perform_request(endpoint: String, body: RequestBody) -> String {
-    println!("{} {:?}", endpoint, body);
-    "message response".into()
-}
-
-#[command]
-pub async fn my_custom_command(value: &str) -> Result<String> {
-    // Call another async function and wait for it to finish
-    // some_async_function().await;
-    // Note that the return value must be wrapped in `Ok()` now.
-    println!("my_custom_command called with {}", value);
-
-    Ok(format!("{}", value))
-}
 
 /// Search All TerraphimGraphs defined in a config by query param
 #[command]
@@ -94,19 +76,34 @@ pub async fn get_config(
     Ok(current_config.clone())
 }
 
+use persistence::Persistable;
+
+#[command]
+pub async fn update_config(
+    config_state: tauri::State<'_, ConfigState>,
+    config_new: Config,
+) -> Result<terraphim_config::Config> {
+    println!("Update config called with {:?}", config_new);
+    let mut config_state = config_state.config.lock().await;
+    config_state.update(config_new.clone());
+    // FIXME: add tauri error TerraphimTauriError and use context
+    let _= config_state.save().await;
+    Ok(config_state.clone())
+}
 pub struct Port(u16);
 
 /// A command to get the unused port instead of 3000.
 #[tauri::command]
-pub fn get_port(port: tauri::State<Port>) -> Result<String> {
+pub fn _get_port(port: tauri::State<Port>) -> Result<String> {
     Ok(format!("{}", port.0))
 }
 
 use std::net::SocketAddr;
 use terraphim_server::axum_server;
 
+/// Start the server, currently not in use, but will be important for OAuth etc in the future.
 #[tauri::command]
-async fn start_server() -> Result<()> {
+async fn _start_server() -> Result<()> {
     let port = portpicker::pick_unused_port().expect("failed to find unused port");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let mut config = Config::new();
