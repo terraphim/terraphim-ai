@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut config = Config::new();
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
-    let globbal_shortcut = current_config.global_shortcut.clone();
+    let global_shortcut = current_config.global_shortcut.clone();
     // drop mutex guard to avoid deadlock
     drop(current_config);
 
@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             window.hide().unwrap();
             app_handle
                 .global_shortcut_manager()
-                .register(&globbal_shortcut, move || {
+                .register(&global_shortcut, move || {
                     if window.is_visible().unwrap() {
                         window.hide().unwrap();
                     } else {
