@@ -67,11 +67,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .manage(config_state.clone())
         .invoke_handler(tauri::generate_handler![
-            cmd::my_custom_command,
             cmd::search,
             cmd::get_config,
-            cmd::log_operation,
-            cmd::perform_request,
+            cmd::update_config
         ])
         .build(context)
         .expect("error while running tauri application");
