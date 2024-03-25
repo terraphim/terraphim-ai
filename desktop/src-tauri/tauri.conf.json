@@ -88,7 +88,9 @@
       "active": false
     },
     "allowlist": {
-      "all": true
+      "globalShortcut": {
+        "all": true
+      }
     },
     "windows": [
       {
