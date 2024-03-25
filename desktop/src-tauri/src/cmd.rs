@@ -7,7 +7,8 @@ use serde::Serialize;
 use serde::Serializer;
 use tauri::command;
 use tauri::State;
-use anyhow::Context;
+// TODO: reenable
+// use anyhow::Context;
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_middleware::search_haystacks;
@@ -90,28 +91,28 @@ pub async fn update_config(
     let _= config_state.save().await;
     Ok(config_state.clone())
 }
-pub struct Port(u16);
+// pub struct Port(u16);
 
-/// A command to get the unused port instead of 3000.
-#[tauri::command]
-pub fn _get_port(port: tauri::State<Port>) -> Result<String> {
-    Ok(format!("{}", port.0))
-}
+// /// A command to get the unused port instead of 3000.
+// #[tauri::command]
+// pub fn _get_port(port: tauri::State<Port>) -> Result<String> {
+//     Ok(format!("{}", port.0))
+// }
 
-use std::net::SocketAddr;
-use terraphim_server::axum_server;
+// use std::net::SocketAddr;
+// use terraphim_server::axum_server;
 
-/// Start the server, currently not in use, but will be important for OAuth etc in the future.
-#[tauri::command]
-async fn _start_server() -> Result<()> {
-    let port = portpicker::pick_unused_port().expect("failed to find unused port");
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let mut config = Config::new();
-    let config_state = ConfigState::new(&mut config).await.unwrap();
-    tauri::async_runtime::spawn(async move {
-        if let Err(e) = axum_server(addr, config_state).await {
-            println!("Failed to start axum server: {e:?}");
-        }
-    });
-    Ok(())
-}
+// /// Start the server, currently not in use, but will be important for OAuth etc in the future.
+// #[tauri::command]
+// async fn _start_server() -> Result<()> {
+//     let port = portpicker::pick_unused_port().expect("failed to find unused port");
+//     let addr = SocketAddr::from(([127, 0, 0, 1], port));
+//     let mut config = Config::new();
+//     let config_state = ConfigState::new(&mut config).await.unwrap();
+//     tauri::async_runtime::spawn(async move {
+//         if let Err(e) = axum_server(addr, config_state).await {
+//             println!("Failed to start axum server: {e:?}");
+//         }
+//     });
+//     Ok(())
+// }
