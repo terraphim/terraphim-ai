@@ -2,16 +2,19 @@
   import { Modal } from 'svelma';
 
   import type { SearchResult } from './SearchResult';
-
+  import SvelteMarkdown from 'svelte-markdown';
   export let active: boolean = false;
   export let item: SearchResult;
+  export let content = item.body;
 </script>
 
 <Modal bind:active>
   <div class="box wrapper">
     <article class="card-content content">
       <h2>{item.title}</h2>
-      {@html item.body}
+      <!-- {@html item.body} -->
+
+      <SvelteMarkdown source={content} />
     </article>
   </div>
 </Modal>
