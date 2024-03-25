@@ -5,12 +5,15 @@
   import type { SearchResult } from './SearchResult';
   import configStore from '../ThemeSwitcher.svelte';
   import { role, is_tauri, serverUrl } from '../stores';
+  
+
   export let item: SearchResult;
   let showModal = false;
-
+  
   const onTitleClick = () => {
     showModal = true;
   };
+  
   
   if (configStore[$role]!== undefined){
     console.log("Have attribute",configStore[$role]);
