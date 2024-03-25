@@ -7,8 +7,6 @@ use serde::Serialize;
 use serde::Serializer;
 use tauri::command;
 use tauri::State;
-// TODO: reenable
-// use anyhow::Context;
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_middleware::search_haystacks;
@@ -43,8 +41,6 @@ impl Serialize for TerraphimTauriError {
 }
 
 pub type Result<T> = anyhow::Result<T, TerraphimTauriError>;
-
-
 
 /// Search All TerraphimGraphs defined in a config by query param
 #[command]
@@ -88,7 +84,7 @@ pub async fn update_config(
     let mut config_state = config_state.config.lock().await;
     config_state.update(config_new.clone());
     // FIXME: add tauri error TerraphimTauriError and use context
-    let _= config_state.save().await;
+    let _ = config_state.save().await;
     Ok(config_state.clone())
 }
 // pub struct Port(u16);
