@@ -1,19 +1,18 @@
-use anyhow::Context;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
     Extension, Json,
 };
-use std::ops::Deref;
 use std::sync::Arc;
-use terraphim_config::Config;
-use terraphim_config::ConfigState;
-use terraphim_middleware::{search_haystacks, thesaurus::create_thesaurus_from_haystack};
-use terraphim_rolegraph::RoleGraph;
-use terraphim_types::{merge_and_serialize, Article, IndexedDocument, SearchQuery};
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
+
+use service::TerraphimService;
+use terraphim_config::Config;
+use terraphim_config::ConfigState;
+use terraphim_rolegraph::RoleGraph;
+use terraphim_types::{Article, IndexedDocument, SearchQuery};
 
 use crate::error::Result;
 
@@ -25,15 +24,16 @@ pub(crate) async fn health_axum() -> impl IntoResponse {
 }
 /// Creates index of the article for each rolegraph
 pub(crate) async fn create_article(
-    State(mut config): State<ConfigState>,
+    State(config): State<ConfigState>,
     Json(article): Json<Article>,
 ) -> impl IntoResponse {
-    log::warn!("create_article");
-    config
-        .index_article(&article)
+    log::info!("create_article");
+    let mut terraphim_service = TerraphimService::new(config.clone());
+    let article = terraphim_service
+        .create_article(article)
         .await
-        .expect("Failed to index article");
-    log::warn!("send response");
+        .expect("Failed to create article");
+    log::info!("send response");
     let response = Json(article);
     (StatusCode::CREATED, response)
 }
@@ -54,28 +54,14 @@ pub(crate) async fn search_articles(
     State(config_state): State<ConfigState>,
     search_query: Query<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {
-    println!("GET Searching articles with query: {search_query:?}");
-    let search_query = search_query.deref().clone();
-    // Return on empty search term
-    if search_query.search_term.is_empty() {
-        log::debug!("Empty search term. Returning early");
-        return Ok(Json(vec![]));
-    }
+    log::info!("Search called with {:?}", search_query);
+    let terraphim_service = TerraphimService::new(config_state);
+    terraphim_service
+        .create_thesaurus(search_query.0.clone())
+        .await?;
 
-    // Build thesaurus and update knowledge graph automata_url
-    log::debug!("Creating thesaurus from haystack");
-    create_thesaurus_from_haystack(config_state.clone(), search_query.clone()).await?;
-    log::debug!("Thesaurus created");
+    let articles = terraphim_service.search_articles(search_query.0).await?;
 
-    let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
-        .await
-        .context(format!(
-            "Failed to query haystack for `{}`",
-            search_query.search_term
-        ))?;
-    let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
-    let articles = merge_and_serialize(cached_articles, docs);
-    log::trace!("Final articles: {articles:?}");
     Ok(Json(articles))
 }
 
@@ -87,40 +73,37 @@ pub(crate) async fn search_articles_post(
     search_query: Json<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {
     log::debug!("POST Searching articles with query: {search_query:?}");
-    let search_query = search_query.deref().clone();
+
+    let terraphim_service = TerraphimService::new(config_state);
 
     // Build thesaurus and update knowledge graph automata_url
     log::debug!("Creating thesaurus from haystack");
-    create_thesaurus_from_haystack(config_state.clone(), search_query.clone()).await?;
+    terraphim_service
+        .create_thesaurus(search_query.0.clone())
+        .await?;
     log::debug!("Thesaurus created");
 
-    let cached_articles = search_haystacks(config_state.clone(), search_query.clone())
-        .await
-        .context(format!(
-            "Failed to query haystack for `{}`",
-            search_query.search_term
-        ))?;
-    let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
-    let articles = merge_and_serialize(cached_articles, docs);
+    let articles = terraphim_service.search_articles(search_query.0).await?;
     log::trace!("Final articles: {articles:?}");
+
     Ok(Json(articles))
 }
 
 /// API handler for Terraphim Config
 pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<Config> {
-    let config = config.config.lock().await;
-    Json(config.clone())
-}
+    let terraphim_service = TerraphimService::new(config);
+    let config = terraphim_service.fetch_config().await;
 
-use persistence::Persistable;
+    Json(config)
+}
 
 /// API handler for Terraphim Config update
 pub async fn update_config(
     State(config): State<ConfigState>,
     Json(config_new): Json<Config>,
 ) -> Result<Json<Config>> {
-    let mut config_state = config.config.lock().await;
-    config_state.update(config_new.clone());
-    config_state.save().await.context("Failed to save config")?;
+    let terraphim_service = TerraphimService::new(config);
+    let config_state = terraphim_service.update_config(config_new).await?;
+
     Ok(Json(config_state.clone()))
 }
