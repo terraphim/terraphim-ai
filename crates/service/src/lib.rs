@@ -28,9 +28,9 @@ impl<'a> TerraphimService {
         Self { config_state }
     }
 
-    /// Create a thesaurus from a haystack
-    pub async fn create_thesaurus(&self, search_query: SearchQuery) -> Result<()> {
-        Ok(create_thesaurus_from_haystack(self.config_state.clone(), search_query.clone()).await?)
+    /// Update a thesaurus from a haystack and update the knowledge graph automata URL
+    async fn update_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
+        Ok(create_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
     }
 
     /// Create article
@@ -40,7 +40,9 @@ impl<'a> TerraphimService {
     }
 
     /// Search for articles in the haystacks
-    pub async fn search_articles(&self, search_query: SearchQuery) -> Result<Vec<Article>> {
+    pub async fn search_articles(&self, search_query: &SearchQuery) -> Result<Vec<Article>> {
+        self.update_thesaurus(search_query).await?;
+
         let cached_articles =
             terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
                 .await?;

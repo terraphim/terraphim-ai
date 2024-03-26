@@ -5172,6 +5172,7 @@ dependencies = [
  "persistence",
  "portpicker",
  "serde",
+ "service",
  "tauri",
  "tauri-build",
  "terraphim_config",

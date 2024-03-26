@@ -299,13 +299,13 @@ impl ConfigState {
     }
 
     /// Search articles in rolegraph using the search query
-    pub async fn search_articles(&self, search_query: SearchQuery) -> Vec<IndexedDocument> {
+    pub async fn search_articles(&self, search_query: &SearchQuery) -> Vec<IndexedDocument> {
         println!("search_articles: {:#?}", search_query);
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
 
         // if role is not provided, use the default role from the config
-        let role = search_query.role.unwrap_or(default_role);
+        let role = search_query.role.clone().unwrap_or(default_role);
         log::debug!("Role for search_articles: {:#?}", role);
 
         let role = role.to_lowercase();
