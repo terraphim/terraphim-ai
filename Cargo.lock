@@ -4499,6 +4499,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "service"
+version = "0.1.0"
+dependencies = [
+ "opendal",
+ "persistence",
+ "terraphim_config",
+ "terraphim_middleware",
+ "terraphim_settings",
+ "terraphim_types",
+ "thiserror",
+]
+
+[[package]]
 name = "servo_arc"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5278,6 +5291,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "service",
  "static-files",
  "tempfile",
  "terraphim_automata",

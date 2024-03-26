@@ -11,6 +11,7 @@ terraphim_rolegraph = { path = "../crates/terraphim_rolegraph" }
 terraphim_settings = { path = "../crates/settings" }
 terraphim_types = { path = "../terraphim_types" }
 terraphim_automata = { path = "../crates/terraphim_automata" }
+service = { path = "../crates/service" }
 
 anyhow = "1.0.40"
 axum = { version = "0.6.2", features = ["macros"] }
