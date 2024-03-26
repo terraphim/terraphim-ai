@@ -56,11 +56,7 @@ pub(crate) async fn search_articles(
 ) -> Result<Json<Vec<Article>>> {
     log::info!("Search called with {:?}", search_query);
     let terraphim_service = TerraphimService::new(config_state);
-    terraphim_service
-        .create_thesaurus(search_query.0.clone())
-        .await?;
-
-    let articles = terraphim_service.search_articles(search_query.0).await?;
+    let articles = terraphim_service.search_articles(&search_query.0).await?;
 
     Ok(Json(articles))
 }
@@ -75,15 +71,7 @@ pub(crate) async fn search_articles_post(
     log::debug!("POST Searching articles with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
-
-    // Build thesaurus and update knowledge graph automata_url
-    log::debug!("Creating thesaurus from haystack");
-    terraphim_service
-        .create_thesaurus(search_query.0.clone())
-        .await?;
-    log::debug!("Thesaurus created");
-
-    let articles = terraphim_service.search_articles(search_query.0).await?;
+    let articles = terraphim_service.search_articles(&search_query.0).await?;
     log::trace!("Final articles: {articles:?}");
 
     Ok(Json(articles))

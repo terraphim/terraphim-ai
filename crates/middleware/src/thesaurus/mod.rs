@@ -39,9 +39,9 @@ use crate::Error;
 
 pub async fn create_thesaurus_from_haystack(
     config_state: ConfigState,
-    search_query: SearchQuery,
+    search_query: &SearchQuery,
 ) -> Result<()> {
-    let role_name = search_query.role.unwrap_or_default();
+    let role_name = search_query.role.clone().unwrap_or_default();
 
     let config = config_state.config.lock().await;
     let roles = config.roles.clone();
