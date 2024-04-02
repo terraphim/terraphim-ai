@@ -48,18 +48,19 @@ fn load_sample_thesaurus() -> Thesaurus {
     thesaurus.unwrap()
 }
 
-fn bench_find_matches_ids(c: &mut Criterion) {
+fn bench_find_matching_node_idss(c: &mut Criterion) {
     let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
     let rolegraph = block_on(get_rolegraph());
 
     let sizes = &[1, 10, 100, 1000];
     for size in sizes {
         let input = query.repeat(*size);
-        c.benchmark_group("find_matches_ids").bench_with_input(
-            BenchmarkId::new("find_matches_ids", size),
-            size,
-            |b, _| b.iter(|| rolegraph.find_matches_ids(&input)),
-        );
+        c.benchmark_group("find_matching_node_idss")
+            .bench_with_input(
+                BenchmarkId::new("find_matching_node_idss", size),
+                size,
+                |b, _| b.iter(|| rolegraph.find_matching_node_ids(&input)),
+            );
     }
 }
 
@@ -163,7 +164,7 @@ fn bench_query(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_find_matches_ids,
+    bench_find_matching_node_idss,
     bench_find_matches,
     bench_split_paragraphs,
     bench_parse_document_to_pair,

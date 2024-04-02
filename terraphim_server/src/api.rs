@@ -67,12 +67,22 @@ pub(crate) async fn search_articles_post(
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {
-    println!("POST Searching articles with query: {search_query:?}");
     log::info!("POST Searching articles with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
     let articles = terraphim_service.search_articles(&search_query.0).await?;
-    log::trace!("Final articles: {articles:?}");
+
+    // Check if log level is debug:
+    if log::log_enabled!(log::Level::Debug) {
+        log::debug!("Articles found:");
+        for article in &articles {
+            log::debug!(
+                "{} -> {}",
+                article.id.as_ref().unwrap(),
+                article.rank.unwrap()
+            );
+        }
+    }
 
     Ok(Json(articles))
 }

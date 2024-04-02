@@ -146,7 +146,7 @@ impl LogseqService {
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         let haystack = haystack.to_string_lossy().to_string();
-        println!("Running logseq with needle `{needle}` and haystack `{haystack}`");
+        log::trace!("Running logseq with needle `{needle}` and haystack `{haystack}`");
 
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle.to_string(), haystack]
