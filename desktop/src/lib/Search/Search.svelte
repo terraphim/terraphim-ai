@@ -1,57 +1,59 @@
 <script lang="ts">
-  import { Field, Input } from 'svelma';
-  import { invoke } from '@tauri-apps/api/tauri';
-  import logo from '/public/assets/terraphim_gray.png';
-  import { role, is_tauri, input, serverUrl} from '../stores';
-  import type { SearchResult } from './SearchResult';
-  import ResultItem from './ResultItem.svelte';
-  import { CONFIG } from '../../config';
-    import { subscribe } from 'svelte/internal';
+  import { Field, Input } from "svelma";
+  import { invoke } from "@tauri-apps/api/tauri";
+  import logo from "/public/assets/terraphim_gray.png";
+  import { role, is_tauri, input, serverUrl } from "../stores";
+  import type { SearchResult } from "./SearchResult";
+  import ResultItem from "./ResultItem.svelte";
+  import { CONFIG } from "../../config";
+  import { subscribe } from "svelte/internal";
   let result: SearchResult[] = [];
-  
+
   let currentSearchUrl;
   async function handleClick() {
     if ($is_tauri) {
       console.log("Tauri config");
       console.log($input);
-      await invoke('search', { searchQuery: {
-        search_term: $input,
-        skip: 0,
-        limit: 10,
-        role: $role,
-    }})
-        .then(data => {
-          console.log(data);
-          result = data;
-        })
-        .catch(e => console.error(e));
-    } else {
-      console.log($input);
-      console.log("Role config");
-      console.log($role);
-      console.log('The current value is: ',$serverUrl);
-      let json_body= JSON.stringify({
+      await invoke("search", {
+        searchQuery: {
           search_term: $input,
           skip: 0,
           limit: 10,
           role: $role,
-        });
-      console.log('The current value is: ',json_body);
+        },
+      })
+        .then((data) => {
+          console.log(data);
+          result = data;
+        })
+        .catch((e) => console.error(e));
+    } else {
+      console.log($input);
+      console.log("Role config");
+      console.log($role);
+      console.log("The current value is: ", $serverUrl);
+      let json_body = JSON.stringify({
+        search_term: $input,
+        skip: 0,
+        limit: 10,
+        role: $role,
+      });
+      console.log("The current value is: ", json_body);
 
-  const response = await fetch($serverUrl, {
-        method: 'POST',
+      console.log("Server URL: ", $serverUrl);
+      const response = await fetch($serverUrl, {
+        method: "POST",
         headers: {
-          accept: 'application/json',
-          'Content-Type': 'application/json',
+          accept: "application/json",
+          "Content-Type": "application/json",
         },
         body: json_body,
       });
       const data = await response.json();
       console.log(data);
-      result=data;
+      result = data;
+    }
   }
-  }
-
 </script>
 
 <Field>
@@ -64,7 +66,7 @@
     autofocus
     on:click={handleClick}
     on:submit={handleClick}
-    on:keyup={e => e.key === 'Enter' && handleClick()}
+    on:keyup={(e) => e.key === "Enter" && handleClick()}
   />
 </Field>
 {#if result !== null && result.length !== 0}
