@@ -24,7 +24,7 @@ mod tests {
         let cached_articles = search_haystacks(config_state.clone(), search_query.clone()).await?;
         let docs: Vec<IndexedDocument> = config_state.search_articles(search_query).await;
         let articles = merge_and_serialize(cached_articles, docs);
-        log::trace!("Final articles: {articles:?}");
+        log::debug!("Final articles: {articles:?}");
 
         Ok(())
     }
