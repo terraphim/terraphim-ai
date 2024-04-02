@@ -18,10 +18,10 @@ use crate::error::Result;
 
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
-/// health check endpoint
 pub(crate) async fn health_axum() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
+
 /// Creates index of the article for each rolegraph
 pub(crate) async fn create_article(
     State(config): State<ConfigState>,
@@ -42,13 +42,12 @@ pub(crate) async fn _list_articles(
     State(rolegraph): State<Arc<Mutex<RoleGraph>>>,
 ) -> impl IntoResponse {
     let rolegraph = rolegraph.lock().await.clone();
-    println!("{rolegraph:?}");
+    log::debug!("{rolegraph:?}");
 
     (StatusCode::OK, Json("Ok"))
 }
 
 /// Search All TerraphimGraphs defined in a config by query params.
-#[axum::debug_handler]
 pub(crate) async fn search_articles(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
@@ -68,7 +67,8 @@ pub(crate) async fn search_articles_post(
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
 ) -> Result<Json<Vec<Article>>> {
-    log::debug!("POST Searching articles with query: {search_query:?}");
+    println!("POST Searching articles with query: {search_query:?}");
+    log::info!("POST Searching articles with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
     let articles = terraphim_service.search_articles(&search_query.0).await?;
