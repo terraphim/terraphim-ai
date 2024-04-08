@@ -1,5 +1,6 @@
 pub mod error;
 pub mod settings;
+pub mod thesaurus;
 
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
@@ -79,6 +80,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
         let key = self.get_key();
         let serde_str = serde_json::to_string(&self)?;
         for (op, _time) in ops.values() {
+            log::debug!("Saving to operator: {:?}", op);
             op.write(&key, serde_str.clone()).await?;
         }
         Ok(())
