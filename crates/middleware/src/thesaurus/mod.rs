@@ -23,6 +23,7 @@
 
 use crate::Result;
 use cached::proc_macro::cached;
+use persistence::Persistable;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
@@ -59,11 +60,10 @@ pub async fn create_thesaurus_from_haystack(
 
         let logseq = Logseq::default();
         let thesaurus = logseq.build(&haystack.path).await?;
-
-        // Use persistence crate to store the thesaurus
-        
-
-
+        match thesaurus.save().await {
+            Ok(_) => log::debug!("Thesaurus saved"),
+            Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
+        }
 
         let thesaurus_path = haystack.path.join("thesaurus.json");
 
