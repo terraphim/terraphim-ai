@@ -60,7 +60,11 @@ pub async fn create_thesaurus_from_haystack(
         let logseq = Logseq::default();
         let thesaurus = logseq.build(&haystack.path).await?;
 
-        // Write thesaurus to local file (for now)
+        // Use persistence crate to store the thesaurus
+        
+
+
+
         let thesaurus_path = haystack.path.join("thesaurus.json");
 
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;

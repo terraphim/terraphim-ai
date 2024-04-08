@@ -17,6 +17,12 @@ pub enum Error {
 // which gets used by the `#[config]` macro below.
 pub type SettingsResult<T> = std::result::Result<T, Error>;
 
+/// Default config path
+pub const DEFAULT_CONFIG_PATH: &str = ".config";
+
+/// Default settings file
+pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_local.toml");
+
 /// Configuration settings for the device or server.
 ///
 /// These values are set when the server initializes, and do not change while
@@ -34,23 +40,28 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Get the default path for the config file
+    ///
+    /// This is the default path where the config file is stored.
+    pub fn default_config_path() -> PathBuf {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
+            let config_dir = proj_dirs.config_dir();
+            config_dir.to_path_buf()
+        } else {
+            PathBuf::from(DEFAULT_CONFIG_PATH)
+        }
+    }
+
     /// Load settings from environment and file
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
         log::info!("Loading device settings...");
         let config_path = match config_path {
             Some(path) => path,
-            None => {
-                if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
-                    let config_dir = proj_dirs.config_dir();
-                    config_dir.to_path_buf()
-                } else {
-                    PathBuf::from(".config/")
-                }
-            }
+            None => Settings::default_config_path(),
         };
         log::debug!("Using config path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
-        log::info!("Using config_file: {:?}", config_file);
+        log::debug!("Using config_file: {:?}", config_file);
 
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
@@ -65,12 +76,10 @@ fn init_config_file(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
     if !path.exists() {
         std::fs::create_dir_all(path)?;
     }
-    log::info!("Checking for settings.toml");
     let config_file = path.join("settings.toml");
     if !config_file.exists() {
-        log::warn!("Creating default config at: {:?}", config_file);
-        let default_config = include_str!("../default/settings_local.toml");
-        std::fs::write(&config_file, default_config)?;
+        log::info!("Creating default config at: {:?}", config_file);
+        std::fs::write(&config_file, DEFAULT_SETTINGS)?;
     }
     Ok(config_file)
 }
