@@ -90,7 +90,7 @@ impl RoleGraph {
     /// Find all matches in the rolegraph for the given text
     ///
     /// Returns a list of IDs of the matched nodes
-    pub fn find_matches_ids(&self, text: &str) -> Vec<Id> {
+    pub fn find_matching_node_ids(&self, text: &str) -> Vec<Id> {
         let mut matches = Vec::new();
         for mat in self.ac.find_iter(text) {
             let id = &self.ac_values[mat.pattern()];
@@ -137,69 +137,71 @@ impl RoleGraph {
         // }
     }
 
-    //  Query the graph using a query string, returns a list of document ids
-    //  ranked and weighted by weighted mean average of node rank, edge rank and
-    //  document rank
+    /// Performs a query on the graph using a query string. Returns a list of document IDs
+    /// ranked and weighted by the weighted mean average of node rank, edge rank, and
+    /// document rank.
     pub fn query(
         &self,
         query_string: &str,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Vec<(String, IndexedDocument)>> {
-        log::debug!("performing query");
-        let nodes = self.find_matches_ids(query_string);
+        log::debug!("Performing query with query string: '{}'", query_string);
+        let node_ids = self.find_matching_node_ids(query_string);
 
-        //  TODO: turn into BinaryHeap by implementing hash and eq traits
-
-        let mut results_map: AHashMap<String, IndexedDocument> = AHashMap::new();
-        for node_id in nodes {
-            // log::debug!("Matched node {:?}", node_id);
+        let mut results = AHashMap::new();
+        for node_id in node_ids {
             let node = self.nodes.get(&node_id).ok_or(Error::NodeIdNotFound)?;
-            let nterm = self.ac_reverse_nterm.get(&node_id).unwrap();
-            // println!("Normalized term {nterm}");
-            let node_rank = node.rank;
-            // log::debug!("Node Rank {}", node_rank);
-            // log::debug!("Node connected to Edges {:?}", node.connected_with);
-            for each_edge_key in &node.connected_with {
-                let each_edge = self.edges.get(each_edge_key).ok_or(Error::EdgeIdNotFound)?;
-                log::trace!("Edge Details {:?}", each_edge);
-                let edge_rank = each_edge.rank;
-                for (document_id, rank) in &each_edge.doc_hash {
-                    let total_rank = node_rank + edge_rank + rank;
-                    match results_map.entry(document_id.clone()) {
-                        Entry::Vacant(_) => {
-                            let document = IndexedDocument {
-                                id: document_id.to_string(),
-                                matched_to: vec![each_edge.clone()],
-                                rank: total_rank,
-                                tags: vec![nterm.to_string()],
-                                nodes: vec![node_id.clone()],
-                            };
+            let normalized_term = self
+                .ac_reverse_nterm
+                .get(&node_id)
+                .expect("Normalized term missing for node_id");
+            log::debug!("Processing node ID: {:?} with rank: {}", node_id, node.rank);
 
-                            results_map.insert(document_id.clone(), document);
+            for edge_id in &node.connected_with {
+                let edge = self.edges.get(edge_id).ok_or(Error::EdgeIdNotFound)?;
+                log::trace!("Processing edge ID: {:?} with rank: {}", edge_id, edge.rank);
+
+                for (document_id, document_rank) in &edge.doc_hash {
+                    let total_rank = node.rank + edge.rank + document_rank;
+                    match results.entry(document_id.clone()) {
+                        Entry::Vacant(e) => {
+                            e.insert(IndexedDocument {
+                                id: document_id.clone(),
+                                matched_edges: vec![edge.clone()],
+                                rank: total_rank,
+                                tags: vec![normalized_term.to_string()],
+                                nodes: vec![node_id.clone()],
+                            });
                         }
-                        Entry::Occupied(entry) => {
-                            let document = entry.into_mut();
-                            document.rank += 1;
-                            document.matched_to.push(each_edge.clone());
-                            document.matched_to.dedup_by_key(|k| k.id.clone());
+                        Entry::Occupied(mut e) => {
+                            let doc = e.get_mut();
+                            doc.rank += total_rank; // Adjust to correctly aggregate the rank
+                            doc.matched_edges.push(edge.clone());
+                            // Remove duplicate edges based on unique IDs
+                            doc.matched_edges.dedup_by_key(|e| e.id.clone());
                         }
                     }
                 }
             }
         }
-        let mut hash_vec = results_map.into_iter().collect::<Vec<_>>();
-        hash_vec.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
-        hash_vec = hash_vec
+
+        let mut ranked_documents = results.into_iter().collect::<Vec<_>>();
+        ranked_documents.sort_by_key(|&(_, ref doc)| std::cmp::Reverse(doc.rank));
+        ranked_documents.sort_by_key(|&(_, ref doc)| std::cmp::Reverse(doc.id.clone()));
+
+        let documents: Vec<_> = ranked_documents
             .into_iter()
             .skip(offset.unwrap_or(0))
             .take(limit.unwrap_or(std::usize::MAX))
             .collect();
-        Ok(hash_vec)
+
+        log::debug!("Query resulted in {} documents", documents.len());
+        Ok(documents)
     }
 
     pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
-        let matches = self.find_matches_ids(text);
+        let matches = self.find_matching_node_ids(text);
         for (a, b) in matches.into_iter().tuple_windows() {
             // cast to Id
             let a = a as Id;
@@ -209,7 +211,7 @@ impl RoleGraph {
 
     pub fn parse_document<T: Into<Document>>(&mut self, document_id: &str, input: T) {
         let document: Document = input.into();
-        let matches = self.find_matches_ids(&document.to_string());
+        let matches = self.find_matching_node_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id, a, b);
         }
@@ -359,24 +361,24 @@ mod tests {
     }
 
     #[test]
-    async fn test_find_matches_ids() {
+    async fn test_find_matching_node_idss() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
         let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
             .await
             .unwrap();
-        let matches = rolegraph.find_matches_ids(query);
+        let matches = rolegraph.find_matching_node_ids(query);
         assert_eq!(matches.len(), 7);
     }
 
     #[test]
-    async fn test_find_matches_ids_ac_values() {
+    async fn test_find_matching_node_idss_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
         let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
             .await
             .unwrap();
-        let matches = rolegraph.find_matches_ids(query);
+        let matches = rolegraph.find_matching_node_ids(query);
         println!("matches: {:?}", matches);
         for each_match in matches.iter() {
             let ac_reverse_nterm = rolegraph.ac_reverse_nterm.get(each_match).unwrap();
@@ -396,19 +398,19 @@ mod tests {
             .unwrap();
         let article_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches = rolegraph.find_matches_ids(query);
+        let matches = rolegraph.find_matching_node_ids(query);
         for (a, b) in matches.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(&article_id, a, b);
         }
         let article_id2 = Ulid::new().to_string();
         let query2 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches2 = rolegraph.find_matches_ids(query2);
+        let matches2 = rolegraph.find_matching_node_ids(query2);
         for (a, b) in matches2.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(&article_id2, a, b);
         }
         let article_id3 = Ulid::new().to_string();
         let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        let matches3 = rolegraph.find_matches_ids(query3);
+        let matches3 = rolegraph.find_matching_node_ids(query3);
         for (a, b) in matches3.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(&article_id3, a, b);
         }

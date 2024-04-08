@@ -384,7 +384,7 @@ pub struct IndexedDocument {
     /// UUID of the indexed document, matching external storage id
     pub id: String,
     /// Matched to edges
-    pub matched_to: Vec<Edge>,
+    pub matched_edges: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
     pub rank: u64,
     /// tags, which are nodes turned into concepts for human readability

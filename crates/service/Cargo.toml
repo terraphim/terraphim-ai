@@ -1,0 +1,14 @@
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+persistence = { path = "../persistence" }
+terraphim_config = { path = "../config" }
+terraphim_middleware = { path = "../middleware" }
+terraphim_settings = { path = "../settings" }
+terraphim_types = { path = "../../terraphim_types" }
+
+thiserror = "1.0.58"
+opendal = { version = "0.44.2" }

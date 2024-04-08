@@ -39,9 +39,9 @@ use crate::Error;
 
 pub async fn create_thesaurus_from_haystack(
     config_state: ConfigState,
-    search_query: SearchQuery,
+    search_query: &SearchQuery,
 ) -> Result<()> {
-    let role_name = search_query.role.unwrap_or_default();
+    let role_name = search_query.role.clone().unwrap_or_default();
 
     let config = config_state.config.lock().await;
     let roles = config.roles.clone();
@@ -146,7 +146,7 @@ impl LogseqService {
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         let haystack = haystack.to_string_lossy().to_string();
-        println!("Running logseq with needle `{needle}` and haystack `{haystack}`");
+        log::trace!("Running logseq with needle `{needle}` and haystack `{haystack}`");
 
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle.to_string(), haystack]

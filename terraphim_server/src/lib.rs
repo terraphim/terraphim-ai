@@ -25,6 +25,7 @@ static INDEX_HTML: &str = "index.html";
 struct Assets;
 
 pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState) -> Result<()> {
+    log::info!("Starting axum server");
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
