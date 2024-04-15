@@ -11,7 +11,9 @@ mod tests {
     /// Uses `fixtures/logseq` as the haystack
     async fn test_logseq_thesaurus() -> Result<()> {
         let logseq = Logseq::default();
-        let thesaurus = logseq.build("fixtures/logseq").await?;
+        let thesaurus = logseq
+            .build("some_role".to_string(), "fixtures/logseq")
+            .await?;
         let json = serde_json::to_string_pretty(&thesaurus)?;
         println!("{}", json);
 

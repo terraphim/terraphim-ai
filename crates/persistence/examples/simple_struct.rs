@@ -10,11 +10,8 @@ struct MyStruct {
 }
 #[async_trait]
 impl Persistable for MyStruct {
-    fn new() -> Self {
-        MyStruct {
-            name: String::new(),
-            age: 0,
-        }
+    fn new(name: String) -> Self {
+        MyStruct { name, age: 0 }
     }
 
     async fn save_to_one(&self, profile_name: &str) -> Result<()> {
@@ -55,7 +52,7 @@ async fn main() -> Result<()> {
     let (_ops, fastest_op) = obj.load_config().await?;
     println!("fastest_op: {:#?}", fastest_op);
 
-    let mut obj1 = MyStruct::new();
+    let mut obj1 = MyStruct::new("obj".to_string());
     let key = obj.get_key();
     println!("key: {}", key);
     obj1 = obj1.load(&key).await?;

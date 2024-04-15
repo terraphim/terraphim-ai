@@ -326,38 +326,46 @@ impl Node {
 /// where a resource can be as diverse as a Markdown file or a document in
 /// Notion or AtomicServer
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct Thesaurus(AHashMap<NormalizedTermValue, NormalizedTerm>);
+pub struct Thesaurus {
+    /// Name of the thesaurus
+    pub name: String,
+    /// The inner hashmap of normalized terms
+    inner: AHashMap<NormalizedTermValue, NormalizedTerm>,
+}
 
 impl Thesaurus {
     /// Create a new, empty thesaurus
-    pub fn new() -> Self {
-        Self(AHashMap::new())
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            inner: AHashMap::new(),
+        }
     }
 
     /// Inserts a key-value pair into the thesaurus.
     pub fn insert(&mut self, key: NormalizedTermValue, value: NormalizedTerm) {
-        self.0.insert(key, value);
+        self.inner.insert(key, value);
     }
 
     /// Get the length of the thesaurus
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.inner.len()
     }
 
     /// Check if the thesaurus is empty
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.inner.is_empty()
     }
 
     /// Custom `get` method for the thesaurus, which accepts a
     /// `NormalizedTermValue` and returns a reference to the
     /// `NormalizedTerm`.
     pub fn get(&self, key: &NormalizedTermValue) -> Option<&NormalizedTerm> {
-        self.0.get(key)
+        self.inner.get(key)
     }
 
     pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
-        self.0.keys()
+        self.inner.keys()
     }
 }
 
@@ -367,7 +375,7 @@ impl<'a> IntoIterator for &'a Thesaurus {
     type IntoIter = Iter<'a, NormalizedTermValue, NormalizedTerm>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.inner.iter()
     }
 }
 

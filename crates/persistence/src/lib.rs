@@ -55,7 +55,7 @@ async fn init_device_storage() -> Result<DeviceStorage> {
 #[async_trait]
 pub trait Persistable: Serialize + DeserializeOwned {
     /// Create a new instance
-    fn new() -> Self;
+    fn new(key: String) -> Self;
 
     /// Save to all profiles
     async fn save(&self) -> Result<()>;
