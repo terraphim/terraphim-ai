@@ -4,7 +4,9 @@ use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
-use terraphim_types::{Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Thesaurus};
+use terraphim_types::{
+    Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Rank, Thesaurus,
+};
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
@@ -100,10 +102,10 @@ impl RoleGraph {
     }
 
     /// Convert node rank to f64
-    /// 
+    ///
     /// TODO: Reuse that because we don't want to do node-based ranking but rather f64 based ranking
     /// See normalization step in https://github.com/BurntSushi/imdb-rename
-    /// 
+    ///
     /// This method performs several key operations to process and rank
     /// documents:
     /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
@@ -168,7 +170,9 @@ impl RoleGraph {
                 log::trace!("Processing edge ID: {:?} with rank: {}", edge_id, edge.rank);
 
                 for (document_id, document_rank) in &edge.doc_hash {
-                    let total_rank = node.rank + edge.rank + document_rank;
+                    // For now, this sums up over nodes and edges
+                    // TODO: Calculate the total rank based on scorer
+                    let total_rank = Rank::new(node.rank + edge.rank + document_rank);
                     match results.entry(document_id.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(IndexedDocument {
