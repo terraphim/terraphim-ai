@@ -1,4 +1,5 @@
 use std::fmt::{self, Display, Formatter};
+use std::ops::{Add, AddAssign};
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -225,8 +226,45 @@ impl ToString for Document {
 }
 
 /// Rank of a document in the search results
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Rank(u64);
+
+impl Rank {
+    /// Create a new rank with a given value
+    pub fn new(rank: u64) -> Self {
+        Self(rank)
+    }
+}
+
+impl Add for Rank {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+// Implement +=
+impl Add for &mut Rank {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        self.0 += other.0;
+        self
+    }
+}
+
+impl AddAssign for Rank {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
+impl Display for Rank {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// An article is a piece of content that can be indexed and searched.
 ///
@@ -399,7 +437,7 @@ pub struct IndexedDocument {
     pub matched_edges: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
     /// Number of nodes
-    pub rank: u64,
+    pub rank: Rank,
     /// tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
     /// list of node ids for validation of matching
