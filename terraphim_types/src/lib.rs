@@ -224,6 +224,10 @@ impl ToString for Document {
     }
 }
 
+/// Rank of a document in the search results
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Rank(u64);
+
 /// An article is a piece of content that can be indexed and searched.
 ///
 /// It holds the title, body, description, tags, and rank.
@@ -245,7 +249,7 @@ pub struct Article {
     /// Tags for the article
     pub tags: Option<Vec<String>>,
     /// Rank of the article in the search results
-    pub rank: Option<u64>,
+    pub rank: Option<Rank>,
 }
 
 impl From<Article> for Document {
@@ -394,6 +398,7 @@ pub struct IndexedDocument {
     /// Matched to edges
     pub matched_edges: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
+    /// Number of nodes
     pub rank: u64,
     /// tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
@@ -417,12 +422,17 @@ pub struct SearchQuery {
     pub role: Option<String>,
 }
 
+/// Defines the relevance function (scorer) to be used for ranking search
+/// results for the `Role`.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum RelevanceFunction {
     #[serde(rename = "terraphim-graph")]
     TerraphimGraph,
     #[serde(rename = "redis-search")]
     RedisSearch,
+    /// Use the title scorer for relevance
+    #[serde(rename = "title-scorer")]
+    TitleScorer,
 }
 
 /// Defines all supported inputs for the knowledge graph.
@@ -443,6 +453,7 @@ pub enum KnowledgeGraphInputType {
 ///
 /// Returns the merged articles
 pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -> Vec<Article> {
+    // TODO: use relevance function for ranking (scorer)
     let mut articles: Vec<Article> = Vec::new();
     for doc in docs {
         log::trace!("doc: {:#?}", doc);
@@ -450,6 +461,8 @@ pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -
             // Article found in cache
             let mut article = article;
             article.tags = Some(doc.tags.clone());
+            // rank only available for terraphim graph
+            // use scorer to populate the rank for all cases
             article.rank = Some(doc.rank);
             articles.push(article.clone());
         } else {
