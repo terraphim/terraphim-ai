@@ -23,6 +23,7 @@
 
 use crate::Result;
 use cached::proc_macro::cached;
+use persistence::Persistable;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
@@ -58,9 +59,12 @@ pub async fn create_thesaurus_from_haystack(
         );
 
         let logseq = Logseq::default();
-        let thesaurus = logseq.build(&haystack.path).await?;
+        let thesaurus = logseq.build(role_name.clone(), &haystack.path).await?;
+        match thesaurus.save().await {
+            Ok(_) => log::debug!("Thesaurus saved"),
+            Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
+        }
 
-        // Write thesaurus to local file (for now)
         let thesaurus_path = haystack.path.join("thesaurus.json");
 
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
@@ -77,12 +81,17 @@ pub async fn create_thesaurus_from_haystack(
 /// resources (e.g. files) with key-value pairs and returns a `Thesaurus`
 /// (a dictionary with synonyms which map to higher-level concepts)
 pub trait ThesaurusBuilder {
-    /// `haystack` is the root directory for building the thesaurus
-    /// (e.g. a directory of Logseq files)
+    /// Build the thesaurus from the data source
+    ///
+    /// * `name` is the name of the thesaurus
+    /// * `haystack` is the root directory for building the thesaurus
+    ///   (e.g. a directory of Logseq files)
+    ///
     // This could be generalized (e.g. to take a `Read` trait object
     // or a `Resource` or a glob of inputs)
     fn build<P: Into<PathBuf> + Send>(
         &self,
+        name: String,
         haystack: P,
     ) -> impl std::future::Future<Output = Result<Thesaurus>> + Send;
 }
@@ -108,14 +117,14 @@ pub struct Logseq {
 impl ThesaurusBuilder for Logseq {
     /// Build the knowledge graph from the data source
     /// and store it in each rolegraph.
-    async fn build<P: Into<PathBuf> + Send>(&self, haystack: P) -> Result<Thesaurus> {
+    async fn build<P: Into<PathBuf> + Send>(&self, name: String, haystack: P) -> Result<Thesaurus> {
         let haystack = haystack.into();
         let messages = self
             .service
             .get_raw_messages(LOGSEQ_KEY_VALUE_DELIMITER, &haystack)
             .await?;
 
-        let thesaurus = index_inner(messages);
+        let thesaurus = index_inner(name, messages);
         Ok(thesaurus)
     }
 }
@@ -200,8 +209,8 @@ impl LogseqService {
 // This is a free-standing function because it's a requirement for caching the
 // results
 #[cached]
-fn index_inner(messages: Vec<Message>) -> Thesaurus {
-    let mut thesaurus = Thesaurus::new();
+fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
+    let mut thesaurus = Thesaurus::new(name);
     let mut current_concept: Option<Concept> = None;
 
     let mut existing_paths: HashSet<PathBuf> = HashSet::new();
