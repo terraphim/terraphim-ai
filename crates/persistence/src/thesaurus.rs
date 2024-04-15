@@ -6,8 +6,8 @@ use crate::Persistable;
 
 #[async_trait]
 impl Persistable for Thesaurus {
-    fn new() -> Self {
-        Thesaurus::new()
+    fn new(key: String) -> Self {
+        Thesaurus::new(key)
     }
 
     /// Save to a single profile
@@ -32,7 +32,6 @@ impl Persistable for Thesaurus {
 
     /// returns ulid as key + .json
     fn get_key(&self) -> String {
-        // TODO: What should the key be?
-        "thesaurus.json".to_string()
+        format!("thesaurus_{}.json", self.name)
     }
 }
