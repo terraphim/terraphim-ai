@@ -52,6 +52,8 @@ pub enum TerraphimConfigError {
 pub struct Role {
     pub shortname: Option<String>,
     pub name: String,
+    /// The relevance function used to rank search results
+    // TODO: use this
     pub relevance_function: RelevanceFunction,
     pub theme: String,
     #[serde(rename = "serverUrl")]

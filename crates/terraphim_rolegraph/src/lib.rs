@@ -99,6 +99,11 @@ impl RoleGraph {
         matches
     }
 
+    /// Convert node rank to f64
+    /// 
+    /// TODO: Reuse that because we don't want to do node-based ranking but rather f64 based ranking
+    /// See normalization step in https://github.com/BurntSushi/imdb-rename
+    /// 
     /// This method performs several key operations to process and rank
     /// documents:
     /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
