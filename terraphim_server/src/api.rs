@@ -76,11 +76,7 @@ pub(crate) async fn search_articles_post(
     if log::log_enabled!(log::Level::Debug) {
         log::debug!("Articles found:");
         for article in &articles {
-            log::debug!(
-                "{} -> {}",
-                article.id.as_ref().unwrap(),
-                article.rank.unwrap()
-            );
+            log::debug!("{} -> {}", article.id, article.rank.unwrap());
         }
     }
 

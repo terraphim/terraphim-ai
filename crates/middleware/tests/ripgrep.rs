@@ -21,9 +21,9 @@ mod tests {
         };
         println!("Searching articles with query: {search_query:?} {role_name}");
 
-        let cached_articles = search_haystacks(config_state.clone(), search_query.clone()).await?;
+        let haystack_articles = search_haystacks(config_state.clone(), search_query.clone()).await?;
         let docs: Vec<IndexedDocument> = config_state.search_articles(&search_query).await;
-        let articles = merge_and_serialize(cached_articles, docs);
+        let articles = merge_and_serialize(haystack_articles, docs);
         log::debug!("Final articles: {articles:?}");
 
         Ok(())

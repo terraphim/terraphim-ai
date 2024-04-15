@@ -159,10 +159,9 @@ impl RoleGraph {
         let mut results = AHashMap::new();
         for node_id in node_ids {
             let node = self.nodes.get(&node_id).ok_or(Error::NodeIdNotFound)?;
-            let normalized_term = self
-                .ac_reverse_nterm
-                .get(&node_id)
-                .expect("Normalized term missing for node_id");
+            let Some(normalized_term) = self.ac_reverse_nterm.get(&node_id) else {
+                return Err(Error::NodeIdNotFound);
+            };
             log::debug!("Processing node ID: {:?} with rank: {}", node_id, node.rank);
 
             for edge_id in &node.connected_with {
