@@ -206,7 +206,7 @@ pub struct Document {
     /// Title of the document
     pub title: String,
     /// Body of the document
-    pub body: Option<String>,
+    pub body: String,
     /// Description of the document
     pub description: Option<String>,
 }
@@ -215,9 +215,7 @@ impl ToString for Document {
     fn to_string(&self) -> String {
         let mut text = String::new();
         text.push_str(&self.title);
-        if let Some(body) = &self.body {
-            text.push_str(body);
-        }
+        text.push_str(&self.body);
         if let Some(description) = &self.description {
             text.push_str(description);
         }
@@ -273,17 +271,18 @@ impl Display for Rank {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Article {
     /// Unique identifier for the article
-    pub id: Option<String>,
-    /// A short excerpt of the article
-    pub stub: Option<String>,
+    pub id: String,
     /// Title of the article
     pub title: String,
-    /// URL of the article
-    pub url: String,
     /// The article body
     pub body: String,
     /// A short description of the article
     pub description: Option<String>,
+
+    /// A short excerpt of the article
+    pub stub: Option<String>,
+    /// URL of the article
+    pub url: String,
     /// Tags for the article
     pub tags: Option<Vec<String>>,
     /// Rank of the article in the search results
@@ -291,18 +290,12 @@ pub struct Article {
 }
 
 impl From<Article> for Document {
-    fn from(val: Article) -> Self {
-        // If the ID is not provided, generate a new one
-        let id = match val.id {
-            Some(id) => id,
-            None => ulid::Ulid::new().to_string(),
-        };
-
+    fn from(article: Article) -> Self {
         Document {
-            id,
-            title: val.title,
-            body: Some(val.body),
-            description: val.description,
+            id: article.id,
+            title: article.title,
+            body: article.body,
+            description: article.description,
         }
     }
 }

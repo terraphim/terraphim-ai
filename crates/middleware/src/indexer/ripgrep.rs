@@ -50,8 +50,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
                 }
                 existing_paths.insert(path.clone());
 
-                let id = calculate_hash(&path);
-                article.id = Some(id.clone());
+                article.id = calculate_hash(&path);
                 article.title = path.clone();
                 article.url = path.clone();
             }
@@ -117,14 +116,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
             Message::End(_) => {
                 // The `End` message could be received before the `Begin`
                 // message causing the article to be empty
-                let id = match article.id {
-                    Some(ref id) => id,
-                    None => {
-                        println!("Error: End message received before Begin message. Skipping.");
-                        continue;
-                    }
-                };
-                cached_articles.insert(id.to_string(), article.clone());
+                cached_articles.insert(article.id.to_string(), article.clone());
             }
             _ => {}
         };

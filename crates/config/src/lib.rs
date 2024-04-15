@@ -285,14 +285,9 @@ impl ConfigState {
     }
 
     /// Index article into all rolegraphs
-    // TODO: This should probably be  moved to the `persistance` crate
+    // TODO: This should probably be moved to the `persistance` crate
     pub async fn index_article(&mut self, article: &Article) -> OpendalResult<()> {
-        let id = article
-            .id
-            .clone()
-            // Initialize article ID if it's `None`
-            .get_or_insert_with(|| ulid::Ulid::new().to_string())
-            .clone();
+        let id = article.id.clone();
 
         for rolegraph_state in self.roles.values() {
             let mut rolegraph = rolegraph_state.lock().await;
