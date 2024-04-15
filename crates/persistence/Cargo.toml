@@ -9,6 +9,7 @@ tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "tracing-log",
 ] }
+terraphim_types = { path = "../../terraphim_types" }
 
 async-once-cell = "0.5.3"
 async-trait = "0.1.74"
@@ -43,4 +44,3 @@ services-rocksdb = ["opendal/services-rocksdb"]
 services-sled = ["opendal/services-sled"]
 # Enable services atomic server
 services-atomicserver = ["opendal/services-atomicserver"]
-

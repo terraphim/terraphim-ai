@@ -218,7 +218,8 @@ impl Default for Config {
 
 #[async_trait]
 impl Persistable for Config {
-    fn new() -> Self {
+    fn new(_key: String) -> Self {
+        // Key is not used because we use the `id` field
         Config::new()
     }
 
