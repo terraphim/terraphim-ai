@@ -6,7 +6,7 @@ use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
 use opendal::Operator;
 use serde::{de::DeserializeOwned, Serialize};
-use terraphim_settings::Settings;
+use terraphim_settings::DeviceSettings;
 
 use std::collections::HashMap;
 
@@ -32,7 +32,7 @@ impl DeviceStorage {
 }
 
 async fn init_device_storage() -> Result<DeviceStorage> {
-    let settings = Settings::load_from_env_and_file(None)?;
+    let settings = DeviceSettings::load_from_env_and_file(None)?;
     log::info!("Loaded settings: {:?}", settings);
 
     let operators = settings::parse_profiles(&settings).await?;
@@ -53,7 +53,7 @@ async fn init_device_storage() -> Result<DeviceStorage> {
 }
 
 /// A trait for persisting objects
-/// 
+///
 /// This trait is used to save and load objects to and from the fastest operator
 /// An operator is a storage backend that implements the `opendal::Operator`
 /// trait, such as a file system, a database, or a cloud storage service.

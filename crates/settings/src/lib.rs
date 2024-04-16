@@ -15,7 +15,7 @@ pub enum Error {
 
 // Need to name it explicitly to avoid conflict with std::Result
 // which gets used by the `#[config]` macro below.
-pub type SettingsResult<T> = std::result::Result<T, Error>;
+pub type DeviceSettingsResult<T> = std::result::Result<T, Error>;
 
 /// Default config path
 pub const DEFAULT_CONFIG_PATH: &str = ".config";
@@ -23,14 +23,14 @@ pub const DEFAULT_CONFIG_PATH: &str = ".config";
 /// Default settings file
 pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_local.toml");
 
-/// Configuration settings for the device or server.
+/// Configuration settings for the device (i.e. the server or runtime).
 ///
-/// These values are set when the server initializes, and do not change while
+/// These values are set when the server is initialized, and do not change while
 /// running. These are constructed from default or local files and ENV
 /// variables.
 #[config]
 #[derive(Debug)]
-pub struct Settings {
+pub struct DeviceSettings {
     /// The address to listen on
     pub server_hostname: String,
     /// API endpoint for the server
@@ -39,7 +39,7 @@ pub struct Settings {
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
 
-impl Settings {
+impl DeviceSettings {
     /// Get the default path for the config file
     ///
     /// This is the default path where the config file is stored.
@@ -53,17 +53,17 @@ impl Settings {
     }
 
     /// Load settings from environment and file
-    pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> SettingsResult<Self> {
+    pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> DeviceSettingsResult<Self> {
         log::info!("Loading device settings...");
         let config_path = match config_path {
             Some(path) => path,
-            None => Settings::default_config_path(),
+            None => DeviceSettings::default_config_path(),
         };
         log::debug!("Config path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
         log::debug!("Loading config_file: {:?}", config_file);
 
-        Ok(Settings::with_layers(&[
+        Ok(DeviceSettings::with_layers(&[
             Layer::Toml(config_file),
             Layer::Env(Some(String::from("TERRAPHIM_"))),
         ])?)
@@ -101,7 +101,7 @@ mod tests {
         for (k, v) in &env_vars {
             std::env::set_var(k, v);
         }
-        let config = Settings::load_from_env_and_file(None);
+        let config = DeviceSettings::load_from_env_and_file(None);
         println!("{:?}", config);
 
         assert_eq!(

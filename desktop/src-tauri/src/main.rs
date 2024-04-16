@@ -12,12 +12,12 @@ use tauri::{
 };
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_settings::Settings;
+use terraphim_settings::DeviceSettings;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // TODO: Use the device settings to load the config
-    let _device_settings = Settings::load_from_env_and_file(None);
+    let _device_settings = DeviceSettings::load_from_env_and_file(None);
 
     let mut config = Config::new();
     let config_state = ConfigState::new(&mut config).await?;
