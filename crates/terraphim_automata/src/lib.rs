@@ -1,8 +1,11 @@
 pub mod matcher;
 
 pub use matcher::{find_matches, Matched};
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::PathBuf;
 use url::Url;
 
 use terraphim_types::Thesaurus;
@@ -23,9 +26,64 @@ pub enum TerraphimAutomataError {
 
     #[error("Aho-Corasick build error: {0}")]
     AhoCorasick(#[from] aho_corasick::BuildError),
+
+    #[error("URL parse error: {0}")]
+    UrlParse(#[from] url::ParseError),
 }
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
+
+/// AutomataPath is a path to the automata file
+///
+/// It can either be a local file path or a URL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AutomataPath {
+    Local(PathBuf),
+    Remote(Url),
+}
+
+impl Display for AutomataPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AutomataPath::Local(path) => write!(f, "Local: {:?}", path),
+            AutomataPath::Remote(url) => write!(f, "Remote: {:?}", url),
+        }
+    }
+}
+
+impl AutomataPath {
+    /// Create a new AutomataPath from a URL
+    pub fn from_remote(url: &str) -> Result<Self> {
+        let url = Url::parse(url)?;
+
+        if url.scheme() != "http" && url.scheme() != "https" {
+            return Err(TerraphimAutomataError::Dict(format!(
+                "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
+                url.scheme()
+            )));
+        }
+
+        Ok(AutomataPath::Remote(url))
+    }
+
+    /// Create a new AutomataPath from a file
+    pub fn from_local<P: AsRef<std::path::Path>>(file: P) -> Self {
+        AutomataPath::Local(file.as_ref().to_path_buf())
+    }
+
+    /// Create a sample remote AutomataPath for testing
+    pub fn remote_example() -> Self {
+        AutomataPath::Remote(
+            Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
+                .unwrap(),
+        )
+    }
+
+    /// Create a sample local AutomataPath for testing
+    pub fn local_example() -> Self {
+        AutomataPath::Local(PathBuf::from("data/term_to_id.json"))
+    }
+}
 
 /// `load_automata` loads output of the knowledge graph builder
 // pub async fn load_automata(url_or_file: &str) -> Result<matcher::Automata> {
@@ -35,7 +93,7 @@ pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 // }
 
 /// Load a thesaurus from a file or URL
-pub async fn load_thesaurus(automata_url: Url) -> Result<Thesaurus> {
+pub async fn load_thesaurus(automata_path: AutomataPath) -> Result<Thesaurus> {
     async fn read_url(url: Url) -> Result<String> {
         let response = reqwest::Client::new()
             .get(url)
@@ -48,17 +106,15 @@ pub async fn load_thesaurus(automata_url: Url) -> Result<Thesaurus> {
         Ok(text)
     }
 
-    log::debug!("Reading thesaurus from file {automata_url:?}");
-    let contents = if automata_url.scheme() == "http" || automata_url.scheme() == "https" {
-        read_url(automata_url).await?
-    } else {
-        let file_path = automata_url
-            .to_file_path()
-            .map_err(|_| TerraphimAutomataError::Dict("Invalid file path".to_string()))?;
-        let mut file = File::open(file_path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        contents
+    log::debug!("Reading thesaurus from {automata_path}");
+    let contents = match automata_path {
+        AutomataPath::Local(path) => {
+            let mut file = File::open(path)?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            contents
+        }
+        AutomataPath::Remote(url) => read_url(url).await?,
     };
 
     let thesaurus = serde_json::from_str(&contents)?;
@@ -73,9 +129,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_thesaurus_from_file() {
-        let thesaurus = load_thesaurus(Url::parse("data/term_to_id_simple.json").unwrap())
-            .await
-            .unwrap();
+        let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
+        let thesaurus = load_thesaurus(automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
@@ -93,12 +148,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_thesaurus_from_url() {
-        let thesaurus = load_thesaurus(
-            Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+        let automata_path = AutomataPath::remote_example();
+        let thesaurus = load_thesaurus(automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 1725);
         assert_eq!(
             thesaurus

@@ -340,16 +340,14 @@ pub fn magic_unpair(z: u128) -> (u128, u128) {
 mod tests {
     use super::*;
 
-    use terraphim_automata::load_thesaurus;
+    use terraphim_automata::{load_thesaurus, AutomataPath};
     use tokio::test;
     use ulid::Ulid;
-    use url::Url;
 
     async fn load_sample_thesaurus() -> Thesaurus {
-        let automata_url =
-            Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap();
-        load_thesaurus(automata_url).await.unwrap()
+        load_thesaurus(AutomataPath::remote_example())
+            .await
+            .unwrap()
     }
 
     #[test]
