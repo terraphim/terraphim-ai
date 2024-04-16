@@ -59,9 +59,9 @@ impl Settings {
             Some(path) => path,
             None => Settings::default_config_path(),
         };
-        log::debug!("Using config path: {:?}", config_path);
+        log::debug!("Config path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
-        log::debug!("Using config_file: {:?}", config_file);
+        log::debug!("Loading config_file: {:?}", config_file);
 
         Ok(Settings::with_layers(&[
             Layer::Toml(config_file),
@@ -72,14 +72,15 @@ impl Settings {
 
 /// Initialize the config file if it doesn't exist
 fn init_config_file(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
-    log::info!("Initializing config file at: {:?}", path);
     if !path.exists() {
         std::fs::create_dir_all(path)?;
     }
     let config_file = path.join("settings.toml");
     if !config_file.exists() {
-        log::info!("Creating default config at: {:?}", config_file);
+        log::info!("Initializing default config file at: {:?}", path);
         std::fs::write(&config_file, DEFAULT_SETTINGS)?;
+    } else {
+        log::debug!("Config file exists at: {:?}", config_file);
     }
     Ok(config_file)
 }
