@@ -32,6 +32,6 @@ impl Persistable for Thesaurus {
 
     /// returns ulid as key + .json
     fn get_key(&self) -> String {
-        format!("thesaurus_{}.json", self.name)
+        format!("thesaurus_{}.json", self.name())
     }
 }

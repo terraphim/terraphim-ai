@@ -4,25 +4,25 @@ use poem_openapi::{payload::Json, ApiResponse};
 use serde_json::value::Index;
 use ulid::Ulid;
 
-use crate::types::{ApiTags, Article, SearchQuery};
+use crate::types::{ApiTags, Document, SearchQuery};
 use anyhow::{Context, Result};
 use poem_openapi::{types::ToJSON, types::Type, NewType, Object};
-use terraphim_types::{Article, IndexedArticle, RoleGraph};
+use terraphim_types::{Document, IndexedDocument, RoleGraph};
 use tokio::sync::Mutex;
 
 // This would be the correct approach, however
-// IndexArticle is not `Type` and so we can't implement `NewType` for `ApiIndexedArticle`
-// That is because `IndexedArticle` is not `Send` and `Sync`.
-// We tried `Arc<Mutex<IndexedArticle>>` but that didn't work either because
+// IndexDocument is not `Type` and so we can't implement `NewType` for `ApiIndexedDocument`
+// That is because `IndexedDocument` is not `Send` and `Sync`.
+// We tried `Arc<Mutex<IndexedDocument>>` but that didn't work either because
 // `Mutex` is not `Type` either and we cannot implement that because of orphan rules
 // Therefore we manually serialize it with to_string()
 
 // use std::sync::Arc;
 
 // #[derive(Debug, Clone)]
-// pub struct ApiIndexedArticle(pub IndexedArticle);
+// pub struct ApiIndexedDocument(pub IndexedDocument);
 
-// impl ToJSON for ApiIndexedArticle {
+// impl ToJSON for ApiIndexedDocument {
 //     /// Convert this value to [`Value`].
 //     fn to_json(&self) -> Option<Value>;
 
@@ -34,23 +34,23 @@ use tokio::sync::Mutex;
 
 #[derive(ApiResponse, Debug, PartialEq, Eq)]
 pub enum QueryResponse {
-    /// Return the found articles.
+    /// Return the found documents.
     #[oai(status = 200)]
     Ok(PlainText<String>),
-    /// Return when the specified query didn't match any articles.
+    /// Return when the specified query didn't match any documents.
     #[oai(status = 404)]
     NotFound,
 }
 
 #[derive(ApiResponse)]
-enum CreateArticleResponse {
-    /// Returns when the article is successfully created.
+enum CreateDocumentResponse {
+    /// Returns when the document is successfully created.
     #[oai(status = 200)]
     Ok(Json<String>),
 }
 
 pub(crate) struct Api {
-    /// RoleGraph for ingesting articles
+    /// RoleGraph for ingesting documents
     pub(crate) rolegraph: Mutex<RoleGraph>,
 }
 
@@ -64,25 +64,25 @@ impl Api {
         }
     }
 
-    #[oai(path = "/articles", method = "post", tag = "ApiTags::Article")]
-    async fn create_article(&self, article: Json<Article>) -> CreateArticleResponse {
-        log::warn!("create_article");
+    #[oai(path = "/articles", method = "post", tag = "ApiTags::Document")]
+    async fn create_document(&self, document: Json<Document>) -> CreateDocumentResponse {
+        log::warn!("create_document");
 
-        log::warn!("create article");
+        log::warn!("create document");
         let id = Ulid::new().to_string();
-        let article: Article = article.0;
+        let document: Document = document.0;
 
         let mut rolegraph = self.rolegraph.lock().await;
-        rolegraph.parse_article(id.clone(), article);
+        rolegraph.parse_document(id.clone(), document);
 
         log::warn!("send response");
-        CreateArticleResponse::Ok(Json(id))
+        CreateDocumentResponse::Ok(Json(id))
     }
 
     #[oai(path = "/search", method = "post", tag = "ApiTags::Search")]
     async fn graph_search(&self, search_query: Json<SearchQuery>) -> QueryResponse {
         let rolegraph = self.rolegraph.lock().await;
-        let articles: Vec<(&String, IndexedArticle)> =
+        let documents: Vec<(&String, IndexedDocument)> =
             match rolegraph.query(&search_query.search_term) {
                 Ok(docs) => docs,
                 Err(e) => {
@@ -91,26 +91,26 @@ impl Api {
                 }
             };
 
-        match articles.len() {
+        match documents.len() {
             0 => QueryResponse::NotFound,
             _ => {
-                let docs: Vec<String> = match articles
+                let docs: Vec<String> = match documents
                     .into_iter()
                     .map(|(_id, doc)| doc.to_json_string())
                     .collect()
                 {
                     Ok(docs) => docs,
                     Err(e) => {
-                        log::error!("Error converting an individual article into JSON: {}", e);
+                        log::error!("Error converting an individual document into JSON: {}", e);
                         return QueryResponse::NotFound;
                     }
                 };
-                // let docs: Vec<String> = articles.into_iter().map(|(_id, doc) | doc.to_string()).collect();
-                // let docs: Vec<IndexedArticle> = articles.into_iter().map(|(_id, doc) | doc).collect();
+                // let docs: Vec<String> = documents.into_iter().map(|(_id, doc) | doc.to_string()).collect();
+                // let docs: Vec<IndexedDocument> = documents.into_iter().map(|(_id, doc) | doc).collect();
                 let json: String = match serde_json::to_string(&docs) {
                     Ok(json) => json,
                     Err(e) => {
-                        log::error!("Error converting vector of articles to JSON: {}", e);
+                        log::error!("Error converting vector of documents to JSON: {}", e);
                         return QueryResponse::NotFound;
                     }
                 };
@@ -128,20 +128,20 @@ impl Api {
     }
 }
 
-// fn serialize_into_json(articles: Vec<(&String, IndexedArticle)>) -> QueryResponse {
-//     let docs: Result<Vec<String>, _> = articles.into_iter().map(|(_id, doc) | doc.to_json_string()).collect();
+// fn serialize_into_json(documents: Vec<(&String, IndexedDocument)>) -> QueryResponse {
+//     let docs: Result<Vec<String>, _> = documents.into_iter().map(|(_id, doc) | doc.to_json_string()).collect();
 //     QueryResponse::Ok(Json(docs.unwrap()))
 // }
 
 // #[cfg(test)]
 // mod test {
 //     use super::*;
-//     use terraphim_rolegraph::{Article, IndexedArticle, RoleGraph};
+//     use terraphim_rolegraph::{Document, IndexedDocument, RoleGraph};
 
 //     #[test]
 //     fn test_serialization() {
-//         let articles: Vec<(&String, IndexedArticle)>  = vec![];
-//         let response = serialize_into_json(articles);
+//         let documents: Vec<(&String, IndexedDocument)>  = vec![];
+//         let response = serialize_into_json(documents);
 //         // assert_eq!(response, QueryResponse::Ok(Json(vec![r#"{"title":"test","body":"test","tags":["test"]}"#])));
 //         assert_eq!(response, QueryResponse::Ok(Json(vec![])));
 //     }
@@ -153,14 +153,14 @@ impl Api {
 //         let automata_url = "./data/term_to_id.json";
 //         let mut rolegraph = RoleGraph::new(role, automata_url);
 
-//         let doc = Article {
+//         let doc = Document {
 //             id: "1".to_string(),
 //             title: "Life cycle concepts".to_string(),
 //             body: Some("I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction".to_string()),
 //             description: None,
 //         };
 
-//         rolegraph.parse_article(
+//         rolegraph.parse_document(
 //             "asdf".to_string(),
 //             doc
 //         );

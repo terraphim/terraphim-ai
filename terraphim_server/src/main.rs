@@ -18,14 +18,14 @@
 use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
+use url::Url;
+
 use terraphim_automata::load_thesaurus;
 use terraphim_config::{Config, ConfigState};
+use terraphim_rolegraph::RoleGraph;
 use terraphim_rolegraph::RoleGraphSync;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::Settings;
-
-/// TODO: Can't get Open API docs to work with axum consistently, given up for now.
-use terraphim_rolegraph::RoleGraph;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -61,8 +61,6 @@ async fn main() -> Result<()> {
             SocketAddr::from(([127, 0, 0, 1], port))
         });
 
-    // TODO: make the service type configurable
-    // For now, we only support passing in the service type as an argument
     let mut config = Config::new();
     let mut config_state = ConfigState::new(&mut config)
         .await
@@ -70,7 +68,8 @@ async fn main() -> Result<()> {
 
     // Example of adding a role for testing
     let role = "system operator2".to_string();
-    let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
+    let automata_url =
+        Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json").unwrap();
     let thesaurus = load_thesaurus(automata_url).await?;
     let rolegraph = RoleGraph::new(role.clone(), thesaurus).await?;
     config_state

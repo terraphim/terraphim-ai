@@ -8,7 +8,7 @@ use serde_json::Value;
 use terraphim_automata::load_thesaurus;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Article, IndexedArticle, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
+    Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -68,9 +68,9 @@ pub struct Role {
     pub extra: AHashMap<String, Value>,
 }
 
-/// The service used for indexing articles
+/// The service used for indexing documents
 ///
-/// Each service assumes articles to be stored in a specific format
+/// Each service assumes documents to be stored in a specific format
 /// and uses a specific indexing algorithm
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum ServiceType {
@@ -78,7 +78,7 @@ pub enum ServiceType {
     Ripgrep,
 }
 
-/// A haystack is a collection of articles that can be indexed and searched
+/// A haystack is a collection of documents that can be indexed and searched
 ///
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
@@ -86,11 +86,11 @@ pub enum ServiceType {
 pub struct Haystack {
     /// The path to the haystack
     pub path: PathBuf,
-    /// The service used for indexing articles in the haystack
+    /// The service used for indexing documents in the haystack
     pub service: ServiceType,
 }
 
-/// A knowledge graph is the collection of articles which were indexed
+/// A knowledge graph is the collection of documents which were indexed
 /// using a specific service
 // TODO: Make the fields private once `TerraphimConfig` is more flexible
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -278,8 +278,8 @@ impl ConfigState {
         // and add it to the config state
         let mut roles = AHashMap::new();
         for (name, role) in &config.roles {
-            let automata_url = role.kg.automata_url.as_str();
             let role_name = name.to_lowercase();
+            let automata_url = role.kg.automata_url.clone();
             log::info!("Loading Role {} - Url {}", role_name, automata_url);
 
             let thesaurus = load_thesaurus(automata_url).await?;
@@ -293,31 +293,31 @@ impl ConfigState {
         })
     }
 
-    /// Index article into all rolegraphs
+    /// Index document into all rolegraphs
     // TODO: This should probably be moved to the `persistance` crate
-    pub async fn index_article(&mut self, article: &Article) -> OpendalResult<()> {
-        let id = article.id.clone();
+    pub async fn index_document(&mut self, document: &Document) -> OpendalResult<()> {
+        let id = document.id.clone();
 
         for rolegraph_state in self.roles.values() {
             let mut rolegraph = rolegraph_state.lock().await;
-            rolegraph.insert_article(&id, article.clone());
+            rolegraph.insert_document(&id, document.clone());
         }
         Ok(())
     }
 
-    /// Search articles in rolegraph using the search query
-    pub async fn search_articles(&self, search_query: &SearchQuery) -> Vec<IndexedArticle> {
-        log::debug!("search_articles: {:?}", search_query);
+    /// Search documents in rolegraph using the search query
+    pub async fn search_documents(&self, search_query: &SearchQuery) -> Vec<IndexedDocument> {
+        log::debug!("search_documents: {:?}", search_query);
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
 
         // if role is not provided, use the default role from the config
         let role = search_query.role.clone().unwrap_or(default_role);
-        log::debug!("Role for search_articles: {:#?}", role);
+        log::debug!("Role for search_documents: {:#?}", role);
 
         let role = role.to_lowercase();
         let rolegraph = self.roles.get(&role).unwrap().lock().await;
-        let articles: Vec<(String, IndexedArticle)> = match rolegraph.query(
+        let documents: Vec<(String, IndexedDocument)> = match rolegraph.query(
             &search_query.search_term,
             search_query.skip,
             search_query.limit,
@@ -329,7 +329,7 @@ impl ConfigState {
             }
         };
 
-        articles.into_iter().map(|(_id, doc)| doc).collect()
+        documents.into_iter().map(|(_id, doc)| doc).collect()
     }
 }
 

@@ -2,7 +2,7 @@ use persistence::Persistable;
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_middleware::thesaurus::create_thesaurus_from_haystack;
-use terraphim_types::{Article, IndexedArticle, SearchQuery};
+use terraphim_types::{Document, IndexedDocument, SearchQuery};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
@@ -33,23 +33,23 @@ impl<'a> TerraphimService {
         Ok(create_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
     }
 
-    /// Create article
-    pub async fn create_article(&mut self, article: Article) -> Result<Article> {
-        self.config_state.index_article(&article).await?;
-        Ok(article)
+    /// Create document
+    pub async fn create_document(&mut self, document: Document) -> Result<Document> {
+        self.config_state.index_document(&document).await?;
+        Ok(document)
     }
 
-    /// Search for articles in the haystacks
-    pub async fn search_articles(&self, search_query: &SearchQuery) -> Result<Vec<Article>> {
+    /// Search for documents in the haystacks
+    pub async fn search_documents(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
         self.update_thesaurus(search_query).await?;
 
-        let cached_articles =
+        let cached_documents =
             terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
                 .await?;
-        let docs: Vec<IndexedArticle> = self.config_state.search_articles(search_query).await;
-        let articles = terraphim_types::merge_and_serialize(cached_articles, docs);
+        let docs: Vec<IndexedDocument> = self.config_state.search_documents(search_query).await;
+        let documents = terraphim_types::merge_and_serialize(cached_documents, docs);
 
-        Ok(articles)
+        Ok(documents)
     }
 
     /// Fetch the current config

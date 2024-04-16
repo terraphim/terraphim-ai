@@ -17,13 +17,13 @@ fn calculate_hash<T: Hash>(t: &T) -> String {
     format!("{:x}", s.finish())
 }
 
-/// A Middleware is a service that creates an index of articles from
+/// A Middleware is a service that creates an index of documents from
 /// a haystack.
 ///
 /// Every middleware receives a needle and a haystack and returns
-/// a HashMap of Articles.
+/// a HashMap of Documents.
 pub trait IndexMiddleware {
-    /// Index the haystack and return a HashMap of Articles
+    /// Index the haystack and return a HashMap of Documents
     ///
     /// # Errors
     ///
@@ -36,7 +36,7 @@ pub trait IndexMiddleware {
     ) -> impl std::future::Future<Output = Result<Index>> + Send;
 }
 
-/// Use Middleware to search through haystacks and return an index of articles
+/// Use Middleware to search through haystacks and return an index of documents
 /// that match the search query.
 pub async fn search_haystacks(
     mut config_state: ConfigState,
@@ -57,31 +57,31 @@ pub async fn search_haystacks(
     // Define middleware to be used for searching.
     let ripgrep = RipgrepIndexer::default();
 
-    let mut all_new_articles: Index = AHashMap::new();
+    let mut all_new_documents: Index = AHashMap::new();
 
     for haystack in &role.haystacks {
-        log::info!("Finding articles in haystack: {:#?}", haystack);
+        log::info!("Finding documents in haystack: {:#?}", haystack);
         let needle = &search_query.search_term;
 
-        let new_articles = match haystack.service {
+        let new_documents = match haystack.service {
             ServiceType::Ripgrep => {
-                // Search through articles using ripgrep
+                // Search through documents using ripgrep
                 // This indexes the haystack using the ripgrep middleware
                 ripgrep.index(needle, &haystack.path).await?
             }
         };
 
-        for new_article in new_articles.values() {
-            if let Err(e) = config_state.index_article(new_article).await {
+        for new_document in new_documents.values() {
+            if let Err(e) = config_state.index_document(new_document).await {
                 log::warn!(
-                    "Failed to index article `{}` ({}): {e:?}",
-                    new_article.title,
-                    new_article.url
+                    "Failed to index document `{}` ({}): {e:?}",
+                    new_document.title,
+                    new_document.url
                 );
             }
         }
 
-        all_new_articles.extend(new_articles);
+        all_new_documents.extend(new_documents);
     }
-    Ok(all_new_articles)
+    Ok(all_new_documents)
 }

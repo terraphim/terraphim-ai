@@ -4,7 +4,7 @@ use pulldown_cmark::{html, Options, Parser, Tag};
 fn main() {
     let markdown_input = r#"
 ---
-title: My Article
+title: My Document
 tags: [example, rust]
 ---
 

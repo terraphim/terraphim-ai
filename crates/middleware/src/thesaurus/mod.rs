@@ -112,7 +112,7 @@ pub trait ThesaurusBuilder {
 /// ```
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 
-/// The synonyms keyword used in Logseq articles
+/// The synonyms keyword used in Logseq documents
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 /// A builder for a knowledge graph, which knows how to handle Logseq input.
@@ -188,7 +188,7 @@ impl LogseqService {
 /// Creates a `term_to_id` structure, which maps terms to their corresponding
 /// concept IDs.
 ///
-/// E.g. if a logseq article titled "validated system" contains
+/// E.g. if a logseq document titled "validated system" contains
 ///
 /// ```md
 /// synonyms:: operation service module, something else
