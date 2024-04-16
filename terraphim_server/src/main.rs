@@ -18,7 +18,7 @@
 use anyhow::Context;
 use clap::Parser;
 use std::net::SocketAddr;
-use url::Url;
+use terraphim_automata::AutomataPath;
 
 use terraphim_automata::load_thesaurus;
 use terraphim_config::{Config, ConfigState};
@@ -68,9 +68,7 @@ async fn main() -> Result<()> {
 
     // Example of adding a role for testing
     let role = "system operator2".to_string();
-    let automata_url =
-        Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json").unwrap();
-    let thesaurus = load_thesaurus(automata_url).await?;
+    let thesaurus = load_thesaurus(AutomataPath::remote_example()).await?;
     let rolegraph = RoleGraph::new(role.clone(), thesaurus).await?;
     config_state
         .roles

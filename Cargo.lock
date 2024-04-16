@@ -5246,6 +5246,7 @@ dependencies = [
  "persistence",
  "serde",
  "serde_json",
+ "terraphim_automata",
  "terraphim_config",
  "terraphim_rolegraph",
  "terraphim_types",

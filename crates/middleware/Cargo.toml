@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 terraphim_config = { path = "../config" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_automata = { path = "../terraphim_automata" }
 terraphim_types = { path = "../../terraphim_types" }
 persistence = { path = "../persistence" }
 

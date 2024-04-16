@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use persistence::Persistable;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use terraphim_automata::load_thesaurus;
+use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
     Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
@@ -95,7 +95,7 @@ pub struct Haystack {
 // TODO: Make the fields private once `TerraphimConfig` is more flexible
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
-    pub automata_url: Url,
+    pub automata_path: AutomataPath,
     pub input_type: KnowledgeGraphInputType,
     pub path: PathBuf,
     pub public: bool,
@@ -125,10 +125,7 @@ impl Config {
         let mut roles = AHashMap::new();
 
         let kg = KnowledgeGraph {
-            automata_url: Url::parse(
-                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-            )
-            .unwrap(),
+            automata_path: AutomataPath::remote_example(),
             input_type: KnowledgeGraphInputType::Markdown,
             path: PathBuf::from("~/pkm"),
             public: true,
@@ -151,10 +148,7 @@ impl Config {
         roles.insert("Default".to_lowercase().to_string(), default_role);
 
         let engineer_kg = KnowledgeGraph {
-            automata_url: Url::parse(
-                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-            )
-            .unwrap(),
+            automata_path: AutomataPath::remote_example(),
             input_type: KnowledgeGraphInputType::Markdown,
             path: PathBuf::from("~/pkm"),
             public: true,
@@ -177,10 +171,7 @@ impl Config {
         roles.insert("Engineer".to_lowercase().to_string(), engineer_role);
 
         let system_operator_kg = KnowledgeGraph {
-            automata_url: Url::parse(
-                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-            )
-            .unwrap(),
+            automata_path: AutomataPath::remote_example(),
             input_type: KnowledgeGraphInputType::Markdown,
             path: PathBuf::from("~/pkm"),
             public: true,
@@ -279,7 +270,7 @@ impl ConfigState {
         let mut roles = AHashMap::new();
         for (name, role) in &config.roles {
             let role_name = name.to_lowercase();
-            let automata_url = role.kg.automata_url.clone();
+            let automata_url = role.kg.automata_path.clone();
             log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
 
             let thesaurus = load_thesaurus(automata_url).await?;
@@ -423,10 +414,7 @@ mod tests {
             theme: "lumen".to_string(),
             server_url: Url::parse("http://localhost:8080").unwrap(),
             kg: KnowledgeGraph {
-                automata_url: Url::parse(
-                    "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-                )
-                .unwrap(),
+                automata_path: AutomataPath::remote_example(),
                 input_type: KnowledgeGraphInputType::Markdown,
                 path: PathBuf::from("~/pkm"),
                 public: true,

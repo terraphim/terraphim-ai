@@ -6,16 +6,16 @@
 //! cargo bench --bench throughput -- query
 //! ```
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use tokio::runtime::Runtime;
+
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::matcher::find_matches;
+use terraphim_automata::AutomataPath;
 use terraphim_rolegraph::input::TEST_CORPUS;
 use terraphim_rolegraph::split_paragraphs;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::Document;
 use terraphim_types::Thesaurus;
-
-use tokio::runtime::Runtime;
-use url::Url;
 
 lazy_static::lazy_static! {
     static ref TOKIO_RUNTIME: Runtime = Runtime::new().unwrap();
@@ -34,18 +34,16 @@ where
 // Create a sample rolegraph for the benchmarks
 async fn get_rolegraph() -> RoleGraph {
     let role = "system operator".to_string();
-    let automata_url =
-        Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json").unwrap();
-    let thesaurus = load_thesaurus(automata_url).await.unwrap();
+    let thesaurus = load_thesaurus(AutomataPath::remote_example())
+        .await
+        .unwrap();
     let rolegraph = RoleGraph::new(role, thesaurus).await;
     rolegraph.unwrap()
 }
 
 /// Loads a sample thesaurus
 fn load_sample_thesaurus() -> Thesaurus {
-    let automata_url =
-        Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json").unwrap();
-    let thesaurus = block_on(load_thesaurus(automata_url));
+    let thesaurus = block_on(load_thesaurus(AutomataPath::remote_example()));
     thesaurus.unwrap()
 }
 

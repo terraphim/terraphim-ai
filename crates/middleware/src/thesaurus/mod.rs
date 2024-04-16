@@ -28,13 +28,13 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
+use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
 use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
-use url::Url;
 
 use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
@@ -53,6 +53,7 @@ pub async fn create_thesaurus_from_haystack(
         .get(&role_name)
         .unwrap_or(&config.roles[&default_role])
         .to_owned();
+
     for haystack in &role.haystacks {
         log::debug!(
             "Building thesaurus using logseq for haystack: {:#?}",
@@ -72,14 +73,7 @@ pub async fn create_thesaurus_from_haystack(
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
 
-        // Store thesaurus URL in knowledge graph of role
-        let Ok(thesaurus_url) = Url::from_file_path(&thesaurus_path) else {
-            log::error!("Failed to convert thesaurus path to URL");
-            return Err(Error::Indexation(
-                "Failed to convert thesaurus path to URL".into(),
-            ));
-        };
-        role.kg.automata_url = thesaurus_url;
+        role.kg.automata_path = AutomataPath::Local(thesaurus_path);
     }
     Ok(())
 }
