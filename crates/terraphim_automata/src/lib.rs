@@ -45,8 +45,8 @@ pub enum AutomataPath {
 impl Display for AutomataPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AutomataPath::Local(path) => write!(f, "Local: {:?}", path),
-            AutomataPath::Remote(url) => write!(f, "Remote: {:?}", url),
+            AutomataPath::Local(path) => write!(f, "Local Path: {:?}", path),
+            AutomataPath::Remote(url) => write!(f, "Remote URL: {:?}", url),
         }
     }
 }
@@ -78,11 +78,6 @@ impl AutomataPath {
                 .unwrap(),
         )
     }
-
-    /// Create a sample local AutomataPath for testing
-    pub fn local_example() -> Self {
-        AutomataPath::Local(PathBuf::from("data/term_to_id.json"))
-    }
 }
 
 /// `load_automata` loads output of the knowledge graph builder
@@ -93,7 +88,7 @@ impl AutomataPath {
 // }
 
 /// Load a thesaurus from a file or URL
-pub async fn load_thesaurus(automata_path: AutomataPath) -> Result<Thesaurus> {
+pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
     async fn read_url(url: Url) -> Result<String> {
         let response = reqwest::Client::new()
             .get(url)
@@ -114,7 +109,7 @@ pub async fn load_thesaurus(automata_path: AutomataPath) -> Result<Thesaurus> {
             file.read_to_string(&mut contents)?;
             contents
         }
-        AutomataPath::Remote(url) => read_url(url).await?,
+        AutomataPath::Remote(url) => read_url(url.clone()).await?,
     };
 
     let thesaurus = serde_json::from_str(&contents)?;
@@ -130,7 +125,7 @@ mod tests {
     #[tokio::test]
     async fn test_load_thesaurus_from_file() {
         let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
-        let thesaurus = load_thesaurus(automata_path).await.unwrap();
+        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
@@ -149,7 +144,7 @@ mod tests {
     #[tokio::test]
     async fn test_load_thesaurus_from_url() {
         let automata_path = AutomataPath::remote_example();
-        let thesaurus = load_thesaurus(automata_path).await.unwrap();
+        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 1725);
         assert_eq!(
             thesaurus

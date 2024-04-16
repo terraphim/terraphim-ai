@@ -34,7 +34,7 @@ where
 // Create a sample rolegraph for the benchmarks
 async fn get_rolegraph() -> RoleGraph {
     let role = "system operator".to_string();
-    let thesaurus = load_thesaurus(AutomataPath::remote_example())
+    let thesaurus = load_thesaurus(&AutomataPath::remote_example())
         .await
         .unwrap();
     let rolegraph = RoleGraph::new(role, thesaurus).await;
@@ -43,7 +43,7 @@ async fn get_rolegraph() -> RoleGraph {
 
 /// Loads a sample thesaurus
 fn load_sample_thesaurus() -> Thesaurus {
-    let thesaurus = block_on(load_thesaurus(AutomataPath::remote_example()));
+    let thesaurus = block_on(load_thesaurus(&AutomataPath::remote_example()));
     thesaurus.unwrap()
 }
 

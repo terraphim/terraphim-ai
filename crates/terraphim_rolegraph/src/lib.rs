@@ -345,7 +345,7 @@ mod tests {
     use ulid::Ulid;
 
     async fn load_sample_thesaurus() -> Thesaurus {
-        load_thesaurus(AutomataPath::remote_example())
+        load_thesaurus(&AutomataPath::remote_example())
             .await
             .unwrap()
     }
