@@ -92,21 +92,20 @@ pub struct Haystack {
 
 /// A knowledge graph is the collection of documents which were indexed
 /// using a specific service
-// TODO: Make the fields private once `TerraphimConfig` is more flexible
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
     pub automata_path: AutomataPath,
-    pub input_type: KnowledgeGraphInputType,
-    pub path: PathBuf,
-    pub public: bool,
-    pub publish: bool,
+    input_type: KnowledgeGraphInputType,
+    path: PathBuf,
+    public: bool,
+    publish: bool,
 }
 
 /// The Terraphim config is the main configuration for terraphim
 /// It contains the global shortcut, roles, and default role
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
-    /// Global shortcut for terraphim desktop
+    /// Global shortcut for activating terraphim desktop
     pub global_shortcut: String,
     /// User roles with their respective settings
     pub roles: AHashMap<String, Role>,
@@ -118,9 +117,7 @@ pub struct Config {
 
 impl Config {
     // TODO: In order to make the config more flexible, we should pass in the
-    // roles from the outside. This way, we can define the service (ripgrep,
-    // logseq, etc) for each role. This will allow us to support different
-    // services for different roles more easily.
+    // roles from the outside.
     pub fn new() -> Self {
         let mut roles = AHashMap::new();
 
@@ -264,16 +261,18 @@ pub struct ConfigState {
 }
 
 impl ConfigState {
+    /// Create a new ConfigState
+    ///
+    /// For each role in a config, initialize a rolegraph
+    /// and add it to the config state
     pub async fn new(config: &mut Config) -> Result<Self> {
-        // For each role in a config, initialize a rolegraph
-        // and add it to the config state
         let mut roles = AHashMap::new();
         for (name, role) in &config.roles {
             let role_name = name.to_lowercase();
             let automata_url = role.kg.automata_path.clone();
             log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
 
-            let thesaurus = load_thesaurus(automata_url).await?;
+            let thesaurus = load_thesaurus(&automata_url).await?;
             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
             roles.insert(role_name, RoleGraphSync::from(rolegraph));
         }

@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
 
     // Example of adding a role for testing
     let role = "system operator2".to_string();
-    let thesaurus = load_thesaurus(AutomataPath::remote_example()).await?;
+    let thesaurus = load_thesaurus(&AutomataPath::remote_example()).await?;
     let rolegraph = RoleGraph::new(role.clone(), thesaurus).await?;
     config_state
         .roles
