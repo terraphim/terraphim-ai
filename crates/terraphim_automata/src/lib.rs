@@ -73,10 +73,10 @@ impl AutomataPath {
 
     /// Create a sample remote AutomataPath for testing
     pub fn remote_example() -> Self {
-        AutomataPath::Remote(
-            Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .unwrap(),
+        AutomataPath::from_remote(
+            "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
         )
+        .unwrap()
     }
 }
 

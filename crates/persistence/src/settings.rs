@@ -35,7 +35,7 @@ use std::str::FromStr;
 use std::time::Instant;
 
 use crate::{Error, Result};
-use terraphim_settings::Settings;
+use terraphim_settings::DeviceSettings;
 
 /// resolve_relative_path turns a relative path to a absolute path.
 ///
@@ -70,7 +70,10 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
     result.into()
 }
 
-pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(Operator, u128)> {
+pub async fn parse_profile(
+    settings: &DeviceSettings,
+    profile_name: &str,
+) -> Result<(Operator, u128)> {
     /// Returns the time (in nanoseconds) it takes to load a 1MB file,
     /// used to determine the fastest operator for a given profile.
     async fn get_speed(op: Operator) -> OpendalResult<u128> {
@@ -157,7 +160,9 @@ pub async fn parse_profile(settings: &Settings, profile_name: &str) -> Result<(O
     Ok((op, speed))
 }
 
-pub async fn parse_profiles(settings: &Settings) -> Result<HashMap<String, (Operator, u128)>> {
+pub async fn parse_profiles(
+    settings: &DeviceSettings,
+) -> Result<HashMap<String, (Operator, u128)>> {
     let mut ops = HashMap::new();
     let profile_names = settings.profiles.keys();
     for profile_name in profile_names {
@@ -185,7 +190,7 @@ mod tests {
             env::set_var(k, v);
         }
 
-        let settings = Settings::load_from_env_and_file(None).unwrap();
+        let settings = DeviceSettings::load_from_env_and_file(None).unwrap();
         println!("{:?}", settings);
         let profiles = settings.profiles;
         println!("{:?}", profiles);
@@ -220,7 +225,7 @@ mod tests {
     enable_virtual_host_style = "on"
     "#,
         )?;
-        let settings = Settings::load_from_env_and_file(Some(dir.into_path()))?;
+        let settings = DeviceSettings::load_from_env_and_file(Some(dir.into_path()))?;
         let profile = settings
             .profiles
             .get("mys3")
@@ -256,7 +261,7 @@ mod tests {
         for (k, v) in &env_vars {
             env::set_var(k, v);
         }
-        let settings = Settings::load_from_env_and_file(Some(dir.into_path()))?;
+        let settings = DeviceSettings::load_from_env_and_file(Some(dir.into_path()))?;
 
         let mys3 = settings.profiles["mys3"].clone();
         assert_eq!(mys3["region"], "us-west-1");

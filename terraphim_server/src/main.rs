@@ -25,7 +25,7 @@ use terraphim_config::{Config, ConfigState};
 use terraphim_rolegraph::RoleGraph;
 use terraphim_rolegraph::RoleGraphSync;
 use terraphim_server::{axum_server, Result};
-use terraphim_settings::Settings;
+use terraphim_settings::DeviceSettings;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     log::info!("Commandline arguments: {args:?}");
     let server_settings =
-        Settings::load_from_env_and_file(None).context("Failed to load settings")?;
+        DeviceSettings::load_from_env_and_file(None).context("Failed to load settings")?;
     log::info!(
         "Device settings hostname: {:?}",
         server_settings.server_hostname

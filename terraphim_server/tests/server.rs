@@ -5,7 +5,7 @@
 #[cfg(test)]
 mod tests {
     use terraphim_server::axum_server;
-    use terraphim_settings::Settings;
+    use terraphim_settings::DeviceSettings;
 
     use reqwest::{Client, StatusCode};
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
@@ -16,7 +16,7 @@ mod tests {
 
     async fn start_server() -> SocketAddr {
         let server_settings =
-            Settings::load_from_env_and_file(None).expect("Failed to load settings");
+            DeviceSettings::load_from_env_and_file(None).expect("Failed to load settings");
         let server_hostname = server_settings
             .server_hostname
             .parse::<SocketAddr>()
