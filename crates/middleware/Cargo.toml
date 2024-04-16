@@ -18,3 +18,4 @@ thiserror = "1.0.56"
 tokio = { version = "1.15.0", features = ["full"] }
 tokio-stream = { version = "0.1.14", features = ["sync"] }
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
+url = "2.5.0"

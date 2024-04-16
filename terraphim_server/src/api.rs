@@ -12,11 +12,11 @@ use service::TerraphimService;
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_rolegraph::RoleGraph;
-use terraphim_types::{Article, IndexedDocument, SearchQuery};
+use terraphim_types::{Article, IndexedArticle, SearchQuery};
 
 use crate::error::Result;
 
-pub type SearchResultsStream = Sender<IndexedDocument>;
+pub type SearchResultsStream = Sender<IndexedArticle>;
 
 pub(crate) async fn health_axum() -> impl IntoResponse {
     (StatusCode::OK, "OK")

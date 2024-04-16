@@ -196,34 +196,7 @@ impl Display for Concept {
     }
 }
 
-/// Document that can be indexed by the `RoleGraph`.
-///
-/// These are all articles and entities, which have fields that can be indexed.
-#[derive(Debug, Clone)]
-pub struct Document {
-    /// Unique identifier of the document
-    pub id: String,
-    /// Title of the document
-    pub title: String,
-    /// Body of the document
-    pub body: String,
-    /// Description of the document
-    pub description: Option<String>,
-}
-
-impl ToString for Document {
-    fn to_string(&self) -> String {
-        let mut text = String::new();
-        text.push_str(&self.title);
-        text.push_str(&self.body);
-        if let Some(description) = &self.description {
-            text.push_str(description);
-        }
-        text
-    }
-}
-
-/// Rank of a document in the search results
+/// Rank of an article in the search results
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Rank(u64);
 
@@ -266,6 +239,8 @@ impl Display for Rank {
 
 /// An article is a piece of content that can be indexed and searched.
 ///
+/// Article that can be indexed by the `RoleGraph`.
+///
 /// It holds the title, body, description, tags, and rank.
 /// The `id` is a unique identifier for the article.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -289,14 +264,15 @@ pub struct Article {
     pub rank: Option<Rank>,
 }
 
-impl From<Article> for Document {
-    fn from(article: Article) -> Self {
-        Document {
-            id: article.id,
-            title: article.title,
-            body: article.body,
-            description: article.description,
+impl ToString for Article {
+    fn to_string(&self) -> String {
+        let mut text = String::new();
+        text.push_str(&self.title);
+        text.push_str(&self.body);
+        if let Some(description) = &self.description {
+            text.push_str(description);
         }
+        text
     }
 }
 
@@ -306,14 +282,14 @@ pub struct Edge {
     pub id: Id,
     /// Rank of the edge
     pub rank: u64,
-    /// A hashmap of `document_id` to `rank`
+    /// A hashmap of `article_id` to `rank`
     pub doc_hash: AHashMap<String, u64>,
 }
 
 impl Edge {
-    pub fn new(id: Id, document_id: String) -> Self {
+    pub fn new(id: Id, article_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
-        doc_hash.insert(document_id, 1);
+        doc_hash.insert(article_id, 1);
         Self {
             id,
             rank: 1,
@@ -358,7 +334,7 @@ impl Node {
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
 ///
 /// It holds the normalized terms for a resource
-/// where a resource can be as diverse as a Markdown file or a document in
+/// where a resource can be as diverse as a Markdown file or an article in
 /// Notion or AtomicServer
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Thesaurus {
@@ -420,11 +396,11 @@ impl<'a> IntoIterator for &'a Thesaurus {
 /// and can be searched through using the `RoleGraph`.
 pub type Index = AHashMap<String, Article>;
 
-/// Reference to external storage of documents, traditional indexes use
-/// document, aka article or entity.
+/// Reference to external storage of articles, traditional indexes use
+/// article, aka document or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IndexedDocument {
-    /// UUID of the indexed document, matching external storage id
+pub struct IndexedArticle {
+    /// UUID of the indexed article, matching external storage id
     pub id: String,
     /// Matched to edges
     pub matched_edges: Vec<Edge>,
@@ -437,13 +413,13 @@ pub struct IndexedDocument {
     pub nodes: Vec<Id>,
 }
 
-impl IndexedDocument {
+impl IndexedArticle {
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
 }
 
-/// Query type for searching documents in the `RoleGraph`.
+/// Query type for searching articles in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SearchQuery {
@@ -483,7 +459,7 @@ pub enum KnowledgeGraphInputType {
 /// Merge articles from the cache and the output of query results
 ///
 /// Returns the merged articles
-pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -> Vec<Article> {
+pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedArticle>) -> Vec<Article> {
     // TODO: use relevance function for ranking (scorer)
     let mut articles: Vec<Article> = Vec::new();
     for doc in docs {

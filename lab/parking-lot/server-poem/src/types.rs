@@ -1,7 +1,7 @@
 use poem_openapi::types::ToJSON;
 use poem_openapi::{Object, Tags};
 use serde::{Deserialize, Serialize};
-use terraphim_types::{Document, IndexedDocument};
+use terraphim_types::{Article, IndexedArticle};
 
 #[derive(Debug, Object)]
 pub struct SearchQuery {
@@ -23,15 +23,15 @@ pub struct Article {
     pub tags: Option<Vec<String>>,
 }
 
-impl Into<Document> for Article {
-    fn into(self) -> Document {
+impl Into<Article> for Article {
+    fn into(self) -> Article {
         // If the ID is not provided, generate a new one
         let id = match self.id {
             Some(id) => id,
             None => ulid::Ulid::new().to_string(),
         };
 
-        Document {
+        Article {
             id,
             title: self.title,
             body: Some(self.body),

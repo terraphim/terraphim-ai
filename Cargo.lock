@@ -5200,12 +5200,14 @@ dependencies = [
  "aho-corasick",
  "csv",
  "flate2",
+ "log",
  "reqwest",
  "serde",
  "serde_json",
  "terraphim_types",
  "thiserror",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -5251,6 +5253,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "ulid",
+ "url",
 ]
 
 [[package]]
