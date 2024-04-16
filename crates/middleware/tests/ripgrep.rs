@@ -2,7 +2,7 @@
 mod tests {
     use terraphim_config::{Config, ConfigState};
     use terraphim_middleware::search_haystacks;
-    use terraphim_types::IndexedArticle;
+    use terraphim_types::IndexedDocument;
     use terraphim_types::{merge_and_serialize, SearchQuery};
 
     use terraphim_middleware::Result;
@@ -19,13 +19,13 @@ mod tests {
             skip: Some(0),
             limit: Some(10),
         };
-        println!("Searching articles with query: {search_query:?} {role_name}");
+        println!("Searching documents with query: {search_query:?} {role_name}");
 
-        let haystack_articles =
+        let haystack_documents =
             search_haystacks(config_state.clone(), search_query.clone()).await?;
-        let docs: Vec<IndexedArticle> = config_state.search_articles(&search_query).await;
-        let articles = merge_and_serialize(haystack_articles, docs);
-        log::debug!("Final articles: {articles:?}");
+        let docs: Vec<IndexedDocument> = config_state.search_documents(&search_query).await;
+        let documents = merge_and_serialize(haystack_documents, docs);
+        log::debug!("Final documents: {documents:?}");
 
         Ok(())
     }

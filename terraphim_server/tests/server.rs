@@ -10,7 +10,7 @@ mod tests {
     use reqwest::{Client, StatusCode};
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{Config, ConfigState, Haystack, ServiceType};
-    use terraphim_types::Article;
+    use terraphim_types::Document;
 
     use serial_test::serial;
 
@@ -69,10 +69,10 @@ mod tests {
         server_addr
     }
 
-    // test search article with POST method
+    // test search document with POST method
     #[tokio::test]
     #[serial]
-    async fn test_post_search_article() {
+    async fn test_post_search_document() {
         let server = ensure_server_started().await;
         let client = Client::new();
         let response = client
@@ -106,10 +106,10 @@ mod tests {
         // assert!(body.contains("expected content"));
     }
 
-    // test search article with POST method
+    // test search document with POST method
     #[tokio::test]
     #[serial]
-    async fn test_post_search_article_lifecycle() {
+    async fn test_post_search_document_lifecycle() {
         let server = ensure_server_started().await;
         let client = Client::new();
         let response = client
@@ -133,7 +133,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_search_articles_without_role() {
+    async fn test_search_documents_without_role() {
         let server = ensure_server_started().await;
 
         // Overwrite config for test
@@ -177,22 +177,22 @@ mod tests {
         //         "rank": 10
         //     }
         // ]
-        let articles: Vec<Article> = response.json().await.unwrap();
-        let first_article = &articles[0];
-        assert_eq!(first_article.title, "fixtures/haystack/Transition.md");
-        assert_eq!(first_article.url, "fixtures/haystack/Transition.md");
-        assert!(first_article
+        let documents: Vec<Document> = response.json().await.unwrap();
+        let first_document = &documents[0];
+        assert_eq!(first_document.title, "fixtures/haystack/Transition.md");
+        assert_eq!(first_document.url, "fixtures/haystack/Transition.md");
+        assert!(first_document
             .body
             .contains("Trained operators and maintainers"));
         assert_eq!(
-            first_article.tags,
+            first_document.tags,
             Some(vec!["trained operators and maintainers".to_string()])
         );
     }
 
     #[tokio::test]
     #[serial]
-    async fn test_search_articles_without_limit() {
+    async fn test_search_documents_without_limit() {
         let server = ensure_server_started().await;
 
         // Overwrite config for test
@@ -239,15 +239,15 @@ mod tests {
         //         "rank": 10
         //     }
         // ]
-        let articles: Vec<Article> = response.json().await.unwrap();
-        let first_article = &articles[0];
-        assert_eq!(first_article.title, "fixtures/haystack/Transition.md");
-        assert_eq!(first_article.url, "fixtures/haystack/Transition.md");
-        assert!(first_article
+        let documents: Vec<Document> = response.json().await.unwrap();
+        let first_document = &documents[0];
+        assert_eq!(first_document.title, "fixtures/haystack/Transition.md");
+        assert_eq!(first_document.url, "fixtures/haystack/Transition.md");
+        assert!(first_document
             .body
             .contains("Trained operators and maintainers"));
         assert_eq!(
-            first_article.tags,
+            first_document.tags,
             Some(vec!["trained operators and maintainers".to_string()])
         );
     }
@@ -301,15 +301,15 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_post_article() {
+    async fn test_post_document() {
         let server = ensure_server_started().await;
         let client = Client::new();
         let response = client.post(format!("http://{server}/article"))
             .header("Content-Type", "application/json")
             .body(r#"
             {
-                "title": "Title of the article",
-                "url": "url_of_the_article",
+                "title": "Title of the document",
+                "url": "url_of_the_document",
                 "body": "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction"
             }
             "#)

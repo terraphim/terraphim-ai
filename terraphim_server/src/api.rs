@@ -12,33 +12,33 @@ use service::TerraphimService;
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_rolegraph::RoleGraph;
-use terraphim_types::{Article, IndexedArticle, SearchQuery};
+use terraphim_types::{Document, IndexedDocument, SearchQuery};
 
 use crate::error::Result;
 
-pub type SearchResultsStream = Sender<IndexedArticle>;
+pub type SearchResultsStream = Sender<IndexedDocument>;
 
 pub(crate) async fn health_axum() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 
-/// Creates index of the article for each rolegraph
-pub(crate) async fn create_article(
+/// Creates index of the document for each rolegraph
+pub(crate) async fn create_document(
     State(config): State<ConfigState>,
-    Json(article): Json<Article>,
+    Json(document): Json<Document>,
 ) -> impl IntoResponse {
-    log::info!("create_article");
+    log::info!("create_document");
     let mut terraphim_service = TerraphimService::new(config.clone());
-    let article = terraphim_service
-        .create_article(article)
+    let document = terraphim_service
+        .create_document(document)
         .await
-        .expect("Failed to create article");
+        .expect("Failed to create document");
     log::info!("send response");
-    let response = Json(article);
+    let response = Json(document);
     (StatusCode::CREATED, response)
 }
 
-pub(crate) async fn _list_articles(
+pub(crate) async fn _list_documents(
     State(rolegraph): State<Arc<Mutex<RoleGraph>>>,
 ) -> impl IntoResponse {
     let rolegraph = rolegraph.lock().await.clone();
@@ -48,39 +48,39 @@ pub(crate) async fn _list_articles(
 }
 
 /// Search All TerraphimGraphs defined in a config by query params.
-pub(crate) async fn search_articles(
+pub(crate) async fn search_documents(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Query<SearchQuery>,
-) -> Result<Json<Vec<Article>>> {
+) -> Result<Json<Vec<Document>>> {
     log::info!("Search called with {:?}", search_query);
     let terraphim_service = TerraphimService::new(config_state);
-    let articles = terraphim_service.search_articles(&search_query.0).await?;
+    let documents = terraphim_service.search_documents(&search_query.0).await?;
 
-    Ok(Json(articles))
+    Ok(Json(documents))
 }
 
 /// Search All TerraphimGraphs defined in a config by post params.
 /// FIXME: add title, url and body to search output
-pub(crate) async fn search_articles_post(
+pub(crate) async fn search_documents_post(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
-) -> Result<Json<Vec<Article>>> {
-    log::info!("POST Searching articles with query: {search_query:?}");
+) -> Result<Json<Vec<Document>>> {
+    log::info!("POST Searching documents with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
-    let articles = terraphim_service.search_articles(&search_query.0).await?;
+    let documents = terraphim_service.search_documents(&search_query.0).await?;
 
     // Check if log level is debug:
     if log::log_enabled!(log::Level::Debug) {
-        log::debug!("Articles found:");
-        for article in &articles {
-            log::debug!("{} -> {}", article.id, article.rank.unwrap());
+        log::debug!("Documents found:");
+        for document in &documents {
+            log::debug!("{} -> {}", document.id, document.rank.unwrap());
         }
     }
 
-    Ok(Json(articles))
+    Ok(Json(documents))
 }
 
 /// API handler for Terraphim Config

@@ -3,7 +3,7 @@ pub mod matcher;
 pub use matcher::{find_matches, Matched};
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
+use url::Url;
 
 use terraphim_types::Thesaurus;
 
@@ -35,8 +35,8 @@ pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 // }
 
 /// Load a thesaurus from a file or URL
-pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
-    async fn read_url(url: &str) -> Result<String> {
+pub async fn load_thesaurus(automata_url: Url) -> Result<Thesaurus> {
+    async fn read_url(url: Url) -> Result<String> {
         let response = reqwest::Client::new()
             .get(url)
             .header("Accept", "application/json")
@@ -47,10 +47,15 @@ pub async fn load_thesaurus(url_or_file: &str) -> Result<Thesaurus> {
 
         Ok(text)
     }
-    let contents = if url_or_file.starts_with("http") {
-        read_url(url_or_file).await?
+
+    log::debug!("Reading thesaurus from file {automata_url:?}");
+    let contents = if automata_url.scheme() == "http" || automata_url.scheme() == "https" {
+        read_url(automata_url).await?
     } else {
-        let mut file = File::open(Path::new(url_or_file))?;
+        let file_path = automata_url
+            .to_file_path()
+            .map_err(|_| TerraphimAutomataError::Dict("Invalid file path".to_string()))?;
+        let mut file = File::open(file_path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         contents
@@ -68,7 +73,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_thesaurus_from_file() {
-        let thesaurus = load_thesaurus("data/term_to_id_simple.json").await.unwrap();
+        let thesaurus = load_thesaurus(Url::parse("data/term_to_id_simple.json").unwrap())
+            .await
+            .unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
@@ -86,10 +93,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_thesaurus_from_url() {
-        let thesaurus =
-            load_thesaurus("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
-                .await
-                .unwrap();
+        let thesaurus = load_thesaurus(
+            Url::parse("https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json")
+                .unwrap(),
+        )
+        .await
+        .unwrap();
         assert_eq!(thesaurus.len(), 1725);
         assert_eq!(
             thesaurus

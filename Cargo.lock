@@ -5276,6 +5276,7 @@ dependencies = [
  "tokio",
  "ulid",
  "unicode-segmentation",
+ "url",
 ]
 
 [[package]]
@@ -5311,6 +5312,7 @@ dependencies = [
  "tower",
  "tower-http",
  "ulid",
+ "url",
  "walkdir",
 ]
 

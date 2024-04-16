@@ -196,7 +196,7 @@ impl Display for Concept {
     }
 }
 
-/// Rank of an article in the search results
+/// Rank of an document in the search results
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Rank(u64);
 
@@ -237,42 +237,42 @@ impl Display for Rank {
     }
 }
 
-/// An article is a piece of content that can be indexed and searched.
-///
-/// Article that can be indexed by the `RoleGraph`.
+/// A document is the central a piece of content that gets indexed and searched.
 ///
 /// It holds the title, body, description, tags, and rank.
-/// The `id` is a unique identifier for the article.
+/// The `id` is a unique identifier for the document.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct Article {
-    /// Unique identifier for the article
+pub struct Document {
+    /// Unique identifier for the document
     pub id: String,
-    /// Title of the article
-    pub title: String,
-    /// The article body
-    pub body: String,
-    /// A short description of the article
-    pub description: Option<String>,
-
-    /// A short excerpt of the article
-    pub stub: Option<String>,
-    /// URL of the article
+    /// URL to the document
     pub url: String,
-    /// Tags for the article
+    /// Title of the document
+    pub title: String,
+    /// The document body
+    pub body: String,
+
+    /// A short description of the document
+    pub description: Option<String>,
+    /// A short excerpt of the document
+    pub stub: Option<String>,
+    /// Tags for the document
     pub tags: Option<Vec<String>>,
-    /// Rank of the article in the search results
+    /// Rank of the document in the search results
     pub rank: Option<Rank>,
 }
 
-impl ToString for Article {
-    fn to_string(&self) -> String {
-        let mut text = String::new();
-        text.push_str(&self.title);
-        text.push_str(&self.body);
-        if let Some(description) = &self.description {
-            text.push_str(description);
+impl fmt::Display for Document {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Start with title and body
+        write!(f, "{} {}", self.title, self.body)?;
+
+        // Append description if it exists
+        if let Some(ref description) = self.description {
+            write!(f, " {}", description)?;
         }
-        text
+
+        Ok(())
     }
 }
 
@@ -282,14 +282,14 @@ pub struct Edge {
     pub id: Id,
     /// Rank of the edge
     pub rank: u64,
-    /// A hashmap of `article_id` to `rank`
+    /// A hashmap of `document_id` to `rank`
     pub doc_hash: AHashMap<String, u64>,
 }
 
 impl Edge {
-    pub fn new(id: Id, article_id: String) -> Self {
+    pub fn new(id: Id, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
-        doc_hash.insert(article_id, 1);
+        doc_hash.insert(document_id, 1);
         Self {
             id,
             rank: 1,
@@ -334,14 +334,14 @@ impl Node {
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
 ///
 /// It holds the normalized terms for a resource
-/// where a resource can be as diverse as a Markdown file or an article in
+/// where a resource can be as diverse as a Markdown file or an document in
 /// Notion or AtomicServer
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Thesaurus {
     /// Name of the thesaurus
-    pub name: String,
+    name: String,
     /// The inner hashmap of normalized terms
-    inner: AHashMap<NormalizedTermValue, NormalizedTerm>,
+    data: AHashMap<NormalizedTermValue, NormalizedTerm>,
 }
 
 impl Thesaurus {
@@ -349,34 +349,39 @@ impl Thesaurus {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            inner: AHashMap::new(),
+            data: AHashMap::new(),
         }
+    }
+
+    /// Get the name of the thesaurus
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// Inserts a key-value pair into the thesaurus.
     pub fn insert(&mut self, key: NormalizedTermValue, value: NormalizedTerm) {
-        self.inner.insert(key, value);
+        self.data.insert(key, value);
     }
 
     /// Get the length of the thesaurus
     pub fn len(&self) -> usize {
-        self.inner.len()
+        self.data.len()
     }
 
     /// Check if the thesaurus is empty
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        self.data.is_empty()
     }
 
     /// Custom `get` method for the thesaurus, which accepts a
     /// `NormalizedTermValue` and returns a reference to the
     /// `NormalizedTerm`.
     pub fn get(&self, key: &NormalizedTermValue) -> Option<&NormalizedTerm> {
-        self.inner.get(key)
+        self.data.get(key)
     }
 
     pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
-        self.inner.keys()
+        self.data.keys()
     }
 }
 
@@ -386,21 +391,21 @@ impl<'a> IntoIterator for &'a Thesaurus {
     type IntoIter = Iter<'a, NormalizedTermValue, NormalizedTerm>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.iter()
+        self.data.iter()
     }
 }
 
-/// An index is a hashmap of articles
+/// An index is a hashmap of documents
 ///
-/// It holds the articles that have been indexed
+/// It holds the documents that have been indexed
 /// and can be searched through using the `RoleGraph`.
-pub type Index = AHashMap<String, Article>;
+pub type Index = AHashMap<String, Document>;
 
-/// Reference to external storage of articles, traditional indexes use
-/// article, aka document or entity.
+/// Reference to external storage of documents, traditional indexes use
+/// document, aka document or entity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IndexedArticle {
-    /// UUID of the indexed article, matching external storage id
+pub struct IndexedDocument {
+    /// UUID of the indexed document, matching external storage id
     pub id: String,
     /// Matched to edges
     pub matched_edges: Vec<Edge>,
@@ -413,13 +418,13 @@ pub struct IndexedArticle {
     pub nodes: Vec<Id>,
 }
 
-impl IndexedArticle {
+impl IndexedDocument {
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
 }
 
-/// Query type for searching articles in the `RoleGraph`.
+/// Query type for searching documents in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SearchQuery {
@@ -456,25 +461,25 @@ pub enum KnowledgeGraphInputType {
     Json,
 }
 
-/// Merge articles from the cache and the output of query results
+/// Merge documents from the cache and the output of query results
 ///
-/// Returns the merged articles
-pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedArticle>) -> Vec<Article> {
+/// Returns the merged documents
+pub fn merge_and_serialize(cached_documents: Index, docs: Vec<IndexedDocument>) -> Vec<Document> {
     // TODO: use relevance function for ranking (scorer)
-    let mut articles: Vec<Article> = Vec::new();
+    let mut documents: Vec<Document> = Vec::new();
     for doc in docs {
         log::trace!("doc: {:#?}", doc);
-        if let Some(article) = cached_articles.get(&doc.id).cloned() {
-            // Article found in cache
-            let mut article = article;
-            article.tags = Some(doc.tags.clone());
+        if let Some(document) = cached_documents.get(&doc.id).cloned() {
+            // Document found in cache
+            let mut document = document;
+            document.tags = Some(doc.tags.clone());
             // rank only available for terraphim graph
             // use scorer to populate the rank for all cases
-            article.rank = Some(doc.rank);
-            articles.push(article.clone());
+            document.rank = Some(doc.rank);
+            documents.push(document.clone());
         } else {
-            log::warn!("Article not found in cache");
+            log::warn!("Document not found in cache");
         }
     }
-    articles
+    documents
 }
