@@ -8,7 +8,7 @@ use serde_json::Value;
 use terraphim_automata::load_thesaurus;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Article, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
+    Article, IndexedArticle, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -17,6 +17,7 @@ use ulid::Ulid;
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
+use url::Url;
 
 type PersistenceResult<T> = std::result::Result<T, persistence::Error>;
 
@@ -42,6 +43,9 @@ pub enum TerraphimConfigError {
 
     #[error("Automata error")]
     Automata(#[from] terraphim_automata::TerraphimAutomataError),
+
+    #[error("Url error")]
+    Url(#[from] url::ParseError),
 }
 
 /// A role is a collection of settings for a specific user
@@ -57,16 +61,16 @@ pub struct Role {
     pub relevance_function: RelevanceFunction,
     pub theme: String,
     #[serde(rename = "serverUrl")]
-    pub server_url: String,
+    pub server_url: Url,
     pub kg: KnowledgeGraph,
     pub haystacks: Vec<Haystack>,
     #[serde(flatten)]
     pub extra: AHashMap<String, Value>,
 }
 
-/// The service used for indexing documents
+/// The service used for indexing articles
 ///
-/// Each service assumes documents to be stored in a specific format
+/// Each service assumes articles to be stored in a specific format
 /// and uses a specific indexing algorithm
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum ServiceType {
@@ -74,7 +78,7 @@ pub enum ServiceType {
     Ripgrep,
 }
 
-/// A haystack is a collection of documents that can be indexed and searched
+/// A haystack is a collection of articles that can be indexed and searched
 ///
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
@@ -82,17 +86,16 @@ pub enum ServiceType {
 pub struct Haystack {
     /// The path to the haystack
     pub path: PathBuf,
-    /// The service used for indexing documents in the haystack
+    /// The service used for indexing articles in the haystack
     pub service: ServiceType,
 }
 
-/// A knowledge graph is the collection of documents which were indexed
+/// A knowledge graph is the collection of articles which were indexed
 /// using a specific service
 // TODO: Make the fields private once `TerraphimConfig` is more flexible
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KnowledgeGraph {
-    // TODO: Convert to `url::Url` type
-    pub automata_url: String,
+    pub automata_url: Url,
     pub input_type: KnowledgeGraphInputType,
     pub path: PathBuf,
     pub public: bool,
@@ -122,8 +125,10 @@ impl Config {
         let mut roles = AHashMap::new();
 
         let kg = KnowledgeGraph {
-            automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
-                .to_string(),
+            automata_url: Url::parse(
+                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+            )
+            .unwrap(),
             input_type: KnowledgeGraphInputType::Markdown,
             path: PathBuf::from("~/pkm"),
             public: true,
@@ -138,7 +143,7 @@ impl Config {
             name: "Default".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "spacelab".to_string(),
-            server_url: "http://localhost:8000/articles/search".to_string(),
+            server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
             kg,
             haystacks: vec![haystack],
             extra: AHashMap::new(),
@@ -146,8 +151,10 @@ impl Config {
         roles.insert("Default".to_lowercase().to_string(), default_role);
 
         let engineer_kg = KnowledgeGraph {
-            automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
-                .to_string(),
+            automata_url: Url::parse(
+                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+            )
+            .unwrap(),
             input_type: KnowledgeGraphInputType::Markdown,
             path: PathBuf::from("~/pkm"),
             public: true,
@@ -162,7 +169,7 @@ impl Config {
             name: "Engineer".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "lumen".to_string(),
-            server_url: "http://localhost:8000/articles/search".to_string(),
+            server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
             kg: engineer_kg,
             haystacks: vec![engineer_haystack],
             extra: AHashMap::new(),
@@ -170,8 +177,10 @@ impl Config {
         roles.insert("Engineer".to_lowercase().to_string(), engineer_role);
 
         let system_operator_kg = KnowledgeGraph {
-            automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
-                .to_string(),
+            automata_url: Url::parse(
+                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+            )
+            .unwrap(),
             input_type: KnowledgeGraphInputType::Markdown,
             path: PathBuf::from("~/pkm"),
             public: true,
@@ -186,7 +195,7 @@ impl Config {
             name: "System Operator".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "superhero".to_string(),
-            server_url: "http://localhost:8000/articles/search".to_string(),
+            server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
             kg: system_operator_kg,
             haystacks: vec![system_operator_haystack],
             extra: AHashMap::new(),
@@ -271,7 +280,7 @@ impl ConfigState {
         for (name, role) in &config.roles {
             let automata_url = role.kg.automata_url.as_str();
             let role_name = name.to_lowercase();
-            log::info!("Loading Role {} - Url {}", role_name.clone(), automata_url);
+            log::info!("Loading Role {} - Url {}", role_name, automata_url);
 
             let thesaurus = load_thesaurus(automata_url).await?;
             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
@@ -291,13 +300,13 @@ impl ConfigState {
 
         for rolegraph_state in self.roles.values() {
             let mut rolegraph = rolegraph_state.lock().await;
-            rolegraph.parse_document(&id, article.clone());
+            rolegraph.insert_article(&id, article.clone());
         }
         Ok(())
     }
 
     /// Search articles in rolegraph using the search query
-    pub async fn search_articles(&self, search_query: &SearchQuery) -> Vec<IndexedDocument> {
+    pub async fn search_articles(&self, search_query: &SearchQuery) -> Vec<IndexedArticle> {
         log::debug!("search_articles: {:?}", search_query);
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
@@ -308,7 +317,7 @@ impl ConfigState {
 
         let role = role.to_lowercase();
         let rolegraph = self.roles.get(&role).unwrap().lock().await;
-        let documents: Vec<(String, IndexedDocument)> = match rolegraph.query(
+        let articles: Vec<(String, IndexedArticle)> = match rolegraph.query(
             &search_query.search_term,
             search_query.skip,
             search_query.limit,
@@ -320,7 +329,7 @@ impl ConfigState {
             }
         };
 
-        documents.into_iter().map(|(_id, doc)| doc).collect()
+        articles.into_iter().map(|(_id, doc)| doc).collect()
     }
 }
 
@@ -412,10 +421,12 @@ mod tests {
             name: "Father".to_string(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "lumen".to_string(),
-            server_url: "http://localhost:8080".to_string(),
+            server_url: Url::parse("http://localhost:8080").unwrap(),
             kg: KnowledgeGraph {
-                automata_url: "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json"
-                    .to_string(),
+                automata_url: Url::parse(
+                    "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+                )
+                .unwrap(),
                 input_type: KnowledgeGraphInputType::Markdown,
                 path: PathBuf::from("~/pkm"),
                 public: true,

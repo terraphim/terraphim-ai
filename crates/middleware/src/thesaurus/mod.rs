@@ -34,6 +34,7 @@ use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use url::Url;
 
 use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
@@ -71,8 +72,14 @@ pub async fn create_thesaurus_from_haystack(
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
 
-        // Put into knowledge graph of role
-        role.kg.automata_url = thesaurus_path.to_string_lossy().to_string();
+        // Store thesaurus URL in knowledge graph of role
+        let Ok(thesaurus_url) = Url::from_file_path(&thesaurus_path) else {
+            log::error!("Failed to convert thesaurus path to URL");
+            return Err(Error::Indexation(
+                "Failed to convert thesaurus path to URL".into(),
+            ));
+        };
+        role.kg.automata_url = thesaurus_url;
     }
     Ok(())
 }
@@ -105,7 +112,7 @@ pub trait ThesaurusBuilder {
 /// ```
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 
-/// The synonyms keyword used in Logseq documents
+/// The synonyms keyword used in Logseq articles
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 /// A builder for a knowledge graph, which knows how to handle Logseq input.
@@ -181,7 +188,7 @@ impl LogseqService {
 /// Creates a `term_to_id` structure, which maps terms to their corresponding
 /// concept IDs.
 ///
-/// E.g. if a logseq document titled "validated system" contains
+/// E.g. if a logseq article titled "validated system" contains
 ///
 /// ```md
 /// synonyms:: operation service module, something else

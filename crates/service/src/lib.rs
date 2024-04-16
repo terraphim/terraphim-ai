@@ -2,7 +2,7 @@ use persistence::Persistable;
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_middleware::thesaurus::create_thesaurus_from_haystack;
-use terraphim_types::{Article, IndexedDocument, SearchQuery};
+use terraphim_types::{Article, IndexedArticle, SearchQuery};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
@@ -46,7 +46,7 @@ impl<'a> TerraphimService {
         let cached_articles =
             terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
                 .await?;
-        let docs: Vec<IndexedDocument> = self.config_state.search_articles(search_query).await;
+        let docs: Vec<IndexedArticle> = self.config_state.search_articles(search_query).await;
         let articles = terraphim_types::merge_and_serialize(cached_articles, docs);
 
         Ok(articles)

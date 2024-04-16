@@ -52,6 +52,11 @@ async fn init_device_storage() -> Result<DeviceStorage> {
     Ok(DeviceStorage { ops, fastest_op })
 }
 
+/// A trait for persisting objects
+/// 
+/// This trait is used to save and load objects to and from the fastest operator
+/// An operator is a storage backend that implements the `opendal::Operator`
+/// trait, such as a file system, a database, or a cloud storage service.
 #[async_trait]
 pub trait Persistable: Serialize + DeserializeOwned {
     /// Create a new instance
