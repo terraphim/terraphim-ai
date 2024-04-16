@@ -3,8 +3,7 @@ pub mod matcher;
 pub use matcher::{find_matches, Matched};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use std::fs::File;
-use std::io::prelude::*;
+use std::fs;
 use std::path::PathBuf;
 use url::Url;
 
@@ -96,19 +95,12 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
             .send()
             .await?;
 
-        let text = response.text().await?;
-
-        Ok(text)
+        Ok(response.text().await?)
     }
 
     log::debug!("Reading thesaurus from {automata_path}");
     let contents = match automata_path {
-        AutomataPath::Local(path) => {
-            let mut file = File::open(path)?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)?;
-            contents
-        }
+        AutomataPath::Local(path) => fs::read_to_string(path)?,
         AutomataPath::Remote(url) => read_url(url.clone()).await?,
     };
 
