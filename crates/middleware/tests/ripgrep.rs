@@ -1,15 +1,47 @@
 #[cfg(test)]
 mod tests {
-    use terraphim_config::{Config, ConfigState};
+    use std::path::PathBuf;
+
+    use ahash::AHashMap;
+    use terraphim_automata::AutomataPath;
+    use terraphim_config::{
+        ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
+    };
     use terraphim_middleware::search_haystacks;
-    use terraphim_types::IndexedDocument;
     use terraphim_types::{merge_and_serialize, SearchQuery};
+    use terraphim_types::{IndexedDocument, KnowledgeGraphInputType, RelevanceFunction};
 
     use terraphim_middleware::Result;
+    use url::Url;
 
     #[tokio::test]
     async fn test_roundtrip() -> Result<()> {
-        let mut config = Config::new();
+        let mut config = ConfigBuilder::new()
+            .add_role(
+                "System Operator",
+                Role {
+                    shortname: Some("operator".to_string()),
+                    name: "System Operator".to_string(),
+                    relevance_function: RelevanceFunction::TerraphimGraph,
+                    theme: "superhero".to_string(),
+                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    kg: KnowledgeGraph {
+                        automata_path: AutomataPath::remote_example(),
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("~/pkm"),
+                        public: true,
+                        publish: true,
+                    },
+                    haystacks: vec![Haystack {
+                        path: PathBuf::from("/tmp/system_operator/pages/"),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: AHashMap::new(),
+                },
+            )
+            .default_role("Default")
+            .build()?;
+
         let config_state = ConfigState::new(&mut config).await?;
 
         let role_name = "System Operator".to_string();
