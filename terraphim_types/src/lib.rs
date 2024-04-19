@@ -464,6 +464,7 @@ pub enum KnowledgeGraphInputType {
 /// Merge documents from the cache and the output of query results
 ///
 /// Returns the merged documents
+// TODO: This function should be moved to the `terraphim_middleware` or `terraphim_service` crate
 pub fn merge_and_serialize(cached_documents: Index, docs: Vec<IndexedDocument>) -> Vec<Document> {
     // TODO: use relevance function for ranking (scorer)
     let mut documents: Vec<Document> = Vec::new();
