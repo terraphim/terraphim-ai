@@ -436,7 +436,7 @@ pub struct SearchQuery {
 
 /// Defines the relevance function (scorer) to be used for ranking search
 /// results for the `Role`.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum RelevanceFunction {
     #[serde(rename = "terraphim-graph")]
     TerraphimGraph,
@@ -451,7 +451,7 @@ pub enum RelevanceFunction {
 ///
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]

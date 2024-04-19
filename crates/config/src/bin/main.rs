@@ -1,14 +1,46 @@
+use std::path::PathBuf;
+
+use ahash::AHashMap;
 use persistence::Persistable;
-use terraphim_config::{Config, Result, TerraphimConfigError};
+use terraphim_automata::AutomataPath;
+use terraphim_config::{
+    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
+};
+use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
+use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
         .try_init()
-        .map_err(|e| TerraphimConfigError::TracingSubscriber(e));
+        .map_err(TerraphimConfigError::TracingSubscriber);
 
-    let config = Config::new();
+    let mut config = ConfigBuilder::new()
+        .add_role(
+            "Engineer",
+            Role {
+                shortname: Some("Engineer".to_string()),
+                name: "Engineer".to_string(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "lumen".to_string(),
+                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                kg: KnowledgeGraph {
+                    automata_path: AutomataPath::remote_example(),
+                    input_type: KnowledgeGraphInputType::Markdown,
+                    path: PathBuf::from("~/pkm"),
+                    public: true,
+                    publish: true,
+                },
+                haystacks: vec![Haystack {
+                    path: PathBuf::from("localsearch"),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .build()?;
+
     let json_str = serde_json::to_string_pretty(&config)?;
     println!("json_str: {:?}", json_str);
 
@@ -20,12 +52,11 @@ async fn main() -> Result<()> {
     let (_ops, fastest_op) = config.load_config().await?;
     println!("fastest_op: {:?}", fastest_op.info());
 
-    let mut obj1 = Config::new();
     let key = config.get_key();
     // println!("key: {}", key);
-    obj1 = obj1.load(&key).await?;
-    println!("loaded obj: {:?}", obj1);
-    assert_eq!(obj1.get_key(), config.get_key());
+    let loaded_config = config.load(&key).await?;
+    println!("loaded obj: {:?}", loaded_config);
+    assert_eq!(loaded_config.get_key(), config.get_key());
 
     Ok(())
 }

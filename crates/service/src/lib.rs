@@ -1,5 +1,3 @@
-use persistence::Persistable;
-use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_middleware::thesaurus::create_thesaurus_from_haystack;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
@@ -58,11 +56,11 @@ impl<'a> TerraphimService {
         current_config.clone()
     }
 
-    /// Update the current config
-    pub async fn update_config(&self, config_new: Config) -> Result<terraphim_config::Config> {
-        let mut config_state_lock = self.config_state.config.lock().await;
-        config_state_lock.update(config_new.clone());
-        config_state_lock.save().await?;
-        Ok(config_state_lock.clone())
-    }
+    // /// Update the current config
+    // pub async fn update_config(&self, config_new: Config) -> Result<terraphim_config::Config> {
+    //     let mut config_state_lock = self.config_state.config.lock().await;
+    //     config_state_lock.update(config_new.clone());
+    //     config_state_lock.save().await?;
+    //     Ok(config_state_lock.clone())
+    // }
 }

@@ -5224,6 +5224,7 @@ dependencies = [
  "persistence",
  "serde",
  "serde_json",
+ "tempfile",
  "terraphim_automata",
  "terraphim_rolegraph",
  "terraphim_types",
