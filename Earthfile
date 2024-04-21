@@ -252,8 +252,8 @@ docs-pages:
   RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
-  RUN cargo install --git https://github.com/typst/typst typst-cli --tag v0.11.0
-  RUN cargo install mdbook-typst
+  RUN cargo install --git https://github.com/typst/typst typst-cli 
+  RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
   RUN cargo install mdbook-mermaid
   RUN apt update && apt install libvips-dev -y
   RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
