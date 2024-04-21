@@ -24,6 +24,7 @@ pipeline:
   BUILD +lint
   BUILD +test
   BUILD +build-native
+  BUILD +docs-pages
 
 rustlib:
   BUILD +install
