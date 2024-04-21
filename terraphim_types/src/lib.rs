@@ -436,13 +436,9 @@ pub struct SearchQuery {
 
 /// Defines the relevance function (scorer) to be used for ranking search
 /// results for the `Role`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
 pub enum RelevanceFunction {
-    #[serde(rename = "terraphim-graph")]
-    TerraphimGraph,
-    #[serde(rename = "redis-search")]
-    RedisSearch,
-    /// Use the title scorer for relevance
+    /// Scorer for ranking search results based on the title of a document
     #[serde(rename = "title-scorer")]
     TitleScorer,
 }
@@ -466,7 +462,6 @@ pub enum KnowledgeGraphInputType {
 /// Returns the merged documents
 // TODO: This function should be moved to the `terraphim_middleware` or `terraphim_service` crate
 pub fn merge_and_serialize(cached_documents: Index, docs: Vec<IndexedDocument>) -> Vec<Document> {
-    // TODO: use relevance function for ranking (scorer)
     let mut documents: Vec<Document> = Vec::new();
     for doc in docs {
         log::trace!("doc: {:#?}", doc);

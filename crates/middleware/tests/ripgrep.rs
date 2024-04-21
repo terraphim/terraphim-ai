@@ -22,7 +22,7 @@ mod tests {
                 Role {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".to_string(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
+                    relevance_function: RelevanceFunction::TitleScorer,
                     theme: "superhero".to_string(),
                     server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
                     kg: KnowledgeGraph {
