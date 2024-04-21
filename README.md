@@ -80,7 +80,7 @@ The compactness and mobility of such AI assistant drives the [[Design Decisions]
 [ghost]: https://www.destinypedia.com/Ghost 
 [relict]: https://www.goodreads.com/en/book/show/196710046  
 
-Terraphim is a trademark registered in the UK, US and internationally (WIPO). 
+Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
 
 ## Contributing
 
