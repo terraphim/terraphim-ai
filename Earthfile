@@ -247,13 +247,15 @@ docker-scratch:
 
   
 docs-pages:
-  FROM rust:1.75.0-buster
+  FROM +install-native 
   RUN cargo install mdbook
+  RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
-  RUN cargo install --git https://github.com/typst/typst typst-cli --tag v0.10.0
+  RUN cargo install --git https://github.com/typst/typst typst-cli --tag v0.11.0
   RUN cargo install mdbook-typst
   RUN cargo install mdbook-mermaid
+  RUN apt update && apt install libvips-dev -y
   RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
   RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
   COPY --keep-ts docs /docs
