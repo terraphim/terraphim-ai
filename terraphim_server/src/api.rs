@@ -70,14 +70,11 @@ pub(crate) async fn search_documents_post(
     log::info!("POST Searching documents with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
-    let documents = terraphim_service.search_documents(&search_query.0).await?;
+    let documents = terraphim_service.search_documents(&search_query).await?;
 
-    // Check if log level is debug:
-    if log::log_enabled!(log::Level::Debug) {
-        log::debug!("Documents found:");
-        for document in &documents {
-            log::debug!("{} -> {}", document.id, document.rank.unwrap());
-        }
+    log::debug!("Documents found:");
+    for document in &documents {
+        log::debug!("{} -> {}", document.id, document.rank.unwrap());
     }
 
     Ok(Json(documents))
@@ -91,13 +88,16 @@ pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<Confi
     Json(config)
 }
 
-/// API handler for Terraphim Config update
-pub async fn update_config(
-    State(config): State<ConfigState>,
-    Json(config_new): Json<Config>,
-) -> Result<Json<Config>> {
-    let terraphim_service = TerraphimService::new(config);
-    let config_state = terraphim_service.update_config(config_new).await?;
+// /// API handler for Terraphim Config update
+// pub async fn update_config(
+//     State(config_config): State<ConfigState>,
+//     Json(config_new): Json<Config>,
+// ) -> Result<Json<Config>> {
+//     let mut config = ConfigBuilder::from_config(config_new).build()?;
+//     let state = ConfigState::new(&mutconfig).await?;
 
-    Ok(Json(config_state.clone()))
-}
+//     let terraphim_service = TerraphimService::new(config);
+//     let config_state = terraphim_service.update_config(config_new).await?;
+
+//     Ok(Json(config_state.clone()))
+// }

@@ -69,9 +69,10 @@ impl<'a> TerraphimService {
 
         // Get the role from the config
         let role = self.get_search_role(search_query).await?;
+        log::debug!("Role for searching: {:?}", role);
 
-        let relevance_function = role.relevance_function;
         // Use relevance function for ranking (scorer)
+        let relevance_function = role.relevance_function;
 
         // Sort the documents by relevance
         let documents = score::sort_documents(documents, relevance_function);
