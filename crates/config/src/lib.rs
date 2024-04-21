@@ -60,7 +60,6 @@ pub struct Role {
     pub shortname: Option<String>,
     pub name: String,
     /// The relevance function used to rank search results
-    // TODO: use this
     pub relevance_function: RelevanceFunction,
     pub theme: String,
     #[serde(rename = "serverUrl")]
@@ -282,6 +281,12 @@ impl ConfigState {
         })
     }
 
+    /// Get a role from the config
+    pub async fn get_role(&self, role: &str) -> Option<Role> {
+        let config = self.config.lock().await;
+        config.roles.get(role).cloned()
+    }
+
     /// Index document into all rolegraphs
     // TODO: This should probably be moved to the `persistance` crate
     pub async fn index_document(&mut self, document: &Document) -> OpendalResult<()> {
@@ -380,7 +385,7 @@ mod tests {
                 Role {
                     shortname: Some("Default".to_string()),
                     name: "Default".to_string(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
+                    relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
                     server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
                     kg: KnowledgeGraph {
@@ -402,7 +407,7 @@ mod tests {
                 Role {
                     shortname: Some("Engineer".to_string()),
                     name: "Engineer".to_string(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
+                    relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
                     server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
                     kg: KnowledgeGraph {
@@ -424,7 +429,7 @@ mod tests {
                 Role {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".to_string(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
+                    relevance_function: RelevanceFunction::TitleScorer,
                     theme: "superhero".to_string(),
                     server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
                     kg: KnowledgeGraph {
@@ -469,7 +474,7 @@ mod tests {
         Role {
             shortname: Some("father".to_string()),
             name: "Father".to_string(),
-            relevance_function: RelevanceFunction::TerraphimGraph,
+            relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),
             server_url: Url::parse("http://localhost:8080").unwrap(),
             kg: KnowledgeGraph {

@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
             Role {
                 shortname: Some("Engineer".to_string()),
                 name: "Engineer".to_string(),
-                relevance_function: RelevanceFunction::TerraphimGraph,
+                relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
                 server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
                 kg: KnowledgeGraph {
