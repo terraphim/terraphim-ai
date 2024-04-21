@@ -78,4 +78,22 @@ The compactness and mobility of such AI assistant drives the [[Design Decisions]
 
 [bd-1]: https://starwars.fandom.com/wiki/BD-1
 [ghost]: https://www.destinypedia.com/Ghost 
-[relict]: https://www.goodreads.com/en/book/show/196710046 
+[relict]: https://www.goodreads.com/en/book/show/196710046  
+
+Terraphim is a trademark registered in the UK, US and internationally (WIPO). 
+
+## Contributing
+
+If you'd like to contribute to the project, please read our
+[Contributing guide](CONTRIBUTING.md).
+
+### Contributors are awesome
+<a href="https://github.com/terraphim/terraphim-ai/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=terraphim/terraphim-ai" />
+</a>
+
+
+
+## License
+
+This project is licensed under the [Apache license](LICENSE).
