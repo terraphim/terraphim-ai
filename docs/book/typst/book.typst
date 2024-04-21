@@ -33,6 +33,35 @@
 #pagebreak(weak: true)
 = Contributing
 === Guide for Terraphim AI contributors
+#par()[You can run the full stack using Earthly. From the project root, execute the following command:]
+``````sh
+earthly ls
+``````
+#par()[This will list all the available targets. You can then run the full stack using the following command:]
+``````sh
+earthly +pipeline
+``````
+#par()[This will build the full stack using Earthly.]
+== Local Development
+#par()[If you want to develop without using Earthly, you need a local node.js, Yarn, and Rust environment.]
+#par()[Then you can run the following commands:]
+=== Install the sample data for #raw("system_operator")
+``````sh
+git clone https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
+``````
+=== Run the backend
+``````sh
+cargo run 
+``````
+=== Run the frontend in development mode:
+``````sh
+yarn run dev
+``````
+#par()[from ./desktop folder]
+#par()[to compile tauri in dev mode run:]
+``````
+yarn run tauri dev 
+``````
 #pagebreak(weak: true)
 = Architecture
 #par()[Use mermaid to draw the architecture of the system.]

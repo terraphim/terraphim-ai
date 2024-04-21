@@ -194,6 +194,32 @@ In summary, Terraphim Private cloud is an evaluation environment for Terraphim A
 </ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
 <h2 id="guide-for-terraphim-ai-contributors"><a class="header" href="#guide-for-terraphim-ai-contributors">Guide for Terraphim AI contributors</a></h2>
+<h2 id="earthly-based-development"><a class="header" href="#earthly-based-development">Earthly-Based Development</a></h2>
+<p>You can run the full stack using Earthly.
+From the project root, execute the following command:</p>
+<pre><code class="language-sh">earthly ls
+</code></pre>
+<p>This will list all the available targets. You can then run the full stack using the following command:</p>
+<pre><code class="language-sh">earthly +pipeline
+</code></pre>
+<p>This will build the full stack using Earthly.</p>
+<h1 id="local-development"><a class="header" href="#local-development">Local Development</a></h1>
+<p>If you want to develop without using Earthly, you need a local node.js, Yarn,
+and Rust environment.</p>
+<p>Then you can run the following commands:</p>
+<h2 id="install-the-sample-data-for-system_operator"><a class="header" href="#install-the-sample-data-for-system_operator">Install the sample data for <code>system_operator</code></a></h2>
+<pre><code class="language-sh">git clone https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
+</code></pre>
+<h2 id="run-the-backend"><a class="header" href="#run-the-backend">Run the backend</a></h2>
+<pre><code class="language-sh">cargo run 
+</code></pre>
+<h2 id="run-the-frontend-in-development-mode"><a class="header" href="#run-the-frontend-in-development-mode">Run the frontend in development mode:</a></h2>
+<pre><code class="language-sh">yarn run dev
+</code></pre>
+<p>from ./desktop folder</p>
+<p>to compile tauri in dev mode run:</p>
+<pre><code>yarn run tauri dev 
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><p>Use mermaid to draw the architecture of the system.</p>
 <pre class="mermaid">graph TD;
     A--&gt;B;
@@ -219,6 +245,22 @@ In summary, Terraphim Private cloud is an evaluation environment for Terraphim A
 
         </div>
 
+        <!-- Livereload script (if served using the cli tool) -->
+        <script>
+            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
+            const socket = new WebSocket(wsAddress);
+            socket.onmessage = function (event) {
+                if (event.data === "reload") {
+                    socket.close();
+                    location.reload();
+                }
+            };
+
+            window.onbeforeunload = function() {
+                socket.close();
+            }
+        </script>
 
 
 
