@@ -13,21 +13,24 @@ use serde::{Serialize, Serializer};
 use terraphim_types::Document;
 use terraphim_types::RelevanceFunction;
 
+/// Sort the documents by relevance.
+/// 
+/// The `relevance_function` parameter is used to determine how the documents
+/// should be sorted. 
 pub fn sort_documents(
     documents: Vec<Document>,
     relevance_function: RelevanceFunction,
 ) -> Vec<Document> {
-    // Create a new searcher
-    let mut searcher = Scorer::new();
+    // Create a new scorer
+    let mut scorer = Scorer::new();
 
     // Create a new query
-    let similarity = Similarity::Levenshtein;
-    let query = Query::new("name").similarity(similarity);
+    let query = Query::new("name").similarity(Similarity::Levenshtein);
 
-    // Search for documents
-    let mut results = searcher.score(&query, documents).unwrap();
+    // Score the documents
+    let mut results = scorer.score(&query, documents).unwrap();
 
-    // Sort the documents
+    // Sort the documents by score/relevance
     match relevance_function {
         RelevanceFunction::TitleScorer => {
             results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));

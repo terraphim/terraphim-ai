@@ -5290,6 +5290,7 @@ dependencies = [
 name = "terraphim_server"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "axum 0.6.20",
  "axum-extra",

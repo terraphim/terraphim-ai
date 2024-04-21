@@ -147,7 +147,7 @@ impl ConfigBuilder {
 
     /// Add a new role to the config
     pub fn add_role(mut self, role_name: &str, role: Role) -> Self {
-        // Set default role if this is the first role
+        // Set to default role if this is the first role
         if self.config.roles.is_empty() {
             self.config.default_role = role_name.to_string();
         }
@@ -158,9 +158,17 @@ impl ConfigBuilder {
     }
 
     /// Set the default role for the config
-    pub fn default_role(mut self, default_role: &str) -> Self {
+    pub fn default_role(mut self, default_role: &str) -> Result<Self> {
+        // Check if the role exists
+        if !self.config.roles.contains_key(default_role) {
+            return Err(TerraphimConfigError::Profile(format!(
+                "Role `{}` does not exist",
+                default_role
+            )));
+        }
+
         self.config.default_role = default_role.to_string();
-        self
+        Ok(self)
     }
 
     /// Build the config
@@ -447,6 +455,7 @@ mod tests {
                 },
             )
             .default_role("Default")
+            .unwrap()
             .build()
             .unwrap();
 
