@@ -39,7 +39,7 @@ mod tests {
                     extra: AHashMap::new(),
                 },
             )
-            .default_role("Default")
+            .default_role("Default")?
             .build()?;
 
         let config_state = ConfigState::new(&mut config).await?;
