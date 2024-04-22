@@ -105,6 +105,9 @@ pub struct KnowledgeGraph {
 
 /// Builder, which allows to create a new `Config`
 ///
+/// The first role added will be set as the default role.
+/// This can be changed by calling `default_role` with the role name.
+///
 /// # Example
 ///
 /// ```rs
