@@ -5,12 +5,11 @@
   import { role, is_tauri, input, serverUrl } from "../stores";
   import type { SearchResult } from "./SearchResult";
   import ResultItem from "./ResultItem.svelte";
-  import { CONFIG } from "../../config";
-  import { subscribe } from "svelte/internal";
   let result: SearchResult[] = [];
 
-  let currentSearchUrl;
-  async function handleClick() {
+  // This gets called when the search input is changed
+  // or when the user clicks on the search button or input field
+  async function handleSearchInputEvent() {
     if ($is_tauri) {
       console.log("Tauri config");
       console.log($input);
@@ -28,19 +27,27 @@
         })
         .catch((e) => console.error(e));
     } else {
-      console.log($input);
-      console.log("Role config");
-      console.log($role);
-      console.log("The current value is: ", $serverUrl);
+      if ($input === "") {
+        // Do nothing when the input is empty
+        return;
+      }
+
+      console.log("handleSearchInputEvent triggered with input", $input);
+
       let json_body = JSON.stringify({
         search_term: $input,
         skip: 0,
         limit: 10,
         role: $role,
       });
-      console.log("The current value is: ", json_body);
 
-      console.log("Server URL: ", $serverUrl);
+      console.log(
+        "Sending request to server URL: ",
+        $serverUrl,
+        "Search body: ",
+        json_body
+      );
+
       const response = await fetch($serverUrl, {
         method: "POST",
         headers: {
@@ -51,6 +58,13 @@
       });
       const data = await response.json();
       console.log(data);
+
+      if (!response.ok) {
+        console.log("Invalid response from server");
+        console.log(data);
+        return;
+      }
+
       result = data;
     }
   }
@@ -64,9 +78,9 @@
     icon="search"
     expanded
     autofocus
-    on:click={handleClick}
-    on:submit={handleClick}
-    on:keyup={(e) => e.key === "Enter" && handleClick()}
+    on:click={handleSearchInputEvent}
+    on:submit={handleSearchInputEvent}
+    on:keyup={(e) => e.key === "Enter" && handleSearchInputEvent()}
   />
 </Field>
 {#if result !== null && result.length !== 0}

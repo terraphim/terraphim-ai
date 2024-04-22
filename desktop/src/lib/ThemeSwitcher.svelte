@@ -1,75 +1,75 @@
 <script lang="ts">
-  import { invoke } from '@tauri-apps/api/tauri';
-  import { theme, role, is_tauri, serverUrl, configStore, roles } from './stores';
-  import { Field, Select } from 'svelma';
-  import { CONFIG } from '../config';
-    import { event } from '@tauri-apps/api';
-  // let configStore =[];
-  let port = 8000;
-  let configURL="";
+  import { invoke } from "@tauri-apps/api/tauri";
+  import { theme, role, is_tauri, configStore, roles } from "./stores";
+  import { CONFIG } from "../config";
+
+  let configURL = "";
   export async function loadConfig() {
     try {
       if (window.__TAURI__) {
         is_tauri.set(true);
         if (is_tauri) {
-          console.log('test is_tauri True');
-          invoke('get_config').then((res) =>{
-              console.log(`Message: ${res.global_shortcut}`);
-              configStore.update(config => {
-                  // config["roles"] = res.roles;
-                  config = res;
-                  return config;
+          console.log("test is_tauri True");
+          invoke("get_config")
+            .then((res) => {
+              console.log("get_config response", res);
+              console.log("Updating config store");
+              configStore.update((config) => {
+                // config["roles"] = res.roles;
+                config = res;
+                return config;
               });
-              roles.update(roles => {
-              roles = $configStore["roles"];
-              return roles;
-            });
-              
-              const role_value=$configStore["default_role"].toLowerCase();
-              role.set(role_value);
-              theme.set($roles[$role]['theme']);
-              console.log('Role', $role);
-              console.log('Theme', $theme);
+              console.log("Updating roles");
+              roles.update((roles) => {
+                roles = $configStore["roles"];
+                return roles;
+              });
 
-          })
-            .catch((e) => console.error(e))
+              const default_role = $configStore["default_role"];
+              if (!default_role) {
+                console.error("No default role defined in config!");
+                return;
+              }
+              role.set(default_role);
+              console.log("Role", $role);
+
+              theme.set($roles[$role]["theme"]);
+              console.log("Theme", $theme);
+            })
+            .catch((e) => console.error(e));
         } else {
-                    console.log('test is_tauri False');
-          };
-        
+          console.log("test is_tauri False");
+        }
       } else {
         is_tauri.set(false);
         configURL = `${CONFIG.ServerURL}/config/`;
-        // configURL = `http://localhost:${port}/config/`;
-        console.log('test configURL ', configURL);
         fetch(configURL)
-          .then(response => response.json())
-          .then(data => {
-            console.log('test data fetched', data);
-            configStore.update(config => {
-                  // config["roles"] = data.roles;
-                  config = data;
-                  return config;
-              });
-            roles.update(roles => {
-              roles = data.roles;
+          .then((response) => response.json())
+          .then((received_config) => {
+            console.log("Config received", received_config);
+            configStore.update((config) => {
+              config = received_config;
+              return config;
+            });
+            console.log("Config store updated");
+            roles.update((roles) => {
+              roles = received_config.roles;
               return roles;
             });
-            // configStore = data.roles;
-            console.log('test configStore', $configStore);
-            console.log('test configStore default role ', $configStore["default_role"]);
-            const role_value=$configStore["default_role"].toLowerCase();
-            role.set(role_value);
-            console.log('test role', $role);
-            theme.set($roles[$role]['theme']);
-            console.log("Keys in configstore", Object.keys($configStore));
-            console.log($configStore);
-            console.log(typeof $configStore);
+            console.log("Default role:", $configStore["default_role"]);
+            const default_role = $configStore["default_role"];
+            role.set(default_role);
+            // Check that we have a theme for the role
+            if ($roles[$role]["theme"] === undefined) {
+              console.error(
+                `No theme defined for role: ${$role}. Using default theme.`
+              );
+            } else {
+              theme.set($roles[$role]["theme"]);
+            }
           })
-          .catch(e => console.error(e));
+          .catch((e) => console.error(e));
       }
-      console.log('test configURL ', configURL);
-
     } catch (error) {
       console.error(error);
     }
@@ -81,16 +81,21 @@
   }
 
   initializeConfig();
-  // console.log('test ', configStore.length);
-  console.log('test CONFIG.ServerURL ', CONFIG.ServerURL);
+  console.log("Using Terraphim Server URL:", CONFIG.ServerURL);
   function updateRole(event) {
-    role.set(event.target.value.toLowerCase());
-    theme.set($roles[$role]['theme']);
-    console.log('Role changed:', event.target.value);
-    console.log('Role changed name:', event.target.value);
-    console.log('Role changed theme:', $theme);
-  }
+    console.log("updateRole event received:", event);
+    console.log("Setting role to", event.target.value);
+    role.set(event.target.value);
 
+    if ($roles[$role]["theme"] === undefined) {
+      console.error(
+        `No theme defined for role: ${$role}. Using default theme.`
+      );
+    } else {
+      theme.set($roles[$role]["theme"]);
+      console.log("New theme:", $theme);
+    }
+  }
 </script>
 
 <div class="field is-grouped is-grouped-right">
@@ -98,7 +103,7 @@
     <div class="select">
       <select bind:value={$role} on:change={updateRole}>
         {#each Object.values($roles) as role_value}
-          <option value={role_value.name.toLowerCase()}>{role_value.name}</option>
+          <option value={role_value.name}>{role_value.name}</option>
         {/each}
       </select>
     </div>
