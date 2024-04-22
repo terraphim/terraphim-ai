@@ -78,7 +78,7 @@ async fn run_server() -> Result<()> {
             SocketAddr::from(([127, 0, 0, 1], port))
         });
 
-    let automata_path = AutomataPath::from_local("data/term_to_id.json");
+    let automata_path = AutomataPath::from_local("fixtures/term_to_id.json");
 
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
     let system_operator_haystack = cwd.join("fixtures/haystack/");
