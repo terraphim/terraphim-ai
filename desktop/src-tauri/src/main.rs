@@ -4,6 +4,7 @@
 )]
 
 mod cmd;
+mod config;
 
 use std::error::Error;
 use tauri::{
@@ -11,7 +12,7 @@ use tauri::{
     SystemTrayMenu,
 };
 
-use terraphim_config::{Config, ConfigState};
+use terraphim_config::ConfigState;
 use terraphim_settings::DeviceSettings;
 
 #[tokio::main]
@@ -19,7 +20,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // TODO: Use the device settings to load the config
     let _device_settings = DeviceSettings::load_from_env_and_file(None);
 
-    let mut config = Config::new();
+    let mut config = config::load_config()?;
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let global_shortcut = current_config.global_shortcut.clone();

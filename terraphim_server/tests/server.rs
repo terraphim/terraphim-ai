@@ -4,15 +4,72 @@
 //! We test the server by sending requests to it and checking the responses.
 #[cfg(test)]
 mod tests {
+    use ahash::AHashMap;
+    use terraphim_automata::AutomataPath;
     use terraphim_server::axum_server;
     use terraphim_settings::DeviceSettings;
 
     use reqwest::{Client, StatusCode};
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
-    use terraphim_config::{Config, ConfigState, Haystack, ServiceType};
-    use terraphim_types::Document;
+    use terraphim_config::{
+        Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
+    };
+    use terraphim_types::{Document, KnowledgeGraphInputType, RelevanceFunction};
+    use url::Url;
 
     use serial_test::serial;
+
+    // Sample config for testing
+    fn sample_config() -> Config {
+        ConfigBuilder::new()
+            .global_shortcut("Ctrl+X")
+            .add_role(
+                "system operator",
+                Role {
+                    shortname: Some("system operator".to_string()),
+                    name: "system operator".to_string(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    theme: "spacelab".to_string(),
+                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    kg: KnowledgeGraph {
+                        automata_path: AutomataPath::from_local("fixtures/term_to_id.json"),
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("fixtures/haystack"),
+                        public: true,
+                        publish: true,
+                    },
+                    haystacks: vec![Haystack {
+                        path: PathBuf::from("fixtures/haystack"),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: AHashMap::new(),
+                },
+            )
+            .add_role(
+                "engineer",
+                Role {
+                    shortname: Some("engineer".to_string()),
+                    name: "engineer".to_string(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    theme: "lumen".to_string(),
+                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    kg: KnowledgeGraph {
+                        automata_path: AutomataPath::from_local("fixtures/term_to_id.json"),
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("fixtures/haystack"),
+                        public: true,
+                        publish: true,
+                    },
+                    haystacks: vec![Haystack {
+                        path: PathBuf::from("fixtures/haystack"),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: AHashMap::new(),
+                },
+            )
+            .build()
+            .unwrap()
+    }
 
     async fn start_server() -> SocketAddr {
         let server_settings =
@@ -25,7 +82,7 @@ mod tests {
                 SocketAddr::from(([127, 0, 0, 1], port))
             });
 
-        let mut config = Config::new();
+        let mut config = sample_config();
         let config_state = ConfigState::new(&mut config)
             .await
             .expect("Failed to create config state");

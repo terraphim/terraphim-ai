@@ -5173,6 +5173,7 @@ dependencies = [
 name = "terraphim-ai-desktop"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "log",
  "persistence",
@@ -5181,6 +5182,7 @@ dependencies = [
  "service",
  "tauri",
  "tauri-build",
+ "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
  "terraphim_rolegraph",
