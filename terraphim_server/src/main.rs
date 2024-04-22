@@ -48,6 +48,16 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    match run_server().await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            log::error!("Error: {e:#?}");
+            std::process::exit(1)
+        }
+    }
+}
+
+async fn run_server() -> Result<()> {
     // Set up logger for the server
     env_logger::init();
 
@@ -141,7 +151,6 @@ async fn main() -> Result<()> {
                 extra: AHashMap::new(),
             },
         )
-        .default_role("Default")?
         .build()
         .unwrap();
     let config_state = ConfigState::new(&mut config)
