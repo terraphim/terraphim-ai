@@ -85,4 +85,17 @@ impl<'a> TerraphimService {
         let current_config = self.config_state.config.lock().await;
         current_config.clone()
     }
+
+    /// Update the config
+    ///
+    /// Overwrites the config in the config state and returns the updated
+    /// config.
+    pub async fn update_config(
+        &self,
+        config: terraphim_config::Config,
+    ) -> Result<terraphim_config::Config> {
+        let mut current_config = self.config_state.config.lock().await;
+        *current_config = config.clone();
+        Ok(config)
+    }
 }
