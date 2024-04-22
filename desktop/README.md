@@ -11,8 +11,9 @@ yarn run tauri dev
 
 To build
 ```
+yarn install
 yarn run build
 yarn run tauri build
 ```
 
-See ../Earhtfile for pre-requisites
+See ../Earthfile for pre-requisites
