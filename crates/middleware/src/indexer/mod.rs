@@ -44,10 +44,7 @@ pub async fn search_haystacks(
 ) -> Result<Index> {
     let config = config_state.config.lock().await.clone();
 
-    let search_query_role = search_query
-        .role
-        .unwrap_or(config.default_role)
-        .to_lowercase();
+    let search_query_role = search_query.role.unwrap_or(config.default_role);
 
     let role = config
         .roles
