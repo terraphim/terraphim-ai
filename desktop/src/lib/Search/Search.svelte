@@ -3,7 +3,6 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import logo from "/public/assets/terraphim_gray.png";
   import { role, is_tauri, input, serverUrl } from "../stores";
-  import type { SearchResult } from "./SearchResult"; // Ensure this is defined somewhere or adjust as needed
   import ResultItem from "./ResultItem.svelte";
 
   interface Document {
