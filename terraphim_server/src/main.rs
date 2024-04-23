@@ -82,6 +82,7 @@ async fn run_server() -> Result<()> {
 
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
     let system_operator_haystack = cwd.join("fixtures/haystack/");
+    log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
 
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
