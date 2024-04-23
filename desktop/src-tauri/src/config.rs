@@ -24,7 +24,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 name: "Default".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
@@ -46,7 +46,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 name: "Engineer".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
@@ -68,7 +68,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 name: "System Operator".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "superhero".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path,
                     input_type: KnowledgeGraphInputType::Markdown,

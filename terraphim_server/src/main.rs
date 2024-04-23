@@ -93,7 +93,7 @@ async fn run_server() -> Result<()> {
                 name: "Default".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
@@ -115,7 +115,7 @@ async fn run_server() -> Result<()> {
                 name: "Engineer".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
@@ -137,7 +137,7 @@ async fn run_server() -> Result<()> {
                 name: "System Operator".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "superhero".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path,
                     input_type: KnowledgeGraphInputType::Markdown,

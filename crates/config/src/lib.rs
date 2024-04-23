@@ -398,7 +398,7 @@ mod tests {
                     name: "Default".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
-                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
                         automata_path: AutomataPath::remote_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
@@ -420,7 +420,7 @@ mod tests {
                     name: "Engineer".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
-                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
                         automata_path: AutomataPath::remote_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
@@ -442,7 +442,7 @@ mod tests {
                     name: "System Operator".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "superhero".to_string(),
-                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
                         automata_path: AutomataPath::remote_example(),
                         input_type: KnowledgeGraphInputType::Markdown,

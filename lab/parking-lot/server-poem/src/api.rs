@@ -64,7 +64,7 @@ impl Api {
         }
     }
 
-    #[oai(path = "/articles", method = "post", tag = "ApiTags::Document")]
+    #[oai(path = "/documents", method = "post", tag = "ApiTags::Document")]
     async fn create_document(&self, document: Json<Document>) -> CreateDocumentResponse {
         log::warn!("create_document");
 

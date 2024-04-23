@@ -31,7 +31,7 @@ const theme = writable<string>("spacelab");
 const role = writable<string>("selected"); // Updated to be empty by default, set upon config load
 const is_tauri = writable<boolean>(false);
 const atomic_configured = writable<boolean>(false);
-const serverUrl = writable<string>(`${CONFIG.ServerURL}/articles/search`);
+const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
 
 // FIXME: add default role
