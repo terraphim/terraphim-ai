@@ -3,77 +3,60 @@
   import { theme, role, is_tauri, configStore, roles } from "./stores";
   import { CONFIG } from "../config";
 
+  interface ConfigResponse {
+    status: string;
+    config: {
+      id: string;
+      global_shortcut: string;
+      roles: Record<string, { name: string; theme: string }>;
+      default_role: string;
+    };
+  }
+
   let configURL = "";
   export async function loadConfig() {
     try {
-      if (window.__TAURI__) {
-        is_tauri.set(true);
-        if (is_tauri) {
-          console.log("test is_tauri True");
-          invoke("get_config")
-            .then((res) => {
-              console.log("get_config response", res);
-              console.log("Updating config store");
-              configStore.update((config) => {
-                // config["roles"] = res.roles;
-                config = res.config;
-                return config;
-              });
-              console.log("Updating roles");
-              roles.update((roles) => {
-                roles = $configStore["roles"];
-                return roles;
-              });
-
-              const default_role = $configStore["default_role"];
-              if (!default_role) {
-                console.error("No default role defined in config!");
-                return;
-              }
-              role.set(default_role);
-              console.log("Role", $role);
-
-              theme.set($roles[$role]["theme"]);
-              console.log("Theme", $theme);
-            })
-            .catch((e) => console.error(e));
-        } else {
-          console.log("test is_tauri False");
-        }
+      is_tauri.set(window.__TAURI__ !== undefined);
+      if ($is_tauri) {
+        console.log("test is_tauri True");
+        invoke<ConfigResponse>("get_config")
+          .then((res) => {
+            console.log("get_config response", res);
+            if (res && res.status === "success") {
+              configStore.set(res.config);
+              roles.set(res.config.roles);
+              role.set(res.config.default_role);
+              theme.set(
+                res.config.roles[res.config.default_role]?.theme || "default"
+              );
+            }
+          })
+          .catch((error) =>
+            console.error("Error fetching config in Tauri:", error)
+          );
       } else {
-        is_tauri.set(false);
+        console.log("test is_tauri False");
         configURL = `${CONFIG.ServerURL}/config/`;
         fetch(configURL)
           .then((response) => response.json())
-          .then((received_config) => {
+          .then((received_config: ConfigResponse) => {
             console.log("Config received", received_config);
-            configStore.update((config) => {
-              config = received_config.config;
-              return config;
-            });
-            console.log("Config store updated");
-            roles.update((roles) => {
-              roles = received_config.config.roles;
-              return roles;
-            });
-            console.log("Default role:", $configStore["default_role"]);
-            const default_role = $configStore["default_role"];
-            role.set(default_role);
-            // Check that we have a theme for the role
-            if ($roles[$role]["theme"] === undefined) {
-              console.error(
-                `No theme defined for role: ${$role}. Using default theme.`
+            if (received_config && received_config.status === "success") {
+              configStore.set(received_config.config);
+              roles.set(received_config.config.roles);
+              role.set(received_config.config.default_role);
+              theme.set(
+                received_config.config.roles[
+                  received_config.config.default_role
+                ]?.theme || "default"
               );
-            } else {
-              theme.set($roles[$role]["theme"]);
             }
           })
-          .catch((e) => console.error(e));
+          .catch((error) => console.error("Error fetching config:", error));
       }
     } catch (error) {
-      console.error(error);
+      console.error("Unhandled error in loadConfig:", error);
     }
-    return configStore;
   }
 
   async function initializeConfig() {
@@ -82,17 +65,20 @@
 
   initializeConfig();
   console.log("Using Terraphim Server URL:", CONFIG.ServerURL);
-  function updateRole(event) {
-    console.log("updateRole event received:", event);
-    console.log("Setting role to", event.target.value);
-    role.set(event.target.value);
 
-    if ($roles[$role]["theme"] === undefined) {
+  function updateRole(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    console.log("updateRole event received:", event);
+    console.log("Setting role to", target.value);
+    role.set(target.value);
+
+    const selectedTheme = $roles[$role]?.theme || "default";
+    if (!selectedTheme) {
       console.error(
         `No theme defined for role: ${$role}. Using default theme.`
       );
     } else {
-      theme.set($roles[$role]["theme"]);
+      theme.set(selectedTheme);
       console.log("New theme:", $theme);
     }
   }
@@ -102,8 +88,8 @@
   <div class="control">
     <div class="select">
       <select bind:value={$role} on:change={updateRole}>
-        {#each Object.values($roles) as role_value}
-          <option value={role_value.name}>{role_value.name}</option>
+        {#each Object.values($roles) as { name, theme }}
+          <option value={name}>{name}</option>
         {/each}
       </select>
     </div>
