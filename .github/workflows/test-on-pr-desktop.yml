@@ -1,4 +1,4 @@
-name: "Test on PR for Tauri"
+name: "Test on PR for Desktop"
 
 on: [pull_request]
 
