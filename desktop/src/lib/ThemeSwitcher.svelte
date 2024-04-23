@@ -16,7 +16,7 @@
               console.log("Updating config store");
               configStore.update((config) => {
                 // config["roles"] = res.roles;
-                config = res;
+                config = res.config;
                 return config;
               });
               console.log("Updating roles");
@@ -48,12 +48,12 @@
           .then((received_config) => {
             console.log("Config received", received_config);
             configStore.update((config) => {
-              config = received_config;
+              config = received_config.config;
               return config;
             });
             console.log("Config store updated");
             roles.update((roles) => {
-              roles = received_config.roles;
+              roles = received_config.config.roles;
               return roles;
             });
             console.log("Default role:", $configStore["default_role"]);

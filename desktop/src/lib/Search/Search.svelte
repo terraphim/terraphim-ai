@@ -23,7 +23,7 @@
       })
         .then((data) => {
           console.log(data);
-          result = data;
+          result = data.documents;
         })
         .catch((e) => console.error(e));
     } else {
@@ -57,15 +57,19 @@
         body: json_body,
       });
       const data = await response.json();
-      console.log(data);
 
       if (!response.ok) {
-        console.log("Invalid response from server");
-        console.log(data);
+        if (data.status === "error") {
+          console.log("No documents found:", data);
+          return;
+        } else {
+          console.log("Unknown response from server", data);
+        }
         return;
       }
 
-      result = data;
+      // Valid response; update the result list
+      result = data.documents;
     }
   }
 </script>
