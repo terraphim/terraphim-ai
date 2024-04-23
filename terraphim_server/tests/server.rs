@@ -30,7 +30,7 @@ mod tests {
                     name: "system operator".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
-                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
                         automata_path: AutomataPath::from_local("fixtures/term_to_id.json"),
                         input_type: KnowledgeGraphInputType::Markdown,
@@ -52,7 +52,7 @@ mod tests {
                     name: "engineer".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
-                    server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
                         automata_path: AutomataPath::from_local("fixtures/term_to_id.json"),
                         input_type: KnowledgeGraphInputType::Markdown,
@@ -133,7 +133,7 @@ mod tests {
         let server = ensure_server_started().await;
         let client = Client::new();
         let response = client
-            .post(format!("http://{server}/articles/search"))
+            .post(format!("http://{server}/documents/search"))
             .header("Content-Type", "application/json")
             .body(
                 r#"
@@ -153,9 +153,9 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_search_articles() {
+    async fn test_search_documents() {
         let server = ensure_server_started().await;
-        let url = format!("http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator");
+        let url = format!("http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator");
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
@@ -170,7 +170,7 @@ mod tests {
         let server = ensure_server_started().await;
         let client = Client::new();
         let response = client
-            .post(format!("http://{server}/articles/search"))
+            .post(format!("http://{server}/documents/search"))
             .header("Content-Type", "application/json")
             .body(
                 r#"
@@ -216,7 +216,7 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
-        let url = format!("http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10");
+        let url = format!("http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10");
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let response = reqwest::get(format!(
-            "http://{server}/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0",
+            "http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0",
         ))
         .await
         .unwrap();
@@ -361,7 +361,7 @@ mod tests {
     async fn test_post_document() {
         let server = ensure_server_started().await;
         let client = Client::new();
-        let response = client.post(format!("http://{server}/article"))
+        let response = client.post(format!("http://{server}/document"))
             .header("Content-Type", "application/json")
             .body(r#"
             {

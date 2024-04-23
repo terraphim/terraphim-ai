@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
                 name: "Engineer".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/articles/search").unwrap(),
+                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
                     automata_path: AutomataPath::remote_example(),
                     input_type: KnowledgeGraphInputType::Markdown,
