@@ -6,7 +6,7 @@ use axum::{
 };
 use std::net::SocketAddr;
 mod api;
-use api::{create_document, health_axum, search_documents, search_documents_post};
+use api::{create_document, health, search_documents, search_documents_post};
 use rust_embed::RustEmbed;
 use terraphim_config::ConfigState;
 use terraphim_types::IndexedDocument;
@@ -30,7 +30,7 @@ pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState)
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
     let app = Router::new()
-        .route("/health", get(health_axum))
+        .route("/health", get(health))
         // .route("/articles", get(list_articles))
         .route("/article", post(create_document))
         .route("/article/", post(create_document))
@@ -38,8 +38,8 @@ pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState)
         .route("/articles/search", post(search_documents_post))
         .route("/config", get(api::show_config))
         .route("/config/", get(api::show_config))
-        // .route("/config", post(api::update_config))
-        // .route("/config/", post(api::update_config))
+        .route("/config", post(api::update_config))
+        .route("/config/", post(api::update_config))
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))

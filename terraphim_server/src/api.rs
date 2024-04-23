@@ -4,6 +4,7 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
+use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
@@ -14,30 +15,39 @@ use terraphim_config::ConfigState;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
 
-use crate::error::Result;
+use crate::error::{Result, Status};
 
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
-pub(crate) async fn health_axum() -> impl IntoResponse {
+/// Health check endpoint
+pub(crate) async fn health() -> impl IntoResponse {
     (StatusCode::OK, "OK")
+}
+
+/// Response for creating a document
+#[derive(Debug, Serialize)]
+pub(crate) struct CreateDocumentResponse {
+    /// Status of the document creation
+    status: Status,
+    /// The id of the document that was successfully created
+    id: String,
 }
 
 /// Creates index of the document for each rolegraph
 pub(crate) async fn create_document(
     State(config): State<ConfigState>,
     Json(document): Json<Document>,
-) -> impl IntoResponse {
-    log::info!("create_document");
+) -> Result<Json<CreateDocumentResponse>> {
+    log::debug!("create_document");
     let mut terraphim_service = TerraphimService::new(config.clone());
-    let document = terraphim_service
-        .create_document(document)
-        .await
-        .expect("Failed to create document");
-    log::info!("send response");
-    let response = Json(document);
-    (StatusCode::CREATED, response)
+    let document = terraphim_service.create_document(document).await?;
+    Ok(Json(CreateDocumentResponse {
+        status: Status::Success,
+        id: document.id,
+    }))
 }
 
+// TODO: Is this still needed now that we have search?
 pub(crate) async fn _list_documents(
     State(rolegraph): State<Arc<Mutex<RoleGraph>>>,
 ) -> impl IntoResponse {
@@ -47,57 +57,93 @@ pub(crate) async fn _list_documents(
     (StatusCode::OK, Json("Ok"))
 }
 
-/// Search All TerraphimGraphs defined in a config by query params.
+#[derive(Debug, Serialize)]
+pub(crate) struct SearchDocumentResponse {
+    /// Status of the search
+    status: Status,
+    /// Vector of documents that match the search query
+    documents: Vec<Document>,
+    /// The number of documents that match the search query
+    total: usize,
+}
+
+/// Search for documents in all Terraphim graphs defined in the config via GET params
 pub(crate) async fn search_documents(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Query<SearchQuery>,
-) -> Result<Json<Vec<Document>>> {
-    log::info!("Search called with {:?}", search_query);
+) -> Result<Json<SearchDocumentResponse>> {
+    log::debug!("search_document called with {:?}", search_query);
+
     let terraphim_service = TerraphimService::new(config_state);
     let documents = terraphim_service.search_documents(&search_query.0).await?;
+    let total = documents.len();
 
-    Ok(Json(documents))
+    Ok(Json(SearchDocumentResponse {
+        status: Status::Success,
+        documents,
+        total,
+    }))
 }
 
-/// Search All TerraphimGraphs defined in a config by post params.
-/// FIXME: add title, url and body to search output
+/// Search for documents in all Terraphim graphs defined in the config via POST body
 pub(crate) async fn search_documents_post(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
-) -> Result<Json<Vec<Document>>> {
-    log::info!("POST Searching documents with query: {search_query:?}");
+) -> Result<Json<SearchDocumentResponse>> {
+    log::debug!("POST Searching documents with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
     let documents = terraphim_service.search_documents(&search_query).await?;
+    let total = documents.len();
 
-    log::debug!("Documents found:");
-    for document in &documents {
-        log::debug!("{} -> {}", document.id, document.rank.unwrap());
+    if total == 0 {
+        log::debug!("No documents found");
+    } else {
+        log::debug!("Documents found:");
+        for document in &documents {
+            log::debug!("{} -> {}", document.id, document.rank.unwrap());
+        }
     }
 
-    Ok(Json(documents))
+    Ok(Json(SearchDocumentResponse {
+        status: Status::Success,
+        documents,
+        total,
+    }))
+}
+
+/// Response type for showing the config
+///
+/// This is also used when updating the config
+#[derive(Debug, Serialize)]
+pub(crate) struct ConfigResponse {
+    /// Status of the config fetch
+    status: Status,
+    /// The config
+    config: Config,
 }
 
 /// API handler for Terraphim Config
-pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<Config> {
+pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<ConfigResponse> {
     let terraphim_service = TerraphimService::new(config);
     let config = terraphim_service.fetch_config().await;
-
-    Json(config)
+    Json(ConfigResponse {
+        status: Status::Success,
+        config,
+    })
 }
 
-// /// API handler for Terraphim Config update
-// pub async fn update_config(
-//     State(config_config): State<ConfigState>,
-//     Json(config_new): Json<Config>,
-// ) -> Result<Json<Config>> {
-//     let mut config = ConfigBuilder::from_config(config_new).build()?;
-//     let state = ConfigState::new(&mutconfig).await?;
-
-//     let terraphim_service = TerraphimService::new(config);
-//     let config_state = terraphim_service.update_config(config_new).await?;
-
-//     Ok(Json(config_state.clone()))
-// }
+/// API handler for Terraphim Config update
+pub(crate) async fn update_config(
+    State(config_state): State<ConfigState>,
+    Json(config_new): Json<Config>,
+) -> Json<ConfigResponse> {
+    let mut config = config_state.config.lock().await;
+    *config = config_new.clone();
+    Json(ConfigResponse {
+        status: Status::Success,
+        config: config_new,
+    })
+}
