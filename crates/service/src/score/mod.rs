@@ -11,37 +11,25 @@ use scored::{Scored, SearchResults};
 use serde::{Serialize, Serializer};
 
 use terraphim_types::Document;
-use terraphim_types::RelevanceFunction;
+use terraphim_types::SearchQuery;
 
 /// Sort the documents by relevance.
-/// 
+///
 /// The `relevance_function` parameter is used to determine how the documents
-/// should be sorted. 
-pub fn sort_documents(
-    documents: Vec<Document>,
-    relevance_function: RelevanceFunction,
-) -> Vec<Document> {
+/// should be sorted.
+pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> Vec<Document> {
+    log::debug!("Sorting documents by relevance");
+
     // Create a new scorer
     let mut scorer = Scorer::new();
 
     // Create a new query
-    let query = Query::new("name").similarity(Similarity::Levenshtein);
+    let query = Query::new(&search_query.search_term).similarity(Similarity::Levenshtein);
 
     // Score the documents
     let mut results = scorer.score(&query, documents).unwrap();
 
-    // Sort the documents by score/relevance
-    match relevance_function {
-        RelevanceFunction::TitleScorer => {
-            results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
-        } // Example of how to add more relevance functions
-          // RelevanceFunction::TitleAndContentScorer => {
-          //     results.rescore(|doc| {
-          //         query.similarity.similarity(&query.name, &doc.title)
-          //             + query.similarity.similarity(&query.name, &doc.content)
-          //     });
-          // }
-    }
+    results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
 
     results
         .into_vec()

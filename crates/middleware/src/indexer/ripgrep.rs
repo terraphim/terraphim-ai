@@ -1,11 +1,10 @@
-use ahash::AHashMap;
 use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
 use terraphim_types::{Document, Index};
 
-use super::{calculate_hash, IndexMiddleware};
+use super::{hash_as_string, IndexMiddleware};
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
 
@@ -33,7 +32,7 @@ impl IndexMiddleware for RipgrepIndexer {
 /// which allows us to cache requests to the index service
 fn index_inner(messages: Vec<Message>) -> Index {
     // Cache of already processed documents
-    let mut cached_documents: Index = AHashMap::new();
+    let mut index: Index = Index::default();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
     let mut document = Document::default();
@@ -50,7 +49,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
                 }
                 existing_paths.insert(path.clone());
 
-                document.id = calculate_hash(&path);
+                document.id = hash_as_string(&path);
                 document.title = path.clone();
                 document.url = path.clone();
             }
@@ -116,11 +115,11 @@ fn index_inner(messages: Vec<Message>) -> Index {
             Message::End(_) => {
                 // The `End` message could be received before the `Begin`
                 // message causing the document to be empty
-                cached_documents.insert(document.id.to_string(), document.clone());
+                index.insert(document.id.to_string(), document.clone());
             }
             _ => {}
         };
     }
 
-    cached_documents
+    index
 }

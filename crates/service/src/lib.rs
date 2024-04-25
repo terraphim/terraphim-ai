@@ -1,7 +1,7 @@
 use persistence::error;
 use terraphim_config::{ConfigState, Role};
-use terraphim_middleware::thesaurus::create_thesaurus_from_haystack;
-use terraphim_types::{Document, IndexedDocument, SearchQuery};
+use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
+use terraphim_types::{Document, IndexedDocument, RelevanceFunction, SearchQuery};
 
 mod score;
 
@@ -32,14 +32,14 @@ impl<'a> TerraphimService {
         Self { config_state }
     }
 
-    /// Update a thesaurus from a haystack and update the knowledge graph automata URL
-    async fn update_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
-        Ok(create_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
+    /// Build a thesaurus from the haystack and update the knowledge graph automata URL
+    async fn build_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
+        Ok(build_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
     }
 
     /// Create document
     pub async fn create_document(&mut self, document: Document) -> Result<Document> {
-        self.config_state.index_document(&document).await?;
+        self.config_state.add_to_roles(&document).await?;
         Ok(document)
     }
 
@@ -57,27 +57,46 @@ impl<'a> TerraphimService {
 
     /// Search for documents in the haystacks
     pub async fn search_documents(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
-        self.update_thesaurus(search_query).await?;
-
-        let cached_documents =
-            terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
-                .await?;
-        let rolegraph_documents: Vec<IndexedDocument> =
-            self.config_state.search_documents(search_query).await;
-
-        let documents = terraphim_types::merge_and_serialize(cached_documents, rolegraph_documents);
-
         // Get the role from the config
+        log::debug!("Role for searching: {:?}", search_query.role);
         let role = self.get_search_role(search_query).await?;
-        log::debug!("Role for searching: {:?}", role);
 
-        // Use relevance function for ranking (scorer)
-        let relevance_function = role.relevance_function;
+        match role.relevance_function {
+            RelevanceFunction::TitleScorer => {
+                let index = terraphim_middleware::search_haystacks(
+                    self.config_state.clone(),
+                    search_query.clone(),
+                )
+                .await?;
 
-        // Sort the documents by relevance
-        let documents = score::sort_documents(documents, relevance_function);
+                let indexed_docs: Vec<IndexedDocument> = self
+                    .config_state
+                    .search_indexed_documents(search_query)
+                    .await;
 
-        Ok(documents)
+                let documents = index.get_documents(indexed_docs);
+                // Sort the documents by relevance
+                let documents = score::sort_documents(search_query, documents);
+                Ok(documents)
+            }
+            RelevanceFunction::TerraphimGraph => {
+                self.build_thesaurus(search_query).await?;
+                let indexed_docs: Vec<IndexedDocument> = self
+                    .config_state
+                    .search_indexed_documents(search_query)
+                    .await;
+
+                // TODO: Convert indexed documents to documents
+                // We probably need to adjust the Thesaurus logseq haystack parser for this.
+                // let documents: Vec<Document> = indexed_docs
+                //     .iter()
+                //     .map(|indexed_doc| indexed_doc.to_document())
+                //     .collect();
+                todo!()
+
+                // Ok(documents)
+            }
+        }
     }
 
     /// Fetch the current config

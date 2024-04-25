@@ -165,7 +165,7 @@ fn bench_query_throughput(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(query_term.len() as u64 * *size as u64));
         group.bench_with_input(BenchmarkId::new("query", size), size, |b, &size| {
             let query_term = query_term.repeat(size);
-            b.iter(|| rolegraph.query(&query_term, None, None))
+            b.iter(|| rolegraph.query_graph(&query_term, None, None))
         });
     }
     group.finish();
@@ -181,7 +181,7 @@ fn bench_query(c: &mut Criterion) {
     rolegraph.insert_document(&id, document);
     let query_term = "Life cycle concepts and project direction".to_string();
     c.bench_function("query_response", |b| {
-        b.iter(|| rolegraph.query(&query_term, None, None))
+        b.iter(|| rolegraph.query_graph(&query_term, None, None))
     });
 }
 

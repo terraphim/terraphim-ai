@@ -298,9 +298,8 @@ impl ConfigState {
         config.roles.get(role).cloned()
     }
 
-    /// Index document into all rolegraphs
-    // TODO: This should probably be moved to the `persistance` crate
-    pub async fn index_document(&mut self, document: &Document) -> OpendalResult<()> {
+    /// Insert document into all rolegraphs
+    pub async fn add_to_roles(&mut self, document: &Document) -> OpendalResult<()> {
         let id = document.id.clone();
 
         for rolegraph_state in self.roles.values() {
@@ -310,8 +309,11 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Search documents in rolegraph using the search query
-    pub async fn search_documents(&self, search_query: &SearchQuery) -> Vec<IndexedDocument> {
+    /// Search documents in rolegraph index, which match the search query
+    pub async fn search_indexed_documents(
+        &self,
+        search_query: &SearchQuery,
+    ) -> Vec<IndexedDocument> {
         log::debug!("search_documents: {:?}", search_query);
         let current_config_state = self.config.lock().await.clone();
         let default_role = current_config_state.default_role.clone();
@@ -320,19 +322,19 @@ impl ConfigState {
         let role = search_query.role.clone().unwrap_or(default_role);
         log::debug!("Role for search_documents: {:#?}", role);
 
-        let role = role.to_lowercase();
-        let rolegraph = self.roles.get(&role).unwrap().lock().await;
-        let documents: Vec<(String, IndexedDocument)> = match rolegraph.query(
-            &search_query.search_term,
-            search_query.skip,
-            search_query.limit,
-        ) {
-            Ok(docs) => docs,
-            Err(e) => {
-                log::error!("Error: {}", e);
-                return Vec::default();
-            }
-        };
+        let role_name = role.to_lowercase();
+        let role = self.roles.get(&role_name).unwrap().lock().await;
+
+        let documents = role
+            .query_graph(
+                &search_query.search_term,
+                search_query.skip,
+                search_query.limit,
+            )
+            .unwrap_or_else(|e| {
+                log::error!("Error while searching graph for documents: {:?}", e);
+                return vec![];
+            });
 
         documents.into_iter().map(|(_id, doc)| doc).collect()
     }

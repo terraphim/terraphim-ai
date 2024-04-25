@@ -46,7 +46,7 @@ pub struct RoleGraph {
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values
-    ac_values: Vec<Id>,
+    aho_corasick_values: Vec<Id>,
     /// Aho-Corasick automata
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
@@ -84,7 +84,7 @@ impl RoleGraph {
             edges: AHashMap::new(),
             documents: AHashMap::new(),
             thesaurus,
-            ac_values: values,
+            aho_corasick_values: values,
             ac,
             ac_reverse_nterm,
         })
@@ -94,12 +94,11 @@ impl RoleGraph {
     ///
     /// Returns a list of IDs of the matched nodes
     pub fn find_matching_node_ids(&self, text: &str) -> Vec<Id> {
-        let mut matches = Vec::new();
-        for mat in self.ac.find_iter(text) {
-            let id = &self.ac_values[mat.pattern()];
-            matches.push(id.clone());
-        }
-        matches
+        log::trace!("Finding matching node IDs for text: '{text}'");
+        self.ac
+            .find_iter(text)
+            .map(|mat| self.aho_corasick_values[mat.pattern()].clone())
+            .collect()
     }
 
     /// Convert node rank to f64
@@ -123,38 +122,39 @@ impl RoleGraph {
     ///   rank and dividing by the sum of the weights for each node, edge, and
     ///   document.
     // YAGNI: at the moment I don't need it, so parked
-    pub fn normalize(&mut self) {
-        let node_len = self.nodes.len() as u32;
-        log::trace!("Node Length {}", node_len);
-        let edge_len = self.edges.len() as u32;
-        log::trace!("Edge Length {}", edge_len);
-        let document_count = self.documents.len() as u32;
-        log::trace!("document Length {}", document_count);
-        let normalizer = f32::from_bits(node_len + edge_len + document_count);
-        let weight_node = f32::from_bits(node_len) / normalizer;
-        let weight_edge = f32::from_bits(edge_len) / normalizer;
-        let weight_document = f32::from_bits(document_count) / normalizer;
-        log::trace!("Weight Node {}", weight_node);
-        log::trace!("Weight Edge {}", weight_edge);
-        log::trace!("Weight document {}", weight_document);
-        // for each node for each edge for each document
-        // for (document_id,rank) in self.documents.iter(){
-        //     let weighted_rank=(weight_node*node_rank as f32)+(weight_edge*edge_rank as f32)+(weight_document*rank as f32)/(weight_node+weight_edge+weight_document);
-        //     log::debug!("document id {} Weighted Rank {}", document_id, weighted_rank);
-        //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
-        // }
-    }
+    // pub fn normalize(&mut self) {
+    //     let node_len = self.nodes.len() as u32;
+    //     log::trace!("Node Length {}", node_len);
+    //     let edge_len = self.edges.len() as u32;
+    //     log::trace!("Edge Length {}", edge_len);
+    //     let document_count = self.documents.len() as u32;
+    //     log::trace!("document Length {}", document_count);
+    //     let normalizer = f32::from_bits(node_len + edge_len + document_count);
+    //     let weight_node = f32::from_bits(node_len) / normalizer;
+    //     let weight_edge = f32::from_bits(edge_len) / normalizer;
+    //     let weight_document = f32::from_bits(document_count) / normalizer;
+    //     log::trace!("Weight Node {}", weight_node);
+    //     log::trace!("Weight Edge {}", weight_edge);
+    //     log::trace!("Weight document {}", weight_document);
+    //     // for each node for each edge for each document
+    //     // for (document_id,rank) in self.documents.iter(){
+    //     //     let weighted_rank=(weight_node*node_rank as f32)+(weight_edge*edge_rank as f32)+(weight_document*rank as f32)/(weight_node+weight_edge+weight_document);
+    //     //     log::debug!("document id {} Weighted Rank {}", document_id, weighted_rank);
+    //     //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
+    //     // }
+    // }
 
-    /// Performs a query on the graph using a query string. Returns a list of document IDs
-    /// ranked and weighted by the weighted mean average of node rank, edge rank, and
-    /// document rank.
-    pub fn query(
+    /// Performs a query on the graph using the query string.
+    ///
+    /// Returns a list of document IDs ranked and weighted by the weighted mean
+    /// average of node rank, edge rank, and document rank.
+    pub fn query_graph(
         &self,
         query_string: &str,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Vec<(String, IndexedDocument)>> {
-        log::debug!("Performing query with query string: '{}'", query_string);
+        log::debug!("Performing graph query with string: '{query_string}'");
         let node_ids = self.find_matching_node_ids(query_string);
 
         let mut results = AHashMap::new();
@@ -438,7 +438,7 @@ mod tests {
         rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
         let results: Vec<(String, IndexedDocument)> = rolegraph
-            .query(
+            .query_graph(
                 "Life cycle concepts and project direction",
                 Some(0),
                 Some(10),

@@ -102,7 +102,7 @@ async fn run_server() -> Result<()> {
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("localsearch"),
+                    path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -135,7 +135,7 @@ async fn run_server() -> Result<()> {
             Role {
                 shortname: Some("operator".to_string()),
                 name: "System Operator".to_string(),
-                relevance_function: RelevanceFunction::TitleScorer,
+                relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
                 server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                 kg: KnowledgeGraph {
