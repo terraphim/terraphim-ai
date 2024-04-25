@@ -31,6 +31,7 @@ use std::process::Stdio;
 use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
+use terraphim_types::Document;
 use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
 use tokio::io::AsyncReadExt;
@@ -39,7 +40,7 @@ use tokio::process::Command;
 use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
 
-pub async fn create_thesaurus_from_haystack(
+pub async fn build_thesaurus_from_haystack(
     config_state: ConfigState,
     search_query: &SearchQuery,
 ) -> Result<()> {
@@ -285,6 +286,19 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 for synonym in synonyms {
                     let nterm = NormalizedTerm::new(concept.id.clone(), synonym.into());
                     thesaurus.insert(concept.value.clone(), nterm);
+
+                    // Create a document (`Document`) for each synonym
+                    todo!("Do we want to create a document for each synonym?")
+                    // let document: Document = Document {
+                    //     id:  todo!(),
+                    //     url: todo!(),
+                    //     title: todo!(),
+                    //     body: todo!(),
+                    //     description: todo!(),
+                    //     stub: todo!(),
+                    //     tags: todo!(),
+                    //     rank: todo!(),
+                    // };
                 }
             }
             _ => {}

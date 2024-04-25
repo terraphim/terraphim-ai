@@ -8,7 +8,7 @@ mod tests {
         ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
     };
     use terraphim_middleware::search_haystacks;
-    use terraphim_types::{merge_and_serialize, SearchQuery};
+    use terraphim_types::SearchQuery;
     use terraphim_types::{IndexedDocument, KnowledgeGraphInputType, RelevanceFunction};
 
     use terraphim_middleware::Result;
@@ -53,10 +53,10 @@ mod tests {
         };
         println!("Searching documents with query: {search_query:?} {role_name}");
 
-        let haystack_documents =
-            search_haystacks(config_state.clone(), search_query.clone()).await?;
-        let docs: Vec<IndexedDocument> = config_state.search_documents(&search_query).await;
-        let documents = merge_and_serialize(haystack_documents, docs);
+        let index = search_haystacks(config_state.clone(), search_query.clone()).await?;
+        let indexed_docs: Vec<IndexedDocument> =
+            config_state.search_indexed_documents(&search_query).await;
+        let documents = index.get_documents(indexed_docs);
         log::debug!("Final documents: {documents:?}");
 
         Ok(())

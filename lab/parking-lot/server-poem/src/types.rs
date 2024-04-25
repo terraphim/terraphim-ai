@@ -23,23 +23,6 @@ pub struct Document {
     pub tags: Option<Vec<String>>,
 }
 
-impl Into<Document> for Document {
-    fn into(self) -> Document {
-        // If the ID is not provided, generate a new one
-        let id = match self.id {
-            Some(id) => id,
-            None => ulid::Ulid::new().to_string(),
-        };
-
-        Document {
-            id,
-            title: self.title,
-            body: Some(self.body),
-            description: self.description,
-        }
-    }
-}
-
 #[derive(Tags)]
 pub(crate) enum ApiTags {
     /// Document operations

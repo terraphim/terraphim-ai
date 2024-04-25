@@ -1,5 +1,5 @@
 use std::fmt::{self, Display, Formatter};
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Deref, DerefMut};
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -399,10 +399,87 @@ impl<'a> IntoIterator for &'a Thesaurus {
 ///
 /// It holds the documents that have been indexed
 /// and can be searched through using the `RoleGraph`.
-pub type Index = AHashMap<String, Document>;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Index {
+    inner: AHashMap<String, Document>,
+}
 
-/// Reference to external storage of documents, traditional indexes use
-/// document, aka document or entity.
+impl Default for Index {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Index {
+    /// Create a new, empty index
+    pub fn new() -> Self {
+        Self {
+            inner: AHashMap::new(),
+        }
+    }
+
+    /// Converts all given indexed documents to documents
+    ///
+    /// Returns the all converted documents
+    pub fn get_documents(&self, docs: Vec<IndexedDocument>) -> Vec<Document> {
+        let mut documents: Vec<Document> = Vec::new();
+        for doc in docs {
+            log::trace!("doc: {:#?}", doc);
+            if let Some(document) = self.get_document(&doc) {
+                // Document found in cache
+                let mut document = document;
+                document.tags = Some(doc.tags.clone());
+                // rank only available for terraphim graph
+                // use scorer to populate the rank for all cases
+                document.rank = Some(doc.rank);
+                documents.push(document.clone());
+            } else {
+                log::warn!("Document not found in cache. Cannot convert.");
+            }
+        }
+        documents
+    }
+
+    /// Get a document from the index (if it exists in the index)
+    pub fn get_document(&self, doc: &IndexedDocument) -> Option<Document> {
+        if let Some(document) = self.inner.get(&doc.id).cloned() {
+            // Document found in cache
+            let mut document = document;
+            document.tags = Some(doc.tags.clone());
+            // Rank only available for terraphim graph
+            // use scorer to populate the rank for all cases
+            document.rank = Some(doc.rank);
+            Some(document)
+        } else {
+            None
+        }
+    }
+}
+
+impl Deref for Index {
+    type Target = AHashMap<String, Document>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for Index {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl IntoIterator for Index {
+    type Item = (String, Document);
+    type IntoIter = std::collections::hash_map::IntoIter<String, Document>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
+/// Reference to external storage of documents
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexedDocument {
     /// UUID of the indexed document, matching external storage id
@@ -412,9 +489,9 @@ pub struct IndexedDocument {
     /// Graph rank (the sum of node rank, edge rank)
     /// Number of nodes
     pub rank: Rank,
-    /// tags, which are nodes turned into concepts for human readability
+    /// Tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
-    /// list of node ids for validation of matching
+    /// List of node ids for validation of matching
     pub nodes: Vec<Id>,
 }
 
@@ -438,6 +515,13 @@ pub struct SearchQuery {
 /// results for the `Role`.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
 pub enum RelevanceFunction {
+    /// Scorer for ranking search results based on the Terraphim graph
+    ///
+    /// This is based on filtered result outputs according to the ranking of the
+    /// knowledge graph. The node, which is most connected will produce the
+    /// highest ranking
+    #[serde(rename = "teraphim-graph")]
+    TerraphimGraph,
     /// Scorer for ranking search results based on the title of a document
     #[serde(rename = "title-scorer")]
     TitleScorer,
@@ -455,27 +539,4 @@ pub enum KnowledgeGraphInputType {
     /// A set of JSON files
     #[serde(rename = "json")]
     Json,
-}
-
-/// Merge documents from the cache and the output of query results
-///
-/// Returns the merged documents
-// TODO: This function should be moved to the `terraphim_middleware` or `terraphim_service` crate
-pub fn merge_and_serialize(cached_documents: Index, docs: Vec<IndexedDocument>) -> Vec<Document> {
-    let mut documents: Vec<Document> = Vec::new();
-    for doc in docs {
-        log::trace!("doc: {:#?}", doc);
-        if let Some(document) = cached_documents.get(&doc.id).cloned() {
-            // Document found in cache
-            let mut document = document;
-            document.tags = Some(doc.tags.clone());
-            // rank only available for terraphim graph
-            // use scorer to populate the rank for all cases
-            document.rank = Some(doc.rank);
-            documents.push(document.clone());
-        } else {
-            log::warn!("Document not found in cache");
-        }
-    }
-    documents
 }
