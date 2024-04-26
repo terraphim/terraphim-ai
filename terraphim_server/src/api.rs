@@ -58,11 +58,11 @@ pub(crate) async fn _list_documents(
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct SearchDocumentResponse {
+pub(crate) struct SearchResponse {
     /// Status of the search
     status: Status,
-    /// Vector of documents that match the search query
-    documents: Vec<Document>,
+    /// Vector of results which matched the query
+    results: Vec<Document>,
     /// The number of documents that match the search query
     total: usize,
 }
@@ -72,16 +72,16 @@ pub(crate) async fn search_documents(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Query<SearchQuery>,
-) -> Result<Json<SearchDocumentResponse>> {
+) -> Result<Json<SearchResponse>> {
     log::debug!("search_document called with {:?}", search_query);
 
     let terraphim_service = TerraphimService::new(config_state);
-    let documents = terraphim_service.search_documents(&search_query.0).await?;
-    let total = documents.len();
+    let results = terraphim_service.search(&search_query.0).await?;
+    let total = results.len();
 
-    Ok(Json(SearchDocumentResponse {
+    Ok(Json(SearchResponse {
         status: Status::Success,
-        documents,
+        results,
         total,
     }))
 }
@@ -91,25 +91,22 @@ pub(crate) async fn search_documents_post(
     Extension(_tx): Extension<SearchResultsStream>,
     State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
-) -> Result<Json<SearchDocumentResponse>> {
+) -> Result<Json<SearchResponse>> {
     log::debug!("POST Searching documents with query: {search_query:?}");
 
     let terraphim_service = TerraphimService::new(config_state);
-    let documents = terraphim_service.search_documents(&search_query).await?;
-    let total = documents.len();
+    let results = terraphim_service.search(&search_query).await?;
+    let total = results.len();
 
     if total == 0 {
         log::debug!("No documents found");
     } else {
-        log::debug!("Documents found:");
-        for document in &documents {
-            log::debug!("{} -> {}", document.id, document.rank.unwrap());
-        }
+        log::debug!("Found {total} documents");
     }
 
-    Ok(Json(SearchDocumentResponse {
+    Ok(Json(SearchResponse {
         status: Status::Success,
-        documents,
+        results,
         total,
     }))
 }

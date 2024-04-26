@@ -286,19 +286,6 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 for synonym in synonyms {
                     let nterm = NormalizedTerm::new(concept.id.clone(), synonym.into());
                     thesaurus.insert(concept.value.clone(), nterm);
-
-                    // Create a document (`Document`) for each synonym
-                    todo!("Do we want to create a document for each synonym?")
-                    // let document: Document = Document {
-                    //     id:  todo!(),
-                    //     url: todo!(),
-                    //     title: todo!(),
-                    //     body: todo!(),
-                    //     description: todo!(),
-                    //     stub: todo!(),
-                    //     tags: todo!(),
-                    //     rank: todo!(),
-                    // };
                 }
             }
             _ => {}

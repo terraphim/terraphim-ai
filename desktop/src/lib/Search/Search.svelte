@@ -4,49 +4,46 @@
   import logo from "/public/assets/terraphim_gray.png";
   import { role, is_tauri, input, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
+  import type { SearchResponse, Document } from "./SearchResult";
 
-  interface Document {
-    id: string;
-    url: string;
-    title: string;
-    body: string;
-    description?: string;
-    stub?: string;
-    tags?: string[];
-    rank?: number;
+  let results: Document[] = [];
+  let error: string | null = null;
+
+  // Reactively handle search input
+  $: {
+    if ($input.trim()) {
+      handleSearchInputEvent();
+    } else {
+      results = [];
+      error = null;
+    }
   }
-
-  interface SearchDocumentResponse {
-    status: string;
-    documents: Document[];
-    total: number;
-  }
-
-  let result: Document[] = [];
 
   async function handleSearchInputEvent() {
-    console.log("handleSearchInputEvent triggered with input", $input);
+    error = null; // Clear previous errors
 
     if ($is_tauri) {
-      console.log("Running search in Tauri with input:", $input);
-      await invoke<SearchDocumentResponse>("search", {
-        searchQuery: {
-          search_term: $input,
-          skip: 0,
-          limit: 10,
-          role: $role,
-        },
-      })
-        .then((response) => {
-          if (response.status === "success") {
-            result = response.documents;
-          } else {
-            console.error("Search failed:", response);
-          }
-        })
-        .catch((e) => console.error("Error in Tauri search:", e));
+      try {
+        const response: SearchResponse = await invoke("search", {
+          searchQuery: {
+            search_term: $input,
+            skip: 0,
+            limit: 10,
+            role: $role,
+          },
+        });
+        if (response.status === "success") {
+          results = response.results;
+        } else {
+          error = `Search failed: ${response.status}`;
+          console.error("Search failed:", response);
+        }
+      } catch (e) {
+        error = `Error in Tauri search: ${e}`;
+        console.error("Error in Tauri search:", e);
+      }
     } else {
-      if ($input === "") return; // Skip if input is empty
+      if (!$input.trim()) return; // Skip if input is empty
 
       const json_body = JSON.stringify({
         search_term: $input,
@@ -55,37 +52,28 @@
         role: $role,
       });
 
-      console.log(
-        "Sending HTTP request to",
-        $serverUrl,
-        "with body:",
-        json_body
-      );
-
-      fetch($serverUrl, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: json_body,
-      })
-        .then(async (response) => {
-          const data: SearchDocumentResponse = await response.json();
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          console.log("Received data:", data);
-          result = data.documents;
-        })
-        .catch((error) => {
-          console.error("Error fetching data:", error);
+      try {
+        const response = await fetch($serverUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: json_body,
         });
+        const data: SearchResponse = await response.json();
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        results = data.results;
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        this.error = `Error fetching data: ${error}`;
+      }
     }
   }
 </script>
 
-<!-- HTML and other Svelte template code -->
 <Field>
   <Input
     type="search"
@@ -94,14 +82,13 @@
     icon="search"
     expanded
     autofocus
-    on:click={handleSearchInputEvent}
-    on:submit={handleSearchInputEvent}
-    on:keyup={(e) => e.key === "Enter" && handleSearchInputEvent()}
   />
 </Field>
-{#if result.length}
-  {#each result as result_item}
-    <ResultItem item={result_item} />
+{#if error}
+  <p class="error">{error}</p>
+{:else if results.length}
+  {#each results as result_item}
+    <ResultItem document={result_item} />
   {/each}
 {:else}
   <section class="section">
@@ -115,5 +102,8 @@
 <style>
   img {
     width: 16rem;
+  }
+  .error {
+    color: red;
   }
 </style>

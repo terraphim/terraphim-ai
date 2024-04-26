@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Tag, Taglist } from "svelma";
+  import { Taglist, Tag } from "svelma";
   import { fade } from "svelte/transition";
   import ArticleModal from "./ArticleModal.svelte";
-  import type { SearchResult } from "./SearchResult";
+  import type { Document } from "./SearchResult";
   import configStore from "../ThemeSwitcher.svelte";
-  import { role, is_tauri, serverUrl } from "../stores";
+  import { role } from "../stores";
 
-  export let item: SearchResult;
+  export let document: Document;
   let showModal = false;
 
   const onTitleClick = () => {
@@ -16,16 +16,10 @@
   if (configStore[$role] !== undefined) {
     console.log("Have attribute", configStore[$role]);
     if (configStore[$role].hasOwnProperty("enableLogseq")) {
-      // The attribute exists
-      // Do something here
       console.log("enable logseq True");
     } else {
-      // The attribute does not exist
-      // Do something else here
+      console.log("Didn't make it");
     }
-  }
-  {
-    console.log("Didn't make it");
   }
 </script>
 
@@ -35,8 +29,8 @@
       <div class="content">
         <div class="level-right">
           <Taglist>
-            {#if item.tags}
-              {#each Object.entries(item.tags) as [count, tag]}
+            {#if "tags" in document}
+              {#each document.tags as tag}
                 <a
                   href="https://terraphim.github.io/terraphim-project/#/page/{tag}"
                   target="_blank"><Tag rounded>{tag}</Tag></a
@@ -48,37 +42,31 @@
         <div transition:fade>
           <button on:click={onTitleClick}>
             <h2 class="title">
-              {item.title}
+              {document.title}
             </h2>
           </button>
-          <small>Description: {item.description}</small>
-          <small />
+          <small
+            >Description: {document.description ||
+              "No description available"}</small
+          >
           <br />
         </div>
       </div>
       <div class="level-right">
         <nav class="level is-mobile" transition:fade>
           <div class="level-right">
-            <a
-              href={item.url}
-              target="_blank"
-              class="level-item"
-              aria-label="URL"
-            >
-              <span class="icon is-medium">
-                <i class="fas fa-link" />
-              </span>
-            </a>
-
-            <a
-              href="logseq://x-callback-url/quickCapture?title={item.title}&url={item.url}"
-              class="level-item"
-              aria-label="download/save"
-            >
-              <span class="icon is-medium">
-                <i class="fas fa-download" aria-hidden="true" />
-              </span>
-            </a>
+            {#if "url" in document}
+              <a
+                href={document.url}
+                target="_blank"
+                class="level-item"
+                aria-label="URL"
+              >
+                <span class="icon is-medium">
+                  <i class="fas fa-link" />
+                </span>
+              </a>
+            {/if}
             <a href="#" class="level-item" aria-label="like">
               <span class="icon is-medium">
                 <i class="fas fa-plus" aria-hidden="true" />
@@ -95,7 +83,7 @@
     </div>
   </article>
 </div>
-<ArticleModal bind:active={showModal} {item} />
+<ArticleModal bind:active={showModal} item={document} />
 
 <style lang="scss">
   button {

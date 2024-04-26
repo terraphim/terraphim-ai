@@ -55,7 +55,7 @@ pub async fn search(
 ) -> Result<Vec<Document>> {
     log::info!("Search called with {:?}", search_query);
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
-    Ok(terraphim_service.search_documents(&search_query).await?)
+    Ok(terraphim_service.search(&search_query).await?)
 }
 
 #[command]
