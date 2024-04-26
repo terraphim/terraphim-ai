@@ -1,5 +1,4 @@
 use persistence::error;
-use serde::Serialize;
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};

@@ -200,9 +200,10 @@ impl fmt::Display for Query {
 /// the IMDb name index will be rescored according to this function. If no
 /// similarity function is provided, then the results will be ranked according
 /// to scores produced by the name index.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Default)]
 pub enum Similarity {
     /// Do not use a similarity function.
+    #[default]
     None,
     /// Computes the Levenshtein edit distance between two names and converts
     /// it to a similarity.
@@ -245,12 +246,6 @@ impl Similarity {
         } else {
             sim
         }
-    }
-}
-
-impl Default for Similarity {
-    fn default() -> Similarity {
-        Similarity::None
     }
 }
 

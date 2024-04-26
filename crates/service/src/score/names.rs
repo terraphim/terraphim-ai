@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// The default is OkapiBM25. If you aren't sure which scorer to use, then
 /// stick with the default.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Default)]
 pub enum NameScorer {
     /// OkapiBM25 is a TF-IDF-like ranking function, which takes name length
     /// into account.
+    #[default]
     OkapiBM25,
     /// TFIDF is the traditional TF-IDF ranking function, which does not
     /// incorporate document length.
@@ -41,12 +42,6 @@ impl NameScorer {
             NameScorer::Jaccard => "jaccard",
             NameScorer::QueryRatio => "queryratio",
         }
-    }
-}
-
-impl Default for NameScorer {
-    fn default() -> NameScorer {
-        NameScorer::OkapiBM25
     }
 }
 
