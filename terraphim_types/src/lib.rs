@@ -487,11 +487,11 @@ pub struct IndexedDocument {
     /// Matched to edges
     pub matched_edges: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
-    /// Number of nodes
+    /// Number of nodes and edges connected to the document
     pub rank: Rank,
     /// Tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
-    /// List of node ids for validation of matching
+    /// List of node IDs for validation of matching
     pub nodes: Vec<Id>,
 }
 

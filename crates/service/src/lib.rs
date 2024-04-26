@@ -1,7 +1,8 @@
 use persistence::error;
+use serde::Serialize;
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
-use terraphim_types::{Document, IndexedDocument, RelevanceFunction, SearchQuery};
+use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};
 
 mod score;
 
@@ -56,19 +57,19 @@ impl<'a> TerraphimService {
     }
 
     /// Search for documents in the haystacks
-    pub async fn search_documents(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
+    pub async fn search(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
         // Get the role from the config
         log::debug!("Role for searching: {:?}", search_query.role);
         let role = self.get_search_role(search_query).await?;
 
-        match role.relevance_function {
-            RelevanceFunction::TitleScorer => {
-                let index = terraphim_middleware::search_haystacks(
-                    self.config_state.clone(),
-                    search_query.clone(),
-                )
+        log::trace!("Building index for search query: {:?}", search_query);
+        let index: Index =
+            terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
                 .await?;
 
+        match role.relevance_function {
+            RelevanceFunction::TitleScorer => {
+                log::debug!("Searching haystack with title scorer");
                 let indexed_docs: Vec<IndexedDocument> = self
                     .config_state
                     .search_indexed_documents(search_query)
@@ -76,25 +77,25 @@ impl<'a> TerraphimService {
 
                 let documents = index.get_documents(indexed_docs);
                 // Sort the documents by relevance
+                log::debug!("Sorting documents by relevance");
                 let documents = score::sort_documents(search_query, documents);
+
                 Ok(documents)
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
-                let indexed_docs: Vec<IndexedDocument> = self
+
+                let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
                     .search_indexed_documents(search_query)
                     .await;
 
-                // TODO: Convert indexed documents to documents
-                // We probably need to adjust the Thesaurus logseq haystack parser for this.
-                // let documents: Vec<Document> = indexed_docs
-                //     .iter()
-                //     .map(|indexed_doc| indexed_doc.to_document())
-                //     .collect();
-                todo!()
+                // Apply to ripgrep vector of document output
+                // I.e. use the ranking of thesaurus to rank the documents here
+                log::debug!("Ranking documents with thesaurus");
+                let documents = index.get_documents(scored_index_docs);
 
-                // Ok(documents)
+                Ok(documents)
             }
         }
     }

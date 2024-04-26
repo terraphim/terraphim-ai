@@ -1,10 +1,7 @@
 <script lang="ts">
-  // import { Tabs, Tab } from 'svelma';
   import { Route } from "tinro";
-  import { Button, Field, Icon, Input } from "svelma";
-  import { Select } from "svelma";
+  import { Button, Field, Input, Switch, Select } from "svelma";
   import FetchRole from "./FetchRole.svelte";
-  import { Switch } from "svelma";
   import { Agent } from "@tomic/lib";
   import { JSONEditor } from "svelte-jsoneditor";
   import { CONFIG } from "../../config";
