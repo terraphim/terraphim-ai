@@ -27,7 +27,7 @@ impl<T> SearchResults<T> {
     /// This operation is idempotent and does not change the ordering of
     /// results.
     pub fn normalize(&mut self) {
-        if let Some(top_score) = self.0.get(0).map(|s| s.score()) {
+        if let Some(top_score) = self.0.first().map(|s| s.score()) {
             // The minimal score is 0, so if the top score is 0, then all
             // scores must be 0. No normalization needed. (And we avoid a
             // divide-by-zero below.)
@@ -49,7 +49,7 @@ impl<T> SearchResults<T> {
             let score = rescore(result.value());
             result.set_score(score);
         }
-        self.0.sort_by(|s1, s2| s1.cmp(&s2).reverse());
+        self.0.sort_by(|s1, s2| s1.cmp(s2).reverse());
     }
 
     /// Trim this collection so that it contains at most the first `size`

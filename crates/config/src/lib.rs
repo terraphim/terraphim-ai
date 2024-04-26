@@ -333,7 +333,7 @@ impl ConfigState {
             )
             .unwrap_or_else(|e| {
                 log::error!("Error while searching graph for documents: {:?}", e);
-                return vec![];
+                vec![]
             });
 
         documents.into_iter().map(|(_id, doc)| doc).collect()

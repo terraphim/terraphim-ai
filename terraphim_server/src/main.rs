@@ -49,7 +49,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     match run_server().await {
-        Ok(_) => Ok(()),
+        Ok(()) => Ok(()),
         Err(e) => {
             log::error!("Error: {e:#?}");
             std::process::exit(1)
