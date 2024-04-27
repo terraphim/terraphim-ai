@@ -14,7 +14,7 @@ mod tests {
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
     };
-    use terraphim_types::{Document, KnowledgeGraphInputType, RelevanceFunction};
+    use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
     use url::Url;
 
     use terraphim_server::ConfigResponse;
