@@ -26,7 +26,7 @@ mod tests {
                     theme: "superhero".to_string(),
                     server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
-                        automata_path: AutomataPath::remote_example(),
+                        automata_path: AutomataPath::local_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("~/pkm"),
                         public: true,

@@ -292,6 +292,12 @@ impl ConfigState {
         })
     }
 
+    /// Get the default role from the config
+    pub async fn get_default_role(&self) -> String {
+        let config = self.config.lock().await;
+        config.default_role.clone()
+    }
+
     /// Get a role from the config
     pub async fn get_role(&self, role: &str) -> Option<Role> {
         let config = self.config.lock().await;
@@ -402,7 +408,7 @@ mod tests {
                     theme: "spacelab".to_string(),
                     server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
-                        automata_path: AutomataPath::remote_example(),
+                        automata_path: AutomataPath::local_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("~/pkm"),
                         public: true,
@@ -424,7 +430,7 @@ mod tests {
                     theme: "lumen".to_string(),
                     server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
-                        automata_path: AutomataPath::remote_example(),
+                        automata_path: AutomataPath::local_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("~/pkm"),
                         public: true,
@@ -446,7 +452,7 @@ mod tests {
                     theme: "superhero".to_string(),
                     server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
                     kg: KnowledgeGraph {
-                        automata_path: AutomataPath::remote_example(),
+                        automata_path: AutomataPath::local_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("~/pkm"),
                         public: true,
@@ -492,7 +498,7 @@ mod tests {
             theme: "lumen".to_string(),
             server_url: Url::parse("http://localhost:8080").unwrap(),
             kg: KnowledgeGraph {
-                automata_path: AutomataPath::remote_example(),
+                automata_path: AutomataPath::local_example(),
                 input_type: KnowledgeGraphInputType::Markdown,
                 path: PathBuf::from("~/pkm"),
                 public: true,
