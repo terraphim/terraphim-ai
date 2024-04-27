@@ -11,8 +11,8 @@ use terraphim_types::Thesaurus;
 
 #[derive(thiserror::Error, Debug)]
 pub enum TerraphimAutomataError {
-    #[error("Reqwest error: {0}")]
-    Reqwest(#[from] reqwest::Error),
+    #[error("Invalid thesaurus: {0}")]
+    InvalidThesaurus(String),
 
     #[error("Serde deserialization error: {0}")]
     Serde(#[from] serde_json::Error),
@@ -70,6 +70,11 @@ impl AutomataPath {
         AutomataPath::Local(file.as_ref().to_path_buf())
     }
 
+    /// Local example for testing
+    pub fn local_example() -> Self {
+        AutomataPath::from_local("data/term_to_id_simple.json")
+    }
+
     /// Create a sample remote AutomataPath for testing
     pub fn remote_example() -> Self {
         AutomataPath::from_remote(
@@ -89,13 +94,31 @@ impl AutomataPath {
 /// Load a thesaurus from a file or URL
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
     async fn read_url(url: Url) -> Result<String> {
+        log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::new()
-            .get(url)
+            .get(url.clone())
             .header("Accept", "application/json")
             .send()
-            .await?;
+            .await
+            .map_err(|e| {
+                TerraphimAutomataError::InvalidThesaurus(format!(
+                    "Failed to fetch thesaurus from remote {url}. Error: {e:#?}",
+                ))
+            })?;
 
-        Ok(response.text().await?)
+        let status = response.status();
+        let headers = response.headers().clone(); // Clone headers for error reporting
+        let body = response.text().await;
+
+        match body {
+            Ok(text) => Ok(text),
+            Err(e) => {
+                let error_info = format!(
+                    "Failed to read thesaurus from remote {url}. Status: {status}. Headers: {headers:#?}. Error: {e:#?}",
+                );
+                Err(TerraphimAutomataError::InvalidThesaurus(error_info))
+            }
+        }
     }
 
     log::debug!("Reading thesaurus from {automata_path}");

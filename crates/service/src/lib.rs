@@ -45,10 +45,15 @@ impl<'a> TerraphimService {
 
     /// Get the role for the given search query
     async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
-        let search_role = search_query.role.clone().unwrap_or_default();
+        let search_role: String = match &search_query.role {
+            Some(role) => role.clone(),
+            None => self.config_state.get_default_role().await,
+        };
+
+        log::debug!("Searching for role: {:?}", search_role);
         let Some(role) = self.config_state.get_role(&search_role).await else {
             return Err(ServiceError::Config(format!(
-                "Role {} not found in config",
+                "Role `{}` not found in config",
                 search_role
             )));
         };

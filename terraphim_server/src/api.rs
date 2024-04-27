@@ -4,7 +4,7 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
@@ -25,12 +25,12 @@ pub(crate) async fn health() -> impl IntoResponse {
 }
 
 /// Response for creating a document
-#[derive(Debug, Serialize)]
-pub(crate) struct CreateDocumentResponse {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateDocumentResponse {
     /// Status of the document creation
-    status: Status,
+    pub status: Status,
     /// The id of the document that was successfully created
-    id: String,
+    pub id: String,
 }
 
 /// Creates index of the document for each rolegraph
@@ -57,14 +57,14 @@ pub(crate) async fn _list_documents(
     (StatusCode::OK, Json("Ok"))
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct SearchResponse {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SearchResponse {
     /// Status of the search
-    status: Status,
+    pub status: Status,
     /// Vector of results which matched the query
-    results: Vec<Document>,
+    pub results: Vec<Document>,
     /// The number of documents that match the search query
-    total: usize,
+    pub total: usize,
 }
 
 /// Search for documents in all Terraphim graphs defined in the config via GET params
@@ -114,22 +114,23 @@ pub(crate) async fn search_documents_post(
 /// Response type for showing the config
 ///
 /// This is also used when updating the config
-#[derive(Debug, Serialize)]
-pub(crate) struct ConfigResponse {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigResponse {
     /// Status of the config fetch
-    status: Status,
+    pub status: Status,
     /// The config
-    config: Config,
+    pub config: Config,
 }
 
 /// API handler for Terraphim Config
-pub(crate) async fn show_config(State(config): State<ConfigState>) -> Json<ConfigResponse> {
+pub(crate) async fn get_config(State(config): State<ConfigState>) -> Result<Json<ConfigResponse>> {
+    log::debug!("Called API endpoint get_config");
     let terraphim_service = TerraphimService::new(config);
     let config = terraphim_service.fetch_config().await;
-    Json(ConfigResponse {
+    Ok(Json(ConfigResponse {
         status: Status::Success,
         config,
-    })
+    }))
 }
 
 /// API handler for Terraphim Config update

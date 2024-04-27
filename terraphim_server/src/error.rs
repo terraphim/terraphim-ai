@@ -3,9 +3,9 @@ use axum::{
     Json,
 };
 use reqwest::StatusCode;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Status {
     #[serde(rename = "success")]
     Success,
