@@ -1,8 +1,9 @@
-use persistence::Persistable;
-use terraphim_config::Config;
-use terraphim_config::ConfigState;
-use terraphim_middleware::thesaurus::create_thesaurus_from_haystack;
-use terraphim_types::{Article, IndexedDocument, SearchQuery};
+use persistence::error;
+use terraphim_config::{ConfigState, Role};
+use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
+use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};
+
+mod score;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
@@ -14,6 +15,9 @@ pub enum ServiceError {
 
     #[error("Persistence error: {0}")]
     Persistence(#[from] persistence::Error),
+
+    #[error("Config error: {0}")]
+    Config(String),
 }
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
@@ -28,28 +32,76 @@ impl<'a> TerraphimService {
         Self { config_state }
     }
 
-    /// Update a thesaurus from a haystack and update the knowledge graph automata URL
-    async fn update_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
-        Ok(create_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
+    /// Build a thesaurus from the haystack and update the knowledge graph automata URL
+    async fn build_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
+        Ok(build_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
     }
 
-    /// Create article
-    pub async fn create_article(&mut self, article: Article) -> Result<Article> {
-        self.config_state.index_article(&article).await?;
-        Ok(article)
+    /// Create document
+    pub async fn create_document(&mut self, document: Document) -> Result<Document> {
+        self.config_state.add_to_roles(&document).await?;
+        Ok(document)
     }
 
-    /// Search for articles in the haystacks
-    pub async fn search_articles(&self, search_query: &SearchQuery) -> Result<Vec<Article>> {
-        self.update_thesaurus(search_query).await?;
+    /// Get the role for the given search query
+    async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
+        let search_role: String = match &search_query.role {
+            Some(role) => role.clone(),
+            None => self.config_state.get_default_role().await,
+        };
 
-        let cached_articles =
+        log::debug!("Searching for role: {:?}", search_role);
+        let Some(role) = self.config_state.get_role(&search_role).await else {
+            return Err(ServiceError::Config(format!(
+                "Role `{}` not found in config",
+                search_role
+            )));
+        };
+        Ok(role)
+    }
+
+    /// Search for documents in the haystacks
+    pub async fn search(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
+        // Get the role from the config
+        log::debug!("Role for searching: {:?}", search_query.role);
+        let role = self.get_search_role(search_query).await?;
+
+        log::trace!("Building index for search query: {:?}", search_query);
+        let index: Index =
             terraphim_middleware::search_haystacks(self.config_state.clone(), search_query.clone())
                 .await?;
-        let docs: Vec<IndexedDocument> = self.config_state.search_articles(search_query).await;
-        let articles = terraphim_types::merge_and_serialize(cached_articles, docs);
 
-        Ok(articles)
+        match role.relevance_function {
+            RelevanceFunction::TitleScorer => {
+                log::debug!("Searching haystack with title scorer");
+                let indexed_docs: Vec<IndexedDocument> = self
+                    .config_state
+                    .search_indexed_documents(search_query)
+                    .await;
+
+                let documents = index.get_documents(indexed_docs);
+                // Sort the documents by relevance
+                log::debug!("Sorting documents by relevance");
+                let documents = score::sort_documents(search_query, documents);
+
+                Ok(documents)
+            }
+            RelevanceFunction::TerraphimGraph => {
+                self.build_thesaurus(search_query).await?;
+
+                let scored_index_docs: Vec<IndexedDocument> = self
+                    .config_state
+                    .search_indexed_documents(search_query)
+                    .await;
+
+                // Apply to ripgrep vector of document output
+                // I.e. use the ranking of thesaurus to rank the documents here
+                log::debug!("Ranking documents with thesaurus");
+                let documents = index.get_documents(scored_index_docs);
+
+                Ok(documents)
+            }
+        }
     }
 
     /// Fetch the current config
@@ -58,11 +110,16 @@ impl<'a> TerraphimService {
         current_config.clone()
     }
 
-    /// Update the current config
-    pub async fn update_config(&self, config_new: Config) -> Result<terraphim_config::Config> {
-        let mut config_state_lock = self.config_state.config.lock().await;
-        config_state_lock.update(config_new.clone());
-        config_state_lock.save().await?;
-        Ok(config_state_lock.clone())
+    /// Update the config
+    ///
+    /// Overwrites the config in the config state and returns the updated
+    /// config.
+    pub async fn update_config(
+        &self,
+        config: terraphim_config::Config,
+    ) -> Result<terraphim_config::Config> {
+        let mut current_config = self.config_state.config.lock().await;
+        *current_config = config.clone();
+        Ok(config)
     }
 }

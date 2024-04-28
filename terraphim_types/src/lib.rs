@@ -1,4 +1,5 @@
 use std::fmt::{self, Display, Formatter};
+use std::ops::{Add, AddAssign, Deref, DerefMut};
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -195,73 +196,83 @@ impl Display for Concept {
     }
 }
 
-/// Document that can be indexed by the `RoleGraph`.
-///
-/// These are all articles and entities, which have fields that can be indexed.
-#[derive(Debug, Clone)]
-pub struct Document {
-    /// Unique identifier of the document
-    pub id: String,
-    /// Title of the document
-    pub title: String,
-    /// Body of the document
-    pub body: Option<String>,
-    /// Description of the document
-    pub description: Option<String>,
-}
+/// Rank of an document in the search results
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Rank(u64);
 
-impl ToString for Document {
-    fn to_string(&self) -> String {
-        let mut text = String::new();
-        text.push_str(&self.title);
-        if let Some(body) = &self.body {
-            text.push_str(body);
-        }
-        if let Some(description) = &self.description {
-            text.push_str(description);
-        }
-        text
+impl Rank {
+    /// Create a new rank with a given value
+    pub fn new(rank: u64) -> Self {
+        Self(rank)
     }
 }
 
-/// An article is a piece of content that can be indexed and searched.
-///
-/// It holds the title, body, description, tags, and rank.
-/// The `id` is a unique identifier for the article.
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct Article {
-    /// Unique identifier for the article
-    pub id: Option<String>,
-    /// A short excerpt of the article
-    pub stub: Option<String>,
-    /// Title of the article
-    pub title: String,
-    /// URL of the article
-    pub url: String,
-    /// The article body
-    pub body: String,
-    /// A short description of the article
-    pub description: Option<String>,
-    /// Tags for the article
-    pub tags: Option<Vec<String>>,
-    /// Rank of the article in the search results
-    pub rank: Option<u64>,
+impl Add for Rank {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
 }
 
-impl From<Article> for Document {
-    fn from(val: Article) -> Self {
-        // If the ID is not provided, generate a new one
-        let id = match val.id {
-            Some(id) => id,
-            None => ulid::Ulid::new().to_string(),
-        };
+// Implement +=
+impl Add for &mut Rank {
+    type Output = Self;
 
-        Document {
-            id,
-            title: val.title,
-            body: Some(val.body),
-            description: val.description,
+    fn add(self, other: Self) -> Self {
+        self.0 += other.0;
+        self
+    }
+}
+
+impl AddAssign for Rank {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
+impl Display for Rank {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// A document is the central a piece of content that gets indexed and searched.
+///
+/// It holds the title, body, description, tags, and rank.
+/// The `id` is a unique identifier for the document.
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct Document {
+    /// Unique identifier for the document
+    pub id: String,
+    /// URL to the document
+    pub url: String,
+    /// Title of the document
+    pub title: String,
+    /// The document body
+    pub body: String,
+
+    /// A short description of the document
+    pub description: Option<String>,
+    /// A short excerpt of the document
+    pub stub: Option<String>,
+    /// Tags for the document
+    pub tags: Option<Vec<String>>,
+    /// Rank of the document in the search results
+    pub rank: Option<Rank>,
+}
+
+impl fmt::Display for Document {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Start with title and body
+        write!(f, "{} {}", self.title, self.body)?;
+
+        // Append description if it exists
+        if let Some(ref description) = self.description {
+            write!(f, " {}", description)?;
         }
+
+        Ok(())
     }
 }
 
@@ -323,14 +334,14 @@ impl Node {
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
 ///
 /// It holds the normalized terms for a resource
-/// where a resource can be as diverse as a Markdown file or a document in
+/// where a resource can be as diverse as a Markdown file or an document in
 /// Notion or AtomicServer
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Thesaurus {
     /// Name of the thesaurus
-    pub name: String,
+    name: String,
     /// The inner hashmap of normalized terms
-    inner: AHashMap<NormalizedTermValue, NormalizedTerm>,
+    data: AHashMap<NormalizedTermValue, NormalizedTerm>,
 }
 
 impl Thesaurus {
@@ -338,34 +349,39 @@ impl Thesaurus {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            inner: AHashMap::new(),
+            data: AHashMap::new(),
         }
+    }
+
+    /// Get the name of the thesaurus
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     /// Inserts a key-value pair into the thesaurus.
     pub fn insert(&mut self, key: NormalizedTermValue, value: NormalizedTerm) {
-        self.inner.insert(key, value);
+        self.data.insert(key, value);
     }
 
     /// Get the length of the thesaurus
     pub fn len(&self) -> usize {
-        self.inner.len()
+        self.data.len()
     }
 
     /// Check if the thesaurus is empty
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        self.data.is_empty()
     }
 
     /// Custom `get` method for the thesaurus, which accepts a
     /// `NormalizedTermValue` and returns a reference to the
     /// `NormalizedTerm`.
     pub fn get(&self, key: &NormalizedTermValue) -> Option<&NormalizedTerm> {
-        self.inner.get(key)
+        self.data.get(key)
     }
 
     pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
-        self.inner.keys()
+        self.data.keys()
     }
 }
 
@@ -375,18 +391,95 @@ impl<'a> IntoIterator for &'a Thesaurus {
     type IntoIter = Iter<'a, NormalizedTermValue, NormalizedTerm>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.iter()
+        self.data.iter()
     }
 }
 
-/// An index is a hashmap of articles
+/// An index is a hashmap of documents
 ///
-/// It holds the articles that have been indexed
+/// It holds the documents that have been indexed
 /// and can be searched through using the `RoleGraph`.
-pub type Index = AHashMap<String, Article>;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Index {
+    inner: AHashMap<String, Document>,
+}
 
-/// Reference to external storage of documents, traditional indexes use
-/// document, aka article or entity.
+impl Default for Index {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Index {
+    /// Create a new, empty index
+    pub fn new() -> Self {
+        Self {
+            inner: AHashMap::new(),
+        }
+    }
+
+    /// Converts all given indexed documents to documents
+    ///
+    /// Returns the all converted documents
+    pub fn get_documents(&self, docs: Vec<IndexedDocument>) -> Vec<Document> {
+        let mut documents: Vec<Document> = Vec::new();
+        for doc in docs {
+            log::trace!("doc: {:#?}", doc);
+            if let Some(document) = self.get_document(&doc) {
+                // Document found in cache
+                let mut document = document;
+                document.tags = Some(doc.tags.clone());
+                // rank only available for terraphim graph
+                // use scorer to populate the rank for all cases
+                document.rank = Some(doc.rank);
+                documents.push(document.clone());
+            } else {
+                log::warn!("Document not found in cache. Cannot convert.");
+            }
+        }
+        documents
+    }
+
+    /// Get a document from the index (if it exists in the index)
+    pub fn get_document(&self, doc: &IndexedDocument) -> Option<Document> {
+        if let Some(document) = self.inner.get(&doc.id).cloned() {
+            // Document found in cache
+            let mut document = document;
+            document.tags = Some(doc.tags.clone());
+            // Rank only available for terraphim graph
+            // use scorer to populate the rank for all cases
+            document.rank = Some(doc.rank);
+            Some(document)
+        } else {
+            None
+        }
+    }
+}
+
+impl Deref for Index {
+    type Target = AHashMap<String, Document>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for Index {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl IntoIterator for Index {
+    type Item = (String, Document);
+    type IntoIter = std::collections::hash_map::IntoIter<String, Document>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
+/// Reference to external storage of documents
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexedDocument {
     /// UUID of the indexed document, matching external storage id
@@ -394,10 +487,11 @@ pub struct IndexedDocument {
     /// Matched to edges
     pub matched_edges: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
-    pub rank: u64,
-    /// tags, which are nodes turned into concepts for human readability
+    /// Number of nodes and edges connected to the document
+    pub rank: Rank,
+    /// Tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
-    /// list of node ids for validation of matching
+    /// List of node IDs for validation of matching
     pub nodes: Vec<Id>,
 }
 
@@ -417,19 +511,27 @@ pub struct SearchQuery {
     pub role: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/// Defines the relevance function (scorer) to be used for ranking search
+/// results for the `Role`.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
 pub enum RelevanceFunction {
-    #[serde(rename = "terraphim-graph")]
+    /// Scorer for ranking search results based on the Terraphim graph
+    ///
+    /// This is based on filtered result outputs according to the ranking of the
+    /// knowledge graph. The node, which is most connected will produce the
+    /// highest ranking
+    #[serde(rename = "teraphim-graph")]
     TerraphimGraph,
-    #[serde(rename = "redis-search")]
-    RedisSearch,
+    /// Scorer for ranking search results based on the title of a document
+    #[serde(rename = "title-scorer")]
+    TitleScorer,
 }
 
 /// Defines all supported inputs for the knowledge graph.
 ///
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]
@@ -437,24 +539,4 @@ pub enum KnowledgeGraphInputType {
     /// A set of JSON files
     #[serde(rename = "json")]
     Json,
-}
-
-/// Merge articles from the cache and the output of query results
-///
-/// Returns the merged articles
-pub fn merge_and_serialize(cached_articles: Index, docs: Vec<IndexedDocument>) -> Vec<Article> {
-    let mut articles: Vec<Article> = Vec::new();
-    for doc in docs {
-        log::trace!("doc: {:#?}", doc);
-        if let Some(article) = cached_articles.get(&doc.id).cloned() {
-            // Article found in cache
-            let mut article = article;
-            article.tags = Some(doc.tags.clone());
-            article.rank = Some(doc.rank);
-            articles.push(article.clone());
-        } else {
-            log::warn!("Article not found in cache");
-        }
-    }
-    articles
 }

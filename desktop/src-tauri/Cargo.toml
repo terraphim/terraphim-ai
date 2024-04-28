@@ -12,6 +12,7 @@ rust-version = "1.57"
 tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
+terraphim_automata = { path = "../../crates/terraphim_automata" }
 terraphim_config = { path = "../../crates/config" }
 terraphim_middleware = { path = "../../crates/middleware" }
 terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph" }
@@ -31,6 +32,7 @@ tauri = { version = "1.6.1", features = [
 ] }
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
+ahash = "0.8.11"
 
 [features]
 # by default Tauri runs in production mode

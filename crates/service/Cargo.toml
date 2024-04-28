@@ -12,3 +12,8 @@ terraphim_types = { path = "../../terraphim_types" }
 
 thiserror = "1.0.58"
 opendal = { version = "0.44.2" }
+serde_json = "1.0.116"
+serde = { version = "1.0.198", features = ["serde_derive"] }
+fnv = "1.0.7"
+log = "0.4.21"
+strsim = "0.11.1"

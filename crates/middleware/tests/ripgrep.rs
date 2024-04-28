@@ -1,15 +1,47 @@
 #[cfg(test)]
 mod tests {
-    use terraphim_config::{Config, ConfigState};
+    use std::path::PathBuf;
+
+    use ahash::AHashMap;
+    use terraphim_automata::AutomataPath;
+    use terraphim_config::{
+        ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
+    };
     use terraphim_middleware::search_haystacks;
-    use terraphim_types::IndexedDocument;
-    use terraphim_types::{merge_and_serialize, SearchQuery};
+    use terraphim_types::SearchQuery;
+    use terraphim_types::{IndexedDocument, KnowledgeGraphInputType, RelevanceFunction};
 
     use terraphim_middleware::Result;
+    use url::Url;
 
     #[tokio::test]
     async fn test_roundtrip() -> Result<()> {
-        let mut config = Config::new();
+        let mut config = ConfigBuilder::new()
+            .add_role(
+                "System Operator",
+                Role {
+                    shortname: Some("operator".to_string()),
+                    name: "System Operator".to_string(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    theme: "superhero".to_string(),
+                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
+                    kg: KnowledgeGraph {
+                        automata_path: AutomataPath::local_example(),
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("~/pkm"),
+                        public: true,
+                        publish: true,
+                    },
+                    haystacks: vec![Haystack {
+                        path: PathBuf::from("/tmp/system_operator/pages/"),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: AHashMap::new(),
+                },
+            )
+            .default_role("Default")?
+            .build()?;
+
         let config_state = ConfigState::new(&mut config).await?;
 
         let role_name = "System Operator".to_string();
@@ -19,12 +51,13 @@ mod tests {
             skip: Some(0),
             limit: Some(10),
         };
-        println!("Searching articles with query: {search_query:?} {role_name}");
+        println!("Searching documents with query: {search_query:?} {role_name}");
 
-        let cached_articles = search_haystacks(config_state.clone(), search_query.clone()).await?;
-        let docs: Vec<IndexedDocument> = config_state.search_articles(&search_query).await;
-        let articles = merge_and_serialize(cached_articles, docs);
-        log::debug!("Final articles: {articles:?}");
+        let index = search_haystacks(config_state.clone(), search_query.clone()).await?;
+        let indexed_docs: Vec<IndexedDocument> =
+            config_state.search_indexed_documents(&search_query).await;
+        let documents = index.get_documents(indexed_docs);
+        log::debug!("Final documents: {documents:?}");
 
         Ok(())
     }

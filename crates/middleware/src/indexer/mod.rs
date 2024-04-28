@@ -1,4 +1,3 @@
-use ahash::AHashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
@@ -11,19 +10,19 @@ mod ripgrep;
 
 pub use ripgrep::RipgrepIndexer;
 
-fn calculate_hash<T: Hash>(t: &T) -> String {
+fn hash_as_string<T: Hash>(t: &T) -> String {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
     format!("{:x}", s.finish())
 }
 
-/// A Middleware is a service that creates an index of articles from
+/// A Middleware is a service that creates an index of documents from
 /// a haystack.
 ///
 /// Every middleware receives a needle and a haystack and returns
-/// a HashMap of Articles.
+/// a HashMap of Documents.
 pub trait IndexMiddleware {
-    /// Index the haystack and return a HashMap of Articles
+    /// Index the haystack and return a HashMap of Documents
     ///
     /// # Errors
     ///
@@ -36,52 +35,46 @@ pub trait IndexMiddleware {
     ) -> impl std::future::Future<Output = Result<Index>> + Send;
 }
 
-/// Use Middleware to search through haystacks and return an index of articles
+/// Use Middleware to search through haystacks and return an index of documents
 /// that match the search query.
 pub async fn search_haystacks(
     mut config_state: ConfigState,
     search_query: SearchQuery,
 ) -> Result<Index> {
     let config = config_state.config.lock().await.clone();
+    let search_query_role = search_query.role.unwrap_or(config.default_role);
+    let needle = &search_query.search_term;
 
-    let search_query_role = search_query
-        .role
-        .unwrap_or(config.default_role)
-        .to_lowercase();
+    let ripgrep = RipgrepIndexer::default();
+    let mut full_index = Index::new();
 
     let role = config
         .roles
         .get(&search_query_role)
         .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
 
-    // Define middleware to be used for searching.
-    let ripgrep = RipgrepIndexer::default();
-
-    let mut all_new_articles: Index = AHashMap::new();
-
     for haystack in &role.haystacks {
-        log::info!("Finding articles in haystack: {:#?}", haystack);
-        let needle = &search_query.search_term;
+        log::info!("Finding documents in haystack: {:#?}", haystack);
 
-        let new_articles = match haystack.service {
+        let index = match haystack.service {
             ServiceType::Ripgrep => {
-                // Search through articles using ripgrep
+                // Search through documents using ripgrep
                 // This indexes the haystack using the ripgrep middleware
                 ripgrep.index(needle, &haystack.path).await?
             }
         };
 
-        for new_article in new_articles.values() {
-            if let Err(e) = config_state.index_article(new_article).await {
+        for indexed_doc in index.values() {
+            if let Err(e) = config_state.add_to_roles(indexed_doc).await {
                 log::warn!(
-                    "Failed to index article `{}` ({}): {e:?}",
-                    new_article.title,
-                    new_article.url
+                    "Failed to insert document `{}` ({}): {e:?}",
+                    indexed_doc.title,
+                    indexed_doc.url
                 );
             }
         }
 
-        all_new_articles.extend(new_articles);
+        full_index.extend(index);
     }
-    Ok(all_new_articles)
+    Ok(full_index)
 }

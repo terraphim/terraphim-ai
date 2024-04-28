@@ -11,9 +11,9 @@ pub struct SearchQuery {
     role: Option<String>,
 }
 
-/// Create article schema
+/// Create document schema
 #[derive(Deserialize, Serialize, Debug, Object)]
-pub struct Article {
+pub struct Document {
     pub id: Option<String>,
     pub stub: Option<String>,
     pub title: String,
@@ -23,27 +23,10 @@ pub struct Article {
     pub tags: Option<Vec<String>>,
 }
 
-impl Into<Document> for Article {
-    fn into(self) -> Document {
-        // If the ID is not provided, generate a new one
-        let id = match self.id {
-            Some(id) => id,
-            None => ulid::Ulid::new().to_string(),
-        };
-
-        Document {
-            id,
-            title: self.title,
-            body: Some(self.body),
-            description: self.description,
-        }
-    }
-}
-
 #[derive(Tags)]
 pub(crate) enum ApiTags {
-    /// Article operations
-    Article,
+    /// Document operations
+    Document,
     /// Config operations
     Config,
     /// Search operations
