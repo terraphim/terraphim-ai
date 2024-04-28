@@ -97,12 +97,12 @@ async fn run_server() -> Result<()> {
                 kg: KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
+                    path: PathBuf::from("fixtures/haystack"),
                     public: true,
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
+                    path: PathBuf::from("fixtures/haystack"),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -119,12 +119,12 @@ async fn run_server() -> Result<()> {
                 kg: KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
+                    path: PathBuf::from("fixtures/haystack"),
                     public: true,
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("localsearch"),
+                    path: PathBuf::from("fixtures/haystack"),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -141,12 +141,12 @@ async fn run_server() -> Result<()> {
                 kg: KnowledgeGraph {
                     automata_path,
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
+                    path: PathBuf::from("fixtures/haystack"),
                     public: true,
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: system_operator_haystack,
+                    path: PathBuf::from("fixtures/haystack"),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
