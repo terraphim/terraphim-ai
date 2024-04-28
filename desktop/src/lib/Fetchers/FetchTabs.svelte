@@ -8,7 +8,6 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { configStore, is_tauri } from "$lib/stores";
   let content = {
-    // text: JSON.stringify($configStore, null, 2),
     json: $configStore,
   };
   function handleChange(updatedContent) {
@@ -39,7 +38,6 @@
     content = updatedContent;
     content;
   }
-  let data;
   let isWiki = false;
   let fetchUrl =
     "https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json";

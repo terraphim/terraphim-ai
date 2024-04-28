@@ -39,4 +39,4 @@ const roles = writable<Record<string, Role>>({}); // Store roles separately for 
 
 let input = writable<string>("");
 
-export { theme, role, is_tauri, input, serverUrl, configStore, roles };
+export { configStore, input, is_tauri, role, roles, serverUrl, theme };

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { Field, Input } from "svelma";
   import { invoke } from "@tauri-apps/api/tauri";
-  import logo from "/public/assets/terraphim_gray.png";
-  import { role, is_tauri, input, serverUrl } from "../stores";
+  import { Field, Input } from "svelma";
+  import { input, is_tauri, role, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
-  import type { SearchResponse, Document } from "./SearchResult";
+  import type { Document, SearchResponse } from "./SearchResult";
+  import logo from "/public/assets/terraphim_gray.png";
 
   let results: Document[] = [];
   let error: string | null = null;
