@@ -1,11 +1,10 @@
-use ahash::AHashMap;
 use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
-use terraphim_types::{Article, Index};
+use terraphim_types::{Document, Index};
 
-use super::{calculate_hash, IndexMiddleware};
+use super::{hash_as_string, IndexMiddleware};
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
 
@@ -16,31 +15,31 @@ pub struct RipgrepIndexer {
 }
 
 impl IndexMiddleware for RipgrepIndexer {
-    /// Index the haystack using ripgrep and return an index of articles
+    /// Index the haystack using ripgrep and return an index of documents
     ///
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Path) -> Result<Index> {
         let messages = self.command.run(needle, haystack).await?;
-        let articles = index_inner(messages);
-        Ok(articles)
+        let documents = index_inner(messages);
+        Ok(documents)
     }
 }
 
 #[cached]
-/// This is the inner function that indexes the articles
+/// This is the inner function that indexes the documents
 /// which allows us to cache requests to the index service
 fn index_inner(messages: Vec<Message>) -> Index {
-    // Cache of already processed articles
-    let mut cached_articles: Index = AHashMap::new();
+    // Cache of already processed documents
+    let mut index: Index = Index::default();
     let mut existing_paths: HashSet<String> = HashSet::new();
 
-    let mut article = Article::default();
+    let mut document = Document::default();
     for message in messages {
         match message {
             Message::Begin(message) => {
-                article = Article::default();
+                document = Document::default();
 
                 let Some(path) = message.path() else {
                     continue;
@@ -50,10 +49,9 @@ fn index_inner(messages: Vec<Message>) -> Index {
                 }
                 existing_paths.insert(path.clone());
 
-                let id = calculate_hash(&path);
-                article.id = Some(id.clone());
-                article.title = path.clone();
-                article.url = path.clone();
+                document.id = hash_as_string(&path);
+                document.title = path.clone();
+                document.url = path.clone();
             }
             Message::Match(message) => {
                 let Some(path) = message.path() else {
@@ -66,7 +64,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
                         continue;
                     }
                 };
-                article.body = body;
+                document.body = body;
 
                 let lines = match &message.lines {
                     Data::Text { text } => text,
@@ -75,25 +73,25 @@ fn index_inner(messages: Vec<Message>) -> Index {
                         continue;
                     }
                 };
-                match article.description {
+                match document.description {
                     Some(description) => {
-                        article.description = Some(description + " " + &lines);
+                        document.description = Some(description + " " + &lines);
                     }
                     None => {
-                        article.description = Some(lines.clone());
+                        document.description = Some(lines.clone());
                     }
                 }
             }
             Message::Context(message) => {
-                let article_url = article.url.clone();
+                let document_url = document.url.clone();
                 let Some(path) = message.path() else {
                     continue;
                 };
 
-                // We got a context for a different article
-                if article_url != *path {
+                // We got a context for a different document
+                if document_url != *path {
                     println!(
-                            "Error: Context for differrent article. article_url != path: {article_url:?} != {path:?}"
+                            "Error: Context for differrent document. document_url != path: {document_url:?} != {path:?}"
                         );
                     continue;
                 }
@@ -105,30 +103,23 @@ fn index_inner(messages: Vec<Message>) -> Index {
                         continue;
                     }
                 };
-                match article.description {
+                match document.description {
                     Some(description) => {
-                        article.description = Some(description + " " + &lines);
+                        document.description = Some(description + " " + &lines);
                     }
                     None => {
-                        article.description = Some(lines.clone());
+                        document.description = Some(lines.clone());
                     }
                 }
             }
             Message::End(_) => {
                 // The `End` message could be received before the `Begin`
-                // message causing the article to be empty
-                let id = match article.id {
-                    Some(ref id) => id,
-                    None => {
-                        println!("Error: End message received before Begin message. Skipping.");
-                        continue;
-                    }
-                };
-                cached_articles.insert(id.to_string(), article.clone());
+                // message causing the document to be empty
+                index.insert(document.id.to_string(), document.clone());
             }
             _ => {}
         };
     }
 
-    cached_articles
+    index
 }

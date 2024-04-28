@@ -1,6 +1,6 @@
-// add article 
+// add document 
 curl -X 'POST' \
-  'http://localhost:8000/article' \
+  'http://localhost:8000/document' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -12,6 +12,6 @@ curl -X 'POST' \
 
 // Search query sample
 curl -X 'GET' \
-  'http://localhost:8000/articles/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator' \
+  'http://localhost:8000/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=system%20operator' \
   -H 'accept: application/json'
 

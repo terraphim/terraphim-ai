@@ -1,6 +1,5 @@
-name: "test-on-pr"
-on: 
-    [pull_request]
+name: "Test on PR with Earthly"
+on: [pull_request]
 
 env:
   CARGO_TERM_COLOR: always

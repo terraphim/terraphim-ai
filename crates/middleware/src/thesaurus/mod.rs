@@ -28,6 +28,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
+use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
 use terraphim_types::SearchQuery;
@@ -38,25 +39,22 @@ use tokio::process::Command;
 use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
 
-pub async fn create_thesaurus_from_haystack(
+pub async fn build_thesaurus_from_haystack(
     config_state: ConfigState,
     search_query: &SearchQuery,
 ) -> Result<()> {
-    let role_name = search_query.role.clone().unwrap_or_default();
-
     let config = config_state.config.lock().await;
     let roles = config.roles.clone();
     let default_role = config.default_role.clone();
+    let role_name = search_query.role.clone().unwrap_or_default();
 
     let role: &mut Role = &mut roles
         .get(&role_name)
-        .unwrap_or(&config.roles[&default_role])
+        .unwrap_or(&roles[&default_role])
         .to_owned();
+
     for haystack in &role.haystacks {
-        log::debug!(
-            "Building thesaurus using logseq for haystack: {:#?}",
-            haystack
-        );
+        log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
         let logseq = Logseq::default();
         let thesaurus = logseq.build(role_name.clone(), &haystack.path).await?;
@@ -71,8 +69,7 @@ pub async fn create_thesaurus_from_haystack(
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
 
-        // Put into knowledge graph of role
-        role.kg.automata_url = thesaurus_path.to_string_lossy().to_string();
+        role.kg.automata_path = AutomataPath::Local(thesaurus_path);
     }
     Ok(())
 }
@@ -155,7 +152,7 @@ impl LogseqService {
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         let haystack = haystack.to_string_lossy().to_string();
-        log::trace!("Running logseq with needle `{needle}` and haystack `{haystack}`");
+        log::debug!("Running logseq with needle `{needle}` and haystack `{haystack}`");
 
         // Merge the default arguments with the needle and haystack
         let args: Vec<String> = vec![needle.to_string(), haystack]
