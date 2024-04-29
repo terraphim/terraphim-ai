@@ -1,13 +1,13 @@
-use std::path::PathBuf;
-
 use ahash::AHashMap;
-use persistence::Persistable;
+use std::path::PathBuf;
+use url::Url;
+
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
 };
+use terraphim_persistence::Persistable;
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
-use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<()> {

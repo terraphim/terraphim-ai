@@ -1,15 +1,16 @@
 use std::{path::PathBuf, sync::Arc};
 
-use ahash::AHashMap;
-use async_trait::async_trait;
-use persistence::Persistable;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use terraphim_automata::{load_thesaurus, AutomataPath};
+use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
     Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
 };
+
+use ahash::AHashMap;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use ulid::Ulid;
@@ -19,7 +20,7 @@ pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 use opendal::Result as OpendalResult;
 use url::Url;
 
-type PersistenceResult<T> = std::result::Result<T, persistence::Error>;
+type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
 
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
@@ -33,7 +34,7 @@ pub enum TerraphimConfigError {
     Profile(String),
 
     #[error("Persistence error")]
-    Persistence(#[from] persistence::Error),
+    Persistence(#[from] terraphim_persistence::Error),
 
     #[error("Serde JSON error")]
     Json(#[from] serde_json::Error),

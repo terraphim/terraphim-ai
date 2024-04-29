@@ -1,11 +1,4 @@
 [workspace]
 resolver = "2"
-members = [
-    "crates/*",
-    "terraphim_types",
-    "terraphim_server",
-    "desktop/src-tauri",
-]
-default-members = [
-    "terraphim_server",
-]
+members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
+default-members = ["terraphim_server"]
