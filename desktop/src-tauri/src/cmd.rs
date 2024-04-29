@@ -5,11 +5,11 @@
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
-use service::TerraphimService;
 use tauri::command;
 use tauri::State;
 
 use terraphim_config::{Config, ConfigState};
+use terraphim_service::TerraphimService;
 use terraphim_types::{Document, SearchQuery};
 
 #[derive(Debug, Deserialize)]
@@ -28,10 +28,10 @@ pub enum TerraphimTauriError {
     Middleware(#[from] terraphim_middleware::Error),
 
     #[error("Persistence error: {0}")]
-    Persistence(#[from] persistence::Error),
+    Persistence(#[from] terraphim_persistence::Error),
 
     #[error("Service error: {0}")]
-    Service(#[from] service::ServiceError),
+    Service(#[from] terraphim_service::ServiceError),
 }
 
 // Manually implement `Serialize` for our error type because some of the

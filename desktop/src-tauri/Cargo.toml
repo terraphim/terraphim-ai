@@ -13,13 +13,13 @@ tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
 terraphim_automata = { path = "../../crates/terraphim_automata" }
-terraphim_config = { path = "../../crates/config" }
-terraphim_middleware = { path = "../../crates/middleware" }
+terraphim_config = { path = "../../crates/terraphim_config" }
+terraphim_middleware = { path = "../../crates/terraphim_middleware" }
 terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph" }
-terraphim_settings = { path = "../../crates/settings" }
-terraphim_types = { path = "../../terraphim_types" }
-persistence = { path = "../../crates/persistence" }
-service = { path = "../../crates/service" }
+terraphim_settings = { path = "../../crates/terraphim_settings" }
+terraphim_types = { path = "../../crates/terraphim_types" }
+terraphim_persistence = { path = "../../crates/terraphim_persistence" }
+terraphim_service = { path = "../../crates/terraphim_service" }
 
 anyhow = "1.0.81"
 log = "0.4.21"
