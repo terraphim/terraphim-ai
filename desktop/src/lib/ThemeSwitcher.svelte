@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
-  import { theme, role, is_tauri, configStore, roles } from "./stores";
   import { CONFIG } from "../config";
+  import { configStore, is_tauri, role, roles, theme } from "./stores";
 
   interface ConfigResponse {
     status: string;

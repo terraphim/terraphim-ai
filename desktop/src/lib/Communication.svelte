@@ -1,19 +1,19 @@
 <script>
-  import { listen, emit } from "@tauri-apps/api/event";
+  import { emit, listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   export let onMessage;
   let unlisten;
 
   onMount(async () => {
-    unlisten = await listen("rust-event", onMessage)
-  })
+    unlisten = await listen("rust-event", onMessage);
+  });
   onDestroy(() => {
     if (unlisten) {
-      unlisten()
+      unlisten();
     }
-  })
+  });
 
   function log() {
     invoke("log_operation", {
