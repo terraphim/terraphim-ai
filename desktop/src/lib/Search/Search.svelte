@@ -1,57 +1,75 @@
 <script lang="ts">
-  import { Field, Input } from "svelma";
   import { invoke } from "@tauri-apps/api/tauri";
-  import logo from "/public/assets/terraphim_gray.png";
-  import { role, is_tauri, input, serverUrl } from "../stores";
-  import type { SearchResult } from "./SearchResult";
+  import { Field, Input } from "svelma";
+  import { input, is_tauri, role, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
-  import { CONFIG } from "../../config";
-  import { subscribe } from "svelte/internal";
-  let result: SearchResult[] = [];
+  import type { Document, SearchResponse } from "./SearchResult";
+  import logo from "/public/assets/terraphim_gray.png";
 
-  let currentSearchUrl;
-  async function handleClick() {
-    if ($is_tauri) {
-      console.log("Tauri config");
-      console.log($input);
-      await invoke("search", {
-        searchQuery: {
-          search_term: $input,
-          skip: 0,
-          limit: 10,
-          role: $role,
-        },
-      })
-        .then((data) => {
-          console.log(data);
-          result = data;
-        })
-        .catch((e) => console.error(e));
+  let results: Document[] = [];
+  let error: string | null = null;
+
+  // Reactively handle search input
+  $: {
+    if ($input.trim()) {
+      handleSearchInputEvent();
     } else {
-      console.log($input);
-      console.log("Role config");
-      console.log($role);
-      console.log("The current value is: ", $serverUrl);
-      let json_body = JSON.stringify({
+      results = [];
+      error = null;
+    }
+  }
+
+  async function handleSearchInputEvent() {
+    error = null; // Clear previous errors
+
+    if ($is_tauri) {
+      try {
+        const response: SearchResponse = await invoke("search", {
+          searchQuery: {
+            search_term: $input,
+            skip: 0,
+            limit: 10,
+            role: $role,
+          },
+        });
+        if (response.status === "success") {
+          results = response.results;
+        } else {
+          error = `Search failed: ${response.status}`;
+          console.error("Search failed:", response);
+        }
+      } catch (e) {
+        error = `Error in Tauri search: ${e}`;
+        console.error("Error in Tauri search:", e);
+      }
+    } else {
+      if (!$input.trim()) return; // Skip if input is empty
+
+      const json_body = JSON.stringify({
         search_term: $input,
         skip: 0,
         limit: 10,
         role: $role,
       });
-      console.log("The current value is: ", json_body);
 
-      console.log("Server URL: ", $serverUrl);
-      const response = await fetch($serverUrl, {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: json_body,
-      });
-      const data = await response.json();
-      console.log(data);
-      result = data;
+      try {
+        const response = await fetch($serverUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: json_body,
+        });
+        const data: SearchResponse = await response.json();
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        results = data.results;
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        this.error = `Error fetching data: ${error}`;
+      }
     }
   }
 </script>
@@ -64,23 +82,19 @@
     icon="search"
     expanded
     autofocus
-    on:click={handleClick}
-    on:submit={handleClick}
-    on:keyup={(e) => e.key === "Enter" && handleClick()}
   />
 </Field>
-{#if result !== null && result.length !== 0}
-  {#each result as result_item}
-    <ResultItem item={result_item} />
+{#if error}
+  <p class="error">{error}</p>
+{:else if results.length}
+  {#each results as result_item}
+    <ResultItem document={result_item} />
   {/each}
 {:else}
   <section class="section">
     <div class="content has-text-grey has-text-centered">
       <img src={logo} alt="Terraphim Logo" />
-    </div>
-    <div class="content has-text-grey has-text-centered">
       <p>I am Terraphim, your personal assistant.</p>
-      <p />
     </div>
   </section>
 {/if}
@@ -88,5 +102,8 @@
 <style>
   img {
     width: 16rem;
+  }
+  .error {
+    color: red;
   }
 </style>

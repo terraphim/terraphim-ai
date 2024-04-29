@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 terraphim_automata = { path = "../terraphim_automata" }
-terraphim_types = { path = "../../terraphim_types" }
+terraphim_types = { path = "../terraphim_types" }
 
 ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"
@@ -20,6 +20,7 @@ thiserror = "1.0.30"
 tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 unicode-segmentation = "1.10.1"
+url = "2.5.0"
 
 [[bench]]
 name = "throughput"

@@ -1,19 +1,18 @@
 <script>
-  import { writable } from "svelte/store";
   import {
     register as registerShortcut,
-    unregister as unregisterShortcut,
     unregisterAll as unregisterAllShortcuts,
+    unregister as unregisterShortcut,
   } from "@tauri-apps/api/globalShortcut";
+  import { writable } from "svelte/store";
 
-  import { appWindow, WebviewWindow, LogicalSize, UserAttentionType, PhysicalSize, PhysicalPosition } from "@tauri-apps/api/window";
+  import { appWindow } from "@tauri-apps/api/window";
 
-  
   let selectedWindow = appWindow.label;
   let isvisible = true;
   const windowMap = {
-    [selectedWindow]: appWindow
-  }
+    [selectedWindow]: appWindow,
+  };
 
   export let onMessage;
   const shortcuts = writable([]);
@@ -31,7 +30,6 @@
         isvisible = true;
       }
       onMessage(`Shortcut ${shortcut_} triggered`);
-      
     })
       .then(() => {
         shortcuts.update((shortcuts_) => [...shortcuts_, shortcut_]);

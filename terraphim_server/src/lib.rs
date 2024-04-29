@@ -1,21 +1,23 @@
+use std::net::SocketAddr;
+
 use axum::{
     http::{header, Method, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
     Extension, Router,
 };
-use std::net::SocketAddr;
-mod api;
-use api::{create_article, health_axum, search_articles, search_articles_post};
 use rust_embed::RustEmbed;
 use terraphim_config::ConfigState;
 use terraphim_types::IndexedDocument;
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 
+mod api;
 mod error;
 
-pub use error::Result;
+use api::{create_document, health, search_documents, search_documents_post};
+pub use api::{ConfigResponse, CreateDocumentResponse, SearchResponse};
+pub use error::{Result, Status};
 
 // use axum_embed::ServeEmbed;
 static INDEX_HTML: &str = "index.html";
@@ -30,14 +32,14 @@ pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState)
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
     let app = Router::new()
-        .route("/health", get(health_axum))
-        // .route("/articles", get(list_articles))
-        .route("/article", post(create_article))
-        .route("/article/", post(create_article))
-        .route("/articles/search", get(search_articles))
-        .route("/articles/search", post(search_articles_post))
-        .route("/config", get(api::show_config))
-        .route("/config/", get(api::show_config))
+        .route("/health", get(health))
+        // .route("/documents", get(list_documents))
+        .route("/documents", post(create_document))
+        .route("/documents/", post(create_document))
+        .route("/documents/search", get(search_documents))
+        .route("/documents/search", post(search_documents_post))
+        .route("/config", get(api::get_config))
+        .route("/config/", get(api::get_config))
         .route("/config", post(api::update_config))
         .route("/config/", post(api::update_config))
         .fallback(static_handler)

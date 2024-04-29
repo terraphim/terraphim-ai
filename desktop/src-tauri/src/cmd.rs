@@ -5,12 +5,12 @@
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
-use service::TerraphimService;
 use tauri::command;
 use tauri::State;
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_types::{Article, SearchQuery};
+use terraphim_service::TerraphimService;
+use terraphim_types::{Document, SearchQuery};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -28,10 +28,10 @@ pub enum TerraphimTauriError {
     Middleware(#[from] terraphim_middleware::Error),
 
     #[error("Persistence error: {0}")]
-    Persistence(#[from] persistence::Error),
+    Persistence(#[from] terraphim_persistence::Error),
 
     #[error("Service error: {0}")]
-    Service(#[from] service::ServiceError),
+    Service(#[from] terraphim_service::ServiceError),
 }
 
 // Manually implement `Serialize` for our error type because some of the
@@ -52,10 +52,10 @@ pub type Result<T> = anyhow::Result<T, TerraphimTauriError>;
 pub async fn search(
     config_state: State<'_, ConfigState>,
     search_query: SearchQuery,
-) -> Result<Vec<Article>> {
+) -> Result<Vec<Document>> {
     log::info!("Search called with {:?}", search_query);
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
-    Ok(terraphim_service.search_articles(&search_query).await?)
+    Ok(terraphim_service.search(&search_query).await?)
 }
 
 #[command]

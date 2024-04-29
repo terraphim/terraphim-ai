@@ -4,7 +4,7 @@ use poem_openapi::{payload::Json, ApiResponse};
 use serde_json::value::Index;
 use ulid::Ulid;
 
-use crate::types::{ApiTags, Article, SearchQuery};
+use crate::types::{ApiTags, Document, SearchQuery};
 use anyhow::{Context, Result};
 use poem_openapi::{types::ToJSON, types::Type, NewType, Object};
 use terraphim_types::{Document, IndexedDocument, RoleGraph};
@@ -43,8 +43,8 @@ pub enum QueryResponse {
 }
 
 #[derive(ApiResponse)]
-enum CreateArticleResponse {
-    /// Returns when the article is successfully created.
+enum CreateDocumentResponse {
+    /// Returns when the document is successfully created.
     #[oai(status = 200)]
     Ok(Json<String>),
 }
@@ -64,19 +64,19 @@ impl Api {
         }
     }
 
-    #[oai(path = "/articles", method = "post", tag = "ApiTags::Article")]
-    async fn create_article(&self, article: Json<Article>) -> CreateArticleResponse {
-        log::warn!("create_article");
+    #[oai(path = "/documents", method = "post", tag = "ApiTags::Document")]
+    async fn create_document(&self, document: Json<Document>) -> CreateDocumentResponse {
+        log::warn!("create_document");
 
         log::warn!("create document");
         let id = Ulid::new().to_string();
-        let article: Article = article.0;
+        let document: Document = document.0;
 
         let mut rolegraph = self.rolegraph.lock().await;
-        rolegraph.parse_document(id.clone(), article);
+        rolegraph.parse_document(id.clone(), document);
 
         log::warn!("send response");
-        CreateArticleResponse::Ok(Json(id))
+        CreateDocumentResponse::Ok(Json(id))
     }
 
     #[oai(path = "/search", method = "post", tag = "ApiTags::Search")]
