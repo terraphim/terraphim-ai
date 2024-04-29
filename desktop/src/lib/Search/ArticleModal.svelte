@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Modal } from "svelma";
-  import type { Document } from "./SearchResult";
   import SvelteMarkdown from "svelte-markdown";
+  import type { Document } from "./SearchResult";
   export let active: boolean = false;
   export let item: Document;
   export let content = item.body;
