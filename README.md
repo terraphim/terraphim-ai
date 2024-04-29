@@ -76,6 +76,33 @@ The term is originally taken from the [Relict series][relict] of science fiction
 novels by [Vasiliy Golovachev](https://en.wikipedia.org/wiki/Vasili_Golovachov).
 Terraphim is an artificial intelligence living inside a spacesuit (part of an
 exocortex), or inside your house or vehicle, and it is designed to help you with
-your tasks. You can carry it around with you. 
+your tasks. You can carry it around with you.
+Similar entities now common in science fiction, for example Destiny 2 has entity called [Ghost][ghost].
 
-[relict]: https://www.goodreads.com/en/book/show/196710046
+
+Or in Star Wars Jedi Survivor there is an AI assistant [BD-1][bd-1]. 
+
+The compactness and mobility of such AI assistant drives the [[Design Decisions]] of Terraphim.
+
+[bd-1]: https://starwars.fandom.com/wiki/BD-1
+[ghost]: https://www.destinypedia.com/Ghost 
+[relict]: https://www.goodreads.com/en/book/show/196710046  
+
+Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
+
+## Contributing
+
+If you'd like to contribute to the project, please read our
+[Contributing guide](CONTRIBUTING.md).
+
+### Contributors are awesome
+<a href="https://github.com/terraphim/terraphim-ai/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=terraphim/terraphim-ai" />
+</a>
+
+
+
+## License
+
+This project is licensed under the [Apache license](LICENSE).
+
