@@ -9,10 +9,10 @@ use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
 
-use service::TerraphimService;
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_rolegraph::RoleGraph;
+use terraphim_service::TerraphimService;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
 
 use crate::error::{Result, Status};
