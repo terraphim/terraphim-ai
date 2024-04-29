@@ -7,8 +7,6 @@ Terraphim is a privacy-first AI assistant that works for you under your complete
 
 You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
 
-We use modern algorithms for AI/ML, data fusion, and distributed communication techniques to operate AI assistants on the user's hardware, including unused mobile devices.
-
 Terraphim operates on local infrastructure and works exclusively for the owner's benefit.
 
 https://github.com/terraphim/terraphim-ai/assets/175809/59c74652-bab4-45b2-99aa-1c0c9b90196b
