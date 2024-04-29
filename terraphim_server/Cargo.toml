@@ -9,7 +9,7 @@ terraphim_config = { path = "../crates/config" }
 terraphim_middleware = { path = "../crates/middleware" }
 terraphim_rolegraph = { path = "../crates/terraphim_rolegraph" }
 terraphim_settings = { path = "../crates/settings" }
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { path = "../crates/terraphim_types" }
 terraphim_automata = { path = "../crates/terraphim_automata" }
 service = { path = "../crates/service" }
 
