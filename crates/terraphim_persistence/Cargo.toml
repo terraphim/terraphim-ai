@@ -1,19 +1,18 @@
 [package]
-name = "persistence"
+name = "terraphim_persistence"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-terraphim_settings = { path = "../settings" }
+terraphim_settings = { path = "../terraphim_settings" }
+terraphim_types = { path = "../terraphim_types" }
+
 tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "tracing-log",
 ] }
-terraphim_types = { path = "../terraphim_types" }
-
 async-once-cell = "0.5.3"
 async-trait = "0.1.74"
-
 log = "0.4"
 opendal = { version = "0.44.2", features = [
   "services-dashmap",

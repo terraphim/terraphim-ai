@@ -21,18 +21,19 @@
 //! thesaurus.insert("concept".to_string(), "baz".to_string());
 //! ```
 
+use terraphim_automata::AutomataPath;
+use terraphim_config::ConfigState;
+use terraphim_config::Role;
+use terraphim_persistence::Persistable;
+use terraphim_types::SearchQuery;
+use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
+
 use crate::Result;
 use cached::proc_macro::cached;
-use persistence::Persistable;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
-use terraphim_automata::AutomataPath;
-use terraphim_config::ConfigState;
-use terraphim_config::Role;
-use terraphim_types::SearchQuery;
-use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 

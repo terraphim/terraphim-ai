@@ -1,6 +1,6 @@
-use persistence::error;
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
+use terraphim_persistence::error;
 use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};
 
 mod score;
@@ -14,7 +14,7 @@ pub enum ServiceError {
     OpenDal(#[from] opendal::Error),
 
     #[error("Persistence error: {0}")]
-    Persistence(#[from] persistence::Error),
+    Persistence(#[from] terraphim_persistence::Error),
 
     #[error("Config error: {0}")]
     Config(String),

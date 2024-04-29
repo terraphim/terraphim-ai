@@ -8,7 +8,7 @@ terraphim_config = { path = "../terraphim_config" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_types = { path = "../terraphim_types" }
-persistence = { path = "../persistence" }
+terraphim_persistence = { path = "../terraphim_persistence" }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 cached = { version = "0.47.0", features = ["async", "serde", "ahash"] }

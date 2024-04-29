@@ -3276,25 +3276,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
-name = "persistence"
-version = "0.1.0"
-dependencies = [
- "async-once-cell",
- "async-trait",
- "log",
- "opendal",
- "serde",
- "serde_json",
- "tempfile",
- "terraphim_config",
- "terraphim_settings",
- "terraphim_types",
- "thiserror",
- "tokio",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "phf"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4500,24 +4481,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "service"
-version = "0.1.0"
-dependencies = [
- "fnv",
- "log",
- "opendal",
- "persistence",
- "serde",
- "serde_json",
- "strsim 0.11.1",
- "terraphim_config",
- "terraphim_middleware",
- "terraphim_settings",
- "terraphim_types",
- "thiserror",
-]
-
-[[package]]
 name = "servo_arc"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5176,16 +5139,16 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "log",
- "persistence",
  "portpicker",
  "serde",
- "service",
  "tauri",
  "tauri-build",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
+ "terraphim_persistence",
  "terraphim_rolegraph",
+ "terraphim_service",
  "terraphim_settings",
  "terraphim_types",
  "thiserror",
@@ -5228,11 +5191,11 @@ dependencies = [
  "dirs",
  "log",
  "opendal",
- "persistence",
  "serde",
  "serde_json",
  "tempfile",
  "terraphim_automata",
+ "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_types",
  "thiserror",
@@ -5251,11 +5214,11 @@ dependencies = [
  "ahash 0.8.11",
  "cached",
  "log",
- "persistence",
  "serde",
  "serde_json",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_types",
  "thiserror",
@@ -5263,6 +5226,25 @@ dependencies = [
  "tokio-stream",
  "ulid",
  "url",
+]
+
+[[package]]
+name = "terraphim_persistence"
+version = "0.1.0"
+dependencies = [
+ "async-once-cell",
+ "async-trait",
+ "log",
+ "opendal",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_config",
+ "terraphim_settings",
+ "terraphim_types",
+ "thiserror",
+ "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -5301,20 +5283,20 @@ dependencies = [
  "env_logger",
  "log",
  "mime_guess",
- "persistence",
  "portpicker",
  "reqwest",
  "rust-embed",
  "serde",
  "serde_json",
  "serial_test",
- "service",
  "static-files",
  "tempfile",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
+ "terraphim_persistence",
  "terraphim_rolegraph",
+ "terraphim_service",
  "terraphim_settings",
  "terraphim_types",
  "tokio",
@@ -5324,6 +5306,24 @@ dependencies = [
  "ulid",
  "url",
  "walkdir",
+]
+
+[[package]]
+name = "terraphim_service"
+version = "0.1.0"
+dependencies = [
+ "fnv",
+ "log",
+ "opendal",
+ "serde",
+ "serde_json",
+ "strsim 0.11.1",
+ "terraphim_config",
+ "terraphim_middleware",
+ "terraphim_persistence",
+ "terraphim_settings",
+ "terraphim_types",
+ "thiserror",
 ]
 
 [[package]]
