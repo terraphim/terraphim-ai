@@ -89,7 +89,7 @@ source-native:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
@@ -112,7 +112,7 @@ source:
   FROM ghcr.io/terraphim/terraphim_builder:latest
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   DO rust+CARGO --args=fetch  
 
@@ -168,7 +168,7 @@ build-focal:
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN curl https://pkgx.sh | sh
   RUN pkgx +openssl cargo build --release
@@ -185,7 +185,7 @@ build-bionic:
   # RUN rustup toolchain install stable
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts --dir terraphim_server desktop default crates ./
   IF [ "$CARGO_HOME" = "" ]
     ENV CARGO_HOME="$HOME/.cargo"
   END
@@ -222,7 +222,7 @@ docker-aarch64:
 
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates terraphim_types  ./
+  COPY --keep-ts --dir terraphim_server desktop default crates ./
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \

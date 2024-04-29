@@ -4,7 +4,9 @@ use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
-use terraphim_types::{Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Thesaurus};
+use terraphim_types::{
+    Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Rank, Thesaurus,
+};
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
@@ -44,7 +46,7 @@ pub struct RoleGraph {
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values
-    ac_values: Vec<Id>,
+    aho_corasick_values: Vec<Id>,
     /// Aho-Corasick automata
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
@@ -64,6 +66,7 @@ impl RoleGraph {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
+
         for (key, normalized_term) in &thesaurus {
             keys.push(key);
             values.push(normalized_term.id.clone());
@@ -81,7 +84,7 @@ impl RoleGraph {
             edges: AHashMap::new(),
             documents: AHashMap::new(),
             thesaurus,
-            ac_values: values,
+            aho_corasick_values: values,
             ac,
             ac_reverse_nterm,
         })
@@ -91,18 +94,22 @@ impl RoleGraph {
     ///
     /// Returns a list of IDs of the matched nodes
     pub fn find_matching_node_ids(&self, text: &str) -> Vec<Id> {
-        let mut matches = Vec::new();
-        for mat in self.ac.find_iter(text) {
-            let id = &self.ac_values[mat.pattern()];
-            matches.push(id.clone());
-        }
-        matches
+        log::trace!("Finding matching node IDs for text: '{text}'");
+        self.ac
+            .find_iter(text)
+            .map(|mat| self.aho_corasick_values[mat.pattern()].clone())
+            .collect()
     }
 
+    /// Convert node rank to f64
+    ///
+    /// TODO: Reuse that because we don't want to do node-based ranking but rather f64 based ranking
+    /// See normalization step in https://github.com/BurntSushi/imdb-rename
+    ///
     /// This method performs several key operations to process and rank
     /// documents:
     /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
-    ///   for a document ID, creating a hierarchical weighting system.
+    ///   for an document ID, creating a hierarchical weighting system.
     /// - Creates a hashmap to store outputs with document_id and rank, aiming
     ///   to deduplicate documents in the output.
     /// - Normalizes the output rank from 1 to the total number of records,
@@ -115,47 +122,47 @@ impl RoleGraph {
     ///   rank and dividing by the sum of the weights for each node, edge, and
     ///   document.
     // YAGNI: at the moment I don't need it, so parked
-    pub fn normalize(&mut self) {
-        let node_len = self.nodes.len() as u32;
-        log::trace!("Node Length {}", node_len);
-        let edge_len = self.edges.len() as u32;
-        log::trace!("Edge Length {}", edge_len);
-        let document_count = self.documents.len() as u32;
-        log::trace!("document Length {}", document_count);
-        let normalizer = f32::from_bits(node_len + edge_len + document_count);
-        let weight_node = f32::from_bits(node_len) / normalizer;
-        let weight_edge = f32::from_bits(edge_len) / normalizer;
-        let weight_document = f32::from_bits(document_count) / normalizer;
-        log::trace!("Weight Node {}", weight_node);
-        log::trace!("Weight Edge {}", weight_edge);
-        log::trace!("Weight document {}", weight_document);
-        // for each node for each edge for each document
-        // for (document_id,rank) in self.documents.iter(){
-        //     let weighted_rank=(weight_node*node_rank as f32)+(weight_edge*edge_rank as f32)+(weight_document*rank as f32)/(weight_node+weight_edge+weight_document);
-        //     log::debug!("document id {} Weighted Rank {}", document_id, weighted_rank);
-        //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
-        // }
-    }
+    // pub fn normalize(&mut self) {
+    //     let node_len = self.nodes.len() as u32;
+    //     log::trace!("Node Length {}", node_len);
+    //     let edge_len = self.edges.len() as u32;
+    //     log::trace!("Edge Length {}", edge_len);
+    //     let document_count = self.documents.len() as u32;
+    //     log::trace!("document Length {}", document_count);
+    //     let normalizer = f32::from_bits(node_len + edge_len + document_count);
+    //     let weight_node = f32::from_bits(node_len) / normalizer;
+    //     let weight_edge = f32::from_bits(edge_len) / normalizer;
+    //     let weight_document = f32::from_bits(document_count) / normalizer;
+    //     log::trace!("Weight Node {}", weight_node);
+    //     log::trace!("Weight Edge {}", weight_edge);
+    //     log::trace!("Weight document {}", weight_document);
+    //     // for each node for each edge for each document
+    //     // for (document_id,rank) in self.documents.iter(){
+    //     //     let weighted_rank=(weight_node*node_rank as f32)+(weight_edge*edge_rank as f32)+(weight_document*rank as f32)/(weight_node+weight_edge+weight_document);
+    //     //     log::debug!("document id {} Weighted Rank {}", document_id, weighted_rank);
+    //     //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
+    //     // }
+    // }
 
-    /// Performs a query on the graph using a query string. Returns a list of document IDs
-    /// ranked and weighted by the weighted mean average of node rank, edge rank, and
-    /// document rank.
-    pub fn query(
+    /// Performs a query on the graph using the query string.
+    ///
+    /// Returns a list of document IDs ranked and weighted by the weighted mean
+    /// average of node rank, edge rank, and document rank.
+    pub fn query_graph(
         &self,
         query_string: &str,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Result<Vec<(String, IndexedDocument)>> {
-        log::debug!("Performing query with query string: '{}'", query_string);
+        log::debug!("Performing graph query with string: '{query_string}'");
         let node_ids = self.find_matching_node_ids(query_string);
 
         let mut results = AHashMap::new();
         for node_id in node_ids {
             let node = self.nodes.get(&node_id).ok_or(Error::NodeIdNotFound)?;
-            let normalized_term = self
-                .ac_reverse_nterm
-                .get(&node_id)
-                .expect("Normalized term missing for node_id");
+            let Some(normalized_term) = self.ac_reverse_nterm.get(&node_id) else {
+                return Err(Error::NodeIdNotFound);
+            };
             log::debug!("Processing node ID: {:?} with rank: {}", node_id, node.rank);
 
             for edge_id in &node.connected_with {
@@ -163,7 +170,9 @@ impl RoleGraph {
                 log::trace!("Processing edge ID: {:?} with rank: {}", edge_id, edge.rank);
 
                 for (document_id, document_rank) in &edge.doc_hash {
-                    let total_rank = node.rank + edge.rank + document_rank;
+                    // For now, this sums up over nodes and edges
+                    // TODO: Calculate the total rank based on scorer
+                    let total_rank = Rank::new(node.rank + edge.rank + document_rank);
                     match results.entry(document_id.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(IndexedDocument {
@@ -187,8 +196,8 @@ impl RoleGraph {
         }
 
         let mut ranked_documents = results.into_iter().collect::<Vec<_>>();
-        ranked_documents.sort_by_key(|&(_, ref doc)| std::cmp::Reverse(doc.rank));
-        ranked_documents.sort_by_key(|&(_, ref doc)| std::cmp::Reverse(doc.id.clone()));
+        ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
+        ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.id.clone()));
 
         let documents: Vec<_> = ranked_documents
             .into_iter()
@@ -200,17 +209,17 @@ impl RoleGraph {
         Ok(documents)
     }
 
-    pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
-        let matches = self.find_matching_node_ids(text);
-        for (a, b) in matches.into_iter().tuple_windows() {
-            // cast to Id
-            let a = a as Id;
-            self.add_or_update_document(document_id, a, b);
-        }
-    }
+    // pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
+    //     let matches = self.find_matching_node_ids(text);
+    //     for (a, b) in matches.into_iter().tuple_windows() {
+    //         // cast to Id
+    //         let a = a as Id;
+    //         self.add_or_update_document(document_id, a, b);
+    //     }
+    // }
 
-    pub fn parse_document<T: Into<Document>>(&mut self, document_id: &str, input: T) {
-        let document: Document = input.into();
+    /// Inserts an document into the rolegraph
+    pub fn insert_document(&mut self, document_id: &str, document: Document) {
         let matches = self.find_matching_node_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id, a, b);
@@ -331,14 +340,14 @@ pub fn magic_unpair(z: u128) -> (u128, u128) {
 mod tests {
     use super::*;
 
-    use terraphim_automata::load_thesaurus;
+    use terraphim_automata::{load_thesaurus, AutomataPath};
     use tokio::test;
     use ulid::Ulid;
 
     async fn load_sample_thesaurus() -> Thesaurus {
-        let automata_url = "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json";
-        let thesaurus = load_thesaurus(automata_url).await.unwrap();
-        thesaurus
+        load_thesaurus(&AutomataPath::remote_example())
+            .await
+            .unwrap()
     }
 
     #[test]
@@ -396,30 +405,40 @@ mod tests {
         let mut rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
             .await
             .unwrap();
-        let article_id = Ulid::new().to_string();
+        let document_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches = rolegraph.find_matching_node_ids(query);
         for (a, b) in matches.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(&article_id, a, b);
+            rolegraph.add_or_update_document(&document_id, a, b);
         }
-        let article_id2 = Ulid::new().to_string();
+        let document_id2 = Ulid::new().to_string();
         let query2 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches2 = rolegraph.find_matching_node_ids(query2);
         for (a, b) in matches2.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(&article_id2, a, b);
+            rolegraph.add_or_update_document(&document_id2, a, b);
         }
-        let article_id3 = Ulid::new().to_string();
+        let document_id3 = Ulid::new().to_string();
         let query3 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches3 = rolegraph.find_matching_node_ids(query3);
         for (a, b) in matches3.into_iter().tuple_windows() {
-            rolegraph.add_or_update_document(&article_id3, a, b);
+            rolegraph.add_or_update_document(&document_id3, a, b);
         }
-        let article_id4 = "ArticleID4".to_string();
+        let document_id4 = "DocumentID4".to_string();
         let query4 = "I am a text with the word Life cycle concepts and bar and maintainers, some bingo words, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        rolegraph.parse_document_to_pair(&article_id4, query4);
+        let document = Document {
+            stub: None,
+            url: "/path/to/document".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id4.clone(),
+            title: "Life cycle concepts and project direction".to_string(),
+            body: query4.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
         let results: Vec<(String, IndexedDocument)> = rolegraph
-            .query(
+            .query_graph(
                 "Life cycle concepts and project direction",
                 Some(0),
                 Some(10),
