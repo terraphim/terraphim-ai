@@ -78,6 +78,8 @@ pub struct Role {
 pub enum ServiceType {
     /// Use ripgrep as the indexing service
     Ripgrep,
+    /// Use gmail as the indexing service
+    Gmail,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched

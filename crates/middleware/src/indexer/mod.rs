@@ -6,8 +6,10 @@ use terraphim_types::{Index, SearchQuery};
 
 use crate::{Error, Result};
 
+mod gmail;
 mod ripgrep;
 
+pub use gmail::GmailIndexer;
 pub use ripgrep::RipgrepIndexer;
 
 fn hash_as_string<T: Hash>(t: &T) -> String {
@@ -45,7 +47,6 @@ pub async fn search_haystacks(
     let search_query_role = search_query.role.unwrap_or(config.default_role);
     let needle = &search_query.search_term;
 
-    let ripgrep = RipgrepIndexer::default();
     let mut full_index = Index::new();
 
     let role = config
@@ -60,7 +61,13 @@ pub async fn search_haystacks(
             ServiceType::Ripgrep => {
                 // Search through documents using ripgrep
                 // This indexes the haystack using the ripgrep middleware
+                let ripgrep = RipgrepIndexer::default();
                 ripgrep.index(needle, &haystack.path).await?
+            }
+            ServiceType::Gmail => {
+                // Search through Gmail using the Gmail index
+                let gmail = GmailIndexer::default();
+                gmail.index(needle, &haystack.path).await?
             }
         };
 
