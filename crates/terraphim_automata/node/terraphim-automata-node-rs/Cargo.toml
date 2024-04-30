@@ -10,7 +10,8 @@ documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["personal-assistant", "ai", "privacy", "agent", "automata"]
-readme = "../README.md"
+readme = "../../../../README.md"
+
 
 [lib]
 crate-type = ["cdylib"]

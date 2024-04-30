@@ -9,7 +9,8 @@ homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["personal-assistant", "ai", "privacy", "middleware"]
 license = "Apache-2.0"
-readme = "../README.md"
+readme = "../../README.md"
+
 
 [dependencies]
 terraphim_config = { path = "../terraphim_config" }
