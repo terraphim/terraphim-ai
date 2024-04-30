@@ -12,11 +12,11 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_persistence = { path = "../terraphim_persistence" }
-terraphim_config = { path = "../terraphim_config" }
-terraphim_middleware = { path = "../terraphim_middleware" }
-terraphim_settings = { path = "../terraphim_settings" }
-terraphim_types = { path = "../terraphim_types" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "0.1.0" }
+terraphim_config = { path = "../terraphim_config", version = "0.1.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "0.1.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
 
 thiserror = "1.0.58"
 opendal = { version = "0.44.2" }

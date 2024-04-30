@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
 
 ahash = { version = "0.8.6", features = ["serde"] }
 aho-corasick = "1.0.2"

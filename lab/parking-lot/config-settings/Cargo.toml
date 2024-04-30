@@ -11,8 +11,6 @@ keywords = ["personal-assistant", "ai", "privacy", "config"]
 license = "Apache-2.0"
 readme = "../../../README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.44"
 directories = ">= 2, < 5"
