@@ -24,5 +24,4 @@ localsearch
 .DS_Store
 cargo_vendored
 node_modules
-yarn.lock
 desktop/src-tauri/Cargo.lock
