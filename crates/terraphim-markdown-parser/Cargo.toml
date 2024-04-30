@@ -2,6 +2,14 @@
 name = "terraphim-markdown-parser"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim Markdown Parser"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "agent", "terraphim"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 [dependencies]
 pulldown-cmark = "0.9.3"

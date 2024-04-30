@@ -1,10 +1,14 @@
 [package]
 name = "terraphim-ai-desktop"
 version = "0.1.0"
-description = "Privacy preserving AI assistant: Take control of the relevance"
-authors = ["Alex Mikhalev"]
-license = "APACHE-2.0"
-repository = "https://github.com/terraphim/terraphim-ai/"
+description = "Desktop app for Terraphim, a privacy preserving AI assistant: Take control of the relevance"
+authors = ["Terraphim Contributors"]
+license = "Apache-2.0"
+homepage = "https://terraphim.ai"
+documentation = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "tauri", "desktop"]
+readme = "../README.md"
 edition = "2021"
 rust-version = "1.57"
 

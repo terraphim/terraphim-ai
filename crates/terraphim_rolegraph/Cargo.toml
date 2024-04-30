@@ -2,6 +2,14 @@
 name = "terraphim_rolegraph"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim rolegraph module, which provides role handling for Terraphim AI."
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "roles", "rolegraph"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 [dependencies]
 terraphim_automata = { path = "../terraphim_automata" }
