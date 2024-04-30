@@ -13,8 +13,8 @@ readme = "../../README.md"
 
 
 [dependencies]
-terraphim_settings = { path = "../terraphim_settings" }
-terraphim_types = { path = "../terraphim_types" }
+terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
 
 tracing-subscriber = { version = "0.3", features = [
     "env-filter",

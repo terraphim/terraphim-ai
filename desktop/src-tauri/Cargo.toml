@@ -16,14 +16,14 @@ rust-version = "1.57"
 tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
-terraphim_automata = { path = "../../crates/terraphim_automata" }
-terraphim_config = { path = "../../crates/terraphim_config" }
-terraphim_middleware = { path = "../../crates/terraphim_middleware" }
-terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph" }
-terraphim_settings = { path = "../../crates/terraphim_settings" }
-terraphim_types = { path = "../../crates/terraphim_types" }
-terraphim_persistence = { path = "../../crates/terraphim_persistence" }
-terraphim_service = { path = "../../crates/terraphim_service" }
+terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.1.0" }
+terraphim_config = { path = "../../crates/terraphim_config", version = "0.1.0" }
+terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.1.0" }
+terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.1.0" }
+terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.1.0" }
+terraphim_types = { path = "../../crates/terraphim_types", version = "0.1.0" }
+terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.1.0" }
+terraphim_service = { path = "../../crates/terraphim_service", version = "0.1.0" }
 
 anyhow = "1.0.81"
 log = "0.4.21"
