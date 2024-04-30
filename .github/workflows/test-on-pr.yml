@@ -1,4 +1,4 @@
-name: "Test on PR with Earthly"
+name: Test with Earthly
 on: [pull_request]
 
 env:
