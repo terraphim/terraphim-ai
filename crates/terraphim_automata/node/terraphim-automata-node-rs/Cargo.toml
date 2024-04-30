@@ -2,10 +2,15 @@
 name = "terraphim-automata-node-rs"
 version = "0.1.0"
 description = "Node JS binding to Terraphim AI internal matcher based on Aho-Corasick automata"
-authors = ["Alex Mikhalev"]
-license = "MIT"
+authors = ["Terraphim Contributors"]
+license = "Apache-2.0"
 edition = "2018"
 exclude = ["index.node"]
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "agent", "automata"]
+readme = "../README.md"
 
 [lib]
 crate-type = ["cdylib"]
@@ -15,7 +20,7 @@ crate-type = ["cdylib"]
 [dependencies]
 aho-corasick = "1.0.1"
 # neon = "0.10.1"
-terraphim_automata = {path="../.."}
+terraphim_automata = { path = "../.." }
 
 [dependencies.neon]
 version = "0.10.1"

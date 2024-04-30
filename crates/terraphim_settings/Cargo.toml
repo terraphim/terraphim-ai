@@ -2,6 +2,14 @@
 name = "terraphim_settings"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim settings handling library"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "settings", "configuration"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 [dependencies]
 directories = "5.0.1"

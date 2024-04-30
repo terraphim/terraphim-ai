@@ -2,6 +2,14 @@
 name = "terraphim-settings"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim AI configuration settings"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "config"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,5 +28,9 @@ log = "0.4.14"
 test-log = "0.2.14"
 
 [dev-dependencies]
-opendal = { version = "0.44.2", features = ["services-dashmap", "services-redis", "services-sled"] }
+opendal = { version = "0.44.2", features = [
+    "services-dashmap",
+    "services-redis",
+    "services-sled",
+] }
 tempfile = "3.7.1"
