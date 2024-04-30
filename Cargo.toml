@@ -2,8 +2,3 @@
 resolver = "2"
 members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
 default-members = ["terraphim_server"]
-
-# CI build creates artifacts that are not part of the repo
-# Allow to publish with release-plz even if there are uncommitted changes
-# See https://github.com/MarcoIeni/release-plz/issues/1360
-allow_dirty = true
