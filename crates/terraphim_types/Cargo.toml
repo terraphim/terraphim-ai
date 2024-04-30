@@ -2,6 +2,14 @@
 name = "terraphim_types"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Core types crate for Terraphim AI"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "agent", "types"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 [dependencies]
 ahash = { version = "0.8.8", features = ["serde"] }

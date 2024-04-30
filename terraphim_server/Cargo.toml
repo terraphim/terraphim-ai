@@ -2,6 +2,14 @@
 name = "terraphim_server"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim service handling the core logic of the Terraphim AI."
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "service", "core"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 [dependencies]
 terraphim_persistence = { path = "../crates/terraphim_persistence" }
