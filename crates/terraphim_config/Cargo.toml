@@ -2,6 +2,15 @@
 name = "terraphim_config"
 version = "0.1.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim configuration"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "configuration", "config"]
+license = "Apache-2.0"
+readme = "../README.md"
+
 
 [[bin]]
 bench = false
@@ -15,21 +24,21 @@ terraphim_automata = { path = "../terraphim_automata" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 
 opendal = { version = "0.44.2", features = [
-  "services-dashmap",
-  "services-sled",
-  "services-atomicserver",
+    "services-dashmap",
+    "services-sled",
+    "services-atomicserver",
 ] }
 tokio = { version = "1.35.1", features = [
-  "full",
-  "fs",
-  "macros",
-  "rt-multi-thread",
+    "full",
+    "fs",
+    "macros",
+    "rt-multi-thread",
 ] }
 log = "0.4"
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = [
-  "env-filter",
-  "tracing-log",
+    "env-filter",
+    "tracing-log",
 ] }
 serde = { version = "1.0.182", features = ["derive"] }
 serde_json = "1.0.104"
