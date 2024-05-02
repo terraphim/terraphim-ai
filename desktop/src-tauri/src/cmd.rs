@@ -10,14 +10,6 @@ use terraphim_service::TerraphimService;
 use terraphim_types::{Document, SearchQuery};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct RequestBody {
-    id: i32,
-    name: String,
-}
-
-
 use serde::Serializer;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Status {
