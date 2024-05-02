@@ -22,14 +22,14 @@
         invoke<ConfigResponse>("get_config")
           .then((res) => {
             console.log("get_config response", res);
-            
-              configStore.set(res);
-              roles.set(res.roles);
-              role.set(res.default_role);
+            if (res && res.status === "success") {
+              configStore.set(res.config);
+              roles.set(res.config.roles);
+              role.set(res.config.default_role);
               theme.set(
-                res.roles[res.default_role]?.theme || "default"
+                res.config.roles[res.config.default_role]?.theme || "default"
               );
-            
+            }
           })
           .catch((error) =>
             console.error("Error fetching config in Tauri:", error)

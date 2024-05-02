@@ -1,16 +1,14 @@
-// Copyright 2019-2021 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-use serde::Deserialize;
-use serde::Serialize;
-use serde::Serializer;
+
 use tauri::command;
 use tauri::State;
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, SearchQuery};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -18,6 +16,24 @@ pub struct RequestBody {
     id: i32,
     name: String,
 }
+
+
+use serde::Serializer;
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+pub enum Status {
+    #[serde(rename = "success")]
+    Success,
+    #[serde(rename = "error")]
+    Error,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse {
+    pub status: Status,
+    pub message: String,
+}
+
+
 
 // Everything we return from commands must implement `Serialize`.
 // This includes Errors and `anyhow`'s `Error` type doesn't implement it.
@@ -47,6 +63,19 @@ impl Serialize for TerraphimTauriError {
 
 pub type Result<T> = anyhow::Result<T, TerraphimTauriError>;
 
+/// Response type for showing the config
+///
+/// This is also used when updating the config
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigResponse {
+    /// Status of the config fetch
+    pub status: Status,
+    /// The config
+    pub config: Config,
+}
+
+
+
 /// Search All TerraphimGraphs defined in a config by query param
 #[command]
 pub async fn search(
@@ -61,10 +90,14 @@ pub async fn search(
 #[command]
 pub async fn get_config(
     config_state: tauri::State<'_, ConfigState>,
-) -> Result<terraphim_config::Config> {
+) -> Result<ConfigResponse> {
     log::info!("Get config called");
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
-    Ok(terraphim_service.fetch_config().await)
+    let config =terraphim_service.fetch_config().await;
+    Ok(ConfigResponse {
+        status: Status::Success,
+        config,
+    })
 }
 
 #[command]
