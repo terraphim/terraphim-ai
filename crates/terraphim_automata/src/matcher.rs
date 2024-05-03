@@ -43,18 +43,20 @@ pub fn find_matches(
 }
 
 // // This function replacing instead of matching patterns
-// pub fn replace_matches(text: &str, thesaurus: Thesaurus) -> Result<Vec<u8>> {
-//     let mut patterns: Vec<String> = Vec::new();
-//     let mut replace_with: Vec<String> = Vec::new();
-//     for (key, value) in thesaurus.iter() {
-//         patterns.push(key.to_string());
-//         replace_with.push(value.clone().id.clone().to_string());
-//     }
-//     let ac = AhoCorasick::builder()
-//         .match_kind(MatchKind::LeftmostLongest)
-//         .ascii_case_insensitive(true)
-//         .build(patterns)?;
+pub fn replace_matches(text: &str, thesaurus: Thesaurus) -> Result<Vec<u8>> {
+    let mut patterns: Vec<String> = Vec::new();
+    let mut replace_with: Vec<String> = Vec::new();
+    for (key, value) in thesaurus.into_iter() {
+        patterns.push(key.to_string());
+        replace_with.push(value.clone().id.clone().to_string());
+    }
+    let ac = AhoCorasick::builder()
+        .match_kind(MatchKind::LeftmostLongest)
+        .ascii_case_insensitive(true)
+        .build(patterns)?;
 
-//     let result = ac.replace_all_bytes(text.as_bytes(), &replace_with);
-//     Ok(result)
-// }
+    let result = ac.replace_all_bytes(text.as_bytes(), &replace_with);
+    Ok(result)
+}
+
+// tests
