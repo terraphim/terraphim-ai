@@ -15,8 +15,7 @@ use terraphim_rolegraph::RoleGraph;
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
 
-use crate::error::{Result, Status};
-
+use crate::error::{Result, Status};    
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
 /// Health check endpoint

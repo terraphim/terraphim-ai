@@ -58,5 +58,5 @@ pub fn replace_matches(text: &str, thesaurus: Thesaurus) -> Result<Vec<u8>> {
     let result = ac.replace_all_bytes(text.as_bytes(), &replace_with);
     Ok(result)
 }
-
+ 
 // tests
