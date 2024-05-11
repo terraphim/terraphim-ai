@@ -76,3 +76,4 @@ pub async fn update_config(
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
     Ok(terraphim_service.update_config(config_new).await?)
 }
+
