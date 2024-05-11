@@ -26,7 +26,7 @@ pipeline:
 
 
 install:
-  FROM rust:1.75.0-buster
+  FROM rust:1.76.0-buster
   RUN apt-get update -qq
   RUN apt install -y musl-tools musl-dev
   RUN update-ca-certificates
