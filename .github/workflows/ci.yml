@@ -28,4 +28,4 @@ jobs:
       - name: Docker Login
         run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
       - name: Run build
-        run: earthly --org applied-knowledge-systems --sat registry-satellite --ci --push +pipeline
+        run: earthly --org applied-knowledge-systems --sat registry-satellite --ci --push +pipeline 
