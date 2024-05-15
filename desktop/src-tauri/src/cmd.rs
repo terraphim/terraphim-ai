@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-
 use tauri::command;
 use tauri::State;
 
+use serde::{Deserialize, Serialize};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, SearchQuery};
-use serde::{Deserialize, Serialize};
 
 use serde::Serializer;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
@@ -24,8 +23,6 @@ pub struct ErrorResponse {
     pub status: Status,
     pub message: String,
 }
-
-
 
 // Everything we return from commands must implement `Serialize`.
 // This includes Errors and `anyhow`'s `Error` type doesn't implement it.
@@ -66,26 +63,38 @@ pub struct ConfigResponse {
     pub config: Config,
 }
 
-
+/// Response type for showing the search results
+///
+/// This is used when searching for documents
+/// and returning the results
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SearchResponse {
+    /// Status of the search
+    pub status: Status,
+    /// The search results
+    pub results: Vec<Document>,
+}
 
 /// Search All TerraphimGraphs defined in a config by query param
 #[command]
 pub async fn search(
     config_state: State<'_, ConfigState>,
     search_query: SearchQuery,
-) -> Result<Vec<Document>> {
+) -> Result<SearchResponse> {
     log::info!("Search called with {:?}", search_query);
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
-    Ok(terraphim_service.search(&search_query).await?)
+    let results = terraphim_service.search(&search_query).await?;
+    Ok(SearchResponse {
+        status: Status::Success,
+        results,
+    })
 }
 
 #[command]
-pub async fn get_config(
-    config_state: tauri::State<'_, ConfigState>,
-) -> Result<ConfigResponse> {
+pub async fn get_config(config_state: tauri::State<'_, ConfigState>) -> Result<ConfigResponse> {
     log::info!("Get config called");
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
-    let config =terraphim_service.fetch_config().await;
+    let config = terraphim_service.fetch_config().await;
     Ok(ConfigResponse {
         status: Status::Success,
         config,
@@ -96,9 +105,12 @@ pub async fn get_config(
 pub async fn update_config(
     config_state: tauri::State<'_, ConfigState>,
     config_new: Config,
-) -> Result<terraphim_config::Config> {
+) -> Result<ConfigResponse> {
     log::info!("Update config called with {:?}", config_new);
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
-    Ok(terraphim_service.update_config(config_new).await?)
+    let config = terraphim_service.update_config(config_new).await?;
+    Ok(ConfigResponse {
+        status: Status::Success,
+        config,
+    })
 }
-

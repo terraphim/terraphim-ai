@@ -47,6 +47,18 @@ yarn # Install dependencies
 yarn run dev
 ```
 
+Alternatively, you can use the Tauri-based desktop app by running:
+
+```bash
+cd desktop
+# Install dependencies
+yarn
+# run the Tauri dev server 
+yarn run tauri dev
+```
+
+(See the [desktop README](desktop/README.md) for more details.)
+
 ## Terminology
 
 When configuring or working on Terraphim, you will encounter the following
