@@ -63,7 +63,6 @@ pub struct ConfigResponse {
     pub config: Config,
 }
 
-
 /// Response type for showing the search results
 ///
 /// This is used when searching for documents
@@ -75,7 +74,6 @@ pub struct SearchResponse {
     /// The search results
     pub results: Vec<Document>,
 }
-
 
 /// Search All TerraphimGraphs defined in a config by query param
 #[command]
