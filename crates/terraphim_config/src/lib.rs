@@ -50,6 +50,9 @@ pub enum TerraphimConfigError {
 
     #[error("Url error")]
     Url(#[from] url::ParseError),
+
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
 }
 
 /// A role is a collection of settings for a specific user

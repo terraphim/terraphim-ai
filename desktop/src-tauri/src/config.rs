@@ -8,12 +8,22 @@ use terraphim_config::{
 };
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 
+/// The path to the default haystack directory
+// TODO: Replace this with a file-based config loader based on `twelf` in the
+// future
+const DEFAULT_HAYSTACK_PATH: &str = "../../docs/";
+
 /// Load the default config
 ///
 // TODO: Replace this with a file-based config loader based on `twelf` in the
 // future
 pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
     let automata_path = AutomataPath::from_local("data/term_to_id.json");
+
+    // Create the path to the default haystack directory
+    // by concating the current directory with the default haystack path
+    let docs_path = std::env::current_dir()?.join(DEFAULT_HAYSTACK_PATH);
+    println!("Docs path: {:?}", docs_path);
 
     ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
@@ -33,7 +43,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("localsearch"),
+                    path: docs_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -55,7 +65,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("localsearch"),
+                    path: docs_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -77,7 +87,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                     publish: true,
                 },
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("/tmp/system_operator/pages/"),
+                    path: docs_path,
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
