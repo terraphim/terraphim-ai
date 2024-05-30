@@ -34,17 +34,7 @@ use terraphim_config::ConfigState;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::DeviceSettings;
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// String to search for
-    #[arg(short, long)]
-    search_term: Option<String>,
 
-    /// Role to use for search
-    #[arg(short, long)]
-    role: Option<String>,
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -60,9 +50,7 @@ async fn main() -> Result<()> {
 async fn run_server() -> Result<()> {
     // Set up logger for the server
     env_logger::init();
-
-    let args = Args::parse();
-    log::info!("Commandline arguments: {args:?}");
+    
     let server_settings =
         DeviceSettings::load_from_env_and_file(None).context("Failed to load settings")?;
     log::info!(
