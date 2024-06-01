@@ -34,8 +34,6 @@ use terraphim_config::ConfigState;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::DeviceSettings;
 
-
-
 #[tokio::main]
 async fn main() -> Result<()> {
     match run_server().await {
@@ -50,7 +48,7 @@ async fn main() -> Result<()> {
 async fn run_server() -> Result<()> {
     // Set up logger for the server
     env_logger::init();
-    
+
     let server_settings =
         DeviceSettings::load_from_env_and_file(None).context("Failed to load settings")?;
     log::info!(
