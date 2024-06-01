@@ -76,7 +76,7 @@ impl<'a> TerraphimService {
                 log::debug!("Searching haystack with title scorer");
                 let indexed_docs: Vec<IndexedDocument> = self
                     .config_state
-                    .search_indexed_documents(search_query)
+                    .search_indexed_documents(search_query, &role)
                     .await;
 
                 let documents = index.get_documents(indexed_docs);
@@ -91,7 +91,7 @@ impl<'a> TerraphimService {
 
                 let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
-                    .search_indexed_documents(search_query)
+                    .search_indexed_documents(search_query, &role)
                     .await;
 
                 // Apply to ripgrep vector of document output
