@@ -104,7 +104,8 @@ fn build_js(dirs: &Dirs) {
     let pkg_manager = "./scripts/yarn_and_build.sh";
     p!("install js packages...");
     p!("build js assets...");
-    let out = std::process::Command::new("/bin/bash").arg(pkg_manager)
+    let out = std::process::Command::new("/bin/bash")
+        .arg(pkg_manager)
         .current_dir(&dirs.browser_root)
         .output()
         .expect("Failed to build js bundle");

@@ -214,10 +214,7 @@ mod tests {
         // Check that all documents contain the search term and are located in the haystack
         for document in documents {
             println!("{:#?}", document);
-            assert!(document
-                .body
-                .to_lowercase()
-                .contains("system"));
+            assert!(document.body.to_lowercase().contains("system"));
             //TODO: tags are not populated for default role, only for KG based roles
             // assert_eq!(
             //     document.tags,
@@ -249,10 +246,7 @@ mod tests {
         // Check that all documents contain the search term and are located in the haystack
         for document in documents {
             println!("{:#?}", document);
-            assert!(document
-                .body
-                .to_lowercase()
-                .contains("system"));
+            assert!(document.body.to_lowercase().contains("system"));
             assert!(document.url.contains("fixtures/haystack/"));
         }
     }

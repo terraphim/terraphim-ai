@@ -287,7 +287,7 @@ impl ConfigState {
                 let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
                 roles.insert(role_name, RoleGraphSync::from(rolegraph));
             } else {
-                log::info!("Skipping KG due to None settings for role {}",role_name);
+                log::info!("Skipping KG due to None settings for role {}", role_name);
             }
         }
 
