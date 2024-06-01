@@ -18,7 +18,6 @@ use ulid::Ulid;
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
-use url::Url;
 
 type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
 
@@ -66,9 +65,7 @@ pub struct Role {
     /// The relevance function used to rank search results
     pub relevance_function: RelevanceFunction,
     pub theme: String,
-    #[serde(rename = "serverUrl")]
-    pub server_url: Url,
-    pub kg: KnowledgeGraph,
+    pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
     #[serde(flatten)]
     pub extra: AHashMap<String, Value>,
@@ -282,12 +279,15 @@ impl ConfigState {
         let mut roles = AHashMap::new();
         for (name, role) in &config.roles {
             let role_name = name.to_lowercase();
-            let automata_url = role.kg.automata_path.clone();
-            log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
-
-            let thesaurus = load_thesaurus(&automata_url).await?;
-            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
-            roles.insert(role_name, RoleGraphSync::from(rolegraph));
+            if role.kg.as_ref().is_some() {
+                let automata_url = role.kg.as_ref().unwrap().automata_path.clone();
+                log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
+                let thesaurus = load_thesaurus(&automata_url).await?;
+                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                roles.insert(role_name, RoleGraphSync::from(rolegraph));
+            } else {
+                log::info!("Skipping KG due to None settings");
+            }
         }
 
         Ok(ConfigState {
@@ -410,14 +410,7 @@ mod tests {
                     name: "Default".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
-                        automata_path: AutomataPath::local_example(),
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: PathBuf::from("~/pkm"),
-                        public: true,
-                        publish: true,
-                    },
+                    kg: None,
                     haystacks: vec![Haystack {
                         path: PathBuf::from("localsearch"),
                         service: ServiceType::Ripgrep,
@@ -432,14 +425,7 @@ mod tests {
                     name: "Engineer".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
-                        automata_path: AutomataPath::local_example(),
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: PathBuf::from("~/pkm"),
-                        public: true,
-                        publish: true,
-                    },
+                    kg: None,
                     haystacks: vec![Haystack {
                         path: PathBuf::from("localsearch"),
                         service: ServiceType::Ripgrep,
@@ -454,14 +440,13 @@ mod tests {
                     name: "System Operator".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "superhero".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
+                    kg: Some(KnowledgeGraph {
                         automata_path: AutomataPath::local_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("~/pkm"),
                         public: true,
                         publish: true,
-                    },
+                    }),
                     haystacks: vec![Haystack {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
                         service: ServiceType::Ripgrep,
@@ -500,14 +485,13 @@ mod tests {
             name: "Father".to_string(),
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),
-            server_url: Url::parse("http://localhost:8080").unwrap(),
-            kg: KnowledgeGraph {
+            kg: Some(KnowledgeGraph {
                 automata_path: AutomataPath::local_example(),
                 input_type: KnowledgeGraphInputType::Markdown,
                 path: PathBuf::from("~/pkm"),
                 public: true,
                 publish: true,
-            },
+            }),
             haystacks: vec![Haystack {
                 path: PathBuf::from("localsearch"),
                 service: ServiceType::Ripgrep,
