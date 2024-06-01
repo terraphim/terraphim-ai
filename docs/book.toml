@@ -7,6 +7,7 @@ title = "Terraphim AI documentation"
 
 [output.html]
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
+mathjax-support = true
 # [output.compress]
 # subtitle = "How to use and contribute to Terraphim AI assistant"
 # highlight = "no-node"
@@ -18,6 +19,37 @@ additional-js = ["mermaid.min.js", "mermaid-init.js"]
 format = "pdf"
 
 [preprocessor]
-
+[preprocessor.alerts]
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
+
+# [output.pandoc]
+# hosted-html = "https://docs.terraphim.ai/" # URL of a HTML version of the book
+
+# [output.pandoc.code]
+# # Display hidden lines in code blocks (e.g., lines in Rust blocks prefixed by '#').
+# # See https://rust-lang.github.io/mdBook/format/mdbook.html?highlight=hidden#hiding-code-lines
+# show-hidden-lines = false
+
+# [output.pandoc.profile.pdf] 
+# # options to pass to Pandoc (see https://pandoc.org/MANUAL.html#defaults-files)
+# output-file = "output.pdf" # output file (within the profile's build directory)
+# to = "latex" # output format
+
+# # PDF-specific settings
+# pdf-engine = "pdflatex" # engine to use to produce PDF output
+
+# # `mdbook-pandoc` overrides Pandoc's defaults for the following options to better support mdBooks
+# file-scope = true # parse each file individually before combining
+# number-sections = true # number sections headings
+# standalone = true # produce output with an appropriate header and footer
+# table-of-contents = true # include an automatically generated table of contents
+
+# [output.pandoc.profile.docx] 
+# # options to pass to Pandoc (see https://pandoc.org/MANUAL.html#defaults-files)
+# output-file = "output.docx" # output file (within the profile's build directory)
+# # `mdbook-pandoc` overrides Pandoc's defaults for the following options to better support mdBooks
+# file-scope = true # parse each file individually before combining
+# number-sections = true # number sections headings
+# standalone = true # produce output with an appropriate header and footer
+# table-of-contents = true # include an automatically generated table of contents

@@ -2,7 +2,7 @@ VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 FROM ghcr.io/terraphim/terraphim_builder_native:latest
 
-WORKDIR frontend
+WORKDIR /code/desktop
 
 deps:
     # COPY package.json tsconfig.json yarn.lock vite.config.ts tsconfig.node.json index.html ./
@@ -10,9 +10,10 @@ deps:
     # COPY --dir src src
     # COPY --dir public public
     RUN oro apply -q || true
-    RUN pkgx +yarnpkg.com yarn
+    RUN /code/desktop/scripts/yarn_and_build.sh
 
 build:
     FROM +deps
-    RUN pkgx +yarnpkg.com yarn run build
+    # RUN pkgx +yarnpkg.com yarn run build
+
     SAVE ARTIFACT dist /dist AS LOCAL dist

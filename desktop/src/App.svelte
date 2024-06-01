@@ -62,7 +62,7 @@
     <Route path="/fetch/*"><FetchTabs /></Route>
   </main>
 
-  <footer on:mouseover={toggleVissible}>
+  <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>
     <div class={visible}>
       <Route path="/">
         <nav class="navbar">
