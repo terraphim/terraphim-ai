@@ -64,8 +64,15 @@ async fn run_server() -> Result<()> {
 
     let automata_path = AutomataPath::from_local("fixtures/term_to_id.json");
 
+    // mind where cargo run is triggered from
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
-    let system_operator_haystack = cwd.join("fixtures/haystack/");
+    println!("{}", cwd.display());
+    let system_operator_haystack = if cwd.ends_with("terraphim_server") {
+        cwd.join("fixtures/haystack/")
+    } else {
+        cwd.join("terraphim_server/fixtures/haystack/")
+    };
+
     log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
 
     let mut config = ConfigBuilder::new()

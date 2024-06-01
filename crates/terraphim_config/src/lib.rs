@@ -323,18 +323,14 @@ impl ConfigState {
     pub async fn search_indexed_documents(
         &self,
         search_query: &SearchQuery,
+        role: &Role,
     ) -> Vec<IndexedDocument> {
         log::debug!("search_documents: {:?}", search_query);
-        let current_config_state = self.config.lock().await.clone();
-        let default_role = current_config_state.default_role.clone();
 
-        // if role is not provided, use the default role from the config
-        let role = search_query.role.clone().unwrap_or(default_role);
         log::debug!("Role for search_documents: {:#?}", role);
 
-        let role_name = role.to_lowercase();
+        let role_name = role.name.to_lowercase();
         let role = self.roles.get(&role_name).unwrap().lock().await;
-
         let documents = role
             .query_graph(
                 &search_query.search_term,
