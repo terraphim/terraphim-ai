@@ -74,12 +74,8 @@ impl<'a> TerraphimService {
         match role.relevance_function {
             RelevanceFunction::TitleScorer => {
                 log::debug!("Searching haystack with title scorer");
-                let indexed_docs: Vec<IndexedDocument> = self
-                    .config_state
-                    .search_indexed_documents(search_query, &role)
-                    .await;
 
-                let documents = index.get_documents(indexed_docs);
+                let documents = index.get_all_documents();
                 // Sort the documents by relevance
                 log::debug!("Sorting documents by relevance");
                 let documents = score::sort_documents(search_query, documents);

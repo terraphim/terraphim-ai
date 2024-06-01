@@ -279,14 +279,15 @@ impl ConfigState {
         let mut roles = AHashMap::new();
         for (name, role) in &config.roles {
             let role_name = name.to_lowercase();
-            if role.kg.as_ref().is_some() {
+            log::info!("Creating role {}", role_name);
+            if role.kg.is_some() {
                 let automata_url = role.kg.as_ref().unwrap().automata_path.clone();
                 log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
                 let thesaurus = load_thesaurus(&automata_url).await?;
                 let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
                 roles.insert(role_name, RoleGraphSync::from(rolegraph));
             } else {
-                log::info!("Skipping KG due to None settings");
+                log::info!("Skipping KG due to None settings for role {}",role_name);
             }
         }
 
@@ -319,7 +320,8 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Search documents in rolegraph index, which match the search query
+    /// Search documents in rolegraph index using matching Knowledge Graph
+    /// If knowledge graph isn't defined for the role, RoleGraph isn't build for the role
     pub async fn search_indexed_documents(
         &self,
         search_query: &SearchQuery,
@@ -330,6 +332,8 @@ impl ConfigState {
         log::debug!("Role for search_documents: {:#?}", role);
 
         let role_name = role.name.to_lowercase();
+        log::debug!("Role name for searching {role_name}");
+        log::debug!("All roles defined {:?}", self.roles.clone().into_keys());
         let role = self.roles.get(&role_name).unwrap().lock().await;
         let documents = role
             .query_graph(
