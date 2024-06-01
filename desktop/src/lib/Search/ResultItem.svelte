@@ -28,16 +28,16 @@
     <div class="media-content">
       <div class="content">
         <div class="level-right">
+          {#if document.tags}
           <Taglist>
-            {#if "tags" in document}
               {#each document.tags as tag}
                 <a
                   href="https://terraphim.github.io/terraphim-project/#/page/{tag}"
                   target="_blank"><Tag rounded>{tag}</Tag></a
                 >
               {/each}
-            {/if}
           </Taglist>
+          {/if}
         </div>
         <div transition:fade>
           <button on:click={onTitleClick}>
