@@ -77,7 +77,7 @@ async fn run_server() -> Result<()> {
     } else {
         cwd.join("terraphim_server/fixtures/term_to_id.json")
     };
-    log::debug!("Test automata_test_path {:?}",automata_test_path);
+    log::debug!("Test automata_test_path {:?}", automata_test_path);
     let automata_path = AutomataPath::from_local(automata_test_path);
 
     let mut config = ConfigBuilder::new()
