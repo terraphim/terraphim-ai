@@ -102,23 +102,10 @@ fn should_build(dirs: &Dirs) -> bool {
 /// Runs JS package manager to install packages and build the JS bundle
 fn build_js(dirs: &Dirs) {
     let pkg_manager = "./scripts/yarn_and_build.sh";
-
     p!("install js packages...");
-
-    std::process::Command::new(pkg_manager)
-        .current_dir(&dirs.browser_root)
-        .args(["install"])
-        .output()
-        .unwrap_or_else(|_| {
-            panic!(
-                "Failed to install js packages. Make sure you have {} installed.",
-                pkg_manager
-            )
-        });
     p!("build js assets...");
-    let out = std::process::Command::new(pkg_manager)
+    let out = std::process::Command::new("/bin/bash").arg(pkg_manager)
         .current_dir(&dirs.browser_root)
-        .args(["run", "build"])
         .output()
         .expect("Failed to build js bundle");
     // Check if out contains errors

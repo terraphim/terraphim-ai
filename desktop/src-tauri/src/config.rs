@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use ahash::AHashMap;
-use tauri::Url;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
     Config, ConfigBuilder, Haystack, KnowledgeGraph, Role, ServiceType, TerraphimConfigError,
@@ -11,7 +10,8 @@ use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 /// The path to the default haystack directory
 // TODO: Replace this with a file-based config loader based on `twelf` in the
 // future
-const DEFAULT_HAYSTACK_PATH: &str = "../../docs/";
+// const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+const DEFAULT_HAYSTACK_PATH: &str = "terraphim_server/fixtures";
 
 /// Load the default config
 ///
@@ -22,7 +22,10 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
 
     // Create the path to the default haystack directory
     // by concating the current directory with the default haystack path
-    let docs_path = std::env::current_dir()?.join(DEFAULT_HAYSTACK_PATH);
+    let mut docs_path = std::env::current_dir().unwrap();
+    docs_path.pop();
+    docs_path.pop();
+    docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
     println!("Docs path: {:?}", docs_path);
 
     ConfigBuilder::new()

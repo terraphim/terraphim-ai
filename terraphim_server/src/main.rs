@@ -62,8 +62,6 @@ async fn run_server() -> Result<()> {
             SocketAddr::from(([127, 0, 0, 1], port))
         });
 
-    let automata_path = AutomataPath::from_local("fixtures/term_to_id.json");
-
     // mind where cargo run is triggered from
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
     println!("{}", cwd.display());
@@ -74,6 +72,13 @@ async fn run_server() -> Result<()> {
     };
 
     log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
+    let automata_test_path = if cwd.ends_with("terraphim_server") {
+        cwd.join("fixtures/term_to_id.json")
+    } else {
+        cwd.join("terraphim_server/fixtures/term_to_id.json")
+    };
+    log::debug!("Test automata_test_path {:?}",automata_test_path);
+    let automata_path = AutomataPath::from_local(automata_test_path);
 
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
@@ -86,7 +91,7 @@ async fn run_server() -> Result<()> {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("fixtures/haystack"),
+                    path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -102,12 +107,12 @@ async fn run_server() -> Result<()> {
                 kg: Some(KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("fixtures/haystack"),
+                    path: system_operator_haystack.clone(),
                     public: true,
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("fixtures/haystack"),
+                    path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -123,12 +128,12 @@ async fn run_server() -> Result<()> {
                 kg: Some(KnowledgeGraph {
                     automata_path,
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("fixtures/haystack"),
+                    path: system_operator_haystack.clone(),
                     public: true,
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("fixtures/haystack"),
+                    path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
