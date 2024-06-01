@@ -17,7 +17,6 @@
 
 use ahash::AHashMap;
 use anyhow::Context;
-use clap::Parser;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use terraphim_automata::AutomataPath;
@@ -28,7 +27,6 @@ use terraphim_config::Role;
 use terraphim_config::ServiceType;
 use terraphim_types::KnowledgeGraphInputType;
 use terraphim_types::RelevanceFunction;
-use url::Url;
 
 use terraphim_config::ConfigState;
 use terraphim_server::{axum_server, Result};
@@ -79,14 +77,7 @@ async fn run_server() -> Result<()> {
                 name: "Default".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
-                    automata_path: automata_path.clone(),
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("fixtures/haystack"),
-                    public: true,
-                    publish: true,
-                },
+                kg: None,
                 haystacks: vec![Haystack {
                     path: PathBuf::from("fixtures/haystack"),
                     service: ServiceType::Ripgrep,
@@ -101,14 +92,13 @@ async fn run_server() -> Result<()> {
                 name: "Engineer".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
+                kg: Some(KnowledgeGraph {
                     automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: PathBuf::from("fixtures/haystack"),
                     public: true,
                     publish: true,
-                },
+                }),
                 haystacks: vec![Haystack {
                     path: PathBuf::from("fixtures/haystack"),
                     service: ServiceType::Ripgrep,
@@ -123,14 +113,13 @@ async fn run_server() -> Result<()> {
                 name: "System Operator".to_string(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
+                kg: Some(KnowledgeGraph {
                     automata_path,
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: PathBuf::from("fixtures/haystack"),
                     public: true,
                     publish: true,
-                },
+                }),
                 haystacks: vec![Haystack {
                     path: PathBuf::from("fixtures/haystack"),
                     service: ServiceType::Ripgrep,

@@ -34,14 +34,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 name: "Default".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
-                    automata_path: automata_path.clone(),
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
-                    public: true,
-                    publish: true,
-                },
+                kg: None,
                 haystacks: vec![Haystack {
                     path: docs_path.clone(),
                     service: ServiceType::Ripgrep,
@@ -56,14 +49,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 name: "Engineer".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
-                    automata_path: automata_path.clone(),
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
-                    public: true,
-                    publish: true,
-                },
+                kg: None,
                 haystacks: vec![Haystack {
                     path: docs_path.clone(),
                     service: ServiceType::Ripgrep,
@@ -78,14 +64,13 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 name: "System Operator".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "superhero".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
+                kg: Some(KnowledgeGraph {
                     automata_path,
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: PathBuf::from("~/pkm"),
                     public: true,
                     publish: true,
-                },
+                }),
                 haystacks: vec![Haystack {
                     path: docs_path,
                     service: ServiceType::Ripgrep,
