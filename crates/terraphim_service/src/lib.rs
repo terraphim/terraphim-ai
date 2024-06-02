@@ -76,12 +76,12 @@ impl<'a> TerraphimService {
                 log::debug!("Searching haystack with title scorer");
 
                 let documents = index.get_all_documents();
-                
+
                 log::debug!("Sorting documents by relevance");
                 // Sort the documents by relevance
                 let documents = score::sort_documents(search_query, documents);
                 let mut docs_ranked = Vec::new();
-                for (idx, doc) in documents.iter().enumerate(){
+                for (idx, doc) in documents.iter().enumerate() {
                     let document: &mut terraphim_types::Document = &mut doc.clone();
                     let rank = terraphim_types::Rank::new(idx.try_into().unwrap());
                     document.rank = Some(rank);
