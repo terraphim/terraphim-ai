@@ -18,7 +18,6 @@
 use ahash::AHashMap;
 use anyhow::Context;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigBuilder;
 use terraphim_config::Haystack;
