@@ -197,7 +197,6 @@ impl RoleGraph {
 
         let mut ranked_documents = results.into_iter().collect::<Vec<_>>();
         ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
-        ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.id.clone()));
 
         let documents: Vec<_> = ranked_documents
             .into_iter()
