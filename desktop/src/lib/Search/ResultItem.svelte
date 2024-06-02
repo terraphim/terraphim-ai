@@ -31,6 +31,7 @@
           {#if document.tags}
           <Taglist>
               {#each document.tags as tag}
+              <!-- FIXME: link shall be config parameter for KG -->
                 <a
                   href="https://terraphim.github.io/terraphim-project/#/page/{tag}"
                   target="_blank"><Tag rounded>{tag}</Tag></a
@@ -38,6 +39,11 @@
               {/each}
           </Taglist>
           {/if}
+        </div>
+          <div class="level-right">
+          <Taglist>
+            <Tag rounded>Rank {document.rank}</Tag>
+          </Taglist>
         </div>
         <div transition:fade>
           <button on:click={onTitleClick}>

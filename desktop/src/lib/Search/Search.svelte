@@ -88,8 +88,8 @@
 {#if error}
   <p class="error">{error}</p>
 {:else if results.length}
-  {#each results as result_item}
-    <ResultItem document={result_item} />
+  {#each results as item}
+    <ResultItem document={item} />
   {/each}
 {:else}
   <section class="section">
