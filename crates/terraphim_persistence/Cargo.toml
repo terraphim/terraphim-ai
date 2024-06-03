@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_persistence"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim persistence layer"
@@ -14,7 +14,7 @@ readme = "../../README.md"
 
 [dependencies]
 terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
-terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.1.1" }
 
 tracing-subscriber = { version = "0.3", features = [
     "env-filter",
