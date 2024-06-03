@@ -70,7 +70,7 @@ pub async fn build_thesaurus_from_haystack(
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
 
-        role.kg.automata_path = AutomataPath::Local(thesaurus_path);
+        role.kg.as_mut().unwrap().automata_path = AutomataPath::Local(thesaurus_path);
     }
     Ok(())
 }

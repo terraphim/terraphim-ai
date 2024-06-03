@@ -28,15 +28,21 @@
     <div class="media-content">
       <div class="content">
         <div class="level-right">
+          {#if document.tags}
           <Taglist>
-            {#if "tags" in document}
               {#each document.tags as tag}
+              <!-- FIXME: link shall be config parameter for KG -->
                 <a
                   href="https://terraphim.github.io/terraphim-project/#/page/{tag}"
                   target="_blank"><Tag rounded>{tag}</Tag></a
                 >
               {/each}
-            {/if}
+          </Taglist>
+          {/if}
+        </div>
+          <div class="level-right">
+          <Taglist>
+            <Tag rounded>Rank {document.rank}</Tag>
           </Taglist>
         </div>
         <div transition:fade>

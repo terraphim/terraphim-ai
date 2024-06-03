@@ -439,6 +439,11 @@ impl Index {
         }
         documents
     }
+    /// Returns all documents from the index for scorer without graph embeddings
+    pub fn get_all_documents(&self) -> Vec<Document> {
+        let documents: Vec<Document> = self.values().cloned().collect::<Vec<Document>>();
+        documents
+    }
 
     /// Get a document from the index (if it exists in the index)
     pub fn get_document(&self, doc: &IndexedDocument) -> Option<Document> {

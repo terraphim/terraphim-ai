@@ -1,1 +1,0 @@
-synonyms:: testing, test file, test of a document

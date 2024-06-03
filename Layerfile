@@ -15,7 +15,7 @@ RUN rustup component add rustfmt
 RUN cargo install ripgrep
 WORKDIR /code
 COPY . .
-RUN ./desktop/scripts/yarn_and_build.sh
+RUN ./scripts/yarn_and_build.sh
 ENV TERRAPHIM_SERVER_HOSTNAME=0.0.0.0:8000
 RUN cargo build --release
 RUN git clone --depth 1 https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/

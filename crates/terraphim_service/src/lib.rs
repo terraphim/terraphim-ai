@@ -74,24 +74,28 @@ impl<'a> TerraphimService {
         match role.relevance_function {
             RelevanceFunction::TitleScorer => {
                 log::debug!("Searching haystack with title scorer");
-                let indexed_docs: Vec<IndexedDocument> = self
-                    .config_state
-                    .search_indexed_documents(search_query)
-                    .await;
 
-                let documents = index.get_documents(indexed_docs);
-                // Sort the documents by relevance
+                let documents = index.get_all_documents();
+
                 log::debug!("Sorting documents by relevance");
+                // Sort the documents by relevance
                 let documents = score::sort_documents(search_query, documents);
-
-                Ok(documents)
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = terraphim_types::Rank::new((total_length - idx).try_into().unwrap());
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
 
                 let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
-                    .search_indexed_documents(search_query)
+                    .search_indexed_documents(search_query, &role)
                     .await;
 
                 // Apply to ripgrep vector of document output
