@@ -246,8 +246,7 @@ docker-scratch:
     ENTRYPOINT ["./terraphim_server"]
     SAVE IMAGE aks/terraphim_server:scratch
 
-  
-docs-pages:
+docs-deps:
   FROM +install-native 
   RUN cargo install mdbook
   RUN cargo install mdbook-epub
@@ -256,9 +255,15 @@ docs-pages:
   RUN cargo install --git https://github.com/typst/typst typst-cli 
   RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
   RUN cargo install mdbook-mermaid
+  RUN cargo install mdbook-alerts
   RUN apt update && apt install libvips-dev -y
   RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
   RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
+
+
+  
+docs-pages:
+  FROM +docs-deps
   COPY --keep-ts docs /docs
   WORKDIR /docs
   RUN mdbook --version

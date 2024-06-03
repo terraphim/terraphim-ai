@@ -15,7 +15,6 @@ mod tests {
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
     };
     use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
-    use url::Url;
 
     use terraphim_server::ConfigResponse;
 
@@ -35,14 +34,7 @@ mod tests {
                     name: "Default".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
-                        automata_path: automata_path.clone(),
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: haystack.clone(),
-                        public: true,
-                        publish: true,
-                    },
+                    kg: None,
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
                         service: ServiceType::Ripgrep,
@@ -57,14 +49,13 @@ mod tests {
                     name: "Engineer".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
+                    kg: Some(KnowledgeGraph {
                         automata_path: automata_path.clone(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: haystack.clone(),
                         public: true,
                         publish: true,
-                    },
+                    }),
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
                         service: ServiceType::Ripgrep,
@@ -79,14 +70,13 @@ mod tests {
                     name: "System Operator".to_string(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
                     theme: "superhero".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
+                    kg: Some(KnowledgeGraph {
                         automata_path,
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: haystack.clone(),
                         public: true,
                         publish: true,
-                    },
+                    }),
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
                         service: ServiceType::Ripgrep,
@@ -191,7 +181,7 @@ mod tests {
     async fn test_search_documents_without_role() {
         let server = ensure_server_started().await;
 
-        let url = format!("http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10");
+        let url = format!("http://{server}/documents/search?search_term=system&skip=0&limit=10");
         let response = reqwest::get(url).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
 
@@ -224,14 +214,12 @@ mod tests {
         // Check that all documents contain the search term and are located in the haystack
         for document in documents {
             println!("{:#?}", document);
-            assert!(document
-                .body
-                .to_lowercase()
-                .contains("trained operators and maintainers"));
-            assert_eq!(
-                document.tags,
-                Some(vec!["trained operators and maintainers".to_string()])
-            );
+            assert!(document.body.to_lowercase().contains("system"));
+            //TODO: tags are not populated for default role, only for KG based roles
+            // assert_eq!(
+            //     document.tags,
+            //     Some(vec!["trained operators and maintainers".to_string()])
+            // );
             assert!(document.url.contains("fixtures/haystack/"));
         }
     }
@@ -242,7 +230,7 @@ mod tests {
         let server = ensure_server_started().await;
 
         let response = reqwest::get(format!(
-            "http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0",
+            "http://{server}/documents/search?search_term=system&skip=0",
         ))
         .await
         .unwrap();
@@ -258,14 +246,7 @@ mod tests {
         // Check that all documents contain the search term and are located in the haystack
         for document in documents {
             println!("{:#?}", document);
-            assert!(document
-                .body
-                .to_lowercase()
-                .contains("trained operators and maintainers"));
-            assert_eq!(
-                document.tags,
-                Some(vec!["trained operators and maintainers".to_string()])
-            );
+            assert!(document.body.to_lowercase().contains("system"));
             assert!(document.url.contains("fixtures/haystack/"));
         }
     }
