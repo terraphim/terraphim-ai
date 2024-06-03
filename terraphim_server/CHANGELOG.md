@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/terraphim/terraphim-ai/compare/terraphim_server-v0.1.0...terraphim_server-v0.1.1) - 2024-06-03
+
+### Other
+- faster doc build
+- cargo fmt
+- Fixing test and consistent folder management
+- Fixing test and search logic for default scorer
+- Spring clean config - refactor redundant fields and kg optional
+- Spring clean config - refactor redundant fields and kg optional
+- cargo fmt
+- node yarn fixes
+- Logo fixes
+- Update Tauri code after search endpoint changes ([#90](https://github.com/terraphim/terraphim-ai/pull/90))
+- bumped rust version 1.76.0
+- Formatter applied
+- Merge remote-tracking branch 'origin' into replacer
+- Replaces uncommented
+
+### Removed
+- removed sorting by key
+
 ## [0.1.0](https://github.com/terraphim/terraphim-ai/releases/tag/terraphim_server-v0.1.0) - 2024-04-29
 
 ### Fixed

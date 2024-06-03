@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/terraphim/terraphim-ai/compare/terraphim_rolegraph-v0.1.0...terraphim_rolegraph-v0.1.1) - 2024-06-03
+
+### Removed
+- removed sorting by key
+
 ## [0.1.0](https://github.com/terraphim/terraphim-ai/releases/tag/terraphim_rolegraph-v0.1.0) - 2024-04-29
 
 ### Fixed
