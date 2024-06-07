@@ -78,7 +78,8 @@ async fn run_server() -> Result<()> {
     };
     log::debug!("Test automata_test_path {:?}", automata_test_path);
     let automata_path = AutomataPath::from_local(automata_test_path);
-
+    let automata_remote = AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_System%20Operator.json").unwrap();
+    println!("{}",automata_remote);
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
         .add_role(
@@ -101,10 +102,10 @@ async fn run_server() -> Result<()> {
             Role {
                 shortname: Some("Engineer".to_string()),
                 name: "Engineer".to_string(),
-                relevance_function: RelevanceFunction::TitleScorer,
+                relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: automata_path.clone(),
+                    automata_path: automata_remote.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: system_operator_haystack.clone(),
                     public: true,

@@ -8,7 +8,7 @@
     config: {
       id: string;
       global_shortcut: string;
-      roles: Record<string, { name: string; theme: string }>;
+      roles: Record<string, { name: string; theme: string ; kg}>;
       default_role: string;
     };
   }

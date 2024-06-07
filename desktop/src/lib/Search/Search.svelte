@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { Field, Input } from "svelma";
-  import { input, is_tauri, role, serverUrl } from "../stores";
+  import { input, is_tauri, role, roles,serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
@@ -18,6 +18,7 @@
       error = null;
     }
   }
+  
 
   async function handleSearchInputEvent() {
     error = null; // Clear previous errors
@@ -99,7 +100,10 @@
     </div>
   </section>
 {/if}
+{#if $roles[$role]?.kg}
 
+Direct Automata: {$roles[$role]?.kg?.automata_path?.Remote}
+{/if}
 <style>
   img {
     width: 16rem;

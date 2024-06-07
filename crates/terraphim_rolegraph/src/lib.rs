@@ -219,6 +219,7 @@ impl RoleGraph {
 
     /// Inserts an document into the rolegraph
     pub fn insert_document(&mut self, document_id: &str, document: Document) {
+        // FIXME: to_string have a performance penalty compared to &str above
         let matches = self.find_matching_node_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id, a, b);
@@ -313,17 +314,17 @@ pub fn magic_pair(x: u128, y: u128) -> u128 {
     }
 }
 
-// Magic unpair
-// func unpair(z int) (int, int) {
-//   q := int(math.Floor(math.Sqrt(float64(z))))
-//     l := z - q * q
+/// Magic unpair
+/// func unpair(z int) (int, int) {
+///   q := int(math.Floor(math.Sqrt(float64(z))))
+///     l := z - q * q
 
-//   if l < q {
-//       return l, q
+///   if l < q {
+///       return l, q
 //   }
 
-//   return q, l - q
-// }
+///   return q, l - q
+/// }
 #[memoize(CustomHasher: ahash::AHashMap)]
 pub fn magic_unpair(z: u128) -> (u128, u128) {
     let q = (z as f32).sqrt().floor() as u128;
