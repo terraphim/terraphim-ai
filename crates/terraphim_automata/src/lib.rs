@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
-// use reqwest::Url;
+
 
 use terraphim_types::Thesaurus;
 
@@ -25,9 +25,6 @@ pub enum TerraphimAutomataError {
 
     #[error("Aho-Corasick build error: {0}")]
     AhoCorasick(#[from] aho_corasick::BuildError),
-
-    #[error("URL parse error: {0}")]
-    UrlParse(#[from] url::ParseError),
 }
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
@@ -53,8 +50,7 @@ impl Display for AutomataPath {
 impl AutomataPath {
     /// Create a new AutomataPath from a URL
     pub fn from_remote(url: &str) -> Result<Self> {
-        // let url = reqwest::Url::parse(url)?;
-        println!("{url}");
+        
         if !url.starts_with("http") || !url.starts_with("https") {
             return Err(TerraphimAutomataError::Dict(format!(
                 "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
