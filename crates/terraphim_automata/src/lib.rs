@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
-use url::Url;
+// use reqwest::Url;
 
 use terraphim_types::Thesaurus;
 
@@ -38,7 +38,7 @@ pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AutomataPath {
     Local(PathBuf),
-    Remote(Url),
+    Remote(String),
 }
 
 impl Display for AutomataPath {
@@ -53,16 +53,16 @@ impl Display for AutomataPath {
 impl AutomataPath {
     /// Create a new AutomataPath from a URL
     pub fn from_remote(url: &str) -> Result<Self> {
-        let url = Url::parse(url)?;
-
-        if url.scheme() != "http" && url.scheme() != "https" {
+        // let url = reqwest::Url::parse(url)?;
+        println!("{url}");
+        if !url.starts_with("http") || !url.starts_with("https") {
             return Err(TerraphimAutomataError::Dict(format!(
                 "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
-                url.scheme()
+                url
             )));
         }
 
-        Ok(AutomataPath::Remote(url))
+        Ok(AutomataPath::Remote(url.to_string()))
     }
 
     /// Create a new AutomataPath from a file
@@ -93,7 +93,7 @@ impl AutomataPath {
 
 /// Load a thesaurus from a file or URL
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
-    async fn read_url(url: Url) -> Result<String> {
+    async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::new()
             .get(url.clone())

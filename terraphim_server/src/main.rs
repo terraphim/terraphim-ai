@@ -105,7 +105,7 @@ async fn run_server() -> Result<()> {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: automata_remote.clone(),
+                    automata_path: automata_path.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: system_operator_haystack.clone(),
                     public: true,
