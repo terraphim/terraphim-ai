@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use terraphim_types::{
-    Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Rank, Thesaurus,
+    Document, Edge, IndexedDocument, Node, NormalizedTermValue, Rank, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
@@ -38,19 +38,19 @@ pub struct RoleGraph {
     /// The role of the graph
     pub role: String,
     /// A mapping from node IDs to nodes
-    nodes: AHashMap<Id, Node>,
+    nodes: AHashMap<u64, Node>,
     /// A mapping from edge IDs to edges
-    edges: AHashMap<Id, Edge>,
+    edges: AHashMap<u64, Edge>,
     /// A mapping from document IDs to indexed documents
     documents: AHashMap<String, IndexedDocument>,
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values
-    aho_corasick_values: Vec<Id>,
+    aho_corasick_values: Vec<u64>,
     /// Aho-Corasick automata
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
-    pub ac_reverse_nterm: AHashMap<Id, NormalizedTermValue>,
+    pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
 }
 
 impl RoleGraph {
@@ -69,8 +69,8 @@ impl RoleGraph {
 
         for (key, normalized_term) in &thesaurus {
             keys.push(key);
-            values.push(normalized_term.id.clone());
-            ac_reverse_nterm.insert(normalized_term.id.clone(), normalized_term.value.clone());
+            values.push(normalized_term.id);
+            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
 
         let ac = AhoCorasick::builder()
@@ -93,11 +93,11 @@ impl RoleGraph {
     /// Find all matches in the rolegraph for the given text
     ///
     /// Returns a list of IDs of the matched nodes
-    pub fn find_matching_node_ids(&self, text: &str) -> Vec<Id> {
+    pub fn find_matching_node_ids(&self, text: &str) -> Vec<u64> {
         log::trace!("Finding matching node IDs for text: '{text}'");
         self.ac
             .find_iter(text)
-            .map(|mat| self.aho_corasick_values[mat.pattern()].clone())
+            .map(|mat| self.aho_corasick_values[mat.pattern()])
             .collect()
     }
 
@@ -180,7 +180,7 @@ impl RoleGraph {
                                 matched_edges: vec![edge.clone()],
                                 rank: total_rank,
                                 tags: vec![normalized_term.to_string()],
-                                nodes: vec![node_id.clone()],
+                                nodes: vec![node_id],
                             });
                         }
                         Entry::Occupied(mut e) => {
@@ -188,7 +188,7 @@ impl RoleGraph {
                             doc.rank += total_rank; // Adjust to correctly aggregate the rank
                             doc.matched_edges.push(edge.clone());
                             // Remove duplicate edges based on unique IDs
-                            doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                            doc.matched_edges.dedup_by_key(|e| e.id);
                         }
                     }
                 }
@@ -226,32 +226,32 @@ impl RoleGraph {
         }
     }
 
-    pub fn add_or_update_document(&mut self, document_id: &str, x: Id, y: Id) {
-        let edge = magic_pair(x.as_u128(), y.as_u128());
-        let edge = self.init_or_update_edge(Id::from(edge), document_id);
+    pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
+        let edge = magic_pair(x, y);
+        let edge = self.init_or_update_edge(edge, document_id);
         self.init_or_update_node(x, &edge);
         self.init_or_update_node(y, &edge);
     }
 
-    fn init_or_update_node(&mut self, node_id: Id, edge: &Edge) {
-        match self.nodes.entry(node_id.clone()) {
+    fn init_or_update_node(&mut self, node_id: u64, edge: &Edge) {
+        match self.nodes.entry(node_id) {
             Entry::Vacant(_) => {
-                let node = Node::new(node_id.clone(), edge.clone());
-                self.nodes.insert(node.id.clone(), node);
+                let node = Node::new(node_id, edge.clone());
+                self.nodes.insert(node.id, node);
             }
             Entry::Occupied(entry) => {
                 let node = entry.into_mut();
                 node.rank += 1;
-                node.connected_with.push(edge.id.clone());
+                node.connected_with.push(edge.id);
             }
         };
     }
 
-    fn init_or_update_edge(&mut self, edge_key: Id, document_id: &str) -> Edge {
-        let edge = match self.edges.entry(edge_key.clone()) {
+    fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
+        let edge = match self.edges.entry(edge_key) {
             Entry::Vacant(_) => {
                 let edge = Edge::new(edge_key, document_id.to_string());
-                self.edges.insert(edge.id.clone(), edge.clone());
+                self.edges.insert(edge.id, edge.clone());
                 edge
             }
             Entry::Occupied(entry) => {
@@ -306,7 +306,7 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 /// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
 /// also using memoize macro with Ahash hasher
 #[memoize(CustomHasher: ahash::AHashMap)]
-pub fn magic_pair(x: u128, y: u128) -> u128 {
+pub fn magic_pair(x: u64, y: u64) -> u64 {
     if x >= y {
         x * x + x + y
     } else {
@@ -326,8 +326,8 @@ pub fn magic_pair(x: u128, y: u128) -> u128 {
 ///   return q, l - q
 /// }
 #[memoize(CustomHasher: ahash::AHashMap)]
-pub fn magic_unpair(z: u128) -> (u128, u128) {
-    let q = (z as f32).sqrt().floor() as u128;
+pub fn magic_unpair(z: u64) -> (u64, u64) {
+    let q = (z as f32).sqrt().floor() as u64;
     let l = z - q * q;
     if l < q {
         (l, q)
@@ -345,7 +345,7 @@ mod tests {
     use ulid::Ulid;
 
     async fn load_sample_thesaurus() -> Thesaurus {
-        load_thesaurus(&AutomataPath::remote_example())
+        load_thesaurus(&AutomataPath::local_example_full())
             .await
             .unwrap()
     }
@@ -377,7 +377,7 @@ mod tests {
             .await
             .unwrap();
         let matches = rolegraph.find_matching_node_ids(query);
-        assert_eq!(matches.len(), 7);
+        assert_eq!(matches.len(), 4);
     }
 
     #[test]

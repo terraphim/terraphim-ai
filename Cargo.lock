@@ -5177,7 +5177,6 @@ dependencies = [
  "terraphim_types",
  "thiserror",
  "tokio",
- "url",
 ]
 
 [[package]]

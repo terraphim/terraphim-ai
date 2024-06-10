@@ -70,11 +70,15 @@ impl AutomataPath {
     pub fn local_example() -> Self {
         AutomataPath::from_local("data/term_to_id_simple.json")
     }
+    /// Full Local example for testing
+    pub fn local_example_full() -> Self {
+        AutomataPath::from_local("data/term_to_id.json")
+    }
 
     /// Create a sample remote AutomataPath for testing
     pub fn remote_example() -> Self {
         AutomataPath::from_remote(
-            "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+            "https://staging-storage.terraphim.io/thesaurus_Default.json",
         )
         .unwrap()
     }
@@ -129,7 +133,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
 
 #[cfg(test)]
 mod tests {
-    use terraphim_types::{Id, NormalizedTermValue};
+    use terraphim_types::{NormalizedTermValue};
 
     use super::*;
 
@@ -140,15 +144,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            Id::from(1)
+            1_u64
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            Id::from(2)
+            2_u64
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            Id::from(1)
+            1_u64
         );
     }
 
@@ -162,7 +166,7 @@ mod tests {
                 .get(&NormalizedTermValue::from("@risk a user guide"))
                 .unwrap()
                 .id,
-            Id::from(661)
+            661_u64
         );
     }
 }

@@ -78,7 +78,7 @@ async fn run_server() -> Result<()> {
     };
     log::debug!("Test automata_test_path {:?}", automata_test_path);
     let automata_path = AutomataPath::from_local(automata_test_path);
-    let automata_remote = AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_System%20Operator.json").unwrap();
+    let automata_remote = AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json").unwrap();
     println!("{}",automata_remote);
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
@@ -105,7 +105,7 @@ async fn run_server() -> Result<()> {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: automata_path.clone(),
+                    automata_path: automata_remote.clone(),
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: system_operator_haystack.clone(),
                     public: true,

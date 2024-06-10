@@ -2,107 +2,11 @@ use std::fmt::{self, Display, Formatter};
 use std::ops::{Add, AddAssign, Deref, DerefMut};
 
 use ahash::AHashMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Iter;
 use std::iter::IntoIterator;
-use ulid::Ulid;
 
-/// A unique ID. The underlying type is an implementation detail and subject to change.
-///
-/// Currently, this is a wrapper around the `ulid` crate's `Ulid` type.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Id {
-    /// A Ulid is a unique 128-bit lexicographically sortable identifier
-    ulid: Ulid,
-    // Bytes of the ULID (for use in the `AsRef<[u8]>` trait, which is used in
-    // aho-corasick)
-    bytes: Vec<u8>,
-}
 
-impl Id {
-    pub fn new() -> Self {
-        let ulid = Ulid::new();
-        let bytes = ulid.to_string().into_bytes();
-        Id { ulid, bytes }
-    }
-
-    pub fn as_u128(&self) -> u128 {
-        self.ulid.into()
-    }
-}
-
-impl Default for Id {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// Custom Debug implementation to hide the `bytes` field
-impl fmt::Debug for Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Convert the ulid to its u128 representation
-        let ulid_as_u128: u128 = self.ulid.into();
-        write!(f, "{}", ulid_as_u128)
-    }
-}
-
-impl AsRef<[u8]> for Id {
-    fn as_ref(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-impl From<Ulid> for Id {
-    fn from(ulid: Ulid) -> Self {
-        Self {
-            ulid,
-            bytes: ulid.to_string().into_bytes(),
-        }
-    }
-}
-
-impl From<u128> for Id {
-    fn from(id: u128) -> Self {
-        let ulid = Ulid::from(id);
-        Self {
-            ulid,
-            bytes: ulid.to_string().into_bytes(),
-        }
-    }
-}
-
-impl Display for Id {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.ulid)
-    }
-}
-
-impl Serialize for Id {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialize the ulid field as u128
-        serializer.serialize_u128(self.ulid.0)
-    }
-}
-
-impl<'de> Deserialize<'de> for Id {
-    fn deserialize<D>(deserializer: D) -> Result<Id, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // We expect the ULID to be serialized as a u128
-        let ulid = u128::deserialize(deserializer)?;
-        Ok(Id::from(ulid))
-
-        // // TODO
-        // // let ulid = Ulid::deserialize(deserializer)?;
-        // // Ok(Id::from(ulid))
-
-        // Ok(Id::new())
-    }
-}
 
 /// The value of a normalized term
 ///
@@ -141,13 +45,23 @@ impl AsRef<[u8]> for NormalizedTermValue {
     }
 }
 
+
+
+// FIXME: this can be greatly improved, ID only shall be unique per KG
+use std::sync::atomic::{AtomicU64, Ordering};
+static INT_SEQ: AtomicU64 = AtomicU64::new(0);
+fn get_int_id() -> u64{
+    INT_SEQ.fetch_add(1, Ordering::SeqCst)
+}
+
+
 /// A normalized term is a higher-level term that has been normalized
 ///
 /// It holds a unique identifier to an underlying and the normalized value.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NormalizedTerm {
     /// Unique identifier for the normalized term
-    pub id: Id,
+    pub id: u64,
     /// The normalized value
     // This field is currently called `nterm` in the JSON
     #[serde(rename = "nterm")]
@@ -155,7 +69,7 @@ pub struct NormalizedTerm {
 }
 
 impl NormalizedTerm {
-    pub fn new(id: Id, value: NormalizedTermValue) -> Self {
+    pub fn new(id: u64, value: NormalizedTermValue) -> Self {
         Self { id, value }
     }
 }
@@ -169,7 +83,7 @@ impl NormalizedTerm {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Concept {
     /// A unique identifier for the concept
-    pub id: Id,
+    pub id: u64,
     /// The normalized concept
     pub value: NormalizedTermValue,
 }
@@ -177,7 +91,7 @@ pub struct Concept {
 impl Concept {
     pub fn new(value: NormalizedTermValue) -> Self {
         Self {
-            id: Id::new(),
+            id: get_int_id(),
             value,
         }
     }
@@ -279,7 +193,7 @@ impl fmt::Display for Document {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the edge
-    pub id: Id,
+    pub id: u64,
     /// Rank of the edge
     pub rank: u64,
     /// A hashmap of `document_id` to `rank`
@@ -287,7 +201,7 @@ pub struct Edge {
 }
 
 impl Edge {
-    pub fn new(id: Id, document_id: String) -> Self {
+    pub fn new(id: u64, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
         Self {
@@ -304,16 +218,16 @@ impl Edge {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
     /// Unique identifier of the node
-    pub id: Id,
+    pub id: u64,
     /// Number of co-occurrences
     pub rank: u64,
     /// List of connected nodes
-    pub connected_with: Vec<Id>,
+    pub connected_with: Vec<u64>,
 }
 
 impl Node {
     /// Create a new node with a given id and edge
-    pub fn new(id: Id, edge: Edge) -> Self {
+    pub fn new(id: u64, edge: Edge) -> Self {
         Self {
             id,
             rank: 1,
@@ -497,7 +411,7 @@ pub struct IndexedDocument {
     /// Tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
     /// List of node IDs for validation of matching
-    pub nodes: Vec<Id>,
+    pub nodes: Vec<u64>,
 }
 
 impl IndexedDocument {

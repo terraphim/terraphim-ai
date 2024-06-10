@@ -100,9 +100,13 @@
     </div>
   </section>
 {/if}
-{#if $roles[$role]?.kg}
-
-Direct Automata: {$roles[$role]?.kg?.automata_path?.Remote}
+{#if $roles[$role]?.kg?.automata_path}
+          
+{#if $roles[$role]?.kg?.automata_path?.Remote}
+Direct Remote Automata: {$roles[$role]?.kg?.automata_path?.Remote}
+{:else}
+Direct Local Automata: {$roles[$role]?.kg?.automata_path?.Local}
+{/if}
 {/if}
 <style>
   img {
