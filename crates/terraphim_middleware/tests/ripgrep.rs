@@ -12,32 +12,47 @@ mod tests {
     use terraphim_types::{IndexedDocument, KnowledgeGraphInputType, RelevanceFunction};
 
     use terraphim_middleware::Result;
-    use url::Url;
+    
 
     #[tokio::test]
     async fn test_roundtrip() -> Result<()> {
-        let mut config = ConfigBuilder::new()
-            .add_role(
-                "System Operator",
-                Role {
+        let role = Role {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".to_string(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "superhero".to_string(),
-                    server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                    kg: KnowledgeGraph {
+                    kg: Some(KnowledgeGraph {
                         automata_path: AutomataPath::local_example(),
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("~/pkm"),
                         public: true,
                         publish: true,
-                    },
+                    }),
                     haystacks: vec![Haystack {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
                         service: ServiceType::Ripgrep,
                     }],
                     extra: AHashMap::new(),
-                },
+                };
+        let mut config = ConfigBuilder::new()
+            .add_role(
+                "System Operator",
+                role.clone(),
+            )
+            .add_role(
+            "Default",
+            Role {
+                shortname: Some("Default".to_string()),
+                name: "Default".to_string(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    path: PathBuf::from("/tmp/system_operator/pages/"),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
             )
             .default_role("Default")?
             .build()?;
@@ -55,7 +70,7 @@ mod tests {
 
         let index = search_haystacks(config_state.clone(), search_query.clone()).await?;
         let indexed_docs: Vec<IndexedDocument> =
-            config_state.search_indexed_documents(&search_query).await;
+            config_state.search_indexed_documents(&search_query,&role).await;
         let documents = index.get_documents(indexed_docs);
         log::debug!("Final documents: {documents:?}");
 

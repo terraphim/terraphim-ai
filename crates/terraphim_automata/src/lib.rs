@@ -68,6 +68,7 @@ impl AutomataPath {
 
     /// Local example for testing
     pub fn local_example() -> Self {
+        log::debug!("Current folder {:?}",std::env::current_dir());
         AutomataPath::from_local("data/term_to_id_simple.json")
     }
     /// Full Local example for testing

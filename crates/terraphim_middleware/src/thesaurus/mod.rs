@@ -101,9 +101,11 @@ pub trait ThesaurusBuilder {
 /// title:: My Note
 /// tags:: #idea #project
 /// ```
+// FIXME: move to config item per role
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 
 /// The synonyms keyword used in Logseq documents
+// FIXME: move to config item per role
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 /// A builder for a knowledge graph, which knows how to handle Logseq input.
@@ -284,7 +286,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                     }
                 };
                 for synonym in synonyms {
-                    let nterm = NormalizedTerm::new(concept.id.clone(), synonym.into());
+                    let nterm = NormalizedTerm::new(concept.id, synonym.into());
                     thesaurus.insert(concept.value.clone(), nterm);
                 }
             }
