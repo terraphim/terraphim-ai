@@ -1,6 +1,5 @@
 use ahash::AHashMap;
 use std::path::PathBuf;
-use url::Url;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
@@ -24,14 +23,13 @@ async fn main() -> Result<()> {
                 name: "Engineer".to_string(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
+                kg: Some(KnowledgeGraph {
                     automata_path: AutomataPath::local_example(),
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: PathBuf::from("~/pkm"),
                     public: true,
                     publish: true,
-                },
+                }),
                 haystacks: vec![Haystack {
                     path: PathBuf::from("localsearch"),
                     service: ServiceType::Ripgrep,
