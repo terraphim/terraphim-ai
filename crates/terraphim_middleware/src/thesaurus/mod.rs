@@ -74,6 +74,7 @@ pub async fn build_thesaurus_from_haystack(
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
         role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
         log::info!("Make sure thesaurus updated in a role {}", role_name);
+        // TODO: may be re-building all thesaurus on change using inotify is easier
         let mut rolegraphs = config_state.roles.clone();
 
         if let Some(rolegraph_value) = rolegraphs.get_mut(&role_name){

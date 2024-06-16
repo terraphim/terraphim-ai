@@ -101,11 +101,10 @@ impl RoleGraph {
             .collect()
     }
 
-    /// Convert node rank to f64
-    ///
-    /// TODO: Reuse that because we don't want to do node-based ranking but rather f64 based ranking
+    /// Currently I don't need this functionality,
+    /// but it's commonly referred as "training" if you are writing graph embeddings, see FAIR or [Cleora](https://arxiv.org/pdf/2102.02302)
+    /// Currently I like rank based integers better - they map directly into UI grid but f64 based ranking may be useful for R&D
     /// See normalization step in https://github.com/BurntSushi/imdb-rename
-    ///
     /// This method performs several key operations to process and rank
     /// documents:
     /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
@@ -171,7 +170,6 @@ impl RoleGraph {
 
                 for (document_id, document_rank) in &edge.doc_hash {
                     // For now, this sums up over nodes and edges
-                    // TODO: Calculate the total rank based on scorer
                     let total_rank = Rank::new(node.rank + edge.rank + document_rank);
                     match results.entry(document_id.clone()) {
                         Entry::Vacant(e) => {

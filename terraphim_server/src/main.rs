@@ -105,11 +105,12 @@ async fn run_server() -> Result<()> {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: automata_remote.clone(),
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: system_operator_haystack.clone(),
-                    public: true,
-                    publish: true,
+                    automata_path: Some(automata_remote.clone()),
+                    knwoledge_graph_local: Some(KnowledgeGraphLocal{
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
+                        public: true,
+                        publish: true}),
                 }),
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),
@@ -126,11 +127,12 @@ async fn run_server() -> Result<()> {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path,
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: system_operator_haystack.clone(),
-                    public: true,
-                    publish: true,
+                    automata_path: Some(automata_remote.clone()),
+                    knwoledge_graph_local: Some(KnowledgeGraphLocal{
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
+                        public: true,
+                        publish: true}),
                 }),
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),

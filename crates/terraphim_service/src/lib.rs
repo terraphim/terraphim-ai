@@ -92,7 +92,7 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
-
+                //FIXME: it's a bug - thesaurus is build but never loaded
                 let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
                     .search_indexed_documents(search_query, &role)
