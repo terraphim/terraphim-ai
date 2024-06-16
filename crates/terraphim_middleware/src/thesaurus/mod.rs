@@ -27,6 +27,7 @@ use terraphim_config::Role;
 use terraphim_persistence::Persistable;
 use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync, Error as RoleGraphError};
 
 use crate::Result;
 use cached::proc_macro::cached;
@@ -44,6 +45,8 @@ pub async fn build_thesaurus_from_haystack(
     config_state: ConfigState,
     search_query: &SearchQuery,
 ) -> Result<()> {
+    // build thesaurus from haystack or load from remote
+    // FIXME: introduce LRU cache for locally build thesaurus via persistance crate
     let config = config_state.config.lock().await;
     let roles = config.roles.clone();
     let default_role = config.default_role.clone();
@@ -53,7 +56,7 @@ pub async fn build_thesaurus_from_haystack(
         .get(&role_name)
         .unwrap_or(&roles[&default_role])
         .to_owned();
-
+    
     for haystack in &role.haystacks {
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
@@ -69,8 +72,20 @@ pub async fn build_thesaurus_from_haystack(
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
+        role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
+        log::info!("Make sure thesaurus updated in a role {}", role_name);
+        let mut rolegraphs = config_state.roles.clone();
 
-        role.kg.as_mut().unwrap().automata_path = AutomataPath::Local(thesaurus_path);
+        if let Some(rolegraph_value) = rolegraphs.get_mut(&role_name){
+            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
+            match rolegraph {
+                Ok(rolegraph) => {
+                    *rolegraph_value=RoleGraphSync::from(rolegraph);
+                },
+                Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+            }
+            
+        }
     }
     Ok(())
 }
