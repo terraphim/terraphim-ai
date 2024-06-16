@@ -28,7 +28,6 @@ pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> V
 
     // Score the documents
     let mut results = scorer.score(&query, documents).unwrap();
-    //FIXME: results.score and rank solve the same purpose. Results score shall be normalized into rank and mapped to IndexedDocument
     results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
     log::debug!("Rescore results {:#?}", results);
     results

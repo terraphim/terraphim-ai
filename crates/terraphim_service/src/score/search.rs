@@ -20,7 +20,7 @@ use crate::scored::{Scored, SearchResults};
 ///
 /// The primary interface to a `Searcher` is its `search` method, which takes
 /// as input a [`Query`](struct.Query.html) and returns a ranked list of
-/// [`Document`](struct.Document.html) as output.
+/// [`Document`](struct.Document.html) as output.  Below code is copy paste from https://github.com/BurntSushi/imdb-rename all credit goes to Andrew
 #[derive(Debug)]
 pub struct Searcher {
     idx: Index,
