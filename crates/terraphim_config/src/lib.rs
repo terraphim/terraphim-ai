@@ -97,13 +97,25 @@ pub struct Haystack {
 /// using a specific service
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct KnowledgeGraph {
-    pub automata_path: AutomataPath,
+    /// automata path refering to the published automata and can be online url or local file with pre-build automata
+    pub automata_path: Option<AutomataPath>,
+    /// Knowlege graph can be re-build from local files, for example Markdown files
+    pub knwoledge_graph_local: Option<KnowledgeGraphLocal>,
+}
+/// check KG set correctly 
+impl KnowledgeGraph {
+    fn is_set(&self) -> bool {
+        self.automata_path.is_some() || self.knwoledge_graph_local.is_some() 
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct KnowledgeGraphLocal {
     pub input_type: KnowledgeGraphInputType,
     pub path: PathBuf,
     pub public: bool,
     pub publish: bool,
 }
-
 /// Builder, which allows to create a new `Config`
 ///
 /// The first role added will be set as the default role.
@@ -155,7 +167,6 @@ impl ConfigBuilder {
         if self.config.roles.is_empty() {
             self.config.default_role = role_name.to_string();
         }
-
         self.config.roles.insert(role_name.to_string(), role);
 
         self
@@ -280,14 +291,21 @@ impl ConfigState {
         for (name, role) in &config.roles {
             let role_name = name.to_lowercase();
             log::info!("Creating role {}", role_name);
-            if role.kg.is_some() {
-                let automata_url = role.kg.as_ref().unwrap().automata_path.clone();
-                log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
-                let thesaurus = load_thesaurus(&automata_url).await?;
-                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
-                roles.insert(role_name, RoleGraphSync::from(rolegraph));
-            } else {
-                log::info!("Skipping KG due to None settings for role {}", role_name);
+            // FIXME: this looks like local KG is never re-build
+            // check if role have configured local KG or automata_path
+            // skip role if incorrectly configured
+            if role.relevance_function== RelevanceFunction::TerraphimGraph {
+                if role.kg.as_ref().is_some_and(|kg|kg.is_set()){
+                    //FIXME: turn into errors
+                    log::info!("Role {} is configured correctly", role_name);
+                    let automata_url = role.kg.as_ref().unwrap().automata_path.as_ref().unwrap().clone();
+                    log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_url);
+                    let thesaurus = load_thesaurus(&automata_url).await?;
+                    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                    roles.insert(role_name, RoleGraphSync::from(rolegraph));
+                }else {
+                    log::info!("Role {} is configured to use KG ranking but is missing remote url or local configuration", role_name );
+                }
             }
         }
 
