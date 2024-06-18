@@ -6,8 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Iter;
 use std::iter::IntoIterator;
 
-
-
 /// The value of a normalized term
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
@@ -45,15 +43,12 @@ impl AsRef<[u8]> for NormalizedTermValue {
     }
 }
 
-
-
 // FIXME: this can be greatly improved, ID only shall be unique per KG
 use std::sync::atomic::{AtomicU64, Ordering};
 static INT_SEQ: AtomicU64 = AtomicU64::new(0);
-fn get_int_id() -> u64{
+fn get_int_id() -> u64 {
     INT_SEQ.fetch_add(1, Ordering::SeqCst)
 }
-
 
 /// A normalized term is a higher-level term that has been normalized
 ///

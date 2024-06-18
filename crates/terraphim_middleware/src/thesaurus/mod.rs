@@ -25,9 +25,9 @@ use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
 use terraphim_persistence::Persistable;
+use terraphim_rolegraph::{Error as RoleGraphError, RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
-use terraphim_rolegraph::{RoleGraph, RoleGraphSync, Error as RoleGraphError};
 
 use crate::Result;
 use cached::proc_macro::cached;
@@ -56,7 +56,7 @@ pub async fn build_thesaurus_from_haystack(
         .get(&role_name)
         .unwrap_or(&roles[&default_role])
         .to_owned();
-    
+
     for haystack in &role.haystacks {
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
@@ -77,15 +77,14 @@ pub async fn build_thesaurus_from_haystack(
         // TODO: may be re-building all thesaurus on change using inotify is easier
         let mut rolegraphs = config_state.roles.clone();
 
-        if let Some(rolegraph_value) = rolegraphs.get_mut(&role_name){
+        if let Some(rolegraph_value) = rolegraphs.get_mut(&role_name) {
             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
             match rolegraph {
                 Ok(rolegraph) => {
-                    *rolegraph_value=RoleGraphSync::from(rolegraph);
-                },
+                    *rolegraph_value = RoleGraphSync::from(rolegraph);
+                }
                 Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
             }
-            
         }
     }
     Ok(())

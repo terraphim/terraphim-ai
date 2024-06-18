@@ -50,7 +50,12 @@ fn index_inner(messages: Vec<Message>) -> Index {
                 existing_paths.insert(path.clone());
 
                 document.id = hash_as_string(&path);
-                let title = Path::new(&path).file_stem().unwrap().to_str().unwrap().to_string();
+                let title = Path::new(&path)
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
                 document.title = title;
                 document.url = path.clone();
             }

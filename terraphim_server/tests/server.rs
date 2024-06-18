@@ -12,7 +12,8 @@ mod tests {
     use reqwest::{Client, StatusCode};
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
-        Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, Role, ServiceType,
+        Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
+        ServiceType,
     };
     use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 
@@ -50,11 +51,13 @@ mod tests {
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
                     kg: Some(KnowledgeGraph {
-                        automata_path: automata_path.clone(),
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: haystack.clone(),
-                        public: true,
-                        publish: true,
+                        automata_path: Some(automata_path.clone()),
+                        knowledge_graph_local: Some(KnowledgeGraphLocal {
+                            input_type: KnowledgeGraphInputType::Markdown,
+                            path: PathBuf::from("/tmp/system_operator/pages/"),
+                            public: true,
+                            publish: true,
+                        }),
                     }),
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
@@ -71,11 +74,13 @@ mod tests {
                     relevance_function: RelevanceFunction::TerraphimGraph,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
-                        automata_path,
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: haystack.clone(),
-                        public: true,
-                        publish: true,
+                        automata_path: Some(automata_path),
+                        knowledge_graph_local: Some(KnowledgeGraphLocal {
+                            input_type: KnowledgeGraphInputType::Markdown,
+                            path: PathBuf::from("/tmp/system_operator/pages/"),
+                            public: true,
+                            publish: true,
+                        }),
                     }),
                     haystacks: vec![Haystack {
                         path: haystack.clone(),

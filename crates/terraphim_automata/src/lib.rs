@@ -6,7 +6,6 @@ use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
 
-
 use terraphim_types::Thesaurus;
 
 #[derive(thiserror::Error, Debug)]
@@ -50,7 +49,6 @@ impl Display for AutomataPath {
 impl AutomataPath {
     /// Create a new AutomataPath from a URL
     pub fn from_remote(url: &str) -> Result<Self> {
-        
         if !url.starts_with("http") || !url.starts_with("https") {
             return Err(TerraphimAutomataError::Dict(format!(
                 "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
@@ -68,7 +66,7 @@ impl AutomataPath {
 
     /// Local example for testing
     pub fn local_example() -> Self {
-        log::debug!("Current folder {:?}",std::env::current_dir());
+        log::debug!("Current folder {:?}", std::env::current_dir());
         AutomataPath::from_local("data/term_to_id_simple.json")
     }
     /// Full Local example for testing
@@ -78,10 +76,8 @@ impl AutomataPath {
 
     /// Create a sample remote AutomataPath for testing
     pub fn remote_example() -> Self {
-        AutomataPath::from_remote(
-            "https://staging-storage.terraphim.io/thesaurus_Default.json",
-        )
-        .unwrap()
+        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+            .unwrap()
     }
 }
 
@@ -134,7 +130,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
 
 #[cfg(test)]
 mod tests {
-    use terraphim_types::{NormalizedTermValue};
+    use terraphim_types::NormalizedTermValue;
 
     use super::*;
 

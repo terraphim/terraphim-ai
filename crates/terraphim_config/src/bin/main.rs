@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Result, Role, ServiceType, TerraphimConfigError,
+    ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Result, Role, ServiceType,
+    TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
@@ -25,7 +26,7 @@ async fn main() -> Result<()> {
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::local_example()),
-                    knwoledge_graph_local:None
+                    knowledge_graph_local: None,
                 }),
                 haystacks: vec![Haystack {
                     path: PathBuf::from("localsearch"),

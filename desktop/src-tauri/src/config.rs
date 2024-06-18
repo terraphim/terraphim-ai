@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use ahash::AHashMap;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    Config, ConfigBuilder, Haystack, KnowledgeGraph, Role, ServiceType, TerraphimConfigError,
+    Config, ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
+    TerraphimConfigError,
 };
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 
@@ -68,11 +69,13 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path,
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
-                    public: true,
-                    publish: true,
+                    automata_path: Some(automata_path),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("/tmp/system_operator/pages/"),
+                        public: true,
+                        publish: true,
+                    }),
                 }),
                 haystacks: vec![Haystack {
                     path: docs_path,

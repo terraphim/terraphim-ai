@@ -21,9 +21,9 @@ use std::net::SocketAddr;
 use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigBuilder;
 use terraphim_config::Haystack;
-use terraphim_config::KnowledgeGraph;
 use terraphim_config::Role;
 use terraphim_config::ServiceType;
+use terraphim_config::{KnowledgeGraph, KnowledgeGraphLocal};
 use terraphim_types::KnowledgeGraphInputType;
 use terraphim_types::RelevanceFunction;
 
@@ -78,8 +78,10 @@ async fn run_server() -> Result<()> {
     };
     log::debug!("Test automata_test_path {:?}", automata_test_path);
     let automata_path = AutomataPath::from_local(automata_test_path);
-    let automata_remote = AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json").unwrap();
-    println!("{}",automata_remote);
+    let automata_remote =
+        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+            .unwrap();
+    println!("{automata_remote}");
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
         .add_role(
@@ -106,11 +108,12 @@ async fn run_server() -> Result<()> {
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(automata_remote.clone()),
-                    knwoledge_graph_local: Some(KnowledgeGraphLocal{
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: system_operator_haystack.clone(),
                         public: true,
-                        publish: true}),
+                        publish: true,
+                    }),
                 }),
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),
@@ -128,11 +131,12 @@ async fn run_server() -> Result<()> {
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(automata_remote.clone()),
-                    knwoledge_graph_local: Some(KnowledgeGraphLocal{
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: system_operator_haystack.clone(),
                         public: true,
-                        publish: true}),
+                        publish: true,
+                    }),
                 }),
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),

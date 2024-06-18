@@ -100,12 +100,12 @@ pub struct KnowledgeGraph {
     /// automata path refering to the published automata and can be online url or local file with pre-build automata
     pub automata_path: Option<AutomataPath>,
     /// Knowlege graph can be re-build from local files, for example Markdown files
-    pub knwoledge_graph_local: Option<KnowledgeGraphLocal>,
+    pub knowledge_graph_local: Option<KnowledgeGraphLocal>,
 }
-/// check KG set correctly 
+/// check KG set correctly
 impl KnowledgeGraph {
     fn is_set(&self) -> bool {
-        self.automata_path.is_some() || self.knwoledge_graph_local.is_some() 
+        self.automata_path.is_some() || self.knowledge_graph_local.is_some()
     }
 }
 
@@ -294,16 +294,23 @@ impl ConfigState {
             // FIXME: this looks like local KG is never re-build
             // check if role have configured local KG or automata_path
             // skip role if incorrectly configured
-            if role.relevance_function== RelevanceFunction::TerraphimGraph {
-                if role.kg.as_ref().is_some_and(|kg|kg.is_set()){
+            if role.relevance_function == RelevanceFunction::TerraphimGraph {
+                if role.kg.as_ref().is_some_and(|kg| kg.is_set()) {
                     //FIXME: turn into errors
                     log::info!("Role {} is configured correctly", role_name);
-                    let automata_url = role.kg.as_ref().unwrap().automata_path.as_ref().unwrap().clone();
+                    let automata_url = role
+                        .kg
+                        .as_ref()
+                        .unwrap()
+                        .automata_path
+                        .as_ref()
+                        .unwrap()
+                        .clone();
                     log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_url);
                     let thesaurus = load_thesaurus(&automata_url).await?;
                     let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
                     roles.insert(role_name, RoleGraphSync::from(rolegraph));
-                }else {
+                } else {
                     log::info!("Role {} is configured to use KG ranking but is missing remote url or local configuration", role_name );
                 }
             }
@@ -419,6 +426,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_builder() {
+        let automata_remote = AutomataPath::from_remote(
+            "https://staging-storage.terraphim.io/thesaurus_Default.json",
+        )
+        .unwrap();
         let config = ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
             .add_role(
@@ -456,14 +467,16 @@ mod tests {
                 Role {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".to_string(),
-                    relevance_function: RelevanceFunction::TitleScorer,
+                    relevance_function: RelevanceFunction::TerraphimGraph,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
-                        automata_path: AutomataPath::local_example(),
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: PathBuf::from("~/pkm"),
-                        public: true,
-                        publish: true,
+                        automata_path: Some(automata_remote.clone()),
+                        knowledge_graph_local: Some(KnowledgeGraphLocal {
+                            input_type: KnowledgeGraphInputType::Markdown,
+                            path: PathBuf::from("~/pkm"),
+                            public: true,
+                            publish: true,
+                        }),
                     }),
                     haystacks: vec![Haystack {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
@@ -504,11 +517,8 @@ mod tests {
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),
             kg: Some(KnowledgeGraph {
-                automata_path: AutomataPath::local_example(),
-                input_type: KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("~/pkm"),
-                public: true,
-                publish: true,
+                automata_path: Some(AutomataPath::local_example()),
+                knowledge_graph_local: None,
             }),
             haystacks: vec![Haystack {
                 path: PathBuf::from("localsearch"),
