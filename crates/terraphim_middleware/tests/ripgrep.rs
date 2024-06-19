@@ -27,7 +27,7 @@ mod tests {
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: PathBuf::from("/tmp/system_operator/pages/"),
                     public: true,
-                    publish: true,
+                    publish: true, 
                 }),
             }),
             haystacks: vec![Haystack {
