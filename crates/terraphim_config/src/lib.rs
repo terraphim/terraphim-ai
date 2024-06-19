@@ -359,9 +359,7 @@ impl ConfigState {
         let role_name = role.name.to_lowercase();
         log::debug!("Role name for searching {role_name}");
         log::debug!("All roles defined  {:?}", self.roles.clone().into_keys());
-        println!("Role name for searching {role_name}");
-        println!("Config Role {:?}",&self);
-        println!("All roles defined  {:?}", &self.roles.clone().into_keys());
+        //FIXME: breaks here for ripgrep, means KB based search is triggered before KG build
         let role = self.roles.get(&role_name).unwrap().lock().await;
         let documents = role
             .query_graph(
