@@ -22,6 +22,8 @@
 //! thesaurus.insert("bar".to_string().to_string().into(), nterm.clone());
 //! thesaurus.insert("baz".to_string().into(), nterm.clone());
 //! ```
+//! The logic as follows: if you ask for concept by name you get concept, if you ask (get) for any of the synonyms you will get concept with id,
+//! its pre-computed reverse tree traversal - any of the synonyms (leaf) maps into the concepts (root)
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
