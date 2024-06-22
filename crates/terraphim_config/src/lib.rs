@@ -360,7 +360,14 @@ impl ConfigState {
         log::debug!("Role name for searching {role_name}");
         log::debug!("All roles defined  {:?}", self.roles.clone().into_keys());
         //FIXME: breaks here for ripgrep, means KB based search is triggered before KG build
-        let role = self.roles.get(&role_name).unwrap().lock().await;
+        let role = match self.roles.get(&role_name) {
+            Some(role) => role.lock().await,
+            None => {
+                // Handle the None case, e.g., return an empty vector since the function expects Vec<IndexedDocument>
+                log::error!("Role `{}` does not exist or RoleGraph isn't populated", role_name);
+                return Vec::new();
+            },
+        };
         let documents = role
             .query_graph(
                 &search_query.search_term,

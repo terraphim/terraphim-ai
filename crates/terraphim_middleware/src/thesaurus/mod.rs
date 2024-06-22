@@ -6,19 +6,21 @@
 //!
 //! If we parse a file named `path/to/concept.md` with the following content:
 //!
-//! ```
+//! ```markdown
 //! synonyms:: foo, bar, baz
 //! ```
 //!
 //! Then the thesaurus will contain the following entries:
 //!
 //! ```rust
-//! use terraphim_types::Thesaurus;
-//!
-//! let mut thesaurus = Thesaurus::new();
-//! thesaurus.insert("concept".to_string(), "foo".to_string());
-//! thesaurus.insert("concept".to_string(), "bar".to_string());
-//! thesaurus.insert("concept".to_string(), "baz".to_string());
+//! use terraphim_types::{Thesaurus, Concept, NormalizedTerm};
+//! let concept = Concept::new("concept".into());
+//! let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+//! let mut thesaurus = Thesaurus::new("Engineer".to_string());
+//! thesaurus.insert(concept.value.clone(), nterm.clone());
+//! thesaurus.insert("foo".to_string().into(),nterm.clone());
+//! thesaurus.insert("bar".to_string().to_string().into(), nterm.clone());
+//! thesaurus.insert("baz".to_string().into(), nterm.clone());
 //! ```
 
 use terraphim_automata::AutomataPath;
@@ -112,7 +114,7 @@ pub trait ThesaurusBuilder {
 /// In Logseq, `::` serves as a delimiter between the property name and its
 /// value, e.g.
 ///
-/// ```
+/// ```markdown
 /// title:: My Note
 /// tags:: #idea #project
 /// ```
@@ -254,6 +256,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 };
                 log::trace!("Found concept: {concept}");
                 current_concept = Some(concept);
+                
             }
             Message::Match(message) => {
                 if message.path().is_none() {
@@ -294,15 +297,19 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                     synonym.split(',').map(|s| s.trim().to_string()).collect();
 
                 let concept = match current_concept {
-                    Some(ref concept) => concept,
+                    Some(ref concept) => {
+                        let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+                        thesaurus.insert(concept.value.clone(), nterm);
+                        concept
+                    },
                     None => {
                         println!("Error: No concept found. Skipping");
                         continue;
                     }
                 };
                 for synonym in synonyms {
-                    let nterm = NormalizedTerm::new(concept.id, synonym.into());
-                    thesaurus.insert(concept.value.clone(), nterm);
+                    let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+                    thesaurus.insert(synonym.into(), nterm);
                 }
             }
             _ => {}

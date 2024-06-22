@@ -45,7 +45,7 @@ impl AsRef<[u8]> for NormalizedTermValue {
 
 // FIXME: this can be greatly improved, ID only shall be unique per KG
 use std::sync::atomic::{AtomicU64, Ordering};
-static INT_SEQ: AtomicU64 = AtomicU64::new(0);
+static INT_SEQ: AtomicU64 = AtomicU64::new(1);
 fn get_int_id() -> u64 {
     INT_SEQ.fetch_add(1, Ordering::SeqCst)
 }
@@ -434,7 +434,7 @@ pub enum RelevanceFunction {
     /// This is based on filtered result outputs according to the ranking of the
     /// knowledge graph. The node, which is most connected will produce the
     /// highest ranking
-    #[serde(rename = "teraphim-graph")]
+    #[serde(rename = "terraphim-graph")]
     TerraphimGraph,
     /// Scorer for ranking search results based on the title of a document
     #[serde(rename = "title-scorer")]
