@@ -1,3 +1,4 @@
+use std::default;
 use std::fmt::{self, Display, Formatter};
 use std::ops::{Add, AddAssign, Deref, DerefMut};
 
@@ -9,13 +10,17 @@ use std::iter::IntoIterator;
 /// The value of a normalized term
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
     pub fn new(term: String) -> Self {
         let value = term.trim().to_lowercase();
         Self(value)
+    }
+    // convert to &str 
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -30,6 +35,8 @@ impl From<&str> for NormalizedTermValue {
         Self::new(term.to_string())
     }
 }
+
+
 
 impl Display for NormalizedTermValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -419,7 +426,7 @@ impl IndexedDocument {
 /// It contains the search term, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SearchQuery {
-    pub search_term: String,
+    pub search_term: NormalizedTermValue,
     pub skip: Option<usize>,
     pub limit: Option<usize>,
     pub role: Option<String>,

@@ -9,7 +9,7 @@ mod tests {
         ServiceType,
     };
     use terraphim_middleware::search_haystacks;
-    use terraphim_types::SearchQuery;
+    use terraphim_types::{NormalizedTermValue, SearchQuery};
     use terraphim_types::{IndexedDocument, KnowledgeGraphInputType, RelevanceFunction};
 
     use terraphim_middleware::Result;
@@ -60,7 +60,7 @@ mod tests {
 
         let role_name = "System Operator".to_string();
         let search_query = SearchQuery {
-            search_term: "life cycle framework".to_string(),
+            search_term: NormalizedTermValue::new("life cycle framework".to_string()),
             role: Some(role_name.clone()),
             skip: Some(0),
             limit: Some(10),

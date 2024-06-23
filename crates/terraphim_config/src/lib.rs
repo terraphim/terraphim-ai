@@ -370,7 +370,7 @@ impl ConfigState {
         };
         let documents = role
             .query_graph(
-                &search_query.search_term,
+                search_query.search_term.as_str(),
                 search_query.skip,
                 search_query.limit,
             )

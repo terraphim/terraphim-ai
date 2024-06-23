@@ -24,7 +24,7 @@ pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> V
     let mut scorer = Scorer::new();
 
     // Create a new query
-    let query = Query::new(&search_query.search_term).similarity(Similarity::Levenshtein);
+    let query = Query::new(&search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
 
     // Score the documents
     let mut results = scorer.score(&query, documents).unwrap();
@@ -92,12 +92,20 @@ impl Scorer {
         for document in documents {
             results.push(Scored::new(document));
         }
+        log::debug!("Similarity {:?}", query.similarity);
+        log::debug!("Query {:?}", query);
         results.rescore(|document| self.similarity(query, &document.title));
+        log::debug!("results after rescoring: {:#?}", results);
         Ok(results)
     }
 
     fn similarity(&self, query: &Query, name: &str) -> f64 {
-        query.similarity.similarity(&query.name, name)
+        log::debug!("Similarity {:?}", query.similarity);
+        log::debug!("Query {:?}", query);
+        log::debug!("Name {:?}", name);
+        let result = query.similarity.similarity(&query.name, name);
+        log::debug!("Similarity calculation {:?}", result);
+        result
     }
 }
 

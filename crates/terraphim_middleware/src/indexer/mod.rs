@@ -43,7 +43,7 @@ pub async fn search_haystacks(
 ) -> Result<Index> {
     let config = config_state.config.lock().await.clone();
     let search_query_role = search_query.role.unwrap_or(config.default_role);
-    let needle = &search_query.search_term;
+    let needle = search_query.search_term.as_str();
 
     let ripgrep = RipgrepIndexer::default();
     let mut full_index = Index::new();
