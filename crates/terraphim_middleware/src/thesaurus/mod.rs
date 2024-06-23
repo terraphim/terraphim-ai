@@ -158,7 +158,7 @@ impl Default for LogseqService {
     fn default() -> Self {
         Self {
             command: "rg".to_string(),
-            default_args: ["--json", "--trim", "--ignore-case"]
+            default_args: ["--json", "--trim", "--ignore-case","-tmarkdown"]
                 .into_iter()
                 .map(String::from)
                 .collect(),
