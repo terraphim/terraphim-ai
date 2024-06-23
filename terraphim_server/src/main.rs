@@ -82,6 +82,7 @@ async fn run_server() -> Result<()> {
         AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
             .unwrap();
     println!("{automata_remote}");
+    // FIXME: check if there is an existing config saved via persistable before creating a new one
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
         .add_role(
