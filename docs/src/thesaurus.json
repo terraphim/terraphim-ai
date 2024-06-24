@@ -2,12 +2,28 @@
   "name": "Terraphim Engineer",
   "data": {
     "service": {
-      "id": 23,
-      "nterm": "middleware"
+      "id": 34,
+      "nterm": "service"
+    },
+    "agent": {
+      "id": 33,
+      "nterm": "haystack"
+    },
+    "middleware": {
+      "id": 34,
+      "nterm": "service"
+    },
+    "datasource": {
+      "id": 33,
+      "nterm": "haystack"
+    },
+    "provider": {
+      "id": 34,
+      "nterm": "service"
     },
     "haystack": {
-      "id": 22,
-      "nterm": "agent"
+      "id": 33,
+      "nterm": "haystack"
     }
   }
 }
