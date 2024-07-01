@@ -5311,6 +5311,7 @@ dependencies = [
 name = "terraphim_service"
 version = "0.1.0"
 dependencies = [
+ "cached",
  "fnv",
  "log",
  "opendal",

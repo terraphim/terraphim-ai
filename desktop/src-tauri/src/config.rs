@@ -16,8 +16,6 @@ const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
 
 /// Load the default config
 ///
-// TODO: Replace this with a file-based config loader based on `twelf` in the
-// future
 pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
     let automata_path = AutomataPath::from_local("data/term_to_id.json");
 
@@ -69,7 +67,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_path.clone()),
+                    automata_path: Some(AutomataPath::from_local(docs_path.join("Terraphim Engineer_thesaurus.json".to_string()))),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: docs_path.join("kg"),

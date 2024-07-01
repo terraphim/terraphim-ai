@@ -10,14 +10,14 @@
   let error: string | null = null;
 
   // Reactively handle search input
-  $: {
-    if ($input.trim()) {
-      handleSearchInputEvent();
-    } else {
-      results = [];
-      error = null;
-    }
-  }
+  // $: {
+  //   if ($input.trim()) {
+  //     handleSearchInputEvent();
+  //   } else {
+  //     results = [];
+  //     error = null;
+  //   }
+  // }
   
 
   async function handleSearchInputEvent() {
@@ -35,6 +35,8 @@
         });
         if (response.status === "success") {
           results = response.results;
+          console.log("Response results");
+          console.log(results);
         } else {
           error = `Search failed: ${response.status}`;
           console.error("Search failed:", response);
@@ -83,6 +85,9 @@
     icon="search"
     expanded
     autofocus
+    on:click={handleSearchInputEvent}
+    on:submit={handleSearchInputEvent}
+    on:keyup={e => e.key === 'Enter' && handleSearchInputEvent()}
   />
 </Field>
 </form>

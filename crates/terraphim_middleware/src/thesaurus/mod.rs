@@ -46,12 +46,12 @@ use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
 
 pub async fn build_thesaurus_from_haystack(
-    config_state: ConfigState,
+    config_state: &mut ConfigState,
     search_query: &SearchQuery,
 ) -> Result<()> {
     // build thesaurus from haystack or load from remote
     // FIXME: introduce LRU cache for locally build thesaurus via persistance crate
-    let config = config_state.config.lock().await;
+    let config = config_state.config.lock().await.clone();
     let roles = config.roles.clone();
     let default_role = config.default_role.clone();
     let role_name = search_query.role.clone().unwrap_or_default();
@@ -70,25 +70,36 @@ pub async fn build_thesaurus_from_haystack(
             Ok(_) => log::debug!("Thesaurus saved"),
             Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
         }
-
-        let thesaurus_path = haystack.path.join("thesaurus.json");
+        let mut haystack_path = haystack.path.clone();
+        haystack_path.pop();
+        let thesaurus_path = haystack.path.join(format!("{}_thesaurus.json",role_name.clone()));
 
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
         role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
         log::info!("Make sure thesaurus updated in a role {}", role_name);
+        println!("Make sure thesaurus updated in a role {}", role_name);
         // TODO: may be re-building all thesaurus on change using inotify is easier
-        let mut rolegraphs = config_state.roles.clone();
 
-        if let Some(rolegraph_value) = rolegraphs.get_mut(&role_name) {
-            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
-            match rolegraph {
-                Ok(rolegraph) => {
-                    *rolegraph_value = RoleGraphSync::from(rolegraph);
-                }
-                Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+        update_thesaurus(config_state, &role_name, thesaurus).await?;
+    }
+    Ok(())
+}
+
+async fn update_thesaurus(
+    config_state: &mut ConfigState,
+    role_name: &str,
+    thesaurus: Thesaurus,
+) -> Result<()> {
+    let mut rolegraphs = config_state.roles.clone();
+    if let Some(rolegraph_value) = rolegraphs.get_mut(role_name) {
+        let rolegraph = RoleGraph::new(role_name.to_string(), thesaurus).await;
+        match rolegraph {
+            Ok(rolegraph) => {
+                *rolegraph_value = RoleGraphSync::from(rolegraph);
             }
+            Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
         }
     }
     Ok(())
@@ -158,7 +169,7 @@ impl Default for LogseqService {
     fn default() -> Self {
         Self {
             command: "rg".to_string(),
-            default_args: ["--json", "--trim", "--ignore-case","-tmarkdown"]
+            default_args: ["--json", "--trim", "--ignore-case", "-tmarkdown"]
                 .into_iter()
                 .map(String::from)
                 .collect(),
@@ -258,7 +269,6 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 };
                 log::trace!("Found concept: {concept}");
                 current_concept = Some(concept);
-                
             }
             Message::Match(message) => {
                 if message.path().is_none() {
@@ -303,7 +313,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                         let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
                         thesaurus.insert(concept.value.clone(), nterm);
                         concept
-                    },
+                    }
                     None => {
                         println!("Error: No concept found. Skipping");
                         continue;

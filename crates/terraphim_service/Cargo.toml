@@ -25,3 +25,4 @@ serde = { version = "1.0.198", features = ["serde_derive"] }
 fnv = "1.0.7"
 log = "0.4.21"
 strsim = "0.11.1"
+cached = "0.47.0"

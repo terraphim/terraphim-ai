@@ -321,7 +321,8 @@ impl ConfigState {
             roles,
         })
     }
-
+    /// update thesaurus for the role in a config 
+    //FIXME:
     /// Get the default role from the config
     pub async fn get_default_role(&self) -> String {
         let config = self.config.lock().await;
@@ -364,9 +365,12 @@ impl ConfigState {
             Some(role) => role.lock().await,
             None => {
                 // Handle the None case, e.g., return an empty vector since the function expects Vec<IndexedDocument>
-                log::error!("Role `{}` does not exist or RoleGraph isn't populated", role_name);
+                log::error!(
+                    "Role `{}` does not exist or RoleGraph isn't populated",
+                    role_name
+                );
                 return Vec::new();
-            },
+            }
         };
         let documents = role
             .query_graph(

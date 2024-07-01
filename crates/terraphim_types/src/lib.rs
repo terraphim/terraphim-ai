@@ -1,7 +1,7 @@
 use std::default;
 use std::fmt::{self, Display, Formatter};
-use std::ops::{Add, AddAssign, Deref, DerefMut};
-
+use std::ops::{Deref, DerefMut};
+use std::collections::HashSet;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Iter;
@@ -18,7 +18,7 @@ impl NormalizedTermValue {
         let value = term.trim().to_lowercase();
         Self(value)
     }
-    // convert to &str 
+    // convert to &str
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -35,8 +35,6 @@ impl From<&str> for NormalizedTermValue {
         Self::new(term.to_string())
     }
 }
-
-
 
 impl Display for NormalizedTermValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -112,46 +110,8 @@ impl Display for Concept {
     }
 }
 
-/// Rank of an document in the search results
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Rank(u64);
 
-impl Rank {
-    /// Create a new rank with a given value
-    pub fn new(rank: u64) -> Self {
-        Self(rank)
-    }
-}
 
-impl Add for Rank {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
-
-// Implement +=
-impl Add for &mut Rank {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        self.0 += other.0;
-        self
-    }
-}
-
-impl AddAssign for Rank {
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
-
-impl Display for Rank {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 /// A document is the central a piece of content that gets indexed and searched.
 ///
@@ -175,7 +135,7 @@ pub struct Document {
     /// Tags for the document
     pub tags: Option<Vec<String>>,
     /// Rank of the document in the search results
-    pub rank: Option<Rank>,
+    pub rank: Option<u64>,
 }
 
 impl fmt::Display for Document {
@@ -223,17 +183,19 @@ pub struct Node {
     pub id: u64,
     /// Number of co-occurrences
     pub rank: u64,
-    /// List of connected nodes
-    pub connected_with: Vec<u64>,
+    /// List of connected edges
+    pub connected_with: HashSet<u64>,
 }
 
 impl Node {
     /// Create a new node with a given id and edge
     pub fn new(id: u64, edge: Edge) -> Self {
+        let mut connected_with = HashSet::new();
+        connected_with.insert(edge.id);
         Self {
             id,
             rank: 1,
-            connected_with: vec![edge.id],
+            connected_with,
         }
     }
 
@@ -409,7 +371,7 @@ pub struct IndexedDocument {
     pub matched_edges: Vec<Edge>,
     /// Graph rank (the sum of node rank, edge rank)
     /// Number of nodes and edges connected to the document
-    pub rank: Rank,
+    pub rank: u64,
     /// Tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
     /// List of node IDs for validation of matching

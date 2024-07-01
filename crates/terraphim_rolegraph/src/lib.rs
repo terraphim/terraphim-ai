@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use terraphim_types::{
-    Document, Edge, IndexedDocument, Node, NormalizedTermValue, Rank, Thesaurus,
+    Document, Edge, IndexedDocument, Node, NormalizedTermValue, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
@@ -170,7 +170,7 @@ impl RoleGraph {
 
                 for (document_id, document_rank) in &edge.doc_hash {
                     // For now, this sums up over nodes and edges
-                    let total_rank = Rank::new(node.rank + edge.rank + document_rank);
+                    let total_rank = node.rank + edge.rank + document_rank;
                     match results.entry(document_id.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(IndexedDocument {
@@ -217,7 +217,6 @@ impl RoleGraph {
 
     /// Inserts an document into the rolegraph
     pub fn insert_document(&mut self, document_id: &str, document: Document) {
-        // FIXME: to_string have a performance penalty compared to &str above
         let matches = self.find_matching_node_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id, a, b);
@@ -240,7 +239,7 @@ impl RoleGraph {
             Entry::Occupied(entry) => {
                 let node = entry.into_mut();
                 node.rank += 1;
-                node.connected_with.push(edge.id);
+                node.connected_with.insert(edge.id);
             }
         };
     }
@@ -385,6 +384,7 @@ mod tests {
         let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
             .await
             .unwrap();
+        println!("rolegraph: {:?}", rolegraph);
         let matches = rolegraph.find_matching_node_ids(query);
         println!("matches: {:?}", matches);
         for each_match in matches.iter() {
@@ -395,6 +395,101 @@ mod tests {
             rolegraph.ac_reverse_nterm.get(&matches[0]).unwrap(),
             &NormalizedTermValue::new("life cycle models".to_string())
         );
+    }
+    
+    #[test]
+    async fn test_terraphim_engineer(){
+        let role_name = "Terraphim Engineer".to_string();
+        const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+        let mut docs_path = std::env::current_dir().unwrap();
+        docs_path.pop();
+        docs_path.pop();
+        docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
+        println!("Docs path: {:?}", docs_path);
+        let automata_path = AutomataPath::from_local(docs_path.join("Terraphim Engineer_thesaurus.json".to_string()));
+        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
+        let mut rolegraph = RoleGraph::new(role_name, thesaurus.clone())
+        .await
+        .unwrap();
+        let document_id = Ulid::new().to_string();
+        let test_document = r#"
+        This folder is an example of personal knowledge graph used for testing and fixtures 
+        terraphim-graph
+        "#;
+        println!("thesaurus: {:?}", thesaurus);
+        assert_eq!(thesaurus.len(), 10);
+        let matches = rolegraph.find_matching_node_ids(&test_document);
+        println!("Matches {:?}",matches);
+        for (a, b) in matches.into_iter().tuple_windows() {
+            rolegraph.add_or_update_document(&document_id, a, b);
+        }
+        let document = Document {
+            stub: None,
+            url: "/path/to/document".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id.clone(),
+            title: "README".to_string(),
+            body: test_document.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id, document);
+        println!("query with {}","terraphim-graph and service".to_string());
+        let results: Vec<(String, IndexedDocument)> = match rolegraph
+            .query_graph(
+                "terraphim-graph and service",
+                Some(0),
+                Some(10)
+            ){
+                Ok(results) => results,
+                Err(Error::NodeIdNotFound) => {
+                    println!("NodeIdNotFound");
+                    Vec::new()
+                }
+                Err(e) => {
+                    println!("Error: {:?}", e);
+                    Vec::new()
+                }
+            };
+        println!("results shall be zero: {:#?}", results);
+
+        let document_id2= "document2".to_string();
+        let test_document2 = r#"
+        # Terraphim-Graph scorer
+        Terraphim-Graph (scorer) is using unique graph embeddings, where the rank of the term is defined by number of synonyms connected to the concept.
+        
+        synonyms:: graph embeddings, graph, knowledge graph based embeddings 
+        
+        Now we will have a concept "Terrpahim Graph Scorer" with synonyms "graph embeddings" and "terraphim-graph". This provides service
+        "#;
+        let document2 = Document {
+            stub: None,
+            url: "/path/to/document2".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id2.clone(),
+            title: "terraphim-graph".to_string(),
+            body: test_document2.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id2, document2);
+        log::debug!("Query graph");
+        let results: Vec<(String, IndexedDocument)> = rolegraph
+            .query_graph(
+                "terraphim-graph and service",
+                Some(0),
+                Some(10),
+            )
+            .unwrap();
+        println!("results: {:#?}", results);
+        let top_result = results.get(0).unwrap();
+        println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
+        println!("Top result {:#?}", top_result.1);
+        println!("Nodes {:#?}   ", rolegraph.nodes);
+        println!("Nodes count {:?}", rolegraph.nodes.len());
+        println!("Edges count {:?}", rolegraph.edges.len());
+
+
     }
 
     #[test]
@@ -442,6 +537,10 @@ mod tests {
                 Some(10),
             )
             .unwrap();
+        println!("results: {:#?}", results);
+        let top_result = results.get(0).unwrap();
+        println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
+        println!("Top result {:#?}", top_result.1);
         assert_eq!(results.len(), 4);
     }
 }

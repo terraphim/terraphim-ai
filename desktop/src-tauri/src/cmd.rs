@@ -82,7 +82,7 @@ pub async fn search(
     search_query: SearchQuery,
 ) -> Result<SearchResponse> {
     log::info!("Search called with {:?}", search_query);
-    let terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
     let results = terraphim_service.search(&search_query).await?;
     Ok(SearchResponse {
         status: Status::Success,

@@ -2,7 +2,6 @@ use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::error;
 use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};
-
 mod score;
 
 #[derive(thiserror::Error, Debug)]
@@ -33,8 +32,8 @@ impl<'a> TerraphimService {
     }
 
     /// Build a thesaurus from the haystack and update the knowledge graph automata URL
-    async fn build_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
-        Ok(build_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
+    async fn build_thesaurus(&mut self, search_query: &SearchQuery) -> Result<()> {
+        Ok(build_thesaurus_from_haystack(&mut self.config_state, search_query).await?)
     }
 
     /// Create document
@@ -61,7 +60,7 @@ impl<'a> TerraphimService {
     }
 
     /// Search for documents in the haystacks
-    pub async fn search(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
+    pub async fn search(&mut self, search_query: &SearchQuery) -> Result<Vec<Document>> {
         // Get the role from the config
         log::debug!("Role for searching: {:?}", search_query.role);
         let role = self.get_search_role(search_query).await?;
@@ -84,7 +83,7 @@ impl<'a> TerraphimService {
                 let mut docs_ranked = Vec::new();
                 for (idx, doc) in documents.iter().enumerate() {
                     let document: &mut terraphim_types::Document = &mut doc.clone();
-                    let rank = terraphim_types::Rank::new((total_length - idx).try_into().unwrap());
+                    let rank = (total_length - idx).try_into().unwrap();
                     document.rank = Some(rank);
                     docs_ranked.push(document.clone());
                 }
