@@ -26,19 +26,20 @@ mod tests {
         println!("Docs path: {:?}", docs_path);
         let role_name = "Terraphim Engineer".to_string();
         let role = Role {
-            shortname: Some("tfengineer".to_string()),
-            name: role_name.clone(),
+            shortname: Some("tfengineer".into()),
+            name: role_name.clone().into(),
             relevance_function: RelevanceFunction::TerraphimGraph,
             theme: "lumen".to_string(),
             kg: Some(KnowledgeGraph {
                 automata_path: Some(AutomataPath::from_local(
                     docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
                 )),
+                public: true,
+                publish: true,
                 knowledge_graph_local: Some(KnowledgeGraphLocal {
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: docs_path.join("kg"),
-                    public: true,
-                    publish: true,
+
                 }),
             }),
             haystacks: vec![Haystack {
@@ -57,7 +58,7 @@ mod tests {
         let role_name = "Terraphim Engineer".to_string();
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::new("terraphim-graph".to_string()),
-            role: Some(role_name.clone()),
+            role: Some(role_name.clone().into()),
             skip: Some(0),
             limit: Some(10),
         };
@@ -79,17 +80,17 @@ mod tests {
     async fn test_roundtrip() -> Result<()> {
         let role = Role {
             shortname: Some("operator".to_string()),
-            name: "System Operator".to_string(),
+            name: "System Operator".into(),
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "superhero".to_string(),
             kg: Some(KnowledgeGraph {
                 automata_path: Some(AutomataPath::local_example()),
                 knowledge_graph_local: Some(KnowledgeGraphLocal {
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("/tmp/system_operator/pages/"),
-                    public: true,
-                    publish: true,
+                    path: PathBuf::from("/tmp/system_operator/pages/"), 
                 }),
+                public: true,
+                publish: true,
             }),
             haystacks: vec![Haystack {
                 path: PathBuf::from("/tmp/system_operator/pages/"),
@@ -102,8 +103,8 @@ mod tests {
             .add_role(
                 "Default",
                 Role {
-                    shortname: Some("Default".to_string()),
-                    name: "Default".to_string(),
+                    shortname: Some("Default".into()),
+                    name: "Default".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
                     kg: None,
@@ -122,7 +123,7 @@ mod tests {
         let role_name = "System Operator".to_string();
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::new("life cycle framework".to_string()),
-            role: Some(role_name.clone()),
+            role: Some(role_name.clone().into()),
             skip: Some(0),
             limit: Some(10),
         };

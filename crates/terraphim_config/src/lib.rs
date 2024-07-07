@@ -454,7 +454,7 @@ mod tests {
                 "Default",
                 Role {
                     shortname: Some("Default".to_string()),
-                    name: "Default".to_string(),
+                    name: "Default".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
                     kg: None,
@@ -469,7 +469,7 @@ mod tests {
                 "Engineer",
                 Role {
                     shortname: Some("Engineer".to_string()),
-                    name: "Engineer".to_string(),
+                    name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
                     kg: None,
@@ -484,7 +484,7 @@ mod tests {
                 "System Operator",
                 Role {
                     shortname: Some("operator".to_string()),
-                    name: "System Operator".to_string(),
+                    name: "System Operator".into(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
@@ -492,9 +492,10 @@ mod tests {
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
                             path: PathBuf::from("~/pkm"),
-                            public: true,
-                            publish: true,
+
                         }),
+                        public: true,
+                        publish: true,
                     }),
                     haystacks: vec![Haystack {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
@@ -531,12 +532,14 @@ mod tests {
     fn dummy_role() -> Role {
         Role {
             shortname: Some("father".to_string()),
-            name: "Father".to_string(),
+            name: "Father".into(),
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),
             kg: Some(KnowledgeGraph {
                 automata_path: Some(AutomataPath::local_example()),
                 knowledge_graph_local: None,
+                public: true,
+                publish: true,
             }),
             haystacks: vec![Haystack {
                 path: PathBuf::from("localsearch"),

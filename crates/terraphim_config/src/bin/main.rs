@@ -21,12 +21,14 @@ async fn main() -> Result<()> {
             "Engineer",
             Role {
                 shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string(),
+                name: "Engineer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::local_example()),
                     knowledge_graph_local: None,
+                    public: false,
+                    publish: false,
                 }),
                 haystacks: vec![Haystack {
                     path: PathBuf::from("localsearch"),

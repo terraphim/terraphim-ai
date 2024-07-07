@@ -89,7 +89,7 @@ async fn run_server() -> Result<()> {
             "Default",
             Role {
                 shortname: Some("Default".to_string()),
-                name: "Default".to_string(),
+                name: "Default".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
@@ -103,8 +103,8 @@ async fn run_server() -> Result<()> {
         .add_role(
             "Engineer",
             Role {
-                shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string(),
+                shortname: Some("Engineer".into()),
+                name: "Engineer".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -112,9 +112,9 @@ async fn run_server() -> Result<()> {
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: system_operator_haystack.clone(),
-                        public: true,
-                        publish: true,
                     }),
+                    public: true,
+                    publish: true,
                 }),
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),
@@ -127,7 +127,7 @@ async fn run_server() -> Result<()> {
             "System Operator",
             Role {
                 shortname: Some("operator".to_string()),
-                name: "System Operator".to_string(),
+                name: "System Operator".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -135,9 +135,9 @@ async fn run_server() -> Result<()> {
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: system_operator_haystack.clone(),
-                        public: true,
-                        publish: true,
                     }),
+                    public: true,
+                    publish: true,
                 }),
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),

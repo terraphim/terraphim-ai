@@ -15,7 +15,7 @@ mod tests {
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
         ServiceType,
     };
-    use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
+    use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction, RoleName};
 
     use terraphim_server::ConfigResponse;
 
@@ -29,10 +29,10 @@ mod tests {
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
             .add_role(
-                "Default",
+                "Default".into(),
                 Role {
                     shortname: Some("Default".to_string()),
-                    name: "Default".to_string(),
+                    name: "Default".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
                     kg: None,
@@ -46,8 +46,8 @@ mod tests {
             .add_role(
                 "Engineer",
                 Role {
-                    shortname: Some("Engineer".to_string()),
-                    name: "Engineer".to_string(),
+                    shortname: Some("Engineer".into()),
+                    name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
                     kg: Some(KnowledgeGraph {
@@ -55,9 +55,9 @@ mod tests {
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
                             path: PathBuf::from("/tmp/system_operator/pages/"),
-                            public: true,
-                            publish: true,
                         }),
+                        public: true,
+                        publish: true,
                     }),
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
@@ -70,7 +70,7 @@ mod tests {
                 "System Operator",
                 Role {
                     shortname: Some("operator".to_string()),
-                    name: "System Operator".to_string(),
+                    name: "System Operator".into(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
@@ -78,9 +78,9 @@ mod tests {
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
                             path: PathBuf::from("/tmp/system_operator/pages/"),
-                            public: true,
-                            publish: true,
                         }),
+                        public: true,
+                        publish: true,
                     }),
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
@@ -268,8 +268,8 @@ mod tests {
         // Check that the config is valid JSON and contains the expected roles
         let response: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(response.status, Status::Success));
-        assert!(response.config.roles.contains_key("System Operator"));
-        assert!(response.config.roles.contains_key("Engineer"));
+        assert!(response.config.roles.contains_key(&RoleName::new("System Operator")));
+        assert!(response.config.roles.contains_key(&RoleName::new("Engineer")));
     }
 
     /// test update config
@@ -282,11 +282,11 @@ mod tests {
         let response = reqwest::get(&config_url).await.unwrap();
         let orig_config: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(orig_config.status, Status::Success));
-        assert_eq!(orig_config.config.default_role, "Default");
+        assert_eq!(orig_config.config.default_role, "Default".into());
         assert_eq!(orig_config.config.global_shortcut, "Ctrl+X");
 
         let mut new_config = orig_config.config.clone();
-        new_config.default_role = "Engineer".to_string();
+        new_config.default_role = "Engineer".to_string().into();
         new_config.global_shortcut = "Ctrl+P".to_string();
         let client = Client::new();
         let response = client
@@ -301,7 +301,7 @@ mod tests {
 
         let new_config: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(orig_config.status, Status::Success));
-        assert_eq!(new_config.config.default_role, "Engineer");
+        assert_eq!(new_config.config.default_role, "Engineer".into());
         assert_eq!(new_config.config.global_shortcut, "Ctrl+P");
     }
 
