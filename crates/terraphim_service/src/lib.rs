@@ -1,11 +1,13 @@
+use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
 use terraphim_persistence::error;
-use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 
-use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus};
+use terraphim_types::{
+    Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus,
+};
 mod score;
 
 #[derive(thiserror::Error, Debug)]
@@ -41,17 +43,16 @@ impl<'a> TerraphimService {
     }
     /// load thesaurus from config object and if absent make sure it's loaded from automata_url
     pub async fn ensure_thesaurus_loaded(&mut self, role_name: &RoleName) -> Result<Thesaurus> {
-
         println!("Loading thesaurus for role: {}", role_name);
         println!("Role keys {:?}", self.config_state.roles.keys());
         let mut rolegraphs = self.config_state.roles.clone();
         if let Some(rolegraph_value) = rolegraphs.get(role_name) {
             let mut thesaurus = rolegraph_value.lock().await.thesaurus.clone();
-            thesaurus=thesaurus.load().await.unwrap();
+            thesaurus = thesaurus.load().await.unwrap();
             println!("Thesaurus loaded: {:#?}", thesaurus);
             log::info!("Rolegraph loaded: for role name {:?}", role_name);
-            return Ok(thesaurus)
-        }else{
+            return Ok(thesaurus);
+        } else {
             let role = self.config_state.get_role(role_name).await.unwrap();
             if let Some(automata_path) = role.kg.unwrap().automata_path {
                 let thesaurus = load_thesaurus(&automata_path).await.unwrap();
@@ -63,7 +64,7 @@ impl<'a> TerraphimService {
                     }
                     Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
                 }
-                return Ok(thesaurus)
+                return Ok(thesaurus);
             } else {
                 return Err(ServiceError::Config("Automata path not found".into()));
             }

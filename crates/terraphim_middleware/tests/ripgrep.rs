@@ -16,50 +16,49 @@ mod tests {
 
     #[tokio::test]
     async fn test_terraphim_engineer_roundtrip() -> Result<()> {
-    // Create the path to the default haystack directory
-    // by concating the current directory with the default haystack path
-    const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
-    let mut docs_path = std::env::current_dir().unwrap();
-    docs_path.pop();
-    docs_path.pop();
-    docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
-    println!("Docs path: {:?}", docs_path);
-    let role_name = "Terraphim Engineer".to_string();
-    let role = Role {
-        shortname: Some("tfengineer".to_string()),
-        name: role_name.clone(),
-        relevance_function: RelevanceFunction::TerraphimGraph,
-        theme: "lumen".to_string(),
-        kg: Some(KnowledgeGraph {
-            automata_path: Some(AutomataPath::from_local(docs_path.join("Terraphim Engineer_thesaurus.json".to_string()))),
-            knowledge_graph_local: Some(KnowledgeGraphLocal {
-                input_type: KnowledgeGraphInputType::Markdown,
-                path: docs_path.join("kg"),
-                public: true,
-                publish: true,
+        // Create the path to the default haystack directory
+        // by concating the current directory with the default haystack path
+        const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+        let mut docs_path = std::env::current_dir().unwrap();
+        docs_path.pop();
+        docs_path.pop();
+        docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
+        println!("Docs path: {:?}", docs_path);
+        let role_name = "Terraphim Engineer".to_string();
+        let role = Role {
+            shortname: Some("tfengineer".to_string()),
+            name: role_name.clone(),
+            relevance_function: RelevanceFunction::TerraphimGraph,
+            theme: "lumen".to_string(),
+            kg: Some(KnowledgeGraph {
+                automata_path: Some(AutomataPath::from_local(
+                    docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                )),
+                knowledge_graph_local: Some(KnowledgeGraphLocal {
+                    input_type: KnowledgeGraphInputType::Markdown,
+                    path: docs_path.join("kg"),
+                    public: true,
+                    publish: true,
+                }),
             }),
-        }),
-        haystacks: vec![Haystack {
-            path: docs_path.clone(),
-            service: ServiceType::Ripgrep,
-        }],
-        extra: AHashMap::new(),
-    };
-    let mut config = ConfigBuilder::new()
-    .add_role(
-        &role_name,
-        role.clone(),
-    )
-    .default_role(&role_name)?
-    .build()?;
+            haystacks: vec![Haystack {
+                path: docs_path.clone(),
+                service: ServiceType::Ripgrep,
+            }],
+            extra: AHashMap::new(),
+        };
+        let mut config = ConfigBuilder::new()
+            .add_role(&role_name, role.clone())
+            .default_role(&role_name)?
+            .build()?;
 
-    let config_state = ConfigState::new(&mut config).await?;
+        let config_state = ConfigState::new(&mut config).await?;
 
-    let role_name = "Terraphim Engineer".to_string();
-    let search_query = SearchQuery {
-        search_term: NormalizedTermValue::new("terraphim-graph".to_string()),
-        role: Some(role_name.clone()),
-        skip: Some(0),
+        let role_name = "Terraphim Engineer".to_string();
+        let search_query = SearchQuery {
+            search_term: NormalizedTermValue::new("terraphim-graph".to_string()),
+            role: Some(role_name.clone()),
+            skip: Some(0),
             limit: Some(10),
         };
         println!("Searching documents with query: {search_query:?} {role_name}");

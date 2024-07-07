@@ -4,7 +4,7 @@ use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery, RoleName
+    Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, RoleName, SearchQuery,
 };
 
 use ahash::AHashMap;
@@ -327,7 +327,7 @@ impl ConfigState {
         })
     }
     /// update thesaurus for the role in a config
-     
+
     //FIXME:
     /// Get the default role from the config
     pub async fn get_default_role(&self) -> RoleName {

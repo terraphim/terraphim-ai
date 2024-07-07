@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use terraphim_types::{
-    Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus
+    Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
@@ -396,9 +396,9 @@ mod tests {
             &NormalizedTermValue::new("life cycle models".to_string())
         );
     }
-    
+
     #[test]
-    async fn test_terraphim_engineer(){
+    async fn test_terraphim_engineer() {
         let role_name = "Terraphim Engineer".to_string();
         const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
         let mut docs_path = std::env::current_dir().unwrap();
@@ -406,11 +406,11 @@ mod tests {
         docs_path.pop();
         docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
         println!("Docs path: {:?}", docs_path);
-        let automata_path = AutomataPath::from_local(docs_path.join("Terraphim Engineer_thesaurus.json".to_string()));
+        let automata_path = AutomataPath::from_local(
+            docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+        );
         let thesaurus = load_thesaurus(&automata_path).await.unwrap();
-        let mut rolegraph = RoleGraph::new(role_name, thesaurus.clone())
-        .await
-        .unwrap();
+        let mut rolegraph = RoleGraph::new(role_name, thesaurus.clone()).await.unwrap();
         let document_id = Ulid::new().to_string();
         let test_document = r#"
         This folder is an example of personal knowledge graph used for testing and fixtures 
@@ -419,7 +419,7 @@ mod tests {
         println!("thesaurus: {:?}", thesaurus);
         assert_eq!(thesaurus.len(), 10);
         let matches = rolegraph.find_matching_node_ids(&test_document);
-        println!("Matches {:?}",matches);
+        println!("Matches {:?}", matches);
         for (a, b) in matches.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(&document_id, a, b);
         }
@@ -434,13 +434,9 @@ mod tests {
             description: None,
         };
         rolegraph.insert_document(&document_id, document);
-        println!("query with {}","terraphim-graph and service".to_string());
-        let results: Vec<(String, IndexedDocument)> = match rolegraph
-            .query_graph(
-                "terraphim-graph and service",
-                Some(0),
-                Some(10)
-            ){
+        println!("query with {}", "terraphim-graph and service".to_string());
+        let results: Vec<(String, IndexedDocument)> =
+            match rolegraph.query_graph("terraphim-graph and service", Some(0), Some(10)) {
                 Ok(results) => results,
                 Err(Error::NodeIdNotFound) => {
                     println!("NodeIdNotFound");
@@ -453,7 +449,7 @@ mod tests {
             };
         println!("results shall be zero: {:#?}", results);
 
-        let document_id2= "document2".to_string();
+        let document_id2 = "document2".to_string();
         let test_document2 = r#"
         # Terraphim-Graph scorer
         Terraphim-Graph (scorer) is using unique graph embeddings, where the rank of the term is defined by number of synonyms connected to the concept.
@@ -475,11 +471,7 @@ mod tests {
         rolegraph.insert_document(&document_id2, document2);
         log::debug!("Query graph");
         let results: Vec<(String, IndexedDocument)> = rolegraph
-            .query_graph(
-                "terraphim-graph and service",
-                Some(0),
-                Some(10),
-            )
+            .query_graph("terraphim-graph and service", Some(0), Some(10))
             .unwrap();
         println!("results: {:#?}", results);
         let top_result = results.get(0).unwrap();
@@ -488,8 +480,6 @@ mod tests {
         println!("Nodes {:#?}   ", rolegraph.nodes);
         println!("Nodes count {:?}", rolegraph.nodes.len());
         println!("Edges count {:?}", rolegraph.edges.len());
-
-
     }
 
     #[test]

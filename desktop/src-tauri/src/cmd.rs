@@ -5,7 +5,6 @@ use tauri::command;
 use tauri::State;
 
 use serde::{Deserialize, Serialize};
-use serde_json_any_key::*;
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
@@ -126,6 +125,8 @@ pub async fn publish_thesaurus(
     role_name: String,
 ) -> Result<Thesaurus> {
     let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
-    let thesaurus = terraphim_service.ensure_thesaurus_loaded(&role_name.into()).await?;
+    let thesaurus = terraphim_service
+        .ensure_thesaurus_loaded(&role_name.into())
+        .await?;
     Ok(thesaurus)
 }

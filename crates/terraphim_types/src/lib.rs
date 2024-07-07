@@ -1,11 +1,11 @@
-use std::default;
-use std::fmt::{self, Display, Formatter};
-use std::ops::{Deref, DerefMut};
-use std::collections::HashSet;
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::Iter;
+use std::collections::HashSet;
+use std::default;
+use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
+use std::ops::{Deref, DerefMut};
 
 use std::str::FromStr;
 
@@ -174,9 +174,6 @@ impl Display for Concept {
         write!(f, "{}", self.value)
     }
 }
-
-
-
 
 /// A document is the central a piece of content that gets indexed and searched.
 ///

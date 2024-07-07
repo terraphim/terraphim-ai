@@ -31,7 +31,7 @@ use terraphim_config::Role;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{Error as RoleGraphError, RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
-use terraphim_types::{Concept, NormalizedTerm, Thesaurus, RoleName};
+use terraphim_types::{Concept, NormalizedTerm, RoleName, Thesaurus};
 
 use crate::Result;
 use cached::proc_macro::cached;
@@ -66,7 +66,9 @@ pub async fn build_thesaurus_from_haystack(
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
         let logseq = Logseq::default();
-        let thesaurus: Thesaurus = logseq.build(role_name.as_lowercase().to_string(), &haystack.path).await?;
+        let thesaurus: Thesaurus = logseq
+            .build(role_name.as_lowercase().to_string(), &haystack.path)
+            .await?;
         match thesaurus.save().await {
             Ok(_) => {
                 log::debug!("Thesaurus saved");
@@ -77,7 +79,9 @@ pub async fn build_thesaurus_from_haystack(
         let mut haystack_path = haystack.path.clone();
         haystack_path.pop();
         //FIXME: This is for debug only at the momment, to be removed and replaced with load from persistable
-        let thesaurus_path = haystack.path.join(format!("{}_thesaurus.json",role_name.clone()));
+        let thesaurus_path = haystack
+            .path
+            .join(format!("{}_thesaurus.json", role_name.clone()));
 
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;

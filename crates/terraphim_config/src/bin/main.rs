@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
 
     let key = config.get_key();
     // println!("key: {}", key);
-    let loaded_config = config.load(&key).await?;
+    let loaded_config = config.load().await?;
     println!("loaded obj: {:?}", loaded_config);
     assert_eq!(loaded_config.get_key(), config.get_key());
 

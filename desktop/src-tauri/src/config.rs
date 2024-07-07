@@ -67,7 +67,9 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(AutomataPath::from_local(docs_path.join("Terraphim Engineer_thesaurus.json".to_string()))),
+                    automata_path: Some(AutomataPath::from_local(
+                        docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                    )),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: docs_path.join("kg"),
