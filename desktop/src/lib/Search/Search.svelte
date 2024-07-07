@@ -5,10 +5,11 @@
   import ResultItem from "./ResultItem.svelte";
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
-
+  import Typeahead from "svelte-typeahead";
+  import { typeahead, thesaurus } from "../stores";
   let results: Document[] = [];
   let error: string | null = null;
-
+  let data = [];
   // Reactively handle search input
   // $: {
   //   if ($input.trim()) {
@@ -18,7 +19,16 @@
   //     error = null;
   //   }
   // }
-  
+  // Enable this for typeahead component
+  $: {
+  if ($typeahead) {
+      console.log("thesaurus", $thesaurus);
+      for (const [key, value] of Object.entries($thesaurus)) {
+        data.push({ label: key, value: value });
+      }
+      console.log("data", data);
+    }
+  }
 
   async function handleSearchInputEvent() {
     error = null; // Clear previous errors
@@ -75,8 +85,18 @@
       }
     }
   }
+  // const extract = (item) => item.state;
 </script>
 <form on:submit|preventDefault={$input}>
+{#if $typeahead}
+<Field>
+  <Typeahead type="search" icon="search" bind:value={$input} label="Search" placeholder={`Search over Knowledge graph for ${$role}`} {data} extract={(item) => item.label}
+    on:select={handleSearchInputEvent}
+    on:click={handleSearchInputEvent}
+    on:submit={handleSearchInputEvent}
+    on:keyup={e => e.key === 'Enter' && handleSearchInputEvent()}/>
+  </Field>
+{:else}
 <Field>
   <Input
     type="search"
@@ -90,6 +110,7 @@
     on:keyup={e => e.key === 'Enter' && handleSearchInputEvent()}
   />
 </Field>
+{/if}
 </form>
 {#if error}
   <p class="error">{error}</p>
@@ -105,14 +126,15 @@
     </div>
   </section>
 {/if}
-{#if $roles[$role]?.kg?.automata_path}
-          
-{#if $roles[$role]?.kg?.automata_path?.Remote}
-Direct Remote Automata: {$roles[$role]?.kg?.automata_path?.Remote}
-{:else}
-Direct Local Automata: {$roles[$role]?.kg?.automata_path?.Local}
-{/if}
-{/if}
+
+<!-- key value for thesaurus if typeahead is true -->
+<!-- {#if $typeahead}
+  <div>
+    {#each Object.entries($thesaurus) as [key, value]}
+      <div>{key}: {value.id}</div>
+    {/each}
+  </div>
+{/if} -->
 <style>
   img {
     width: 16rem;
@@ -120,4 +142,22 @@ Direct Local Automata: {$roles[$role]?.kg?.automata_path?.Local}
   .error {
     color: red;
   }
+  :global([data-svelte-typeahead]) {
+
+      padding-left: 2.5em;
+
+
+      box-shadow: inset 0 .0625em .125em rgba(10,10,10,.05);
+      width: 100%;
+
+
+      max-width: 100%;
+
+
+      background-color: #fff;
+      border-color: #dbdbdb;
+      border-radius: 4px;
+      color: #363636;
+  }
+
 </style>

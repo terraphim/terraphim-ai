@@ -17,6 +17,8 @@ terraphim_config = { path = "../terraphim_config", version = "0.1.0" }
 terraphim_middleware = { path = "../terraphim_middleware", version = "0.1.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
 terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "0.1.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
 
 thiserror = "1.0.58"
 opendal = { version = "0.44.2" }

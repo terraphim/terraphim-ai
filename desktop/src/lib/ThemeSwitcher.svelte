@@ -1,14 +1,15 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { CONFIG } from "../config";
-  import { configStore, is_tauri, role, roles, theme } from "./stores";
+  import { configStore, is_tauri, role, roles, theme, thesaurus, typeahead } from "./stores";
 
   interface ConfigResponse {
     status: string;
     config: {
       id: string;
       global_shortcut: string;
-      roles: Record<string, { name: string; theme: string ; kg}>;
+      // roles: Record<string, { name: string; theme: string ; kg}>;
+      roles: { [key: string]: { name: string; theme: string; kg?: { publish?: boolean } } };
       default_role: string;
     };
   }
@@ -24,7 +25,7 @@
             console.log("get_config response", res);
             if (res && res.status === "success") {
               configStore.set(res.config);
-              roles.set(res.config.roles);
+              roles.set(Object.values(res.config.roles));
               role.set(res.config.default_role);
               theme.set(
                 res.config.roles[res.config.default_role]?.theme || "default"
@@ -70,9 +71,30 @@
     const target = event.target as HTMLSelectElement;
     console.log("updateRole event received:", event);
     console.log("Setting role to", target.value);
+    var selectedTheme = "default";
     role.set(target.value);
-
-    const selectedTheme = $roles[$role]?.theme || "default";
+    console.log($roles);
+    // FIXME: ugly hack to make roles work with new deserialization out of tauri
+    const roleSettings = $roles.find(r => r.name === target.value);
+    console.log("Role settings ", roleSettings);
+    if (roleSettings) {
+      // if role have kg.publish=true then publish thesaurus
+      if (roleSettings.kg?.publish) {
+      console.log("Publishing thesaurus for role", $role);
+      invoke("publish_thesaurus", { roleName: $role }).then((res) => {
+        console.log("publish_thesaurus response", res);
+        // update thesaurus store
+        thesaurus.set(res.data);
+        typeahead.set(true);
+      });
+      }
+      selectedTheme = roleSettings.theme;
+    }else{
+      console.error(
+        `No role settings found for role: ${$role}. Using default theme.`
+      );
+    }
+    
     if (!selectedTheme) {
       console.error(
         `No theme defined for role: ${$role}. Using default theme.`

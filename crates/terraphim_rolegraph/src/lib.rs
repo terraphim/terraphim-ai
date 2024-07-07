@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use terraphim_types::{
-    Document, Edge, IndexedDocument, Node, NormalizedTermValue, Thesaurus,
+    Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
@@ -36,7 +36,7 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     /// The role of the graph
-    pub role: String,
+    pub role: RoleName,
     /// A mapping from node IDs to nodes
     nodes: AHashMap<u64, Node>,
     /// A mapping from edge IDs to edges
@@ -55,7 +55,7 @@ pub struct RoleGraph {
 
 impl RoleGraph {
     /// Creates a new `RoleGraph` with the given role and thesaurus
-    pub async fn new(role: String, thesaurus: Thesaurus) -> Result<Self> {
+    pub async fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.

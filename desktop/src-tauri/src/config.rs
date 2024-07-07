@@ -33,7 +33,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             "Default",
             Role {
                 shortname: Some("Default".to_string()),
-                name: "Default".to_string(),
+                name: "Default".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
@@ -48,7 +48,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             "Engineer",
             Role {
                 shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string(),
+                name: "Engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
                 kg: None,
@@ -63,7 +63,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             "Terraphim Engineer",
             Role {
                 shortname: Some("Terraphim Engineer".to_string()),
-                name: "Terraphim Engineer".to_string(),
+                name: "Terraphim Engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -71,9 +71,9 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: docs_path.join("kg"),
-                        public: true,
-                        publish: true,
                     }),
+                    public: true,
+                    publish: true,
                 }),
                 haystacks: vec![Haystack {
                     path: docs_path.clone(),
@@ -86,7 +86,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             "System Operator",
             Role {
                 shortname: Some("operator".to_string()),
-                name: "System Operator".to_string(),
+                name: "System Operator".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -94,9 +94,9 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: PathBuf::from("/tmp/system_operator/pages/"),
-                        public: true,
-                        publish: true,
                     }),
+                    public: true,
+                    publish: true,
                 }),
                 haystacks: vec![Haystack {
                     path: docs_path.clone(),

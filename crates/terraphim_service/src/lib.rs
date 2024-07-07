@@ -1,7 +1,11 @@
 use terraphim_config::{ConfigState, Role};
-use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
+use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
 use terraphim_persistence::error;
-use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};
+use terraphim_automata::{load_thesaurus, AutomataPath};
+use terraphim_persistence::Persistable;
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
+
+use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus};
 mod score;
 
 #[derive(thiserror::Error, Debug)]
@@ -35,6 +39,36 @@ impl<'a> TerraphimService {
     async fn build_thesaurus(&mut self, search_query: &SearchQuery) -> Result<()> {
         Ok(build_thesaurus_from_haystack(&mut self.config_state, search_query).await?)
     }
+    /// load thesaurus from config object and if absent make sure it's loaded from automata_url
+    pub async fn ensure_thesaurus_loaded(&mut self, role_name: &RoleName) -> Result<Thesaurus> {
+
+        println!("Loading thesaurus for role: {}", role_name);
+        println!("Role keys {:?}", self.config_state.roles.keys());
+        let mut rolegraphs = self.config_state.roles.clone();
+        if let Some(rolegraph_value) = rolegraphs.get(role_name) {
+            let mut thesaurus = rolegraph_value.lock().await.thesaurus.clone();
+            thesaurus=thesaurus.load().await.unwrap();
+            println!("Thesaurus loaded: {:#?}", thesaurus);
+            log::info!("Rolegraph loaded: for role name {:?}", role_name);
+            return Ok(thesaurus)
+        }else{
+            let role = self.config_state.get_role(role_name).await.unwrap();
+            if let Some(automata_path) = role.kg.unwrap().automata_path {
+                let thesaurus = load_thesaurus(&automata_path).await.unwrap();
+                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                match rolegraph {
+                    Ok(rolegraph) => {
+                        let rolegraph_value = RoleGraphSync::from(rolegraph);
+                        rolegraphs.insert(role_name.clone(), rolegraph_value);
+                    }
+                    Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                }
+                return Ok(thesaurus)
+            } else {
+                return Err(ServiceError::Config("Automata path not found".into()));
+            }
+        }
+    }
 
     /// Create document
     pub async fn create_document(&mut self, document: Document) -> Result<Document> {
@@ -44,7 +78,7 @@ impl<'a> TerraphimService {
 
     /// Get the role for the given search query
     async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
-        let search_role: String = match &search_query.role {
+        let search_role = match &search_query.role {
             Some(role) => role.clone(),
             None => self.config_state.get_default_role().await,
         };
@@ -91,7 +125,7 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
-                //FIXME: it's a bug - thesaurus is build but never loaded
+                let thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
                 let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
                     .search_indexed_documents(search_query, &role)
@@ -100,6 +134,7 @@ impl<'a> TerraphimService {
                 // Apply to ripgrep vector of document output
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
+                println!("Ranking documents with thesaurus");
                 let documents = index.get_documents(scored_index_docs);
 
                 Ok(documents)

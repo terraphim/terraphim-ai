@@ -31,7 +31,7 @@ use terraphim_config::Role;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{Error as RoleGraphError, RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
-use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
+use terraphim_types::{Concept, NormalizedTerm, Thesaurus, RoleName};
 
 use crate::Result;
 use cached::proc_macro::cached;
@@ -51,27 +51,32 @@ pub async fn build_thesaurus_from_haystack(
 ) -> Result<()> {
     // build thesaurus from haystack or load from remote
     // FIXME: introduce LRU cache for locally build thesaurus via persistance crate
+    println!("Building thesaurus from haystack");
     let config = config_state.config.lock().await.clone();
     let roles = config.roles.clone();
     let default_role = config.default_role.clone();
     let role_name = search_query.role.clone().unwrap_or_default();
-
+    println!("Role name: {}", role_name);
     let role: &mut Role = &mut roles
         .get(&role_name)
         .unwrap_or(&roles[&default_role])
         .to_owned();
-
+    println!("Role: {:?}", role);
     for haystack in &role.haystacks {
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
         let logseq = Logseq::default();
-        let thesaurus = logseq.build(role_name.clone(), &haystack.path).await?;
+        let thesaurus: Thesaurus = logseq.build(role_name.as_lowercase().to_string(), &haystack.path).await?;
         match thesaurus.save().await {
-            Ok(_) => log::debug!("Thesaurus saved"),
+            Ok(_) => {
+                log::debug!("Thesaurus saved");
+                println!("Thesaurus saved");
+            }
             Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
         }
         let mut haystack_path = haystack.path.clone();
         haystack_path.pop();
+        //FIXME: This is for debug only at the momment, to be removed and replaced with load from persistable
         let thesaurus_path = haystack.path.join(format!("{}_thesaurus.json",role_name.clone()));
 
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
@@ -89,19 +94,20 @@ pub async fn build_thesaurus_from_haystack(
 
 async fn update_thesaurus(
     config_state: &mut ConfigState,
-    role_name: &str,
+    role_name: &RoleName,
     thesaurus: Thesaurus,
 ) -> Result<()> {
+    println!("Updating thesaurus for role: {}", role_name);
     let mut rolegraphs = config_state.roles.clone();
-    if let Some(rolegraph_value) = rolegraphs.get_mut(role_name) {
-        let rolegraph = RoleGraph::new(role_name.to_string(), thesaurus).await;
-        match rolegraph {
-            Ok(rolegraph) => {
-                *rolegraph_value = RoleGraphSync::from(rolegraph);
-            }
-            Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
+    match rolegraph {
+        Ok(rolegraph) => {
+            let rolegraph_value = RoleGraphSync::from(rolegraph);
+            rolegraphs.insert(role_name.clone(), rolegraph_value);
         }
+        Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
     }
+
     Ok(())
 }
 

@@ -24,9 +24,10 @@ impl Persistable for Thesaurus {
     }
 
     /// Load key from the fastest operator
-    async fn load(&mut self, key: &str) -> Result<Self> {
+    async fn load(&mut self) -> Result<Self> {
         let op = &self.load_config().await?.1;
-        let obj = self.load_from_operator(key, op).await?;
+        let key = self.get_key();
+        let obj = self.load_from_operator(&key, op).await?;
         Ok(obj)
     }
 

@@ -3,10 +3,75 @@ use std::fmt::{self, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::collections::HashSet;
 use ahash::AHashMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::Iter;
 use std::iter::IntoIterator;
 
+use std::str::FromStr;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct RoleName {
+    pub original: String,
+    pub lowercase: String,
+}
+
+impl RoleName {
+    pub fn new(name: &str) -> Self {
+        RoleName {
+            original: name.to_string(),
+            lowercase: name.to_lowercase(),
+        }
+    }
+
+    pub fn as_lowercase(&self) -> &str {
+        &self.lowercase
+    }
+}
+
+impl fmt::Display for RoleName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.original)
+    }
+}
+
+impl FromStr for RoleName {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(RoleName::new(s))
+    }
+}
+
+impl From<&str> for RoleName {
+    fn from(s: &str) -> Self {
+        RoleName::new(s)
+    }
+}
+
+impl From<String> for RoleName {
+    fn from(s: String) -> Self {
+        RoleName::new(&s)
+    }
+}
+
+impl Serialize for RoleName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.original)
+    }
+}
+
+impl<'de> Deserialize<'de> for RoleName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(RoleName::new(&s))
+    }
+}
 /// The value of a normalized term
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
@@ -391,7 +456,7 @@ pub struct SearchQuery {
     pub search_term: NormalizedTermValue,
     pub skip: Option<usize>,
     pub limit: Option<usize>,
-    pub role: Option<String>,
+    pub role: Option<RoleName>,
 }
 
 /// Defines the relevance function (scorer) to be used for ranking search
