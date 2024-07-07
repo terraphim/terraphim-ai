@@ -87,6 +87,8 @@
         thesaurus.set(res.data);
         typeahead.set(true);
       });
+      }else{
+        typeahead.set(false);
       }
       selectedTheme = roleSettings.theme;
     }else{
