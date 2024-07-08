@@ -2,7 +2,6 @@ use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::Iter;
 use std::collections::HashSet;
-use std::default;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};

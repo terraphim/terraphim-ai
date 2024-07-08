@@ -20,6 +20,7 @@ terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "0.1.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
 
+ahash = { version = "0.8.8", features = ["serde"] }
 thiserror = "1.0.58"
 opendal = { version = "0.44.2" }
 serde_json = "1.0.116"

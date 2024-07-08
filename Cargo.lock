@@ -5324,6 +5324,7 @@ dependencies = [
 name = "terraphim_service"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "cached",
  "fnv",
  "log",
@@ -5359,11 +5360,9 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "log",
- "opendal",
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
  "ulid",
 ]
 

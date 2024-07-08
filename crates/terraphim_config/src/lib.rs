@@ -531,7 +531,7 @@ mod tests {
 
     fn dummy_role() -> Role {
         Role {
-            shortname: Some("father".to_string()),
+            shortname: Some("father".into()),
             name: "Father".into(),
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),

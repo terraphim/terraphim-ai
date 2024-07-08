@@ -4,7 +4,7 @@ use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
 use terraphim_persistence::error;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
-
+use ahash::AHashMap;
 use terraphim_types::{
     Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus,
 };
@@ -43,17 +43,12 @@ impl<'a> TerraphimService {
     }
     /// load thesaurus from config object and if absent make sure it's loaded from automata_url
     pub async fn ensure_thesaurus_loaded(&mut self, role_name: &RoleName) -> Result<Thesaurus> {
-        println!("Loading thesaurus for role: {}", role_name);
-        println!("Role keys {:?}", self.config_state.roles.keys());
-        let mut rolegraphs = self.config_state.roles.clone();
-        if let Some(rolegraph_value) = rolegraphs.get(role_name) {
-            let mut thesaurus = rolegraph_value.lock().await.thesaurus.clone();
-            thesaurus = thesaurus.load().await.unwrap();
-            println!("Thesaurus loaded: {:#?}", thesaurus);
-            log::info!("Rolegraph loaded: for role name {:?}", role_name);
-            return Ok(thesaurus);
-        } else {
-            let role = self.config_state.get_role(role_name).await.unwrap();
+        async fn load_thesaurus_from_automata_path(
+            config_state: &ConfigState,
+            role_name: &RoleName,
+            rolegraphs: &mut AHashMap<RoleName, RoleGraphSync>,
+        ) -> Result<Thesaurus> {
+            let role = config_state.get_role(role_name).await.unwrap();
             if let Some(automata_path) = role.kg.unwrap().automata_path {
                 let thesaurus = load_thesaurus(&automata_path).await.unwrap();
                 let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
@@ -64,10 +59,29 @@ impl<'a> TerraphimService {
                     }
                     Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
                 }
-                return Ok(thesaurus);
+                Ok(thesaurus)
             } else {
-                return Err(ServiceError::Config("Automata path not found".into()));
+                Err(ServiceError::Config("Automata path not found".into()))
             }
+        }
+        println!("Loading thesaurus for role: {}", role_name);
+        println!("Role keys {:?}", self.config_state.roles.keys());
+        let mut rolegraphs = self.config_state.roles.clone();
+        if let Some(rolegraph_value) = rolegraphs.get(role_name) {
+            let mut thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
+            match thesaurus_result {
+                Ok(thesaurus) => {
+                    println!("Thesaurus loaded: {:#?}", thesaurus);
+                    log::info!("Rolegraph loaded: for role name {:?}", role_name);
+                    return Ok(thesaurus);
+                }
+                Err(e) => {
+                    log::error!("Failed to load thesaurus: {:?}", e);
+                    return load_thesaurus_from_automata_path(&self.config_state, role_name, &mut rolegraphs).await;
+                }
+            }
+        } else {
+            return load_thesaurus_from_automata_path(&self.config_state, role_name, &mut rolegraphs).await;
         }
     }
 

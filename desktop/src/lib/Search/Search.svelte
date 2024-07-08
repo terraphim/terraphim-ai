@@ -1,33 +1,69 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { Field, Input } from "svelma";
-  import { input, is_tauri, role, roles,serverUrl } from "../stores";
+  import { input, is_tauri, role, roles, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
-  import Typeahead from "svelte-typeahead";
-  import { typeahead, thesaurus } from "../stores";
+  import { thesaurus } from "../stores";
+
   let results: Document[] = [];
   let error: string | null = null;
-  let data = [];
-  // Reactively handle search input
-  // $: {
-  //   if ($input.trim()) {
-  //     handleSearchInputEvent();
-  //   } else {
-  //     results = [];
-  //     error = null;
-  //   }
-  // }
-  // Enable this for typeahead component
-  $: {
-  if ($typeahead) {
-      console.log("thesaurus", $thesaurus);
-      for (const [key, value] of Object.entries($thesaurus)) {
-        data.push({ label: key, value: value });
-      }
-      console.log("data", data);
+  let suggestions: string[] = [];
+  let suggestionIndex = -1;
+
+  $: thesaurusEntries = Object.entries($thesaurus);
+
+  function getSuggestions(value: string) {
+    const inputValue = value.trim().toLowerCase();
+    const inputLength = inputValue.length;
+    
+    return inputLength === 0
+      ? []
+      : thesaurusEntries
+          .filter(([key]) => key.toLowerCase().includes(inputValue))
+          .map(([key]) => key)
+          .slice(0, 5);
+  }
+
+  function updateSuggestions(event: Event) {
+    const inputElement = event.target as HTMLInputElement;
+    const cursorPosition = inputElement.selectionStart;
+    const textBeforeCursor = $input.slice(0, cursorPosition);
+    const words = textBeforeCursor.split(/\s+/);
+    const currentWord = words[words.length - 1];
+
+    suggestions = getSuggestions(currentWord);
+    suggestionIndex = -1;
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (suggestions.length === 0) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
+    } else if (event.key === "Enter" && suggestionIndex !== -1) {
+      event.preventDefault();
+      applySuggestion(suggestions[suggestionIndex]);
     }
+  }
+
+  function applySuggestion(suggestion: string) {
+    const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
+    const cursorPosition = inputElement.selectionStart;
+    const textBeforeCursor = $input.slice(0, cursorPosition);
+    const textAfterCursor = $input.slice(cursorPosition);
+    const words = textBeforeCursor.split(/\s+/);
+    words[words.length - 1] = suggestion;
+    
+    $input = [...words, textAfterCursor].join(" ");
+    inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
+    suggestions = [];
+    suggestionIndex = -1;
   }
 
   async function handleSearchInputEvent() {
@@ -85,33 +121,39 @@
       }
     }
   }
-  // const extract = (item) => item.state;
 </script>
-<form on:submit|preventDefault={$input}>
-{#if $typeahead}
-<Field>
-  <Typeahead type="search" icon="search" bind:value={$input} label="Search" placeholder={`Search over Knowledge graph for ${$role}`} {data} extract={(item) => item.label}
-    on:select={handleSearchInputEvent}
-    on:click={handleSearchInputEvent}
-    on:submit={handleSearchInputEvent}
-    on:keyup={e => e.key === 'Enter' && handleSearchInputEvent()}/>
+
+<form on:submit|preventDefault={handleSearchInputEvent}>
+  <Field>
+    <div class="input-wrapper">
+      <Input
+        type="search"
+        bind:value={$input}
+        placeholder={`Search over Knowledge graph for ${$role}`}
+        icon="search"
+        expanded
+        autofocus
+        on:click={handleSearchInputEvent}
+        on:submit={handleSearchInputEvent}
+        on:keydown={handleKeydown}
+        on:input={updateSuggestions}
+      />
+      {#if suggestions.length > 0}
+        <ul class="suggestions">
+          {#each suggestions as suggestion, index}
+            <li
+              class:active={index === suggestionIndex}
+              on:click={() => applySuggestion(suggestion)}
+            >
+              {suggestion}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   </Field>
-{:else}
-<Field>
-  <Input
-    type="search"
-    bind:value={$input}
-    placeholder="Search"
-    icon="search"
-    expanded
-    autofocus
-    on:click={handleSearchInputEvent}
-    on:submit={handleSearchInputEvent}
-    on:keyup={e => e.key === 'Enter' && handleSearchInputEvent()}
-  />
-</Field>
-{/if}
 </form>
+
 {#if error}
   <p class="error">{error}</p>
 {:else if results.length}
@@ -127,14 +169,6 @@
   </section>
 {/if}
 
-<!-- key value for thesaurus if typeahead is true -->
-<!-- {#if $typeahead}
-  <div>
-    {#each Object.entries($thesaurus) as [key, value]}
-      <div>{key}: {value.id}</div>
-    {/each}
-  </div>
-{/if} -->
 <style>
   img {
     width: 16rem;
@@ -142,22 +176,30 @@
   .error {
     color: red;
   }
-  :global([data-svelte-typeahead]) {
-
-      padding-left: 2.5em;
-
-
-      box-shadow: inset 0 .0625em .125em rgba(10,10,10,.05);
-      width: 100%;
-
-
-      max-width: 100%;
-
-
-      background-color: #fff;
-      border-color: #dbdbdb;
-      border-radius: 4px;
-      color: #363636;
+  .input-wrapper {
+    position: relative;
   }
-
+  .suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    background-color: white;
+    border: 1px solid #dbdbdb;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 3px rgba(10, 10, 10, 0.1);
+  }
+  .suggestions li {
+    padding: 0.5em 1em;
+    cursor: pointer;
+  }
+  .suggestions li:hover,
+  .suggestions li.active {
+    background-color: #f5f5f5;
+  }
 </style>
