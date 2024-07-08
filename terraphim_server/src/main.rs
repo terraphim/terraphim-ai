@@ -77,7 +77,6 @@ async fn run_server() -> Result<()> {
         cwd.join("terraphim_server/fixtures/term_to_id.json")
     };
     log::debug!("Test automata_test_path {:?}", automata_test_path);
-    let automata_path = AutomataPath::from_local(automata_test_path);
     let automata_remote =
         AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
             .unwrap();

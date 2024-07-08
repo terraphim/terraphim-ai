@@ -492,7 +492,6 @@ mod tests {
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
                             path: PathBuf::from("~/pkm"),
-
                         }),
                         public: true,
                         publish: true,

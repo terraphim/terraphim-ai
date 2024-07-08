@@ -39,7 +39,6 @@ mod tests {
                 knowledge_graph_local: Some(KnowledgeGraphLocal {
                     input_type: KnowledgeGraphInputType::Markdown,
                     path: docs_path.join("kg"),
-
                 }),
             }),
             haystacks: vec![Haystack {
@@ -87,7 +86,7 @@ mod tests {
                 automata_path: Some(AutomataPath::local_example()),
                 knowledge_graph_local: Some(KnowledgeGraphLocal {
                     input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("/tmp/system_operator/pages/"), 
+                    path: PathBuf::from("/tmp/system_operator/pages/"),
                 }),
                 public: true,
                 publish: true,

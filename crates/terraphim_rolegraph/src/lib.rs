@@ -410,7 +410,9 @@ mod tests {
             docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
         );
         let thesaurus = load_thesaurus(&automata_path).await.unwrap();
-        let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone()).await.unwrap();
+        let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone())
+            .await
+            .unwrap();
         let document_id = Ulid::new().to_string();
         let test_document = r#"
         This folder is an example of personal knowledge graph used for testing and fixtures 

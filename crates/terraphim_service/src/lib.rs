@@ -1,10 +1,10 @@
+use ahash::AHashMap;
 use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
 use terraphim_persistence::error;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
-use ahash::AHashMap;
 use terraphim_types::{
     Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus,
 };
@@ -77,11 +77,21 @@ impl<'a> TerraphimService {
                 }
                 Err(e) => {
                     log::error!("Failed to load thesaurus: {:?}", e);
-                    return load_thesaurus_from_automata_path(&self.config_state, role_name, &mut rolegraphs).await;
+                    return load_thesaurus_from_automata_path(
+                        &self.config_state,
+                        role_name,
+                        &mut rolegraphs,
+                    )
+                    .await;
                 }
             }
         } else {
-            return load_thesaurus_from_automata_path(&self.config_state, role_name, &mut rolegraphs).await;
+            return load_thesaurus_from_automata_path(
+                &self.config_state,
+                role_name,
+                &mut rolegraphs,
+            )
+            .await;
         }
     }
 
