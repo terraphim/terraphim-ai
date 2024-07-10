@@ -5,7 +5,7 @@
   import ResultItem from "./ResultItem.svelte";
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
-  import { thesaurus } from "../stores";
+  import { thesaurus,typeahead } from "../stores";
 
   let results: Document[] = [];
   let error: string | null = null;
@@ -46,7 +46,7 @@
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
-    } else if (event.key === "Enter" && suggestionIndex !== -1) {
+    } else if ((event.key === "Enter" || event.key === "Tab") && suggestionIndex !== -1) {
       event.preventDefault();
       applySuggestion(suggestions[suggestionIndex]);
     }
@@ -60,7 +60,7 @@
     const words = textBeforeCursor.split(/\s+/);
     words[words.length - 1] = suggestion;
     
-    $input = [...words, textAfterCursor].join(" ");
+    $input = [...words, textAfterCursor].join("");
     inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
     suggestions = [];
     suggestionIndex = -1;
@@ -129,7 +129,7 @@
       <Input
         type="search"
         bind:value={$input}
-        placeholder={`Search over Knowledge graph for ${$role}`}
+        placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
         icon="search"
         expanded
         autofocus
