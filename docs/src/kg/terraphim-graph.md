@@ -6,5 +6,5 @@ Terraphim Graph (scorer) is using unique graph embeddings, where the rank of the
 
 synonyms:: graph embeddings, graph, knowledge graph based embeddings 
 
-Now we will have a concept "Terrpahim Graph Scorer" with synonyms "graph embeddings". 
+Now we will have a concept "Terraphim Graph Scorer" with synonyms "graph embeddings". 
 
