@@ -60,7 +60,7 @@
     const words = textBeforeCursor.split(/\s+/);
     words[words.length - 1] = suggestion;
     
-    $input = [...words, textAfterCursor].join("");
+    $input = [...words, textAfterCursor].join(" ");
     inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
     suggestions = [];
     suggestionIndex = -1;
