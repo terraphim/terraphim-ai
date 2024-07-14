@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             start_main_app,
         ])
         .setup(|app| {
-            let splashscreen_window = WindowBuilder::new(app, "splashscreen", tauri::WindowUrl::App("splashscreen.html".into()))
+            let splashscreen_window = WindowBuilder::new(app, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
                 .title("Splashscreen")
                 .resizable(false)
                 .decorations(false)

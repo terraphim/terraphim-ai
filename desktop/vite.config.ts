@@ -15,52 +15,70 @@ export default defineConfig({
           console.log('Starting splashscreen build...');
           const { compile } = await import('svelte/compiler');
           const inputPath = resolve(__dirname, 'src/lib/StartupScreen.svelte');
-          const outputPath = resolve(__dirname, 'dist/splashscreen.html');
-          
+          const jsOutputPath = resolve(__dirname, 'dist/splashscreen.js');
+          const htmlOutputPath = resolve(__dirname, 'dist/splashscreen.html');
+
           console.log(`Reading Svelte component from ${inputPath}`);
           const input = readFileSync(inputPath, 'utf8');
-          
-          console.log('Compiling Svelte component...');
-          const { js, css, warnings } = compile(input, { generate: 'dom' });
 
-          if (warnings.length) {
-            warnings.forEach(warning => {
-              console.warn(warning);
-            });
-          }
+          console.log('Compiling Svelte component...');
+          const { js, css } = compile(input, {
+            generate: 'dom',
+            format: 'esm',
+            name: 'SplashScreen'
+          });
+
+          console.log(`Writing JavaScript content to ${jsOutputPath}`);
+          writeFileSync(jsOutputPath, js.code);
 
           console.log('Creating HTML content...');
           const html = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Splash Screen</title>
-              <style>${css.code}</style>
-            </head>
-            <body>
-              <script>${js.code}</script>
-            </body>
-            </html>
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Splash Screen</title>
+            <style>
+              /* Add your CSS styles here */
+              body {
+                font-family: Arial, sans-serif;
+                background-color: #f0f0f0;
+              }
+              .splash-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+              }
+              .splash-content {
+                text-align: center;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="splash-container">
+              <div class="splash-content">
+                <!-- Your Svelte component content goes here -->
+              </div>
+            </div>
+            <script type="module">
+              import SplashScreen from './splashscreen.js'; // Import the compiled Svelte component
+              const target = document.querySelector('.splash-content');
+              new SplashScreen({
+                target
+              });
+            </script>
+          </body>
           `;
 
-          // Ensure the dist directory exists
-          const distDir = resolve(__dirname, 'dist');
-          if (!existsSync(distDir)) {
-            console.log(`Creating directory ${distDir}`);
-            mkdirSync(distDir);
+          console.log(`Writing HTML content to ${htmlOutputPath}`);
+          if (!existsSync(resolve(__dirname, 'src-tauri'))) {
+            mkdirSync(resolve(__dirname, 'src-tauri'));
           }
+          writeFileSync(htmlOutputPath, html);
 
-          console.log(`Writing HTML content to ${outputPath}`);
-          writeFileSync(outputPath, html);
-          
-          // Verify the file was written
-          if (existsSync(outputPath)) {
-            console.log('splashscreen.html has been created successfully.');
-          } else {
-            console.error('Failed to create splashscreen.html.');
-          }
+          console.log('splashscreen.html has been created successfully.');
         } catch (error) {
           console.error('Error during splashscreen build:', error);
         }
@@ -72,5 +90,6 @@ export default defineConfig({
       '$lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
       '$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
     }
-  }
+  },
+  clearScreen: false,
 })
