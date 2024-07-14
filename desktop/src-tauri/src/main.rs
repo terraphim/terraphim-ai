@@ -5,11 +5,12 @@
 
 mod cmd;
 mod config;
+mod startup;
 
 use std::error::Error;
 use tauri::{
     CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
-    SystemTrayMenu,
+    SystemTrayMenu, WindowBuilder,
 };
 
 use terraphim_config::ConfigState;
@@ -34,13 +35,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let tray_menu = SystemTrayMenu::new()
         .add_item(CustomMenuItem::new("toggle", "Show/Hide"))
         .add_item(quit);
-    // .add_item(show);
     let system_tray = SystemTray::new().with_menu(tray_menu);
 
-    // tauri::async_runtime::spawn(async move {
-    //   let mut config_state= terraphim_server::types::ConfigState::new().await.unwrap();
-    //   axum_server(addr,config_state).await;
-    // });
     let app = tauri::Builder::default()
         .system_tray(system_tray)
         .on_system_tray_event(|app, event| match event {
@@ -72,12 +68,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::get_config,
             cmd::update_config,
             cmd::publish_thesaurus,
+            startup::save_initial_settings,
+            start_main_app,
         ])
+        .setup(|app| {
+            let splashscreen_window = WindowBuilder::new(app, "splashscreen", tauri::WindowUrl::App("splashscreen.html".into()))
+                .title("Splashscreen")
+                .resizable(false)
+                .decorations(false)
+                .always_on_top(true)
+                .inner_size(400.0, 200.0)
+                .build()?;
+
+            // Hide the main window initially
+            app.get_window("main").unwrap().hide()?;
+
+            Ok(())
+        })
         .build(context)
         .expect("error while running tauri application");
 
     app.run(move |app_handle, e| match e {
-        // Application is ready (triggered only once)
         RunEvent::Ready => {
             let app_handle = app_handle.clone();
             let window = app_handle.get_window("main").unwrap();
@@ -93,27 +104,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 })
                 .unwrap();
         }
-
-        //   // Triggered when a window is trying to close
-        //   tauri::RunEvent::WindowEvent {
-        //     label,
-        //     event: win_event,
-        //     ..
-        // } => match win_event {
-        //     tauri::WindowEvent::CloseRequested { api, .. } => {
-        //         let win = app.get_window(label.as_str()).unwrap();
-        //         win.hide().unwrap();
-        //         api.prevent_close();
-        //     }
-        //     _ => {}
-        // },
-
-        // Keep the event loop running even if all windows are closed
-        // This allow us to catch system tray events when there is no window
         RunEvent::ExitRequested { api, .. } => {
             api.prevent_exit();
         }
         _ => {}
     });
     Ok(())
+}
+
+#[tauri::command]
+async fn start_main_app(app_handle: tauri::AppHandle) {
+    // Reload config here if needed
+    // let mut config = config::load_config().unwrap();
+    // let config_state = ConfigState::new(&mut config).await.unwrap();
+    // app_handle.manage(config_state);
+
+    // Close splashscreen
+    if let Some(splashscreen) = app_handle.get_window("splashscreen") {
+        splashscreen.close().unwrap();
+    }
+
+    // Show main window
+    if let Some(main_window) = app_handle.get_window("main") {
+        main_window.show().unwrap();
+    }
 }

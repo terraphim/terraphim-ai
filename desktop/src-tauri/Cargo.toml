@@ -29,7 +29,7 @@ anyhow = "1.0.81"
 log = "0.4.21"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
-tauri = { version = "1.6.1", features = [
+tauri = { version = "1.6.1", features = [ "dialog-all", "path-all", "fs-all",
     "global-shortcut-all",
     "cli",
     "system-tray",

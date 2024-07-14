@@ -8,21 +8,6 @@
     default as configStore,
   } from "./lib/ThemeSwitcher.svelte";
   import { theme } from "./lib/stores";
-
-  // onMount(() => {
-  //   const secret = prompt('Enter your secret');
-  //   if (!secret) {
-  //     console.log('No secret entered');
-  //     return;
-  //   }
-  //   const agent = Agent.fromSecret(secret);
-  //   // This is where you configure your atomic data store.
-  //   const store = new Store({
-  //     serverUrl: 'http://localhost:9883',
-  //     agent,
-  //   });
-  //   initStore(store);
-  // })
   let visible = "is-hidden";
   function toggleVissible() {
     visible = "";
@@ -39,6 +24,7 @@
     href={`/assets/bulmaswatch/${$theme}/bulmaswatch.min.css`}
   />
 </svelte:head>
+
 <div class="is-full-height">
   <main class="main-content">
     <ThemeSwitcher />
@@ -46,19 +32,7 @@
       <Search />
     </Route>
     <br />
-    <ul>
-      {#if Array.isArray(configStore)}
-        {#each configStore as item}
-          <li>{item.name} {item.theme}</li>
-        {/each}
-      {/if}
-    </ul>
 
-    <!-- <nav class="navbar ">
-
-    <a class="navbar-item " href="/" use:active exact>Home</a>
-    <a class="navbar-item " href="/fetch" use:active>Fetchers</a>
-  </nav> -->
     <Route path="/fetch/*"><FetchTabs /></Route>
   </main>
 
