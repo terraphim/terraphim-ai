@@ -3,7 +3,9 @@
   import { open } from "@tauri-apps/api/dialog";
   import { onMount } from "svelte";
   import { readDir } from "@tauri-apps/api/fs";
-  import { resolve,appDir,appDataDir } from "@tauri-apps/api/path";
+  import { resolve, appDir, appDataDir } from "@tauri-apps/api/path";
+  import { isInitialSetupComplete, theme } from "$lib/stores";
+  import { readBinaryFile } from '@tauri-apps/api/fs'
 
   let dataFolder = "";
   let globalShortcut = "";
@@ -15,7 +17,7 @@
       const selected = await open({
         directory: true,
         multiple: false,
-        defaultPath: await appDir()
+        defaultPath: await appDataDir()
       });
       console.log(selected);
       console.log(typeof selected);
@@ -29,10 +31,12 @@
       error = `Failed to open folder selector: ${err.message}`;
     }
   }
+
   function startCapturingShortcut() {
     isCapturingShortcut = true;
     globalShortcut = "Press your desired shortcut...";
   }
+
   function handleKeyDown(event) {
     if (!isCapturingShortcut) return;
 
@@ -51,6 +55,7 @@
       isCapturingShortcut = false;
     }
   }
+
   async function saveSettings() {
     if (!dataFolder || !globalShortcut) {
       error = "Please fill in both fields";
@@ -68,9 +73,9 @@
     } catch (e) {
       error = "Failed to save settings";
       console.error(e);
-    }finally {
-        // set initial setup complete to true
-        isInitialSetupComplete = true;
+    } finally {
+      // set initial setup complete to true
+      isInitialSetupComplete.set(true);
     }
   }
 
@@ -81,7 +86,16 @@
     };
   });
 </script>
-
+<svelte:head>
+  <meta
+    name="color-scheme"
+    content={$theme == "spacelab" ? "lumen darkly" : $theme}
+  />
+  <link
+    rel="stylesheet"
+    href={`/assets/bulmaswatch/${$theme}/bulmaswatch.min.css`}
+  />
+</svelte:head>
 <div class="startup-screen section">
   <div class="container">
     <h1 class="title is-2">Welcome to Terraphim AI</h1>
@@ -89,13 +103,8 @@
     <div class="field">
       <label class="label" for="data-folder">Data Folder Path:</label>
       <div class="control">
-        <input class="input" id="data-folder" type="file" webkitdirectory="true" directory bind:value={dataFolder}/>
-        <!-- <input class="input" id="data-folder" type="file" bind:value={dataFolder} readonly /> -->
-      </div>
-    </div>
-    <div class="field">
-      <div class="control">
-        <button class="button is-primary" on:click={selectFolder}>Browse</button>
+        <button class="button is-link" id="open-dialog" on:click={selectFolder}>Select path for your data</button>
+        <input class="input" id="data-folder" type="text" readonly placeholder="Click to set path" bind:value={dataFolder} on:click={selectFolder}/>
       </div>
     </div>
     <div class="field">

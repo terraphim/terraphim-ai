@@ -39,6 +39,7 @@ const is_tauri = writable<boolean>(false);
 const atomic_configured = writable<boolean>(false);
 const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
+const isInitialSetupComplete = writable<boolean>(false);
 
 // FIXME: add default role
 // const roles = writable<Record<string, Role>>({}); // Store roles separately for easier access
@@ -47,4 +48,4 @@ const roles = writable<{ [key: string]: { name: string; theme: string; kg?: { pu
 let input = writable<string>("");
 const typeahead = writable<boolean>(false);
 
-export { configStore, input, is_tauri, role, roles, serverUrl, theme, typeahead, thesaurus };
+export { configStore, input, is_tauri, role, roles, serverUrl, theme, typeahead, thesaurus, isInitialSetupComplete };

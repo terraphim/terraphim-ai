@@ -74,10 +74,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .setup(|app| {
             let splashscreen_window = WindowBuilder::new(app, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
                 .title("Splashscreen")
-                .resizable(false)
+                .resizable(true)
                 .decorations(false)
                 .always_on_top(true)
-                .inner_size(400.0, 200.0)
+                .inner_size(400.0, 400.0)
                 .build()?;
 
             // Hide the main window initially
