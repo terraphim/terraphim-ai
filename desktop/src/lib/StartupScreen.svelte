@@ -103,7 +103,7 @@
     <div class="field">
       <label class="label" for="data-folder">Data Folder Path:</label>
       <div class="control">
-        <button class="button is-link" id="open-dialog" on:click={selectFolder}>Select path for your data</button>
+        <!-- <button class="button is-link" id="open-dialog" on:click={selectFolder}>Select path for your data</button> -->
         <input class="input" id="data-folder" type="text" readonly placeholder="Click to set path" bind:value={dataFolder} on:click={selectFolder}/>
       </div>
     </div>
