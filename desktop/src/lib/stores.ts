@@ -6,6 +6,12 @@ interface Role {
   name: string;
   theme: string;
 }
+interface NormalisedThesaurus {
+  id: string;
+  term: string;
+}
+// writable key value store for thesaurus, where value is id and normalised term
+const thesaurus = writable<Array<Record<string, NormalisedThesaurus>>>([]);
 
 interface Config {
   id: string;
@@ -35,8 +41,10 @@ const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
 
 // FIXME: add default role
-const roles = writable<Record<string, Role>>({}); // Store roles separately for easier access
+// const roles = writable<Record<string, Role>>({}); // Store roles separately for easier access
+const roles = writable<{ [key: string]: { name: string; theme: string; kg?: { publish?: boolean } } }>({});
 
 let input = writable<string>("");
+const typeahead = writable<boolean>(false);
 
-export { configStore, input, is_tauri, role, roles, serverUrl, theme };
+export { configStore, input, is_tauri, role, roles, serverUrl, theme, typeahead, thesaurus };

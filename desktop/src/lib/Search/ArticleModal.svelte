@@ -4,7 +4,7 @@
   import type { Document } from "./SearchResult";
   export let active: boolean = false;
   export let item: Document;
-  export let content = item.body;
+
 </script>
 
 <Modal bind:active>
@@ -13,7 +13,7 @@
       <h2>{item.title}</h2>
       <!-- {@html item.body} -->
 
-      <SvelteMarkdown source={content} />
+      <SvelteMarkdown source={item.body} />
     </article>
   </div>
 </Modal>

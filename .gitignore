@@ -25,3 +25,6 @@ localsearch
 cargo_vendored
 node_modules
 desktop/src-tauri/Cargo.lock
+docs/src/thesaurus.json
+docs/src/*.json
+

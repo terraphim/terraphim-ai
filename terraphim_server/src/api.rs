@@ -74,7 +74,7 @@ pub(crate) async fn search_documents(
 ) -> Result<Json<SearchResponse>> {
     log::debug!("search_document called with {:?}", search_query);
 
-    let terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
     let results = terraphim_service.search(&search_query.0).await?;
     let total = results.len();
 
@@ -93,7 +93,7 @@ pub(crate) async fn search_documents_post(
 ) -> Result<Json<SearchResponse>> {
     log::debug!("POST Searching documents with query: {search_query:?}");
 
-    let terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
     let results = terraphim_service.search(&search_query).await?;
     let total = results.len();
 

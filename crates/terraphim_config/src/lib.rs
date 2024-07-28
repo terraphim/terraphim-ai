@@ -4,7 +4,7 @@ use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, SearchQuery,
+    Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, RoleName, SearchQuery,
 };
 
 use ahash::AHashMap;
@@ -20,6 +20,7 @@ pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
+use serde_json_any_key::*;
 
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
@@ -61,7 +62,7 @@ pub enum TerraphimConfigError {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Role {
     pub shortname: Option<String>,
-    pub name: String,
+    pub name: RoleName,
     /// The relevance function used to rank search results
     pub relevance_function: RelevanceFunction,
     pub theme: String,
@@ -97,13 +98,25 @@ pub struct Haystack {
 /// using a specific service
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct KnowledgeGraph {
-    pub automata_path: AutomataPath,
-    pub input_type: KnowledgeGraphInputType,
-    pub path: PathBuf,
+    /// automata path refering to the published automata and can be online url or local file with pre-build automata
+    pub automata_path: Option<AutomataPath>,
+    /// Knowlege graph can be re-build from local files, for example Markdown files
+    pub knowledge_graph_local: Option<KnowledgeGraphLocal>,
     pub public: bool,
     pub publish: bool,
 }
+/// check KG set correctly
+impl KnowledgeGraph {
+    fn is_set(&self) -> bool {
+        self.automata_path.is_some() || self.knowledge_graph_local.is_some()
+    }
+}
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct KnowledgeGraphLocal {
+    pub input_type: KnowledgeGraphInputType,
+    pub path: PathBuf,
+}
 /// Builder, which allows to create a new `Config`
 ///
 /// The first role added will be set as the default role.
@@ -151,27 +164,28 @@ impl ConfigBuilder {
 
     /// Add a new role to the config
     pub fn add_role(mut self, role_name: &str, role: Role) -> Self {
+        let role_name = RoleName::new(role_name);
         // Set to default role if this is the first role
         if self.config.roles.is_empty() {
-            self.config.default_role = role_name.to_string();
+            self.config.default_role = role_name.clone();
         }
-
-        self.config.roles.insert(role_name.to_string(), role);
+        self.config.roles.insert(role_name, role);
 
         self
     }
 
     /// Set the default role for the config
     pub fn default_role(mut self, default_role: &str) -> Result<Self> {
+        let default_role = RoleName::new(default_role);
         // Check if the role exists
-        if !self.config.roles.contains_key(default_role) {
+        if !self.config.roles.contains_key(&default_role) {
             return Err(TerraphimConfigError::Profile(format!(
                 "Role `{}` does not exist",
                 default_role
             )));
         }
 
-        self.config.default_role = default_role.to_string();
+        self.config.default_role = default_role;
         Ok(self)
     }
 
@@ -202,9 +216,10 @@ pub struct Config {
     /// Global shortcut for activating terraphim desktop
     pub global_shortcut: String,
     /// User roles with their respective settings
-    pub roles: AHashMap<String, Role>,
+    #[serde(with = "any_key_map")]
+    pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
-    pub default_role: String,
+    pub default_role: RoleName,
 }
 
 impl Config {
@@ -214,7 +229,7 @@ impl Config {
             // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles: AHashMap::new(),
-            default_role: "default".to_string(),
+            default_role: RoleName::new("default"),
         }
     }
 }
@@ -246,9 +261,10 @@ impl Persistable for Config {
     }
 
     /// Load key from the fastest operator
-    async fn load(&mut self, key: &str) -> PersistenceResult<Self> {
+    async fn load(&mut self) -> PersistenceResult<Self> {
         let op = &self.load_config().await?.1;
-        let obj = self.load_from_operator(key, op).await?;
+        let key = self.get_key();
+        let obj = self.load_from_operator(&key, op).await?;
         Ok(obj)
     }
 
@@ -267,7 +283,7 @@ pub struct ConfigState {
     /// Terraphim Config
     pub config: Arc<Mutex<Config>>,
     /// RoleGraphs
-    pub roles: AHashMap<String, RoleGraphSync>,
+    pub roles: AHashMap<RoleName, RoleGraphSync>,
 }
 
 impl ConfigState {
@@ -278,16 +294,30 @@ impl ConfigState {
     pub async fn new(config: &mut Config) -> Result<Self> {
         let mut roles = AHashMap::new();
         for (name, role) in &config.roles {
-            let role_name = name.to_lowercase();
+            let role_name = name.clone();
             log::info!("Creating role {}", role_name);
-            if role.kg.is_some() {
-                let automata_url = role.kg.as_ref().unwrap().automata_path.clone();
-                log::info!("Loading Role `{}` - URL: {}", role_name, automata_url);
-                let thesaurus = load_thesaurus(&automata_url).await?;
-                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
-                roles.insert(role_name, RoleGraphSync::from(rolegraph));
-            } else {
-                log::info!("Skipping KG due to None settings for role {}", role_name);
+            // FIXME: this looks like local KG is never re-build
+            // check if role have configured local KG or automata_path
+            // skip role if incorrectly configured
+            if role.relevance_function == RelevanceFunction::TerraphimGraph {
+                if role.kg.as_ref().is_some_and(|kg| kg.is_set()) {
+                    //FIXME: turn into errors
+                    log::info!("Role {} is configured correctly", role_name);
+                    let automata_url = role
+                        .kg
+                        .as_ref()
+                        .unwrap()
+                        .automata_path
+                        .as_ref()
+                        .unwrap()
+                        .clone();
+                    log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_url);
+                    let thesaurus = load_thesaurus(&automata_url).await?;
+                    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                    roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
+                } else {
+                    log::info!("Role {} is configured to use KG ranking but is missing remote url or local configuration", role_name );
+                }
             }
         }
 
@@ -296,15 +326,17 @@ impl ConfigState {
             roles,
         })
     }
+    /// update thesaurus for the role in a config
 
+    //FIXME:
     /// Get the default role from the config
-    pub async fn get_default_role(&self) -> String {
+    pub async fn get_default_role(&self) -> RoleName {
         let config = self.config.lock().await;
         config.default_role.clone()
     }
 
     /// Get a role from the config
-    pub async fn get_role(&self, role: &str) -> Option<Role> {
+    pub async fn get_role(&self, role: &RoleName) -> Option<Role> {
         let config = self.config.lock().await;
         config.roles.get(role).cloned()
     }
@@ -331,13 +363,24 @@ impl ConfigState {
 
         log::debug!("Role for search_documents: {:#?}", role);
 
-        let role_name = role.name.to_lowercase();
+        let role_name = &role.name;
         log::debug!("Role name for searching {role_name}");
         log::debug!("All roles defined  {:?}", self.roles.clone().into_keys());
-        let role = self.roles.get(&role_name).unwrap().lock().await;
+        //FIXME: breaks here for ripgrep, means KB based search is triggered before KG build
+        let role = match self.roles.get(&role_name) {
+            Some(role) => role.lock().await,
+            None => {
+                // Handle the None case, e.g., return an empty vector since the function expects Vec<IndexedDocument>
+                log::error!(
+                    "Role `{}` does not exist or RoleGraph isn't populated",
+                    role_name
+                );
+                return Vec::new();
+            }
+        };
         let documents = role
             .query_graph(
-                &search_query.search_term,
+                search_query.search_term.as_str(),
                 search_query.skip,
                 search_query.limit,
             )
@@ -401,13 +444,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_builder() {
+        let automata_remote = AutomataPath::from_remote(
+            "https://staging-storage.terraphim.io/thesaurus_Default.json",
+        )
+        .unwrap();
         let config = ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
             .add_role(
                 "Default",
                 Role {
                     shortname: Some("Default".to_string()),
-                    name: "Default".to_string(),
+                    name: "Default".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "spacelab".to_string(),
                     kg: None,
@@ -422,7 +469,7 @@ mod tests {
                 "Engineer",
                 Role {
                     shortname: Some("Engineer".to_string()),
-                    name: "Engineer".to_string(),
+                    name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
                     theme: "lumen".to_string(),
                     kg: None,
@@ -437,13 +484,15 @@ mod tests {
                 "System Operator",
                 Role {
                     shortname: Some("operator".to_string()),
-                    name: "System Operator".to_string(),
-                    relevance_function: RelevanceFunction::TitleScorer,
+                    name: "System Operator".into(),
+                    relevance_function: RelevanceFunction::TerraphimGraph,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
-                        automata_path: AutomataPath::local_example(),
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: PathBuf::from("~/pkm"),
+                        automata_path: Some(automata_remote.clone()),
+                        knowledge_graph_local: Some(KnowledgeGraphLocal {
+                            input_type: KnowledgeGraphInputType::Markdown,
+                            path: PathBuf::from("~/pkm"),
+                        }),
                         public: true,
                         publish: true,
                     }),
@@ -460,7 +509,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(config.roles.len(), 3);
-        assert_eq!(config.default_role, "Default");
+        assert_eq!(config.default_role, RoleName::new("Default"));
     }
 
     #[test]
@@ -481,14 +530,13 @@ mod tests {
 
     fn dummy_role() -> Role {
         Role {
-            shortname: Some("father".to_string()),
-            name: "Father".to_string(),
+            shortname: Some("father".into()),
+            name: "Father".into(),
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),
             kg: Some(KnowledgeGraph {
-                automata_path: AutomataPath::local_example(),
-                input_type: KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("~/pkm"),
+                automata_path: Some(AutomataPath::local_example()),
+                knowledge_graph_local: None,
                 public: true,
                 publish: true,
             }),
@@ -508,10 +556,10 @@ mod tests {
             .build()
             .unwrap();
 
-        assert!(config.roles.contains_key("Father"));
+        assert!(config.roles.contains_key(&RoleName::new("Father")));
         assert_eq!(config.roles.len(), 1);
-        assert_eq!(&config.default_role, "Father");
-        assert_eq!(config.roles["Father"], dummy_role());
+        assert_eq!(&config.default_role, &RoleName::new("Father"));
+        assert_eq!(config.roles[&RoleName::new("Father")], dummy_role());
     }
 
     #[tokio::test]

@@ -26,10 +26,10 @@ impl Persistable for MyStruct {
         Ok(())
     }
 
-    async fn load(&mut self, key: &str) -> Result<Self> {
+    async fn load(&mut self) -> Result<Self> {
         let op = &self.load_config().await?.1;
-
-        let obj = self.load_from_operator(key, &op).await?;
+        let key = self.get_key();
+        let obj = self.load_from_operator(&key, &op).await?;
         Ok(obj)
     }
 
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
     let mut obj1 = MyStruct::new("obj".to_string());
     let key = obj.get_key();
     println!("key: {}", key);
-    obj1 = obj1.load(&key).await?;
+    obj1 = obj1.load().await?;
     println!("loaded obj: {:?}", obj1);
 
     Ok(())

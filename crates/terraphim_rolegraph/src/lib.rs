@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use terraphim_types::{
-    Document, Edge, Id, IndexedDocument, Node, NormalizedTermValue, Rank, Thesaurus,
+    Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
@@ -36,26 +36,26 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     /// The role of the graph
-    pub role: String,
+    pub role: RoleName,
     /// A mapping from node IDs to nodes
-    nodes: AHashMap<Id, Node>,
+    nodes: AHashMap<u64, Node>,
     /// A mapping from edge IDs to edges
-    edges: AHashMap<Id, Edge>,
+    edges: AHashMap<u64, Edge>,
     /// A mapping from document IDs to indexed documents
     documents: AHashMap<String, IndexedDocument>,
     /// A thesaurus is a mapping from synonyms to concepts
     pub thesaurus: Thesaurus,
     /// Aho-Corasick values
-    aho_corasick_values: Vec<Id>,
+    aho_corasick_values: Vec<u64>,
     /// Aho-Corasick automata
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
-    pub ac_reverse_nterm: AHashMap<Id, NormalizedTermValue>,
+    pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
 }
 
 impl RoleGraph {
     /// Creates a new `RoleGraph` with the given role and thesaurus
-    pub async fn new(role: String, thesaurus: Thesaurus) -> Result<Self> {
+    pub async fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
         // We need to iterate over keys and values at the same time
         // because the order of entries is not guaranteed
         // when using `.keys()` and `.values()`.
@@ -69,8 +69,8 @@ impl RoleGraph {
 
         for (key, normalized_term) in &thesaurus {
             keys.push(key);
-            values.push(normalized_term.id.clone());
-            ac_reverse_nterm.insert(normalized_term.id.clone(), normalized_term.value.clone());
+            values.push(normalized_term.id);
+            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
 
         let ac = AhoCorasick::builder()
@@ -93,19 +93,18 @@ impl RoleGraph {
     /// Find all matches in the rolegraph for the given text
     ///
     /// Returns a list of IDs of the matched nodes
-    pub fn find_matching_node_ids(&self, text: &str) -> Vec<Id> {
+    pub fn find_matching_node_ids(&self, text: &str) -> Vec<u64> {
         log::trace!("Finding matching node IDs for text: '{text}'");
         self.ac
             .find_iter(text)
-            .map(|mat| self.aho_corasick_values[mat.pattern()].clone())
+            .map(|mat| self.aho_corasick_values[mat.pattern()])
             .collect()
     }
 
-    /// Convert node rank to f64
-    ///
-    /// TODO: Reuse that because we don't want to do node-based ranking but rather f64 based ranking
+    /// Currently I don't need this functionality,
+    /// but it's commonly referred as "training" if you are writing graph embeddings, see FAIR or [Cleora](https://arxiv.org/pdf/2102.02302)
+    /// Currently I like rank based integers better - they map directly into UI grid but f64 based ranking may be useful for R&D
     /// See normalization step in https://github.com/BurntSushi/imdb-rename
-    ///
     /// This method performs several key operations to process and rank
     /// documents:
     /// - Utilizes node rank as a weight for an edge, and edge rank as a weight
@@ -171,8 +170,7 @@ impl RoleGraph {
 
                 for (document_id, document_rank) in &edge.doc_hash {
                     // For now, this sums up over nodes and edges
-                    // TODO: Calculate the total rank based on scorer
-                    let total_rank = Rank::new(node.rank + edge.rank + document_rank);
+                    let total_rank = node.rank + edge.rank + document_rank;
                     match results.entry(document_id.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(IndexedDocument {
@@ -180,7 +178,7 @@ impl RoleGraph {
                                 matched_edges: vec![edge.clone()],
                                 rank: total_rank,
                                 tags: vec![normalized_term.to_string()],
-                                nodes: vec![node_id.clone()],
+                                nodes: vec![node_id],
                             });
                         }
                         Entry::Occupied(mut e) => {
@@ -188,7 +186,7 @@ impl RoleGraph {
                             doc.rank += total_rank; // Adjust to correctly aggregate the rank
                             doc.matched_edges.push(edge.clone());
                             // Remove duplicate edges based on unique IDs
-                            doc.matched_edges.dedup_by_key(|e| e.id.clone());
+                            doc.matched_edges.dedup_by_key(|e| e.id);
                         }
                     }
                 }
@@ -225,32 +223,32 @@ impl RoleGraph {
         }
     }
 
-    pub fn add_or_update_document(&mut self, document_id: &str, x: Id, y: Id) {
-        let edge = magic_pair(x.as_u128(), y.as_u128());
-        let edge = self.init_or_update_edge(Id::from(edge), document_id);
+    pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
+        let edge = magic_pair(x, y);
+        let edge = self.init_or_update_edge(edge, document_id);
         self.init_or_update_node(x, &edge);
         self.init_or_update_node(y, &edge);
     }
 
-    fn init_or_update_node(&mut self, node_id: Id, edge: &Edge) {
-        match self.nodes.entry(node_id.clone()) {
+    fn init_or_update_node(&mut self, node_id: u64, edge: &Edge) {
+        match self.nodes.entry(node_id) {
             Entry::Vacant(_) => {
-                let node = Node::new(node_id.clone(), edge.clone());
-                self.nodes.insert(node.id.clone(), node);
+                let node = Node::new(node_id, edge.clone());
+                self.nodes.insert(node.id, node);
             }
             Entry::Occupied(entry) => {
                 let node = entry.into_mut();
                 node.rank += 1;
-                node.connected_with.push(edge.id.clone());
+                node.connected_with.insert(edge.id);
             }
         };
     }
 
-    fn init_or_update_edge(&mut self, edge_key: Id, document_id: &str) -> Edge {
-        let edge = match self.edges.entry(edge_key.clone()) {
+    fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
+        let edge = match self.edges.entry(edge_key) {
             Entry::Vacant(_) => {
                 let edge = Edge::new(edge_key, document_id.to_string());
-                self.edges.insert(edge.id.clone(), edge.clone());
+                self.edges.insert(edge.id, edge.clone());
                 edge
             }
             Entry::Occupied(entry) => {
@@ -305,7 +303,7 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 /// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
 /// also using memoize macro with Ahash hasher
 #[memoize(CustomHasher: ahash::AHashMap)]
-pub fn magic_pair(x: u128, y: u128) -> u128 {
+pub fn magic_pair(x: u64, y: u64) -> u64 {
     if x >= y {
         x * x + x + y
     } else {
@@ -313,20 +311,20 @@ pub fn magic_pair(x: u128, y: u128) -> u128 {
     }
 }
 
-// Magic unpair
-// func unpair(z int) (int, int) {
-//   q := int(math.Floor(math.Sqrt(float64(z))))
-//     l := z - q * q
+/// Magic unpair
+/// func unpair(z int) (int, int) {
+///   q := int(math.Floor(math.Sqrt(float64(z))))
+///     l := z - q * q
 
-//   if l < q {
-//       return l, q
+///   if l < q {
+///       return l, q
 //   }
 
-//   return q, l - q
-// }
+///   return q, l - q
+/// }
 #[memoize(CustomHasher: ahash::AHashMap)]
-pub fn magic_unpair(z: u128) -> (u128, u128) {
-    let q = (z as f32).sqrt().floor() as u128;
+pub fn magic_unpair(z: u64) -> (u64, u64) {
+    let q = (z as f32).sqrt().floor() as u64;
     let l = z - q * q;
     if l < q {
         (l, q)
@@ -344,7 +342,7 @@ mod tests {
     use ulid::Ulid;
 
     async fn load_sample_thesaurus() -> Thesaurus {
-        load_thesaurus(&AutomataPath::remote_example())
+        load_thesaurus(&AutomataPath::local_example_full())
             .await
             .unwrap()
     }
@@ -372,20 +370,21 @@ mod tests {
     async fn test_find_matching_node_idss() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         let matches = rolegraph.find_matching_node_ids(query);
-        assert_eq!(matches.len(), 7);
+        assert_eq!(matches.len(), 4);
     }
 
     #[test]
     async fn test_find_matching_node_idss_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
+        println!("rolegraph: {:?}", rolegraph);
         let matches = rolegraph.find_matching_node_ids(query);
         println!("matches: {:?}", matches);
         for each_match in matches.iter() {
@@ -399,9 +398,96 @@ mod tests {
     }
 
     #[test]
+    async fn test_terraphim_engineer() {
+        let role_name = "Terraphim Engineer".to_string();
+        const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+        let mut docs_path = std::env::current_dir().unwrap();
+        docs_path.pop();
+        docs_path.pop();
+        docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
+        println!("Docs path: {:?}", docs_path);
+        let automata_path = AutomataPath::from_local(
+            docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+        );
+        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
+        let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone())
+            .await
+            .unwrap();
+        let document_id = Ulid::new().to_string();
+        let test_document = r#"
+        This folder is an example of personal knowledge graph used for testing and fixtures 
+        terraphim-graph
+        "#;
+        println!("thesaurus: {:?}", thesaurus);
+        assert_eq!(thesaurus.len(), 10);
+        let matches = rolegraph.find_matching_node_ids(&test_document);
+        println!("Matches {:?}", matches);
+        for (a, b) in matches.into_iter().tuple_windows() {
+            rolegraph.add_or_update_document(&document_id, a, b);
+        }
+        let document = Document {
+            stub: None,
+            url: "/path/to/document".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id.clone(),
+            title: "README".to_string(),
+            body: test_document.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id, document);
+        println!("query with {}", "terraphim-graph and service".to_string());
+        let results: Vec<(String, IndexedDocument)> =
+            match rolegraph.query_graph("terraphim-graph and service", Some(0), Some(10)) {
+                Ok(results) => results,
+                Err(Error::NodeIdNotFound) => {
+                    println!("NodeIdNotFound");
+                    Vec::new()
+                }
+                Err(e) => {
+                    println!("Error: {:?}", e);
+                    Vec::new()
+                }
+            };
+        println!("results shall be zero: {:#?}", results);
+
+        let document_id2 = "document2".to_string();
+        let test_document2 = r#"
+        # Terraphim-Graph scorer
+        Terraphim-Graph (scorer) is using unique graph embeddings, where the rank of the term is defined by number of synonyms connected to the concept.
+        
+        synonyms:: graph embeddings, graph, knowledge graph based embeddings 
+        
+        Now we will have a concept "Terrpahim Graph Scorer" with synonyms "graph embeddings" and "terraphim-graph". This provides service
+        "#;
+        let document2 = Document {
+            stub: None,
+            url: "/path/to/document2".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id2.clone(),
+            title: "terraphim-graph".to_string(),
+            body: test_document2.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id2, document2);
+        log::debug!("Query graph");
+        let results: Vec<(String, IndexedDocument)> = rolegraph
+            .query_graph("terraphim-graph and service", Some(0), Some(10))
+            .unwrap();
+        println!("results: {:#?}", results);
+        let top_result = results.get(0).unwrap();
+        println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
+        println!("Top result {:#?}", top_result.1);
+        println!("Nodes {:#?}   ", rolegraph.nodes);
+        println!("Nodes count {:?}", rolegraph.nodes.len());
+        println!("Edges count {:?}", rolegraph.edges.len());
+    }
+
+    #[test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
-        let mut rolegraph = RoleGraph::new(role, load_sample_thesaurus().await)
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         let document_id = Ulid::new().to_string();
@@ -443,6 +529,10 @@ mod tests {
                 Some(10),
             )
             .unwrap();
+        println!("results: {:#?}", results);
+        let top_result = results.get(0).unwrap();
+        println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
+        println!("Top result {:#?}", top_result.1);
         assert_eq!(results.len(), 4);
     }
 }

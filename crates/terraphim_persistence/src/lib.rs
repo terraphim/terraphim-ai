@@ -69,7 +69,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
     async fn save_to_one(&self, profile_name: &str) -> Result<()>;
 
     /// Load a key from the fastest operator
-    async fn load(&mut self, key: &str) -> Result<Self>
+    async fn load(&mut self) -> Result<Self>
     where
         Self: Sized;
 
