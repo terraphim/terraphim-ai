@@ -73,20 +73,18 @@ function create_fragment(ctx) {
 	let label0;
 	let t6;
 	let div0;
-	let button0;
-	let t8;
 	let input0;
-	let t9;
+	let t7;
 	let div3;
 	let label1;
-	let t11;
+	let t9;
 	let div2;
 	let input1;
-	let t12;
-	let t13;
+	let t10;
+	let t11;
 	let div5;
 	let div4;
-	let button1;
+	let button;
 	let mounted;
 	let dispose;
 	let if_block = /*error*/ ctx[2] && create_if_block(ctx);
@@ -109,24 +107,21 @@ function create_fragment(ctx) {
 			label0.textContent = "Data Folder Path:";
 			t6 = space();
 			div0 = element("div");
-			button0 = element("button");
-			button0.textContent = "Select path for your data";
-			t8 = space();
 			input0 = element("input");
-			t9 = space();
+			t7 = space();
 			div3 = element("div");
 			label1 = element("label");
 			label1.textContent = "Global Shortcut:";
-			t11 = space();
+			t9 = space();
 			div2 = element("div");
 			input1 = element("input");
-			t12 = space();
+			t10 = space();
 			if (if_block) if_block.c();
-			t13 = space();
+			t11 = space();
 			div5 = element("div");
 			div4 = element("div");
-			button1 = element("button");
-			button1.textContent = "Save Settings";
+			button = element("button");
+			button.textContent = "Save Settings";
 			attr(meta, "name", "color-scheme");
 
 			attr(meta, "content", meta_content_value = /*$theme*/ ctx[3] == "spacelab"
@@ -139,8 +134,6 @@ function create_fragment(ctx) {
 			attr(p, "class", "subtitle");
 			attr(label0, "class", "label");
 			attr(label0, "for", "data-folder");
-			attr(button0, "class", "button is-link");
-			attr(button0, "id", "open-dialog");
 			attr(input0, "class", "input");
 			attr(input0, "id", "data-folder");
 			attr(input0, "type", "text");
@@ -157,7 +150,7 @@ function create_fragment(ctx) {
 			attr(input1, "placeholder", "Click to set shortcut");
 			attr(div2, "class", "control");
 			attr(div3, "class", "field");
-			attr(button1, "class", "button is-success");
+			attr(button, "class", "button is-success");
 			attr(div4, "class", "control");
 			attr(div5, "class", "field");
 			attr(div6, "class", "container svelte-1v50vlg");
@@ -177,32 +170,29 @@ function create_fragment(ctx) {
 			append(div1, label0);
 			append(div1, t6);
 			append(div1, div0);
-			append(div0, button0);
-			append(div0, t8);
 			append(div0, input0);
 			set_input_value(input0, /*dataFolder*/ ctx[0]);
-			append(div6, t9);
+			append(div6, t7);
 			append(div6, div3);
 			append(div3, label1);
-			append(div3, t11);
+			append(div3, t9);
 			append(div3, div2);
 			append(div2, input1);
 			set_input_value(input1, /*globalShortcut*/ ctx[1]);
-			append(div6, t12);
+			append(div6, t10);
 			if (if_block) if_block.m(div6, null);
-			append(div6, t13);
+			append(div6, t11);
 			append(div6, div5);
 			append(div5, div4);
-			append(div4, button1);
+			append(div4, button);
 
 			if (!mounted) {
 				dispose = [
-					listen(button0, "click", /*selectFolder*/ ctx[4]),
 					listen(input0, "input", /*input0_input_handler*/ ctx[7]),
 					listen(input0, "click", /*selectFolder*/ ctx[4]),
 					listen(input1, "input", /*input1_input_handler*/ ctx[8]),
 					listen(input1, "click", /*startCapturingShortcut*/ ctx[5]),
-					listen(button1, "click", /*saveSettings*/ ctx[6])
+					listen(button, "click", /*saveSettings*/ ctx[6])
 				];
 
 				mounted = true;
@@ -233,7 +223,7 @@ function create_fragment(ctx) {
 				} else {
 					if_block = create_if_block(ctx);
 					if_block.c();
-					if_block.m(div6, t13);
+					if_block.m(div6, t11);
 				}
 			} else if (if_block) {
 				if_block.d(1);
