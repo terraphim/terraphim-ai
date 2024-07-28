@@ -5,8 +5,10 @@ use tauri::command;
 use tauri::State;
 
 use serde::{Deserialize, Serialize};
+
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
+use terraphim_types::Thesaurus;
 use terraphim_types::{Document, SearchQuery};
 
 use serde::Serializer;
@@ -82,7 +84,7 @@ pub async fn search(
     search_query: SearchQuery,
 ) -> Result<SearchResponse> {
     log::info!("Search called with {:?}", search_query);
-    let terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
     let results = terraphim_service.search(&search_query).await?;
     Ok(SearchResponse {
         status: Status::Success,
@@ -95,9 +97,10 @@ pub async fn get_config(config_state: tauri::State<'_, ConfigState>) -> Result<C
     log::info!("Get config called");
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
     let config = terraphim_service.fetch_config().await;
+
     Ok(ConfigResponse {
         status: Status::Success,
-        config,
+        config: config,
     })
 }
 
@@ -111,6 +114,19 @@ pub async fn update_config(
     let config = terraphim_service.update_config(config_new).await?;
     Ok(ConfigResponse {
         status: Status::Success,
-        config,
+        config: config,
     })
+}
+
+/// Command to expose thesaurus if publish=true in knowledge graph
+#[command]
+pub async fn publish_thesaurus(
+    config_state: tauri::State<'_, ConfigState>,
+    role_name: String,
+) -> Result<Thesaurus> {
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let thesaurus = terraphim_service
+        .ensure_thesaurus_loaded(&role_name.into())
+        .await?;
+    Ok(thesaurus)
 }

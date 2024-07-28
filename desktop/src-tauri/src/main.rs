@@ -70,7 +70,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .invoke_handler(tauri::generate_handler![
             cmd::search,
             cmd::get_config,
-            cmd::update_config
+            cmd::update_config,
+            cmd::publish_thesaurus,
         ])
         .build(context)
         .expect("error while running tauri application");

@@ -1,0 +1,29 @@
+{
+  "name": "Terraphim Engineer",
+  "data": {
+    "middleware": {
+      "id": 74,
+      "nterm": "service"
+    },
+    "haystack": {
+      "id": 73,
+      "nterm": "haystack"
+    },
+    "service": {
+      "id": 74,
+      "nterm": "service"
+    },
+    "agent": {
+      "id": 73,
+      "nterm": "haystack"
+    },
+    "provider": {
+      "id": 74,
+      "nterm": "service"
+    },
+    "datasource": {
+      "id": 73,
+      "nterm": "haystack"
+    }
+  }
+}

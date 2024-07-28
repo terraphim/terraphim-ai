@@ -1,10 +1,10 @@
 use ahash::AHashMap;
 use std::path::PathBuf;
-use url::Url;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
+    ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Result, Role, ServiceType,
+    TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
@@ -21,17 +21,15 @@ async fn main() -> Result<()> {
             "Engineer",
             Role {
                 shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string(),
+                name: "Engineer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
-                server_url: Url::parse("http://localhost:8000/documents/search").unwrap(),
-                kg: KnowledgeGraph {
-                    automata_path: AutomataPath::local_example(),
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
-                    public: true,
-                    publish: true,
-                },
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(AutomataPath::local_example()),
+                    knowledge_graph_local: None,
+                    public: false,
+                    publish: false,
+                }),
                 haystacks: vec![Haystack {
                     path: PathBuf::from("localsearch"),
                     service: ServiceType::Ripgrep,
@@ -54,7 +52,7 @@ async fn main() -> Result<()> {
 
     let key = config.get_key();
     // println!("key: {}", key);
-    let loaded_config = config.load(&key).await?;
+    let loaded_config = config.load().await?;
     println!("loaded obj: {:?}", loaded_config);
     assert_eq!(loaded_config.get_key(), config.get_key());
 

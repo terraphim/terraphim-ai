@@ -6,7 +6,7 @@ Note: axum have it's own default/settings.toml file to configure the server depe
 it will copy default/settings.toml to ~/.config/terraphim/settings.toml if it doesn't exist on MacOS and Linux. 
 
 To build locally, run:
-```
+```bash
 earthly +save-fe-local
 cargo build
 ```

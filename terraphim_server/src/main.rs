@@ -21,9 +21,9 @@ use std::net::SocketAddr;
 use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigBuilder;
 use terraphim_config::Haystack;
-use terraphim_config::KnowledgeGraph;
 use terraphim_config::Role;
 use terraphim_config::ServiceType;
+use terraphim_config::{KnowledgeGraph, KnowledgeGraphLocal};
 use terraphim_types::KnowledgeGraphInputType;
 use terraphim_types::RelevanceFunction;
 
@@ -77,15 +77,18 @@ async fn run_server() -> Result<()> {
         cwd.join("terraphim_server/fixtures/term_to_id.json")
     };
     log::debug!("Test automata_test_path {:?}", automata_test_path);
-    let automata_path = AutomataPath::from_local(automata_test_path);
-
+    let automata_remote =
+        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+            .unwrap();
+    println!("{automata_remote}");
+    // FIXME: check if there is an existing config saved via persistable before creating a new one
     let mut config = ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
         .add_role(
             "Default",
             Role {
                 shortname: Some("Default".to_string()),
-                name: "Default".to_string(),
+                name: "Default".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
@@ -99,14 +102,16 @@ async fn run_server() -> Result<()> {
         .add_role(
             "Engineer",
             Role {
-                shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string(),
-                relevance_function: RelevanceFunction::TitleScorer,
+                shortname: Some("Engineer".into()),
+                name: "Engineer".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: automata_path.clone(),
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: system_operator_haystack.clone(),
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
+                    }),
                     public: true,
                     publish: true,
                 }),
@@ -121,13 +126,15 @@ async fn run_server() -> Result<()> {
             "System Operator",
             Role {
                 shortname: Some("operator".to_string()),
-                name: "System Operator".to_string(),
+                name: "System Operator".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path,
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: system_operator_haystack.clone(),
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
+                    }),
                     public: true,
                     publish: true,
                 }),

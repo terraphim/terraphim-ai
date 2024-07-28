@@ -6,27 +6,32 @@
 //!
 //! If we parse a file named `path/to/concept.md` with the following content:
 //!
-//! ```
+//! ```markdown
 //! synonyms:: foo, bar, baz
 //! ```
 //!
 //! Then the thesaurus will contain the following entries:
 //!
 //! ```rust
-//! use terraphim_types::Thesaurus;
-//!
-//! let mut thesaurus = Thesaurus::new();
-//! thesaurus.insert("concept".to_string(), "foo".to_string());
-//! thesaurus.insert("concept".to_string(), "bar".to_string());
-//! thesaurus.insert("concept".to_string(), "baz".to_string());
+//! use terraphim_types::{Thesaurus, Concept, NormalizedTerm};
+//! let concept = Concept::new("concept".into());
+//! let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+//! let mut thesaurus = Thesaurus::new("Engineer".to_string());
+//! thesaurus.insert(concept.value.clone(), nterm.clone());
+//! thesaurus.insert("foo".to_string().into(),nterm.clone());
+//! thesaurus.insert("bar".to_string().to_string().into(), nterm.clone());
+//! thesaurus.insert("baz".to_string().into(), nterm.clone());
 //! ```
+//! The logic as follows: if you ask for concept by name you get concept, if you ask (get) for any of the synonyms you will get concept with id,
+//! its pre-computed reverse tree traversal - any of the synonyms (leaf) maps into the concepts (root)
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
 use terraphim_persistence::Persistable;
+use terraphim_rolegraph::{Error as RoleGraphError, RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
-use terraphim_types::{Concept, NormalizedTerm, Thesaurus};
+use terraphim_types::{Concept, NormalizedTerm, RoleName, Thesaurus};
 
 use crate::Result;
 use cached::proc_macro::cached;
@@ -41,37 +46,72 @@ use crate::command::ripgrep::{json_decode, Data, Message};
 use crate::Error;
 
 pub async fn build_thesaurus_from_haystack(
-    config_state: ConfigState,
+    config_state: &mut ConfigState,
     search_query: &SearchQuery,
 ) -> Result<()> {
-    let config = config_state.config.lock().await;
+    // build thesaurus from haystack or load from remote
+    // FIXME: introduce LRU cache for locally build thesaurus via persistance crate
+    println!("Building thesaurus from haystack");
+    let config = config_state.config.lock().await.clone();
     let roles = config.roles.clone();
     let default_role = config.default_role.clone();
     let role_name = search_query.role.clone().unwrap_or_default();
-
+    println!("Role name: {}", role_name);
     let role: &mut Role = &mut roles
         .get(&role_name)
         .unwrap_or(&roles[&default_role])
         .to_owned();
-
+    println!("Role: {:?}", role);
     for haystack in &role.haystacks {
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
         let logseq = Logseq::default();
-        let thesaurus = logseq.build(role_name.clone(), &haystack.path).await?;
+        let thesaurus: Thesaurus = logseq
+            .build(role_name.as_lowercase().to_string(), &haystack.path)
+            .await?;
         match thesaurus.save().await {
-            Ok(_) => log::debug!("Thesaurus saved"),
+            Ok(_) => {
+                log::debug!("Thesaurus saved");
+                println!("Thesaurus saved");
+            }
             Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
         }
-
-        let thesaurus_path = haystack.path.join("thesaurus.json");
+        let mut haystack_path = haystack.path.clone();
+        haystack_path.pop();
+        //FIXME: This is for debug only at the momment, to be removed and replaced with load from persistable
+        let thesaurus_path = haystack
+            .path
+            .join(format!("{}_thesaurus.json", role_name.clone()));
 
         let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
+        role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
+        log::info!("Make sure thesaurus updated in a role {}", role_name);
+        println!("Make sure thesaurus updated in a role {}", role_name);
+        // TODO: may be re-building all thesaurus on change using inotify is easier
 
-        role.kg.as_mut().unwrap().automata_path = AutomataPath::Local(thesaurus_path);
+        update_thesaurus(config_state, &role_name, thesaurus).await?;
     }
+    Ok(())
+}
+
+async fn update_thesaurus(
+    config_state: &mut ConfigState,
+    role_name: &RoleName,
+    thesaurus: Thesaurus,
+) -> Result<()> {
+    println!("Updating thesaurus for role: {}", role_name);
+    let mut rolegraphs = config_state.roles.clone();
+    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
+    match rolegraph {
+        Ok(rolegraph) => {
+            let rolegraph_value = RoleGraphSync::from(rolegraph);
+            rolegraphs.insert(role_name.clone(), rolegraph_value);
+        }
+        Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+    }
+
     Ok(())
 }
 
@@ -97,13 +137,15 @@ pub trait ThesaurusBuilder {
 /// In Logseq, `::` serves as a delimiter between the property name and its
 /// value, e.g.
 ///
-/// ```
+/// ```markdown
 /// title:: My Note
 /// tags:: #idea #project
 /// ```
+// FIXME: move to config item per role
 const LOGSEQ_KEY_VALUE_DELIMITER: &str = "::";
 
 /// The synonyms keyword used in Logseq documents
+// FIXME: move to config item per role
 const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 /// A builder for a knowledge graph, which knows how to handle Logseq input.
@@ -137,7 +179,7 @@ impl Default for LogseqService {
     fn default() -> Self {
         Self {
             command: "rg".to_string(),
-            default_args: ["--json", "--trim", "--ignore-case"]
+            default_args: ["--json", "--trim", "--ignore-case", "-tmarkdown"]
                 .into_iter()
                 .map(String::from)
                 .collect(),
@@ -277,15 +319,19 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                     synonym.split(',').map(|s| s.trim().to_string()).collect();
 
                 let concept = match current_concept {
-                    Some(ref concept) => concept,
+                    Some(ref concept) => {
+                        let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+                        thesaurus.insert(concept.value.clone(), nterm);
+                        concept
+                    }
                     None => {
                         println!("Error: No concept found. Skipping");
                         continue;
                     }
                 };
                 for synonym in synonyms {
-                    let nterm = NormalizedTerm::new(concept.id.clone(), synonym.into());
-                    thesaurus.insert(concept.value.clone(), nterm);
+                    let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+                    thesaurus.insert(synonym.into(), nterm);
                 }
             }
             _ => {}

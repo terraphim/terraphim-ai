@@ -149,7 +149,7 @@ test:
   # COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
   # RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 5 && cargo test;
-  RUN cargo test
+  RUN cargo test --workspace
   #DO rust+CARGO --args="test --offline"
 
 fmt:
@@ -252,8 +252,8 @@ docs-deps:
   RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
-  RUN cargo install --git https://github.com/typst/typst typst-cli 
-  RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
+  # RUN cargo install --git https://github.com/typst/typst typst-cli 
+  # RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
   RUN cargo install mdbook-mermaid
   RUN cargo install mdbook-alerts
   RUN apt update && apt install libvips-dev -y

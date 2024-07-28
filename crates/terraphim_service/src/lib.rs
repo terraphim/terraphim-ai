@@ -1,8 +1,13 @@
+use ahash::AHashMap;
+use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_config::{ConfigState, Role};
-use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
+use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
 use terraphim_persistence::error;
-use terraphim_types::{Document, Index, IndexedDocument, RelevanceFunction, SearchQuery};
-
+use terraphim_persistence::Persistable;
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
+use terraphim_types::{
+    Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus,
+};
 mod score;
 
 #[derive(thiserror::Error, Debug)]
@@ -33,8 +38,61 @@ impl<'a> TerraphimService {
     }
 
     /// Build a thesaurus from the haystack and update the knowledge graph automata URL
-    async fn build_thesaurus(&self, search_query: &SearchQuery) -> Result<()> {
-        Ok(build_thesaurus_from_haystack(self.config_state.clone(), search_query).await?)
+    async fn build_thesaurus(&mut self, search_query: &SearchQuery) -> Result<()> {
+        Ok(build_thesaurus_from_haystack(&mut self.config_state, search_query).await?)
+    }
+    /// load thesaurus from config object and if absent make sure it's loaded from automata_url
+    pub async fn ensure_thesaurus_loaded(&mut self, role_name: &RoleName) -> Result<Thesaurus> {
+        async fn load_thesaurus_from_automata_path(
+            config_state: &ConfigState,
+            role_name: &RoleName,
+            rolegraphs: &mut AHashMap<RoleName, RoleGraphSync>,
+        ) -> Result<Thesaurus> {
+            let role = config_state.get_role(role_name).await.unwrap();
+            if let Some(automata_path) = role.kg.unwrap().automata_path {
+                let thesaurus = load_thesaurus(&automata_path).await.unwrap();
+                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                match rolegraph {
+                    Ok(rolegraph) => {
+                        let rolegraph_value = RoleGraphSync::from(rolegraph);
+                        rolegraphs.insert(role_name.clone(), rolegraph_value);
+                    }
+                    Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                }
+                Ok(thesaurus)
+            } else {
+                Err(ServiceError::Config("Automata path not found".into()))
+            }
+        }
+        println!("Loading thesaurus for role: {}", role_name);
+        println!("Role keys {:?}", self.config_state.roles.keys());
+        let mut rolegraphs = self.config_state.roles.clone();
+        if let Some(rolegraph_value) = rolegraphs.get(role_name) {
+            let mut thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
+            match thesaurus_result {
+                Ok(thesaurus) => {
+                    println!("Thesaurus loaded: {:#?}", thesaurus);
+                    log::info!("Rolegraph loaded: for role name {:?}", role_name);
+                    return Ok(thesaurus);
+                }
+                Err(e) => {
+                    log::error!("Failed to load thesaurus: {:?}", e);
+                    return load_thesaurus_from_automata_path(
+                        &self.config_state,
+                        role_name,
+                        &mut rolegraphs,
+                    )
+                    .await;
+                }
+            }
+        } else {
+            return load_thesaurus_from_automata_path(
+                &self.config_state,
+                role_name,
+                &mut rolegraphs,
+            )
+            .await;
+        }
     }
 
     /// Create document
@@ -45,7 +103,7 @@ impl<'a> TerraphimService {
 
     /// Get the role for the given search query
     async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
-        let search_role: String = match &search_query.role {
+        let search_role = match &search_query.role {
             Some(role) => role.clone(),
             None => self.config_state.get_default_role().await,
         };
@@ -61,7 +119,7 @@ impl<'a> TerraphimService {
     }
 
     /// Search for documents in the haystacks
-    pub async fn search(&self, search_query: &SearchQuery) -> Result<Vec<Document>> {
+    pub async fn search(&mut self, search_query: &SearchQuery) -> Result<Vec<Document>> {
         // Get the role from the config
         log::debug!("Role for searching: {:?}", search_query.role);
         let role = self.get_search_role(search_query).await?;
@@ -84,7 +142,7 @@ impl<'a> TerraphimService {
                 let mut docs_ranked = Vec::new();
                 for (idx, doc) in documents.iter().enumerate() {
                     let document: &mut terraphim_types::Document = &mut doc.clone();
-                    let rank = terraphim_types::Rank::new((total_length - idx).try_into().unwrap());
+                    let rank = (total_length - idx).try_into().unwrap();
                     document.rank = Some(rank);
                     docs_ranked.push(document.clone());
                 }
@@ -92,7 +150,7 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
-
+                let thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
                 let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
                     .search_indexed_documents(search_query, &role)
@@ -101,6 +159,7 @@ impl<'a> TerraphimService {
                 // Apply to ripgrep vector of document output
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
+                println!("Ranking documents with thesaurus");
                 let documents = index.get_documents(scored_index_docs);
 
                 Ok(documents)

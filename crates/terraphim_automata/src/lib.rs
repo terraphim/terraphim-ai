@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
-use url::Url;
 
 use terraphim_types::Thesaurus;
 
@@ -25,9 +24,6 @@ pub enum TerraphimAutomataError {
 
     #[error("Aho-Corasick build error: {0}")]
     AhoCorasick(#[from] aho_corasick::BuildError),
-
-    #[error("URL parse error: {0}")]
-    UrlParse(#[from] url::ParseError),
 }
 
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
@@ -38,7 +34,7 @@ pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AutomataPath {
     Local(PathBuf),
-    Remote(Url),
+    Remote(String),
 }
 
 impl Display for AutomataPath {
@@ -53,16 +49,14 @@ impl Display for AutomataPath {
 impl AutomataPath {
     /// Create a new AutomataPath from a URL
     pub fn from_remote(url: &str) -> Result<Self> {
-        let url = Url::parse(url)?;
-
-        if url.scheme() != "http" && url.scheme() != "https" {
+        if !url.starts_with("http") || !url.starts_with("https") {
             return Err(TerraphimAutomataError::Dict(format!(
                 "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
-                url.scheme()
+                url
             )));
         }
 
-        Ok(AutomataPath::Remote(url))
+        Ok(AutomataPath::Remote(url.to_string()))
     }
 
     /// Create a new AutomataPath from a file
@@ -72,15 +66,18 @@ impl AutomataPath {
 
     /// Local example for testing
     pub fn local_example() -> Self {
+        log::debug!("Current folder {:?}", std::env::current_dir());
         AutomataPath::from_local("data/term_to_id_simple.json")
+    }
+    /// Full Local example for testing
+    pub fn local_example_full() -> Self {
+        AutomataPath::from_local("data/term_to_id.json")
     }
 
     /// Create a sample remote AutomataPath for testing
     pub fn remote_example() -> Self {
-        AutomataPath::from_remote(
-            "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
-        )
-        .unwrap()
+        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+            .unwrap()
     }
 }
 
@@ -93,7 +90,7 @@ impl AutomataPath {
 
 /// Load a thesaurus from a file or URL
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
-    async fn read_url(url: Url) -> Result<String> {
+    async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::new()
             .get(url.clone())
@@ -133,7 +130,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
 
 #[cfg(test)]
 mod tests {
-    use terraphim_types::{Id, NormalizedTermValue};
+    use terraphim_types::NormalizedTermValue;
 
     use super::*;
 
@@ -144,15 +141,15 @@ mod tests {
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
-            Id::from(1)
+            1_u64
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
-            Id::from(2)
+            2_u64
         );
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
-            Id::from(1)
+            1_u64
         );
     }
 
@@ -166,7 +163,7 @@ mod tests {
                 .get(&NormalizedTermValue::from("@risk a user guide"))
                 .unwrap()
                 .id,
-            Id::from(661)
+            661_u64
         );
     }
 }

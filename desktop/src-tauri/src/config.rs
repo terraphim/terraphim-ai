@@ -3,20 +3,19 @@ use std::path::PathBuf;
 use ahash::AHashMap;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    Config, ConfigBuilder, Haystack, KnowledgeGraph, Role, ServiceType, TerraphimConfigError,
+    Config, ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
+    TerraphimConfigError,
 };
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 
 /// The path to the default haystack directory
 // TODO: Replace this with a file-based config loader based on `twelf` in the
 // future
-// const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
-const DEFAULT_HAYSTACK_PATH: &str = "terraphim_server/fixtures";
+const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+// const DEFAULT_HAYSTACK_PATH: &str = "terraphim_server/fixtures";
 
 /// Load the default config
 ///
-// TODO: Replace this with a file-based config loader based on `twelf` in the
-// future
 pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
     let automata_path = AutomataPath::from_local("data/term_to_id.json");
 
@@ -34,7 +33,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             "Default",
             Role {
                 shortname: Some("Default".to_string()),
-                name: "Default".to_string(),
+                name: "Default".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
@@ -49,7 +48,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             "Engineer",
             Role {
                 shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string(),
+                name: "Engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
                 kg: None,
@@ -61,21 +60,48 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
             },
         )
         .add_role(
-            "System Operator",
+            "Terraphim Engineer",
             Role {
-                shortname: Some("operator".to_string()),
-                name: "System Operator".to_string(),
-                relevance_function: RelevanceFunction::TitleScorer,
-                theme: "superhero".to_string(),
+                shortname: Some("Terraphim Engineer".to_string()),
+                name: "Terraphim Engineer".to_string().into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path,
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("~/pkm"),
+                    automata_path: Some(AutomataPath::from_local(
+                        docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                    )),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: docs_path.join("kg"),
+                    }),
                     public: true,
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: docs_path,
+                    path: docs_path.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .add_role(
+            "System Operator",
+            Role {
+                shortname: Some("operator".to_string()),
+                name: "System Operator".to_string().into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "superhero".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(automata_path.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("/tmp/system_operator/pages/"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    path: docs_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
