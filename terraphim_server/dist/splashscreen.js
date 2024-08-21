@@ -29,11 +29,19 @@ import { resolve, appDir, appDataDir } from "@tauri-apps/api/path";
 import { isInitialSetupComplete, theme } from "$lib/stores";
 import { readBinaryFile } from '@tauri-apps/api/fs';
 
+import {
+	register as registerShortcut,
+	unregisterAll as unregisterAllShortcuts,
+	unregister as unregisterShortcut
+} from "@tauri-apps/api/globalShortcut";
+
+import { appWindow } from "@tauri-apps/api/window";
+
 function add_css(target) {
 	append_styles(target, "svelte-1v50vlg", ".startup-screen.svelte-1v50vlg{display:flex;align-items:center;justify-content:center;height:100vh}.container.svelte-1v50vlg{max-width:500px}");
 }
 
-// (124:4) {#if error}
+// (144:4) {#if error}
 function create_if_block(ctx) {
 	let p;
 	let t;
@@ -248,7 +256,7 @@ function instance($$self, $$props, $$invalidate) {
 	let $theme;
 	component_subscribe($$self, theme, $$value => $$invalidate(3, $theme = $$value));
 	let dataFolder = "";
-	let globalShortcut = "";
+	let globalShortcut = "CmdOrControl+X";
 	let error = "";
 	let isCapturingShortcut = false;
 
@@ -296,6 +304,21 @@ function instance($$self, $$props, $$invalidate) {
 	}
 
 	async function saveSettings() {
+		// Register the global shortcut
+		try {
+			await registerShortcut(globalShortcut, () => {
+				if (appWindow.isVisible()) {
+					appWindow.hide();
+				}
+			});
+
+			console.log(`Global shortcut ${globalShortcut} registered successfully`);
+		} catch(err) {
+			$$invalidate(2, error = `Failed to register global shortcut: ${err.message}`);
+			console.error("Failed to register global shortcut:", err);
+			return;
+		}
+
 		if (!dataFolder || !globalShortcut) {
 			$$invalidate(2, error = "Please fill in both fields");
 			return;
@@ -303,13 +326,14 @@ function instance($$self, $$props, $$invalidate) {
 
 		try {
 			await invoke("save_initial_settings", {
-				settings: {
+				newSettings: {
 					data_folder: dataFolder,
 					global_shortcut: globalShortcut
 				}
 			});
 
-			window.location.reload();
+			alert("Settings saved successfully");
+			await invoke("close_splashscreen");
 		} catch(e) {
 			$$invalidate(2, error = "Failed to save settings");
 			console.error(e);
@@ -320,6 +344,7 @@ function instance($$self, $$props, $$invalidate) {
 	}
 
 	onMount(() => {
+		// unregisterAllShortcuts();
 		document.addEventListener("keydown", handleKeyDown);
 
 		return () => {
