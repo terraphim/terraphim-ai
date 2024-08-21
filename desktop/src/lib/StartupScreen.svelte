@@ -6,9 +6,14 @@
   import { resolve, appDir, appDataDir } from "@tauri-apps/api/path";
   import { isInitialSetupComplete, theme } from "$lib/stores";
   import { readBinaryFile } from '@tauri-apps/api/fs'
-
+  import {
+    register as registerShortcut,
+    unregisterAll as unregisterAllShortcuts,
+    unregister as unregisterShortcut,
+  } from "@tauri-apps/api/globalShortcut";
+  import { appWindow } from "@tauri-apps/api/window";
   let dataFolder = "";
-  let globalShortcut = "";
+  let globalShortcut = "CmdOrControl+X";
   let error = "";
   let isCapturingShortcut = false;
 
@@ -57,6 +62,19 @@
   }
 
   async function saveSettings() {
+    // Register the global shortcut
+    try {
+      await registerShortcut(globalShortcut, () => {
+        if (appWindow.isVisible()) {
+          appWindow.hide();
+        }
+      });
+      console.log(`Global shortcut ${globalShortcut} registered successfully`);
+    } catch (err) {
+      error = `Failed to register global shortcut: ${err.message}`;
+      console.error("Failed to register global shortcut:", err);
+      return;
+    }
     if (!dataFolder || !globalShortcut) {
       error = "Please fill in both fields";
       return;
@@ -64,12 +82,13 @@
 
     try {
       await invoke("save_initial_settings", {
-        settings: {
+        newSettings: {
           data_folder: dataFolder,
           global_shortcut: globalShortcut,
         },
       });
-      window.location.reload();
+      alert("Settings saved successfully");
+      await invoke("close_splashscreen");
     } catch (e) {
       error = "Failed to save settings";
       console.error(e);
@@ -80,6 +99,7 @@
   }
 
   onMount(() => {
+    // unregisterAllShortcuts();
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);

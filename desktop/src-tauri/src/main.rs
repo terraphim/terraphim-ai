@@ -5,9 +5,10 @@
 
 mod cmd;
 mod config;
-mod startup;
 
 use std::error::Error;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tauri::{
     CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
     SystemTrayMenu, WindowBuilder,
@@ -18,14 +19,22 @@ use terraphim_settings::DeviceSettings;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // TODO: Use the device settings to load the config
-    let _device_settings = DeviceSettings::load_from_env_and_file(None);
+    let device_settings = match DeviceSettings::load_from_env_and_file(None) {
+        Ok(settings) => settings,
+        Err(e) => {
+            log::error!("Failed to load device settings: {:?}", e);
+            panic!("Failed to load device settings: {:?}", e);
+        }
+    };
+    let device_settings_read=device_settings.clone();
+    let device_settings = Arc::new(Mutex::new(device_settings));
+    
+    log::info!("Device settings: {:?}", device_settings.lock().await);
 
     let mut config = config::load_config()?;
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let global_shortcut = current_config.global_shortcut.clone();
-    // drop mutex guard to avoid deadlock
     drop(current_config);
 
     log::debug!("{:?}", config_state.config);
@@ -63,26 +72,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
             _ => {}
         })
         .manage(config_state.clone())
+        .manage(device_settings.clone())
         .invoke_handler(tauri::generate_handler![
             cmd::search,
             cmd::get_config,
             cmd::update_config,
             cmd::publish_thesaurus,
-            startup::save_initial_settings,
+            cmd::save_initial_settings,
+            cmd::close_splashscreen,
             start_main_app,
         ])
-        .setup(|app| {
-            let splashscreen_window = WindowBuilder::new(app, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
+        .setup(move |app| {
+            let settings = device_settings_read.clone();
+            println!("Settings: {:?}", settings);
+            let handle = app.handle();
+            let main_window = app.get_window("main").unwrap(); 
+            if !settings.initialized {           
+            tauri::async_runtime::spawn(async move {
+                let splashscreen_window = WindowBuilder::new(&handle, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
                 .title("Splashscreen")
                 .resizable(true)
-                .decorations(false)
-                .always_on_top(true)
-                .inner_size(400.0, 400.0)
-                .build()?;
+                .decorations(true)
+                .always_on_top(false)
+                .inner_size(800.0, 600.0).build().unwrap();
+                splashscreen_window.show().unwrap();
 
-            // Hide the main window initially
-            app.get_window("main").unwrap().hide()?;
-
+                // Hide the main window initially
+                main_window.hide().unwrap();
+            });
+            } else {
+                // Show the main window if device_settings.initialized is true
+                main_window.show().unwrap();
+            }
+       
             Ok(())
         })
         .build(context)

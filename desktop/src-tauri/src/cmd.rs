@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
+use terraphim_settings::DeviceSettings;
 use terraphim_types::Thesaurus;
 use terraphim_types::{Document, SearchQuery};
 
@@ -129,4 +130,54 @@ pub async fn publish_thesaurus(
         .ensure_thesaurus_loaded(&role_name.into())
         .await?;
     Ok(thesaurus)
+}
+
+
+use std::path::PathBuf;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialSettings {
+    data_folder: PathBuf,
+    global_shortcut: String,
+}
+use tauri::async_runtime::Mutex;
+use std::sync::Arc;
+
+#[tauri::command]
+pub async fn save_initial_settings( config_state: tauri::State<'_, ConfigState>,
+    device_settings: tauri::State<'_, Arc<Mutex<DeviceSettings>>>,new_settings: InitialSettings) -> Result<()> {
+    println!("Saving initial settings: {:?}", new_settings);
+    println!("Device settings: {:?}", device_settings);
+    let mut settings = device_settings.lock().await;
+    let mut config = config_state.config.lock().await;
+    let data_folder = PathBuf::from(&new_settings.data_folder);
+    println!("Data folder: {:?}", data_folder);
+    if !data_folder.exists() {
+        println!("Data folder does not exist");
+    }
+    if !data_folder.is_dir() {
+        println!("Selected path is not a folder");
+    }
+    
+    // Here you would typically save these settings to a file or database
+    // For this example, we'll just print them
+    println!("Data folder: {:?}", new_settings.data_folder);
+    println!("Global shortcut: {}", new_settings.global_shortcut);
+    config.global_shortcut = new_settings.global_shortcut;
+    let updated_config = config.clone();
+    drop(config);  // Release the lock before calling update_config
+    update_config(config_state.clone(), updated_config).await?;
+    // settings.data_folder = data_folder;
+    settings.update_initialized_flag(None, true).unwrap();
+    drop(settings);
+    Ok(())
+}
+use tauri::{Manager, Window};
+
+#[tauri::command]
+pub async fn close_splashscreen(window: Window) {
+  // Close splashscreen
+  window.get_window("splashscreen").expect("no window labeled 'splashscreen' found").close().unwrap();
+  // Show main window
+  window.get_window("main").expect("no window labeled 'main' found").show().unwrap();
 }
