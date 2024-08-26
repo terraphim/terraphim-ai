@@ -79,8 +79,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::update_config,
             cmd::publish_thesaurus,
             cmd::save_initial_settings,
-            cmd::close_splashscreen,
-            start_main_app,
+            cmd::close_splashscreen
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();
@@ -132,22 +131,4 @@ async fn main() -> Result<(), Box<dyn Error>> {
         _ => {}
     });
     Ok(())
-}
-
-#[tauri::command]
-async fn start_main_app(app_handle: tauri::AppHandle) {
-    // Reload config here if needed
-    // let mut config = config::load_config().unwrap();
-    // let config_state = ConfigState::new(&mut config).await.unwrap();
-    // app_handle.manage(config_state);
-
-    // Close splashscreen
-    if let Some(splashscreen) = app_handle.get_window("splashscreen") {
-        splashscreen.close().unwrap();
-    }
-
-    // Show main window
-    if let Some(main_window) = app_handle.get_window("main") {
-        main_window.show().unwrap();
-    }
 }
