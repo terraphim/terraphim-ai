@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::publish_thesaurus,
             cmd::save_initial_settings,
             cmd::close_splashscreen
-        ])
+       ])
         .setup(move |app| {
             let settings = device_settings_read.clone();
             println!("Settings: {:?}", settings);

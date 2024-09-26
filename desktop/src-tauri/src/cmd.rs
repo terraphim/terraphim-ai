@@ -132,7 +132,6 @@ pub async fn publish_thesaurus(
     Ok(thesaurus)
 }
 
-
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
