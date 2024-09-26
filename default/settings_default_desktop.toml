@@ -1,5 +1,6 @@
 server_hostname = "${TERRAPHIM_SERVER_HOSTNAME}-127.0.0.1:8000"
 api_endpoint="${TERRAPHIM_SERVER_API_ENDPOINT}-http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
 
 [profiles.s3]
 type = "s3"

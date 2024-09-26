@@ -73,25 +73,25 @@ impl<'a> TerraphimService {
                 Ok(thesaurus) => {
                     println!("Thesaurus loaded: {:#?}", thesaurus);
                     log::info!("Rolegraph loaded: for role name {:?}", role_name);
-                    return Ok(thesaurus);
+                    Ok(thesaurus)
                 }
                 Err(e) => {
                     log::error!("Failed to load thesaurus: {:?}", e);
-                    return load_thesaurus_from_automata_path(
+                    load_thesaurus_from_automata_path(
                         &self.config_state,
                         role_name,
                         &mut rolegraphs,
                     )
-                    .await;
+                    .await
                 }
             }
         } else {
-            return load_thesaurus_from_automata_path(
+            load_thesaurus_from_automata_path(
                 &self.config_state,
                 role_name,
                 &mut rolegraphs,
             )
-            .await;
+            .await
         }
     }
 

@@ -1,5 +1,6 @@
 server_hostname = "127.0.0.1:8000"
 api_endpoint="http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
 
 [profiles.s3]
 type = "s3"

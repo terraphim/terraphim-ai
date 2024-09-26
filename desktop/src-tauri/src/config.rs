@@ -17,6 +17,7 @@ const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
 /// Load the default config
 ///
 pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
+    
     let automata_path = AutomataPath::from_local("data/term_to_id.json");
 
     // Create the path to the default haystack directory
