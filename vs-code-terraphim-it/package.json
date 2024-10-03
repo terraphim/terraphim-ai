@@ -30,7 +30,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "pnpm exec tsc -p ./",
     "lint": "eslint \"src/**/*.ts\"",
-    "watch": "pnpm exec tsc -watch -p ./"
+    "watch": "pnpm exec tsc -watch -p ./",
+    "update-ontologies": "pnpm exec ad-generate ontologies"
   },
   "devDependencies": {
     "@types/node": "^18",

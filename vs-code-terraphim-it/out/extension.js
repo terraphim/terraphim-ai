@@ -4,7 +4,7 @@ exports.activate = activate;
 const vscode = require("vscode");
 const lib_1 = require("@tomic/lib");
 const getStore_1 = require("./helpers/getStore");
-const airportOntology_1 = require("./airport-ontology/src/ontologies/airportOntology");
+const airportOntology_1 = require("./ontologies/airportOntology");
 // --------- Create a Store ---------.
 const store = (0, getStore_1.getStore)();
 async function get_all_resources() {
