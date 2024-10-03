@@ -21,16 +21,16 @@
   "contributes": {
     "commands": [
       {
-        "command": "extension.terraphimIt",
-        "title": "Terraphim it"
+        "command": "extension.terraphimCommand",
+        "title": "Terraphim IT"
       }
     ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "pnpm exec tsc -p ./",
     "lint": "eslint \"src/**/*.ts\"",
-    "watch": "tsc -watch -p ./"
+    "watch": "pnpm exec tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/node": "^18",
@@ -38,6 +38,10 @@
     "@typescript-eslint/eslint-plugin": "^7.14.0",
     "@typescript-eslint/parser": "^7.14.0",
     "eslint": "^8.26.0",
-    "typescript": "^5.5.2"
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@tomic/cli": "^0.39.0",
+    "@tomic/lib": "^0.39.0"
   }
 }

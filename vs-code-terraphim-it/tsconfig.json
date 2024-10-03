@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"module": "commonjs",
 		"target": "es2020",
-		"lib": ["es2020"],
+		"lib": ["ES2022", "dom", "es6", "es5", "dom.iterable", "scripthost","ESNext"],
 		"outDir": "out",
 		"sourceMap": true,
 		"strict": true,
