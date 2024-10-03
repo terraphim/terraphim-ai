@@ -38,6 +38,7 @@ function activate(context) {
             const word = document.getText();
             const reversed = word.split('').reverse().join('');
             const results = await get_all_resources();
+            console.log(results);
             editor.edit(editBuilder => {
                 editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), reversed);
             });

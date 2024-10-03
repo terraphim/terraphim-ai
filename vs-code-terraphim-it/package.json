@@ -42,7 +42,7 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "@tomic/cli": "^0.39.0",
-    "@tomic/lib": "^0.39.0"
+    "@tomic/cli": "0.40.0",
+    "@tomic/lib": "0.40.0"
   }
 }
