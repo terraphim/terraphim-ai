@@ -9,7 +9,7 @@ import {
 // --------- Create a Store ---------.
 const store = getStore();
 
-async function get_all_resources() {
+async function get_all_resources(): Promise<{ [key: string]: string }> {
   // search over all atomic server resources
   const itemCollection = new CollectionBuilder(store)
     .setProperty(core.properties.isA)
@@ -18,16 +18,18 @@ async function get_all_resources() {
     .setSortDesc(true)
     .build();
 
-  const results = [];
+  const results: { [key: string]: string } = {};
+
   for await (const inst of itemCollection) {
     const item = await store.getResource<SystemOperatorAnalyticalLens>(inst);
-    results.push({
-      id: item.subject,
-      title: item.title,
-      description: item.subject,
-    });
+    if (item.props.synonym) {
+      // split the synonym by comma and add each synonym as a key
+      item.props.synonym.split(',').forEach(synonym => {
+        results[synonym] = item.subject;
+      });
+    }
+    results[item.title] = item.subject;
   }
-  console.log(results);
   return results;
 }
 
@@ -43,17 +45,17 @@ export function activate(context: vscode.ExtensionContext) {
         // const selection = editor.selection;
 
         // Get the word within the selection
-        const word = document.getText();
-        const reversed = word.split('').reverse().join('');
+        let text = document.getText();
         const results = await get_all_resources();
-        console.log(results);
+        Object.keys(results).forEach(key => {
+          text = text.replace(new RegExp(key, 'g'), `[${key}](${results[key]})`);
+        });
         editor.edit(editBuilder => {
           editBuilder.replace(
             new vscode.Range(0, 0, editor.document.lineCount, 0),
-            reversed,
+            text,
           );
         });
-        editor.insertSnippet(new vscode.SnippetString(results[0].description));
       }
     },
   );

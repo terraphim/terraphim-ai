@@ -14,7 +14,13 @@
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Other"
+    "AI",
+    "Programming Languages",
+    "Education",
+    "Machine Learning",
+    "Data Science",
+    "Other",
+    "Snippets"
   ],
   "activationEvents": [],
   "main": "./out/extension",

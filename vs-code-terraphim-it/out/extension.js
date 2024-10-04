@@ -15,16 +15,17 @@ async function get_all_resources() {
         .setSortBy(airportOntology_1.airportOntology.properties.synonym)
         .setSortDesc(true)
         .build();
-    const results = [];
+    const results = {};
     for await (const inst of itemCollection) {
         const item = await store.getResource(inst);
-        results.push({
-            id: item.subject,
-            title: item.title,
-            description: item.subject,
-        });
+        if (item.props.synonym) {
+            // split the synonym by comma and add each synonym as a key
+            item.props.synonym.split(',').forEach(synonym => {
+                results[synonym] = item.subject;
+            });
+        }
+        results[item.title] = item.subject;
     }
-    console.log(results);
     return results;
 }
 function activate(context) {
@@ -35,14 +36,14 @@ function activate(context) {
             const document = editor.document;
             // const selection = editor.selection;
             // Get the word within the selection
-            const word = document.getText();
-            const reversed = word.split('').reverse().join('');
+            let text = document.getText();
             const results = await get_all_resources();
-            console.log(results);
-            editor.edit(editBuilder => {
-                editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), reversed);
+            Object.keys(results).forEach(key => {
+                text = text.replace(new RegExp(key, 'g'), `[${key}](${results[key]})`);
             });
-            editor.insertSnippet(new vscode.SnippetString(results[0].description));
+            editor.edit(editBuilder => {
+                editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), text);
+            });
         }
     });
     context.subscriptions.push(disposable);
