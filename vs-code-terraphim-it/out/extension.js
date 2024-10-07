@@ -8,6 +8,7 @@ const pkg_1 = require("../rust-lib/pkg");
 const airportOntology_1 = require("./ontologies/airportOntology");
 function activate(context) {
     let agent;
+    let store;
     const disposable = vscode.commands.registerCommand('extension.terraphimCommand', async function () {
         // Get the configuration
         const config = vscode.workspace.getConfiguration('terraphimIt');
@@ -27,8 +28,7 @@ function activate(context) {
         }
         vscode.window.showInformationMessage("Replacing links using Rust");
         // --------- Create a Store ---------.
-        const store = (0, getStore_1.getStore)(agent);
-        // Get the active text editor
+        store = (0, getStore_1.getStore)(agent);
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             const document = editor.document;
@@ -51,6 +51,36 @@ function activate(context) {
         }
     });
     context.subscriptions.push(disposable);
+    // Register the Terraphim AI Autocomplete command
+    const autocompleteDisposable = vscode.commands.registerCommand('extension.terraphimAIAutocomplete', async function () {
+        if (!store) {
+            store = (0, getStore_1.getStore)(agent);
+        }
+        // Register the completion provider
+        const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimCompletionProvider(store), ' ' // Trigger on space
+        );
+        context.subscriptions.push(provider);
+        vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
+    });
+    context.subscriptions.push(autocompleteDisposable);
+}
+class TerraphimCompletionProvider {
+    constructor(store) {
+        this.store = store;
+    }
+    async provideCompletionItems(document, position, token, context) {
+        const linePrefix = document.lineAt(position).text.substr(0, position.character);
+        if (!linePrefix.endsWith(' ')) {
+            return [];
+        }
+        const results = await get_all_resources(this.store);
+        return Object.entries(results.data).map(([key, value]) => {
+            const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Text);
+            item.detail = value.description;
+            item.documentation = new vscode.MarkdownString(`[${value.nterm}](${value.url})`);
+            return item;
+        });
+    }
 }
 async function get_all_resources(store) {
     // search over all atomic server resources
@@ -68,11 +98,11 @@ async function get_all_resources(store) {
         if (item.props.synonym) {
             // split the synonym by comma and add each synonym as a key
             item.props.synonym.split(',').forEach(synonym => {
-                results.data[synonym] = { id: counter, nterm: item.props.name, url: item.subject };
+                results.data[synonym] = { id: counter, nterm: item.props.name, url: item.subject, description: item.props.description };
                 counter++;
             });
         }
-        results.data[item.props.name] = { id: counter, nterm: item.props.name, url: item.subject };
+        results.data[item.props.name] = { id: counter, nterm: item.props.name, url: item.subject, description: item.props.description };
         counter++;
     }
     // console.log(results);

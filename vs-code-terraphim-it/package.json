@@ -29,6 +29,10 @@
       {
         "command": "extension.terraphimCommand",
         "title": "Terraphim IT"
+      },
+      {
+        "command": "extension.terraphimAIAutocomplete",
+        "title": "Terraphim AI Autocomplete"
       }
     ],
     "configuration": {

@@ -15,12 +15,14 @@ interface EngineeringData {
       id: number;
       nterm: string;
       url: string;
+      description: string;
     };
   };
 }
 
 export function activate(context: vscode.ExtensionContext) {
   let agent: string | undefined;
+  let store: Store | undefined;
 
   const disposable = vscode.commands.registerCommand(
     'extension.terraphimCommand',
@@ -44,10 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
       vscode.window.showInformationMessage("Replacing links using Rust");
-        // --------- Create a Store ---------.
-    const store = getStore(agent);
+      // --------- Create a Store ---------.
 
-      // Get the active text editor
+      store = getStore(agent);
+
       const editor = vscode.window.activeTextEditor;
 
       if (editor) {
@@ -77,7 +79,59 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(disposable);
+  // Register the Terraphim AI Autocomplete command
+  const autocompleteDisposable = vscode.commands.registerCommand(
+    'extension.terraphimAIAutocomplete',
+    async function () {
+      if (!store) {
+        store = getStore(agent);
+      }
+
+      // Register the completion provider
+      const provider = vscode.languages.registerCompletionItemProvider(
+        { scheme: 'file', language: '*' },
+        new TerraphimCompletionProvider(store),
+        ' ' // Trigger on space
+      );
+
+      context.subscriptions.push(provider);
+      vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
+    }
+  );
+
+  context.subscriptions.push(autocompleteDisposable);
+  
 }
+
+class TerraphimCompletionProvider implements vscode.CompletionItemProvider {
+  private store: Store;
+
+  constructor(store: Store) {
+    this.store = store;
+  }
+
+  async provideCompletionItems(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    token: vscode.CancellationToken,
+    context: vscode.CompletionContext
+  ): Promise<vscode.CompletionItem[] | vscode.CompletionList> {
+    const linePrefix = document.lineAt(position).text.substr(0, position.character);
+    if (!linePrefix.endsWith(' ')) {
+      return [];
+    }
+
+    const results = await get_all_resources(this.store);
+    return Object.entries(results.data).map(([key, value]) => {
+      const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Text);
+      item.detail = value.description;
+      item.documentation = new vscode.MarkdownString(`[${value.nterm}](${value.url})`);
+      return item;
+    });
+  }
+}
+
+
 
 async function get_all_resources(store: Store): Promise<EngineeringData> {
   // search over all atomic server resources
@@ -98,11 +152,11 @@ async function get_all_resources(store: Store): Promise<EngineeringData> {
     if (item.props.synonym) {
       // split the synonym by comma and add each synonym as a key
       item.props.synonym.split(',').forEach(synonym => {
-        results.data[synonym] = {id: counter, nterm: item.props.name, url: item.subject};
+        results.data[synonym] = {id: counter, nterm: item.props.name, url: item.subject, description: item.props.description};
         counter++;
       });
     }
-    results.data[item.props.name] = {id: counter, nterm: item.props.name, url: item.subject};
+    results.data[item.props.name] = {id: counter, nterm: item.props.name, url: item.subject, description: item.props.description};
     counter++;
   }
   // console.log(results);
