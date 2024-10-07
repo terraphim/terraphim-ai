@@ -4,6 +4,7 @@ exports.activate = activate;
 const vscode = require("vscode");
 const lib_1 = require("@tomic/lib");
 const getStore_1 = require("./helpers/getStore");
+const pkg_1 = require("../rust-lib/pkg");
 const airportOntology_1 = require("./ontologies/airportOntology");
 function activate(context) {
     let agent;
@@ -24,6 +25,7 @@ function activate(context) {
                 }
             }
         }
+        vscode.window.showInformationMessage("Replacing links using Rust");
         // --------- Create a Store ---------.
         const store = (0, getStore_1.getStore)(agent);
         // Get the active text editor
@@ -32,17 +34,16 @@ function activate(context) {
             const document = editor.document;
             // const selection = editor.selection;
             // Get the word within the selection
-            let text = document.getText();
+            const text = document.getText();
             const results = await get_all_resources(store);
-            Object.keys(results).forEach(key => {
-                text = text.replace(new RegExp(key, 'g'), `[${key}](${results[key]})`);
-            });
+            const thesaurus = JSON.stringify(results);
+            const replacedText = await (0, pkg_1.replace_links)(text, thesaurus);
             editor.edit(editBuilder => {
-                editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), text);
+                editBuilder.replace(new vscode.Range(0, 0, editor.document.lineCount, 0), replacedText.toString());
             });
             // Show information message with agent if it's set
             if (agent) {
-                vscode.window.showInformationMessage(`Terraphim IT executed with agent: ${agent}`);
+                vscode.window.showInformationMessage(`Terraphim IT executed with agent starting with: ${agent.substring(0, 5)}`);
             }
             else {
                 vscode.window.showInformationMessage('Terraphim IT executed');
@@ -59,18 +60,22 @@ async function get_all_resources(store) {
         .setSortBy(airportOntology_1.airportOntology.properties.synonym)
         .setSortDesc(true)
         .build();
-    const results = {};
+    const results = { name: "Engineering", data: {} };
+    let counter = 1;
     for await (const inst of itemCollection) {
         const item = await store.getResource(inst);
-        console.log(item);
+        // console.log(item);
         if (item.props.synonym) {
             // split the synonym by comma and add each synonym as a key
             item.props.synonym.split(',').forEach(synonym => {
-                results[synonym] = item.subject;
+                results.data[synonym] = { id: counter, nterm: item.props.name, url: item.subject };
+                counter++;
             });
         }
-        results[item.title] = item.subject;
+        results.data[item.props.name] = { id: counter, nterm: item.props.name, url: item.subject };
+        counter++;
     }
+    // console.log(results);
     return results;
 }
 //# sourceMappingURL=extension.js.map

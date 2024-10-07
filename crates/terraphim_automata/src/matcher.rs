@@ -42,13 +42,32 @@ pub fn find_matches(
     Ok(matches)
 }
 
+pub enum LinkType {
+    WikiLinks,
+    HTMLLinks,
+    MarkdownLinks
+}
+
 // // This function replacing instead of matching patterns
-pub fn replace_matches(text: &str, thesaurus: Thesaurus) -> Result<Vec<u8>> {
+pub fn replace_matches(text: &str, thesaurus: Thesaurus, link_type: LinkType) -> Result<Vec<u8>> {
     let mut patterns: Vec<String> = Vec::new();
     let mut replace_with: Vec<String> = Vec::new();
     for (key, value) in thesaurus.into_iter() {
-        patterns.push(key.to_string());
-        replace_with.push(value.clone().id.clone().to_string());
+        match link_type {
+            LinkType::WikiLinks => {
+                patterns.push(key.to_string());
+                replace_with.push(format!("[[{}]]", value.clone().value));
+            }
+            LinkType::HTMLLinks => {
+                patterns.push(key.to_string());
+                replace_with.push(format!("<a href=\"{}\">{}</a>", value.clone().url.unwrap_or_default(), value.clone().value));
+            }
+            LinkType::MarkdownLinks => {
+                patterns.push(key.to_string());
+                replace_with.push(format!("[{}]({})", &key, value.clone().url.unwrap_or_default()));
+            }
+        }
+        
     }
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)

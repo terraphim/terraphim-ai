@@ -179,16 +179,16 @@ mod tests {
     fn test_update_initialized_flag() {
         let temp_dir = tempdir().unwrap();
         let config_path = temp_dir.path().to_path_buf();
-
+        let mut config = DeviceSettings::load_from_env_and_file(Some(config_path.clone())).unwrap();
         // Initialize with false
-        update_initialized_flag(&config_path, false).unwrap();
+        config.update_initialized_flag(Some(config_path.clone()), false).unwrap();
 
         // Check if initialized is false
-        let config = DeviceSettings::load_from_env_and_file(Some(config_path.clone())).unwrap();
+        
         assert_eq!(config.initialized, false);
 
         // Update to true
-        update_initialized_flag(&config_path, true).unwrap();
+        config.update_initialized_flag(Some(config_path.clone()), true).unwrap();
 
         // Check if initialized is now true
         let config = DeviceSettings::load_from_env_and_file(Some(config_path.clone())).unwrap();

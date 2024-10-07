@@ -1,13 +1,23 @@
 import * as vscode from 'vscode';
 import { CollectionBuilder, core, Store } from '@tomic/lib';
 import { getStore } from './helpers/getStore';
+import { replace_links } from '../rust-lib/pkg';
 
 import {
   airportOntology,
   type SystemOperatorAnalyticalLens,
 } from './ontologies/airportOntology';
 
-
+interface EngineeringData {
+  name: string;
+  data: {
+    [key: string]: {
+      id: number;
+      nterm: string;
+      url: string;
+    };
+  };
+}
 
 export function activate(context: vscode.ExtensionContext) {
   let agent: string | undefined;
@@ -33,6 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
           }
         }
       }
+      vscode.window.showInformationMessage("Replacing links using Rust");
         // --------- Create a Store ---------.
     const store = getStore(agent);
 
@@ -44,21 +55,20 @@ export function activate(context: vscode.ExtensionContext) {
         // const selection = editor.selection;
 
         // Get the word within the selection
-        let text = document.getText();
+        const text = document.getText();
         const results = await get_all_resources(store);
-        Object.keys(results).forEach(key => {
-          text = text.replace(new RegExp(key, 'g'), `[${key}](${results[key]})`);
-        });
+        const thesaurus = JSON.stringify(results);
+        const replacedText = await replace_links(text, thesaurus);
         editor.edit(editBuilder => {
           editBuilder.replace(
             new vscode.Range(0, 0, editor.document.lineCount, 0),
-            text,
+            replacedText.toString(),
           );
         });
 
         // Show information message with agent if it's set
         if (agent) {
-          vscode.window.showInformationMessage(`Terraphim IT executed with agent: ${agent}`);
+          vscode.window.showInformationMessage(`Terraphim IT executed with agent starting with: ${agent.substring(0, 5)}`);
         } else {
           vscode.window.showInformationMessage('Terraphim IT executed');
         }
@@ -69,7 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 }
 
-async function get_all_resources(store: Store): Promise<{ [key: string]: string }> {
+async function get_all_resources(store: Store): Promise<EngineeringData> {
   // search over all atomic server resources
   const itemCollection = new CollectionBuilder(store)
     .setProperty(core.properties.isA)
@@ -78,18 +88,23 @@ async function get_all_resources(store: Store): Promise<{ [key: string]: string 
     .setSortDesc(true)
     .build();
 
-  const results: { [key: string]: string } = {};
 
+
+  const results: EngineeringData  = {name: "Engineering", data: {}};
+  let counter = 1;
   for await (const inst of itemCollection) {
     const item = await store.getResource<SystemOperatorAnalyticalLens>(inst);
-    console.log(item);
+    // console.log(item);
     if (item.props.synonym) {
       // split the synonym by comma and add each synonym as a key
       item.props.synonym.split(',').forEach(synonym => {
-        results[synonym] = item.subject;
+        results.data[synonym] = {id: counter, nterm: item.props.name, url: item.subject};
+        counter++;
       });
     }
-    results[item.title] = item.subject;
+    results.data[item.props.name] = {id: counter, nterm: item.props.name, url: item.subject};
+    counter++;
   }
+  // console.log(results);
   return results;
 }
