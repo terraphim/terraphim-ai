@@ -18,19 +18,19 @@ const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
 ///
 pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
     
-    let automata_path = AutomataPath::from_local("data/term_to_id.json");
+    
 
     // Create the path to the default haystack directory
     // by concating the current directory with the default haystack path
     let mut docs_path = std::env::current_dir().unwrap();
+    println!("Current dir: {:?}", docs_path);
+    let automata_path = AutomataPath::from_local(docs_path.join("data/term_to_id.json"));
     docs_path.pop();
     docs_path.pop();
     docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
     println!("Docs path: {:?}", docs_path);
 
-    if !automata_path.exists() {
-        println!("File not found: {:?}", automata_path);
-    }
+    println!("Automata path: {:?}", automata_path.to_string());
 
     ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
@@ -73,7 +73,7 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::from_local(
-                        docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                        docs_path.join("thesaurus.json".to_string()),
                     )),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,

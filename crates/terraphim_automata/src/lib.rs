@@ -124,7 +124,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
         }
     }
 
-    log::debug!("Reading thesaurus from {automata_path}");
+    println!("Reading thesaurus from {automata_path}");
     let contents = match automata_path {
         AutomataPath::Local(path) => fs::read_to_string(path)?,
         AutomataPath::Remote(url) => read_url(url.clone()).await?,
