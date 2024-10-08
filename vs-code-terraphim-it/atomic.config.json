@@ -1,0 +1,5 @@
+{
+  "outputFolder": "./src/ontologies",
+  "moduleAlias": "@tomic/lib",
+  "ontologies": ["https://common.terraphim.io/argu-site/86qcyzy28tk/ontology/airport-ontology"]
+}

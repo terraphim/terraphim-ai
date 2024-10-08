@@ -130,11 +130,13 @@ pub struct NormalizedTerm {
     // This field is currently called `nterm` in the JSON
     #[serde(rename = "nterm")]
     pub value: NormalizedTermValue,
+    /// The URL of the normalized term
+    pub url: Option<String>
 }
 
 impl NormalizedTerm {
     pub fn new(id: u64, value: NormalizedTermValue) -> Self {
-        Self { id, value }
+        Self { id, value, url: None }
     }
 }
 
@@ -271,10 +273,6 @@ impl Node {
 }
 
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
-///
-/// It holds the normalized terms for a resource
-/// where a resource can be as diverse as a Markdown file or an document in
-/// Notion or AtomicServer
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Thesaurus {
     /// Name of the thesaurus

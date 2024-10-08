@@ -1,6 +1,6 @@
 pub mod matcher;
 
-pub use matcher::{find_matches, Matched};
+pub use matcher::{find_matches, Matched, replace_matches, LinkType};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fs;
@@ -81,12 +81,18 @@ impl AutomataPath {
     }
 }
 
-/// `load_automata` loads output of the knowledge graph builder
-// pub async fn load_automata(url_or_file: &str) -> Result<matcher::Automata> {
-//     let thesaurus = load_thesaurus(url_or_file).await?;
-//     let automata = Automata::new(thesaurus);
-//     Ok(automata)
-// }
+pub async fn load_thesaurus_from_json(json_str: &str) -> Result<Thesaurus> {
+    let thesaurus: Thesaurus = serde_json::from_str(json_str)?;
+    Ok(thesaurus)
+}
+
+
+/// load thesaurus from JSON string and replace terms using streaming matcher
+pub async fn load_thesaurus_from_json_and_replace(json_str: &str, content: &str, link_type: LinkType) -> Result<Vec<u8>> {
+    let thesaurus = load_thesaurus_from_json(json_str).await?;
+    let replaced = replace_matches(content, thesaurus, link_type)?;
+    Ok(replaced)    
+}
 
 /// Load a thesaurus from a file or URL
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
@@ -118,7 +124,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
         }
     }
 
-    log::debug!("Reading thesaurus from {automata_path}");
+    println!("Reading thesaurus from {automata_path}");
     let contents = match automata_path {
         AutomataPath::Local(path) => fs::read_to_string(path)?,
         AutomataPath::Remote(url) => read_url(url.clone()).await?,
@@ -165,5 +171,101 @@ mod tests {
                 .id,
             661_u64
         );
+    }
+
+    #[tokio::test]
+    async fn test_load_thesaurus_from_json() {
+        let json_str = r#"
+{
+  "name": "Engineering",
+  "data": {
+    "project management framework tailoring": {
+      "id": 1,
+      "nterm": "project tailoring strategy",
+      "url": "https://example.com/project-tailoring-strategy"
+    },
+    "strategy documents": {
+      "id": 2,
+      "nterm": "strategy documents",
+      "url": "https://example.com/strategy-documents"
+    },
+    "project constraints": {
+      "id": 3,
+      "nterm": "project constraints",
+      "url": "https://example.com/project-constraints"
+    }
+  }
+}"#;
+
+        let thesaurus = load_thesaurus_from_json(json_str).await.unwrap();
+        assert_eq!(thesaurus.len(), 3);
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("project management framework tailoring")).unwrap().id,
+            1_u64
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("strategy documents")).unwrap().id,
+            2_u64
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("project constraints")).unwrap().id,
+            3_u64
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("project management framework tailoring")).unwrap().url,
+            Some("https://example.com/project-tailoring-strategy".to_string())
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("strategy documents")).unwrap().url,
+            Some("https://example.com/strategy-documents".to_string())
+        );
+        
+    }
+
+    #[tokio::test]
+    async fn test_load_thesaurus_from_json_and_replace() {
+        let json_str = r#"
+{
+  "name": "Engineering",
+  "data": {
+    "project management framework tailoring": {
+      "id": 1,
+      "nterm": "project tailoring strategy",
+      "url": "https://example.com/project-tailoring-strategy"
+    },
+    "strategy documents": {
+      "id": 2,
+      "nterm": "strategy documents",
+      "url": "https://example.com/strategy-documents"
+    },
+    "project constraints": {
+      "id": 3,
+      "nterm": "project constraints",
+      "url": "https://example.com/project-constraints"
+    }
+  }
+}"#;
+
+        let content = "I like project constraints and strategy documents.";
+        let replaced = load_thesaurus_from_json_and_replace(json_str, content, LinkType::MarkdownLinks).await.unwrap();
+        let replaced_str = String::from_utf8(replaced).unwrap();
+        assert_eq!(replaced_str, "I like [project constraints](https://example.com/project-constraints) and [strategy documents](https://example.com/strategy-documents).");
+
+        // Test HTMLLinks
+        let replaced = load_thesaurus_from_json_and_replace(json_str, content, LinkType::HTMLLinks).await.unwrap();
+        let replaced_str = String::from_utf8(replaced).unwrap();
+        assert_eq!(replaced_str, "I like <a href=\"https://example.com/project-constraints\">project constraints</a> and <a href=\"https://example.com/strategy-documents\">strategy documents</a>.");
+
+        // Test WikiLinks
+        let replaced = load_thesaurus_from_json_and_replace(json_str, content, LinkType::WikiLinks).await.unwrap();
+        let replaced_str = String::from_utf8(replaced).unwrap();
+        assert_eq!(replaced_str, "I like [[project constraints]] and [[strategy documents]].");
+    }
+
+    #[tokio::test]
+    async fn test_load_thesaurus_from_json_invalid() {
+        let invalid_json = "{invalid_json}";
+        let result = load_thesaurus_from_json(invalid_json).await;
+        assert!(result.is_err());
     }
 }
