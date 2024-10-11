@@ -206,13 +206,20 @@ impl Default for ConfigBuilder {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum ConfigId {
+    Server,
+    Desktop,
+    Embedded,
+}
+
 /// The Terraphim config is the main configuration for terraphim
 ///
 /// It contains the global shortcut, roles, and the default role
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
-    /// Unique identifier for the config
-    pub id: String,
+    /// Identifier for the config
+    pub id: ConfigId,
     /// Global shortcut for activating terraphim desktop
     pub global_shortcut: String,
     /// User roles with their respective settings
@@ -225,8 +232,7 @@ pub struct Config {
 impl Config {
     fn empty() -> Self {
         Self {
-            id: Ulid::new().to_string(),
-            // global shortcut for terraphim desktop
+            id: ConfigId::Server, // Default to Server
             global_shortcut: "Ctrl+X".to_string(),
             roles: AHashMap::new(),
             default_role: RoleName::new("default"),
@@ -270,7 +276,11 @@ impl Persistable for Config {
 
     /// returns ulid as key + .json
     fn get_key(&self) -> String {
-        self.id.clone() + ".json"
+        match self.id {
+            ConfigId::Server => "server",
+            ConfigId::Desktop => "desktop",
+            ConfigId::Embedded => "embedded",
+        }.to_string() + ".json"
     }
 }
 
