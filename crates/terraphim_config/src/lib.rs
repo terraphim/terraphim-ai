@@ -417,6 +417,7 @@ pub struct Config {
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
     pub default_role: RoleName,
+    pub selected_role: RoleName
 }
 
 impl Config {
@@ -426,6 +427,7 @@ impl Config {
             global_shortcut: "Ctrl+X".to_string(),
             roles: AHashMap::new(),
             default_role: RoleName::new("default"),
+            selected_role: RoleName::new("default")
         }
     }
 }
