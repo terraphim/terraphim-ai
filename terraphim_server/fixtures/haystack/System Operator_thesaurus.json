@@ -1,0 +1,125 @@
+{
+  "name": "system operator",
+  "data": {
+    "operation of system": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "system maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "maintenance management": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "system maintains key functions": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "testconcept": {
+      "id": 11,
+      "nterm": "testconcept"
+    },
+    "operate the system": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "maintaining operational capability": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "maintenance activities": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "transition": {
+      "id": 7,
+      "nterm": "transition"
+    },
+    "maintenance process": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "system operationally effective": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "replace a legacy system": {
+      "id": 7,
+      "nterm": "transition"
+    },
+    "monitor system performance": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "manage the migration between systems": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "terraphim hello": {
+      "id": 11,
+      "nterm": "testconcept"
+    },
+    "slep": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "system scheduled maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "replace an existing system": {
+      "id": 7,
+      "nterm": "transition"
+    },
+    "hello terraphim": {
+      "id": 11,
+      "nterm": "testconcept"
+    },
+    "analyze operational problems": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "preventive maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "operation": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "maintenance actions": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "monitor the services": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "breakdown in services": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "sustain service": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "service life extension program": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "corrective maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "identify analyze operational problems": {
+      "id": 10,
+      "nterm": "operation"
+    }
+  }
+}

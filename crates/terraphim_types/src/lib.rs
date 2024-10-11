@@ -480,7 +480,7 @@ pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]
     Markdown,
-    /// A set of JSON files
+    /// A JSON files
     #[serde(rename = "json")]
     Json,
 }

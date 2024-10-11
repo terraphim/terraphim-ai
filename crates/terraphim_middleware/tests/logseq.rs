@@ -42,7 +42,7 @@ mod tests {
         //       "nterm": "artificial intelligence"
         //     }
         // }
-
+        println!("{:#?}", thesaurus);
         assert_eq!(thesaurus.len(), 7);
         assert_eq!(
             thesaurus

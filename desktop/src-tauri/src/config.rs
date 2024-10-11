@@ -28,9 +28,6 @@ pub(crate) fn load_config() -> Result<Config, TerraphimConfigError> {
     docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
     println!("Docs path: {:?}", docs_path);
 
-    if !automata_path.exists() {
-        println!("File not found: {:?}", automata_path);
-    }
 
     ConfigBuilder::new()
         .global_shortcut("Ctrl+X")
