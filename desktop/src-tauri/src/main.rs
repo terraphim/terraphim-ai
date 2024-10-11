@@ -16,6 +16,7 @@ use tauri::{
 
 use terraphim_config::ConfigState;
 use terraphim_settings::DeviceSettings;
+use terraphim_service::TerraphimService;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -31,7 +32,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     
     log::info!("Device settings: {:?}", device_settings.lock().await);
 
-    let mut config = config::load_config()?;
+    let mut config = TerraphimService::load_config().expect("Failed to load config");
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let global_shortcut = current_config.global_shortcut.clone();

@@ -144,7 +144,7 @@ impl ConfigBuilder {
     /// Create a new `ConfigBuilder`
     pub fn new() -> Self {
         Self {
-            config: Config::empty(),
+            config: Config::new(None),
         }
     }
 
@@ -189,12 +189,19 @@ impl ConfigBuilder {
         Ok(self)
     }
 
+    /// Set the id for the config
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.config.id = id.into();
+        self
+    }
+
     /// Build the config
     pub fn build(self) -> Result<Config> {
         // Make sure that we have at least one role
         if self.config.roles.is_empty() {
             return Err(TerraphimConfigError::NoRoles);
         }
+
 
         Ok(self.config)
     }
@@ -220,31 +227,33 @@ pub struct Config {
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
     pub default_role: RoleName,
+    pub selected_role: Option<RoleName>,
 }
 
 impl Config {
-    fn empty() -> Self {
+    fn new(id: Option<String>) -> Self {
         Self {
-            id: Ulid::new().to_string(),
+            id: id.unwrap_or_else(|| "default".to_string()),
             // global shortcut for terraphim desktop
             global_shortcut: "Ctrl+X".to_string(),
             roles: AHashMap::new(),
             default_role: RoleName::new("default"),
+            selected_role: None,
         }
     }
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self::empty()
+        Self::new(None)
     }
 }
 
 #[async_trait]
 impl Persistable for Config {
-    fn new(_key: String) -> Self {
+    fn new(key: String) -> Self {
         // Key is not used because we use the `id` field
-        Config::empty()
+        Config::new(Some(key))
     }
 
     /// Save to a single profile
@@ -326,9 +335,12 @@ impl ConfigState {
             roles,
         })
     }
-    /// update thesaurus for the role in a config
+    /// get selected role
+    pub async fn get_selected_role(&self) -> RoleName {
+        let config = self.config.lock().await;
+        config.selected_role.clone().unwrap()
+    }
 
-    //FIXME:
     /// Get the default role from the config
     pub async fn get_default_role(&self) -> RoleName {
         let config = self.config.lock().await;
@@ -402,7 +414,7 @@ mod tests {
 
     #[test]
     async fn test_write_config_to_json() {
-        let config = Config::empty();
+        let config = Config::new(None);
         let json_str = serde_json::to_string_pretty(&config).unwrap();
 
         let mut tempfile = tempfile().unwrap();
@@ -411,32 +423,32 @@ mod tests {
 
     #[test]
     async fn test_get_key() {
-        let config = Config::empty();
+        let config = Config::new(None);
         serde_json::to_string_pretty(&config).unwrap();
         assert!(config.get_key().ends_with(".json"));
     }
 
     #[tokio::test]
     async fn test_save_all() {
-        let config = Config::empty();
+        let config = Config::new(None);
         config.save().await.unwrap();
     }
 
     #[tokio::test]
     async fn test_save_one_s3() {
-        let config = Config::empty();
+        let config = Config::new(None);
         config.save_to_one("s3").await.unwrap();
     }
 
     #[tokio::test]
     async fn test_save_one_sled() {
-        let config = Config::empty();
+        let config = Config::new(None);
         config.save_to_one("sled").await.unwrap();
     }
 
     #[test]
     async fn test_write_config_to_toml() {
-        let config = Config::empty();
+        let config = Config::new(None);
         let toml = toml::to_string_pretty(&config).unwrap();
         // Ensure that the toml is valid
         toml::from_str::<Config>(&toml).unwrap();
@@ -567,5 +579,29 @@ mod tests {
         let config = ConfigBuilder::new().build();
         assert!(config.is_err());
         assert!(matches!(config.unwrap_err(), TerraphimConfigError::NoRoles));
+    }
+
+    #[test]
+    async fn test_config_builder_with_id() {
+        let config = ConfigBuilder::new()
+            .id("custom_id".to_string())
+            .global_shortcut("Ctrl+X")
+            .add_role("Default", dummy_role())
+            .build()
+            .unwrap();
+
+
+        assert_eq!(config.id, "custom_id");
+    }
+
+    #[test]
+    async fn test_config_builder_default_id() {
+        let config = ConfigBuilder::new()
+            .global_shortcut("Ctrl+X")
+            .add_role("Default", dummy_role())
+            .build()
+            .unwrap();
+
+        assert_eq!(config.id, "default");
     }
 }

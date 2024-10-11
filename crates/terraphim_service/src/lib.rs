@@ -10,6 +10,18 @@ use terraphim_types::{
 };
 mod score;
 
+use terraphim_config::{
+    Config, ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, ServiceType,
+    TerraphimConfigError,
+};
+use terraphim_types::KnowledgeGraphInputType;
+
+/// The path to the default haystack directory
+// TODO: Replace this with a file-based config loader based on `twelf` in the
+// future
+const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+
+
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
     #[error("An error occurred: {0}")]
@@ -183,6 +195,40 @@ impl<'a> TerraphimService {
     ) -> Result<terraphim_config::Config> {
         let mut current_config = self.config_state.config.lock().await;
         *current_config = config.clone();
+        Ok(config)
+    }
+
+    pub fn load_config() -> Result<terraphim_config::Config> {
+        let mut docs_path = std::env::current_dir().map_err(|_| ServiceError::Config("Failed to get current directory".into()))?;
+        println!("Current dir: {:?}", docs_path);
+        let automata_path = AutomataPath::from_local(docs_path.join("data/term_to_id.json"));
+        docs_path.pop();
+        docs_path.pop();
+        docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
+        println!("Docs path: {:?}", docs_path);
+
+        println!("Automata path: {:?}", automata_path.to_string());
+
+        let config = ConfigBuilder::new()
+            .global_shortcut("Ctrl+X")
+            .add_role(
+                "Default",
+                Role {
+                    shortname: Some("Default".to_string()),
+                    name: "Default".to_string().into(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    theme: "spacelab".to_string(),
+                    kg: None,
+                    haystacks: vec![Haystack {
+                        path: docs_path.clone(),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: ahash::AHashMap::new(),
+                },
+            )
+            // Add other roles here...
+            .default_role("Default").expect("Failed to set default role")
+            .build().expect("Failed to build config");
         Ok(config)
     }
 }
