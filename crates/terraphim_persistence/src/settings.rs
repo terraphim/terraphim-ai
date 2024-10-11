@@ -208,8 +208,7 @@ mod tests {
         }
 
         fn get_key(&self) -> String {
-            // make sure name doesn't contain any special characters or spaces and all lowercase
-            self.name.clone().chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase()
+            self.normalize_key(&self.name)
         }
     }
     /// Test saving and loading a struct to a dashmap profile

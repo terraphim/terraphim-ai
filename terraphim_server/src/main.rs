@@ -12,21 +12,14 @@
     variant_size_differences,
     clippy::missing_const_for_fn
 )]
-#![deny(anonymous_parameters, macro_use_extern_crate, pointer_structural_match)]
+#![deny(anonymous_parameters, macro_use_extern_crate)]
 #![deny(missing_docs)]
 
-use ahash::AHashMap;
+
 use anyhow::Context;
 use std::net::SocketAddr;
-use terraphim_automata::AutomataPath;
-use terraphim_config::ConfigBuilder;
-use terraphim_config::Haystack;
-use terraphim_config::Role;
-use terraphim_config::ServiceType;
-use terraphim_config::{KnowledgeGraph, KnowledgeGraphLocal};
-use terraphim_types::KnowledgeGraphInputType;
-use terraphim_types::RelevanceFunction;
-
+use terraphim_config::{ConfigBuilder, ConfigId};
+use terraphim_persistence::Persistable;
 use terraphim_config::ConfigState;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::DeviceSettings;
@@ -61,92 +54,18 @@ async fn run_server() -> Result<()> {
             SocketAddr::from(([127, 0, 0, 1], port))
         });
 
-    // mind where cargo run is triggered from
-    let cwd = std::env::current_dir().context("Failed to get current directory")?;
-    println!("{}", cwd.display());
-    let system_operator_haystack = if cwd.ends_with("terraphim_server") {
-        cwd.join("fixtures/haystack/")
-    } else {
-        cwd.join("terraphim_server/fixtures/haystack/")
-    };
-
-    log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
-    let automata_test_path = if cwd.ends_with("terraphim_server") {
-        cwd.join("fixtures/term_to_id.json")
-    } else {
-        cwd.join("terraphim_server/fixtures/term_to_id.json")
-    };
-    log::debug!("Test automata_test_path {:?}", automata_test_path);
-    let automata_remote =
-        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
-            .unwrap();
-    println!("{automata_remote}");
-    // FIXME: check if there is an existing config saved via persistable before creating a new one
-    let mut config = ConfigBuilder::new()
-        .global_shortcut("Ctrl+X")
-        .add_role(
-            "Default",
-            Role {
-                shortname: Some("Default".to_string()),
-                name: "Default".into(),
-                relevance_function: RelevanceFunction::TitleScorer,
-                theme: "spacelab".to_string(),
-                kg: None,
-                haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
-                    service: ServiceType::Ripgrep,
-                }],
-                extra: AHashMap::new(),
+    
+        let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build() {
+            Ok(mut local_config) => match local_config.load().await {
+                Ok(config) => config,
+                Err(e) => {
+                    log::info!("Failed to load config: {:?}", e);
+                    let config = ConfigBuilder::new().build_default_server().build().unwrap();
+                    config
+                },
             },
-        )
-        .add_role(
-            "Engineer",
-            Role {
-                shortname: Some("Engineer".into()),
-                name: "Engineer".into(),
-                relevance_function: RelevanceFunction::TerraphimGraph,
-                theme: "lumen".to_string(),
-                kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_remote.clone()),
-                    knowledge_graph_local: Some(KnowledgeGraphLocal {
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: system_operator_haystack.clone(),
-                    }),
-                    public: true,
-                    publish: true,
-                }),
-                haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
-                    service: ServiceType::Ripgrep,
-                }],
-                extra: AHashMap::new(),
-            },
-        )
-        .add_role(
-            "System Operator",
-            Role {
-                shortname: Some("operator".to_string()),
-                name: "System Operator".into(),
-                relevance_function: RelevanceFunction::TerraphimGraph,
-                theme: "superhero".to_string(),
-                kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_remote.clone()),
-                    knowledge_graph_local: Some(KnowledgeGraphLocal {
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: system_operator_haystack.clone(),
-                    }),
-                    public: true,
-                    publish: true,
-                }),
-                haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
-                    service: ServiceType::Ripgrep,
-                }],
-                extra: AHashMap::new(),
-            },
-        )
-        .build()
-        .unwrap();
+            Err(e) => panic!("Failed to build config: {:?}", e),
+        };
     let config_state = ConfigState::new(&mut config)
         .await
         .context("Failed to load config")?;
