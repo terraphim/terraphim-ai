@@ -127,4 +127,8 @@ pub trait Persistable: Serialize + DeserializeOwned {
     }
 
     fn get_key(&self) -> String;
+    fn normalize_key(&self, key: &str) -> String {
+        let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
+        re.replace_all(key, "").to_lowercase()
+    }
 }
