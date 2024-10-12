@@ -31,8 +31,52 @@ impl Persistable for Thesaurus {
         Ok(obj)
     }
 
-    /// returns ulid as key + .json
+    /// returns key + .json
     fn get_key(&self) -> String {
-        format!("thesaurus_{}.json", self.name())
+        format!("thesaurus_{}.json", self.normalize_key(&self.name()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+// Test saving and loading a struct to a dashmap profile
+#[tokio::test]
+#[serial_test::serial]
+async fn test_save_and_load() -> Result<()> {
+
+    // Create a test object
+    let test_obj = Thesaurus::new("Test Thesaurus".to_string());
+
+    // Save the object
+    test_obj.save_to_one("dash").await?;
+
+    // Load the object
+    let mut loaded_obj = Thesaurus::new("Test Thesaurus".to_string());
+    loaded_obj = loaded_obj.load().await?;
+
+    // Compare the original and loaded objects
+    assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
+
+    Ok(())
+}
+/// Test saving and loading a struct to all profiles
+#[tokio::test]
+#[serial_test::serial]
+async fn test_save_and_load_all() -> Result<()> {
+    // Create a test object
+    let test_obj = Thesaurus::new("Test Thesaurus".to_string());
+
+    // Save the object
+    test_obj.save().await?;
+
+    // Load the object
+    let mut loaded_obj = Thesaurus::new("Test Thesaurus".to_string());
+    loaded_obj = loaded_obj.load().await?;
+
+    // Compare the original and loaded objects
+    assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
+
+        Ok(())
     }
 }

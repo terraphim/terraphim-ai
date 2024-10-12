@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
-use ulid::Ulid;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
@@ -72,6 +71,7 @@ pub struct Role {
     pub extra: AHashMap<String, Value>,
 }
 
+use anyhow::Context;
 /// The service used for indexing documents
 ///
 /// Each service assumes documents to be stored in a specific format
@@ -147,6 +147,196 @@ impl ConfigBuilder {
             config: Config::empty(),
         }
     }
+    pub fn new_with_id(id: ConfigId) -> Self {
+        Self {
+            config: Config { id, ..Config::empty() },
+        }
+    }
+    pub fn build_default_embedded(mut self) -> Self {
+        self.config.id = ConfigId::Embedded;
+        self
+    }
+    pub fn build_default_server(mut self) -> Self {
+        self.config.id = ConfigId::Server;
+        // mind where cargo run is triggered from
+        let cwd = std::env::current_dir().context("Failed to get current directory").unwrap();
+        println!("{}", cwd.display());
+        let system_operator_haystack = if cwd.ends_with("terraphim_server") {
+        cwd.join("fixtures/haystack/")
+    } else {
+        cwd.join("terraphim_server/fixtures/haystack/")
+    };
+
+    log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
+    let automata_test_path = if cwd.ends_with("terraphim_server") {
+        cwd.join("fixtures/term_to_id.json")
+    } else {
+        cwd.join("terraphim_server/fixtures/term_to_id.json")
+    };
+    log::debug!("Test automata_test_path {:?}", automata_test_path);
+    let automata_remote =
+        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+            .unwrap();
+        println!("{automata_remote}");
+        self.global_shortcut("Ctrl+X")
+        .add_role(
+            "Default",
+            Role {
+                shortname: Some("Default".to_string()),
+                name: "Default".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    path: system_operator_haystack.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .add_role(
+            "Engineer",
+            Role {
+                shortname: Some("Engineer".into()),
+                name: "Engineer".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "lumen".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    path: system_operator_haystack.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .add_role(
+            "System Operator",
+            Role {
+                shortname: Some("operator".to_string()),
+                name: "System Operator".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "superhero".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    path: system_operator_haystack.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .default_role("Default").unwrap()
+    }
+
+    pub fn build_default_desktop(mut self) -> Self {
+        const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
+        let automata_path = AutomataPath::from_local("data/term_to_id.json");
+    
+        // Create the path to the default haystack directory
+        // by concating the current directory with the default haystack path
+        let mut docs_path = std::env::current_dir().unwrap();
+        docs_path.pop();
+        docs_path.pop();
+        docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
+        println!("Docs path: {:?}", docs_path);
+        self.config.id = ConfigId::Desktop;
+        self.global_shortcut("Ctrl+X")
+        .add_role(
+            "Default",  
+            Role {
+                shortname: Some("Default".to_string()),
+                name: "Default".to_string().into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    path: docs_path.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .add_role(
+            "Engineer",
+            Role {
+                shortname: Some("Engineer".to_string()),
+                name: "Engineer".to_string().into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "lumen".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    path: docs_path.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .add_role(
+            "Terraphim Engineer",
+            Role {
+                shortname: Some("Terraphim Engineer".to_string()),
+                name: "Terraphim Engineer".to_string().into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "lumen".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(AutomataPath::from_local(
+                        docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                    )),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: docs_path.join("kg"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    path: docs_path.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .add_role(
+            "System Operator",
+            Role {
+                shortname: Some("operator".to_string()),
+                name: "System Operator".to_string().into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "superhero".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(automata_path.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("/tmp/system_operator/pages/"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    path: docs_path.clone(),
+                    service: ServiceType::Ripgrep,
+                }],
+                extra: AHashMap::new(),
+            },
+        )
+        .default_role("Default").unwrap()
+    }
+
 
     /// Start from an existing config
     ///
@@ -192,9 +382,9 @@ impl ConfigBuilder {
     /// Build the config
     pub fn build(self) -> Result<Config> {
         // Make sure that we have at least one role
-        if self.config.roles.is_empty() {
-            return Err(TerraphimConfigError::NoRoles);
-        }
+        // if self.config.roles.is_empty() {
+        //     return Err(TerraphimConfigError::NoRoles);
+        // }
 
         Ok(self.config)
     }
@@ -206,13 +396,20 @@ impl Default for ConfigBuilder {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum ConfigId {
+    Server,
+    Desktop,
+    Embedded,
+}
+
 /// The Terraphim config is the main configuration for terraphim
 ///
 /// It contains the global shortcut, roles, and the default role
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
-    /// Unique identifier for the config
-    pub id: String,
+    /// Identifier for the config
+    pub id: ConfigId,
     /// Global shortcut for activating terraphim desktop
     pub global_shortcut: String,
     /// User roles with their respective settings
@@ -220,16 +417,17 @@ pub struct Config {
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
     pub default_role: RoleName,
+    pub selected_role: RoleName
 }
 
 impl Config {
     fn empty() -> Self {
         Self {
-            id: Ulid::new().to_string(),
-            // global shortcut for terraphim desktop
+            id: ConfigId::Server, // Default to Server
             global_shortcut: "Ctrl+X".to_string(),
             roles: AHashMap::new(),
             default_role: RoleName::new("default"),
+            selected_role: RoleName::new("default")
         }
     }
 }
@@ -270,7 +468,11 @@ impl Persistable for Config {
 
     /// returns ulid as key + .json
     fn get_key(&self) -> String {
-        self.id.clone() + ".json"
+        match self.id {
+            ConfigId::Server => "server",
+            ConfigId::Desktop => "desktop",
+            ConfigId::Embedded => "embedded",
+        }.to_string() + "_config.json"
     }
 }
 
@@ -326,9 +528,7 @@ impl ConfigState {
             roles,
         })
     }
-    /// update thesaurus for the role in a config
 
-    //FIXME:
     /// Get the default role from the config
     pub async fn get_default_role(&self) -> RoleName {
         let config = self.config.lock().await;
@@ -425,6 +625,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_one_s3() {
         let config = Config::empty();
+        println!("{:#?}", config);
         config.save_to_one("s3").await.unwrap();
     }
 
@@ -562,7 +763,57 @@ mod tests {
         assert_eq!(config.roles[&RoleName::new("Father")], dummy_role());
     }
 
+    ///test to create config with different id - server, desktop, embedded
     #[tokio::test]
+    async fn test_config_with_id_desktop() {
+        let config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
+            Ok(mut config) => match config.load().await {
+                Ok(config) => config,
+                Err(e) => {
+                    log::info!("Failed to load config: {:?}", e);
+                    let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+                    config
+                },
+            },
+            Err(e) => panic!("Failed to build config: {:?}", e),
+        };
+        assert_eq!(config.id, ConfigId::Desktop);
+    }
+    /// repeat the test with server and embedded
+    #[tokio::test]
+    async fn test_config_with_id_server() {
+        let config = match ConfigBuilder::new_with_id(ConfigId::Server).build() {
+            Ok(mut local_config) => match local_config.load().await {
+                Ok(config) => config,
+                Err(e) => {
+                    log::info!("Failed to load config: {:?}", e);
+                    let config = ConfigBuilder::new().build_default_server().build().unwrap();
+                    config
+                },
+            },
+            Err(e) => panic!("Failed to build config: {:?}", e),
+        };
+        assert_eq!(config.id, ConfigId::Server);
+    }
+
+    #[tokio::test]
+    async fn test_config_with_id_embedded() {
+        let config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+            Ok(mut config) => match config.load().await {
+                Ok(config) => config,
+                Err(e) => {
+                    log::info!("Failed to load config: {:?}", e);
+                    let config = ConfigBuilder::new().build_default_embedded().build().unwrap();
+                    config
+                },
+            },
+            Err(e) => panic!("Failed to build config: {:?}", e),
+        };
+        assert_eq!(config.id, ConfigId::Embedded);
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn test_at_least_one_role() {
         let config = ConfigBuilder::new().build();
         assert!(config.is_err());

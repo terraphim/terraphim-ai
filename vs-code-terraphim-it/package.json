@@ -1,0 +1,64 @@
+{
+  "name": "terraphim-it",
+  "displayName": "Terraphim It",
+  "description": "Apply Current Terraphim AI role to the current text",
+  "version": "0.0.1",
+  "publisher": "applied-knowledge-systems",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terraphim/terraphim-ai"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Education",
+    "Machine Learning",
+    "Data Science",
+    "Other",
+    "Snippets"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.terraphimCommand",
+        "title": "Terraphim IT"
+      }
+    ],
+    "configuration": {
+      "title": "Terraphim IT",
+      "properties": {
+        "terraphimIt.agent": {
+          "type": "string",
+          "default": "",
+          "description": "The agent to use for Terraphim IT"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "npx tsc -p ./",
+    "lint": "eslint \"src/**/*.ts\"",
+    "watch": "npx tsc -watch -p ./",
+    "update-ontologies": "npx ad-generate ontologies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.10",
+    "@types/vscode": "^1.73.0",
+    "@typescript-eslint/eslint-plugin": "^7.14.0",
+    "@typescript-eslint/parser": "^7.14.0",
+    "eslint": "^8.26.0",
+    "typescript": "^5.6"
+  },
+  "dependencies": {
+    "@tomic/cli": "0.40.0",
+    "@tomic/lib": "0.40.0"
+  }
+}

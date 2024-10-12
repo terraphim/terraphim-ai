@@ -4,7 +4,8 @@
 )]
 
 mod cmd;
-mod config;
+use terraphim_config::{ConfigBuilder, ConfigId};
+use terraphim_persistence::Persistable;
 
 use std::error::Error;
 use std::sync::Arc;
@@ -31,7 +32,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     
     log::info!("Device settings: {:?}", device_settings.lock().await);
 
-    let mut config = config::load_config()?;
+    let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
+        Ok(mut config) => match config.load().await {
+            Ok(config) => config,
+            Err(e) => {
+                log::info!("Failed to load config: {:?}", e);
+                let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+                config
+            },
+        },
+        Err(e) => panic!("Failed to build config: {:?}", e),
+    };
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
     let global_shortcut = current_config.global_shortcut.clone();
