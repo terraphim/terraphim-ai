@@ -5,6 +5,7 @@ const vscode = require("vscode");
 const lib_1 = require("@tomic/lib");
 const getStore_1 = require("./helpers/getStore");
 const pkg_1 = require("../rust-lib/pkg");
+const index_js_1 = require("terraphim_ai_nodejs/index.js");
 const airportOntology_1 = require("./ontologies/airportOntology");
 function activate(context) {
     let agent;
@@ -63,6 +64,31 @@ function activate(context) {
         vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
     });
     context.subscriptions.push(autocompleteDisposable);
+    const napiAutocompleteDisposable = vscode.commands.registerCommand('extension.terraphimNapiAutocomplete', async function () {
+        // Register the completion provider
+        const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimNapiCompletionProvider(), ' ' // Trigger on space
+        );
+        context.subscriptions.push(provider);
+        vscode.window.showInformationMessage('Terraphim Napi Autocomplete activated');
+    });
+    context.subscriptions.push(napiAutocompleteDisposable);
+}
+class TerraphimNapiCompletionProvider {
+    async provideCompletionItems(document, position, token, context) {
+        const linePrefix = document.lineAt(position).text.substr(0, position.character);
+        if (!linePrefix.endsWith(' ')) {
+            return [];
+        }
+        const results = await (0, index_js_1.searchDocumentsSelectedRole)(linePrefix);
+        const parsedResults = JSON.parse(results);
+        console.log(parsedResults);
+        return Object.entries(parsedResults).map(([key, value]) => {
+            const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
+            item.detail = value.body;
+            item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
+            return item;
+        });
+    }
 }
 class TerraphimCompletionProvider {
     constructor(store) {

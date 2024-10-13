@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { CollectionBuilder, core, Store } from '@tomic/lib';
 import { getStore } from './helpers/getStore';
 import { replace_links } from '../rust-lib/pkg';
-
+import { searchDocumentsSelectedRole } from 'terraphim_ai_nodejs/index.js';
 import {
   airportOntology,
   type SystemOperatorAnalyticalLens,
@@ -100,7 +100,50 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(autocompleteDisposable);
+
+  const napiAutocompleteDisposable = vscode.commands.registerCommand(
+    'extension.terraphimNapiAutocomplete',
+    async function () {
+
+
+      // Register the completion provider
+      const provider = vscode.languages.registerCompletionItemProvider(
+        { scheme: 'file', language: '*' },
+        new TerraphimNapiCompletionProvider(),
+        ' ' // Trigger on space
+      );
+
+      context.subscriptions.push(provider);
+      vscode.window.showInformationMessage('Terraphim Napi Autocomplete activated');
+    }
+  );
+
+  context.subscriptions.push(napiAutocompleteDisposable);
   
+}
+
+class TerraphimNapiCompletionProvider implements vscode.CompletionItemProvider {
+  async provideCompletionItems(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    token: vscode.CancellationToken,
+    context: vscode.CompletionContext
+  ): Promise<vscode.CompletionItem[] | vscode.CompletionList> {
+    const linePrefix = document.lineAt(position).text.substr(0, position.character);
+    if (!linePrefix.endsWith(' ')) {
+      return [];
+    }
+
+    const results = await searchDocumentsSelectedRole(linePrefix);
+    const parsedResults = JSON.parse(results);
+    console.log(parsedResults);
+    return Object.entries(parsedResults).map(([key, value]) => {
+      const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
+      item.detail = value.body as string;
+      item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
+      return item;
+    });
+  }
 }
 
 class TerraphimCompletionProvider implements vscode.CompletionItemProvider {

@@ -33,6 +33,10 @@
       {
         "command": "extension.terraphimAIAutocomplete",
         "title": "Terraphim AI Autocomplete"
+      },
+      {
+        "command": "extension.terraphimNapiAutocomplete",
+        "title": "Terraphim Napi Autocomplete"
       }
     ],
     "configuration": {
