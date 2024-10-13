@@ -1,10 +1,10 @@
 {
-  "name": "terraphim-ai-nodejs",
+  "name": "terraphim_ai_node",
   "version": "0.0.0",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
-    "name": "terraphim-ai-nodejs",
+    "name": "terraphim_ai_nodejs",
     "triples": {
       "defaults": false,
       "additional": [

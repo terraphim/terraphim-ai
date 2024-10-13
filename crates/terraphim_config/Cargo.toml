@@ -22,6 +22,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
 terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "0.1.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "0.1.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
 
 opendal = { version = "0.44.2", features = [
     "services-dashmap",

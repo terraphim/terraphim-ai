@@ -5499,6 +5499,7 @@ dependencies = [
  "terraphim_automata",
  "terraphim_persistence",
  "terraphim_rolegraph",
+ "terraphim_settings",
  "terraphim_types",
  "thiserror",
  "tokio",

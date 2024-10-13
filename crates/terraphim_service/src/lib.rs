@@ -68,7 +68,7 @@ impl<'a> TerraphimService {
         println!("Role keys {:?}", self.config_state.roles.keys());
         let mut rolegraphs = self.config_state.roles.clone();
         if let Some(rolegraph_value) = rolegraphs.get(role_name) {
-            let mut thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
+            let thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
             match thesaurus_result {
                 Ok(thesaurus) => {
                     println!("Thesaurus loaded: {:#?}", thesaurus);

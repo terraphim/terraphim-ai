@@ -32,24 +32,24 @@ switch (platform) {
   case 'android':
     switch (arch) {
       case 'arm64':
-        localFileExisted = existsSync(join(__dirname, 'terraphim-ai-nodejs.android-arm64.node'))
+        localFileExisted = existsSync(join(__dirname, 'terraphim_ai_nodejs.android-arm64.node'))
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.android-arm64.node')
+            nativeBinding = require('./terraphim_ai_nodejs.android-arm64.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-android-arm64')
+            nativeBinding = require('terraphim_ai_node-android-arm64')
           }
         } catch (e) {
           loadError = e
         }
         break
       case 'arm':
-        localFileExisted = existsSync(join(__dirname, 'terraphim-ai-nodejs.android-arm-eabi.node'))
+        localFileExisted = existsSync(join(__dirname, 'terraphim_ai_nodejs.android-arm-eabi.node'))
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.android-arm-eabi.node')
+            nativeBinding = require('./terraphim_ai_nodejs.android-arm-eabi.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-android-arm-eabi')
+            nativeBinding = require('terraphim_ai_node-android-arm-eabi')
           }
         } catch (e) {
           loadError = e
@@ -63,13 +63,13 @@ switch (platform) {
     switch (arch) {
       case 'x64':
         localFileExisted = existsSync(
-          join(__dirname, 'terraphim-ai-nodejs.win32-x64-msvc.node')
+          join(__dirname, 'terraphim_ai_nodejs.win32-x64-msvc.node')
         )
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.win32-x64-msvc.node')
+            nativeBinding = require('./terraphim_ai_nodejs.win32-x64-msvc.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-win32-x64-msvc')
+            nativeBinding = require('terraphim_ai_node-win32-x64-msvc')
           }
         } catch (e) {
           loadError = e
@@ -77,13 +77,13 @@ switch (platform) {
         break
       case 'ia32':
         localFileExisted = existsSync(
-          join(__dirname, 'terraphim-ai-nodejs.win32-ia32-msvc.node')
+          join(__dirname, 'terraphim_ai_nodejs.win32-ia32-msvc.node')
         )
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.win32-ia32-msvc.node')
+            nativeBinding = require('./terraphim_ai_nodejs.win32-ia32-msvc.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-win32-ia32-msvc')
+            nativeBinding = require('terraphim_ai_node-win32-ia32-msvc')
           }
         } catch (e) {
           loadError = e
@@ -91,13 +91,13 @@ switch (platform) {
         break
       case 'arm64':
         localFileExisted = existsSync(
-          join(__dirname, 'terraphim-ai-nodejs.win32-arm64-msvc.node')
+          join(__dirname, 'terraphim_ai_nodejs.win32-arm64-msvc.node')
         )
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.win32-arm64-msvc.node')
+            nativeBinding = require('./terraphim_ai_nodejs.win32-arm64-msvc.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-win32-arm64-msvc')
+            nativeBinding = require('terraphim_ai_node-win32-arm64-msvc')
           }
         } catch (e) {
           loadError = e
@@ -108,23 +108,23 @@ switch (platform) {
     }
     break
   case 'darwin':
-    localFileExisted = existsSync(join(__dirname, 'terraphim-ai-nodejs.darwin-universal.node'))
+    localFileExisted = existsSync(join(__dirname, 'terraphim_ai_nodejs.darwin-universal.node'))
     try {
       if (localFileExisted) {
-        nativeBinding = require('./terraphim-ai-nodejs.darwin-universal.node')
+        nativeBinding = require('./terraphim_ai_nodejs.darwin-universal.node')
       } else {
-        nativeBinding = require('terraphim-ai-nodejs-darwin-universal')
+        nativeBinding = require('terraphim_ai_node-darwin-universal')
       }
       break
     } catch {}
     switch (arch) {
       case 'x64':
-        localFileExisted = existsSync(join(__dirname, 'terraphim-ai-nodejs.darwin-x64.node'))
+        localFileExisted = existsSync(join(__dirname, 'terraphim_ai_nodejs.darwin-x64.node'))
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.darwin-x64.node')
+            nativeBinding = require('./terraphim_ai_nodejs.darwin-x64.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-darwin-x64')
+            nativeBinding = require('terraphim_ai_node-darwin-x64')
           }
         } catch (e) {
           loadError = e
@@ -132,13 +132,13 @@ switch (platform) {
         break
       case 'arm64':
         localFileExisted = existsSync(
-          join(__dirname, 'terraphim-ai-nodejs.darwin-arm64.node')
+          join(__dirname, 'terraphim_ai_nodejs.darwin-arm64.node')
         )
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.darwin-arm64.node')
+            nativeBinding = require('./terraphim_ai_nodejs.darwin-arm64.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-darwin-arm64')
+            nativeBinding = require('terraphim_ai_node-darwin-arm64')
           }
         } catch (e) {
           loadError = e
@@ -152,12 +152,12 @@ switch (platform) {
     if (arch !== 'x64') {
       throw new Error(`Unsupported architecture on FreeBSD: ${arch}`)
     }
-    localFileExisted = existsSync(join(__dirname, 'terraphim-ai-nodejs.freebsd-x64.node'))
+    localFileExisted = existsSync(join(__dirname, 'terraphim_ai_nodejs.freebsd-x64.node'))
     try {
       if (localFileExisted) {
-        nativeBinding = require('./terraphim-ai-nodejs.freebsd-x64.node')
+        nativeBinding = require('./terraphim_ai_nodejs.freebsd-x64.node')
       } else {
-        nativeBinding = require('terraphim-ai-nodejs-freebsd-x64')
+        nativeBinding = require('terraphim_ai_node-freebsd-x64')
       }
     } catch (e) {
       loadError = e
@@ -168,26 +168,26 @@ switch (platform) {
       case 'x64':
         if (isMusl()) {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-x64-musl.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-x64-musl.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-x64-musl.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-x64-musl.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-x64-musl')
+              nativeBinding = require('terraphim_ai_node-linux-x64-musl')
             }
           } catch (e) {
             loadError = e
           }
         } else {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-x64-gnu.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-x64-gnu.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-x64-gnu.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-x64-gnu.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-x64-gnu')
+              nativeBinding = require('terraphim_ai_node-linux-x64-gnu')
             }
           } catch (e) {
             loadError = e
@@ -197,26 +197,26 @@ switch (platform) {
       case 'arm64':
         if (isMusl()) {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-arm64-musl.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-arm64-musl.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-arm64-musl.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-arm64-musl.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-arm64-musl')
+              nativeBinding = require('terraphim_ai_node-linux-arm64-musl')
             }
           } catch (e) {
             loadError = e
           }
         } else {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-arm64-gnu.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-arm64-gnu.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-arm64-gnu.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-arm64-gnu.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-arm64-gnu')
+              nativeBinding = require('terraphim_ai_node-linux-arm64-gnu')
             }
           } catch (e) {
             loadError = e
@@ -226,26 +226,26 @@ switch (platform) {
       case 'arm':
         if (isMusl()) {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-arm-musleabihf.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-arm-musleabihf.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-arm-musleabihf.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-arm-musleabihf.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-arm-musleabihf')
+              nativeBinding = require('terraphim_ai_node-linux-arm-musleabihf')
             }
           } catch (e) {
             loadError = e
           }
         } else {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-arm-gnueabihf.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-arm-gnueabihf.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-arm-gnueabihf.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-arm-gnueabihf.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-arm-gnueabihf')
+              nativeBinding = require('terraphim_ai_node-linux-arm-gnueabihf')
             }
           } catch (e) {
             loadError = e
@@ -255,26 +255,26 @@ switch (platform) {
       case 'riscv64':
         if (isMusl()) {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-riscv64-musl.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-riscv64-musl.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-riscv64-musl.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-riscv64-musl.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-riscv64-musl')
+              nativeBinding = require('terraphim_ai_node-linux-riscv64-musl')
             }
           } catch (e) {
             loadError = e
           }
         } else {
           localFileExisted = existsSync(
-            join(__dirname, 'terraphim-ai-nodejs.linux-riscv64-gnu.node')
+            join(__dirname, 'terraphim_ai_nodejs.linux-riscv64-gnu.node')
           )
           try {
             if (localFileExisted) {
-              nativeBinding = require('./terraphim-ai-nodejs.linux-riscv64-gnu.node')
+              nativeBinding = require('./terraphim_ai_nodejs.linux-riscv64-gnu.node')
             } else {
-              nativeBinding = require('terraphim-ai-nodejs-linux-riscv64-gnu')
+              nativeBinding = require('terraphim_ai_node-linux-riscv64-gnu')
             }
           } catch (e) {
             loadError = e
@@ -283,13 +283,13 @@ switch (platform) {
         break
       case 's390x':
         localFileExisted = existsSync(
-          join(__dirname, 'terraphim-ai-nodejs.linux-s390x-gnu.node')
+          join(__dirname, 'terraphim_ai_nodejs.linux-s390x-gnu.node')
         )
         try {
           if (localFileExisted) {
-            nativeBinding = require('./terraphim-ai-nodejs.linux-s390x-gnu.node')
+            nativeBinding = require('./terraphim_ai_nodejs.linux-s390x-gnu.node')
           } else {
-            nativeBinding = require('terraphim-ai-nodejs-linux-s390x-gnu')
+            nativeBinding = require('terraphim_ai_node-linux-s390x-gnu')
           }
         } catch (e) {
           loadError = e
@@ -310,6 +310,8 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { sum } = nativeBinding
+const { sum, replaceLinks, getConfig } = nativeBinding
 
 module.exports.sum = sum
+module.exports.replaceLinks = replaceLinks
+module.exports.getConfig = getConfig

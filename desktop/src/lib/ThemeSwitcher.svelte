@@ -77,14 +77,26 @@
     // FIXME: ugly hack to make roles work with new deserialization out of tauri
     const roleSettings = $roles.find(r => r.name === target.value);
     console.log("Role settings ", roleSettings);
+
     if (roleSettings) {
-      // if role have kg.publish=true then publish thesaurus
+      configStore.update(config => {
+        config.selected_role = roleSettings.shortname;
+        return config;
+      });
+      if ($is_tauri) {
+      invoke("update_config", { configNew: $configStore })
+        .then((res) => {
+          console.log("update_config response", res);
+        })
+        .catch((e) => console.error(e));
+      }
+        // if role have kg.publish=true then publish thesaurus
       if (roleSettings.kg?.publish) {
       console.log("Publishing thesaurus for role", $role);
       invoke("publish_thesaurus", { roleName: $role }).then((res) => {
         console.log("publish_thesaurus response", res);
         // update thesaurus store
-        thesaurus.set(res.data);
+        thesaurus.set(res as any);
         typeahead.set(true);
       });
       }else{
