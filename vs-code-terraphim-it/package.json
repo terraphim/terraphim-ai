@@ -2,7 +2,7 @@
   "name": "terraphim-it",
   "displayName": "Terraphim It",
   "description": "Apply Current Terraphim AI role to the current text",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "publisher": "applied-knowledge-systems",
   "private": true,
   "license": "MIT",
@@ -29,6 +29,10 @@
       {
         "command": "extension.terraphimCommand",
         "title": "Terraphim IT"
+      },
+      {
+        "command": "extension.terraphimAIAutocomplete",
+        "title": "Terraphim AI Autocomplete"
       }
     ],
     "configuration": {
@@ -47,7 +51,8 @@
     "compile": "npx tsc -p ./",
     "lint": "eslint \"src/**/*.ts\"",
     "watch": "npx tsc -watch -p ./",
-    "update-ontologies": "npx ad-generate ontologies"
+    "update-ontologies": "npx ad-generate ontologies",
+    "build-rust": "wasm-pack build rust-lib --target nodejs"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",

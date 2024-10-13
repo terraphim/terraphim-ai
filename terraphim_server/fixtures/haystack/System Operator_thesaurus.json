@@ -1,6 +1,7 @@
 {
   "name": "system operator",
   "data": {
+<<<<<<< HEAD
     "system maintains key functions": {
       "id": 10,
       "nterm": "operation"
@@ -9,10 +10,13 @@
       "id": 10,
       "nterm": "operation"
     },
+=======
+>>>>>>> vs_code_wasm
     "corrective maintenance": {
       "id": 8,
       "nterm": "maintenance"
     },
+<<<<<<< HEAD
     "service life extension program": {
       "id": 10,
       "nterm": "operation"
@@ -58,6 +62,9 @@
       "nterm": "operation"
     },
     "maintaining operational capability": {
+=======
+    "maintenance management": {
+>>>>>>> vs_code_wasm
       "id": 8,
       "nterm": "maintenance"
     },
@@ -65,10 +72,22 @@
       "id": 10,
       "nterm": "operation"
     },
+<<<<<<< HEAD
+=======
+    "operation": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "analyze operational problems": {
+      "id": 10,
+      "nterm": "operation"
+    },
+>>>>>>> vs_code_wasm
     "transition": {
       "id": 7,
       "nterm": "transition"
     },
+<<<<<<< HEAD
     "hello terraphim": {
       "id": 11,
       "nterm": "testconcept"
@@ -89,10 +108,17 @@
       "id": 10,
       "nterm": "operation"
     },
+=======
+    "maintaining operational capability": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+>>>>>>> vs_code_wasm
     "manage the migration between systems": {
       "id": 10,
       "nterm": "operation"
     },
+<<<<<<< HEAD
     "preventive maintenance": {
       "id": 8,
       "nterm": "maintenance"
@@ -101,25 +127,110 @@
       "id": 10,
       "nterm": "operation"
     },
+=======
+>>>>>>> vs_code_wasm
     "replace an existing system": {
       "id": 7,
       "nterm": "transition"
     },
-    "replace a legacy system": {
-      "id": 7,
-      "nterm": "transition"
+<<<<<<< HEAD
+=======
+    "system scheduled maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
     },
-    "monitor the services": {
-      "id": 10,
-      "nterm": "operation"
+    "maintenance activities": {
+      "id": 8,
+      "nterm": "maintenance"
     },
-    "slep": {
+    "maintenance actions": {
       "id": 10,
       "nterm": "operation"
     },
     "maintenance process": {
       "id": 8,
       "nterm": "maintenance"
+    },
+    "system maintains key functions": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "testconcept": {
+      "id": 11,
+      "nterm": "testconcept"
+    },
+>>>>>>> vs_code_wasm
+    "replace a legacy system": {
+      "id": 7,
+      "nterm": "transition"
+    },
+<<<<<<< HEAD
+=======
+    "operate the system": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "breakdown in services": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "operation of system": {
+      "id": 10,
+      "nterm": "operation"
+    },
+>>>>>>> vs_code_wasm
+    "monitor the services": {
+      "id": 10,
+      "nterm": "operation"
+    },
+<<<<<<< HEAD
+=======
+    "sustain service": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "preventive maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "service life extension program": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "terraphim hello": {
+      "id": 11,
+      "nterm": "testconcept"
+    },
+    "system maintenance": {
+      "id": 8,
+      "nterm": "maintenance"
+    },
+    "identify analyze operational problems": {
+      "id": 10,
+      "nterm": "operation"
+    },
+    "system operationally effective": {
+      "id": 10,
+      "nterm": "operation"
+    },
+>>>>>>> vs_code_wasm
+    "slep": {
+      "id": 10,
+      "nterm": "operation"
+    },
+<<<<<<< HEAD
+    "maintenance process": {
+      "id": 8,
+      "nterm": "maintenance"
+=======
+    "hello terraphim": {
+      "id": 11,
+      "nterm": "testconcept"
+>>>>>>> vs_code_wasm
     }
   }
 }
