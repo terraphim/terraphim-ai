@@ -540,6 +540,11 @@ impl ConfigState {
         config.default_role.clone()
     }
 
+    pub async fn get_selected_role(&self) -> RoleName {
+        let config = self.config.lock().await;
+        config.selected_role.clone()
+    }
+
     /// Get a role from the config
     pub async fn get_role(&self, role: &RoleName) -> Option<Role> {
         let config = self.config.lock().await;

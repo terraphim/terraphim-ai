@@ -6,9 +6,10 @@ extern crate napi_derive;
 use terraphim_automata::{load_thesaurus_from_json_and_replace, LinkType};
 use terraphim_persistence::Persistable;
 use terraphim_config::ConfigState;
-use terraphim_config::{ConfigBuilder,ConfigId};
+use terraphim_config::{Config,ConfigBuilder,ConfigId};
 use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
+use terraphim_types::NormalizedTermValue;
 use anyhow::Context;
 
 #[napi]
@@ -31,8 +32,8 @@ pub async fn replace_links(content: String, thesaurus: String) -> String {
   .unwrap()
 }
 
-#[napi]
-pub async fn get_config() -> String {
+
+pub async fn get_config() -> Config {
   let device_settings =
   DeviceSettings::load_from_env_and_file(None).context("Failed to load settings").unwrap();
   println!("Device settings: {:?}", device_settings);
@@ -52,7 +53,18 @@ pub async fn get_config() -> String {
   let config_state = ConfigState::new(&mut config).await.unwrap();
   let terraphim_service = TerraphimService::new(config_state);
   let config = terraphim_service.fetch_config().await;
-  serde_json::to_string(&config).unwrap()
+  config
+}
+
+
+
+#[napi]
+pub async fn search_documents_selected_role(query: String) ->String {
+  let mut config = get_config().await;
+  let config_state = ConfigState::new(&mut config).await.unwrap();
+  let mut terraphim_service = TerraphimService::new(config_state);
+  let documents = terraphim_service.search_documents_selected_role(&NormalizedTermValue::new(query)).await.unwrap();
+  serde_json::to_string(&documents).unwrap()
 }
 
 #[cfg(test)]
@@ -67,7 +79,15 @@ mod tests {
   #[tokio::test]
   async fn async_get_config_test() {
     let config = get_config().await;
-    println!("Config: {}", config);
-    assert_eq!(config, "{}");
+    println!("Config: {}", serde_json::to_string(&config).unwrap());
+    assert_eq!(config.id, ConfigId::Desktop);
+  }
+
+  #[tokio::test]
+  async fn async_search_documents_selected_role_test() {
+    let result = search_documents_selected_role("agent".to_string()).await;
+    println!("Result: {}", result);
+    //assert that results contain the word "agent"
+    assert!(result.contains("agent"));
   }
 } 
