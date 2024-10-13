@@ -60,12 +60,11 @@ async fn run_server() -> Result<()> {
                 Ok(config) => config,
                 Err(e) => {
                     log::info!("Failed to load config: {:?}", e);
-                    let config = ConfigBuilder::new().build_default_server().build().unwrap();
-                    config
-                },
+                    ConfigBuilder::new().build_default_server().build().unwrap()
+                }
             },
-            Err(e) => panic!("Failed to build config: {:?}", e),
-        };
+        Err(e) => panic!("Failed to build config: {e:?}"),
+    };
     let config_state = ConfigState::new(&mut config)
         .await
         .context("Failed to load config")?;
