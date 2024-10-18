@@ -23,6 +23,7 @@ interface EngineeringData {
 export function activate(context: vscode.ExtensionContext) {
   let agent: string | undefined;
   let store: Store | undefined;
+  let activeProvider: vscode.Disposable | undefined;
 
   const disposable = vscode.commands.registerCommand(
     'extension.terraphimCommand',
@@ -86,14 +87,18 @@ export function activate(context: vscode.ExtensionContext) {
       if (!store) {
         store = getStore(agent);
       }
-
+      // Deactivate the existing provider if any
+      if (activeProvider) {
+        activeProvider.dispose();
+        activeProvider = undefined;
+      }
       // Register the completion provider
       const provider = vscode.languages.registerCompletionItemProvider(
         { scheme: 'file', language: '*' },
         new TerraphimCompletionProvider(store),
         ' ' // Trigger on space
       );
-
+      activeProvider = provider;
       context.subscriptions.push(provider);
       vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
     }
@@ -104,7 +109,11 @@ export function activate(context: vscode.ExtensionContext) {
   const napiAutocompleteDisposable = vscode.commands.registerCommand(
     'extension.terraphimNapiAutocomplete',
     async function () {
-
+      // Deactivate the existing provider if any
+      if (activeProvider) {
+        activeProvider.dispose();
+        activeProvider = undefined;
+      }
 
       // Register the completion provider
       const provider = vscode.languages.registerCompletionItemProvider(
@@ -113,6 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
         ' ' // Trigger on space
       );
 
+      activeProvider = provider;
       context.subscriptions.push(provider);
       vscode.window.showInformationMessage('Terraphim Napi Autocomplete activated');
     }
@@ -123,26 +133,65 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 class TerraphimNapiCompletionProvider implements vscode.CompletionItemProvider {
+  private lastQuery: string = '';
+  private lastResults: vscode.CompletionItem[] = [];
+  private updateSubscription: vscode.Disposable | null = null;
+
+  constructor() {
+    this.subscribeForUpdates();
+  }
+
+  private subscribeForUpdates() {
+    if (this.updateSubscription) {
+      this.updateSubscription.dispose();
+    }
+    this.updateSubscription = vscode.workspace.onDidChangeTextDocument(this.onDocumentChange.bind(this));
+  }
+
+  private onDocumentChange(event: vscode.TextDocumentChangeEvent) {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor && event.document === activeEditor.document) {
+      this.updateCompletions(activeEditor.document, activeEditor.selection.active);
+    }
+  }
+
+  private async updateCompletions(document: vscode.TextDocument, position: vscode.Position) {
+    const wordRange = document.getWordRangeAtPosition(position) || document.getWordRangeAtPosition(position.translate(0, -1));
+    if (wordRange) {
+      const word = document.getText(wordRange);
+      console.log("word", word);
+      if (word !== this.lastQuery) {
+        this.lastQuery = word;
+        const results = await searchDocumentsSelectedRole(word);
+        const parsedResults = JSON.parse(results);
+        this.lastResults = this.createCompletionItems(parsedResults);
+      }
+    }
+  }
+
+  private createCompletionItems(parsedResults: any): vscode.CompletionItem[] {
+    return Object.entries(parsedResults).map(([key, value]: [string, any]) => {
+      const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
+      item.detail = value.body as string;
+      item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
+      return item;
+    });
+  }
+
   async provideCompletionItems(
     document: vscode.TextDocument,
     position: vscode.Position,
     token: vscode.CancellationToken,
     context: vscode.CompletionContext
   ): Promise<vscode.CompletionItem[] | vscode.CompletionList> {
-    const linePrefix = document.lineAt(position).text.substr(0, position.character);
-    if (!linePrefix.endsWith(' ')) {
-      return [];
-    }
+    await this.updateCompletions(document, position);
+    return this.lastResults;
+  }
 
-    const results = await searchDocumentsSelectedRole(linePrefix);
-    const parsedResults = JSON.parse(results);
-    console.log(parsedResults);
-    return Object.entries(parsedResults).map(([key, value]) => {
-      const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
-      item.detail = value.body as string;
-      item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
-      return item;
-    });
+  dispose() {
+    if (this.updateSubscription) {
+      this.updateSubscription.dispose();
+    }
   }
 }
 

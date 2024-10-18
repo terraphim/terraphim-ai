@@ -78,11 +78,15 @@
                 <i class="fas fa-plus" aria-hidden="true" />
               </span>
             </a>
-            <a href="#" class="level-item" aria-label="like">
-              <span class="icon is-medium">
-                <i class="fas fa-bookmark" aria-hidden="true" />
-              </span>
-            </a>
+            <a
+            href={`vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`}
+            class="level-item"
+            aria-label="Open in VSCode"
+          >
+            <span class="icon is-medium">
+              <i class="fas fa-code" aria-hidden="true" />
+            </span>
+          </a>
           </div>
         </nav>
       </div>

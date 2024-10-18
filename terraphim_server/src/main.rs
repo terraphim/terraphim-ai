@@ -55,7 +55,7 @@ async fn run_server() -> Result<()> {
         });
 
     
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build() {
+        let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
             Ok(mut local_config) => match local_config.load().await {
                 Ok(config) => config,
                 Err(e) => {

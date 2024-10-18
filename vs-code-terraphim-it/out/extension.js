@@ -10,6 +10,7 @@ const airportOntology_1 = require("./ontologies/airportOntology");
 function activate(context) {
     let agent;
     let store;
+    let activeProvider;
     const disposable = vscode.commands.registerCommand('extension.terraphimCommand', async function () {
         // Get the configuration
         const config = vscode.workspace.getConfiguration('terraphimIt');
@@ -57,37 +58,82 @@ function activate(context) {
         if (!store) {
             store = (0, getStore_1.getStore)(agent);
         }
+        // Deactivate the existing provider if any
+        if (activeProvider) {
+            activeProvider.dispose();
+            activeProvider = undefined;
+        }
         // Register the completion provider
         const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimCompletionProvider(store), ' ' // Trigger on space
         );
+        activeProvider = provider;
         context.subscriptions.push(provider);
         vscode.window.showInformationMessage('Terraphim AI Autocomplete activated');
     });
     context.subscriptions.push(autocompleteDisposable);
     const napiAutocompleteDisposable = vscode.commands.registerCommand('extension.terraphimNapiAutocomplete', async function () {
+        // Deactivate the existing provider if any
+        if (activeProvider) {
+            activeProvider.dispose();
+            activeProvider = undefined;
+        }
         // Register the completion provider
         const provider = vscode.languages.registerCompletionItemProvider({ scheme: 'file', language: '*' }, new TerraphimNapiCompletionProvider(), ' ' // Trigger on space
         );
+        activeProvider = provider;
         context.subscriptions.push(provider);
         vscode.window.showInformationMessage('Terraphim Napi Autocomplete activated');
     });
     context.subscriptions.push(napiAutocompleteDisposable);
 }
 class TerraphimNapiCompletionProvider {
-    async provideCompletionItems(document, position, token, context) {
-        const linePrefix = document.lineAt(position).text.substr(0, position.character);
-        if (!linePrefix.endsWith(' ')) {
-            return [];
+    constructor() {
+        this.lastQuery = '';
+        this.lastResults = [];
+        this.updateSubscription = null;
+        this.subscribeForUpdates();
+    }
+    subscribeForUpdates() {
+        if (this.updateSubscription) {
+            this.updateSubscription.dispose();
         }
-        const results = await (0, index_js_1.searchDocumentsSelectedRole)(linePrefix);
-        const parsedResults = JSON.parse(results);
-        console.log(parsedResults);
+        this.updateSubscription = vscode.workspace.onDidChangeTextDocument(this.onDocumentChange.bind(this));
+    }
+    onDocumentChange(event) {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && event.document === activeEditor.document) {
+            this.updateCompletions(activeEditor.document, activeEditor.selection.active);
+        }
+    }
+    async updateCompletions(document, position) {
+        const wordRange = document.getWordRangeAtPosition(position) || document.getWordRangeAtPosition(position.translate(0, -1));
+        if (wordRange) {
+            const word = document.getText(wordRange);
+            console.log("word", word);
+            if (word !== this.lastQuery) {
+                this.lastQuery = word;
+                const results = await (0, index_js_1.searchDocumentsSelectedRole)(word);
+                const parsedResults = JSON.parse(results);
+                this.lastResults = this.createCompletionItems(parsedResults);
+            }
+        }
+    }
+    createCompletionItems(parsedResults) {
         return Object.entries(parsedResults).map(([key, value]) => {
             const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
             item.detail = value.body;
             item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
             return item;
         });
+    }
+    async provideCompletionItems(document, position, token, context) {
+        await this.updateCompletions(document, position);
+        return this.lastResults;
+    }
+    dispose() {
+        if (this.updateSubscription) {
+            this.updateSubscription.dispose();
+        }
     }
 }
 class TerraphimCompletionProvider {
