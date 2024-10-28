@@ -55,17 +55,16 @@ async fn run_server() -> Result<()> {
         });
 
     
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build() {
+        let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
             Ok(mut local_config) => match local_config.load().await {
                 Ok(config) => config,
                 Err(e) => {
                     log::info!("Failed to load config: {:?}", e);
-                    let config = ConfigBuilder::new().build_default_server().build().unwrap();
-                    config
-                },
+                    ConfigBuilder::new().build_default_server().build().unwrap()
+                }
             },
-            Err(e) => panic!("Failed to build config: {:?}", e),
-        };
+        Err(e) => panic!("Failed to build config: {e:?}"),
+    };
     let config_state = ConfigState::new(&mut config)
         .await
         .context("Failed to load config")?;

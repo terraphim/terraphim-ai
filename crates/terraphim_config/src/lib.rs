@@ -7,6 +7,8 @@ use terraphim_types::{
     Document, IndexedDocument, KnowledgeGraphInputType, RelevanceFunction, RoleName, SearchQuery,
 };
 
+use terraphim_settings::DeviceSettings;
+
 use ahash::AHashMap;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -138,6 +140,8 @@ pub struct KnowledgeGraphLocal {
 #[derive(Debug)]
 pub struct ConfigBuilder {
     config: Config,
+    device_settings: DeviceSettings,
+    settings_path: PathBuf
 }
 
 impl ConfigBuilder {
@@ -145,16 +149,24 @@ impl ConfigBuilder {
     pub fn new() -> Self {
         Self {
             config: Config::empty(),
+            device_settings: DeviceSettings::new(),
+            settings_path: PathBuf::new(),
         }
     }
     pub fn new_with_id(id: ConfigId) -> Self {
         Self {
             config: Config { id, ..Config::empty() },
+            device_settings: DeviceSettings::new(),
+            settings_path: PathBuf::new(),
         }
     }
     pub fn build_default_embedded(mut self) -> Self {
         self.config.id = ConfigId::Embedded;
         self
+    }
+
+    pub fn get_default_data_path(&self) -> PathBuf {
+        PathBuf::from(&self.device_settings.default_data_path)
     }
     pub fn build_default_server(mut self) -> Self {
         self.config.id = ConfigId::Server;
@@ -244,16 +256,9 @@ impl ConfigBuilder {
     }
 
     pub fn build_default_desktop(mut self) -> Self {
-        const DEFAULT_HAYSTACK_PATH: &str = "docs/src/";
-        let automata_path = AutomataPath::from_local("data/term_to_id.json");
-    
-        // Create the path to the default haystack directory
-        // by concating the current directory with the default haystack path
-        let mut docs_path = std::env::current_dir().unwrap();
-        docs_path.pop();
-        docs_path.pop();
-        docs_path = docs_path.join(DEFAULT_HAYSTACK_PATH);
-        println!("Docs path: {:?}", docs_path);
+        let default_data_path = self.get_default_data_path();
+        let automata_path = AutomataPath::from_local(default_data_path.join("term_to_id.json"));
+        println!("Docs path: {:?}", default_data_path);
         self.config.id = ConfigId::Desktop;
         self.global_shortcut("Ctrl+X")
         .add_role(
@@ -265,7 +270,7 @@ impl ConfigBuilder {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
-                    path: docs_path.clone(),
+                    path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -280,7 +285,7 @@ impl ConfigBuilder {
                 theme: "lumen".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
-                    path: docs_path.clone(),
+                    path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -295,17 +300,17 @@ impl ConfigBuilder {
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::from_local(
-                        docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                        default_data_path.join("Terraphim Engineer_thesaurus.json".to_string()),
                     )),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
-                        path: docs_path.join("kg"),
+                        path: default_data_path.join("kg"),
                     }),
                     public: true,
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: docs_path.clone(),
+                    path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -328,7 +333,7 @@ impl ConfigBuilder {
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: docs_path.clone(),
+                    path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                 }],
                 extra: AHashMap::new(),
@@ -342,8 +347,8 @@ impl ConfigBuilder {
     ///
     /// This is useful when you want to start from an setup and modify some
     /// fields
-    pub fn from_config(config: Config) -> Self {
-        Self { config }
+    pub fn from_config(config: Config, device_settings: DeviceSettings, settings_path: PathBuf) -> Self {
+        Self { config, device_settings, settings_path }
     }
 
     /// Set the global shortcut for the config
@@ -426,8 +431,8 @@ impl Config {
             id: ConfigId::Server, // Default to Server
             global_shortcut: "Ctrl+X".to_string(),
             roles: AHashMap::new(),
-            default_role: RoleName::new("default"),
-            selected_role: RoleName::new("default")
+            default_role: RoleName::new("Default"),
+            selected_role: RoleName::new("Default")
         }
     }
 }
@@ -535,6 +540,11 @@ impl ConfigState {
         config.default_role.clone()
     }
 
+    pub async fn get_selected_role(&self) -> RoleName {
+        let config = self.config.lock().await;
+        config.selected_role.clone()
+    }
+
     /// Get a role from the config
     pub async fn get_role(&self, role: &RoleName) -> Option<Role> {
         let config = self.config.lock().await;
@@ -630,6 +640,13 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn load_s3() {
+        let mut config = Config::empty();
+        config.load().await.unwrap();
+        println!("{:#?}", config);
+    }
+
+    #[tokio::test]
     async fn test_save_one_sled() {
         let config = Config::empty();
         config.save_to_one("sled").await.unwrap();
@@ -720,8 +737,9 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(config.global_shortcut, "Ctrl+X");
-
-        let new_config = ConfigBuilder::from_config(config)
+        let device_settings = DeviceSettings::new();    
+        let settings_path = PathBuf::from(".");
+        let new_config = ConfigBuilder::from_config(config, device_settings, settings_path)
             .global_shortcut("Ctrl+/")
             .build()
             .unwrap();
