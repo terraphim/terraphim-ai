@@ -1,0 +1,15 @@
+{
+  "name": "terraphim-ai-nodejs-darwin-universal",
+  "version": "0.0.0",
+  "os": [
+    "darwin"
+  ],
+  "main": "terraphim-ai-nodejs.darwin-universal.node",
+  "files": [
+    "terraphim-ai-nodejs.darwin-universal.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 10"
+  }
+}

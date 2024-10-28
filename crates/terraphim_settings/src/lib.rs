@@ -63,11 +63,17 @@ pub struct DeviceSettings {
     /// init completed
     #[serde(deserialize_with = "deserialize_bool_from_string")]
     pub initialized: bool,
+    /// default data path
+    pub default_data_path: String,
     /// configured storage backends available on device
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
 
 impl DeviceSettings {
+    /// Create a new DeviceSettings
+    pub fn new() -> Self {
+        Self::load_from_env_and_file(None).unwrap()
+    }
     /// Get the default path for the config file
     ///
     /// This is the default path where the config file is stored.

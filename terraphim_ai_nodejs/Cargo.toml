@@ -1,0 +1,32 @@
+[package]
+edition = "2021"
+name = "terraphim_ai_nodejs"
+version = "0.0.0"
+
+[lib]
+name = "terraphim_ai_nodejs"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
+napi = { version = "2.12.2", default-features = false, features = ["napi8", "tokio_rt"] }
+napi-derive = "2.12.2"
+serde_json = "1.0.128"
+terraphim_automata = { path = "../crates/terraphim_automata" }
+terraphim_service = { path = "../crates/terraphim_service" }
+terraphim_config = { path = "../crates/terraphim_config" }
+terraphim_persistence = { path = "../crates/terraphim_persistence" }
+terraphim_settings = { path = "../crates/terraphim_settings" }
+terraphim_types = { path = "../crates/terraphim_types" }
+anyhow = "1.0.89"
+tokio = { version = "1.40.0", features = ["full"] }
+
+[build-dependencies]
+napi-build = "2.0.1"
+
+[profile.release]
+lto = true
+strip = "symbols"
+
+[workspace]
+resolver = "2"

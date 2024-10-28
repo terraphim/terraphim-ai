@@ -6,7 +6,7 @@ use terraphim_persistence::error;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus,
+    Document, Index, IndexedDocument, NormalizedTermValue,RelevanceFunction, RoleName, SearchQuery, Thesaurus,
 };
 mod score;
 
@@ -68,7 +68,7 @@ impl<'a> TerraphimService {
         println!("Role keys {:?}", self.config_state.roles.keys());
         let mut rolegraphs = self.config_state.roles.clone();
         if let Some(rolegraph_value) = rolegraphs.get(role_name) {
-            let mut thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
+            let thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
             match thesaurus_result {
                 Ok(thesaurus) => {
                     println!("Thesaurus loaded: {:#?}", thesaurus);
@@ -116,6 +116,17 @@ impl<'a> TerraphimService {
             )));
         };
         Ok(role)
+    }
+    
+    /// search for documents in the haystacks with selected role from the config
+    /// and return the documents sorted by relevance
+    pub async fn search_documents_selected_role(
+        &mut self,
+        search_term: &NormalizedTermValue,
+    ) -> Result<Vec<Document>> {
+        let role = self.config_state.get_selected_role().await;
+        let documents = self.search(&SearchQuery { search_term: search_term.clone(), role: Some(role), skip: None, limit: None }).await?;
+        Ok(documents)
     }
 
     /// Search for documents in the haystacks
@@ -183,6 +194,70 @@ impl<'a> TerraphimService {
     ) -> Result<terraphim_config::Config> {
         let mut current_config = self.config_state.config.lock().await;
         *current_config = config.clone();
+        current_config.save().await?;
+        println!("Config updated {:?}", current_config);
         Ok(config)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    //test get config
+    #[tokio::test]
+    async fn test_get_config() {
+        use anyhow::Context;
+        use terraphim_settings::DeviceSettings;
+        use terraphim_config::{ConfigBuilder, ConfigId};
+        let device_settings =
+        DeviceSettings::load_from_env_and_file(None).context("Failed to load settings").unwrap();
+        println!("Device settings: {:?}", device_settings);
+      
+          let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
+            Ok(mut config) => match config.load().await {
+                Ok(config) => config,
+                Err(e) => {
+                    println!("Failed to load config: {:?}", e);
+                    let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+                    config
+                },
+            },
+            Err(e) => panic!("Failed to build config: {:?}", e),
+        };
+        let config_state = ConfigState::new(&mut config).await.unwrap();
+        let terraphim_service = TerraphimService::new(config_state);
+        let config = terraphim_service.fetch_config().await;
+        println!("Config: {:?}", config);
+    }
+
+
+    // test search documents with selected role
+    #[tokio::test]
+    async fn test_search_documents_selected_role() {
+        use anyhow::Context;
+        use terraphim_settings::DeviceSettings;
+        use terraphim_config::{ConfigBuilder, ConfigId};
+        let device_settings =
+        DeviceSettings::load_from_env_and_file(None).context("Failed to load settings").unwrap();
+        println!("Device settings: {:?}", device_settings);
+      
+          let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
+            Ok(mut config) => match config.load().await {
+                Ok(config) => config,
+                Err(e) => {
+                    println!("Failed to load config: {:?}", e);
+                    let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+                    config
+                },
+            },
+            Err(e) => panic!("Failed to build config: {:?}", e),
+        };
+        let config_state = ConfigState::new(&mut config).await.unwrap();
+        let mut terraphim_service = TerraphimService::new(config_state);
+        let documents = terraphim_service.search_documents_selected_role(&NormalizedTermValue::new("agent".to_string())).await.unwrap();
+        println!("Documents: {:?}", documents);
+    }     
+}  

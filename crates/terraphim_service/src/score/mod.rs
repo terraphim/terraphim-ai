@@ -24,7 +24,7 @@ pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> V
     let mut scorer = Scorer::new();
 
     // Create a new query
-    let query = Query::new(&search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
+    let query = Query::new(search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
 
     // Score the documents
     let mut results = scorer.score(&query, documents).unwrap();
