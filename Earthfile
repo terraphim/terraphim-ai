@@ -79,9 +79,7 @@ install-native:
   RUN rustup component add rustfmt
   RUN cargo install ripgrep
   RUN cargo install cross
-  RUN cargo install orogene
-  RUN curl https://pkgx.sh | sh
-  RUN pkgx install yarnpkg.com
+  RUN curl -fsSL https://bun.sh/install | bash
   SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder_native:latest
 
 source-native:
@@ -192,7 +190,8 @@ build-bionic:
   IF ! echo $PATH | grep -E -q "(^|:)$CARGO_HOME/bin($|:)"
     ENV PATH="$PATH:$CARGO_HOME/bin"
   END
-  RUN ./desktop/scripts/yarn_and_build.sh
+  # RUN ./desktop/scripts/yarn_and_build.sh
+  RUN lsb_release -a | grep bionic && /code/desktop/scripts/yarn_and_build.sh
   # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_bionic
@@ -251,7 +250,7 @@ docs-deps:
   RUN cargo install mdbook
   RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
-  RUN cargo install mdbook-sitemap-generator
+  # RUN cargo install mdbook-sitemap-generator #broken
   # RUN cargo install --git https://github.com/typst/typst typst-cli 
   # RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
   RUN cargo install mdbook-mermaid
@@ -268,5 +267,5 @@ docs-pages:
   WORKDIR /docs
   RUN mdbook --version
   RUN mdbook build
-  RUN mdbook-sitemap-generator -d docs.terraphim.ai -o /docs/book/html/sitemap.xml
+  # RUN mdbook-sitemap-generator -d docs.terraphim.ai -o /docs/book/html/sitemap.xml
   RUN --secret NETLIFY_AUTH_TOKEN=NETLIFY_TOKEN bash -c "source $HOME/.nvm/nvm.sh && netlify deploy --dir /docs/book/html --prod --auth $NETLIFY_AUTH_TOKEN --site docs-terraphim-ai"

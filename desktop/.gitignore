@@ -26,3 +26,4 @@ vite.config.*.mjs
 .vscode/*
 src-old
 src-old
+bun.lockb

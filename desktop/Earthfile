@@ -9,11 +9,9 @@ deps:
     COPY --keep-ts . .
     # COPY --dir src src
     # COPY --dir public public
-    RUN oro apply -q || true
+    RUN chmod +x /code/desktop/scripts/yarn_and_build.sh
     RUN /code/desktop/scripts/yarn_and_build.sh
-
 build:
     FROM +deps
-    # RUN pkgx +yarnpkg.com yarn run build
-
     SAVE ARTIFACT dist /dist AS LOCAL dist
+
