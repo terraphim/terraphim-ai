@@ -1,0 +1,42 @@
+@import './shoelace-light.css';
+
+.card::part(base) {
+  background: var(--sl-color-neutral-50);
+  border-color: var(--sl-panel-border-color);
+}
+
+.card::part(header) {
+  color: var(--sl-color-neutral-200);
+}
+
+.card::part(body) {
+  color: var(--sl-color-neutral-300);
+}
+
+/* Dark theme variables */
+.sl-theme-dark {
+    --sl-color-primary-50: rgb(240, 249, 255);
+    --sl-color-primary-100: rgb(224, 242, 254);
+    --sl-color-primary-200: rgb(186, 230, 253);
+    --sl-color-primary-300: rgb(125, 211, 252);
+    --sl-color-primary-400: rgb(56, 189, 248);
+    --sl-color-primary-500: rgb(14, 165, 233);
+    --sl-color-primary-600: rgb(2, 132, 199);
+    --sl-color-primary-700: rgb(3, 105, 161);
+    --sl-color-primary-800: rgb(7, 89, 133);
+    --sl-color-primary-900: rgb(12, 74, 110);
+    
+    --bg: #1f1f1f;
+    --fg: #c8c9db;
+    
+    --sidebar-bg: #252529;
+    --sidebar-fg: #c8c9db;
+    --sidebar-active: var(--sl-color-primary-300);
+    
+    --scrollbar: var(--sidebar-fg);
+    --icons: #737480;
+    --icons-hover: #b7b9cc;
+    
+    --links: var(--sl-color-primary-300);
+    --link-hover: var(--sl-color-primary-100);
+}

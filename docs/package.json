@@ -1,0 +1,30 @@
+{
+  "name": "terraphim-ai-assistant-docs",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Terraphim AI Assistant Documentation",
+  "scripts": {
+    "dev": "obook dev",
+    "prebuild": "cp index.html dist/",
+    "build": "obook build && node scripts/generate-sitemap.js",
+    "postbuild": "cp index.html dist/"
+  },
+  "obook": {
+    "input": "./_preview.html",
+    "output": "./dist",
+    "sitemap": {
+      "hostname": "https://docs.terraphim.ai",
+      "enabled": true
+    },
+    "theme": {
+      "light": "theme/shoelace-light.css",
+      "dark": "theme/shoelace-dark.css",
+      "custom": ["theme/starlight.css"]
+    },
+    "scripts": [
+      "discord.js",
+      "mermaid.min.js",
+      "mermaid-init.js"
+    ]
+  }
+}

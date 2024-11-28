@@ -1,0 +1,11 @@
+{
+  "logo": {
+    "text": "Terraphim AI"
+  },
+  "navs": [
+    {
+      "name": "Documentation",
+      "summary": "./SUMMARY.md"
+    }
+  ]
+}

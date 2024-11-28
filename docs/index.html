@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terraphim AI Documentation</title>
+    
+    <!-- Shoelace autoloader and themes -->
+    <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.14.0/cdn/shoelace-autoloader.js"></script> -->
+    <!-- <link rel="stylesheet" href="theme/shoelace-light.css" /> -->
+    <!-- <link rel="stylesheet" href="theme/shoelace-dark.css" /> -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/css/public.css" />
+    <style>
+        html,
+        body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          font-family: var(--sl-font-sans);
+        }
+    </style>
+  </head>
+  <body>
+    <div class="card-container">
+      <sl-card class="card">
+        <h2 slot="header">Documentation</h2>
+        <p>Read our comprehensive documentation to learn more about Terraphim AI</p>
+        <div slot="footer">
+          <sl-button href="@/en/Introduction.html" variant="primary">Read Docs</sl-button>
+        </div>
+      </sl-card>
+
+      <sl-card class="card">
+        <div slot="header">Contributing</div>
+        <p>Learn how you can contribute to the Terraphim AI project</p>
+        <div slot="footer">
+          <sl-button href="@/en/Contributing.html" variant="primary">Contribute</sl-button>
+        </div>
+      </sl-card>
+    </div>
+  </body>
+</html> 

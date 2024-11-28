@@ -1,0 +1,55 @@
+{
+  "name": "terraphim engineer",
+  "data": {
+    "provider": {
+      "id": 6,
+      "nterm": "service",
+      "url": null
+    },
+    "datasource": {
+      "id": 5,
+      "nterm": "haystack",
+      "url": null
+    },
+    "agent": {
+      "id": 5,
+      "nterm": "haystack",
+      "url": null
+    },
+    "graph embeddings": {
+      "id": 8,
+      "nterm": "terraphim-graph",
+      "url": null
+    },
+    "haystack": {
+      "id": 5,
+      "nterm": "haystack",
+      "url": null
+    },
+    "graph": {
+      "id": 8,
+      "nterm": "terraphim-graph",
+      "url": null
+    },
+    "knowledge graph based embeddings": {
+      "id": 8,
+      "nterm": "terraphim-graph",
+      "url": null
+    },
+    "middleware": {
+      "id": 6,
+      "nterm": "service",
+      "url": null
+    },
+    "terraphim-graph": {
+      "id": 8,
+      "nterm": "terraphim-graph",
+      "url": null
+    },
+    "service": {
+      "id": 6,
+      "nterm": "service",
+      "url": null
+    }
+  }
+}

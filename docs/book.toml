@@ -2,64 +2,48 @@
 authors = ["AlexMikhalev"]
 language = "en"
 multilingual = false
-src = "src"
+src = "en"
 title = "Terraphim AI documentation"
 
 [output.html]
 git-repository-icon = "fa-github"
 git-repository-url = "https://github.com/terraphim/terraphim-ai"
-edit-url-template = "https://github.com/terraphim/terraphim-ai/edit/develop/docs/{path}"
-additional-js = ["discord.js","mermaid.min.js", "mermaid-init.js"]
+edit-url-template = "https://github.com/terraphim/terraphim-ai/edit/main/docs/{path}"
+additional-css = [
+    "theme/css/shoelace-light.css",
+    "theme/css/shoelace-dark.css",
+    # "theme/css/layout.css",
+    "theme/css/toc.css"
+]
+additional-js = [
+    # "discord.js",
+    "mermaid.min.js", 
+    "mermaid-init.js",
+    "theme/js/theme-switcher.js",
+    "theme/js/toc-generator.js"
+]
 mathjax-support = true
+preferred-dark-theme = "ayu"
+default-theme = "light"
+no-section-label = true
+page-toc = true
+page-toc-position = "right"
 
 [output.html.fold]
 enable = true
 level = 2
 
-[output.linkcheck]
-optional = true
-
-# [output.compress]
-# subtitle = "How to use and contribute to Terraphim AI assistant"
-# highlight = "no-node"
-
-# [output.epub]
-
-# [output.typst]
-# [output.typst.output]
-# format = "pdf"
+[output.html.search]
+enable = true
+limit-results = 20
+teaser-word-count = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
 
 [preprocessor]
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
-
-# [output.pandoc]
-# hosted-html = "https://docs.terraphim.ai/" # URL of a HTML version of the book
-
-# [output.pandoc.code]
-# # Display hidden lines in code blocks (e.g., lines in Rust blocks prefixed by '#').
-# # See https://rust-lang.github.io/mdBook/format/mdbook.html?highlight=hidden#hiding-code-lines
-# show-hidden-lines = false
-
-# [output.pandoc.profile.pdf] 
-# # options to pass to Pandoc (see https://pandoc.org/MANUAL.html#defaults-files)
-# output-file = "output.pdf" # output file (within the profile's build directory)
-# to = "latex" # output format
-
-# # PDF-specific settings
-# pdf-engine = "pdflatex" # engine to use to produce PDF output
-
-# # `mdbook-pandoc` overrides Pandoc's defaults for the following options to better support mdBooks
-# file-scope = true # parse each file individually before combining
-# number-sections = true # number sections headings
-# standalone = true # produce output with an appropriate header and footer
-# table-of-contents = true # include an automatically generated table of contents
-
-# [output.pandoc.profile.docx] 
-# # options to pass to Pandoc (see https://pandoc.org/MANUAL.html#defaults-files)
-# output-file = "output.docx" # output file (within the profile's build directory)
-# # `mdbook-pandoc` overrides Pandoc's defaults for the following options to better support mdBooks
-# file-scope = true # parse each file individually before combining
-# number-sections = true # number sections headings
-# standalone = true # produce output with an appropriate header and footer
-# table-of-contents = true # include an automatically generated table of contents
