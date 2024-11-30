@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Use cases for Terraphim AI</title>
+        <script src="https://cdn.jsdelivr.net/gh/kirakiray/ofa.js@4.3.32/dist/ofa.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/gh/kirakiray/ofa.js@4.3.32/libs/scsr/scsr.mjs"
+      type="module"
+    ></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/css/public.css" />
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+    </style>
+    <script>
+      let configUrl = "config.json";
+    </script>
+    
+  </head>
+  <body>
+    <l-m src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/comps/doc-container.html"></l-m>
+    <l-m src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/comps/doc-header/doc-header.html"></l-m>
+    <o-app src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/app-config.mjs">
+      <template page>
+        <style>
+          .markdown-body::before,
+          .markdown-body::after {
+            display: block;
+            content: "";
+            height: 1px;
+          }
+          .markdown-body::after {
+            height: 32px;
+          }
+          .markdown-body > * {
+            margin-top: 1em;
+            margin-bottom: 1em;
+          }
+        </style>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/css/github-markdown.css"
+        />
+        <article class="markdown-body"><h1>Use cases for Terraphim AI</h1>
+<h2>Search your local markdown files, build your own personal knowledge graph, then publish your knowledge to the web, then reuse</h2>
+<h3>End to End flow</h3>
+<p>The current focus is on perfecting overall end-to-end human usable flow:</p>
+<ul>
+<li><p>engineer or expert takes notes in the Logseq-knowledge graph</p>
+</li>
+<li><p>notes are used to create thesaurus for Terraphim (using Terraphim desktop, feature done, alpha testing)</p>
+</li>
+<li><p>Thesaurus is used per each role to create Terraphim graph (used for ranking search results). Feature done, alpha testing</p>
+</li>
+<li><p>Terraphim desktop is used to search over local markdown files using Terraphim Graph for ranking (Feature done, alpha testing)</p>
+</li>
+<li><p>Terraphim desktop search automatically populates Atomic server with search results (first attempt and approach didn&#39;t work, required changes in Atomic Rust client, atomic 
+server-side updated with new client fetch, Terraphim feature for automatic cache population WIP <a href="https://github.com/terraphim/terraphim-ai/issues/12">https://github.com/terraphim/terraphim-ai/issues/12</a>)</p>
+</li>
+<li><p>User works with search results forming blogs or articles in Atomic server using Atomic as standard CMS (all features done)</p>
+</li>
+<li><p>Final articles are published via different domains using Atomic Server + Sveltekit</p>
+<ul>
+<li><p>current websites: <a href="https://systems.tf">Systems Engineering</a></p>
+</li>
+<li><p>planned set of websites on different topics: learning rust, knowledge graphs, search engines, Metacortex Engineering (cross-discipline collaboration)</p>
+</li>
+</ul>
+</li>
+<li><p>Articles published (or drafts) in Atomic Server are used as input for Terraphim (both desktop and cloud) as haystack for the role (instead or alongside markdown files or any other sources) Blocked on <a href="https://github.com/atomicdata-dev/atomic-server/issues/778">https://github.com/atomicdata-dev/atomic-server/issues/778</a></p>
+</li>
+</ul>
+
+    <article-footer></article-footer>
+    </article>
+        <script>
+          export const parent = "https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/layouts/article-layout.html";
+
+          import pageInit from "https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/document-page-init.mjs";
+
+          export default async (...args) => {
+            return await pageInit(PATH, args);
+          };
+        </script>
+      </template>
+    </o-app>
+    <div id="loading"></div>
+    <div class="body-important other-link"><ul>
+<li><a href="Introduction.html">Introduction</a></li>
+<li><a href="CONTRIBUTE.html">Contributing</a></li>
+<li><a href="Architecture.html">Architecture</a></li>
+<li><a href="DesignDecisions.html">Design Decisions</a></li>
+<li><a href="Use-cases.html">Use cases</a></li>
+<li><a href="CODE_OF_CONDUCT.html">Code of Conduct</a></li>
+<li><a href="index.html">English-index.html</a></li>
+
+</ul></div>
+    <script src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/init.js" type="module"></script>
+  </body>
+</html>

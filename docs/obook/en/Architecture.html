@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title></title>
+        <script src="https://cdn.jsdelivr.net/gh/kirakiray/ofa.js@4.3.32/dist/ofa.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/gh/kirakiray/ofa.js@4.3.32/libs/scsr/scsr.mjs"
+      type="module"
+    ></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/css/public.css" />
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+    </style>
+    <script>
+      let configUrl = "config.json";
+    </script>
+    
+  </head>
+  <body>
+    <l-m src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/comps/doc-container.html"></l-m>
+    <l-m src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/comps/doc-header/doc-header.html"></l-m>
+    <o-app src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/app-config.mjs">
+      <template page>
+        <style>
+          .markdown-body::before,
+          .markdown-body::after {
+            display: block;
+            content: "";
+            height: 1px;
+          }
+          .markdown-body::after {
+            height: 32px;
+          }
+          .markdown-body > * {
+            margin-top: 1em;
+            margin-bottom: 1em;
+          }
+        </style>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/css/github-markdown.css"
+        />
+        <article class="markdown-body"><p>Use mermaid to draw the architecture of the system.</p>
+<pre><code class="language-mermaid">graph TD;
+    A--&gt;B;
+    A--&gt;C;
+    B--&gt;D;
+    C--&gt;D;
+</code></pre>
+
+    <article-footer></article-footer>
+    </article>
+        <script>
+          export const parent = "https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/layouts/article-layout.html";
+
+          import pageInit from "https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/document-page-init.mjs";
+
+          export default async (...args) => {
+            return await pageInit(PATH, args);
+          };
+        </script>
+      </template>
+    </o-app>
+    <div id="loading"></div>
+    <div class="body-important other-link"><ul>
+<li><a href="Introduction.html">Introduction</a></li>
+<li><a href="CONTRIBUTE.html">Contributing</a></li>
+<li><a href="Architecture.html">Architecture</a></li>
+<li><a href="DesignDecisions.html">Design Decisions</a></li>
+<li><a href="Use-cases.html">Use cases</a></li>
+<li><a href="CODE_OF_CONDUCT.html">Code of Conduct</a></li>
+<li><a href="index.html">English-index.html</a></li>
+
+</ul></div>
+    <script src="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/init.js" type="module"></script>
+  </body>
+</html>

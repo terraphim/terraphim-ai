@@ -1,0 +1,31 @@
+<meta http-equiv="refresh" content="0; URL='en/index.html'" />
+<script>
+  const redirect_url = "en/index.html";
+  const langsDir = JSON.parse(`{"en":"en"}`);
+
+  let localLang = "";
+
+  if (/^zh-/.test(navigator.language)) {
+    if (navigator.language === "zh-CN" || navigator.language === "zh") {
+      localLang = "cn";
+    } else {
+      localLang = "t-cn";
+    }
+  } else if (/^es-/.test(navigator.language)) {
+    localLang = "es";
+  } else {
+    localLang = "en";
+  }
+
+  const targetLang = Object.values(langsDir).find((rootStr) => {
+    const reg = new RegExp(`^${rootStr}\/`);
+    if (reg.test(redirect_url)) {
+      return true;
+    }
+  });
+
+  if (targetLang !== localLang && langsDir[localLang]) {
+    const reg = new RegExp(`^${targetLang}\/`);
+    location = redirect_url.replace(reg, langsDir[localLang] + "/");
+  }
+</script>

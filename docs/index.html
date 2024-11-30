@@ -4,40 +4,84 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Terraphim AI Documentation</title>
-    
-    <!-- Shoelace autoloader and themes -->
-    <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.14.0/cdn/shoelace-autoloader.js"></script> -->
-    <!-- <link rel="stylesheet" href="theme/shoelace-light.css" /> -->
-    <!-- <link rel="stylesheet" href="theme/shoelace-dark.css" /> -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/obook@2.1.41/statics/css/public.css" />
+    <meta name="description" content="Personal AI assistant for you, under your own control">
+    <script src="/public/js/ofa.min.js"></script>
+    <script src="/public/js/scsr.mjs" type="module"></script>
+    <link rel="stylesheet" href="/public/css/public.css" />
     <style>
-        html,
-        body {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          font-family: var(--sl-font-sans);
-        }
+      html,
+      body {
+        height: 100%;
+      }
     </style>
+    <script>
+      let configUrl = "config.json";
+    </script>
+    <link rel="shortcut icon" href="/favicon.png">
   </head>
   <body>
-    <div class="card-container">
-      <sl-card class="card">
-        <h2 slot="header">Documentation</h2>
-        <p>Read our comprehensive documentation to learn more about Terraphim AI</p>
-        <div slot="footer">
-          <sl-button href="@/en/Introduction.html" variant="primary">Read Docs</sl-button>
-        </div>
-      </sl-card>
+    <l-m src="/public/components/doc-container.html"></l-m>
+    <l-m src="/public/components/doc-header.html"></l-m>
+    <o-app src="/public/js/app-config.mjs">
+      <template page>
+        <style>
+          .markdown-body::before,
+          .markdown-body::after {
+            display: block;
+            content: "";
+            height: 1px;
+          }
+          .markdown-body::after {
+            height: 32px;
+          }
 
-      <sl-card class="card">
-        <div slot="header">Contributing</div>
-        <p>Learn how you can contribute to the Terraphim AI project</p>
-        <div slot="footer">
-          <sl-button href="@/en/Contributing.html" variant="primary">Contribute</sl-button>
-        </div>
-      </sl-card>
-    </div>
+          p {
+            margin: 0;
+            padding: 0;
+          }
+        </style>
+        <link rel="stylesheet" href="/public/css/github-markdown.css" />
+
+        <p><l-m src="/public/components/simp-block.html"></l-m></p>
+        <simp-block>
+
+          <img src="../publics/logo.svg" class="logo" />
+
+          <h2>What is Terraphim AI?</h2>
+          <h3>AI Assistant for you, under your own control, help you focus and get things done</h3>
+          <p><a href="@/en/Introduction.html">Introduction</a></p>
+        </simp-block>
+
+        <simp-block>
+          <h2>Extremely Simple</h2>
+
+          <p><a href="https://terraphim.ai">Terraphim AI</a></p>
+        </simp-block>
+
+
+        <simp-block>
+
+          <h2>Powerful Features</h2>
+          <h3>A lot of powerful features</h3>
+          <p>No need to worry about the cost of the service <a href="@/en/Use-cases.html">Use Cases</a></p>
+        </simp-block>
+
+        <simp-block>
+
+
+        </simp-block>
+        <script>
+          export const parent = "/public/components/header-layout.html";
+
+          import pageInit from "/public/js/page-init.mjs";
+
+          export default async (...args) => {
+            return await pageInit(PATH, args);
+          };
+        </script>
+      </template>
+    </o-app>
+    <div id="loading"></div>
+    <script src="/public/js/init.js" type="module"></script>
   </body>
-</html> 
+</html>

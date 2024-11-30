@@ -1,70 +1,39 @@
 document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('theme-toggle');
-    if (!themeToggle) {
-        return;
+    const tocToggle = document.getElementById('toc-toggle');
+    const tocWrapper = document.querySelector('.toc-wrapper');
+    
+    if (!themeToggle) return;
+
+    function setTheme(theme) {
+        document.documentElement.classList.remove('sl-theme-light', 'sl-theme-dark');
+        document.documentElement.classList.add(`sl-theme-${theme}`);
+        localStorage.setItem('mdbook-theme', theme);
+        
+        // Update icon
+        const icon = themeToggle.querySelector('i');
+        if (icon) {
+            icon.className = theme === 'light' ? 'fa fa-sun-o' : 'fa fa-moon-o';
+        }
     }
 
-    // Initialize theme based on stored preference or system preference
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Initialize theme
     const savedTheme = localStorage.getItem('mdbook-theme');
-    const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    setTheme(initialTheme);
 
-    // Apply the initial theme
-    applyTheme(initialTheme);
-    updateThemeIcon(initialTheme);
-
-    // Theme toggle click handler
+    // Handle theme toggle
     themeToggle.addEventListener('click', () => {
         const currentTheme = document.documentElement.classList.contains('sl-theme-dark') ? 'dark' : 'light';
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        
-        applyTheme(newTheme);
-        updateThemeIcon(newTheme);
+        setTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
 
-    // Listen for system theme changes
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        const newTheme = e.matches ? 'dark' : 'light';
-        applyTheme(newTheme);
-        updateThemeIcon(newTheme);
-    });
-
-    // Add TOC toggle functionality
-    const tocToggle = document.getElementById('toc-toggle');
-    const tocWrapper = document.getElementById('toc-wrapper');
-    
+    // Handle TOC toggle
     if (tocToggle && tocWrapper) {
         tocToggle.addEventListener('click', () => {
-            tocWrapper.classList.toggle('hidden');
-            tocToggle.setAttribute('aria-expanded', 
-                !tocWrapper.classList.contains('hidden'));
+            tocWrapper.classList.toggle('show');
+            tocToggle.setAttribute('aria-expanded', tocWrapper.classList.contains('show'));
         });
     }
-});
-
-function applyTheme(theme) {
-    const html = document.documentElement;
-    
-    // Remove existing theme classes
-    html.classList.remove('sl-theme-light', 'sl-theme-dark');
-    
-    // Add new theme class
-    html.classList.add(`sl-theme-${theme}`);
-    
-    // Store theme preference
-    localStorage.setItem('mdbook-theme', theme);
-}
-
-function updateThemeIcon(theme) {
-    const themeToggle = document.getElementById('theme-toggle');
-    if (!themeToggle) {
-        return;
-    }
-
-    const moonIcon = '<i class="fa fa-moon-o"></i>';
-    const sunIcon = '<i class="fa fa-sun-o"></i>';
-    
-    themeToggle.innerHTML = theme === 'light' ? moonIcon : sunIcon;
-    themeToggle.setAttribute('title', `Switch to ${theme === 'light' ? 'dark' : 'light'} theme`);
-    themeToggle.setAttribute('aria-label', `Switch to ${theme === 'light' ? 'dark' : 'light'} theme`);
-} 
+}); 

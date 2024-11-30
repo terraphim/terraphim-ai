@@ -1,0 +1,25 @@
+:root {
+    /* Layout */
+    --sl-content-width: 1200px;
+    --sl-spacing-2x-large: 3rem;
+    --sl-spacing-x-large: 2rem;
+    --sl-spacing-large: 1.5rem;
+    --sl-spacing-medium: 1rem;
+    --sl-spacing-small: 0.75rem;
+    --sl-spacing-x-small: 0.5rem;
+    --sl-spacing-3x-small: 0.25rem;
+
+    /* Typography */
+    --sl-font-sans: system-ui, sans-serif;
+    --sl-font-size-2x-small: 0.625rem;
+    --sl-font-size-x-small: 0.75rem;
+    --sl-font-size-small: 0.875rem;
+    --sl-font-size-medium: 1rem;
+    --sl-font-weight-normal: 400;
+    --sl-font-weight-medium: 500;
+    --sl-font-weight-semibold: 600;
+    --sl-line-height-dense: 1.4;
+
+    /* Z-index */
+    --sl-z-index-drawer: 700;
+} 

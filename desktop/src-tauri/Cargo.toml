@@ -26,7 +26,7 @@ terraphim_persistence = { path = "../../crates/terraphim_persistence", version =
 terraphim_service = { path = "../../crates/terraphim_service", version = "0.1.0" }
 serde_json_any_key = "2.0.0" 
 anyhow = "1.0.81"
-log = "0.4.21"
+log = "0.4.22"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
 tauri = { version = "1.7.1", features = [ "cli", "dialog-all", "path-all", "fs-all",

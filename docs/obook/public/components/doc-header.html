@@ -1,0 +1,112 @@
+<template component>
+  <link rel="stylesheet" href="../../font/iconfont.css" />
+  <inject-host>
+    <style>
+      doc-header > ul {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        margin-left: 24px;
+      }
+      doc-header > ul > li {
+        display: block;
+        margin: 0 32px 0 0;
+      }
+      doc-header > ul > li:first-child {
+        margin-left: 0;
+      }
+      doc-header li a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      doc-header li.active {
+        font-weight: bold;
+        color: var(--active-color);
+      }
+    </style>
+  </inject-host>
+  <link rel="stylesheet" href="./doc-header.css" />
+  <header>
+    <div
+      class="menu-btn iconfont icon-caidan"
+      on:click="showLeftPannel = true"
+      style="font-size: 24px"
+    ></div>
+    <div class="logo">
+      <slot name="logo"></slot>
+    </div>
+    <div class="main" style="flex: 1">
+      <x-if :value="!showLeftPannel">
+        <slot></slot>
+      </x-if>
+    </div>
+    <div class="right">
+      <div class="right-btn" on:click="switchMode" style="margin-right: 16px">
+        <x-if :value="isDark.value">
+          <span
+            class="iconfont icon-baitianmoshi"
+            style="font-size: 24px"
+          ></span>
+        </x-if>
+        <x-else>
+          <span class="iconfont icon-heiyemoshi" style="font-size: 24px"></span>
+        </x-else>
+      </div>
+      <slot name="right"></slot>
+    </div>
+    <div
+      class="mask"
+      class:hide="!showLeftPannel"
+      on:click="showLeftPannel = false"
+    >
+      <div class="pannel">
+        <div class="inner-pannel" on:click="$event.stopPropagation()">
+          <div class="logo left-logo">OFAJS</div>
+          <div>
+            <x-if :value="showLeftPannel">
+              <slot></slot>
+            </x-if>
+          </div>
+          <slot name="mobile-aside"></slot>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <script>
+    export default async function ({ load }) {
+      const { isDark } = await load("../../data.mjs");
+
+      return {
+        data: {
+          showLeftPannel: false,
+          isDark: {},
+        },
+        attached() {
+          this.isDark = isDark;
+          this.refreshMode();
+        },
+        detached() {
+          this.isDark = {};
+        },
+        proto: {
+          switchMode() {
+            this.isDark.value = !this.isDark.value;
+            this.refreshMode();
+          },
+          refreshMode() {
+            if (this.isDark.value) {
+              $("html").classList.add("dark");
+            } else {
+              $("html").classList.remove("dark");
+            }
+          },
+        },
+      };
+    }
+  </script>
+</template>

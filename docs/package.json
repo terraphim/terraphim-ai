@@ -5,13 +5,15 @@
   "description": "Terraphim AI Assistant Documentation",
   "scripts": {
     "dev": "obook dev",
-    "prebuild": "cp index.html dist/",
-    "build": "obook build && node scripts/generate-sitemap.js",
-    "postbuild": "cp index.html dist/"
+    "build": "obook build",
+    "build_and_copy": "obook build && cp -R public obook/",
+    "build_with_sitemap": "obook build && node scripts/generate-sitemap.js",
+    "deploy": "obook build && node scripts/generate-sitemap.js && node scripts/deploy.js",
+    "download_deps": "node scripts/download-dependencies.js"
   },
   "obook": {
     "input": "./_preview.html",
-    "output": "./dist",
+    "output": "./obook",
     "sitemap": {
       "hostname": "https://docs.terraphim.ai",
       "enabled": true
@@ -19,12 +21,17 @@
     "theme": {
       "light": "theme/shoelace-light.css",
       "dark": "theme/shoelace-dark.css",
-      "custom": ["theme/starlight.css"]
+      "custom": [
+        "theme/starlight.css"
+      ]
     },
     "scripts": [
       "discord.js",
       "mermaid.min.js",
       "mermaid-init.js"
     ]
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }

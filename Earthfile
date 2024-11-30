@@ -248,7 +248,7 @@ docker-scratch:
 docs-deps:
   FROM +install-native 
   RUN cargo install mdbook
-  RUN cargo install mdbook-epub
+  # RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   # RUN cargo install mdbook-sitemap-generator #broken
   # RUN cargo install --git https://github.com/typst/typst typst-cli 

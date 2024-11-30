@@ -1,5 +1,7 @@
-{
+{ 
+  "github":"https://github.com/terraphim/terraphim-ai",
   "logo": {
+    "url": "../public/terraphim_gray.png",
     "text": "Terraphim AI"
   },
   "navs": [
@@ -7,5 +9,9 @@
       "name": "Documentation",
       "summary": "./SUMMARY.md"
     }
-  ]
+  ],
+  "pages": [
+    "./index.md"
+  ],
+  "footer": "./footer.md"
 }

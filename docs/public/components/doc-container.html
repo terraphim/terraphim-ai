@@ -1,0 +1,68 @@
+<template component>
+  <l-m src="./doc-code.html"></l-m>
+  <l-m src="./article-footer.html"></l-m>
+  <style>
+    :host {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+    }
+
+    .center-con {
+      display: block;
+      margin: 0 auto;
+      max-width: 1800px;
+    }
+
+    .main {
+      position: relative;
+      flex: 1;
+    }
+
+    .position-inner {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+    }
+    .header {
+      background-color: var(--header-bg-color);
+      box-shadow: 0 0 3px rgba(84, 84, 84, 0.5);
+    }
+  </style>
+
+  <div class="container">
+    <div class="header">
+      <div class="center-con">
+        <slot name="header"></slot>
+      </div>
+    </div>
+    <div class="main">
+      <div class="position-inner">
+        <slot></slot>
+        <!-- <slot name="footer"></slot> -->
+      </div>
+    </div>
+  </div>
+  <script>
+    export function loaded() {}
+
+    export const proto = {
+      get scrollTop() {
+        return this.shadow.$(".position-inner").ele.scrollTop;
+      },
+      set scrollTop(top) {
+        this.shadow.$(".position-inner").ele.scrollTop = top;
+      },
+    };
+  </script>
+</template>

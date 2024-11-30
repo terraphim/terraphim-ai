@@ -1,0 +1,182 @@
+<template component>
+  <inject-host>
+    <x-if :value="isDark.value">
+      <link rel="stylesheet" href="../statics/css/hljs-dark.css" />
+    </x-if>
+    <x-else>
+      <link rel="stylesheet" href="../statics/css/hljs-light.css" />
+    </x-else>
+
+    <style>
+      simp-block a {
+        box-sizing: border-box;
+        display: inline-block;
+        height: 44px;
+        line-height: 44px;
+        padding: 0 20px;
+        font-size: 16px;
+        border-radius: 30px;
+        margin: 8px;
+        font-weight: bold;
+        background-color: var(--active-color);
+        color: white;
+        text-decoration: none;
+      }
+
+      simp-block a:nth-child(2n) {
+        background-color: transparent;
+        border: var(--active-color) solid 1px;
+        color: var(--active-color);
+      }
+
+      simp-block:nth-child(2n + 1) {
+        background-color: var(--simp-block-bg);
+      }
+      simp-block > pre {
+        position: relative;
+      }
+      simp-block > pre code {
+        display: block;
+        margin: 8px;
+        padding: 8px 16px !important;
+        font-size: 16px;
+        border-radius: 5px;
+        background-color: #181b20;
+        color: #fff;
+        border: rgba(131, 131, 131, 0.213) solid 1px;
+      }
+
+      /* @media (prefers-color-scheme: dark) {
+        simp-block pre code {
+          background-color: #666;
+        }
+      }*/
+
+      simp-block .copy-btn {
+        position: absolute;
+        right: 0;
+        top: 0;
+        opacity: 0;
+        transition: opacity ease 0.3s;
+      }
+      simp-block pre:hover .copy-btn {
+        opacity: 1;
+      }
+    </style>
+  </inject-host>
+  <style>
+    :host {
+      display: block;
+    }
+
+    .container {
+      display: flex;
+      justify-items: center;
+      align-items: center;
+      flex-direction: column;
+      padding: 120px 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    ::slotted(*:not(:empty)) {
+      margin-block-start: 0;
+      margin-block-end: 0;
+      margin: 0;
+      padding: 0;
+      margin-top: 12px;
+      margin-bottom: 12px;
+    }
+
+    ::slotted(h2) {
+      font-size: 52px;
+      line-height: 1.2em;
+    }
+    ::slotted(h3) {
+      font-size: 28px;
+      font-weight: 400;
+    }
+
+    ::slotted(p) {
+      margin-top: 8px;
+      margin-bottom: 8px;
+      font-size: 20px;
+    }
+
+    ::slotted(.logo) {
+      width: 100px;
+      margin-bottom: 16px;
+    }
+
+    .outer {
+      container-type: inline-size;
+    }
+
+    @container (max-width: 700px) {
+      ::slotted(h2) {
+        font-size: 32px;
+        line-height: 1.2em;
+      }
+
+      ::slotted(h3) {
+        font-size: 24px;
+      }
+
+      ::slotted(p) {
+        font-size: 18px;
+      }
+    }
+  </style>
+  <div class="outer">
+    <div class="container">
+      <slot></slot>
+    </div>
+  </div>
+  <script>
+    import hljs from "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.8.0/build/es/highlight.min.js";
+
+    export default async ({ load }) => {
+      const { isDark } = await load("@obook/statics/data.mjs");
+
+      return {
+        data: {
+          isDark: {},
+        },
+        attached() {
+          this.isDark = isDark;
+
+          this.forEach((e) => {
+            if (e.tag === "pre") {
+              hljs.highlightElement(e.$("code").ele);
+              const btn = $(`<button class="copy-btn">Copy</button>`);
+              btn.on("click", () => {
+                copyToClipboard(e.$("code").text.trim());
+                btn.text = "Copy Succeed";
+                setTimeout(() => {
+                  btn.text = "Copy";
+                }, 2000);
+              });
+              e.push(btn);
+            }
+          });
+        },
+        detached() {
+          this.isDark = {};
+        },
+      };
+    };
+
+    export function copyToClipboard(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+
+      document.body.appendChild(textarea);
+
+      textarea.select();
+      document.execCommand("copy");
+
+      document.body.removeChild(textarea);
+    }
+  </script>
+</template>

@@ -56,16 +56,6 @@
         <!-- Provide site root to javascript -->
         <script>
             var path_to_root = "{{ path_to_root }}";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-            
-            // Initialize theme early to prevent FOUC
-            try {
-                const savedTheme = localStorage.getItem('mdbook-theme');
-                const theme = savedTheme || default_theme;
-                document.documentElement.classList.add(`sl-theme-${theme}`);
-            } catch (e) {
-                document.documentElement.classList.add(`sl-theme-${default_theme}`);
-            }
         </script>
         <!-- Start loading toc.js asap -->
         <script src="{{ path_to_root }}toc.js"></script>

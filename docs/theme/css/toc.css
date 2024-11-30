@@ -10,15 +10,15 @@
     --sl-color-primary-700: rgb(3, 105, 161);
     --sl-color-primary-800: rgb(7, 89, 133);
     --sl-color-primary-900: rgb(12, 74, 110);
-    
+    position: relative;
     /* mdBook specific variables */
     --bg: #ffffff;
     --fg: #333333;
-    
+    position: sticky;
     --sidebar-bg: #fafafa;
     --sidebar-fg: #364149;
     --sidebar-active: var(--sl-color-primary-600);
-    
+    padding: var(--sl-spacing-medium);
     --scrollbar: #cccccc;
     --icons: #cccccc;
     --icons-hover: #333333;
@@ -49,7 +49,7 @@
     overflow-y: auto;
     padding: var(--sl-spacing-medium);
     border-left: solid 1px var(--sl-panel-border-color);
-    transition: display 0.3s ease;
+    background: var(--sl-panel-background-color);
 }
 
 .toc-wrapper.hidden {
@@ -164,7 +164,7 @@
         top: 4rem;
         right: 0;
         width: 280px;
-        background: var(--sl-panel-background-color);
+        height: calc(100vh - 4rem);
         border-left: solid 1px var(--sl-panel-border-color);
         z-index: var(--sl-z-index-drawer);
         box-shadow: var(--sl-shadow-large);
