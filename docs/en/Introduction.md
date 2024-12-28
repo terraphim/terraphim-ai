@@ -1,4 +1,9 @@
 # Introduction
+testing 
+
+<HelloMessage />, {username}!
+
+Visit www.commonmark.org/help for more information.
 
 Terraphim is a privacy-first AI assistant which works for you under your complete control. It starts as a local search engine, which can be configured to search for different types of content, such as Stackoverflow, Github, and local filesystem with a pre-defined folder, including Markdown Files. We use modern algorithms for AI/ML, data fusion, and distributed communication techniques to run AI assistants on the user's hardware, including not used mobile devices.
 
