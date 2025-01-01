@@ -29,7 +29,7 @@ use terraphim_automata::AutomataPath;
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
 use terraphim_persistence::Persistable;
-use terraphim_rolegraph::{Error as RoleGraphError, RoleGraph, RoleGraphSync};
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
 use terraphim_types::{Concept, NormalizedTerm, RoleName, Thesaurus};
 
