@@ -14,10 +14,11 @@ readme = "../../README.md"
 [dependencies]
 directories = "5.0.1"
 log = "0.4.14"
-test-log = "0.2.14"
 thiserror = "1.0.56"
-twelf = { version = "0.13", features = ["json", "toml", "env", "clap"] }
+twelf = { version = "0.15.0", features = ["json", "toml", "env", "clap"] }
 serde = { version = "1.0.182", features = ["derive"] }
 
 [dev-dependencies]
 tempfile="3.2.0"
+envtestkit = "1.1.2"
+test-log = "0.2.14"

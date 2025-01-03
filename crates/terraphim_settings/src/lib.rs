@@ -24,7 +24,7 @@ pub type DeviceSettingsResult<T> = std::result::Result<T, Error>;
 pub const DEFAULT_CONFIG_PATH: &str = ".config";
 
 /// Default settings file
-pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_local.toml");
+pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_full.toml");
 
 fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
@@ -81,6 +81,7 @@ impl DeviceSettings {
     }
 
     /// Load settings from environment and file
+    /// config path shall be a folder and not file
     pub fn load_from_env_and_file(config_path: Option<PathBuf>) -> DeviceSettingsResult<Self> {
         log::info!("Loading device settings...");
         let config_path = match config_path {
@@ -147,18 +148,28 @@ mod tests {
     use super::*;
     use test_log::test;
     use tempfile::tempdir;
+    use envtestkit::lock::{lock_read, lock_test};
+    use envtestkit::set_env;
+    use std::ffi::OsString;
 
     #[test]
     fn test_env_variable() {
-        let env_vars = vec![
-            ("TERRAPHIM_PROFILE_S3_REGION", "us-west-1"),
-            ("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE", "on"),
-        ];
-        for (k, v) in &env_vars {
-            std::env::set_var(k, v);
-        }
-        let config = DeviceSettings::load_from_env_and_file(None);
-        println!("{:?}", config);
+        let _lock = lock_test();
+        let _test = set_env(OsString::from("TERRAPHIM_PROFILE_S3_REGION"), "us-west-1");
+        let _test2 = set_env(OsString::from("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE"),"on");
+        println!("Env: {:?}", std::env::var("TERRAPHIM_PROFILE_S3_REGION"));
+        let config = DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
+        println!("Config: {:?}", config);
+        println!(
+            "Region: {:?}",
+            config.as_ref()
+                .unwrap()
+                .profiles
+                .get("s3")
+                .unwrap()
+                .get("region")
+                .unwrap()
+        );
 
         assert_eq!(
             config
@@ -170,9 +181,6 @@ mod tests {
                 .unwrap(),
             &String::from("us-west-1")
         );
-        for (k, _) in &env_vars {
-            std::env::remove_var(k);
-        }
     }
 
     #[test]
@@ -180,18 +188,18 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let config_path = temp_dir.path().to_path_buf();
         let mut config = DeviceSettings::load_from_env_and_file(Some(config_path.clone())).unwrap();
+        
         // Initialize with false
         config.update_initialized_flag(Some(config_path.clone()), false).unwrap();
-
-        // Check if initialized is false
         
+        // Check if initialized is false
         assert_eq!(config.initialized, false);
 
         // Update to true
         config.update_initialized_flag(Some(config_path.clone()), true).unwrap();
 
         // Check if initialized is now true
-        let config = DeviceSettings::load_from_env_and_file(Some(config_path.clone())).unwrap();
-        assert_eq!(config.initialized, true);
+        let config_copy = DeviceSettings::load_from_env_and_file(Some(config_path.clone())).unwrap();
+        assert_eq!(config_copy.initialized, true);
     }
 }

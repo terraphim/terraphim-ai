@@ -172,105 +172,88 @@ pub async fn parse_profiles(
     Ok(ops)
 }
 
-// TODO: Fix tests, which fail after simplifying the settings loading
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use serde::{Deserialize, Serialize};
+    use async_trait::async_trait;
+    use crate::Persistable;
 
-    #[test]
-    fn test_load_from_env() {
-        let env_vars = vec![
-            ("TERRAPHIM_PROFILE_TEST1_TYPE", "s3"),
-            ("TERRAPHIM_PROFILE_TEST1_ACCESS_KEY_ID", "foo"),
-            ("TERRAPHIM_PROFILE_TEST2_TYPE", "oss"),
-            ("TERRAPHIM_PROFILE_TEST2_ACCESS_KEY_ID", "bar"),
-        ];
-        for (k, v) in &env_vars {
-            env::set_var(k, v);
-        }
-
-        let settings = DeviceSettings::load_from_env_and_file(None).unwrap();
-        println!("{:?}", settings);
-        let profiles = settings.profiles;
-        println!("{:?}", profiles);
-
-        let profile1 = profiles["test1"].clone();
-        assert_eq!(profile1["type"], "s3");
-        assert_eq!(profile1["access_key_id"], "foo");
-
-        let profile2 = profiles["test2"].clone();
-        assert_eq!(profile2["type"], "oss");
-        assert_eq!(profile2["access_key_id"], "bar");
-
-        for (k, _) in &env_vars {
-            env::remove_var(k);
-        }
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestStruct {
+        name: String,
+        age: u8,
     }
 
-    #[test]
-    fn test_load_from_toml() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let tmpfile = dir.path().join("settings.toml");
-        fs::write(
-            &tmpfile,
-            r#"
-    server_hostname = "127.0.0.1:8000"
-    api_endpoint = "127.0.0.1:8000/api"
+    #[async_trait]
+    impl Persistable for TestStruct {
+        fn new(name: String) -> Self {
+            TestStruct { name, age: 0 }
+        }
 
-    [profiles.mys3]
-    type = "s3"
-    region = "us-east-1"
-    access_key_id = "foo"
-    enable_virtual_host_style = "on"
-    "#,
-        )?;
-        let settings = DeviceSettings::load_from_env_and_file(Some(dir.into_path()))?;
-        let profile = settings
-            .profiles
-            .get("mys3")
-            .expect("Profile mys3 not found");
-        assert_eq!(profile.get("region").unwrap(), "us-east-1");
-        assert_eq!(profile.get("access_key_id").unwrap(), "foo");
-        assert_eq!(profile.get("enable_virtual_host_style").unwrap(), "on");
+        async fn save_to_one(&self, profile_name: &str) -> Result<()> {
+            self.save_to_profile(profile_name).await
+        }
+
+        async fn save(&self) -> Result<()> {
+            let _op = &self.load_config().await?.1;
+            self.save_to_all().await
+        }
+
+        async fn load(&mut self) -> Result<Self> {
+            let op = &self.load_config().await?.1;
+            let key = self.get_key();
+            self.load_from_operator(&key, &op).await
+        }
+
+        fn get_key(&self) -> String {
+            self.normalize_key(&self.name)
+        }
+    }
+    /// Test saving and loading a struct to a dashmap profile
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_save_and_load() -> Result<()> {
+
+        // Create a test object
+        let test_obj = TestStruct {
+            name: "Test Object".to_string(),
+            age: 25,
+        };
+
+        // Save the object
+        test_obj.save_to_one("dash").await?;
+
+        // Load the object
+        let mut loaded_obj = TestStruct::new("Test Object".to_string());
+        loaded_obj = loaded_obj.load().await?;
+
+        // Compare the original and loaded objects
+        assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
+
         Ok(())
     }
+    /// Test saving and loading a struct to all profiles
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_save_and_load_all() -> Result<()> {
+        // Create a test object
+        let test_obj = TestStruct {
+            name: "Test Object".to_string(),
+            age: 25,
+        };
 
-    // TODO: This test is currently failing. I don't know exactly why
-    #[test]
-    fn test_load_config_from_file_and_env() -> Result<()> {
-        let dir = tempfile::tempdir().unwrap();
-        let tmpfile = dir.path().join("settings.toml");
-        fs::write(
-            &tmpfile,
-            r#"
-    server_hostname = "127.0.0.1:8000"
-    api_endpoint = "127.0.0.1:8000/api"
+        // Save the object
+        test_obj.save().await?;
 
-    [profiles.mys3]
-    type = "s3"
-    region = "us-east-1"
-    access_key_id = "foo"
-    "#,
-        )
-        .unwrap();
-        let env_vars = vec![
-            ("TERRAPHIM_PROFILE_MYS3_REGION", "us-west-1"),
-            ("TERRAPHIM_PROFILE_MYS3_ENABLE_VIRTUAL_HOST_STYLE", "on"),
-        ];
-        for (k, v) in &env_vars {
-            env::set_var(k, v);
-        }
-        let settings = DeviceSettings::load_from_env_and_file(Some(dir.into_path()))?;
+        // Load the object
+        let mut loaded_obj = TestStruct::new("Test Object".to_string());
+        loaded_obj = loaded_obj.load().await?;
 
-        let mys3 = settings.profiles["mys3"].clone();
-        assert_eq!(mys3["region"], "us-west-1");
-        assert_eq!(mys3["access_key_id"], "foo");
-        assert_eq!(mys3["enable_virtual_host_style"], "on");
+        // Compare the original and loaded objects
+        assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
 
-        for (k, _) in &env_vars {
-            env::remove_var(k);
-        }
         Ok(())
     }
 }

@@ -26,27 +26,25 @@ export function activate(context: vscode.ExtensionContext) {
 
   const disposable = vscode.commands.registerCommand(
     'extension.terraphimCommand',
-    async function () {
-      // Get the configuration
-      const config = vscode.workspace.getConfiguration('terraphimIt');
+    async () => {
+      // Get the agent from configuration
+      const config = vscode.workspace.getConfiguration('terraphim');
+      const configuredAgent = config.get<string>('agent');
 
-      // Only ask for agent if it's not set and hasn't been asked before
-      if (!agent) {
-        agent = config.get<string>('agent');
-        if (!agent) {
-          agent = await vscode.window.showInputBox({
-            prompt: 'Enter the agent to use for Terraphim IT (optional)',
-            placeHolder: 'Agent String'
-          });
+      // If agent is not set in configuration, show input box
+      if (!configuredAgent) {
+        agent = await vscode.window.showInputBox({
+          placeHolder: 'Enter your agent ID',
+          prompt: 'Please enter your Terraphim agent ID',
+        });
 
-          // Save the agent to configuration if provided
-          if (agent) {
-            await config.update('agent', agent, vscode.ConfigurationTarget.Global);
-          }
+        // Save the agent to configuration if provided
+        if (agent) {
+          await config.update('agent', agent, true);
         }
       }
       vscode.window.showInformationMessage("Replacing links using Rust");
-      // --------- Create a Store ---------.
+      // --------- Create a Store ---------
 
       store = getStore(agent);
 
@@ -54,9 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (editor) {
         const document = editor.document;
-        // const selection = editor.selection;
 
-        // Get the word within the selection
         const text = document.getText();
         const results = await get_all_resources(store);
         const thesaurus = JSON.stringify(results);
@@ -75,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
           vscode.window.showInformationMessage('Terraphim IT executed');
         }
       }
-    },
+    }
   );
 
   context.subscriptions.push(disposable);
@@ -100,7 +96,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(autocompleteDisposable);
-  
 }
 
 class TerraphimCompletionProvider implements vscode.CompletionItemProvider {
@@ -131,24 +126,19 @@ class TerraphimCompletionProvider implements vscode.CompletionItemProvider {
   }
 }
 
-
-
 async function get_all_resources(store: Store): Promise<EngineeringData> {
   // search over all atomic server resources
   const itemCollection = new CollectionBuilder(store)
     .setProperty(core.properties.isA)
     .setValue(airportOntology.classes.systemOperatorAnalyticalLens)
-    .setSortBy(airportOntology.properties.synonym)
+    .setSortBy(core.properties.localId)
     .setSortDesc(true)
     .build();
 
-
-
-  const results: EngineeringData  = {name: "Engineering", data: {}};
+  const results: EngineeringData = {name: "Engineering", data: {}};
   let counter = 1;
   for await (const inst of itemCollection) {
     const item = await store.getResource<SystemOperatorAnalyticalLens>(inst);
-    // console.log(item);
     if (item.props.synonym) {
       // split the synonym by comma and add each synonym as a key
       item.props.synonym.split(',').forEach(synonym => {
@@ -159,6 +149,5 @@ async function get_all_resources(store: Store): Promise<EngineeringData> {
     results.data[item.props.name] = {id: counter, nterm: item.props.name, url: item.subject, description: item.props.description};
     counter++;
   }
-  // console.log(results);
   return results;
 }
