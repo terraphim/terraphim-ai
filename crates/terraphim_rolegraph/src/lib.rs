@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use itertools::Itertools;
 use memoize::memoize;
 use regex::Regex;
-use std::collections::hash_map::Entry;
+use std::{collections::hash_map::Entry, result};
 use std::sync::Arc;
 use terraphim_types::{
     Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
@@ -143,6 +143,116 @@ impl RoleGraph {
     //     // }
     // }
 
+    /// Performs a query on the graph using the query string.    /// Lists all nodes in the graph with their ranks and term information
+    pub fn list_ranked_nodes(&self) -> Result<Vec<RankedNode>> {
+        let mut ranked_nodes = Vec::with_capacity(self.nodes.len());
+        
+        for (node_id, node) in &self.nodes {
+            let normalized_term = self.ac_reverse_nterm
+                .get(node_id)
+                .ok_or(Error::NodeIdNotFound)?
+                .clone();
+            
+            let mut total_docs = 0;
+            let mut ranks = Vec::new();
+            
+            for edge_id in &node.connected_with {
+                if let Some(edge) = self.edges.get(edge_id) {
+                    total_docs += edge.doc_hash.len();
+                    ranks.push(Rank {
+                        node_id: *edge_id,
+                        connection_count: node.connected_with.len() as u64,
+                        edge_weight: edge.rank,
+                    });
+                }
+            }
+            
+            // Sort ranks using existing Rank comparison
+            ranks.sort_unstable();
+
+            ranked_nodes.push(RankedNode {
+                id: *node_id,
+                normalized_term,
+                ranks,
+                total_documents: total_docs,
+            });
+        }
+
+        // Sort nodes by their highest rank's edge_weight
+        ranked_nodes.sort_by(|a, b| {
+            let a_max = a.ranks.first().map(|r| r.edge_weight).unwrap_or(0);
+            let b_max = b.ranks.first().map(|r| r.edge_weight).unwrap_or(0);
+            b_max.cmp(&a_max) // Descending order
+        });
+        
+        Ok(ranked_nodes)
+    }
+
+    /// Optimized query to find connections and documents from a list of node IDs
+    pub fn query_graph_optimised(
+        &self,
+        node_ids: &[u64],
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, IndexedDocument)>> {
+        log::debug!("Performing optimized graph query for {} nodes", node_ids.len());
+        
+        let mut results = AHashMap::new();
+        for &node_id in node_ids {
+            let node = self.nodes.get(&node_id).ok_or(Error::NodeIdNotFound)?;
+            let Some(normalized_term) = self.ac_reverse_nterm.get(&node_id) else {
+                return Err(Error::NodeIdNotFound);
+            };
+
+            // Get ranked connections for this node
+            let ranked_connections = node.query_optimised(node_ids, None);
+            
+            for rank in ranked_connections {
+                if let Some(edge) = self.edges.get(&rank.node_id) {
+                    for (document_id, document_rank) in &edge.doc_hash {
+                        let total_rank = rank.edge_weight + document_rank;
+                        
+                        match results.entry(document_id.clone()) {
+                            Entry::Vacant(e) => {
+                                e.insert(IndexedDocument {
+                                    id: document_id.clone(),
+                                    matched_edges: vec![edge.clone()],
+                                    rank: total_rank,
+                                    tags: vec![normalized_term.to_string()],
+                                    nodes: vec![node_id],
+                                });
+                            }
+                            Entry::Occupied(mut e) => {
+                                let doc = e.get_mut();
+                                doc.rank += total_rank;
+                                doc.matched_edges.push(edge.clone());
+                                doc.matched_edges.dedup_by_key(|e| e.id);
+                                if !doc.nodes.contains(&node_id) {
+                                    doc.nodes.push(node_id);
+                                }
+                                if !doc.tags.contains(&normalized_term.to_string()) {
+                                    doc.tags.push(normalized_term.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut ranked_documents = results.into_iter().collect::<Vec<_>>();
+        ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
+
+        let documents = ranked_documents
+            .into_iter()
+            .skip(offset.unwrap_or(0))
+            .take(limit.unwrap_or(std::usize::MAX))
+            .collect();
+
+        log::debug!("Query resulted in {} documents", documents.len());
+        Ok(documents)
+    }
+
     /// Performs a query on the graph using the query string.
     ///
     /// Returns a list of document IDs ranked and weighted by the weighted mean
@@ -206,6 +316,26 @@ impl RoleGraph {
         Ok(documents)
     }
 
+    fn topk_query_graph_optimised (        &self,
+        query_string: &str,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, IndexedDocument)>> {
+        let results = AHashMap::new();
+        for (node_id, node) in self.nodes.iter(){
+            for each_edge_id in node.connected_with{
+                
+
+            }
+        }
+        let documents: Vec<_> = ranked_documents
+        .into_iter()
+        .skip(offset.unwrap_or(0))
+        .take(limit.unwrap_or(std::usize::MAX))
+        .collect();
+    Ok(documents)
+        
+    }
     // pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
     //     let matches = self.find_matching_node_ids(text);
     //     for (a, b) in matches.into_iter().tuple_windows() {
@@ -534,5 +664,84 @@ mod tests {
         println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
         println!("Top result {:#?}", top_result.1);
         assert_eq!(results.len(), 4);
+    }
+
+    #[test]
+    async fn test_list_ranked_nodes() {
+        let role = "system operator".to_string();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+            .await
+            .unwrap();
+
+        // Insert test documents
+        let document_id = Ulid::new().to_string();
+        let test_document = "Life cycle concepts and project direction";
+        let document = Document {
+            stub: None,
+            url: "/test/doc".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id.clone(),
+            title: test_document.to_string(),
+            body: test_document.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id, document);
+
+        // Test list_ranked_nodes
+        let ranked_nodes = rolegraph.list_ranked_nodes().unwrap();
+        assert!(!ranked_nodes.is_empty());
+
+        // Verify nodes are properly ranked
+        for window in ranked_nodes.windows(2) {
+            let first_max = window[0].ranks.first().map(|r| r.edge_weight).unwrap_or(0);
+            let second_max = window[1].ranks.first().map(|r| r.edge_weight).unwrap_or(0);
+            assert!(first_max >= second_max, "Nodes should be sorted by highest rank");
+        }
+    }
+
+    #[test]
+    async fn test_query_graph_optimised() {
+        let role = "system operator".to_string();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+            .await
+            .unwrap();
+
+        // Insert test documents
+        let document_id = Ulid::new().to_string();
+        let test_document = "Life cycle concepts and project direction";
+        let document = Document {
+            stub: None,
+            url: "/test/doc".to_string(),
+            tags: None,
+            rank: None,
+            id: document_id.clone(),
+            title: test_document.to_string(),
+            body: test_document.to_string(),
+            description: None,
+        };
+        rolegraph.insert_document(&document_id, document);
+
+        // Get node IDs for testing
+        let node_ids = rolegraph.find_matching_node_ids(test_document);
+        assert!(!node_ids.is_empty());
+
+        // Test optimized query
+        let results = rolegraph.query_graph_optimised(&node_ids, Some(0), Some(10)).unwrap();
+        assert!(!results.is_empty());
+
+        // Verify results are properly ranked
+        for window in results.windows(2) {
+            assert!(
+                window[0].1.rank >= window[1].1.rank,
+                "Documents should be sorted by rank in descending order"
+            );
+        }
+
+        // Verify document metadata
+        let first_doc = &results[0].1;
+        assert!(!first_doc.matched_edges.is_empty());
+        assert!(!first_doc.tags.is_empty());
+        assert!(!first_doc.nodes.is_empty());
     }
 }

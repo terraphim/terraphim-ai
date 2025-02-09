@@ -261,15 +261,62 @@ impl Node {
             connected_with,
         }
     }
+        /// Lists all nodes in the graph with their ranks and connections
+        pub fn list_ranked_nodes(&self) -> Vec<Rank> {
+            let mut ranks = Vec::with_capacity(self.connected_with.len());
+            
+            for edge_id in &self.connected_with {
+                ranks.push(Rank {
+                    node_id: *edge_id,
+                    connection_count: self.connected_with.len() as u64,
+                    edge_weight: self.rank,
+                });
+            }
+            
+            // Sort by rank in descending order (using existing Ord implementation)
+            ranks.sort_unstable();
+            ranks
+        }
+    /// Optimized query to find connections from a list of node IDs
+    /// Returns ranked connections sorted by edge weight
+    pub fn query_optimised(&self, node_ids: &[u64], limit: Option<usize>) -> Vec<Rank> {
+        let target_nodes: HashSet<u64> = node_ids.iter().cloned().collect();
+        
+        let mut ranks: Vec<Rank> = self.connected_with
+            .iter()
+            .filter(|edge_id| target_nodes.contains(edge_id))
+            .map(|edge_id| Rank {
+                node_id: *edge_id,
+                connection_count: self.connected_with.len() as u64,
+                edge_weight: self.rank,
+            })
+            .collect();
+
+        // Sort using existing Rank comparison (higher edge_weight first)
+        ranks.sort_unstable();
+        
+        if let Some(limit) = limit {
+            ranks.truncate(limit);
+        }
+        
+        ranks
+    }
 
     // pub fn sort_edges_by_value(&self) {
-    //     // let count_b: BTreeMap<&u64, &Edge> =
-    //     // self.connected_with.iter().map(|(k, v)| (v, k)).collect();
-    //     // for (k, v) in self.connected_with.iter().map(|(k, v)| (v.rank, k)) {
-    //     // log::warn!("k {:?} v {:?}", k, v);
-    //     // }
+    //     let count_b: BTreeMap<&u64, &Edge> =
+    //     self.connected_with.iter().map(|(k, v)| (v, k)).collect();
+    //     for (k, v) in self.connected_with.iter().map(|(k, v)| (v.rank, k)) {
+    //     log::warn!("k {:?} v {:?}", k, v);
+    //     }
     //     log::warn!("Connected with {:?}", self.connected_with);
     // }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RankedNode {
+    pub id: u64,
+    pub normalized_term: NormalizedTermValue,
+    pub ranks: Vec<Rank>,
+    pub total_documents: usize,
 }
 
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
@@ -481,4 +528,96 @@ pub enum KnowledgeGraphInputType {
     /// A JSON files
     #[serde(rename = "json")]
     Json,
+}
+
+// Represents the rank of a node in the graph with its connections
+#[derive(Debug, Clone, Serialize, Deserialize, Eq)]
+pub struct Rank {
+    pub node_id: u64,
+    pub connection_count: u64,
+    pub edge_weight: u64,
+}
+
+impl PartialEq for Rank {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.edge_weight == other.edge_weight
+    }
+}
+
+impl PartialOrd for Rank {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Rank {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Higher edge weight means higher rank
+        other.edge_weight.cmp(&self.edge_weight)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rank_ordering() {
+        let rank1 = Rank {
+            node_id: 1,
+            connection_count: 5,
+            edge_weight: 10,
+        };
+        let rank2 = Rank {
+            node_id: 2,
+            connection_count: 3,
+            edge_weight: 20,
+        };
+        let rank3 = Rank {
+            node_id: 3,
+            connection_count: 7,
+            edge_weight: 10,
+        };
+
+        // Test ordering (higher edge_weight should come first)
+        assert!(rank2 > rank1);
+        assert!(rank1 == rank3); // Same edge_weight
+        
+        // Test sorting
+        let mut ranks = vec![rank1.clone(), rank2.clone(), rank3.clone()];
+        ranks.sort_unstable();
+        assert_eq!(ranks, vec![rank2, rank1, rank3]);
+    }
+
+    #[test]
+    fn test_ranked_node_creation() {
+        let normalized_term = NormalizedTermValue::new("test term".to_string());
+        let ranks = vec![
+            Rank {
+                node_id: 1,
+                connection_count: 5,
+                edge_weight: 10,
+            },
+            Rank {
+                node_id: 2,
+                connection_count: 3,
+                edge_weight: 20,
+            },
+        ];
+
+        let ranked_node = RankedNode {
+            id: 1,
+            normalized_term: normalized_term.clone(),
+            ranks: ranks.clone(),
+            total_documents: 2,
+        };
+
+        assert_eq!(ranked_node.id, 1);
+        assert_eq!(ranked_node.normalized_term, normalized_term);
+        assert_eq!(ranked_node.ranks, ranks);
+        assert_eq!(ranked_node.total_documents, 2);
+    }
 }
