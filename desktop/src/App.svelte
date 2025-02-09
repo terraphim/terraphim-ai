@@ -3,6 +3,7 @@
   import { Route } from "tinro";
   import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
   import Search from "./lib/Search/Search.svelte";
+  import NodesView from "./lib/pages/NodesView.svelte";
   import {
     default as ThemeSwitcher,
     default as configStore,
@@ -31,6 +32,9 @@
     <Route path="/">
       <Search />
     </Route>
+    <Route path="/nodes">
+      <NodesView />
+    </Route>
     <br />
 
     <Route path="/fetch/*"><FetchTabs /></Route>
@@ -45,6 +49,12 @@
               <span class="icon" style="color: #333;">
                 <i class="fas fa-home"> </i>
               </span>
+            </a>
+            <a class="navbar-item" href="/nodes">
+              <span class="icon" style="color: #333;">
+                <i class="fas fa-project-diagram"></i>
+              </span>
+              Knowledge Graph
             </a>
             <a class="navbar-item" href="/fetch/json">Configuration</a>
             <a class="navbar-item" href="/contacts">Contacts</a>

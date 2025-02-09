@@ -355,10 +355,50 @@ impl Node {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RankedNode {
+    #[serde(skip_serializing)]
     pub id: u64,
-    pub normalized_term: NormalizedTermValue,
+    pub name: String,
+    pub value: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<RankedNode>,
+    #[serde(skip)]
     pub ranks: Vec<Rank>,
-    pub total_documents: usize,
+    #[serde(skip)]
+    pub parent: Option<u64>,
+    #[serde(skip)]
+    pub expanded: bool
+}
+
+impl PartialEq for RankedNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && 
+        self.name == other.name && 
+        self.value == other.value &&
+        self.parent == other.parent &&
+        self.expanded == other.expanded
+    }
+}
+
+impl Eq for RankedNode {}
+
+impl From<NormalizedTermValue> for String {
+    fn from(val: NormalizedTermValue) -> Self {
+        val.to_string()
+    }
+}
+
+impl RankedNode {
+    pub fn new(id: u64, normalized_term: NormalizedTermValue, total_documents: usize) -> Self {
+        Self {
+            id,
+            name: normalized_term.to_string(),
+            value: total_documents,
+            children: Vec::new(),
+            ranks: Vec::new(),
+            parent: None,
+            expanded: false
+        }
+    }
 }
 
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
@@ -601,6 +641,39 @@ impl Ord for Rank {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct RankEntry {
+    pub edge_weight: f64,
+    pub document_id: String,
+}
+
+// Implement Eq for RankEntry - we consider them equal if they have the same document_id
+// since edge_weight is f64 and can't implement Eq
+impl Eq for RankEntry {}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NodesResponse {
+    pub status: String,
+    pub name: String,
+    pub nodes: Vec<ApiRankedNode>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ApiRankedNode {
+    pub id: String,
+    pub name: String,
+    pub normalized_term: String,
+    pub value: i32,
+    pub total_documents: i32,
+    pub parent: Option<String>,
+    pub children: Vec<ApiRankedNode>,
+    pub expanded: bool,
+    pub ranks: Vec<RankEntry>,
+}
+
+// Implement Eq for ApiRankedNode
+impl Eq for ApiRankedNode {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -634,8 +707,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ranked_node_creation() {
-        let normalized_term = NormalizedTermValue::new("test term".to_string());
+    fn test_ranked_node() {
         let ranks = vec![
             Rank {
                 node_id: 1,
@@ -651,14 +723,52 @@ mod tests {
 
         let ranked_node = RankedNode {
             id: 1,
-            normalized_term: normalized_term.clone(),
+            name: "test term".to_string(),
+            value: 2,
+            children: Vec::new(),
             ranks: ranks.clone(),
-            total_documents: 2,
+            parent: None,
+            expanded: false,
         };
 
         assert_eq!(ranked_node.id, 1);
-        assert_eq!(ranked_node.normalized_term, normalized_term);
-        assert_eq!(ranked_node.ranks, ranks);
-        assert_eq!(ranked_node.total_documents, 2);
+        assert_eq!(ranked_node.name, "test term");
+        assert_eq!(ranked_node.value, 2);
+        assert_eq!(ranked_node.children.len(), 0);
+        assert_eq!(ranked_node.ranks.len(), 2);
+    }
+
+    #[test]
+    fn test_api_ranked_node() {
+        let ranks = vec![
+            RankEntry {
+                edge_weight: 1.0,
+                document_id: "doc1".to_string(),
+            },
+            RankEntry {
+                edge_weight: 0.5,
+                document_id: "doc2".to_string(),
+            },
+        ];
+
+        let api_node = ApiRankedNode {
+            id: "1".to_string(),
+            name: "test term".to_string(),
+            normalized_term: "test term".to_string(),
+            value: 2,
+            total_documents: 2,
+            parent: None,
+            children: Vec::new(),
+            expanded: false,
+            ranks: ranks.clone(),
+        };
+
+        assert_eq!(api_node.id, "1");
+        assert_eq!(api_node.name, "test term");
+        assert_eq!(api_node.normalized_term, "test term");
+        assert_eq!(api_node.value, 2);
+        assert_eq!(api_node.total_documents, 2);
+        assert_eq!(api_node.children.len(), 0);
+        assert_eq!(api_node.ranks.len(), 2);
     }
 }

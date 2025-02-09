@@ -21,6 +21,9 @@ pub enum ServiceError {
     #[error("Persistence error: {0}")]
     Persistence(#[from] terraphim_persistence::Error),
 
+    #[error("RoleGraph error: {0}")]
+    RoleGraph(#[from] terraphim_rolegraph::Error),
+
     #[error("Config error: {0}")]
     Config(String),
 }
@@ -48,35 +51,48 @@ impl<'a> TerraphimService {
             role_name: &RoleName,
             rolegraphs: &mut AHashMap<RoleName, RoleGraphSync>,
         ) -> Result<Thesaurus> {
-            let role = config_state.get_role(role_name).await.unwrap();
-            if let Some(automata_path) = role.kg.unwrap().automata_path {
-                let thesaurus = load_thesaurus(&automata_path).await.unwrap();
-                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
-                match rolegraph {
-                    Ok(rolegraph) => {
-                        let rolegraph_value = RoleGraphSync::from(rolegraph);
-                        rolegraphs.insert(role_name.clone(), rolegraph_value);
-                    }
-                    Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
-                }
-                Ok(thesaurus)
-            } else {
-                Err(ServiceError::Config("Automata path not found".into()))
-            }
+            log::debug!("Attempting to load thesaurus from automata path for role: {}", role_name);
+            let role = config_state.get_role(role_name).await
+                .ok_or_else(|| ServiceError::Config(format!("Role {} not found", role_name)))?;
+            
+            let kg = role.kg
+                .ok_or_else(|| ServiceError::Config(format!("No knowledge graph configuration found for role {}", role_name)))?;
+                
+            let automata_path = kg.automata_path
+                .ok_or_else(|| ServiceError::Config(format!("No automata path found for role {}", role_name)))?;
+                
+            log::debug!("Found automata path: {:?}", automata_path);
+            
+            let thesaurus = load_thesaurus(&automata_path).await
+                .map_err(|e| ServiceError::Config(format!("Failed to load thesaurus for role {}: {}", role_name, e)))?;
+                
+            log::debug!("Loaded thesaurus with {} entries", thesaurus.len());
+            
+            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await
+                .map_err(|e| ServiceError::Config(format!("Failed to create rolegraph for role {}: {}", role_name, e)))?;
+                
+            log::debug!("Created new rolegraph for {}", role_name);
+            let rolegraph_value = RoleGraphSync::from(rolegraph);
+            rolegraphs.insert(role_name.clone(), rolegraph_value);
+            log::debug!("Inserted rolegraph into rolegraphs map");
+            
+            Ok(thesaurus)
         }
-        println!("Loading thesaurus for role: {}", role_name);
-        println!("Role keys {:?}", self.config_state.roles.keys());
+        log::debug!("Loading thesaurus for role: {}", role_name);
+        log::debug!("Available role keys: {:?}", self.config_state.roles.keys());
         let mut rolegraphs = self.config_state.roles.clone();
         if let Some(rolegraph_value) = rolegraphs.get(role_name) {
+            log::debug!("Found existing rolegraph for {}", role_name);
             let mut thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
             match thesaurus_result {
                 Ok(thesaurus) => {
-                    println!("Thesaurus loaded: {:#?}", thesaurus);
-                    log::info!("Rolegraph loaded: for role name {:?}", role_name);
+                    log::debug!("Successfully loaded thesaurus with {} entries", thesaurus.len());
+                    log::info!("Rolegraph loaded for role name {:?}", role_name);
                     Ok(thesaurus)
                 }
                 Err(e) => {
                     log::error!("Failed to load thesaurus: {:?}", e);
+                    log::debug!("Falling back to loading from automata path");
                     load_thesaurus_from_automata_path(
                         &self.config_state,
                         role_name,
@@ -86,6 +102,7 @@ impl<'a> TerraphimService {
                 }
             }
         } else {
+            log::debug!("No existing rolegraph found for {}, loading from automata path", role_name);
             load_thesaurus_from_automata_path(
                 &self.config_state,
                 role_name,
@@ -197,6 +214,39 @@ impl<'a> TerraphimService {
                 Ok(rolegraph.clone())
             }
             None => Err(ServiceError::Config("Selected role not found".into()))
+        }
+    }
+
+    /// Get the rolegraph for a specific role
+    pub async fn get_rolegraph_by_role(&mut self, role: RoleName) -> Result<RoleGraph> {
+        log::debug!("Getting rolegraph for role: {:?}", role);
+        
+        // First check if we have the role in our config
+        if self.config_state.get_role(&role).await.is_none() {
+            return Err(ServiceError::Config(format!(
+                "Role `{}` not found in config",
+                role
+            )));
+        }
+
+        // Get or create rolegraph
+        match self.config_state.roles.get(&role) {
+            Some(rolegraph) => {
+                let rolegraph = rolegraph.lock().await;
+                Ok(rolegraph.clone())
+            }
+            None => {
+                // If role not found in rolegraphs, create a new one
+                let thesaurus = self.ensure_thesaurus_loaded(&role).await?;
+                let rolegraph = RoleGraph::new(role.clone(), thesaurus).await
+                    .map_err(ServiceError::RoleGraph)?;
+                
+                // Store the new rolegraph
+                let rolegraph_sync = RoleGraphSync::from(rolegraph.clone());
+                self.config_state.roles.insert(role, rolegraph_sync);
+                
+                Ok(rolegraph)
+            }
         }
     }
 }

@@ -162,22 +162,23 @@ impl ConfigBuilder {
         let cwd = std::env::current_dir().context("Failed to get current directory").unwrap();
         println!("{}", cwd.display());
         let system_operator_haystack = if cwd.ends_with("terraphim_server") {
-        cwd.join("fixtures/haystack/")
-    } else {
-        cwd.join("terraphim_server/fixtures/haystack/")
-    };
+            cwd.join("fixtures/haystack/")
+        } else {
+            cwd.join("terraphim_server/fixtures/haystack/")
+        };
 
-    log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
-    let automata_test_path = if cwd.ends_with("terraphim_server") {
-        cwd.join("fixtures/term_to_id.json")
-    } else {
-        cwd.join("terraphim_server/fixtures/term_to_id.json")
-    };
-    log::debug!("Test automata_test_path {:?}", automata_test_path);
-    let automata_remote =
-        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
-            .unwrap();
-        println!("{automata_remote}");
+        log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
+        let automata_test_path = if cwd.ends_with("terraphim_server") {
+            cwd.join("fixtures/term_to_id.json")
+        } else {
+            cwd.join("terraphim_server/fixtures/term_to_id.json")
+        };
+        log::debug!("Test automata_test_path {:?}", automata_test_path);
+        
+        // Use local test fixtures instead of remote resources
+        let automata_local = AutomataPath::Local(automata_test_path.clone());
+        println!("{automata_local}");
+        
         self.global_shortcut("Ctrl+X")
         .add_role(
             "default",
@@ -202,7 +203,7 @@ impl ConfigBuilder {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_remote.clone()),
+                    automata_path: Some(automata_local.clone()),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: system_operator_haystack.clone(),
@@ -225,7 +226,7 @@ impl ConfigBuilder {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_remote.clone()),
+                    automata_path: Some(automata_local.clone()),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: system_operator_haystack.clone(),

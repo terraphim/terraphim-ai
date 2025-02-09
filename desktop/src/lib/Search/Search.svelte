@@ -1,16 +1,20 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/tauri";
   import { Field, Input } from "svelma";
   import { input, is_tauri, role, roles, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
-  import type { Document, SearchResponse } from "./SearchResult";
-  import logo from "/assets/terraphim_gray.png";
-  import { thesaurus,typeahead } from "../stores";
+  import IcicleChart from "./IcicleChart.svelte";
+  import type { Document, SearchResponse, ChartData, ChartNode } from "./SearchResult";
+  import { thesaurus, typeahead } from "../stores";
+  import { invokeTauri } from "../tauri";
+
+  // Update image import to use public path
+  const logo = "/assets/terraphim_gray.png";
 
   let results: Document[] = [];
   let error: string | null = null;
   let suggestions: string[] = [];
   let suggestionIndex = -1;
+  let chartData: ChartData | null = null;
 
   $: thesaurusEntries = Object.entries($thesaurus);
 
@@ -28,6 +32,8 @@
 
   function updateSuggestions(event: Event) {
     const inputElement = event.target as HTMLInputElement;
+    if (!inputElement || typeof inputElement.selectionStart !== 'number') return;
+    
     const cursorPosition = inputElement.selectionStart;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
@@ -54,6 +60,8 @@
 
   function applySuggestion(suggestion: string) {
     const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
+    if (!inputElement || typeof inputElement.selectionStart !== 'number') return;
+    
     const cursorPosition = inputElement.selectionStart;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const textAfterCursor = $input.slice(cursorPosition);
@@ -66,12 +74,30 @@
     suggestionIndex = -1;
   }
 
+  function prepareChartData(documents: Document[]): ChartData {
+    // Create a hierarchical structure for the icicle chart
+    const root: ChartData = {
+      name: "Search Results",
+      children: documents.map(doc => ({
+        name: doc.title,
+        size: doc.rank || 1,
+        color: '#' + Math.floor(Math.random()*16777215).toString(16), // Random color for now
+        children: doc.tags ? doc.tags.map(tag => ({
+          name: tag,
+          size: 1,
+          color: '#' + Math.floor(Math.random()*16777215).toString(16)
+        })) : []
+      }))
+    };
+    return root;
+  }
+
   async function handleSearchInputEvent() {
     error = null; // Clear previous errors
 
     if ($is_tauri) {
       try {
-        const response: SearchResponse = await invoke("search", {
+        const response: SearchResponse = await invokeTauri("search", {
           searchQuery: {
             search_term: $input,
             skip: 0,
@@ -81,6 +107,7 @@
         });
         if (response.status === "success") {
           results = response.results;
+          chartData = prepareChartData(response.results);
           console.log("Response results");
           console.log(results);
         } else {
@@ -115,6 +142,7 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
+        chartData = prepareChartData(data.results);
       } catch (error) {
         console.error("Error fetching data:", error);
         this.error = `Error fetching data: ${error}`;
@@ -157,6 +185,11 @@
 {#if error}
   <p class="error">{error}</p>
 {:else if results.length}
+  {#if chartData}
+    <div class="chart-section">
+      <IcicleChart data={chartData} />
+    </div>
+  {/if}
   {#each results as item}
     <ResultItem document={item} />
   {/each}
@@ -201,5 +234,10 @@
   .suggestions li:hover,
   .suggestions li.active {
     background-color: #f5f5f5;
+  }
+  .chart-section {
+    margin: 2rem 0;
+    height: 400px;
+    width: 100%;
   }
 </style>

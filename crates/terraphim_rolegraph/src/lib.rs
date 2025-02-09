@@ -144,49 +144,82 @@ impl RoleGraph {
     //     // }
     // }
 
-    /// Performs a query on the graph using the query string.    /// Lists all nodes in the graph with their ranks and term information
+    /// List all ranked nodes in the graph
     pub fn list_ranked_nodes(&self) -> Result<Vec<RankedNode>> {
-        let mut ranked_nodes = Vec::with_capacity(self.nodes.len());
+        log::debug!("Listing ranked nodes. Total nodes in graph: {}", self.nodes.len());
         
+        let mut node_map = AHashMap::new();
+        
+        // First pass: Create all nodes
         for (node_id, node) in &self.nodes {
-            let normalized_term = self.ac_reverse_nterm
-                .get(node_id)
-                .ok_or(Error::NodeIdNotFound)?
-                .clone();
+            log::trace!("Processing node {}: {:?}", node_id, node);
             
-            let mut total_docs = 0;
+            let mut total_documents = 0;
             let mut ranks = Vec::new();
+            let mut child_ids = Vec::new();
             
-            for edge_id in &node.connected_with {
-                if let Some(edge) = self.edges.get(edge_id) {
-                    total_docs += edge.doc_hash.len();
-                    ranks.push(Rank {
-                        node_id: *edge_id,
-                        connection_count: node.connected_with.len() as u64,
-                        edge_weight: edge.rank,
-                    });
+            // Count documents and collect ranks
+            for (edge_id, edge) in &self.edges {
+                // Check if this edge is connected to our node
+                if node.connected_with.contains(edge_id) {
+                    total_documents += edge.doc_hash.len();
+                    
+                    // Add rank for each document
+                    for (doc_id, doc_rank) in &edge.doc_hash {
+                        if let Some(doc) = self.documents.get(doc_id) {
+                            ranks.push(Rank {
+                                node_id: *edge_id,
+                                connection_count: node.connected_with.len() as u64,
+                                edge_weight: edge.rank,
+                            });
+                            log::trace!("Added rank for document {} with weight {}", doc.id, edge.rank);
+                        } else {
+                            log::warn!("Document {} referenced by edge {} not found", doc_id, edge_id);
+                        }
+                    }
+                    
+                    // Get the connected node IDs from the edge
+                    let (x, y) = magic_unpair(*edge_id);
+                    let other_node = if x == *node_id { y } else { x };
+                    child_ids.push(other_node);
                 }
             }
             
-            // Sort ranks using existing Rank comparison
-            ranks.sort_unstable();
-
-            ranked_nodes.push(RankedNode {
-                id: *node_id,
-                normalized_term,
-                ranks,
-                total_documents: total_docs,
-            });
+            if let Some(normalized_term) = self.ac_reverse_nterm.get(node_id) {
+                let ranked_node = RankedNode::new(*node_id, normalized_term.clone(), total_documents);
+                node_map.insert(*node_id, (ranked_node, child_ids));
+            } else {
+                log::warn!("No normalized term found for node {}", node_id);
+            }
         }
-
-        // Sort nodes by their highest rank's edge_weight
-        ranked_nodes.sort_by(|a, b| {
-            let a_max = a.ranks.first().map(|r| r.edge_weight).unwrap_or(0);
-            let b_max = b.ranks.first().map(|r| r.edge_weight).unwrap_or(0);
-            b_max.cmp(&a_max) // Descending order
-        });
         
-        Ok(ranked_nodes)
+        // Second pass: Build the tree structure
+        let mut root_nodes = Vec::new();
+        let mut processed = AHashMap::new();
+        
+        for (node_id, (mut node, child_ids)) in node_map.clone() {
+            if !processed.contains_key(&node_id) {
+                processed.insert(node_id, true);
+                
+                // Process children
+                for child_id in child_ids {
+                    if let Some((mut child_node, _)) = node_map.get(&child_id).cloned() {
+                        if !processed.contains_key(&child_id) {
+                            processed.insert(child_id, true);
+                            node.children.push(child_node);
+                        }
+                    }
+                }
+                
+                root_nodes.push(node);
+            }
+        }
+        
+        // Sort nodes by value (total_documents) in descending order
+        root_nodes.sort_by(|a, b| b.value.cmp(&a.value));
+        
+        log::debug!("Found {} root nodes", root_nodes.len());
+        Ok(root_nodes)
     }
 
     /// Optimized query to find connections and documents from a list of node IDs
@@ -704,22 +737,20 @@ mod tests {
         // Check first node has expected structure
         let first_node = &ranked_nodes[0];
         assert!(!first_node.ranks.is_empty());
-        assert!(first_node.total_documents > 0);
+        assert!(first_node.value > 0);
         
-        // Verify nodes are sorted by highest rank
+        // Verify nodes are sorted by value in descending order
         for window in ranked_nodes.windows(2) {
-            let first_max = window[0].ranks.first().map(|r| r.edge_weight).unwrap_or(0);
-            let second_max = window[1].ranks.first().map(|r| r.edge_weight).unwrap_or(0);
-            assert!(first_max >= second_max, "Nodes should be sorted by highest rank");
+            assert!(
+                window[0].value >= window[1].value,
+                "Nodes should be sorted by value in descending order"
+            );
         }
 
-        // Verify each node has correct normalized term
+        // Verify each node has correct name from normalized term
         for node in &ranked_nodes {
-            assert!(rolegraph.ac_reverse_nterm.contains_key(&node.id));
-            assert_eq!(
-                rolegraph.ac_reverse_nterm.get(&node.id).unwrap(),
-                &node.normalized_term
-            );
+            let normalized_term = rolegraph.ac_reverse_nterm.get(&node.id).unwrap();
+            assert_eq!(node.name, normalized_term.to_string());
         }
     }
 
