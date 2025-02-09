@@ -27,19 +27,25 @@ export interface ChartData {
   children: ChartNode[];
 }
 
-export interface NodeRank {
+export interface RankEntry {
   edge_weight: number;
   document_id: string;
 }
 
-export interface Node {
+export interface ApiRankedNode {
   id: string;
+  name: string;
   normalized_term: string;
-  ranks: NodeRank[];
+  value: number;
   total_documents: number;
+  parent: string | null;
+  children: ApiRankedNode[];
+  expanded: boolean;
+  ranks: RankEntry[];
 }
 
 export interface NodeResponse {
   status: string;
-  nodes: Node[];
+  name: string;
+  nodes: ApiRankedNode[];
 }
