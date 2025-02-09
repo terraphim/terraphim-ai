@@ -555,8 +555,7 @@ impl PartialOrd for Rank {
 impl Ord for Rank {
     #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Higher edge weight means higher rank
-        other.edge_weight.cmp(&self.edge_weight)
+        self.edge_weight.cmp(&other.edge_weight)
     }
 }
 
@@ -589,7 +588,7 @@ mod tests {
         // Test sorting
         let mut ranks = vec![rank1.clone(), rank2.clone(), rank3.clone()];
         ranks.sort_unstable();
-        assert_eq!(ranks, vec![rank2, rank1, rank3]);
+        assert_eq!(ranks, vec![rank1, rank3, rank2]);
     }
 
     #[test]

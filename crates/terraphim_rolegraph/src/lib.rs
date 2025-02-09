@@ -5,7 +5,7 @@ use regex::Regex;
 use std::{collections::hash_map::Entry, result};
 use std::sync::Arc;
 use terraphim_types::{
-    Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
+    RankedNode, Rank, Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
@@ -243,7 +243,7 @@ impl RoleGraph {
         let mut ranked_documents = results.into_iter().collect::<Vec<_>>();
         ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
 
-        let documents = ranked_documents
+        let documents: Vec<_> = ranked_documents
             .into_iter()
             .skip(offset.unwrap_or(0))
             .take(limit.unwrap_or(std::usize::MAX))
@@ -316,26 +316,6 @@ impl RoleGraph {
         Ok(documents)
     }
 
-    fn topk_query_graph_optimised (        &self,
-        query_string: &str,
-        offset: Option<usize>,
-        limit: Option<usize>,
-    ) -> Result<Vec<(String, IndexedDocument)>> {
-        let results = AHashMap::new();
-        for (node_id, node) in self.nodes.iter(){
-            for each_edge_id in node.connected_with{
-                
-
-            }
-        }
-        let documents: Vec<_> = ranked_documents
-        .into_iter()
-        .skip(offset.unwrap_or(0))
-        .take(limit.unwrap_or(std::usize::MAX))
-        .collect();
-    Ok(documents)
-        
-    }
     // pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
     //     let matches = self.find_matching_node_ids(text);
     //     for (a, b) in matches.into_iter().tuple_windows() {
@@ -673,9 +653,9 @@ mod tests {
             .await
             .unwrap();
 
-        // Insert test documents
+        // Insert test documents with known connections
         let document_id = Ulid::new().to_string();
-        let test_document = "Life cycle concepts and project direction";
+        let test_document = "Life cycle concepts and project direction with Trained operators and maintainers";
         let document = Document {
             stub: None,
             url: "/test/doc".to_string(),
@@ -688,15 +668,31 @@ mod tests {
         };
         rolegraph.insert_document(&document_id, document);
 
-        // Test list_ranked_nodes
+        // Get all ranked nodes
         let ranked_nodes = rolegraph.list_ranked_nodes().unwrap();
+        
+        // Verify we have nodes
         assert!(!ranked_nodes.is_empty());
 
-        // Verify nodes are properly ranked
+        // Check first node has expected structure
+        let first_node = &ranked_nodes[0];
+        assert!(!first_node.ranks.is_empty());
+        assert!(first_node.total_documents > 0);
+        
+        // Verify nodes are sorted by highest rank
         for window in ranked_nodes.windows(2) {
             let first_max = window[0].ranks.first().map(|r| r.edge_weight).unwrap_or(0);
             let second_max = window[1].ranks.first().map(|r| r.edge_weight).unwrap_or(0);
             assert!(first_max >= second_max, "Nodes should be sorted by highest rank");
+        }
+
+        // Verify each node has correct normalized term
+        for node in &ranked_nodes {
+            assert!(rolegraph.ac_reverse_nterm.contains_key(&node.id));
+            assert_eq!(
+                rolegraph.ac_reverse_nterm.get(&node.id).unwrap(),
+                &node.normalized_term
+            );
         }
     }
 
