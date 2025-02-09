@@ -8,6 +8,27 @@ use std::ops::{Deref, DerefMut};
 
 use std::str::FromStr;
 
+/// Combining two numbers into a unique one: pairing functions.
+/// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
+pub fn magic_pair(x: u64, y: u64) -> u64 {
+    if x >= y {
+        x * x + x + y
+    } else {
+        y * y + x
+    }
+}
+
+/// Magic unpair function to recover the original pair of numbers
+pub fn magic_unpair(z: u64) -> (u64, u64) {
+    let q = (z as f32).sqrt().floor() as u64;
+    let l = z - q * q;
+    if l < q {
+        (l, q)
+    } else {
+        (q, l - q)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct RoleName {
     pub original: String,
@@ -282,9 +303,16 @@ impl Node {
     pub fn query_optimised(&self, node_ids: &[u64], limit: Option<usize>) -> Vec<Rank> {
         let target_nodes: HashSet<u64> = node_ids.iter().cloned().collect();
         
+        // For each edge ID in our connected edges, we need to check if it was created
+        // from a pair of nodes where at least one is in our target set
         let mut ranks: Vec<Rank> = self.connected_with
             .iter()
-            .filter(|edge_id| target_nodes.contains(edge_id))
+            .filter(|&edge_id| {
+                // Unpack the edge ID back into its component node IDs
+                let (x, y) = magic_unpair(*edge_id);
+                // The edge is relevant if either node is in our target set
+                target_nodes.contains(&x) || target_nodes.contains(&y)
+            })
             .map(|edge_id| Rank {
                 node_id: *edge_id,
                 connection_count: self.connected_with.len() as u64,

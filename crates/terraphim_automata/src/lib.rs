@@ -71,7 +71,8 @@ impl AutomataPath {
     }
     /// Full Local example for testing
     pub fn local_example_full() -> Self {
-        AutomataPath::from_local("data/term_to_id.json")
+        let crate_root = std::env::current_dir().unwrap().parent().unwrap().to_path_buf();
+        AutomataPath::from_local(crate_root.join("terraphim_automata/data/term_to_id.json"))
     }
 
     /// Create a sample remote AutomataPath for testing
