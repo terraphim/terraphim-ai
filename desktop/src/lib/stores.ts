@@ -18,6 +18,7 @@ interface Config {
   global_shortcut: string;
   roles: Record<string, Role>;
   default_role: string;
+  selected_role: string;
 }
 
 interface ConfigResponse {
@@ -31,6 +32,7 @@ const defaultConfig: Config = {
   global_shortcut: "",
   roles: {},
   default_role: "",
+  selected_role: ""
 };
 
 const theme = writable<string>("spacelab");

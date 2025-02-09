@@ -13,7 +13,7 @@ use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, IndexedDocument, SearchQuery};
+use terraphim_types::{RankedNode, Rank, Document, IndexedDocument, SearchQuery};
 
 use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
@@ -46,14 +46,51 @@ pub(crate) async fn create_document(
     }))
 }
 
-// TODO: Is this still needed now that we have search?
-pub(crate) async fn _list_documents(
-    State(rolegraph): State<Arc<Mutex<RoleGraph>>>,
-) -> impl IntoResponse {
-    let rolegraph = rolegraph.lock().await.clone();
-    log::debug!("{rolegraph:?}");
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListNodesQuery {
+    /// Whether to expand nodes to include linked documents
+    #[serde(default)]
+    pub expand: bool,
+}
 
-    (StatusCode::OK, Json("Ok"))
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListDocumentsResponse {
+    /// Status of the document listing
+    pub status: Status,
+    /// Vector of ranked nodes from the RoleGraph
+    pub nodes: Vec<RankedNode>,
+    /// Vector of documents with their IDs and ranks, only present when expand=true
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub documents: Option<Vec<(String, IndexedDocument, Rank)>>,
+    /// Total number of nodes
+    pub total: usize,
+}
+
+pub(crate) async fn list_ranked_nodes(
+    State(config): State<ConfigState>,
+    Query(query): Query<ListNodesQuery>,
+) -> Result<Json<ListDocumentsResponse>> {
+    let mut terraphim_service = TerraphimService::new(config);
+    let rolegraph = terraphim_service.get_rolegraph().await?;
+    let nodes = rolegraph.list_ranked_nodes()?;
+    let total = nodes.len();
+
+    log::debug!("Found {total} ranked nodes");
+    
+    let documents = if query.expand {
+        let docs = rolegraph.get_ranked_documents(&nodes)?;
+        log::debug!("Expanded to {} documents", docs.len());
+        Some(docs)
+    } else {
+        None
+    };
+
+    Ok(Json(ListDocumentsResponse {
+        status: Status::Success,
+        nodes,
+        documents,
+        total,
+    }))
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

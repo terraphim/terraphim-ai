@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
-
 use std::str::FromStr;
+use std::hash::Hash;
 
 /// Combining two numbers into a unique one: pairing functions.
 /// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
@@ -29,10 +29,24 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RoleName {
     pub original: String,
     pub lowercase: String,
+}
+
+impl PartialEq for RoleName {
+    fn eq(&self, other: &Self) -> bool {
+        self.lowercase == other.lowercase
+    }
+}
+
+impl Eq for RoleName {}
+
+impl Hash for RoleName {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lowercase.hash(state);
+    }
 }
 
 impl RoleName {
@@ -50,7 +64,7 @@ impl RoleName {
 
 impl fmt::Display for RoleName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.original)
+        write!(f, "{}", self.lowercase)
     }
 }
 

@@ -371,6 +371,71 @@ impl RoleGraph {
         };
         edge
     }
+
+    pub fn get_ranked_documents(&self, ranked_nodes: &[RankedNode]) -> Result<Vec<(String, IndexedDocument, Rank)>> {
+        let mut results = AHashMap::new();
+        
+        // Process only the provided ranked nodes
+        for ranked_node in ranked_nodes {
+            let normalized_term = self.ac_reverse_nterm
+                .get(&ranked_node.id)
+                .ok_or(Error::NodeIdNotFound)?;
+
+            // Use the pre-calculated ranks from the RankedNode
+            for rank in &ranked_node.ranks {
+                if let Some(edge) = self.edges.get(&rank.node_id) {
+                    for (document_id, document_rank) in &edge.doc_hash {
+                        let total_rank = rank.edge_weight + document_rank;
+                        
+                        match results.entry(document_id.clone()) {
+                            Entry::Vacant(e) => {
+                                e.insert((
+                                    IndexedDocument {
+                                        id: document_id.clone(),
+                                        matched_edges: vec![edge.clone()],
+                                        rank: total_rank,
+                                        tags: vec![normalized_term.to_string()],
+                                        nodes: vec![ranked_node.id],
+                                    },
+                                    rank.clone(),
+                                ));
+                            }
+                            Entry::Occupied(mut e) => {
+                                let (doc, existing_rank) = e.get_mut();
+                                doc.rank += total_rank;
+                                doc.matched_edges.push(edge.clone());
+                                doc.matched_edges.dedup_by_key(|e| e.id);
+                                if !doc.nodes.contains(&ranked_node.id) {
+                                    doc.nodes.push(ranked_node.id);
+                                }
+                                if !doc.tags.contains(&normalized_term.to_string()) {
+                                    doc.tags.push(normalized_term.to_string());
+                                }
+                                // Update rank if the new one has higher edge_weight
+                                if rank.edge_weight > existing_rank.edge_weight {
+                                    *existing_rank = rank.clone();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut ranked_documents: Vec<_> = results
+            .into_iter()
+            .map(|(id, (doc, rank))| (id, doc, rank))
+            .collect();
+            
+        // Sort by document rank (descending) and then by edge weight (descending)
+        ranked_documents.sort_by(|(_, doc_a, rank_a), (_, doc_b, rank_b)| {
+            doc_b.rank
+                .cmp(&doc_a.rank)
+                .then(rank_b.edge_weight.cmp(&rank_a.edge_weight))
+        });
+        
+        Ok(ranked_documents)
+    }
 }
 
 /// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`

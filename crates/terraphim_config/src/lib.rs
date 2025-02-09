@@ -180,10 +180,10 @@ impl ConfigBuilder {
         println!("{automata_remote}");
         self.global_shortcut("Ctrl+X")
         .add_role(
-            "Default",
+            "default",
             Role {
-                shortname: Some("Default".to_string()),
-                name: "Default".into(),
+                shortname: Some("default".to_string()),
+                name: "default".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
@@ -195,10 +195,10 @@ impl ConfigBuilder {
             },
         )
         .add_role(
-            "Engineer",
+            "engineer",
             Role {
-                shortname: Some("Engineer".into()),
-                name: "Engineer".into(),
+                shortname: Some("engineer".to_string()),
+                name: "engineer".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -218,10 +218,10 @@ impl ConfigBuilder {
             },
         )
         .add_role(
-            "System Operator",
+            "system operator",
             Role {
                 shortname: Some("operator".to_string()),
-                name: "System Operator".into(),
+                name: "system operator".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -240,7 +240,7 @@ impl ConfigBuilder {
                 extra: AHashMap::new(),
             },
         )
-        .default_role("Default").unwrap()
+        .default_role("default").unwrap()
     }
 
     pub fn build_default_desktop(mut self) -> Self {
@@ -257,10 +257,10 @@ impl ConfigBuilder {
         self.config.id = ConfigId::Desktop;
         self.global_shortcut("Ctrl+X")
         .add_role(
-            "Default",  
+            "default",  
             Role {
-                shortname: Some("Default".to_string()),
-                name: "Default".to_string().into(),
+                shortname: Some("default".to_string()),
+                name: "default".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
@@ -272,10 +272,10 @@ impl ConfigBuilder {
             },
         )
         .add_role(
-            "Engineer",
+            "engineer",
             Role {
-                shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string().into(),
+                shortname: Some("engineer".to_string()),
+                name: "engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "lumen".to_string(),
                 kg: None,
@@ -287,15 +287,15 @@ impl ConfigBuilder {
             },
         )
         .add_role(
-            "Terraphim Engineer",
+            "terraphim engineer",
             Role {
-                shortname: Some("Terraphim Engineer".to_string()),
-                name: "Terraphim Engineer".to_string().into(),
+                shortname: Some("terraphim engineer".to_string()),
+                name: "terraphim engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::from_local(
-                        docs_path.join("Terraphim Engineer_thesaurus.json".to_string()),
+                        docs_path.join("terraphim engineer_thesaurus.json".to_string()),
                     )),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
@@ -312,10 +312,10 @@ impl ConfigBuilder {
             },
         )
         .add_role(
-            "System Operator",
+            "system operator",
             Role {
                 shortname: Some("operator".to_string()),
-                name: "System Operator".to_string().into(),
+                name: "system operator".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
@@ -334,7 +334,7 @@ impl ConfigBuilder {
                 extra: AHashMap::new(),
             },
         )
-        .default_role("Default").unwrap()
+        .default_role("default").unwrap()
     }
 
 
@@ -535,6 +535,12 @@ impl ConfigState {
         config.default_role.clone()
     }
 
+    /// Get the selected role from the config
+    pub async fn get_selected_role(&self) -> RoleName {
+        let config = self.config.lock().await;
+        config.selected_role.clone()
+    }
+
     /// Get a role from the config
     pub async fn get_role(&self, role: &RoleName) -> Option<Role> {
         let config = self.config.lock().await;
@@ -710,7 +716,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(config.roles.len(), 3);
-        assert_eq!(config.default_role, RoleName::new("Default"));
+        assert_eq!(config.default_role, RoleName::new("default"));
     }
 
     #[test]
@@ -732,7 +738,7 @@ mod tests {
     fn dummy_role() -> Role {
         Role {
             shortname: Some("father".into()),
-            name: "Father".into(),
+            name: "father".into(),
             relevance_function: RelevanceFunction::TitleScorer,
             theme: "lumen".to_string(),
             kg: Some(KnowledgeGraph {
@@ -753,14 +759,14 @@ mod tests {
     async fn test_add_role() {
         // Create a new role by building a new config
         let config = ConfigBuilder::new()
-            .add_role("Father", dummy_role())
+            .add_role("father", dummy_role())
             .build()
             .unwrap();
 
-        assert!(config.roles.contains_key(&RoleName::new("Father")));
+        assert!(config.roles.contains_key(&RoleName::new("father")));
         assert_eq!(config.roles.len(), 1);
-        assert_eq!(&config.default_role, &RoleName::new("Father"));
-        assert_eq!(config.roles[&RoleName::new("Father")], dummy_role());
+        assert_eq!(&config.default_role, &RoleName::new("father"));
+        assert_eq!(config.roles[&RoleName::new("father")], dummy_role());
     }
 
     ///test to create config with different id - server, desktop, embedded

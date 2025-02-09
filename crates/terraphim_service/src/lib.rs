@@ -185,4 +185,18 @@ impl<'a> TerraphimService {
         *current_config = config.clone();
         Ok(config)
     }
+
+    /// Get the rolegraph for the default role
+    pub async fn get_rolegraph(&mut self) -> Result<RoleGraph> {
+        let selected_role = self.config_state.get_selected_role().await;
+        
+        log::debug!("Selected role: {:?}", selected_role);
+        match self.config_state.roles.get(&selected_role) {
+            Some(rolegraph) => {
+                let rolegraph = rolegraph.lock().await;
+                Ok(rolegraph.clone())
+            }
+            None => Err(ServiceError::Config("Selected role not found".into()))
+        }
+    }
 }

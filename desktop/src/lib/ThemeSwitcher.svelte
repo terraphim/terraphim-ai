@@ -8,9 +8,9 @@
     config: {
       id: string;
       global_shortcut: string;
-      // roles: Record<string, { name: string; theme: string ; kg}>;
-      roles: { [key: string]: { name: string; theme: string; kg?: { publish?: boolean } } };
+      roles: Record<string, { name: string; theme: string; kg?: { publish?: boolean } }>;
       default_role: string;
+      selected_role: string;
     };
   }
 
@@ -25,8 +25,8 @@
             console.log("get_config response", res);
             if (res && res.status === "success") {
               configStore.set(res.config);
-              roles.set(Object.values(res.config.roles));
-              role.set(res.config.default_role);
+              roles.set(res.config.roles);
+              role.set(res.config.selected_role || res.config.default_role);
               theme.set(
                 res.config.roles[res.config.default_role]?.theme || "default"
               );
@@ -45,7 +45,7 @@
             if (received_config && received_config.status === "success") {
               configStore.set(received_config.config);
               roles.set(received_config.config.roles);
-              role.set(received_config.config.default_role);
+              role.set(received_config.config.selected_role || received_config.config.default_role);
               theme.set(
                 received_config.config.roles[
                   received_config.config.default_role
@@ -74,18 +74,51 @@
     var selectedTheme = "default";
     role.set(target.value);
     console.log($roles);
-    // FIXME: ugly hack to make roles work with new deserialization out of tauri
-    const roleSettings = $roles.find(r => r.name === target.value);
+    
+    // Update the config with the new selected role
+    configStore.update(config => {
+      return {
+        ...config,
+        selected_role: target.value
+      };
+    });
+
+    // Send updated config to server
+    if ($is_tauri) {
+      console.log("Updating config on server");
+      invoke("update_config", { configNew: $configStore })
+        .then((res: any) => {
+          console.log(`Config updated: ${res}`);
+        })
+        .catch((error) => console.error(error));
+    } else {
+      const configURL = `${CONFIG.ServerURL}/config/`;
+      fetch(configURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify($configStore),
+      })
+        .then(response => response.json())
+        .then(data => console.log('Config updated:', data))
+        .catch((error) => console.error('Error updating config:', error));
+    }
+
+    // Find role settings in the roles record
+    const roleSettings = Object.values($roles).find(r => r.name === target.value);
     console.log("Role settings ", roleSettings);
     if (roleSettings) {
       // if role have kg.publish=true then publish thesaurus
       if (roleSettings.kg?.publish) {
       console.log("Publishing thesaurus for role", $role);
-      invoke("publish_thesaurus", { roleName: $role }).then((res) => {
+      invoke("publish_thesaurus", { roleName: $role }).then((res: any) => {
         console.log("publish_thesaurus response", res);
         // update thesaurus store
-        thesaurus.set(res.data);
-        typeahead.set(true);
+        if (res && res.data) {
+          thesaurus.set(res.data);
+          typeahead.set(true);
+        }
       });
       }else{
         typeahead.set(false);
