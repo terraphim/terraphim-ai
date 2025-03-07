@@ -4,14 +4,15 @@ use std::result;
 
 mod names;
 mod scored;
+mod bm25;
 
 use crate::error::Result;
 use names::NameScorer;
 use scored::{Scored, SearchResults};
 use serde::{Serialize, Serializer};
+use bm25::{BM25FScorer, BM25PlusScorer};
 
-use terraphim_types::Document;
-use terraphim_types::SearchQuery;
+use terraphim_types::{Document, RelevanceFunction, SearchQuery};
 
 /// Sort the documents by relevance.
 ///
@@ -20,21 +21,136 @@ use terraphim_types::SearchQuery;
 pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> Vec<Document> {
     log::debug!("Sorting documents by relevance");
 
-    // Create a new scorer
-    let mut scorer = Scorer::new();
+    // Determine which relevance function to use
+    let relevance_function = search_query.role.as_ref()
+        .and_then(|_| None) // In the future, this could look up the role's configured relevance function
+        .unwrap_or(RelevanceFunction::TitleScorer);
 
-    // Create a new query
-    let query = Query::new(&search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
+    match relevance_function {
+        RelevanceFunction::TerraphimGraph => {
+            // Use the existing Terraphim graph scoring logic
+            // This is likely handled elsewhere in the codebase
+            documents
+        },
+        RelevanceFunction::TitleScorer => {
+            // Use the existing title scorer
+            let mut scorer = Scorer::new();
+            let query = Query::new(&search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
+            let mut results = scorer.score(&query, documents).unwrap();
+            results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
+            log::debug!("Rescore results {:#?}", results);
+            results
+                .into_vec()
+                .iter()
+                .map(|s| s.clone().into_value())
+                .collect()
+        },
+        RelevanceFunction::BM25F => {
+            // Use BM25F scorer
+            let mut scorer = BM25FScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::BM25Plus => {
+            // Use BM25Plus scorer
+            let mut scorer = BM25PlusScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+    }
+}
 
-    // Score the documents
-    let mut results = scorer.score(&query, documents).unwrap();
-    results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
-    log::debug!("Rescore results {:#?}", results);
-    results
-        .into_vec()
-        .iter()
-        .map(|s| s.clone().into_value())
-        .collect()
+/// Rescore documents from multiple haystacks
+///
+/// This function takes documents from multiple sources (haystacks) and rescores them
+/// using the specified relevance function.
+pub fn rescore_documents(search_query: &SearchQuery, documents: Vec<Document>, relevance_function: RelevanceFunction) -> Vec<Document> {
+    log::debug!("Rescoring documents from multiple haystacks");
+    
+    match relevance_function {
+        RelevanceFunction::TerraphimGraph => {
+            // Use the existing Terraphim graph scoring logic
+            // This is likely handled elsewhere in the codebase
+            documents
+        },
+        RelevanceFunction::TitleScorer => {
+            // Use the existing title scorer
+            let mut scorer = Scorer::new();
+            let query = Query::new(&search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
+            let mut results = scorer.score(&query, documents).unwrap();
+            results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
+            log::debug!("Rescore results {:#?}", results);
+            results
+                .into_vec()
+                .iter()
+                .map(|s| s.clone().into_value())
+                .collect()
+        },
+        RelevanceFunction::BM25F => {
+            // Use BM25F scorer
+            let mut scorer = BM25FScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::BM25Plus => {
+            // Use BM25Plus scorer
+            let mut scorer = BM25PlusScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+    }
 }
 
 #[derive(Debug)]
@@ -264,5 +380,126 @@ impl fmt::Display for Similarity {
             Similarity::Jaro => write!(f, "jaro"),
             Similarity::JaroWinkler => write!(f, "jarowinkler"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use terraphim_types::{NormalizedTermValue, RoleName};
+
+    #[test]
+    fn test_sort_documents_with_different_relevance_functions() {
+        // Create test documents
+        let documents = vec![
+            Document {
+                id: "1".to_string(),
+                url: "http://example.com/1".to_string(),
+                title: "Rust Programming Language".to_string(),
+                body: "Rust is a systems programming language focused on safety, speed, and concurrency.".to_string(),
+                description: Some("Learn about Rust programming".to_string()),
+                stub: None,
+                tags: Some(vec!["programming".to_string(), "systems".to_string()]),
+                rank: None,
+            },
+            Document {
+                id: "2".to_string(),
+                url: "http://example.com/2".to_string(),
+                title: "Python Programming Tutorial".to_string(),
+                body: "Python is a high-level programming language known for its readability.".to_string(),
+                description: Some("Learn Python programming".to_string()),
+                stub: None,
+                tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
+                rank: None,
+            },
+        ];
+
+        // Create search query
+        let search_query = SearchQuery {
+            search_term: NormalizedTermValue::new("rust programming".to_string()),
+            skip: None,
+            limit: None,
+            role: Some(RoleName::new("developer")),
+        };
+
+        // Test TitleScorer
+        let title_results = rescore_documents(&search_query, documents.clone(), RelevanceFunction::TitleScorer);
+        assert_eq!(title_results.len(), 2);
+        // The first document should be the Rust one since the query is "rust programming"
+        assert_eq!(title_results[0].id, "1");
+
+        // Test BM25F
+        let bm25f_results = rescore_documents(&search_query, documents.clone(), RelevanceFunction::BM25F);
+        assert_eq!(bm25f_results.len(), 2);
+        // The first document should be the Rust one since the query is "rust programming"
+        assert_eq!(bm25f_results[0].id, "1");
+
+        // Test BM25Plus
+        let bm25plus_results = rescore_documents(&search_query, documents.clone(), RelevanceFunction::BM25Plus);
+        assert_eq!(bm25plus_results.len(), 2);
+        // The first document should be the Rust one since the query is "rust programming"
+        assert_eq!(bm25plus_results[0].id, "1");
+    }
+
+    #[test]
+    fn test_rescore_documents_from_multiple_haystacks() {
+        // Create test documents from multiple haystacks
+        let haystack1_docs = vec![
+            Document {
+                id: "1".to_string(),
+                url: "http://example.com/1".to_string(),
+                title: "Rust Programming Language".to_string(),
+                body: "Rust is a systems programming language focused on safety, speed, and concurrency.".to_string(),
+                description: Some("Learn about Rust programming".to_string()),
+                stub: None,
+                tags: Some(vec!["programming".to_string(), "systems".to_string()]),
+                rank: None,
+            },
+        ];
+
+        let haystack2_docs = vec![
+            Document {
+                id: "2".to_string(),
+                url: "http://example.com/2".to_string(),
+                title: "Python Programming Tutorial".to_string(),
+                body: "Python is a high-level programming language known for its readability.".to_string(),
+                description: Some("Learn Python programming".to_string()),
+                stub: None,
+                tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
+                rank: None,
+            },
+        ];
+
+        // Combine documents from multiple haystacks
+        let mut combined_docs = Vec::new();
+        combined_docs.extend(haystack1_docs);
+        combined_docs.extend(haystack2_docs);
+
+        // Create search query
+        let search_query = SearchQuery {
+            search_term: NormalizedTermValue::new("rust programming".to_string()),
+            skip: None,
+            limit: None,
+            role: Some(RoleName::new("developer")),
+        };
+
+        // Test rescoring with BM25F
+        let rescored_docs = rescore_documents(&search_query, combined_docs.clone(), RelevanceFunction::BM25F);
+        assert_eq!(rescored_docs.len(), 2);
+        // The first document should be the Rust one since the query is "rust programming"
+        assert_eq!(rescored_docs[0].id, "1");
+
+        // Test with a different query that should favor the Python document
+        let python_query = SearchQuery {
+            search_term: NormalizedTermValue::new("python tutorial".to_string()),
+            skip: None,
+            limit: None,
+            role: Some(RoleName::new("developer")),
+        };
+
+        let rescored_docs = rescore_documents(&python_query, combined_docs.clone(), RelevanceFunction::BM25F);
+        assert_eq!(rescored_docs.len(), 2);
+        // The first document should be the Python one since the query is "python tutorial"
+        assert_eq!(rescored_docs[0].id, "2");
     }
 }

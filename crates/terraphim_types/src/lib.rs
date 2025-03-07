@@ -596,6 +596,18 @@ pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the title of a document
     #[serde(rename = "title-scorer")]
     TitleScorer,
+    /// Scorer for ranking search results based on BM25F algorithm
+    ///
+    /// BM25F is an extension of BM25 that handles multiple fields with different weights
+    /// for structured documents like title, body, etc.
+    #[serde(rename = "bm25f")]
+    BM25F,
+    /// Scorer for ranking search results based on BM25+ algorithm
+    ///
+    /// BM25+ is an improved version of BM25 that addresses the lower-bounding problem
+    /// for term frequency normalization.
+    #[serde(rename = "bm25-plus")]
+    BM25Plus,
 }
 
 /// Defines all supported inputs for the knowledge graph.
@@ -770,5 +782,132 @@ mod tests {
         assert_eq!(api_node.total_documents, 2);
         assert_eq!(api_node.children.len(), 0);
         assert_eq!(api_node.ranks.len(), 2);
+    }
+
+    #[test]
+    fn test_relevance_function_serialization() {
+        // Test serialization of RelevanceFunction variants
+        let terraphim_graph = RelevanceFunction::TerraphimGraph;
+        let title_scorer = RelevanceFunction::TitleScorer;
+        let bm25f = RelevanceFunction::BM25F;
+        let bm25_plus = RelevanceFunction::BM25Plus;
+
+        // Serialize to JSON
+        let terraphim_graph_json = serde_json::to_string(&terraphim_graph).unwrap();
+        let title_scorer_json = serde_json::to_string(&title_scorer).unwrap();
+        let bm25f_json = serde_json::to_string(&bm25f).unwrap();
+        let bm25_plus_json = serde_json::to_string(&bm25_plus).unwrap();
+
+        // Check serialized values
+        assert_eq!(terraphim_graph_json, r#""terraphim-graph""#);
+        assert_eq!(title_scorer_json, r#""title-scorer""#);
+        assert_eq!(bm25f_json, r#""bm25f""#);
+        assert_eq!(bm25_plus_json, r#""bm25-plus""#);
+    }
+
+    #[test]
+    fn test_relevance_function_deserialization() {
+        // Test deserialization of RelevanceFunction variants
+        let terraphim_graph: RelevanceFunction = serde_json::from_str(r#""terraphim-graph""#).unwrap();
+        let title_scorer: RelevanceFunction = serde_json::from_str(r#""title-scorer""#).unwrap();
+        let bm25f: RelevanceFunction = serde_json::from_str(r#""bm25f""#).unwrap();
+        let bm25_plus: RelevanceFunction = serde_json::from_str(r#""bm25-plus""#).unwrap();
+
+        // Check deserialized values
+        assert_eq!(terraphim_graph, RelevanceFunction::TerraphimGraph);
+        assert_eq!(title_scorer, RelevanceFunction::TitleScorer);
+        assert_eq!(bm25f, RelevanceFunction::BM25F);
+        assert_eq!(bm25_plus, RelevanceFunction::BM25Plus);
+    }
+
+    #[test]
+    fn test_relevance_function_equality() {
+        // Test equality of RelevanceFunction variants
+        assert_eq!(RelevanceFunction::TerraphimGraph, RelevanceFunction::TerraphimGraph);
+        assert_eq!(RelevanceFunction::TitleScorer, RelevanceFunction::TitleScorer);
+        assert_eq!(RelevanceFunction::BM25F, RelevanceFunction::BM25F);
+        assert_eq!(RelevanceFunction::BM25Plus, RelevanceFunction::BM25Plus);
+
+        // Test inequality
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::TitleScorer);
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::BM25F);
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::BM25Plus);
+        assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::BM25F);
+        assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::BM25Plus);
+        assert_ne!(RelevanceFunction::BM25F, RelevanceFunction::BM25Plus);
+    }
+
+    #[test]
+    fn test_relevance_function_copy() {
+        // Test that RelevanceFunction implements Copy
+        let original = RelevanceFunction::BM25F;
+        let copied = original;
+        
+        // Both should be equal and valid after copying
+        assert_eq!(original, copied);
+        
+        // Modifying one shouldn't affect the other (this is just a demonstration,
+        // as we can't actually observe the copy semantics directly in a test)
+        let _new_value = RelevanceFunction::BM25Plus;
+        assert_eq!(original, copied);
+    }
+
+    #[test]
+    fn test_bm25_relevance_functions_in_search_query() {
+        // Create a search query with BM25F
+        let search_term = NormalizedTermValue::new("test query".to_string());
+        let role = RoleName::new("researcher");
+        
+        // Create a struct that might use RelevanceFunction
+        struct SearchConfig {
+            query: SearchQuery,
+            relevance_fn: RelevanceFunction,
+        }
+        
+        // Test with BM25F
+        let bm25f_config = SearchConfig {
+            query: SearchQuery {
+                search_term: search_term.clone(),
+                skip: Some(0),
+                limit: Some(10),
+                role: Some(role.clone()),
+            },
+            relevance_fn: RelevanceFunction::BM25F,
+        };
+        
+        // Test with BM25Plus
+        let bm25plus_config = SearchConfig {
+            query: SearchQuery {
+                search_term: search_term.clone(),
+                skip: Some(0),
+                limit: Some(10),
+                role: Some(role.clone()),
+            },
+            relevance_fn: RelevanceFunction::BM25Plus,
+        };
+        
+        // Verify the relevance functions are correctly set
+        assert!(matches!(bm25f_config.relevance_fn, RelevanceFunction::BM25F));
+        assert!(matches!(bm25plus_config.relevance_fn, RelevanceFunction::BM25Plus));
+        assert_ne!(bm25f_config.relevance_fn, bm25plus_config.relevance_fn);
+        
+        // Test pattern matching on relevance functions
+        let relevance_name = match bm25f_config.relevance_fn {
+            RelevanceFunction::TerraphimGraph => "terraphim-graph",
+            RelevanceFunction::TitleScorer => "title-scorer",
+            RelevanceFunction::BM25F => "bm25f",
+            RelevanceFunction::BM25Plus => "bm25-plus",
+        };
+        
+        assert_eq!(relevance_name, "bm25f");
+        
+        let relevance_name = match bm25plus_config.relevance_fn {
+            RelevanceFunction::TerraphimGraph => "terraphim-graph",
+            RelevanceFunction::TitleScorer => "title-scorer",
+            RelevanceFunction::BM25F => "bm25f",
+            RelevanceFunction::BM25Plus => "bm25-plus",
+        };
+        
+        assert_eq!(relevance_name, "bm25-plus");
     }
 }

@@ -181,6 +181,40 @@ impl<'a> TerraphimService {
 
                 Ok(documents)
             }
+            RelevanceFunction::BM25F => {
+                log::debug!("Searching haystack with BM25F scorer");
+
+                let documents = index.get_all_documents();
+
+                // Use the BM25F scorer to rank documents
+                let documents = score::rescore_documents(search_query, documents, RelevanceFunction::BM25F);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
+            }
+            RelevanceFunction::BM25Plus => {
+                log::debug!("Searching haystack with BM25Plus scorer");
+
+                let documents = index.get_all_documents();
+
+                // Use the BM25Plus scorer to rank documents
+                let documents = score::rescore_documents(search_query, documents, RelevanceFunction::BM25Plus);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
+            }
         }
     }
 
