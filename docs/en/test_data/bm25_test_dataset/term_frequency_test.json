@@ -1,0 +1,75 @@
+{
+  "description": "Test dataset for evaluating BM25F and BM25+ handling of term frequency saturation",
+  "documents": [
+    {
+      "id": "tf1",
+      "url": "https://example.com/tf1",
+      "title": "Document with Low Term Frequency",
+      "body": "Rust is a programming language that emphasizes safety, particularly safe concurrency.",
+      "description": "Brief overview of Rust programming language.",
+      "tags": ["rust", "programming", "safety"],
+      "rank": 0
+    },
+    {
+      "id": "tf2",
+      "url": "https://example.com/tf2",
+      "title": "Document with Medium Term Frequency",
+      "body": "Rust is a programming language that emphasizes safety. Rust ensures memory safety without using garbage collection. Rust uses a borrow checker to validate references. Rust provides zero-cost abstractions for many use cases.",
+      "description": "Overview of Rust programming language features.",
+      "tags": ["rust", "programming", "safety", "memory management"],
+      "rank": 0
+    },
+    {
+      "id": "tf3",
+      "url": "https://example.com/tf3",
+      "title": "Document with High Term Frequency",
+      "body": "Rust is a programming language that emphasizes safety. Rust ensures memory safety without using garbage collection. Rust uses a borrow checker to validate references. Rust provides zero-cost abstractions for many use cases. Rust has a growing ecosystem of libraries called crates. Rust is increasingly used for systems programming. Rust can be used for web development through WebAssembly. Rust has strong type inference capabilities. Rust's pattern matching is powerful and expressive. Rust's ownership model prevents data races at compile time.",
+      "description": "Comprehensive overview of Rust programming language features and ecosystem.",
+      "tags": ["rust", "programming", "safety", "memory management", "systems programming"],
+      "rank": 0
+    },
+    {
+      "id": "tf4",
+      "url": "https://example.com/tf4",
+      "title": "Document with Very High Term Frequency",
+      "body": "Rust is a programming language that emphasizes safety. Rust ensures memory safety without using garbage collection. Rust uses a borrow checker to validate references. Rust provides zero-cost abstractions for many use cases. Rust has a growing ecosystem of libraries called crates. Rust is increasingly used for systems programming. Rust can be used for web development through WebAssembly. Rust has strong type inference capabilities. Rust's pattern matching is powerful and expressive. Rust's ownership model prevents data races at compile time. Rust was originally designed by Graydon Hoare at Mozilla Research. Rust is named after the rust fungus. Rust has been voted the most loved programming language in Stack Overflow's Developer Survey every year since 2016. Rust's mascot is a crab named Ferris. Rust's standard library provides a set of common abstractions. Rust has built-in testing capabilities. Rust's compiler provides helpful error messages. Rust has a built-in package manager called Cargo. Rust supports functional programming paradigms. Rust allows for low-level control without sacrificing high-level conveniences.",
+      "description": "Extensive overview of Rust programming language features, ecosystem, history, and community.",
+      "tags": ["rust", "programming", "safety", "memory management", "systems programming", "web development"],
+      "rank": 0
+    },
+    {
+      "id": "tf5",
+      "url": "https://example.com/tf5",
+      "title": "Document with Extreme Term Frequency",
+      "body": "Rust is a programming language. Rust is safe. Rust is fast. Rust is concurrent. Rust is practical. Rust is productive. Rust is memory efficient. Rust is maintainable. Rust is extensible. Rust is for systems programming. Rust is for web development. Rust is for embedded systems. Rust is for network services. Rust is for cross-platform applications. Rust is for performance-critical applications. Rust is for large-scale projects. Rust is for small utilities. Rust is for beginners. Rust is for experts. Rust is for the future. Rust is modern. Rust is innovative. Rust is reliable. Rust is efficient. Rust is precise. Rust is expressive. Rust is empowering. Rust is community-driven. Rust is open source. Rust is well-documented. Rust is actively developed. Rust is widely adopted. Rust is industry-proven. Rust is academically interesting. Rust is pragmatically designed. Rust is carefully crafted. Rust is thoughtfully evolved. Rust is here to stay. Rust is worth learning. Rust is changing systems programming. Rust is enabling safer code. Rust is preventing common bugs. Rust is improving developer experience. Rust is gaining popularity. Rust is solving real problems. Rust is a joy to use.",
+      "description": "A document that repeatedly mentions Rust with minimal context, testing term frequency saturation.",
+      "tags": ["rust", "programming"],
+      "rank": 0
+    }
+  ],
+  "queries": [
+    {
+      "id": "tfq1",
+      "query": "rust programming language",
+      "description": "Test how term frequency affects ranking across documents with varying frequencies"
+    },
+    {
+      "id": "tfq2",
+      "query": "rust safety memory",
+      "description": "Test how term frequency saturation works with multiple query terms"
+    }
+  ],
+  "expected_results": {
+    "tfq1": {
+      "notes": "BM25F and BM25+ should show diminishing returns for very high term frequencies. tf3 and tf4 should rank higher than tf1 and tf2, but tf5 should not be ranked significantly higher than tf4 despite having many more occurrences of 'rust'."
+    },
+    "tfq2": {
+      "notes": "Documents with balanced occurrences of all query terms should rank higher than documents with extreme frequency of just one term."
+    }
+  },
+  "parameters": {
+    "k1_values": [1.2, 1.5, 2.0],
+    "b_values": [0.75, 0.8, 0.85],
+    "delta_values": [0.5, 1.0, 1.5]
+  }
+} 

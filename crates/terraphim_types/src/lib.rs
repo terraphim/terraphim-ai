@@ -608,6 +608,31 @@ pub enum RelevanceFunction {
     /// for term frequency normalization.
     #[serde(rename = "bm25-plus")]
     BM25Plus,
+    /// Scorer for ranking search results based on Okapi BM25 algorithm
+    ///
+    /// Okapi BM25 is the classic BM25 algorithm that considers term frequency,
+    /// inverse document frequency, and document length normalization.
+    #[serde(rename = "okapi-bm25")]
+    OkapiBM25,
+    /// Scorer for ranking search results based on TF-IDF algorithm
+    ///
+    /// TF-IDF (Term Frequency-Inverse Document Frequency) is a classic information
+    /// retrieval algorithm that weighs terms based on their frequency in a document
+    /// and their rarity across the corpus.
+    #[serde(rename = "tfidf")]
+    TFIDF,
+    /// Scorer for ranking search results based on Jaccard similarity
+    ///
+    /// Jaccard similarity measures the similarity between finite sample sets by
+    /// dividing the size of the intersection by the size of the union of the sample sets.
+    #[serde(rename = "jaccard")]
+    Jaccard,
+    /// Scorer for ranking search results based on Query Ratio
+    ///
+    /// Query Ratio measures the proportion of query terms that appear in a document,
+    /// providing a simple but effective relevance measure.
+    #[serde(rename = "query-ratio")]
+    QueryRatio,
 }
 
 /// Defines all supported inputs for the knowledge graph.
@@ -791,18 +816,30 @@ mod tests {
         let title_scorer = RelevanceFunction::TitleScorer;
         let bm25f = RelevanceFunction::BM25F;
         let bm25_plus = RelevanceFunction::BM25Plus;
+        let okapi_bm25 = RelevanceFunction::OkapiBM25;
+        let tfidf = RelevanceFunction::TFIDF;
+        let jaccard = RelevanceFunction::Jaccard;
+        let query_ratio = RelevanceFunction::QueryRatio;
 
         // Serialize to JSON
         let terraphim_graph_json = serde_json::to_string(&terraphim_graph).unwrap();
         let title_scorer_json = serde_json::to_string(&title_scorer).unwrap();
         let bm25f_json = serde_json::to_string(&bm25f).unwrap();
         let bm25_plus_json = serde_json::to_string(&bm25_plus).unwrap();
+        let okapi_bm25_json = serde_json::to_string(&okapi_bm25).unwrap();
+        let tfidf_json = serde_json::to_string(&tfidf).unwrap();
+        let jaccard_json = serde_json::to_string(&jaccard).unwrap();
+        let query_ratio_json = serde_json::to_string(&query_ratio).unwrap();
 
         // Check serialized values
         assert_eq!(terraphim_graph_json, r#""terraphim-graph""#);
         assert_eq!(title_scorer_json, r#""title-scorer""#);
         assert_eq!(bm25f_json, r#""bm25f""#);
         assert_eq!(bm25_plus_json, r#""bm25-plus""#);
+        assert_eq!(okapi_bm25_json, r#""okapi-bm25""#);
+        assert_eq!(tfidf_json, r#""tfidf""#);
+        assert_eq!(jaccard_json, r#""jaccard""#);
+        assert_eq!(query_ratio_json, r#""query-ratio""#);
     }
 
     #[test]
@@ -812,12 +849,20 @@ mod tests {
         let title_scorer: RelevanceFunction = serde_json::from_str(r#""title-scorer""#).unwrap();
         let bm25f: RelevanceFunction = serde_json::from_str(r#""bm25f""#).unwrap();
         let bm25_plus: RelevanceFunction = serde_json::from_str(r#""bm25-plus""#).unwrap();
+        let okapi_bm25: RelevanceFunction = serde_json::from_str(r#""okapi-bm25""#).unwrap();
+        let tfidf: RelevanceFunction = serde_json::from_str(r#""tfidf""#).unwrap();
+        let jaccard: RelevanceFunction = serde_json::from_str(r#""jaccard""#).unwrap();
+        let query_ratio: RelevanceFunction = serde_json::from_str(r#""query-ratio""#).unwrap();
 
         // Check deserialized values
         assert_eq!(terraphim_graph, RelevanceFunction::TerraphimGraph);
         assert_eq!(title_scorer, RelevanceFunction::TitleScorer);
         assert_eq!(bm25f, RelevanceFunction::BM25F);
         assert_eq!(bm25_plus, RelevanceFunction::BM25Plus);
+        assert_eq!(okapi_bm25, RelevanceFunction::OkapiBM25);
+        assert_eq!(tfidf, RelevanceFunction::TFIDF);
+        assert_eq!(jaccard, RelevanceFunction::Jaccard);
+        assert_eq!(query_ratio, RelevanceFunction::QueryRatio);
     }
 
     #[test]
@@ -827,14 +872,40 @@ mod tests {
         assert_eq!(RelevanceFunction::TitleScorer, RelevanceFunction::TitleScorer);
         assert_eq!(RelevanceFunction::BM25F, RelevanceFunction::BM25F);
         assert_eq!(RelevanceFunction::BM25Plus, RelevanceFunction::BM25Plus);
+        assert_eq!(RelevanceFunction::OkapiBM25, RelevanceFunction::OkapiBM25);
+        assert_eq!(RelevanceFunction::TFIDF, RelevanceFunction::TFIDF);
+        assert_eq!(RelevanceFunction::Jaccard, RelevanceFunction::Jaccard);
+        assert_eq!(RelevanceFunction::QueryRatio, RelevanceFunction::QueryRatio);
 
         // Test inequality
         assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::TitleScorer);
         assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::BM25F);
         assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::BM25Plus);
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::OkapiBM25);
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::TFIDF);
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::Jaccard);
+        assert_ne!(RelevanceFunction::TerraphimGraph, RelevanceFunction::QueryRatio);
         assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::BM25F);
         assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::BM25Plus);
+        assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::OkapiBM25);
+        assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::TFIDF);
+        assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::Jaccard);
+        assert_ne!(RelevanceFunction::TitleScorer, RelevanceFunction::QueryRatio);
         assert_ne!(RelevanceFunction::BM25F, RelevanceFunction::BM25Plus);
+        assert_ne!(RelevanceFunction::BM25F, RelevanceFunction::OkapiBM25);
+        assert_ne!(RelevanceFunction::BM25F, RelevanceFunction::TFIDF);
+        assert_ne!(RelevanceFunction::BM25F, RelevanceFunction::Jaccard);
+        assert_ne!(RelevanceFunction::BM25F, RelevanceFunction::QueryRatio);
+        assert_ne!(RelevanceFunction::BM25Plus, RelevanceFunction::OkapiBM25);
+        assert_ne!(RelevanceFunction::BM25Plus, RelevanceFunction::TFIDF);
+        assert_ne!(RelevanceFunction::BM25Plus, RelevanceFunction::Jaccard);
+        assert_ne!(RelevanceFunction::BM25Plus, RelevanceFunction::QueryRatio);
+        assert_ne!(RelevanceFunction::OkapiBM25, RelevanceFunction::TFIDF);
+        assert_ne!(RelevanceFunction::OkapiBM25, RelevanceFunction::Jaccard);
+        assert_ne!(RelevanceFunction::OkapiBM25, RelevanceFunction::QueryRatio);
+        assert_ne!(RelevanceFunction::TFIDF, RelevanceFunction::Jaccard);
+        assert_ne!(RelevanceFunction::TFIDF, RelevanceFunction::QueryRatio);
+        assert_ne!(RelevanceFunction::Jaccard, RelevanceFunction::QueryRatio);
     }
 
     #[test]
@@ -897,6 +968,10 @@ mod tests {
             RelevanceFunction::TitleScorer => "title-scorer",
             RelevanceFunction::BM25F => "bm25f",
             RelevanceFunction::BM25Plus => "bm25-plus",
+            RelevanceFunction::OkapiBM25 => "okapi-bm25",
+            RelevanceFunction::TFIDF => "tfidf",
+            RelevanceFunction::Jaccard => "jaccard",
+            RelevanceFunction::QueryRatio => "query-ratio",
         };
         
         assert_eq!(relevance_name, "bm25f");
@@ -906,6 +981,10 @@ mod tests {
             RelevanceFunction::TitleScorer => "title-scorer",
             RelevanceFunction::BM25F => "bm25f",
             RelevanceFunction::BM25Plus => "bm25-plus",
+            RelevanceFunction::OkapiBM25 => "okapi-bm25",
+            RelevanceFunction::TFIDF => "tfidf",
+            RelevanceFunction::Jaccard => "jaccard",
+            RelevanceFunction::QueryRatio => "query-ratio",
         };
         
         assert_eq!(relevance_name, "bm25-plus");

@@ -266,7 +266,8 @@ mod tests {
     #[tokio::test]
     async fn test_nodes_response_format() {
         // Create test config state
-        let config = ConfigState::default();
+        let mut config = Config::default();
+        let mut config_state = ConfigState::new(&mut config).await.unwrap();
         
         // Create test request
         let request = NodesRequest {
@@ -275,7 +276,7 @@ mod tests {
 
         // Call the endpoint
         let response = list_ranked_nodes(
-            State(config),
+            State(config_state),
             Json(request)
         ).await;
 

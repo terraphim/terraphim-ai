@@ -5,12 +5,18 @@ use std::result;
 mod names;
 mod scored;
 mod bm25;
+mod bm25_additional;
+#[cfg(test)]
+mod bm25_test_dataset;
+#[cfg(test)]
+mod bm25_additional_test;
 
 use crate::error::Result;
 use names::NameScorer;
 use scored::{Scored, SearchResults};
 use serde::{Serialize, Serializer};
 use bm25::{BM25FScorer, BM25PlusScorer};
+use bm25_additional::{OkapiBM25Scorer, TFIDFScorer, JaccardScorer, QueryRatioScorer};
 
 use terraphim_types::{Document, RelevanceFunction, SearchQuery};
 
@@ -83,6 +89,82 @@ pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> V
             // Return documents in order of relevance
             scored_docs.into_iter().map(|(_, doc)| doc).collect()
         },
+        RelevanceFunction::OkapiBM25 => {
+            // Use Okapi BM25 scorer
+            let mut scorer = OkapiBM25Scorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::TFIDF => {
+            // Use TFIDF scorer
+            let mut scorer = TFIDFScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::Jaccard => {
+            // Use Jaccard scorer
+            let mut scorer = JaccardScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::QueryRatio => {
+            // Use QueryRatio scorer
+            let mut scorer = QueryRatioScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
     }
 }
 
@@ -134,6 +216,82 @@ pub fn rescore_documents(search_query: &SearchQuery, documents: Vec<Document>, r
         RelevanceFunction::BM25Plus => {
             // Use BM25Plus scorer
             let mut scorer = BM25PlusScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::OkapiBM25 => {
+            // Use Okapi BM25 scorer
+            let mut scorer = OkapiBM25Scorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::TFIDF => {
+            // Use TFIDF scorer
+            let mut scorer = TFIDFScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::Jaccard => {
+            // Use Jaccard scorer
+            let mut scorer = JaccardScorer::new();
+            scorer.initialize(&documents);
+            
+            // Score each document
+            let mut scored_docs: Vec<(f64, Document)> = documents.into_iter()
+                .map(|doc| {
+                    let score = scorer.score(&search_query.search_term.as_str(), &doc);
+                    (score, doc)
+                })
+                .collect();
+            
+            // Sort by score in descending order
+            scored_docs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Return documents in order of relevance
+            scored_docs.into_iter().map(|(_, doc)| doc).collect()
+        },
+        RelevanceFunction::QueryRatio => {
+            // Use QueryRatio scorer
+            let mut scorer = QueryRatioScorer::new();
             scorer.initialize(&documents);
             
             // Score each document

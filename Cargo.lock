@@ -5522,6 +5522,7 @@ dependencies = [
  "terraphim_config",
  "terraphim_persistence",
  "terraphim_rolegraph",
+ "terraphim_service",
  "terraphim_types",
  "thiserror",
  "tokio",

@@ -1,0 +1,94 @@
+{
+  "documents": [
+    {
+      "id": "doc1",
+      "url": "http://example.com/doc1",
+      "title": "Introduction to Rust Programming Language",
+      "body": "Rust is a systems programming language focused on safety, speed, and concurrency. It is designed to be memory-safe without using garbage collection. Rust is syntactically similar to C++, but provides better memory safety while maintaining high performance. It was originally designed by Graydon Hoare at Mozilla Research.",
+      "description": "Learn about the Rust programming language and its key features",
+      "tags": ["programming", "rust", "systems", "concurrency"],
+      "rank": null
+    },
+    {
+      "id": "doc2",
+      "url": "http://example.com/doc2",
+      "title": "Python Programming for Beginners",
+      "body": "Python is a high-level, interpreted programming language known for its readability and simplicity. It supports multiple programming paradigms, including procedural, object-oriented, and functional programming. Python is widely used in data science, web development, artificial intelligence, and automation.",
+      "description": "A beginner's guide to Python programming",
+      "tags": ["programming", "python", "beginners", "tutorial"],
+      "rank": null
+    },
+    {
+      "id": "doc3",
+      "url": "http://example.com/doc3",
+      "title": "JavaScript and Web Development",
+      "body": "JavaScript is a programming language used primarily for web development. It allows developers to create dynamic and interactive web pages. JavaScript runs on the client-side in web browsers, but can also be used on the server-side with Node.js. It is one of the core technologies of the World Wide Web, alongside HTML and CSS.",
+      "description": "Learn JavaScript for web development",
+      "tags": ["programming", "javascript", "web", "frontend"],
+      "rank": null
+    },
+    {
+      "id": "doc4",
+      "url": "http://example.com/doc4",
+      "title": "Data Science with Python",
+      "body": "Python has become the most popular programming language for data science. Libraries like NumPy, Pandas, Matplotlib, and Scikit-learn provide powerful tools for data manipulation, analysis, and visualization. Python's simplicity and extensive ecosystem make it ideal for data scientists and analysts.",
+      "description": "Using Python for data science and analysis",
+      "tags": ["programming", "python", "data science", "analysis"],
+      "rank": null
+    },
+    {
+      "id": "doc5",
+      "url": "http://example.com/doc5",
+      "title": "Rust for Systems Programming",
+      "body": "Rust is particularly well-suited for systems programming tasks that traditionally would be done in C or C++. Its ownership model ensures memory safety without garbage collection, making it ideal for performance-critical applications. Rust is used in operating systems, game engines, browsers, and other systems software.",
+      "description": "Using Rust for systems programming tasks",
+      "tags": ["programming", "rust", "systems", "performance"],
+      "rank": null
+    },
+    {
+      "id": "doc6",
+      "url": "http://example.com/doc6",
+      "title": "Web Development Frameworks",
+      "body": "Modern web development relies heavily on frameworks that simplify the creation of complex applications. Popular JavaScript frameworks include React, Angular, and Vue.js. For backend development, frameworks like Express.js (JavaScript), Django and Flask (Python), and Ruby on Rails are commonly used.",
+      "description": "Overview of popular web development frameworks",
+      "tags": ["programming", "web", "frameworks", "development"],
+      "rank": null
+    },
+    {
+      "id": "doc7",
+      "url": "http://example.com/doc7",
+      "title": "Machine Learning Basics",
+      "body": "Machine learning is a subset of artificial intelligence that focuses on building systems that learn from data. Common machine learning algorithms include linear regression, decision trees, support vector machines, and neural networks. Python is the most popular language for machine learning, with libraries like TensorFlow and PyTorch.",
+      "description": "Introduction to machine learning concepts",
+      "tags": ["machine learning", "AI", "data science", "algorithms"],
+      "rank": null
+    },
+    {
+      "id": "doc8",
+      "url": "http://example.com/doc8",
+      "title": "Database Systems Overview",
+      "body": "Database systems store and manage data for applications. Relational databases like MySQL, PostgreSQL, and SQLite use SQL for queries. NoSQL databases like MongoDB, Cassandra, and Redis offer different data models for specific use cases. Database choice depends on data structure, scale, and performance requirements.",
+      "description": "Introduction to different database systems",
+      "tags": ["databases", "SQL", "NoSQL", "data storage"],
+      "rank": null
+    },
+    {
+      "id": "doc9",
+      "url": "http://example.com/doc9",
+      "title": "Cloud Computing Services",
+      "body": "Cloud computing provides on-demand computing resources over the internet. Major cloud providers include AWS, Microsoft Azure, and Google Cloud. Services range from infrastructure (IaaS), platforms (PaaS), to software (SaaS). Cloud computing enables scalability, reliability, and cost efficiency for businesses of all sizes.",
+      "description": "Overview of cloud computing platforms and services",
+      "tags": ["cloud", "AWS", "Azure", "infrastructure"],
+      "rank": null
+    },
+    {
+      "id": "doc10",
+      "url": "http://example.com/doc10",
+      "title": "DevOps Practices and Tools",
+      "body": "DevOps combines software development (Dev) and IT operations (Ops) to shorten development cycles and deliver high-quality software continuously. Key practices include continuous integration, continuous delivery, infrastructure as code, and monitoring. Popular tools include Git, Jenkins, Docker, Kubernetes, and Terraform.",
+      "description": "Introduction to DevOps methodologies and tools",
+      "tags": ["devops", "CI/CD", "automation", "infrastructure"],
+      "rank": null
+    }
+  ]
+} 

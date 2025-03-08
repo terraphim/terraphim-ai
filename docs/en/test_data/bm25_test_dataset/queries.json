@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "id": "q1",
+      "query": "rust programming",
+      "expected_results": {
+        "title_scorer": ["doc1", "doc5"],
+        "bm25f": ["doc1", "doc5"],
+        "bm25plus": ["doc1", "doc5"]
+      },
+      "description": "Basic query for Rust programming documents"
+    },
+    {
+      "id": "q2",
+      "query": "python data science",
+      "expected_results": {
+        "title_scorer": ["doc4", "doc2"],
+        "bm25f": ["doc4", "doc7"],
+        "bm25plus": ["doc4", "doc7"]
+      },
+      "description": "Query for Python data science documents"
+    },
+    {
+      "id": "q3",
+      "query": "web development",
+      "expected_results": {
+        "title_scorer": ["doc3", "doc6"],
+        "bm25f": ["doc3", "doc6"],
+        "bm25plus": ["doc3", "doc6"]
+      },
+      "description": "Query for web development documents"
+    },
+    {
+      "id": "q4",
+      "query": "machine learning python",
+      "expected_results": {
+        "title_scorer": ["doc7", "doc4"],
+        "bm25f": ["doc7", "doc4"],
+        "bm25plus": ["doc7", "doc4"]
+      },
+      "description": "Query for machine learning with Python"
+    },
+    {
+      "id": "q5",
+      "query": "cloud infrastructure",
+      "expected_results": {
+        "title_scorer": ["doc9", "doc10"],
+        "bm25f": ["doc9", "doc10"],
+        "bm25plus": ["doc9", "doc10"]
+      },
+      "description": "Query for cloud infrastructure documents"
+    },
+    {
+      "id": "q6",
+      "query": "programming language",
+      "expected_results": {
+        "title_scorer": ["doc1", "doc2"],
+        "bm25f": ["doc1", "doc2", "doc3", "doc4"],
+        "bm25plus": ["doc1", "doc2", "doc3", "doc4"]
+      },
+      "description": "General query for programming languages"
+    },
+    {
+      "id": "q7",
+      "query": "database systems",
+      "expected_results": {
+        "title_scorer": ["doc8"],
+        "bm25f": ["doc8"],
+        "bm25plus": ["doc8"]
+      },
+      "description": "Query for database systems"
+    },
+    {
+      "id": "q8",
+      "query": "devops automation",
+      "expected_results": {
+        "title_scorer": ["doc10"],
+        "bm25f": ["doc10"],
+        "bm25plus": ["doc10"]
+      },
+      "description": "Query for DevOps automation"
+    },
+    {
+      "id": "q9",
+      "query": "javascript frameworks",
+      "expected_results": {
+        "title_scorer": ["doc6", "doc3"],
+        "bm25f": ["doc6", "doc3"],
+        "bm25plus": ["doc6", "doc3"]
+      },
+      "description": "Query for JavaScript frameworks"
+    },
+    {
+      "id": "q10",
+      "query": "systems performance",
+      "expected_results": {
+        "title_scorer": ["doc5"],
+        "bm25f": ["doc5", "doc1"],
+        "bm25plus": ["doc5", "doc1"]
+      },
+      "description": "Query for systems performance"
+    }
+  ]
+} 

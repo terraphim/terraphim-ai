@@ -1,0 +1,98 @@
+{
+  "description": "Test dataset for evaluating BM25F field weighting capabilities",
+  "documents": [
+    {
+      "id": "fw1",
+      "url": "https://example.com/fw1",
+      "title": "Machine Learning Fundamentals",
+      "body": "This document contains some information about machine learning but doesn't mention it frequently.",
+      "description": "A brief overview of machine learning concepts.",
+      "tags": ["ai", "data science"],
+      "rank": 0
+    },
+    {
+      "id": "fw2",
+      "url": "https://example.com/fw2",
+      "title": "Data Analysis Methods",
+      "body": "Machine learning techniques are essential for modern data analysis. Machine learning algorithms can process large datasets efficiently. Machine learning models can identify patterns that humans might miss. Machine learning is transforming how we approach data science problems.",
+      "description": "Overview of data analysis with some machine learning references.",
+      "tags": ["data science", "analysis"],
+      "rank": 0
+    },
+    {
+      "id": "fw3",
+      "url": "https://example.com/fw3",
+      "title": "Advanced Machine Learning Techniques",
+      "body": "This document discusses various data analysis methods.",
+      "description": "Deep dive into machine learning algorithms and their applications.",
+      "tags": ["machine learning", "advanced", "algorithms"],
+      "rank": 0
+    },
+    {
+      "id": "fw4",
+      "url": "https://example.com/fw4",
+      "title": "Introduction to Data Science",
+      "body": "Data science encompasses various techniques including statistics and programming.",
+      "description": "Machine learning is a key component of modern data science approaches.",
+      "tags": ["data science", "machine learning", "introduction"],
+      "rank": 0
+    },
+    {
+      "id": "fw5",
+      "url": "https://example.com/fw5",
+      "title": "Programming for Data Analysis",
+      "body": "Programming languages like Python are essential for data analysis and machine learning projects.",
+      "description": "Learn how to use programming for data analysis tasks.",
+      "tags": ["programming", "python", "machine learning"],
+      "rank": 0
+    }
+  ],
+  "queries": [
+    {
+      "id": "fwq1",
+      "query": "machine learning",
+      "description": "When 'title' field is weighted higher, fw3 should rank higher than fw2 despite fw2 having more occurrences in the body"
+    },
+    {
+      "id": "fwq2",
+      "query": "machine learning",
+      "description": "When 'body' field is weighted higher, fw2 should rank higher than fw3 due to more occurrences"
+    },
+    {
+      "id": "fwq3",
+      "query": "machine learning",
+      "description": "When 'description' field is weighted higher, fw3 should rank higher than others"
+    },
+    {
+      "id": "fwq4",
+      "query": "machine learning",
+      "description": "When 'tags' field is weighted higher, fw3 and fw4 should rank higher"
+    }
+  ],
+  "field_weights": {
+    "title_priority": {
+      "title": 3.0,
+      "body": 1.0,
+      "description": 1.0,
+      "tags": 1.0
+    },
+    "body_priority": {
+      "title": 1.0,
+      "body": 3.0,
+      "description": 1.0,
+      "tags": 1.0
+    },
+    "description_priority": {
+      "title": 1.0,
+      "body": 1.0,
+      "description": 3.0,
+      "tags": 1.0
+    },
+    "tags_priority": {
+      "title": 1.0,
+      "body": 1.0,
+      "description": 1.0,
+      "tags": 3.0
+    }
+  }
+} 

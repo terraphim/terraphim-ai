@@ -1,0 +1,78 @@
+{
+  "description": "Test dataset for evaluating BM25F and BM25+ handling of document length normalization",
+  "documents": [
+    {
+      "id": "dl1",
+      "url": "https://example.com/dl1",
+      "title": "Very Short Document on Machine Learning",
+      "body": "Machine learning is a field of artificial intelligence.",
+      "description": "Brief introduction to machine learning.",
+      "tags": ["machine learning", "ai", "short"],
+      "rank": 0
+    },
+    {
+      "id": "dl2",
+      "url": "https://example.com/dl2",
+      "title": "Short Document on Machine Learning",
+      "body": "Machine learning is a field of artificial intelligence that focuses on developing systems that can learn from data. Machine learning algorithms can improve through experience.",
+      "description": "Short overview of machine learning concepts.",
+      "tags": ["machine learning", "ai", "algorithms"],
+      "rank": 0
+    },
+    {
+      "id": "dl3",
+      "url": "https://example.com/dl3",
+      "title": "Medium-Length Document on Machine Learning",
+      "body": "Machine learning is a field of artificial intelligence that focuses on developing systems that can learn from data. Machine learning algorithms can improve through experience without being explicitly programmed. There are several types of machine learning approaches, including supervised learning, unsupervised learning, and reinforcement learning. Supervised learning involves training a model on labeled data, while unsupervised learning works with unlabeled data to find patterns.",
+      "description": "Comprehensive overview of machine learning concepts and approaches.",
+      "tags": ["machine learning", "ai", "algorithms", "supervised learning", "unsupervised learning"],
+      "rank": 0
+    },
+    {
+      "id": "dl4",
+      "url": "https://example.com/dl4",
+      "title": "Long Document on Machine Learning",
+      "body": "Machine learning is a field of artificial intelligence that focuses on developing systems that can learn from data. Machine learning algorithms can improve through experience without being explicitly programmed. There are several types of machine learning approaches, including supervised learning, unsupervised learning, and reinforcement learning. Supervised learning involves training a model on labeled data, while unsupervised learning works with unlabeled data to find patterns. Reinforcement learning involves an agent learning to make decisions by receiving rewards or penalties. Deep learning is a subset of machine learning that uses neural networks with multiple layers. These deep neural networks can automatically learn hierarchical representations of data. Convolutional neural networks are particularly effective for image processing tasks, while recurrent neural networks work well with sequential data like text or time series. Transfer learning allows models trained on one task to be adapted for another related task. Feature engineering involves selecting or transforming the most relevant variables for a machine learning model. Model evaluation techniques include cross-validation, precision-recall analysis, and ROC curves. Hyperparameter tuning is the process of optimizing the configuration of a machine learning algorithm.",
+      "description": "Detailed exploration of machine learning concepts, approaches, and techniques.",
+      "tags": ["machine learning", "ai", "algorithms", "supervised learning", "unsupervised learning", "reinforcement learning", "deep learning", "neural networks"],
+      "rank": 0
+    },
+    {
+      "id": "dl5",
+      "url": "https://example.com/dl5",
+      "title": "Very Long Document on Machine Learning",
+      "body": "Machine learning is a field of artificial intelligence that focuses on developing systems that can learn from data. Machine learning algorithms can improve through experience without being explicitly programmed. There are several types of machine learning approaches, including supervised learning, unsupervised learning, and reinforcement learning. Supervised learning involves training a model on labeled data, while unsupervised learning works with unlabeled data to find patterns. Reinforcement learning involves an agent learning to make decisions by receiving rewards or penalties. Deep learning is a subset of machine learning that uses neural networks with multiple layers. These deep neural networks can automatically learn hierarchical representations of data. Convolutional neural networks are particularly effective for image processing tasks, while recurrent neural networks work well with sequential data like text or time series. Transfer learning allows models trained on one task to be adapted for another related task. Feature engineering involves selecting or transforming the most relevant variables for a machine learning model. Model evaluation techniques include cross-validation, precision-recall analysis, and ROC curves. Hyperparameter tuning is the process of optimizing the configuration of a machine learning algorithm. Machine learning has applications in various domains including healthcare, finance, transportation, and entertainment. In healthcare, machine learning can help with disease diagnosis, treatment recommendation, and patient monitoring. In finance, it can be used for fraud detection, risk assessment, and algorithmic trading. Autonomous vehicles rely heavily on machine learning for perception, decision-making, and control. Recommendation systems use machine learning to suggest products, movies, or content based on user preferences and behavior. Natural language processing combines machine learning with linguistics to enable computers to understand, interpret, and generate human language. Computer vision applies machine learning to enable computers to derive meaningful information from digital images and videos. Anomaly detection uses machine learning to identify unusual patterns that do not conform to expected behavior. Time series forecasting employs machine learning to predict future values based on previously observed values. Ensemble methods combine multiple machine learning models to improve performance and robustness. Explainable AI focuses on making machine learning models more transparent and interpretable. Ethical considerations in machine learning include fairness, accountability, transparency, and privacy. Bias in machine learning models can lead to unfair or discriminatory outcomes. Federated learning allows models to be trained across multiple devices while keeping data localized. Edge computing brings machine learning capabilities closer to where data is generated. AutoML aims to automate the process of applying machine learning to real-world problems. The future of machine learning includes advances in self-supervised learning, meta-learning, and quantum machine learning.",
+      "description": "Comprehensive examination of machine learning concepts, approaches, techniques, applications, and ethical considerations.",
+      "tags": ["machine learning", "ai", "algorithms", "supervised learning", "unsupervised learning", "reinforcement learning", "deep learning", "neural networks", "applications", "ethics"],
+      "rank": 0
+    }
+  ],
+  "queries": [
+    {
+      "id": "dlq1",
+      "query": "machine learning artificial intelligence",
+      "description": "Test how document length affects ranking when term frequency is similar across documents"
+    },
+    {
+      "id": "dlq2",
+      "query": "supervised unsupervised reinforcement learning",
+      "description": "Test how document length affects ranking when terms appear only in longer documents"
+    },
+    {
+      "id": "dlq3",
+      "query": "neural networks deep learning",
+      "description": "Test how document length affects ranking when terms appear only in the longest documents"
+    }
+  ],
+  "expected_results": {
+    "dlq1": {
+      "notes": "All documents contain 'machine learning' and 'artificial intelligence', but with different document lengths. BM25F and BM25+ should normalize appropriately to prevent longer documents from dominating solely due to length."
+    },
+    "dlq2": {
+      "notes": "Only dl3, dl4, and dl5 contain these terms. The ranking should reflect term frequency balanced against document length."
+    },
+    "dlq3": {
+      "notes": "Only dl4 and dl5 contain these terms. Despite dl5 being much longer, the ranking should not be solely determined by document length."
+    }
+  }
+} 

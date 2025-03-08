@@ -8,7 +8,7 @@ use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
     Document, Index, IndexedDocument, RelevanceFunction, RoleName, SearchQuery, Thesaurus,
 };
-mod score;
+pub mod score;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
@@ -147,6 +147,25 @@ impl<'a> TerraphimService {
                 .await?;
 
         match role.relevance_function {
+            RelevanceFunction::TerraphimGraph => {
+                self.build_thesaurus(search_query).await?;
+                let thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
+                let scored_index_docs: Vec<IndexedDocument> = self
+                    .config_state
+                    .search_indexed_documents(search_query, &role)
+                    .await;
+
+                // Apply to ripgrep vector of document output
+                // I.e. use the ranking of thesaurus to rank the documents here
+                log::debug!("Ranking documents with thesaurus");
+                println!("Ranking documents with thesaurus");
+                let documents = index.get_documents(scored_index_docs);
+                let mut results = Vec::new();
+                for doc in documents {
+                    results.push(doc);
+                }
+                Ok(results)
+            },
             RelevanceFunction::TitleScorer => {
                 log::debug!("Searching haystack with title scorer");
 
@@ -164,23 +183,7 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document.clone());
                 }
                 Ok(docs_ranked)
-            }
-            RelevanceFunction::TerraphimGraph => {
-                self.build_thesaurus(search_query).await?;
-                let thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
-                let scored_index_docs: Vec<IndexedDocument> = self
-                    .config_state
-                    .search_indexed_documents(search_query, &role)
-                    .await;
-
-                // Apply to ripgrep vector of document output
-                // I.e. use the ranking of thesaurus to rank the documents here
-                log::debug!("Ranking documents with thesaurus");
-                println!("Ranking documents with thesaurus");
-                let documents = index.get_documents(scored_index_docs);
-
-                Ok(documents)
-            }
+            },
             RelevanceFunction::BM25F => {
                 log::debug!("Searching haystack with BM25F scorer");
 
@@ -197,7 +200,7 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document.clone());
                 }
                 Ok(docs_ranked)
-            }
+            },
             RelevanceFunction::BM25Plus => {
                 log::debug!("Searching haystack with BM25Plus scorer");
 
@@ -214,7 +217,75 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document.clone());
                 }
                 Ok(docs_ranked)
-            }
+            },
+            RelevanceFunction::OkapiBM25 => {
+                log::debug!("Searching haystack with OkapiBM25 scorer");
+
+                let documents = index.get_all_documents();
+
+                // Use OkapiBM25 scorer to rank documents
+                let documents = score::rescore_documents(search_query, documents, RelevanceFunction::OkapiBM25);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
+            },
+            RelevanceFunction::TFIDF => {
+                log::debug!("Searching haystack with TFIDF scorer");
+
+                let documents = index.get_all_documents();
+
+                // Use TFIDF scorer to rank documents
+                let documents = score::rescore_documents(search_query, documents, RelevanceFunction::TFIDF);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
+            },
+            RelevanceFunction::Jaccard => {
+                log::debug!("Searching haystack with Jaccard scorer");
+
+                let documents = index.get_all_documents();
+
+                // Use Jaccard scorer to rank documents
+                let documents = score::rescore_documents(search_query, documents, RelevanceFunction::Jaccard);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
+            },
+            RelevanceFunction::QueryRatio => {
+                log::debug!("Searching haystack with QueryRatio scorer");
+
+                let documents = index.get_all_documents();
+
+                // Use QueryRatio scorer to rank documents
+                let documents = score::rescore_documents(search_query, documents, RelevanceFunction::QueryRatio);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document.clone());
+                }
+                Ok(docs_ranked)
+            },
         }
     }
 

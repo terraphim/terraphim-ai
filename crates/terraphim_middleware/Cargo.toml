@@ -27,3 +27,6 @@ serde_json = "1.0.110"
 thiserror = "1.0.56"
 tokio = { version = "1.15.0", features = ["full"] }
 wasm-bindgen-futures = "0.4"
+
+[dev-dependencies]
+terraphim_service = { path = "../terraphim_service", version = "0.1.0" }

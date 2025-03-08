@@ -1,0 +1,100 @@
+{
+  "description": "Test dataset for evaluating BM25+ handling of rare terms",
+  "documents": [
+    {
+      "id": "rt1",
+      "url": "https://example.com/rt1",
+      "title": "Common Programming Languages",
+      "body": "Python, JavaScript, and Java are among the most popular programming languages used today. They are widely adopted in various domains.",
+      "description": "Overview of common programming languages.",
+      "tags": ["programming", "languages", "popular"],
+      "rank": 0
+    },
+    {
+      "id": "rt2",
+      "url": "https://example.com/rt2",
+      "title": "Rare Programming Languages",
+      "body": "Haskell, OCaml, and Erlang are functional programming languages with unique features. Prolog is a logic programming language. APL uses special symbols for operations.",
+      "description": "Overview of less common programming languages.",
+      "tags": ["programming", "languages", "rare"],
+      "rank": 0
+    },
+    {
+      "id": "rt3",
+      "url": "https://example.com/rt3",
+      "title": "Esoteric Programming Languages",
+      "body": "Brainfuck is a minimalist esoteric language. Whitespace uses only whitespace characters. INTERCAL was designed to be unlike any other language. Malbolge is deliberately difficult to use.",
+      "description": "Overview of extremely rare and unusual programming languages.",
+      "tags": ["programming", "languages", "esoteric"],
+      "rank": 0
+    },
+    {
+      "id": "rt4",
+      "url": "https://example.com/rt4",
+      "title": "Domain-Specific Languages",
+      "body": "SQL is used for database queries. R is specialized for statistics. MATLAB is used for mathematical computations. Verilog is used for hardware description.",
+      "description": "Languages designed for specific domains.",
+      "tags": ["programming", "languages", "domain-specific"],
+      "rank": 0
+    },
+    {
+      "id": "rt5",
+      "url": "https://example.com/rt5",
+      "title": "Ancient Programming Languages",
+      "body": "FORTRAN was developed in the 1950s. COBOL was designed for business use. LISP introduced many important concepts. ALGOL influenced many subsequent languages.",
+      "description": "Historical programming languages that shaped computing.",
+      "tags": ["programming", "languages", "historical"],
+      "rank": 0
+    }
+  ],
+  "queries": [
+    {
+      "id": "rtq1",
+      "query": "brainfuck whitespace intercal malbolge",
+      "description": "BM25+ should rank rt3 higher than BM25 would, as these are extremely rare terms"
+    },
+    {
+      "id": "rtq2",
+      "query": "haskell ocaml erlang prolog",
+      "description": "BM25+ should rank rt2 higher than BM25 would, as these are rare terms"
+    },
+    {
+      "id": "rtq3",
+      "query": "python javascript java",
+      "description": "BM25+ and BM25 should rank rt1 similarly, as these are common terms"
+    },
+    {
+      "id": "rtq4",
+      "query": "fortran cobol lisp algol",
+      "description": "BM25+ should rank rt5 higher than BM25 would, as these are relatively rare terms"
+    },
+    {
+      "id": "rtq5",
+      "query": "sql r matlab verilog",
+      "description": "BM25+ should rank rt4 higher than BM25 would, as these are domain-specific terms"
+    }
+  ],
+  "expected_results": {
+    "rtq1": {
+      "bm25": ["rt3", "rt2", "rt1"],
+      "bm25plus": ["rt3", "rt2", "rt1"]
+    },
+    "rtq2": {
+      "bm25": ["rt2", "rt3", "rt1"],
+      "bm25plus": ["rt2", "rt3", "rt1"]
+    },
+    "rtq3": {
+      "bm25": ["rt1", "rt2", "rt4"],
+      "bm25plus": ["rt1", "rt2", "rt4"]
+    },
+    "rtq4": {
+      "bm25": ["rt5", "rt3", "rt2"],
+      "bm25plus": ["rt5", "rt3", "rt2"]
+    },
+    "rtq5": {
+      "bm25": ["rt4", "rt2", "rt5"],
+      "bm25plus": ["rt4", "rt2", "rt5"]
+    }
+  },
+  "notes": "The key difference between BM25 and BM25+ should be in the score values, not necessarily in the ranking order. BM25+ should assign higher scores to documents containing rare terms compared to BM25."
+} 
