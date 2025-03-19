@@ -41,7 +41,7 @@ impl TerraphimResourceService {
 
     pub async fn list_resources(&self, request: ResourceListRequest) -> Result<ResourceList, McpError> {
         let search_query = SearchQuery {
-            search_term: NormalizedTermValue::new("".to_string()), // Empty search term to list all documents
+            search_term: NormalizedTermValue::new(".".to_string()), // Use "." to match all documents
             role: None,
             skip: request.cursor.as_ref().and_then(|c| c.parse::<usize>().ok()),
             limit: request.limit.map(|l| l as usize),
@@ -54,15 +54,19 @@ impl TerraphimResourceService {
         };
 
         let resources: Vec<Resource> = documents.into_iter()
-            .map(|doc| Resource {
-                uri: doc.url.clone(),
-                name: doc.title,
-                description: Some(doc.description.unwrap_or_default()),
-                metadata: ResourceMetadata {
-                    mime_type: Some("text/markdown".to_string()),
-                    scheme: "file".to_string(),
-                    version: None,
-                },
+            .map(|doc| {
+                // Extract just the filename from the URL
+                let filename = doc.url.split('/').last().unwrap_or(&doc.url);
+                Resource {
+                    uri: filename.to_string(),
+                    name: doc.title,
+                    description: Some(doc.description.unwrap_or_default()),
+                    metadata: ResourceMetadata {
+                        mime_type: Some("text/markdown".to_string()),
+                        scheme: "file".to_string(),
+                        version: None,
+                    },
+                }
             })
             .collect();
 
@@ -75,11 +79,12 @@ impl TerraphimResourceService {
     }
 
     pub async fn read_resource(&self, request: ResourceReadRequest) -> Result<ResourceReadResponse, McpError> {
+        // First, list all resources to find the one we want
         let search_query = SearchQuery {
-            search_term: NormalizedTermValue::new(request.uri.clone()),
+            search_term: NormalizedTermValue::new(".".to_string()),
             role: None,
             skip: None,
-            limit: Some(1),
+            limit: None,
         };
 
         let documents = {
@@ -88,7 +93,12 @@ impl TerraphimResourceService {
                 .map_err(|e| McpError::internal(format!("Failed to search documents: {}", e)))?
         };
 
-        let document = documents.first()
+        // Find the document with a matching filename (case-insensitive)
+        let document = documents.iter()
+            .find(|doc| {
+                let filename = doc.url.split('/').last().unwrap_or(&doc.url);
+                filename.to_lowercase() == request.uri.to_lowercase()
+            })
             .ok_or_else(|| McpError::not_found(format!("Resource not found: {}", request.uri)))?;
 
         let content = ResourceContent::Text(document.body.clone());

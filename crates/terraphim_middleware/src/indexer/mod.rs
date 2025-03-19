@@ -45,6 +45,8 @@ pub async fn search_haystacks(
     let search_query_role = search_query.role.unwrap_or(config.default_role);
     let needle = search_query.search_term.as_str();
 
+    println!("Searching haystacks with needle: {:?}", needle);
+
     let ripgrep = RipgrepIndexer::default();
     let mut full_index = Index::new();
 
@@ -54,17 +56,21 @@ pub async fn search_haystacks(
         .ok_or_else(|| Error::RoleNotFound(search_query_role.to_string()))?;
 
     for haystack in &role.haystacks {
-        log::info!("Finding documents in haystack: {:#?}", haystack);
+        println!("Searching haystack: {:?}", haystack);
 
         let index = match haystack.service {
             ServiceType::Ripgrep => {
                 // If the search term is empty, use "." to match all files
                 let search_pattern = if needle.is_empty() { "." } else { needle };
-                ripgrep.index(search_pattern, &haystack.path).await?
+                println!("Using search pattern: {:?}", search_pattern);
+                let result = ripgrep.index(search_pattern, &haystack.path).await?;
+                println!("Found {} documents", result.len());
+                result
             }
         };
 
         for indexed_doc in index.values() {
+            println!("Found document: {} ({})", indexed_doc.title, indexed_doc.url);
             if let Err(e) = config_state.add_to_roles(indexed_doc).await {
                 log::warn!(
                     "Failed to insert document `{}` ({}): {e:?}",
@@ -76,5 +82,6 @@ pub async fn search_haystacks(
 
         full_index.extend(index);
     }
+    println!("Total documents found: {}", full_index.len());
     Ok(full_index)
 }
