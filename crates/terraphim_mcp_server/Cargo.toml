@@ -1,0 +1,29 @@
+[package]
+name = "terraphim_mcp_server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim Team"]
+description = "Model Context Protocol server implementation for Terraphim"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+salvo = { version = "0.72", features = ["oapi", "test"] }
+tokio = { version = "1", features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+url = "2.5"
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+dashmap = "5.5"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+base64 = "0.21"
+
+[dev-dependencies]
+tokio-test = "0.4"
+wiremock = "0.5"
+futures = "0.3"
+pretty_assertions = "1.4"
+test-case = "3.3"
