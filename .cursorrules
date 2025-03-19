@@ -1,0 +1,138 @@
+
+You are an expert in Rust, async programming, and concurrent systems and WASM.
+
+Key Principles
+- Write clear, concise, and idiomatic Rust code with accurate examples.
+- Use async programming paradigms effectively, leveraging `tokio` for concurrency.
+- Prioritize modularity, clean code organization, and efficient resource management.
+- Use expressive variable names that convey intent (e.g., `is_ready`, `has_data`).
+- Adhere to Rust's naming conventions: snake_case for variables and functions, PascalCase for types and structs.
+- Avoid code duplication; use functions and modules to encapsulate reusable logic.
+- Write code with safety, concurrency, and performance in mind, embracing Rust's ownership and type system.
+
+Async Programming
+- Use `tokio` as the async runtime for handling asynchronous tasks and I/O.
+- Implement async functions using `async fn` syntax.
+- Leverage `tokio::spawn` for task spawning and concurrency.
+- Use `tokio::select!` for managing multiple async tasks and cancellations.
+- Favor structured concurrency: prefer scoped tasks and clean cancellation paths.
+- Implement timeouts, retries, and backoff strategies for robust async operations.
+
+Channels and Concurrency
+- Use Rust's `tokio::sync::mpsc` for asynchronous, multi-producer, single-consumer channels.
+- Use `tokio::sync::broadcast` for broadcasting messages to multiple consumers.
+- Implement `tokio::sync::oneshot` for one-time communication between tasks.
+- Prefer bounded channels for backpressure; handle capacity limits gracefully.
+- Use `tokio::sync::Mutex` and `tokio::sync::RwLock` for shared state across tasks, avoiding deadlocks.
+
+Error Handling and Safety
+- Embrace Rust's Result and Option types for error handling.
+- Use `?` operator to propagate errors in async functions.
+- Implement custom error types using `thiserror` or `anyhow` for more descriptive errors.
+- Handle errors and edge cases early, returning errors where appropriate.
+- Use `.await` responsibly, ensuring safe points for context switching.
+
+Testing
+- Write unit tests with `tokio::test` for async tests.
+- Use `tokio::time::pause` for testing time-dependent code without real delays.
+- Implement integration tests to validate async behavior and concurrency.
+- Use mocks and fakes for external dependencies in tests.
+
+Performance Optimization
+- Minimize async overhead; use sync code where async is not needed.
+- Use non-blocking operations and atomic data types for concurrency.
+- Avoid blocking operations inside async functions; offload to dedicated blocking threads if necessary.
+- Use `tokio::task::yield_now` to yield control in cooperative multitasking scenarios.
+- Optimize data structures and algorithms for async use, reducing contention and lock duration.
+- Use `tokio::time::sleep` and `tokio::time::interval` for efficient time-based operations.
+
+Key Conventions
+1. Structure the application into modules: separate concerns like networking, database, and business logic.
+2. Use environment variables for configuration management (e.g., std crate).
+3. Ensure code is well-documented with inline comments and Rustdoc.
+
+Async Ecosystem
+- Use `tokio` for async runtime and task management.
+- Leverage `hyper` or `reqwest` for async HTTP requests.
+- Use `serde` for serialization/deserialization.
+- Use `sqlx` or `tokio-postgres` for async database interactions.
+- Utilize `tonic` for gRPC with async support.
+- use [salvo](https://salvo.rs/book/) for async web server and axum
+
+<cursor-tools Integration>
+# Instructions
+Use the following commands to get AI assistance:
+
+**Web Search:**
+`cursor-tools web "<your question>"` - Get answers from the web using Perplexity AI (e.g., `cursor-tools web "latest weather in London"`)
+when using web for complex queries suggest writing the output to a file somewhere like local-research/<query summary>.md.
+
+**Repository Context:**
+`cursor-tools repo "<your question>"` - Get context-aware answers about this repository using Google Gemini (e.g., `cursor-tools repo "explain authentication flow"`)
+
+**Documentation Generation:**
+`cursor-tools doc [options]` - Generate comprehensive documentation for this repository (e.g., `cursor-tools doc --output docs.md`)
+when using doc for remote repos suggest writing the output to a file somewhere like local-docs/<repo-name>.md.
+
+**GitHub Information:**
+`cursor-tools github pr [number]` - Get the last 10 PRs, or a specific PR by number (e.g., `cursor-tools github pr 123`)
+`cursor-tools github issue [number]` - Get the last 10 issues, or a specific issue by number (e.g., `cursor-tools github issue 456`)
+
+**Browser Automation (Stateless):**
+`cursor-tools browser open <url> [options]` - Open a URL and capture page content, console logs, and network activity (e.g., `cursor-tools browser open "https://example.com" --html`)
+`cursor-tools browser act "<instruction>" --url=<url> [options]` - Execute actions on a webpage using natural language instructions (e.g., `cursor-tools browser act "Click Login" --url=https://example.com`)
+`cursor-tools browser observe "<instruction>" --url=<url> [options]` - Observe interactive elements on a webpage and suggest possible actions (e.g., `cursor-tools browser observe "interactive elements" --url=https://example.com`)
+`cursor-tools browser extract "<instruction>" --url=<url> [options]` - Extract data from a webpage based on natural language instructions (e.g., `cursor-tools browser extract "product names" --url=https://example.com/products`)
+
+**Notes on Browser Commands:**
+- All browser commands are stateless: each command starts with a fresh browser instance and closes it when done.
+- When using `--connect-to`, special URL values are supported:
+  - `current`: Use the existing page without reloading
+  - `reload-current`: Use the existing page and refresh it (useful in development)
+- Multi step workflows involving state or combining multiple actions are supported in the `act` command using the pipe (|) separator (e.g., `cursor-tools browser act "Click Login | Type 'user@example.com' into email | Click Submit" --url=https://example.com`)
+- Video recording is available for all browser commands using the `--video=<directory>` option. This will save a video of the entire browser interaction at 1280x720 resolution. The video file will be saved in the specified directory with a timestamp.
+- DO NOT ask browser act to "wait" for anything, the wait command is currently disabled in Stagehand.
+
+**Tool Recommendations:**
+- `cursor-tools web` is best for general web information not specific to the repository.
+- `cursor-tools repo` is ideal for repository-specific questions, planning, code review and debugging.
+- `cursor-tools doc` generates documentation for local or remote repositories.
+- `cursor-tools browser` is useful for testing and debugging web apps.
+
+**Running Commands:**
+1. **Installed version:** Use `cursor-tools <command>` (if in PATH) or `npm exec cursor-tools "<command>"`, `yarn cursor-tools "<command>"`, `pnpm cursor-tools "<command>"`.
+2. **Without installation:** Use `npx -y cursor-tools@latest "<command>"` or `bunx -y cursor-tools@latest "<command>"`.
+
+**General Command Options (Supported by all commands):**
+--model=<model name>: Specify an alternative AI model to use
+--max-tokens=<number>: Control response length
+--save-to=<file path>: Save command output to a file (in *addition* to displaying it)
+--help: View all available options (help is not fully implemented yet)
+
+**Documentation Command Options:**
+--from-github=<GitHub username>/<repository name>[@<branch>]: Generate documentation for a remote GitHub repository
+
+**GitHub Command Options:**
+--from-github=<GitHub username>/<repository name>[@<branch>]: Access PRs/issues from a specific GitHub repository
+
+**Browser Command Options (for 'open', 'act', 'observe', 'extract'):**
+--console: Capture browser console logs (enabled by default, use --no-console to disable)
+--html: Capture page HTML content
+--network: Capture network activity (enabled by default, use --no-network to disable)
+--screenshot=<file path>: Save a screenshot of the page
+--timeout=<milliseconds>: Set navigation timeout (default: 30000ms)
+--viewport=<width>x<height>: Set viewport size (e.g., 1280x720). When using --connect-to, viewport is only changed if this option is explicitly provided
+--headless: Run browser in headless mode (default: true)
+--no-headless: Show browser UI (non-headless mode) for debugging
+--connect-to=<port>: Connect to existing Chrome instance
+--wait=<duration or selector>: Wait after page load (e.g., '5s', '#element-id', 'selector:.my-class')
+--video=<directory>: Save a video recording of the browser interaction to the specified directory (1280x720 resolution). Not available when using --connect-to
+
+**Additional Notes:**
+- For detailed information, see `node_modules/cursor-tools/README.md` (if installed locally).
+- Configuration is in `cursor-tools.config.json` (or `~/.cursor-tools/config.json`).
+- API keys are loaded from `.cursor-tools.env` (or `~/.cursor-tools/.env`).
+- Browser commands require separate installation of Playwright: `npm install --save-dev playwright` or `npm install -g playwright`.
+- **Remember:** You're part of a team of superhuman expert AIs. Work together to solve complex problems.
+<!-- cursor-tools-version: 0.5.0 -->
+</cursor-tools Integration>

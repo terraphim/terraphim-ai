@@ -1,23 +1,178 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use chrono::DateTime;
 use thiserror::Error;
 use url::Url;
-use base64;
+use base64::Engine;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Resource {
+    pub uri: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub metadata: ResourceMetadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceMetadata {
+    pub mime_type: Option<String>,
+    pub scheme: String,
+    pub version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceCapabilities {
+    pub supports_subscriptions: bool,
+    pub supports_templates: bool,
+    pub supports_content_types: Vec<String>,
+    pub max_subscriptions: Option<u32>,
+    pub max_subscription_duration: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceTemplate {
+    pub fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceFilter {
+    pub mime_type: Option<String>,
+    pub scheme: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceList {
+    pub resources: Vec<Resource>,
+    pub total: u32,
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceListRequest {
+    pub filter: Option<ResourceFilter>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceReadRequest {
+    pub uri: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceReadResponse {
+    pub content: ResourceContent,
+}
+
+#[derive(Debug, Clone)]
+pub enum ResourceContent {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+#[derive(Debug)]
 pub enum McpError {
-    #[error("Invalid URI: {0}")]
-    InvalidUri(String),
-    #[error("Resource not found: {0}")]
-    NotFound(String),
-    #[error("Internal error: {0}")]
     Internal(String),
-    #[error("Access denied: {0}")]
-    AccessDenied(String),
-    #[error("Invalid MIME type: {0}")]
-    InvalidMimeType(String),
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
+    NotFound(String),
+    BadRequest(String),
+}
+
+impl McpError {
+    pub fn internal(message: impl Into<String>) -> Self {
+        McpError::Internal(message.into())
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        McpError::NotFound(message.into())
+    }
+
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        McpError::BadRequest(message.into())
+    }
+}
+
+impl std::fmt::Display for McpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            McpError::Internal(msg) => write!(f, "Internal error: {}", msg),
+            McpError::NotFound(msg) => write!(f, "Not found: {}", msg),
+            McpError::BadRequest(msg) => write!(f, "Bad request: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for McpError {}
+
+impl serde::Serialize for ResourceContent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        match self {
+            ResourceContent::Text(text) => {
+                let mut state = serializer.serialize_struct("ResourceContent", 2)?;
+                state.serialize_field("type", "text")?;
+                state.serialize_field("text", text)?;
+                state.end()
+            }
+            ResourceContent::Binary(data) => {
+                let mut state = serializer.serialize_struct("ResourceContent", 2)?;
+                state.serialize_field("type", "binary")?;
+                state.serialize_field("data", &base64::engine::general_purpose::STANDARD.encode(data))?;
+                state.end()
+            }
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceContent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "lowercase")]
+        enum ContentType {
+            Text,
+            Binary,
+        }
+
+        struct ResourceContentVisitor;
+
+        impl<'de> Visitor<'de> for ResourceContentVisitor {
+            type Value = ResourceContent;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a ResourceContent object")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<ResourceContent, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let content_type: ContentType = map.next_value()?;
+                match content_type {
+                    ContentType::Text => {
+                        let text: String = map.next_value()?;
+                        Ok(ResourceContent::Text(text))
+                    }
+                    ContentType::Binary => {
+                        let encoded: String = map.next_value()?;
+                        let data = base64::engine::general_purpose::STANDARD
+                            .decode(encoded)
+                            .map_err(de::Error::custom)?;
+                        Ok(ResourceContent::Binary(data))
+                    }
+                }
+            }
+        }
+
+        const FIELDS: &[&str] = &["type", "text", "data"];
+        deserializer.deserialize_struct("ResourceContent", FIELDS, ResourceContentVisitor)
+    }
 }
 
 /// Represents a unique identifier for a resource
@@ -29,8 +184,8 @@ pub struct ResourceUri {
 
 impl ResourceUri {
     pub fn new(scheme: &str, path: &str) -> Result<Self, McpError> {
-        if !["https", "file", "git"].contains(&scheme) {
-            return Err(McpError::InvalidUri(format!("Unsupported scheme: {}", scheme)));
+        if !["https", "file", "git", "terraphim"].contains(&scheme) {
+            return Err(McpError::internal(format!("Unsupported scheme: {}", scheme)));
         }
 
         Ok(Self {
@@ -51,80 +206,6 @@ impl ResourceUri {
     }
 }
 
-/// Represents a resource in the MCP system
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Resource {
-    pub uri: ResourceUri,
-    pub content: String,
-    pub metadata: ResourceMetadata,
-    pub mime_type: Option<String>,
-    pub name: String,
-}
-
-/// Represents the content of a resource
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ResourceContent {
-    Text {
-        uri: ResourceUri,
-        mime_type: String,
-        text: String,
-    },
-    Binary {
-        uri: ResourceUri,
-        mime_type: String,
-        #[serde(serialize_with = "serialize_base64", deserialize_with = "deserialize_base64")]
-        blob: Vec<u8>,
-    },
-}
-
-fn serialize_base64<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let encoded = base64::encode(bytes);
-    serializer.serialize_str(&encoded)
-}
-
-fn deserialize_base64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let encoded = String::deserialize(deserializer)?;
-    base64::decode(encoded).map_err(serde::de::Error::custom)
-}
-
-/// Represents server capabilities for resources
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceCapabilities {
-    pub subscribe: bool,
-    pub list_changed: bool,
-}
-
-/// Represents a resource template
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceTemplate {
-    pub name: String,
-    pub description: String,
-    pub schema: String,
-    pub uri_template: String,
-    pub mime_type: Option<String>,
-}
-
-/// Represents a list of resources with pagination
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceList {
-    pub resources: Vec<Resource>,
-    pub next_cursor: Option<String>,
-}
-
-/// Represents a resource subscription
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceSubscription {
-    pub uri: ResourceUri,
-    pub subscriber_id: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-}
-
 /// Represents a resource change notification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceChangeNotification {
@@ -140,58 +221,23 @@ pub enum ChangeType {
     Deleted,
 }
 
-/// Represents a resource read request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceReadRequest {
-    pub uri: ResourceUri,
-    pub version: Option<String>,
-}
-
-/// Represents a resource read response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceReadResponse {
-    pub resource: Resource,
-    pub contents: Vec<ResourceContent>,
-    pub version: Option<String>,
-}
-
-/// Represents a resource list request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceListRequest {
-    pub filter: Option<ResourceFilter>,
-    pub cursor: Option<String>,
-    pub limit: Option<usize>,
+pub struct ResourceError {
+    pub code: u16,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceFilter {
-    pub scheme: Option<String>,
-    pub tags: Option<Vec<String>>,
-    pub mime_type: Option<String>,
-    pub name_pattern: Option<String>,
-}
-
-/// Represents a resource subscription request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceSubscribeRequest {
-    pub uri: ResourceUri,
-    pub subscriber_id: String,
-}
-
-/// Represents a resource unsubscribe request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceUnsubscribeRequest {
-    pub uri: ResourceUri,
-    pub subscriber_id: String,
+pub struct SubscriptionRequest {
+    pub resource_uri: String,
+    pub callback_url: String,
+    pub duration: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceMetadata {
-    pub title: String,
-    pub description: Option<String>,
-    pub tags: Vec<String>,
-    pub created_at: String,
-    pub updated_at: String,
+pub struct SubscriptionResponse {
+    pub subscription_id: String,
+    pub expiration: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,16 +259,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resource_uri() {
-        let uri = ResourceUri::new("file", "/path/to/resource").unwrap();
-        assert_eq!(uri.scheme, "file");
-        assert_eq!(uri.path, "/path/to/resource");
-        assert_eq!(uri.to_string(), "file:///path/to/resource");
+    fn test_resource_uri_validation() {
+        let result = ResourceUri::new("invalid", "path");
+        assert!(matches!(result, Err(McpError::Internal(_))));
+        
+        let result = ResourceUri::new("https", "path");
+        assert!(matches!(result, Ok(_)));
+        
+        let result = ResourceUri::new("file", "path");
+        assert!(matches!(result, Ok(_)));
+        
+        let result = ResourceUri::new("git", "path");
+        assert!(matches!(result, Ok(_)));
+        
+        let result = ResourceUri::new("terraphim", "path");
+        assert!(matches!(result, Ok(_)));
     }
 
     #[test]
-    fn test_resource_uri_invalid_scheme() {
-        let result = ResourceUri::new("invalid", "/path");
-        assert!(matches!(result, Err(McpError::InvalidUri(_))));
+    fn test_resource_uri_from_url() {
+        let url = Url::parse("https://example.com/path").unwrap();
+        let uri = ResourceUri::from_url(&url).unwrap();
+        assert_eq!(uri.scheme, "https");
+        assert_eq!(uri.path, "/path");
+    }
+
+    #[test]
+    fn test_resource_uri_to_string() {
+        let uri = ResourceUri {
+            scheme: "https".to_string(),
+            path: "/path".to_string(),
+        };
+        assert_eq!(uri.to_string(), "https:///path");
     }
 } 

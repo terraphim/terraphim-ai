@@ -1,0 +1,22 @@
+version: "1.0"
+name: "terraphim-mcp-test"
+description: "Test configuration for Terraphim MCP server"
+
+paths:
+  documents:
+    - path: "tests/test_data/sample_docs"
+      pattern: "*.md"
+      recursive: false
+
+roles:
+  - name: "test"
+    description: "Test role for MCP server"
+    paths:
+      - "tests/test_data/sample_docs"
+
+settings:
+  server:
+    host: "127.0.0.1"
+    port: 5800
+  logging:
+    level: "debug" 

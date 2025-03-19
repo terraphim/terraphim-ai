@@ -4,213 +4,297 @@ use salvo::test::TestClient;
 use salvo::http::StatusCode;
 use serde_json::json;
 use futures;
+use std::path::PathBuf;
+use tokio::net::TcpListener;
+use terraphim_config::{ConfigBuilder, Role, ServiceType, Haystack};
+use terraphim_types::{RelevanceFunction, SearchQuery, NormalizedTermValue};
+use crate::service::TerraphimResourceService;
+use crate::handlers::resources::ResourceHandlers;
+use crate::schema::{Resource, ResourceUri, ResourceList, ResourceCapabilities, ResourceMetadata, McpError};
 
-use crate::service::InMemoryResourceService;
-use crate::handlers::resources::{
-    ResourceHandlers,
-    list_resources,
-    read_resource,
-    subscribe,
-    unsubscribe,
-    get_capabilities,
-    list_templates
-};
+use salvo::conn::TcpAcceptor;
+use reqwest::Client;
 
-// Middleware for injecting handlers
-struct InjectHandlersMiddleware {
-    handlers: ResourceHandlers,
+pub struct TestServer {
+    pub addr: String,
+    pub service: Arc<TerraphimResourceService>,
 }
 
-#[async_trait]
-impl Handler for InjectHandlersMiddleware {
-    async fn handle(&self, req: &mut Request, depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
-        depot.inject(self.handlers.clone());
-        ctrl.call_next(req, depot, res).await;
+impl TestServer {
+    pub async fn new() -> Self {
+        let mut config = ConfigBuilder::new()
+            .add_role(
+                "Default",
+                Role {
+                    shortname: Some("Default".to_string()),
+                    name: "Default".into(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    theme: "spacelab".to_string(),
+                    kg: None,
+                    haystacks: vec![Haystack {
+                        path: PathBuf::from("tests/test_data/sample_docs"),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: Default::default(),
+                },
+            )
+            .default_role("Default")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let service = Arc::new(TerraphimResourceService::new(config).await.unwrap());
+        
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        
+        let handlers = ResourceHandlers::new(service.clone());
+        let router = handlers.router();
+        
+        let acceptor = TcpAcceptor::new(listener);
+        let server = Server::new(acceptor);
+        
+        tokio::spawn(async move {
+            server.serve(router).await;
+        });
+        
+        Self { addr, service }
     }
-}
-
-async fn setup_test_server() -> Service {
-    // Create service and handlers
-    let service = Arc::new(InMemoryResourceService::new());
-    let handlers = ResourceHandlers::new(service);
-    
-    // Create middleware
-    let inject_middleware = InjectHandlersMiddleware { handlers };
-    
-    // Create router with middleware
-    let router = Router::new()
-        .hoop(inject_middleware);
-    
-    // Add v1 API routes
-    let v1_router = Router::with_path("v1")
-        .push(
-            Router::with_path("resources")
-                .get(list_resources)
-                .post(read_resource)
-                .push(
-                    Router::with_path("subscribe")
-                        .post(subscribe)
-                        .delete(unsubscribe),
-                )
-                .push(
-                    Router::with_path("templates")
-                        .get(list_templates),
-                ),
-        )
-        .push(Router::with_path("capabilities").get(get_capabilities));
-
-    // Build the router
-    let router = router.push(v1_router);
-    
-    Service::new(router)
 }
 
 #[tokio::test]
 async fn test_list_resources() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
+    let client = Client::new();
     
-    let resp = TestClient::get("http://127.0.0.1/v1/resources")
-        .send(&service)
-        .await;
+    let response = client
+        .get(format!("http://{}/v1/resources", server.addr))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
+    assert_eq!(response.status(), 200);
+    let resources: ResourceList = response.json().await.unwrap();
+    assert!(!resources.resources.is_empty());
+    assert_eq!(resources.resources.len(), 2);
 }
 
 #[tokio::test]
 async fn test_read_resource() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
+    let client = Client::new();
     
-    let resp = TestClient::post("http://127.0.0.1/v1/resources")
-        .json(&json!({
-            "uri": {
-                "scheme": "file",
-                "path": "/test/resource.txt"
-            },
-            "version": null
-        }))
-        .send(&service)
-        .await;
+    // First get the list of resources
+    let response = client
+        .get(format!("http://{}/v1/resources", server.addr))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
-}
-
-#[tokio::test]
-async fn test_subscribe() {
-    let service = setup_test_server().await;
+    let resources: ResourceList = response.json().await.unwrap();
+    let first_uri = &resources.resources[0].uri;
     
-    let resp = TestClient::post("http://127.0.0.1/v1/resources/subscribe")
-        .json(&json!({
-            "uri": {
-                "scheme": "file",
-                "path": "/test/resource.txt"
-            },
-            "subscriber_id": "test_subscriber"
-        }))
-        .send(&service)
-        .await;
+    // Then read the specific resource
+    let response = client
+        .get(format!("http://{}/v1/resources/{}", server.addr, first_uri))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
-}
-
-#[tokio::test]
-async fn test_unsubscribe() {
-    let service = setup_test_server().await;
-    
-    let resp = TestClient::delete("http://127.0.0.1/v1/resources/subscribe")
-        .json(&json!({
-            "uri": {
-                "scheme": "file",
-                "path": "/test/resource.txt"
-            },
-            "subscriber_id": "test_subscriber"
-        }))
-        .send(&service)
-        .await;
-    
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
-}
-
-#[tokio::test]
-async fn test_list_templates() {
-    let service = setup_test_server().await;
-    
-    let resp = TestClient::get("http://127.0.0.1/v1/resources/templates")
-        .send(&service)
-        .await;
-    
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
+    assert_eq!(response.status(), 200);
+    let resource: Resource = response.json().await.unwrap();
+    assert_eq!(resource.uri, *first_uri);
 }
 
 #[tokio::test]
 async fn test_get_capabilities() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
+    let client = Client::new();
     
-    let resp = TestClient::get("http://127.0.0.1/v1/capabilities")
-        .send(&service)
-        .await;
+    let response = client
+        .get(format!("http://{}/v1/capabilities", server.addr))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
+    assert_eq!(response.status(), 200);
+    let capabilities: ResourceCapabilities = response.json().await.unwrap();
+    assert!(capabilities.supports_subscriptions);
+    assert!(capabilities.supports_templates);
+    assert!(capabilities.supports_content_types.contains(&"text/markdown".to_string()));
+}
+
+#[tokio::test]
+async fn test_list_templates() {
+    let server = TestServer::new().await;
+    let client = Client::new();
+    
+    let response = client
+        .get(format!("http://{}/v1/templates", server.addr))
+        .send()
+        .await
+        .unwrap();
+    
+    assert_eq!(response.status(), 200);
+    let templates = response.json::<Vec<serde_json::Value>>().await.unwrap();
+    assert!(!templates.is_empty());
+    assert!(templates[0]["fields"].as_array().unwrap().contains(&json!("uri")));
 }
 
 #[tokio::test]
 async fn test_error_responses() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
+    let client = Client::new();
     
     // Test invalid resource read
-    let resp = TestClient::post("http://127.0.0.1/v1/resources")
-        .json(&json!({
-            "uri": {
-                "scheme": "invalid",
-                "path": "/nonexistent"
-            },
-            "version": null
-        }))
-        .send(&service)
-        .await;
+    let response = client
+        .get(format!("http://{}/v1/resources/nonexistent.md", server.addr))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::NOT_FOUND));
+    assert_eq!(response.status(), 404);
 }
 
 #[tokio::test]
 async fn test_pagination() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
+    let client = Client::new();
     
-    let resp = TestClient::get("http://127.0.0.1/v1/resources?limit=10&offset=0")
-        .send(&service)
-        .await;
+    let response = client
+        .get(format!("http://{}/v1/resources?limit=1", server.addr))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
+    assert_eq!(response.status(), 200);
+    let resources: ResourceList = response.json().await.unwrap();
+    assert_eq!(resources.resources.len(), 1);
 }
 
 #[tokio::test]
 async fn test_resource_filtering() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
+    let client = Client::new();
     
-    let resp = TestClient::get("http://127.0.0.1/v1/resources?scheme=file")
-        .send(&service)
-        .await;
+    let response = client
+        .get(format!("http://{}/v1/resources?mime_type=text/markdown", server.addr))
+        .send()
+        .await
+        .unwrap();
     
-    assert_eq!(resp.status_code, Some(StatusCode::OK));
+    assert_eq!(response.status(), 200);
+    let resources: ResourceList = response.json().await.unwrap();
+    assert!(resources.resources.iter().all(|r| r.metadata.mime_type.as_deref() == Some("text/markdown")));
 }
 
 #[tokio::test]
 async fn test_concurrent_requests() {
-    let service = setup_test_server().await;
+    let server = TestServer::new().await;
     
     let future1 = async {
-        TestClient::get("http://127.0.0.1/v1/resources")
-            .send(&service)
+        reqwest::get(format!("http://{}/v1/resources", server.addr))
             .await
+            .unwrap()
+            .status()
     };
     
     let future2 = async {
-        TestClient::get("http://127.0.0.1/v1/capabilities")
-            .send(&service)
+        reqwest::get(format!("http://{}/v1/capabilities", server.addr))
             .await
+            .unwrap()
+            .status()
     };
     
-    let (resp1, resp2) = futures::join!(future1, future2);
+    let (status1, status2) = futures::join!(future1, future2);
     
-    assert_eq!(resp1.status_code, Some(StatusCode::OK));
-    assert_eq!(resp2.status_code, Some(StatusCode::OK));
+    assert_eq!(status1, 200);
+    assert_eq!(status2, 200);
+}
+
+#[tokio::test]
+async fn test_mcp_haystack_integration() {
+    let server = TestServer::new().await;
+    let client = Client::new();
+    
+    // Test 1: List resources
+    let response = client
+        .get(format!("http://{}/v1/resources", server.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let resources: ResourceList = response.json().await.unwrap();
+    assert!(!resources.resources.is_empty());
+    assert_eq!(resources.resources.len(), 2);
+
+    // Test 2: Read specific resource
+    let response = client
+        .get(format!("http://{}/v1/resources/test1.md", server.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let resource: Resource = response.json().await.unwrap();
+    assert_eq!(resource.uri, "test1.md");
+
+    // Test 3: Filter resources by MIME type
+    let response = client
+        .get(format!("http://{}/v1/resources?mime_type=text/markdown", server.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let resources: ResourceList = response.json().await.unwrap();
+    assert!(resources.resources.iter().all(|r| r.metadata.mime_type.as_deref() == Some("text/markdown")));
+
+    // Test 4: Pagination
+    let response = client
+        .get(format!("http://{}/v1/resources?limit=1", server.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let resources: ResourceList = response.json().await.unwrap();
+    assert_eq!(resources.resources.len(), 1);
+
+    // Test 5: Get capabilities
+    let response = client
+        .get(format!("http://{}/v1/capabilities", server.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let capabilities: ResourceCapabilities = response.json().await.unwrap();
+    assert!(capabilities.supports_subscriptions);
+    assert!(capabilities.supports_templates);
+    assert!(capabilities.supports_content_types.contains(&"text/markdown".to_string()));
+
+    // Test 6: List templates
+    let response = client
+        .get(format!("http://{}/v1/templates", server.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let templates = response.json::<Vec<serde_json::Value>>().await.unwrap();
+    assert!(!templates.is_empty());
+    assert!(templates[0]["fields"].as_array().unwrap().contains(&json!("uri")));
+
+    // Test 7: Create resource (should fail as it's read-only)
+    let response = client
+        .post(format!("http://{}/v1/resources", server.addr))
+        .json(&json!({
+            "uri": "new.md",
+            "name": "New Resource",
+            "description": "Test resource",
+            "metadata": {
+                "mime_type": "text/markdown",
+                "scheme": "file"
+            }
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
 }

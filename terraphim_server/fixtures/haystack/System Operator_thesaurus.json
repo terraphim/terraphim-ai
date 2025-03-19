@@ -1,102 +1,7 @@
 {
   "name": "system operator",
   "data": {
-    "service life extension program": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "hello terraphim": {
-      "id": 11,
-      "nterm": "testconcept",
-      "url": null
-    },
-    "replace a legacy system": {
-      "id": 7,
-      "nterm": "transition",
-      "url": null
-    },
-    "terraphim hello": {
-      "id": 11,
-      "nterm": "testconcept",
-      "url": null
-    },
-    "monitor system performance": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "testconcept": {
-      "id": 11,
-      "nterm": "testconcept",
-      "url": null
-    },
     "sustain service": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "identify analyze operational problems": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "system scheduled maintenance": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "slep": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "maintaining operational capability": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "operation of system": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "system maintenance": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "maintenance management": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "maintenance actions": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "preventive maintenance": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "system maintains key functions": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "maintenance": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "analyze operational problems": {
-      "id": 10,
-      "nterm": "operation",
-      "url": null
-    },
-    "monitor the services": {
       "id": 10,
       "nterm": "operation",
       "url": null
@@ -106,17 +11,7 @@
       "nterm": "operation",
       "url": null
     },
-    "maintenance activities": {
-      "id": 8,
-      "nterm": "maintenance",
-      "url": null
-    },
-    "transition": {
-      "id": 7,
-      "nterm": "transition",
-      "url": null
-    },
-    "operate the system": {
+    "identify analyze operational problems": {
       "id": 10,
       "nterm": "operation",
       "url": null
@@ -126,12 +21,17 @@
       "nterm": "operation",
       "url": null
     },
+    "replace a legacy system": {
+      "id": 7,
+      "nterm": "transition",
+      "url": null
+    },
     "corrective maintenance": {
       "id": 8,
       "nterm": "maintenance",
       "url": null
     },
-    "manage the migration between systems": {
+    "maintenance actions": {
       "id": 10,
       "nterm": "operation",
       "url": null
@@ -141,12 +41,112 @@
       "nterm": "transition",
       "url": null
     },
+    "monitor the services": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "maintenance management": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "service life extension program": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "operation of system": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "maintaining operational capability": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "operate the system": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "analyze operational problems": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "testconcept": {
+      "id": 11,
+      "nterm": "testconcept",
+      "url": null
+    },
     "maintenance process": {
       "id": 8,
       "nterm": "maintenance",
       "url": null
     },
+    "slep": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "maintenance activities": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "preventive maintenance": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "maintenance": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "system maintenance": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "manage the migration between systems": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "hello terraphim": {
+      "id": 11,
+      "nterm": "testconcept",
+      "url": null
+    },
+    "system scheduled maintenance": {
+      "id": 8,
+      "nterm": "maintenance",
+      "url": null
+    },
+    "terraphim hello": {
+      "id": 11,
+      "nterm": "testconcept",
+      "url": null
+    },
+    "system maintains key functions": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "transition": {
+      "id": 7,
+      "nterm": "transition",
+      "url": null
+    },
     "system operationally effective": {
+      "id": 10,
+      "nterm": "operation",
+      "url": null
+    },
+    "monitor system performance": {
       "id": 10,
       "nterm": "operation",
       "url": null

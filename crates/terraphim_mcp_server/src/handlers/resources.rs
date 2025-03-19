@@ -1,251 +1,266 @@
 use salvo::prelude::*;
-use salvo::oapi::{self, endpoint};
-use serde_json::json;
 use std::sync::Arc;
+use crate::service::TerraphimResourceService;
+use crate::schema::{
+    Resource, ResourceListRequest, ResourceReadRequest,
+    McpError
+};
+use salvo::http::StatusCode;
 
-use crate::schema::*;
-use crate::service::ResourceService;
-use crate::error::ServerError;
-
-#[derive(Clone)]
 pub struct ResourceHandlers {
-    pub service: Arc<dyn ResourceService>,
+    service: Arc<TerraphimResourceService>,
 }
 
 impl ResourceHandlers {
-    pub fn new(service: Arc<dyn ResourceService>) -> Self {
+    pub fn new(service: Arc<TerraphimResourceService>) -> Self {
+        Self { service }
+    }
+
+    pub fn router(&self) -> Router {
+        Router::new()
+            .push(
+                Router::with_path("v1")
+                    .push(
+                        Router::with_path("resources")
+                            .get(list_resources)
+                            .post(create_resource)
+                            .push(
+                                Router::with_path("<uri>")
+                                    .get(read_resource)
+                            )
+                    )
+                    .push(
+                        Router::with_path("capabilities")
+                            .get(get_capabilities)
+                    )
+                    .push(
+                        Router::with_path("templates")
+                            .get(list_templates)
+                    )
+            )
+            .hoop(InjectHandlersMiddleware::new(self.service.clone()))
+    }
+}
+
+struct InjectHandlersMiddleware {
+    service: Arc<TerraphimResourceService>,
+}
+
+impl InjectHandlersMiddleware {
+    fn new(service: Arc<TerraphimResourceService>) -> Self {
         Self { service }
     }
 }
 
-/// List available resources
-/// 
-/// Returns a paginated list of available resources
-#[handler]
-pub async fn list_resources(
-    req: &mut Request,
-    depot: &mut Depot,
-    res: &mut Response,
-) {
-    let handlers = depot.obtain::<ResourceHandlers>().unwrap();
-    match req.parse_json::<ResourceListRequest>().await {
-        Ok(request) => {
-            match handlers.service.list_resources(request).await {
-                Ok(result) => {
-                    res.render(Json(result));
-                }
-                Err(e) => {
-                    res.status_code(e.status_code());
-                    res.render(Json(json!({
-                        "error": e.to_string()
-                    })));
-                }
-            }
-        }
-        Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(json!({
-                "error": format!("Invalid request: {}", e)
-            })));
-        }
+#[async_trait]
+impl Handler for InjectHandlersMiddleware {
+    async fn handle(&self, req: &mut Request, depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
+        depot.inject(self.service.clone());
+        ctrl.call_next(req, depot, res).await;
     }
 }
 
-/// Read resource contents
-/// 
-/// Returns the contents of a specific resource
 #[handler]
-pub async fn read_resource(
-    req: &mut Request,
-    depot: &mut Depot,
-    res: &mut Response,
-) {
-    let handlers = depot.obtain::<ResourceHandlers>().unwrap();
-    match req.parse_json::<ResourceReadRequest>().await {
-        Ok(request) => {
-            match handlers.service.read_resource(request).await {
-                Ok(result) => {
-                    res.render(Json(result));
-                }
-                Err(e) => {
-                    res.status_code(e.status_code());
-                    res.render(Json(json!({
-                        "error": e.to_string()
-                    })));
-                }
-            }
-        }
-        Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(json!({
-                "error": format!("Invalid request: {}", e)
-            })));
-        }
-    }
+async fn list_resources(_req: &mut Request, depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    let service = depot.obtain::<Arc<TerraphimResourceService>>()
+        .map_err(|_| StatusError::internal_server_error())?;
+
+    let request = ResourceListRequest {
+        filter: None,
+        cursor: None,
+        limit: Some(10),
+    };
+
+    let result = service.list_resources(request).await
+        .map_err(|e| match e {
+            McpError::Internal(_) => StatusError::internal_server_error(),
+            McpError::NotFound(_) => StatusError::not_found(),
+            McpError::BadRequest(_) => StatusError::bad_request(),
+        })?;
+
+    res.render(Json(result));
+    Ok(())
 }
 
-/// Subscribe to resource changes
-/// 
-/// Subscribe to notifications for changes to a specific resource
 #[handler]
-pub async fn subscribe(
-    req: &mut Request,
-    depot: &mut Depot,
-    res: &mut Response,
-) {
-    let handlers = depot.obtain::<ResourceHandlers>().unwrap();
-    match req.parse_json::<ResourceSubscribeRequest>().await {
-        Ok(request) => {
-            match handlers.service.subscribe(request).await {
-                Ok(_) => {
-                    res.render(Json(json!({
-                        "status": "success",
-                        "message": "Successfully subscribed to resource"
-                    })));
-                }
-                Err(e) => {
-                    res.status_code(e.status_code());
-                    res.render(Json(json!({
-                        "error": e.to_string()
-                    })));
-                }
-            }
-        }
-        Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(json!({
-                "error": format!("Invalid request: {}", e)
-            })));
-        }
-    }
+async fn read_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    let service = depot.obtain::<Arc<TerraphimResourceService>>()
+        .map_err(|_| StatusError::internal_server_error())?;
+
+    let uri = req.param::<String>("uri")
+        .ok_or_else(|| StatusError::bad_request())?;
+
+    let request = ResourceReadRequest { uri };
+    let result = service.read_resource(request).await
+        .map_err(|e| match e {
+            McpError::NotFound(_) => StatusError::not_found(),
+            McpError::Internal(_) => StatusError::internal_server_error(),
+            McpError::BadRequest(_) => StatusError::bad_request(),
+        })?;
+
+    res.render(Json(result));
+    Ok(())
 }
 
-/// Unsubscribe from resource changes
-/// 
-/// Unsubscribe from notifications for a specific resource
 #[handler]
-pub async fn unsubscribe(
-    req: &mut Request,
-    depot: &mut Depot,
-    res: &mut Response,
-) {
-    let handlers = depot.obtain::<ResourceHandlers>().unwrap();
-    match req.parse_json::<ResourceUnsubscribeRequest>().await {
-        Ok(request) => {
-            match handlers.service.unsubscribe(request).await {
-                Ok(_) => {
-                    res.render(Json(json!({
-                        "status": "success",
-                        "message": "Successfully unsubscribed from resource"
-                    })));
-                }
-                Err(e) => {
-                    res.status_code(e.status_code());
-                    res.render(Json(json!({
-                        "error": e.to_string()
-                    })));
-                }
-            }
-        }
-        Err(e) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(json!({
-                "error": format!("Invalid request: {}", e)
-            })));
-        }
-    }
+async fn create_resource(req: &mut Request, depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    let service = depot.obtain::<Arc<TerraphimResourceService>>()
+        .map_err(|_| StatusError::internal_server_error())?;
+
+    let resource: Resource = req.parse_json().await
+        .map_err(|_| StatusError::bad_request())?;
+
+    service.create_resource(resource).await
+        .map_err(|e| match e {
+            McpError::BadRequest(_) => StatusError::bad_request(),
+            McpError::Internal(_) => StatusError::internal_server_error(),
+            McpError::NotFound(_) => StatusError::not_found(),
+        })?;
+
+    res.status_code(StatusCode::CREATED);
+    Ok(())
 }
 
-/// Get server capabilities
-/// 
-/// Returns the server's capabilities
 #[handler]
-pub async fn get_capabilities(
-    _req: &mut Request,
-    depot: &mut Depot,
-    res: &mut Response,
-) {
-    let handlers = depot.obtain::<ResourceHandlers>().unwrap();
-    match handlers.service.get_capabilities().await {
-        Ok(capabilities) => {
-            res.render(Json(json!({
-                "capabilities": capabilities
-            })));
-        }
-        Err(e) => {
-            res.status_code(e.status_code());
-            res.render(Json(json!({
-                "error": e.to_string()
-            })));
-        }
-    }
+async fn get_capabilities(_req: &mut Request, depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    let service = depot.obtain::<Arc<TerraphimResourceService>>()
+        .map_err(|_| StatusError::internal_server_error())?;
+
+    let result = service.get_capabilities().await
+        .map_err(|e| match e {
+            McpError::Internal(_) => StatusError::internal_server_error(),
+            McpError::NotFound(_) => StatusError::not_found(),
+            McpError::BadRequest(_) => StatusError::bad_request(),
+        })?;
+
+    res.render(Json(result));
+    Ok(())
 }
 
-/// List available resource templates
-/// 
-/// Returns a list of available resource templates
 #[handler]
-pub async fn list_templates(
-    _req: &mut Request,
-    depot: &mut Depot,
-    res: &mut Response,
-) {
-    let handlers = depot.obtain::<ResourceHandlers>().unwrap();
-    match handlers.service.list_templates().await {
-        Ok(templates) => {
-            res.render(Json(json!({
-                "templates": templates
-            })));
-        }
-        Err(e) => {
-            res.status_code(e.status_code());
-            res.render(Json(json!({
-                "error": e.to_string()
-            })));
-        }
-    }
+async fn list_templates(_req: &mut Request, depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    let service = depot.obtain::<Arc<TerraphimResourceService>>()
+        .map_err(|_| StatusError::internal_server_error())?;
+
+    let result = service.list_templates().await
+        .map_err(|e| match e {
+            McpError::Internal(_) => StatusError::internal_server_error(),
+            McpError::NotFound(_) => StatusError::not_found(),
+            McpError::BadRequest(_) => StatusError::bad_request(),
+        })?;
+
+    res.render(Json(result));
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::InMemoryResourceService;
-    use salvo::test::{TestClient};
-    use salvo::prelude::*;
+    use salvo::conn::tcp::TcpAcceptor;
+    use tokio::net::TcpListener;
+    use reqwest::StatusCode as ReqwestStatusCode;
+    use tempfile::tempdir;
+    use std::fs;
+    use terraphim_config::{ConfigBuilder, Role, ServiceType, Haystack};
+    use terraphim_types::RelevanceFunction;
+    use tokio::time::{sleep, Duration};
+
+    async fn setup_test_server() -> String {
+        // Create a temporary directory for test data
+        let temp_dir = tempdir().unwrap();
+        let test_dir = temp_dir.path().join("sample_docs");
+        fs::create_dir_all(&test_dir).unwrap();
+
+        // Create multiple test markdown files
+        let test_file1 = test_dir.join("test1.md");
+        let test_file2 = test_dir.join("test2.md");
+        fs::write(&test_file1, "# Test Document 1\n\nThis is a test document with unique content.").unwrap();
+        fs::write(&test_file2, "# Test Document 2\n\nThis is another test document with different content.").unwrap();
+
+        let config = ConfigBuilder::new()
+            .add_role(
+                "Default",
+                Role {
+                    shortname: Some("Default".to_string()),
+                    name: "Default".into(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    theme: "spacelab".to_string(),
+                    kg: None,
+                    haystacks: vec![Haystack {
+                        path: test_dir.clone(),
+                        service: ServiceType::Ripgrep,
+                    }],
+                    extra: Default::default(),
+                },
+            )
+            .default_role("Default")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let service = Arc::new(TerraphimResourceService::new(config).await.unwrap());
+        let handlers = ResourceHandlers::new(service);
+        let router = handlers.router();
+        
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let acceptor = TcpAcceptor::try_from(listener).unwrap();
+        
+        let server = Server::new(acceptor);
+        tokio::spawn(async move {
+            server.serve(router).await;
+        });
+
+        // Keep the temp directory alive for the duration of the test
+        std::mem::forget(temp_dir);
+
+        // Give the service time to index the files
+        sleep(Duration::from_millis(100)).await;
+
+        format!("http://{}", addr)
+    }
+
+    #[tokio::test]
+    async fn test_list_resources() {
+        let addr = setup_test_server().await;
+        let client = reqwest::Client::new();
+        let resp = client.get(&format!("{}/v1/resources", addr)).send().await.unwrap();
+        assert_eq!(resp.status(), ReqwestStatusCode::OK);
+        let resources: serde_json::Value = resp.json().await.unwrap();
+        let resources_array = resources["resources"].as_array().unwrap();
+        assert!(!resources_array.is_empty(), "Resources array should not be empty");
+        assert!(resources_array.len() >= 2, "Should have at least 2 resources");
+    }
+
+    #[tokio::test]
+    async fn test_read_resource() {
+        let addr = setup_test_server().await;
+        let client = reqwest::Client::new();
+        let resp = client.get(&format!("{}/v1/resources/test1.md", addr)).send().await.unwrap();
+        assert_eq!(resp.status(), ReqwestStatusCode::OK);
+        let response: serde_json::Value = resp.json().await.unwrap();
+        assert!(response["content"]["text"].as_str().unwrap().contains("Test Document 1"));
+    }
 
     #[tokio::test]
     async fn test_get_capabilities() {
-        // Create the service implementation
-        let service = Arc::new(InMemoryResourceService::new());
-        let handlers = ResourceHandlers::new(service);
-        
-        // Create a router with the handler
-        let router = Router::new()
-            .hoop(HandlersMiddleware { handlers: handlers.clone() })
-            .get(get_capabilities);
-        
-        // Create a test service with the router
-        let test_service = Service::new(router);
-        
-        // Send the request through the test client
-        let resp = TestClient::get("http://127.0.0.1/")
-            .send(&test_service)
-            .await;
-            
-        // Check that the status code is OK
-        assert_eq!(resp.status_code.unwrap(), StatusCode::OK);
+        let addr = setup_test_server().await;
+        let client = reqwest::Client::new();
+        let resp = client.get(&format!("{}/v1/capabilities", addr)).send().await.unwrap();
+        assert_eq!(resp.status(), ReqwestStatusCode::OK);
+        let capabilities: serde_json::Value = resp.json().await.unwrap();
+        assert!(capabilities["supports_subscriptions"].as_bool().unwrap());
+        assert!(capabilities["supports_templates"].as_bool().unwrap());
     }
-    
-    // Middleware for injecting handlers in tests
-    struct HandlersMiddleware {
-        handlers: ResourceHandlers,
-    }
-    
-    #[async_trait]
-    impl Handler for HandlersMiddleware {
-        async fn handle(&self, req: &mut Request, depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
-            depot.inject(self.handlers.clone());
-            ctrl.call_next(req, depot, res).await;
-        }
+
+    #[tokio::test]
+    async fn test_list_templates() {
+        let addr = setup_test_server().await;
+        let client = reqwest::Client::new();
+        let resp = client.get(&format!("{}/v1/templates", addr)).send().await.unwrap();
+        assert_eq!(resp.status(), ReqwestStatusCode::OK);
+        let templates: Vec<serde_json::Value> = resp.json().await.unwrap();
+        assert!(!templates.is_empty());
+        assert!(templates[0]["fields"].as_array().unwrap().contains(&serde_json::Value::String("uri".to_string())));
     }
 } 
