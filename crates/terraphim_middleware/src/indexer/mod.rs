@@ -58,9 +58,9 @@ pub async fn search_haystacks(
 
         let index = match haystack.service {
             ServiceType::Ripgrep => {
-                // Search through documents using ripgrep
-                // This indexes the haystack using the ripgrep middleware
-                ripgrep.index(needle, &haystack.path).await?
+                // If the search term is empty, use "." to match all files
+                let search_pattern = if needle.is_empty() { "." } else { needle };
+                ripgrep.index(search_pattern, &haystack.path).await?
             }
         };
 

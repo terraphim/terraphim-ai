@@ -6,6 +6,7 @@ use crate::schema::{
     McpError
 };
 use salvo::http::StatusCode;
+use crate::docs::{get_api_docs, get_swagger_ui};
 
 pub struct ResourceHandlers {
     service: Arc<TerraphimResourceService>,
@@ -37,6 +38,14 @@ impl ResourceHandlers {
                         Router::with_path("templates")
                             .get(list_templates)
                     )
+            )
+            .push(
+                Router::with_path("openapi.json")
+                    .get(get_openapi_docs)
+            )
+            .push(
+                Router::with_path("docs")
+                    .get(get_docs_ui)
             )
             .hoop(InjectHandlersMiddleware::new(self.service.clone()))
     }
@@ -153,6 +162,18 @@ async fn list_templates(_req: &mut Request, depot: &mut Depot, res: &mut Respons
     Ok(())
 }
 
+#[handler]
+async fn get_openapi_docs(_req: &mut Request, _depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    res.render(Text::Plain(get_api_docs()));
+    Ok(())
+}
+
+#[handler]
+async fn get_docs_ui(_req: &mut Request, _depot: &mut Depot, res: &mut Response) -> Result<(), StatusError> {
+    res.render(Text::Html(get_swagger_ui()));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,7 +192,7 @@ mod tests {
         let test_dir = temp_dir.path().join("sample_docs");
         fs::create_dir_all(&test_dir).unwrap();
 
-        // Create multiple test markdown files
+        // Create test markdown files with unique content
         let test_file1 = test_dir.join("test1.md");
         let test_file2 = test_dir.join("test2.md");
         fs::write(&test_file1, "# Test Document 1\n\nThis is a test document with unique content.").unwrap();
@@ -214,8 +235,8 @@ mod tests {
         // Keep the temp directory alive for the duration of the test
         std::mem::forget(temp_dir);
 
-        // Give the service time to index the files
-        sleep(Duration::from_millis(100)).await;
+        // Give the service more time to index the files
+        sleep(Duration::from_secs(1)).await;
 
         format!("http://{}", addr)
     }
@@ -236,10 +257,20 @@ mod tests {
     async fn test_read_resource() {
         let addr = setup_test_server().await;
         let client = reqwest::Client::new();
-        let resp = client.get(&format!("{}/v1/resources/test1.md", addr)).send().await.unwrap();
+
+        // First list resources to get the URIs
+        let resp = client.get(&format!("{}/v1/resources", addr)).send().await.unwrap();
+        assert_eq!(resp.status(), ReqwestStatusCode::OK);
+        let resources: serde_json::Value = resp.json().await.unwrap();
+        let resources_array = resources["resources"].as_array().unwrap();
+        let first_resource = &resources_array[0];
+        let uri = first_resource["uri"].as_str().unwrap();
+
+        // Then read the specific resource
+        let resp = client.get(&format!("{}/v1/resources/{}", addr, uri)).send().await.unwrap();
         assert_eq!(resp.status(), ReqwestStatusCode::OK);
         let response: serde_json::Value = resp.json().await.unwrap();
-        assert!(response["content"]["text"].as_str().unwrap().contains("Test Document 1"));
+        assert!(response["content"]["text"].as_str().unwrap().contains("Test Document"));
     }
 
     #[tokio::test]

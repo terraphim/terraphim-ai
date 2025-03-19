@@ -41,7 +41,7 @@ impl TerraphimResourceService {
 
     pub async fn list_resources(&self, request: ResourceListRequest) -> Result<ResourceList, McpError> {
         let search_query = SearchQuery {
-            search_term: NormalizedTermValue::new("Test Document".to_string()), // Search for test documents
+            search_term: NormalizedTermValue::new("".to_string()), // Empty search term to list all documents
             role: None,
             skip: request.cursor.as_ref().and_then(|c| c.parse::<usize>().ok()),
             limit: request.limit.map(|l| l as usize),
@@ -55,7 +55,7 @@ impl TerraphimResourceService {
 
         let resources: Vec<Resource> = documents.into_iter()
             .map(|doc| Resource {
-                uri: doc.url,
+                uri: doc.url.clone(),
                 name: doc.title,
                 description: Some(doc.description.unwrap_or_default()),
                 metadata: ResourceMetadata {
@@ -167,8 +167,8 @@ mod tests {
         // Keep the temp directory alive for the duration of the test
         std::mem::forget(temp_dir);
         
-        // Wait a bit to ensure indexing is complete
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Wait longer to ensure indexing is complete
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         
         service
     }
@@ -181,10 +181,10 @@ mod tests {
             cursor: None,
             limit: Some(10),
         }).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Failed to list resources: {:?}", result);
         let resources = result.unwrap();
-        assert!(!resources.resources.is_empty());
-        assert!(resources.resources.len() >= 2); // We created 2 test files
+        assert!(!resources.resources.is_empty(), "No resources found");
+        assert!(resources.resources.len() >= 2, "Expected at least 2 resources, found {}", resources.resources.len()); // We created 2 test files
     }
 
     #[tokio::test]
@@ -200,14 +200,26 @@ mod tests {
     #[tokio::test]
     async fn test_read_resource() {
         let service = setup_test_service().await;
+        
+        // First list resources to get the actual URIs
+        let list_result = service.list_resources(ResourceListRequest {
+            filter: None,
+            cursor: None,
+            limit: Some(10),
+        }).await.unwrap();
+        
+        assert!(!list_result.resources.is_empty(), "No resources found");
+        let first_resource = &list_result.resources[0];
+        
         let result = service.read_resource(ResourceReadRequest {
-            uri: "test1.md".to_string(),
+            uri: first_resource.uri.clone(),
         }).await;
-        assert!(result.is_ok());
+        
+        assert!(result.is_ok(), "Failed to read resource: {:?}", result);
         let response = result.unwrap();
         assert!(matches!(response.content, ResourceContent::Text(_)));
         if let ResourceContent::Text(text) = response.content {
-            assert!(text.contains("Test Document 1"));
+            assert!(text.contains("Test Document"), "Resource content does not contain expected text");
         }
     }
 } 

@@ -13,6 +13,7 @@ use tracing_subscriber::FmtSubscriber;
 mod schema;
 mod service;
 mod handlers;
+mod docs;
 
 #[tokio::main]
 async fn main() {

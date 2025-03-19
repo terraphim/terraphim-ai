@@ -664,24 +664,56 @@ pub fn get_swagger_ui() -> String {
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="SwaggerUI" />
+    <meta name="description" content="Terraphim MCP Server API Documentation" />
     <title>Terraphim MCP Server API Documentation</title>
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .swagger-ui .topbar {
+            background-color: #1b1b1b;
+            padding: 10px 0;
+        }
+        .swagger-ui .info {
+            margin: 20px 0;
+        }
+        .swagger-ui .info .title {
+            color: #3b4151;
+        }
+        .swagger-ui .scheme-container {
+            box-shadow: none;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
 </head>
 <body>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" crossorigin></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" crossorigin></script>
     <script>
         window.onload = () => {
             window.ui = SwaggerUIBundle({
                 url: '/openapi.json',
                 dom_id: '#swagger-ui',
                 deepLinking: true,
+                displayOperationId: true,
+                displayRequestDuration: true,
+                defaultModelsExpandDepth: 3,
+                defaultModelExpandDepth: 3,
                 presets: [
                     SwaggerUIBundle.presets.apis,
-                    SwaggerUIBundle.SwaggerUIStandalonePreset
+                    SwaggerUIStandalonePreset
                 ],
-                layout: "BaseLayout",
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                syntaxHighlight: {
+                    activated: true,
+                    theme: "monokai"
+                }
             });
         };
     </script>

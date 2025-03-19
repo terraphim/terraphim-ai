@@ -173,11 +173,21 @@ impl RipgrepCommand {
     /// JSON output. Learn more about ripgrep's JSON output here:
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
-        // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle.to_string(), haystack.to_string_lossy().to_string()]
-            .into_iter()
-            .chain(self.default_args.clone())
-            .collect();
+        // For empty search patterns, use different arguments to list all markdown files
+        let args = if needle.is_empty() {
+            vec![
+                "--json".to_string(),
+                "--files".to_string(),
+                "-tmarkdown".to_string(),
+                haystack.to_string_lossy().to_string(),
+            ]
+        } else {
+            // Merge the default arguments with the needle and haystack
+            vec![needle.to_string(), haystack.to_string_lossy().to_string()]
+                .into_iter()
+                .chain(self.default_args.clone())
+                .collect()
+        };
 
         let mut child = Command::new(&self.command)
             .args(args)
