@@ -14,6 +14,7 @@ terraphim_service = { path = "../terraphim_service" }
 terraphim_config = { path = "../terraphim_config" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 
+ahash = "0.8.7"
 anyhow = "1.0.80"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
