@@ -172,24 +172,24 @@ impl ConfigBuilder {
         self.config.id = ConfigId::Server;
         // mind where cargo run is triggered from
         let cwd = std::env::current_dir().context("Failed to get current directory").unwrap();
-        println!("{}", cwd.display());
+        log::info!("Current working directory: {}", cwd.display());
         let system_operator_haystack = if cwd.ends_with("terraphim_server") {
-        cwd.join("fixtures/haystack/")
-    } else {
-        cwd.join("terraphim_server/fixtures/haystack/")
-    };
+            cwd.join("fixtures/haystack/")
+        } else {
+            cwd.join("terraphim_server/fixtures/haystack/")
+        };
 
-    log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
-    let automata_test_path = if cwd.ends_with("terraphim_server") {
-        cwd.join("fixtures/term_to_id.json")
-    } else {
-        cwd.join("terraphim_server/fixtures/term_to_id.json")
-    };
-    log::debug!("Test automata_test_path {:?}", automata_test_path);
-    let automata_remote =
-        AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
-            .unwrap();
-        println!("{automata_remote}");
+        log::debug!("system_operator_haystack: {:?}", system_operator_haystack);
+        let automata_test_path = if cwd.ends_with("terraphim_server") {
+            cwd.join("fixtures/term_to_id.json")
+        } else {
+            cwd.join("terraphim_server/fixtures/term_to_id.json")
+        };
+        log::debug!("Test automata_test_path {:?}", automata_test_path);
+        let automata_remote =
+            AutomataPath::from_remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+                .unwrap();
+        log::info!("Automata remote URL: {automata_remote}");
         self.global_shortcut("Ctrl+X")
         .add_role(
             "Default",
@@ -258,7 +258,7 @@ impl ConfigBuilder {
     pub fn build_default_desktop(mut self) -> Self {
         let default_data_path = self.get_default_data_path();
         let automata_path = AutomataPath::from_local(default_data_path.join("term_to_id.json"));
-        println!("Docs path: {:?}", default_data_path);
+        log::info!("Documents path: {:?}", default_data_path);
         self.config.id = ConfigId::Desktop;
         self.global_shortcut("Ctrl+X")
         .add_role(
@@ -609,6 +609,7 @@ mod tests {
     use std::io::Write;
     use tempfile::tempfile;
     use tokio::test;
+    use tempfile::tempdir;
 
     #[test]
     async fn test_write_config_to_json() {
@@ -836,5 +837,21 @@ mod tests {
         let config = ConfigBuilder::new().build();
         assert!(config.is_err());
         assert!(matches!(config.unwrap_err(), TerraphimConfigError::NoRoles));
+    }
+
+    #[tokio::test]
+    async fn test_json_serialization() {
+        let config = Config::fixture();
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        log::debug!("Config: {:#?}", config);
+        assert!(json.len() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_toml_serialization() {
+        let config = Config::fixture();
+        let toml = toml::to_string_pretty(&config).unwrap();
+        log::debug!("Config: {:#?}", config);
+        assert!(toml.len() > 0);
     }
 }

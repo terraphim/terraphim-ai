@@ -94,7 +94,7 @@ impl DeviceSettings {
             Some(path) => path,
             None => DeviceSettings::default_config_path(),
         };
-        println!("Settings path: {:?}", config_path);
+        
         log::debug!("Settings path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
         log::debug!("Loading config_file: {:?}", config_file);
@@ -163,10 +163,12 @@ mod tests {
         let _lock = lock_test();
         let _test = set_env(OsString::from("TERRAPHIM_PROFILE_S3_REGION"), "us-west-1");
         let _test2 = set_env(OsString::from("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE"),"on");
-        println!("Env: {:?}", std::env::var("TERRAPHIM_PROFILE_S3_REGION"));
+        
+        log::debug!("Env: {:?}", std::env::var("TERRAPHIM_PROFILE_S3_REGION"));
         let config = DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
-        println!("Config: {:?}", config);
-        println!(
+        
+        log::debug!("Config: {:?}", config);
+        log::debug!(
             "Region: {:?}",
             config.as_ref()
                 .unwrap()
