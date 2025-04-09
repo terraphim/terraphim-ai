@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use anyhow::Result;
 use axum::{
@@ -43,6 +44,25 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting Terraphim MCP server");
     tracing::info!("Logging to directory: {}", log_dir);
+
+    // Log important environment variables
+    let data_dir = std::env::var("TERRAPHIM_DATA_DIR").unwrap_or_else(|_| "not set".to_string());
+    let fixtures_dir = std::env::var("TERRAPHIM_FIXTURES_DIR").unwrap_or_else(|_| "not set".to_string());
+    let test_mode = std::env::var("TERRAPHIM_TEST_MODE").unwrap_or_else(|_| "not set".to_string());
+    
+    tracing::info!("Environment variables:");
+    tracing::info!("  TERRAPHIM_DATA_DIR: {}", data_dir);
+    tracing::info!("  TERRAPHIM_FIXTURES_DIR: {}", fixtures_dir);
+    tracing::info!("  TERRAPHIM_TEST_MODE: {}", test_mode);
+    
+    // Create data directory if set and doesn't exist
+    if data_dir != "not set" {
+        let data_path = std::path::PathBuf::from(&data_dir);
+        if !data_path.exists() {
+            tracing::info!("Creating data directory: {:?}", data_path);
+            std::fs::create_dir_all(&data_path)?;
+        }
+    }
 
     // Set environment variable to prevent println statements in dependencies
     std::env::set_var("TERRAPHIM_NO_CONSOLE_OUTPUT", "1");
@@ -94,7 +114,7 @@ async fn main() -> Result<()> {
     let addr = format!("{}:{}", host, port).parse::<SocketAddr>()?;
     
     // Create the router
-    let router = RouterService(TerraphimMcpRouter::new(config_state));
+    let router = RouterService(TerraphimMcpRouter::new(Arc::new(config_state)));
     tracing::info!("Initialized Terraphim MCP router");
     
     // Set up HTTP server

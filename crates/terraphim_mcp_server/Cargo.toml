@@ -13,6 +13,7 @@ terraphim_types = { path = "../terraphim_types" }
 terraphim_service = { path = "../terraphim_service" }
 terraphim_config = { path = "../terraphim_config" }
 terraphim_persistence = { path = "../terraphim_persistence" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 
 ahash = "0.8.7"
 anyhow = "1.0.80"
@@ -27,6 +28,7 @@ axum = "0.7.4"
 chrono = { version = "0.4.34", features = ["serde"] }
 futures = "0.3.30"
 tracing-appender = "0.2.3"
+async-trait = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1.36.0", features = ["full", "test-util", "macros"] }

@@ -1,31 +1,62 @@
 use anyhow::{anyhow, Result};
-use mcp_core::resource::Resource;
+use mcp_core::{
+    resource::{Resource, ResourceContents},
+    Content,
+};
 use terraphim_types::Document;
 use url::Url;
+use terraphim_config::{ConfigState, Config};
+use terraphim_service::TerraphimService;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use ahash::AHashMap;
 
 /// URI scheme for Terraphim documents
 const TERRAPHIM_URI_SCHEME: &str = "terraphim";
 
 /// TerraphimResourceMapper handles mapping between Terraphim types and MCP resources
 #[derive(Clone, Debug)]
-pub struct TerraphimResourceMapper {}
+pub struct TerraphimResourceMapper {
+    config_state: Arc<ConfigState>,
+}
 
 impl TerraphimResourceMapper {
     /// Create a new resource mapper
     pub fn new() -> Self {
-        Self {}
+        // Create a config state with an empty config
+        let config = Config::default();
+        let config_state = ConfigState {
+            config: Arc::new(Mutex::new(config)),
+            roles: AHashMap::default(),
+        };
+        
+        Self { 
+            config_state: Arc::new(config_state),
+        }
+    }
+
+    /// Set the config state
+    pub fn with_config_state(mut self, config_state: Arc<ConfigState>) -> Self {
+        self.config_state = config_state;
+        self
+    }
+
+    /// Create a terraphim service instance
+    fn terraphim_service(&self) -> TerraphimService {
+        // Dereference the Arc to pass ConfigState instead of Arc<ConfigState>
+        TerraphimService::new((*self.config_state).clone())
     }
 
     /// Convert a Terraphim document to an MCP resource
-    pub fn document_to_resource(&self, document: &Document, priority: f32) -> Result<Resource> {
+    pub async fn document_to_resource(&self, document: &Document, priority: f32) -> Result<Resource> {
         let uri = self.create_document_uri(&document.id);
         
         // Create a resource with the document title as the name
         let mut resource = Resource::with_uri(
-            uri,
+            uri.clone(),
             document.title.clone(),
             priority,
-            Some("text".to_string()),
+            Some("text/markdown".to_string()),
         )?;
         
         // Add description if available
@@ -34,6 +65,34 @@ impl TerraphimResourceMapper {
         }
         
         Ok(resource)
+    }
+    
+    /// Convert a Terraphim document to MCP content
+    pub async fn document_to_content(&self, document: &Document) -> Content {
+        let uri = self.create_document_uri(&document.id);
+        
+        // Create resource contents
+        let mut text = String::new();
+        text.push_str(&format!("# {}\n\n", document.title));
+        
+        if let Some(description) = &document.description {
+            text.push_str(&format!("{}\n\n", description));
+        }
+        
+        text.push_str(&document.body);
+        
+        if let Some(tags) = &document.tags {
+            text.push_str("\n\nTags: ");
+            text.push_str(&tags.join(", "));
+        }
+        
+        let contents = ResourceContents::TextResourceContents {
+            uri,
+            mime_type: Some("text/markdown".to_string()),
+            text,
+        };
+        
+        Content::resource(contents)
     }
     
     /// Create a URI for a Terraphim document
@@ -48,32 +107,60 @@ impl TerraphimResourceMapper {
             
         if url.scheme() != TERRAPHIM_URI_SCHEME {
             return Err(anyhow!(
-                "Invalid URI scheme: expected '{}', got '{}'",
-                TERRAPHIM_URI_SCHEME,
-                url.scheme()
+                "Invalid URI scheme '{}', expected '{}'",
+                url.scheme(),
+                TERRAPHIM_URI_SCHEME
             ));
         }
         
-        // The host part contains the document ID
         Ok(url.host_str()
-            .ok_or_else(|| anyhow!("Missing document ID in URI: {}", uri))?
+            .ok_or_else(|| anyhow!("Missing document ID in URI '{}'", uri))?
             .to_string())
     }
     
-    /// Create a batch of resources from Terraphim documents with decreasing priority
+    /// Convert a list of Terraphim documents to MCP resources
     pub fn documents_to_resources(&self, documents: &[Document]) -> Result<Vec<Resource>> {
         let mut resources = Vec::with_capacity(documents.len());
         
-        // Set decreasing priority based on order
         for (i, document) in documents.iter().enumerate() {
-            // Priority decreases with index, starting at 1.0
-            let priority = 1.0 - (i as f32 * 0.01);
-            let priority = if priority < 0.0 { 0.0 } else { priority };
+            let priority = 1.0 - (i as f32 * 0.02);
+            // Using synchronous version for simplicity
+            let uri = self.create_document_uri(&document.id);
+            let mut resource = Resource::with_uri(
+                uri.clone(),
+                document.title.clone(),
+                priority,
+                Some("text/markdown".to_string()),
+            )?;
             
-            let resource = self.document_to_resource(document, priority)?;
+            if let Some(description) = &document.description {
+                resource = resource.with_description(description.clone());
+            }
+            
             resources.push(resource);
         }
         
         Ok(resources)
+    }
+
+    /// Get a document by its ID using TerraphimService
+    pub async fn get_document(&self, document_id: &str) -> Result<Document, terraphim_service::ServiceError> {
+        // Create a new service instance for each call
+        let mut service = self.terraphim_service();
+        
+        // Search for the specific document
+        let search_query = terraphim_types::SearchQuery {
+            search_term: terraphim_types::NormalizedTermValue::new(document_id.to_string()),
+            limit: Some(1),
+            skip: None,
+            role: None,
+        };
+        
+        let documents = service.search(&search_query).await?;
+        
+        // Get the document that matches the ID
+        documents.into_iter()
+            .find(|doc| doc.id == document_id)
+            .ok_or_else(|| terraphim_service::ServiceError::Config(format!("Document not found: {}", document_id)))
     }
 } 

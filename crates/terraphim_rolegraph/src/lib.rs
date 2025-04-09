@@ -217,6 +217,7 @@ impl RoleGraph {
 
     /// Inserts an document into the rolegraph
     pub fn insert_document(&mut self, document_id: &str, document: Document) {
+        self.documents.insert(document_id.to_string(), IndexedDocument::from_document(document.clone()));
         let matches = self.find_matching_node_ids(&document.to_string());
         for (a, b) in matches.into_iter().tuple_windows() {
             self.add_or_update_document(document_id, a, b);
@@ -259,6 +260,21 @@ impl RoleGraph {
             }
         };
         edge
+    }
+
+    /// Get a document by its ID
+    pub fn get_document(&self, document_id: &str) -> Option<&IndexedDocument> {
+        self.documents.get(document_id)
+    }
+
+    /// Get all documents in the graph
+    pub fn get_all_documents(&self) -> impl Iterator<Item = (&String, &IndexedDocument)> {
+        self.documents.iter()
+    }
+
+    /// Get the number of documents in the graph
+    pub fn document_count(&self) -> usize {
+        self.documents.len()
     }
 }
 
