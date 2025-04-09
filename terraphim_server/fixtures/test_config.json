@@ -1,0 +1,47 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+X",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "TitleScorer",
+      "theme": "spacelab",
+      "haystacks": [
+        {
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "service": "Ripgrep"
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "TerraphimGraph",
+      "theme": "lumen",
+      "haystacks": [
+        {
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "service": "Ripgrep"
+        }
+      ],
+      "extra": {}
+    },
+    "System Operator": {
+      "shortname": "operator",
+      "name": "System Operator",
+      "relevance_function": "TerraphimGraph",
+      "theme": "superhero",
+      "haystacks": [
+        {
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "service": "Ripgrep"
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Default",
+  "selected_role": "Default"
+} 
