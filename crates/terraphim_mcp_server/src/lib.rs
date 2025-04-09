@@ -1,21 +1,25 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use mcp_core::{
     handler::{PromptError, ResourceError, ToolError},
     prompt::Prompt,
-    protocol::ServerCapabilities,
+    protocol::{ServerCapabilities, JsonRpcRequest, JsonRpcResponse, ErrorData},
     resource::Resource,
     tool::Tool,
     Content,
 };
-use mcp_server::router::CapabilitiesBuilder;
-use serde_json::Value;
-use terraphim_config::ConfigState;
+use mcp_server::router::{CapabilitiesBuilder, Router};
+use serde_json::{Value, json};
+use terraphim_config::{Config, ConfigState};
 use terraphim_service::{ServiceError, TerraphimService};
 use terraphim_types::Document;
 use thiserror::Error;
+use tracing::{debug, error, info, warn};
 
 mod resource_mapper;
 mod tool_handlers;
@@ -59,66 +63,44 @@ impl From<McpError> for ResourceError {
     }
 }
 
-/// Terraphim Model Context Protocol Server Router implementation
+/// The main router type for the Terraphim MCP server
 #[derive(Clone)]
 pub struct TerraphimMcpRouter {
-    /// Terraphim configuration state
-    config_state: ConfigState,
-    /// Resource mapper for converting Terraphim types to MCP resources
-    resource_mapper: TerraphimResourceMapper,
+    config_state: Arc<ConfigState>,
+    resource_mapper: Arc<TerraphimResourceMapper>,
 }
 
 impl TerraphimMcpRouter {
-    /// Create a new Terraphim MCP Router with the provided configuration
-    pub fn new(config_state: ConfigState) -> Self {
+    /// Create a new router instance
+    pub fn new(config_state: Arc<ConfigState>) -> Self {
         Self {
-            config_state,
-            resource_mapper: TerraphimResourceMapper::new(),
+            config_state: config_state.clone(),
+            resource_mapper: Arc::new(TerraphimResourceMapper::new().with_config_state(config_state)),
         }
     }
-
+    
     /// Create a Terraphim service instance from the current configuration
     fn terraphim_service(&self) -> TerraphimService {
-        TerraphimService::new(self.config_state.clone())
+        TerraphimService::new((*self.config_state).clone())
     }
-
-    /// Convert a Terraphim Document to MCP TextContent
-    fn document_to_text_content(document: &Document) -> Content {
-        let mut text = String::new();
-        text.push_str(&format!("Title: {}\n", document.title));
-        
-        if let Some(description) = &document.description {
-            text.push_str(&format!("Description: {}\n", description));
-        }
-        
-        text.push_str("\nContent:\n");
-        text.push_str(&document.body);
-        
-        if let Some(tags) = &document.tags {
-            text.push_str("\n\nTags: ");
-            text.push_str(&tags.join(", "));
-        }
-        
-        Content::text(text)
+    
+    /// Update the configuration
+    pub async fn update_config(&self, new_config: Config) -> Result<(), McpError> {
+        let config = self.config_state.config.clone();
+        let mut current_config = config.lock().await;
+        *current_config = new_config;
+        Ok(())
     }
 }
 
-/// Implement the MCP Router trait for TerraphimMcpRouter
-impl mcp_server::Router for TerraphimMcpRouter {
+#[async_trait]
+impl Router for TerraphimMcpRouter {
     fn name(&self) -> String {
         "terraphim-mcp".to_string()
     }
 
     fn instructions(&self) -> String {
         "This server provides Terraphim knowledge graph search capabilities through the Model Context Protocol. You can search for documents using the search tool and access resources that represent Terraphim documents.".to_string()
-    }
-
-    fn capabilities(&self) -> ServerCapabilities {
-        CapabilitiesBuilder::new()
-            .with_tools(true)
-            .with_resources(true, false)
-            .with_prompts(false)
-            .build()
     }
 
     fn list_tools(&self) -> Vec<Tool> {
@@ -173,71 +155,98 @@ impl mcp_server::Router for TerraphimMcpRouter {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Content>, ToolError>> + Send + 'static>> {
         let this = self.clone();
         let tool_name = tool_name.to_string();
+        let _arguments_clone = arguments.clone();
         
         Box::pin(async move {
+            // Check if the tool name is valid
+            match tool_name.as_str() {
+                "search" | "update_config" => {
+                    // Tool exists, continue with execution
+                },
+                _ => {
+                    // Tool doesn't exist, return an error
+                    return Err(ToolError::NotFound(format!("Tool '{}' not found", tool_name)));
+                }
+            }
+            
             match tool_name.as_str() {
                 "search" => {
-                    // Parse the search parameters
-                    match serde_json::from_value::<SearchToolParams>(arguments) {
-                        Ok(params) => {
-                            handle_search(this, params).await
-                        }
-                        Err(err) => {
-                            Err(ToolError::InvalidParameters(format!("Invalid search parameters: {}", err)))
-                        }
-                    }
-                }
+                    // Parse the JSON-RPC request first
+                    let request = serde_json::from_value::<JsonRpcRequest>(arguments.clone())
+                        .map_err(|e| ToolError::InvalidParameters(format!("Invalid request: {}", e)))?;
+                    
+                    // Extract the params from the request
+                    let params_value = request.params.clone().ok_or_else(|| {
+                        ToolError::InvalidParameters("Missing params field in JSON-RPC request".to_string())
+                    })?;
+                    
+                    // Parse the params into SearchToolParams
+                    let params: SearchToolParams = serde_json::from_value(params_value)
+                        .map_err(|e| ToolError::InvalidParameters(format!("Invalid search parameters: {}", e)))?;
+                    
+                    let response = handle_search(Arc::new(this), request, params).await?;
+                    Ok(vec![Content::Text(mcp_core::content::TextContent { 
+                        text: serde_json::to_string(&response).unwrap_or_default(),
+                        annotations: None,
+                    })])
+                },
                 "update_config" => {
-                    // Parse the update_config parameters
-                    match serde_json::from_value::<UpdateConfigToolParams>(arguments) {
-                        Ok(params) => {
-                            handle_update_config(this, params).await
-                        }
-                        Err(err) => {
-                            Err(ToolError::InvalidParameters(format!("Invalid configuration parameters: {}", err)))
-                        }
-                    }
+                    // Parse the JSON-RPC request first
+                    let request = serde_json::from_value::<JsonRpcRequest>(arguments.clone())
+                        .map_err(|e| ToolError::InvalidParameters(format!("Invalid request: {}", e)))?;
+                    
+                    // Extract the params from the request
+                    let params_value = request.params.clone().ok_or_else(|| {
+                        ToolError::InvalidParameters("Missing params field in JSON-RPC request".to_string())
+                    })?;
+                    
+                    // Parse the params into UpdateConfigToolParams
+                    let params: UpdateConfigToolParams = serde_json::from_value(params_value)
+                        .map_err(|e| ToolError::InvalidParameters(format!("Invalid update_config parameters: {}", e)))?;
+                    
+                    let response = handle_update_config(Arc::new(this), request, params).await?;
+                    Ok(vec![Content::Text(mcp_core::content::TextContent { 
+                        text: serde_json::to_string(&response).unwrap_or_default(),
+                        annotations: None,
+                    })])
+                },
+                _ => {
+                    // This should never be reached due to the early check, but just in case
+                    Err(ToolError::NotFound(format!("Tool '{}' not found", tool_name)))
                 }
-                _ => Err(ToolError::NotFound(format!("Tool {} not found", tool_name))),
             }
         })
     }
 
     fn list_resources(&self) -> Vec<Resource> {
-        // In test mode, create a few test resources to make it easier to test the API
-        if cfg!(test) || std::env::var("TERRAPHIM_TEST_MODE").is_ok() {
-            let mut resources = Vec::new();
-            
-            // Create a few test document resources
-            let test_docs = vec![
-                ("test-doc-1", "Test Document 1", "A test document for e2e testing"),
-                ("test-doc-2", "Test Document 2", "Another test document for e2e testing"),
-                ("system-doc", "System Document", "A document about systems for testing search"),
-                ("terraphim-doc", "Terraphim Document", "A document about terraphim for testing search"),
-            ];
-            
-            for (i, (id, title, description)) in test_docs.iter().enumerate() {
-                let uri = format!("terraphim://{}", id);
-                let priority = 1.0 - (i as f32 * 0.1);
-                
-                if let Ok(resource) = Resource::with_uri(
-                    uri,
-                    title.to_string(),
-                    priority,
-                    Some("text".to_string()),
-                ) {
-                    let resource_with_desc = resource.with_description(description.to_string());
-                    resources.push(resource_with_desc);
-                }
-            }
-            
-            tracing::debug!("Returning {} test resources for e2e testing", resources.len());
-            return resources;
-        }
+        let mut service = self.terraphim_service();
         
-        // Return an empty list for normal operation
-        // Resources will be created dynamically based on search results
-        Vec::new()
+        // Create a wildcard search query to get all documents
+        let search_query = terraphim_types::SearchQuery {
+            search_term: terraphim_types::NormalizedTermValue::new("".to_string()),
+            limit: None,
+            skip: None,
+            role: None,
+        };
+        
+        // Create a runtime to run the async search synchronously
+        let runtime = tokio::runtime::Runtime::new()
+            .unwrap_or_else(|e| {
+                error!("Failed to create Tokio runtime: {}", e);
+                std::process::exit(1);
+            });
+        
+        // Try to search for all documents
+        match runtime.block_on(service.search(&search_query)) {
+            Ok(documents) => {
+                self.resource_mapper.documents_to_resources(&documents)
+                    .unwrap_or_default()
+            }
+            Err(e) => {
+                error!("Failed to list resources: {:?}", e);
+                Vec::new()
+            }
+        }
     }
 
     fn read_resource(
@@ -248,83 +257,35 @@ impl mcp_server::Router for TerraphimMcpRouter {
         let this = self.clone();
         
         Box::pin(async move {
-            let document_id = match this.resource_mapper.extract_document_id_from_uri(&uri) {
-                Ok(id) => id,
-                Err(err) => return Err(ResourceError::NotFound(format!("Invalid URI: {}", err))),
-            };
-            
-            // In test mode, check for test resources first
-            if cfg!(test) || std::env::var("TERRAPHIM_TEST_MODE").is_ok() {
-                let test_docs = vec![
-                    ("test-doc-1", "Test Document 1", "This is a test document for e2e testing.\n\nIt contains multiple paragraphs and demonstrates the resource reading functionality."),
-                    ("test-doc-2", "Test Document 2", "Another test document with different content.\n\nThis document can be used to verify the resource reading API."),
-                    ("system-doc", "System Document", "# System Documentation\n\nThis document describes various system concepts and terminology.\n\n## Components\n\n- Hardware\n- Software\n- Infrastructure\n\n## Maintenance\n\nRegular system maintenance is essential for optimal performance."),
-                    ("terraphim-doc", "Terraphim Document", "# Terraphim Knowledge Graph\n\nTerraphim is a knowledge graph system for organizing and accessing information.\n\n## Features\n\n- Fast search\n- Document indexing\n- Role-based access\n\n## Use Cases\n\nTerraphim can be used for various knowledge management scenarios.")
-                ];
+            let document_id = this.resource_mapper.extract_document_id_from_uri(&uri)
+                .map_err(|e| ResourceError::NotFound(e.to_string()))?;
                 
-                // Check if the document_id matches any test document
-                for (id, title, content) in test_docs {
-                    if id == document_id {
-                        let formatted = format!("# {}\n\n{}", title, content);
-                        tracing::debug!("Found test document: {}", id);
-                        return Ok(formatted);
+            // Use the resource mapper to get the document
+            match this.resource_mapper.get_document(&document_id).await {
+                Ok(document) => {
+                    let mut text = String::new();
+                    text.push_str(&format!("Title: {}\n", document.title));
+                    
+                    if let Some(description) = &document.description {
+                        text.push_str(&format!("Description: {}\n", description));
                     }
-                }
-                
-                tracing::debug!("No test document found with id: {}", document_id);
-            }
-            
-            // If not in test mode or test document not found, proceed with normal search
-            let mut service = this.terraphim_service();
-            
-            // Use search with document ID to find the document
-            let search_term = terraphim_types::NormalizedTermValue::from(document_id.clone());
-            let search_query = terraphim_types::SearchQuery {
-                search_term,
-                skip: None,
-                limit: Some(1),
-                role: None,
-            };
-            
-            let documents = match service.search(&search_query).await {
-                Ok(docs) => docs,
-                Err(err) => {
-                    tracing::error!("Error searching for document {}: {}", document_id, err);
-                    return Err(ResourceError::NotFound(format!(
-                        "Document with id {} not found: {}", document_id, err
-                    )))
+                    
+                    text.push_str("\nContent:\n");
+                    text.push_str(&document.body);
+                    
+                    if let Some(tags) = &document.tags {
+                        text.push_str("\n\nTags: ");
+                        text.push_str(&tags.join(", "));
+                    }
+                    
+                    Ok(text)
                 },
-            };
-            
-            let document = match documents.first() {
-                Some(doc) if doc.id == document_id => doc.clone(),
-                _ => {
-                    tracing::warn!("Document with id {} not found in search results", document_id);
-                    return Err(ResourceError::NotFound(format!("Document with id {} not found", document_id)));
-                }
-            };
-            
-            // Format the document as text
-            let mut content = String::new();
-            content.push_str(&format!("# {}\n\n", document.title));
-            
-            if let Some(description) = &document.description {
-                content.push_str(&format!("{}\n\n", description));
+                Err(e) => Err(ResourceError::NotFound(format!("Document not found: {}", e))),
             }
-            
-            content.push_str(&document.body);
-            
-            if let Some(tags) = &document.tags {
-                content.push_str("\n\n## Tags\n\n");
-                content.push_str(&tags.join(", "));
-            }
-            
-            Ok(content)
         })
     }
 
     fn list_prompts(&self) -> Vec<Prompt> {
-        // No prompts are supported for now
         Vec::new()
     }
 
@@ -339,5 +300,20 @@ impl mcp_server::Router for TerraphimMcpRouter {
                 prompt_name
             )))
         })
+    }
+
+    fn capabilities(&self) -> ServerCapabilities {
+        ServerCapabilities {
+            tools: Some(mcp_core::protocol::ToolsCapability {
+                list_changed: None,
+            }),
+            prompts: Some(mcp_core::protocol::PromptsCapability {
+                list_changed: None,
+            }),
+            resources: Some(mcp_core::protocol::ResourcesCapability {
+                subscribe: None,
+                list_changed: None,
+            }),
+        }
     }
 }

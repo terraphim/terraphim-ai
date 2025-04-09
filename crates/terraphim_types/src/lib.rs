@@ -441,6 +441,16 @@ impl IndexedDocument {
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+    pub fn from_document(document: Document) -> Self {
+        let indexed_document = IndexedDocument {
+            id: document.id,
+            matched_edges: Vec::new(),
+            rank: 0,
+            tags: document.tags.unwrap_or_default(),
+            nodes: Vec::new(),
+        };
+        indexed_document
+    }
 }
 
 /// Query type for searching documents in the `RoleGraph`.

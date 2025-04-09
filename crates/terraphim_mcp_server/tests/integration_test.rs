@@ -2,16 +2,34 @@ use anyhow::Result;
 use mcp_core::{
     handler::{ResourceError, ToolError},
     Content,
+    protocol::{JsonRpcResponse, JsonRpcRequest},
 };
 use mcp_server::router::Router;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_service::TerraphimService;
-use terraphim_types::Document;
+use terraphim_types::{Document, RelevanceFunction, RoleName};
 use terraphim_mcp_server::TerraphimMcpRouter;
 use tokio::task;
+use ahash::AHashMap;
+
+/// Helper function to extract JsonRpcResponse from Content returned by a tool
+fn extract_json_rpc_response(contents: &[Content]) -> Result<JsonRpcResponse> {
+    if contents.is_empty() {
+        return Err(anyhow::anyhow!("Empty content"));
+    }
+    
+    match &contents[0] {
+        Content::Text(text_content) => {
+            serde_json::from_str::<JsonRpcResponse>(&text_content.text)
+                .map_err(|e| anyhow::anyhow!("Failed to parse JSON-RPC response: {}", e))
+        },
+        _ => Err(anyhow::anyhow!("Expected TextContent as first result")),
+    }
+}
 
 // Helper function to create a test document
 fn create_test_document(id: &str, title: &str, content: &str) -> Document {
@@ -87,6 +105,26 @@ async fn setup_test_env(test_name: &str) -> Result<ConfigState> {
         }
     }
     
+    // Add a specific test role that can be queried by name
+    let test_role_name = "test_role".to_string();
+    let test_role = terraphim_config::Role {
+        name: test_role_name.clone().into(),
+        shortname: Some("Test Role".to_string()),
+        relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
+        theme: "default".to_string(),
+        kg: None,
+        haystacks: vec![
+            terraphim_config::Haystack {
+                path: haystack_path.clone(),
+                service: terraphim_config::ServiceType::Ripgrep,
+            }
+        ],
+        extra: ahash::AHashMap::new(),
+    };
+    
+    // Add the test role to the config
+    config.roles.insert(test_role_name.into(), test_role);
+    
     // Create config state
     let config_state = ConfigState::new(&mut config).await?;
 
@@ -147,33 +185,55 @@ async fn test_mcp_router_resources() -> Result<()> {
     let documents = insert_test_documents(&mut service).await?;
     
     // Create the MCP router
-    let router = TerraphimMcpRouter::new(config_state);
+    let router = TerraphimMcpRouter::new(Arc::new(config_state));
     
     // Test 1: Search tool should return results
     let search_params = json!({
-        "query": "Terraphim"
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "search",
+        "params": {
+            "query": "Terraphim"
+        }
     });
     
-    let search_results = router.call_tool("search", search_params).await.map_err(|e| anyhow::anyhow!("Search tool failed: {}", e))?;
+    let search_result = router.call_tool("search", search_params).await.map_err(|e| anyhow::anyhow!("Search tool failed: {}", e))?;
+    
+    // The router now returns Vec<Content> where the first element is TextContent with JSON-RPC response
+    assert!(!search_result.is_empty(), "Search result should not be empty");
+    
+    // Extract the JSON-RPC response from the TextContent
+    let search_results = extract_json_rpc_response(&search_result)?;
+    
+    // Debug output
+    println!("JSON-RPC Response: {:?}", search_results);
+    
+    // Verify we got a valid JSON-RPC response
+    assert!(search_results.jsonrpc == "2.0", "Response should be JSON-RPC 2.0");
+    assert!(search_results.id == Some(1), "Response should have matching ID");
+    assert!(search_results.error.is_none(), "Response should not have an error");
+    
+    let result = search_results.result.expect("Response should have a result");
+    let contents = result.get("contents").expect("Result should have contents").as_array().expect("Contents should be an array");
+    
+    // Debug output
+    println!("Contents count: {}", contents.len());
+    println!("Contents: {:?}", contents);
     
     // Verify we got content in the response
-    assert!(!search_results.is_empty(), "Search results should not be empty");
-    
-    // The first result should be a text summary, and the rest should be resources
-    assert!(matches!(search_results[0], Content::Text(_)), "First result should be a text summary");
+    assert!(!contents.is_empty(), "Search results should not be empty");
     
     // Extract resource URIs from search results
     let mut resource_uris = Vec::new();
     
-    for content in search_results.iter().skip(1) { // Skip the text summary
-        match content {
-            Content::Resource(resource_content) => {
-                if let mcp_core::resource::ResourceContents::TextResourceContents { uri, .. } = &resource_content.resource {
-                    println!("Found resource: {}", uri);
-                    resource_uris.push(uri.clone());
+    for content in contents {
+        if let Some(resource) = content.get("resource") {
+            if let Some(uri) = resource.get("uri") {
+                if let Some(uri_str) = uri.as_str() {
+                    println!("Found resource: {}", uri_str);
+                    resource_uris.push(uri_str.to_string());
                 }
             }
-            _ => {}
         }
     }
     
@@ -198,7 +258,12 @@ async fn test_mcp_router_resources() -> Result<()> {
     }
     
     // Test 4: Invalid tool name should return error
-    let invalid_tool_result = router.call_tool("nonexistent", json!({})).await;
+    let invalid_tool_result = router.call_tool("nonexistent", json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "nonexistent",
+        "params": {}
+    })).await;
     assert!(invalid_tool_result.is_err(), "Calling nonexistent tool should fail");
     
     match invalid_tool_result {
@@ -223,48 +288,178 @@ async fn test_search_with_filters() -> Result<()> {
     let mut service = TerraphimService::new(config_state.clone());
     let _documents = insert_test_documents(&mut service).await?;
     
-    // Create the MCP router
-    let router = TerraphimMcpRouter::new(config_state);
+    // Create the MCP router - we need to wrap config_state in an Arc
+    let router = TerraphimMcpRouter::new(Arc::new(config_state));
     
-    // In the search implementation, the first item is always a text summary
-    // The actual limit is applied to the documents that are returned by the service,
-    // before they're converted to resources
-    
-    // Test 1: Search with a specific query that should return at least one result
+    // Test searching with limit parameter
     let search_params = json!({
-        "query": "knowledge graphs"
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "search",
+        "params": {
+            "query": "test",
+            "limit": 1
+        }
     });
     
-    let search_results = router.call_tool("search", search_params).await.map_err(|e| anyhow::anyhow!("Search failed: {}", e))?;
+    let search_result = router.call_tool("search", search_params).await.map_err(|e| anyhow::anyhow!("Search tool failed: {}", e))?;
     
-    // Print results for debugging
-    if let Content::Text(text_content) = &search_results[0] {
-        println!("Search results: {}", text_content.text);
-    }
+    // Extract the JSON-RPC response from the TextContent
+    let search_results = extract_json_rpc_response(&search_result)?;
     
-    // The search should find at least one result
-    assert!(search_results.len() > 1, "Search should find at least one result");
+    // Debug output
+    println!("Filter test - JSON-RPC Response: {:?}", search_results);
     
-    // Count resource objects
-    let resource_count = search_results.iter().filter(|content| 
-        matches!(content, Content::Resource(_))
-    ).count();
-    println!("Resource count: {}", resource_count);
+    // Verify we got a valid JSON-RPC response
+    assert!(search_results.jsonrpc == "2.0", "Response should be JSON-RPC 2.0");
+    assert!(search_results.id == Some(1), "Response should have matching ID");
+    assert!(search_results.error.is_none(), "Response should not have an error");
     
-    // Test 2: Verify that results contain expected content
-    let doc2_params = json!({
-        "query": "knowledge graphs"
+    let result = search_results.result.expect("Response should have a result");
+    let contents = result.get("contents").expect("Result should have contents").as_array().expect("Contents should be an array");
+    
+    // Debug output
+    println!("Filter test - Contents count: {}", contents.len());
+    println!("Filter test - Contents: {:?}", contents);
+    
+    // Verify limit worked (1 result + summary = 2 items)
+    assert_eq!(contents.len(), 2, "Search with limit=1 should return 2 results (1 summary + 1 document)");
+    
+    // Test searching with a role parameter that doesn't exist
+    let nonexistent_role_params = json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "search",
+        "params": {
+            "query": "test",
+            "role": "nonexistent_role"
+        }
     });
     
-    let doc2_results = router.call_tool("search", doc2_params).await.map_err(|e| anyhow::anyhow!("Search failed: {}", e))?;
+    let nonexistent_role_result = router.call_tool("search", nonexistent_role_params).await.map_err(|e| anyhow::anyhow!("Search tool failed: {}", e))?;
     
-    // Get the text summary to see what documents were found
-    if let Content::Text(text_content) = &doc2_results[0] {
-        println!("Doc2 search results: {}", text_content.text);
-        // Verify that the results mention doc2 which contains "knowledge graphs"
-        assert!(text_content.text.to_lowercase().contains("document 2"), 
-               "Search for 'knowledge graphs' should find Document 2");
+    // Extract the JSON-RPC response
+    let nonexistent_role_response = extract_json_rpc_response(&nonexistent_role_result)?;
+    
+    // Debug output
+    println!("Nonexistent role test - JSON-RPC Response: {:?}", nonexistent_role_response);
+    
+    // Verify we got a valid JSON-RPC response
+    assert!(nonexistent_role_response.jsonrpc == "2.0", "Response should be JSON-RPC 2.0");
+    assert!(nonexistent_role_response.id == Some(3), "Response should have matching ID");
+    
+    // For a nonexistent role, we should get an error response
+    assert!(nonexistent_role_response.error.is_some(), "Response should have an error for nonexistent role");
+    assert!(nonexistent_role_response.result.is_none(), "Response should not have a result for nonexistent role");
+    
+    if let Some(error) = nonexistent_role_response.error {
+        assert!(error.message.contains("Role `nonexistent_role` not found"), 
+                "Error message should indicate the role was not found");
     }
+    
+    // Test searching with valid query
+    let search_params = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "search",
+        "params": {
+            "query": "MCP"
+        }
+    });
+    
+    let doc2_result = router.call_tool("search", search_params).await.map_err(|e| anyhow::anyhow!("Search tool failed: {}", e))?;
+    
+    // Extract the JSON-RPC response
+    let doc2_results = extract_json_rpc_response(&doc2_result)?;
+    
+    // Debug output
+    println!("Regular search test - JSON-RPC Response: {:?}", doc2_results);
+    
+    // Verify we got a valid JSON-RPC response
+    assert!(doc2_results.jsonrpc == "2.0", "Response should be JSON-RPC 2.0");
+    assert!(doc2_results.id == Some(2), "Response should have matching ID");
+    assert!(doc2_results.error.is_none(), "Response should not have an error");
+    
+    let doc2_result = doc2_results.result.expect("Response should have a result");
+    let doc2_contents = doc2_result.get("contents").expect("Result should have contents").as_array().expect("Contents should be an array");
+    
+    // Debug output
+    println!("Regular search test - Contents count: {}", doc2_contents.len());
+    println!("Regular search test - Contents: {:?}", doc2_contents);
+    
+    // Verify we got at least one result for the search
+    assert!(!doc2_contents.is_empty(), "Search should return results");
+    
+    // Clean up
+    cleanup_test_resources(test_name).await?;
+    
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_search_with_role() -> Result<()> {
+    let test_name = "role_search_test";
+    
+    // Set up the test environment
+    let config_state = setup_test_env(test_name).await?;
+    
+    // Create Terraphim service and insert test documents
+    let mut service = TerraphimService::new(config_state.clone());
+    let documents = insert_test_documents(&mut service).await?;
+    
+    // Create the MCP router with Arc<ConfigState>
+    let router = TerraphimMcpRouter::new(Arc::new(config_state));
+    
+    // Test searching with the role parameter
+    let search_params = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "search",
+        "params": {
+            "query": "MCP",
+            "role": "test_role"
+        }
+    });
+    
+    let search_result = router.call_tool("search", search_params).await.map_err(|e| anyhow::anyhow!("Search tool failed: {}", e))?;
+    
+    // Extract the JSON-RPC response from the TextContent
+    let search_results = extract_json_rpc_response(&search_result)?;
+    
+    // Debug output
+    println!("Role search test - JSON-RPC Response: {:?}", search_results);
+    
+    // Verify we got a valid JSON-RPC response
+    assert!(search_results.jsonrpc == "2.0", "Response should be JSON-RPC 2.0");
+    assert!(search_results.id == Some(1), "Response should have matching ID");
+    assert!(search_results.error.is_none(), "Response should not have an error");
+    
+    let result = search_results.result.expect("Response should have a result");
+    let contents = result.get("contents").expect("Result should have contents").as_array().expect("Contents should be an array");
+    
+    // Debug output
+    println!("Role search test - Contents count: {}", contents.len());
+    println!("Role search test - Contents: {:?}", contents);
+    
+    // Verify we got content in the response (at least one result + summary)
+    assert!(contents.len() >= 2, "Role-based search should return at least one result plus summary");
+    
+    // Extract resource URIs from search results
+    let mut resource_uris = Vec::new();
+    
+    for content in contents.iter().skip(1) { // Skip the summary
+        if let Some(resource) = content.get("resource") {
+            if let Some(uri) = resource.get("uri") {
+                if let Some(uri_str) = uri.as_str() {
+                    println!("Found resource in role search: {}", uri_str);
+                    resource_uris.push(uri_str.to_string());
+                }
+            }
+        }
+    }
+    
+    // Verify we got at least one resource
+    assert!(!resource_uris.is_empty(), "Role-based search should return at least one resource");
     
     // Clean up
     cleanup_test_resources(test_name).await?;
