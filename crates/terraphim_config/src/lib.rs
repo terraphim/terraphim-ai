@@ -841,7 +841,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_json_serialization() {
-        let config = Config::fixture();
+        let config = Config::default();
         let json = serde_json::to_string_pretty(&config).unwrap();
         log::debug!("Config: {:#?}", config);
         assert!(json.len() > 0);
@@ -849,7 +849,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_toml_serialization() {
-        let config = Config::fixture();
+        let config = Config::default();
         let toml = toml::to_string_pretty(&config).unwrap();
         log::debug!("Config: {:#?}", config);
         assert!(toml.len() > 0);
