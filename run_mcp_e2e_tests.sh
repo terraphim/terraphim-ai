@@ -10,7 +10,7 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../../../../" && pwd)"
+WORKSPACE_DIR="${SCRIPT_DIR}"
 BINARY_PATH="${WORKSPACE_DIR}/target/release/terraphim_mcp_server"
 FIXTURES_DIR="${SCRIPT_DIR}/terraphim_server/fixtures"
 
