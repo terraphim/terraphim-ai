@@ -5,13 +5,18 @@ import os
 import subprocess
 import sys
 import time
+import json
+from typing import Optional
+import mcp
+from mcp import StdioServerParameters
+from mcp.client.stdio import stdio_client
+from mcp.client.session import ClientSession
 
 class E2ETestRunner:
-    def __init__(self, binary_path, debug_mode=False, expect_data=False):
+    def __init__(self, binary_path: str, debug_mode: bool = False, expect_data: bool = False):
         self.binary_path = binary_path
         self.debug_mode = debug_mode
         self.expect_data = expect_data
-        self.server_process = None
         self.logger = self._setup_logger()
 
     def _setup_logger(self):
@@ -23,54 +28,47 @@ class E2ETestRunner:
 
     async def run_tests(self):
         try:
-            self.logger.info("Starting Terraphim MCP Server...")
-            self.server_process = subprocess.Popen(
-                [self.binary_path],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            
-            # Wait for server to initialize
-            await asyncio.sleep(5)
+            # Start server automatically via mcp stdio_client
+            server_params = StdioServerParameters(command=self.binary_path, args=[], env={})
+            self.logger.info("Starting Terraphim MCP Server via mcp stdio_client...")
+            async with stdio_client(server_params) as (read, write):
+                client = ClientSession(read, write)
+                self.logger.info("Client connected to server. Running protocol tests...")
 
-            # Check if server is running
-            if self.server_process.poll() is not None:
-                stderr = self.server_process.stderr.read()
-                self.logger.error(f"Server failed to start. Error:\n{stderr}")
-                return False
+                # Initialize
+                await client.initialize()
+                self.logger.info("✅ initialize succeeded")
 
-            self.logger.info("Server started successfully.")
-            
-            # Simple test: send a request and check for a response
-            # In a real scenario, you'd use the mcp-sdk to communicate
-            # For now, we just check if it's alive.
-            # This part needs to be adapted to how your server and client communicate.
-            # Since the original test was failing on indentation, I'll provide a placeholder.
-            
-            self.logger.info("Performing a basic health check...")
-            # This is a mock test. A real implementation would use the MCP client.
-            # The original file snippet suggests a call to `read_resource`.
-            # I cannot reproduce that without the MCP SDK usage context.
-            
-            # For now, just assume if the server is running, the test passes.
-            self.logger.info("Server is running. Assuming basic test passed.")
-            test_passed = True
+                # list tools
+                tools_result = await client.list_tools()
+                tools = tools_result.tools
+                self.logger.info(f"✅ list_tools returned {len(tools)} tools")
+                tool_names = [t.name for t in tools]
+                expected = ["search", "update_config_tool"]
+                for name in expected:
+                    if name not in tool_names:
+                        self.logger.error(f"Expected tool {name} missing")
+                        return False
 
+                # call search tool
+                search_result = await client.call_tool(mcp.CallToolRequest(name="search", arguments={"query": "test"}))
+                self.logger.info("✅ search tool executed")
+
+                # list resources
+                res_list = await client.list_resources()
+                self.logger.info(f"✅ list_resources returned {len(res_list.resources)} resources")
+
+                # read first resource if exists
+                if res_list.resources:
+                    first_uri = res_list.resources[0].uri
+                    await client.read_resource(mcp.ReadResourceRequest(uri=first_uri))
+                    self.logger.info("✅ read_resource succeeded")
+
+                self.logger.info("All MCP protocol tests passed.")
+                return True
         except Exception as e:
-            self.logger.error(f"An error occurred during testing: {e}")
-            test_passed = False
-        finally:
-            if self.server_process:
-                self.logger.info("Shutting down server...")
-                self.server_process.terminate()
-                await asyncio.sleep(2)
-                if self.server_process.poll() is None:
-                    self.server_process.kill()
-                self.logger.info("Server shut down.")
-        
-        return test_passed
+            self.logger.error(f"Error during protocol tests: {e}")
+            return False
 
 def main():
     parser = argparse.ArgumentParser(description="E2E Test Runner for Terraphim MCP Server")
@@ -81,20 +79,20 @@ def main():
 
     runner = E2ETestRunner(args.binary, args.debug, args.expect_data)
     
-    loop = asyncio.get_event_loop()
-    if sys.platform == "win32":
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-
+    # Use asyncio.run() instead of manually managing the event loop
     try:
-        if loop.run_until_complete(runner.run_tests()):
+        if asyncio.run(runner.run_tests()):
             logging.info("✅ All tests passed!")
             sys.exit(0)
         else:
             logging.error("❌ Tests failed.")
             sys.exit(1)
-    finally:
-        loop.close()
+    except KeyboardInterrupt:
+        logging.info("Tests interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 

@@ -89,6 +89,11 @@ fi
 LOGS_DIR="${SCRIPT_DIR}/logs"
 mkdir -p "${LOGS_DIR}"
 
+# Clean up previous run
+echo -e "${YELLOW}Cleaning up previous run...${RESET}"
+rm -rf /tmp/sled/db
+pkill -f terraphim_mcp_server || true
+
 # Make sure fixtures directory exists
 mkdir -p "${FIXTURES_DIR}/haystack"
 
