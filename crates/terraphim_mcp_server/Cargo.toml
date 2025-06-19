@@ -2,13 +2,11 @@
 name = "terraphim_mcp_server"
 version = "0.1.0"
 edition = "2021"
-authors = ["Terraphim Team"]
-description = "Terraphim Model Context Protocol Server"
-license = "MIT OR Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mcp-core = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
-mcp-server = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main" }
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main", features = ["server"] }
 terraphim_types = { path = "../terraphim_types" }
 terraphim_service = { path = "../terraphim_service" }
 terraphim_config = { path = "../terraphim_config" }
@@ -29,6 +27,3 @@ chrono = { version = "0.4.34", features = ["serde"] }
 futures = "0.3.30"
 tracing-appender = "0.2.3"
 async-trait = "0.1"
-
-[dev-dependencies]
-tokio = { version = "1.36.0", features = ["full", "test-util", "macros"] }

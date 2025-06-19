@@ -101,6 +101,22 @@ impl<'a> TerraphimService {
         Ok(document)
     }
 
+    /// Get document by ID
+    pub async fn get_document_by_id(&mut self, document_id: &str) -> Result<Option<Document>> {
+        let search_query = SearchQuery {
+            search_term: NormalizedTermValue::new(document_id.to_string()),
+            limit: Some(1),
+            skip: None,
+            role: None,
+        };
+
+        let documents = self.search(&search_query).await?;
+
+        Ok(documents
+            .into_iter()
+            .find(|doc| doc.id == document_id))
+    }
+
     /// Get the role for the given search query
     async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
         let search_role = match &search_query.role {
