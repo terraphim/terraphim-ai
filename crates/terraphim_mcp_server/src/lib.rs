@@ -4,10 +4,10 @@ use anyhow::Result;
 use rmcp::{
     model::{
         CallToolResult, Content, ListResourcesResult, ReadResourceRequestParam, ReadResourceResult,
-        ServerInfo, ErrorData
+        ServerInfo, ErrorData, ListToolsResult, Tool, CallToolRequestParam
     },
     service::RequestContext,
-    tool, Error as McpError, RoleServer, ServerHandler,
+    Error as McpError, RoleServer, ServerHandler,
 };
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
@@ -46,7 +46,6 @@ pub struct McpService {
     resource_mapper: Arc<TerraphimResourceMapper>,
 }
 
-#[tool(tool_box)]
 impl McpService {
     /// Create a new service instance
     pub fn new(config_state: Arc<ConfigState>) -> Self {
@@ -69,13 +68,13 @@ impl McpService {
         Ok(())
     }
 
-    #[tool(description = "Search for documents in the Terraphim knowledge graph")]
+    /// Search for documents in the Terraphim knowledge graph
     pub async fn search(
         &self,
-        #[tool(param)] query: String,
-        #[tool(param)] role: Option<String>,
-        #[tool(param)] limit: Option<i32>,
-        #[tool(param)] skip: Option<i32>,
+        query: String,
+        role: Option<String>,
+        limit: Option<i32>,
+        skip: Option<i32>,
     ) -> Result<CallToolResult, McpError> {
         let mut service = self.terraphim_service();
         let search_query = SearchQuery {
@@ -114,10 +113,10 @@ impl McpService {
         }
     }
 
-    #[tool(description = "Update the Terraphim configuration")]
+    /// Update the Terraphim configuration
     pub async fn update_config_tool(
         &self,
-        #[tool(param)] config_str: String,
+        config_str: String,
     ) -> Result<CallToolResult, McpError> {
         match serde_json::from_str::<Config>(&config_str) {
             Ok(new_config) => match self.update_config(new_config).await {
@@ -142,6 +141,116 @@ impl McpService {
 }
 
 impl ServerHandler for McpService {
+    fn list_tools(
+        &self,
+        _request: Option<rmcp::model::PaginatedRequestParam>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
+        async move {
+            // Convert JSON values to Arc<Map<String, Value>> for input_schema
+            let search_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query"
+                    },
+                    "role": {
+                        "type": "string",
+                        "description": "Optional role to filter by"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return"
+                    },
+                    "skip": {
+                        "type": "integer",
+                        "description": "Number of results to skip"
+                    }
+                },
+                "required": ["query"]
+            });
+            let search_map = search_schema.as_object().unwrap().clone();
+            
+            let config_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "config_str": {
+                        "type": "string",
+                        "description": "JSON configuration string"
+                    }
+                },
+                "required": ["config_str"]
+            });
+            let config_map = config_schema.as_object().unwrap().clone();
+
+            let tools = vec![
+                Tool {
+                    name: "search".into(),
+                    description: Some("Search for documents in the Terraphim knowledge graph".into()),
+                    input_schema: Arc::new(search_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "update_config_tool".into(),
+                    description: Some("Update the Terraphim configuration".into()),
+                    input_schema: Arc::new(config_map),
+                    annotations: None,
+                }
+            ];
+            Ok(ListToolsResult { 
+                tools,
+                next_cursor: None,
+            })
+        }
+    }
+
+    fn call_tool(
+        &self,
+        request: CallToolRequestParam,
+        _context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<CallToolResult, ErrorData>> + Send + '_ {
+        async move {
+            match request.name.as_ref() {
+                "search" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let query = arguments.get("query")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .to_string();
+                    
+                    let role = arguments.get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    
+                    let limit = arguments.get("limit")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as i32);
+                    
+                    let skip = arguments.get("skip")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as i32);
+                    
+                    self.search(query, role, limit, skip).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "update_config_tool" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let config_str = arguments.get("config_str")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ErrorData::invalid_params("Missing 'config_str' parameter".to_string(), None))?
+                        .to_string();
+                    
+                    self.update_config_tool(config_str).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                _ => Err(ErrorData::method_not_found::<rmcp::model::CallToolRequestMethod>())
+            }
+        }
+    }
+
     fn list_resources(
         &self,
         _request: Option<rmcp::model::PaginatedRequestParam>,
@@ -194,11 +303,10 @@ impl ServerHandler for McpService {
                     contents: vec![contents],
                 })
             } else {
-                Err(McpError::resource_not_found(
+                Err(ErrorData::resource_not_found(
                     format!("Document not found: {}", doc_id),
                     None,
-                )
-                .into())
+                ))
             }
         }
     }
