@@ -28,7 +28,7 @@
 
   function updateSuggestions(event: Event) {
     const inputElement = event.target as HTMLInputElement;
-    const cursorPosition = inputElement.selectionStart;
+    const cursorPosition = inputElement.selectionStart ?? 0;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
     const currentWord = words[words.length - 1];
@@ -54,14 +54,14 @@
 
   function applySuggestion(suggestion: string) {
     const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
-    const cursorPosition = inputElement.selectionStart;
+    const cursorPosition = inputElement?.selectionStart ?? 0;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const textAfterCursor = $input.slice(cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
     words[words.length - 1] = suggestion;
     
     $input = [...words, textAfterCursor].join(" ");
-    inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
+    inputElement?.setSelectionRange?.(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
     suggestions = [];
     suggestionIndex = -1;
   }
