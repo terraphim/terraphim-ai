@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^2.1.0",
@@ -19,7 +25,14 @@
     "svelte-typeahead": "^4.4.1",
     "tslib": "^2.5.0",
     "typescript": "^5.0.4",
-    "vite": "^4.3.1"
+    "vite": "^4.3.1",
+    "@testing-library/svelte": "^4.2.3",
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/user-event": "^14.5.2",
+    "vitest": "^1.6.0",
+    "jsdom": "^24.1.0",
+    "@vitest/ui": "^1.6.0",
+    "@playwright/test": "^1.44.1"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.4.0",

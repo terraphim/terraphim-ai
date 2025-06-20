@@ -38,6 +38,12 @@ tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
 ahash = "0.8.11"
 
+[dev-dependencies]
+tokio-test = "0.4.4"
+serial_test = "3.1.1"
+tempfile = "3.12.0"
+mockall = "0.13.0"
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
