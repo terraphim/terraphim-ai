@@ -6,6 +6,9 @@ import { is_tauri, role, roles, theme } from './stores';
 // Test configuration
 const TEST_TIMEOUT = 5000; // 5 seconds for API calls
 
+// Stub TAURI IPC to prevent invoke errors
+(global as any).__TAURI_IPC__ = () => {};
+
 describe('ThemeSwitcher Component - Real Integration', () => {
   beforeAll(async () => {
     // Set up for web-based testing (not Tauri)
@@ -28,16 +31,10 @@ describe('ThemeSwitcher Component - Real Integration', () => {
   it('displays available roles in dropdown', async () => {
     render(ThemeSwitcher);
     
-    // Wait for component to load and populate roles
     await waitFor(() => {
-      const selectElement = screen.getByRole('combobox');
-      expect(selectElement).toBeInTheDocument();
+      const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
+      expect(selectElement.options.length).toBeGreaterThan(0);
     }, { timeout: TEST_TIMEOUT });
-    
-    // Should have some role options available
-    const selectElement = screen.getByRole('combobox');
-    const options = selectElement.querySelectorAll('option');
-    expect(options.length).toBeGreaterThan(0);
   }, TEST_TIMEOUT);
 
   it('changes role when option is selected', async () => {

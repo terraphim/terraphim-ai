@@ -27,8 +27,11 @@
   }
 
   function updateSuggestions(event: Event) {
-    const inputElement = event.target as HTMLInputElement;
-    const cursorPosition = inputElement.selectionStart ?? 0;
+    const inputElement = event.target as HTMLInputElement | null;
+    if (!inputElement || inputElement.selectionStart == null) {
+      return;
+    }
+    const cursorPosition = inputElement.selectionStart;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
     const currentWord = words[words.length - 1];
@@ -115,9 +118,9 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        this.error = `Error fetching data: ${error}`;
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        error = `Error fetching data: ${err}`;
       }
     }
   }

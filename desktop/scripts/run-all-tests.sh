@@ -192,6 +192,35 @@ fi
 
 # Frontend Tests (Svelte/Vitest)
 if [ "$SKIP_FRONTEND" = false ]; then
+    print_status "Starting Terraphim Server for integration tests..."
+
+    # Start server in background on port 8000
+    pushd ../../terraphim_server > /dev/null
+    TERRAPHIM_SERVER_HOSTNAME="127.0.0.1:8000" cargo run --quiet &
+    SERVER_PID=$!
+    popd > /dev/null
+
+    # Give the server time to compile+start
+    print_status "Waiting for Terraphim Server (PID: $SERVER_PID) to start..."
+    SECONDS_WAITED=0
+    SERVER_UP=false
+    while [ $SECONDS_WAITED -lt 60 ]; do
+      if curl -sSf "http://localhost:8000/health" > /dev/null 2>&1; then
+        SERVER_UP=true
+        break
+      fi
+      sleep 2
+      SECONDS_WAITED=$((SECONDS_WAITED+2))
+    done
+
+    if [ "$SERVER_UP" = false ]; then
+      print_error "Terraphim Server failed to start within 60 seconds"
+      kill $SERVER_PID || true
+      exit 1
+    fi
+
+    print_success "Terraphim Server is up and running"
+
     print_status "Running frontend tests (Svelte/Vitest)..."
     
     if [ "$COVERAGE" = true ]; then
@@ -290,4 +319,9 @@ else
     echo ""
     print_error "$TOTAL_FAILED test suite(s) failed"
     exit 1
-fi 
+fi
+
+# At the very end, after tests summary (before exit), ensure the server is stopped
+print_status "Stopping Terraphim Server (PID: $SERVER_PID)..."
+kill $SERVER_PID || true
+print_success "Terraphim Server stopped" 

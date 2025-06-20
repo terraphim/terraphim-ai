@@ -24,8 +24,8 @@
           .then((res) => {
             console.log("get_config response", res);
             if (res && res.status === "success") {
-              configStore.set(res.config);
-              roles.set(Object.values(res.config.roles));
+              configStore.set(res.config as any);
+              roles.set(Object.values(res.config.roles) as any);
               role.set(res.config.default_role);
               theme.set(
                 res.config.roles[res.config.default_role]?.theme || "default"
@@ -43,8 +43,8 @@
           .then((received_config: ConfigResponse) => {
             console.log("Config received", received_config);
             if (received_config && received_config.status === "success") {
-              configStore.set(received_config.config);
-              roles.set(received_config.config.roles);
+              configStore.set(received_config.config as any);
+              roles.set(Object.values(received_config.config.roles) as any);
               role.set(received_config.config.default_role);
               theme.set(
                 received_config.config.roles[
@@ -75,7 +75,8 @@
     role.set(target.value);
     console.log($roles);
     // FIXME: ugly hack to make roles work with new deserialization out of tauri
-    const roleSettings = $roles.find(r => r.name === target.value);
+    const rolesArray = Array.isArray($roles) ? $roles : Object.values($roles);
+    const roleSettings = rolesArray.find((r: any) => r.name === target.value);
     console.log("Role settings ", roleSettings);
 
     if (roleSettings) {
