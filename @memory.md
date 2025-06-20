@@ -97,3 +97,33 @@ The issue appears to be that the server configuration points to fixtures, but th
   • Engineer: "graph embeddings"  
   • System Operator: "service"
 - All 7 integration tests pass; each role search call now yields ≥1 document (or at least non-zero content) and no longer returns empty result sets.
+
+# Terraphim Desktop Application Status (2025-06-20)
+
+## ✅ Desktop Tauri Application
+- **Compilation**: Successfully compiles with no errors, only warnings
+- **Location**: `desktop/src-tauri/` with Rust backend, Svelte frontend
+- **Architecture**: Uses Tauri for system tray, global shortcuts, WebView integration
+- **State Management**: Manages `ConfigState` and `DeviceSettings` as shared state between frontend/backend
+- **Features**: Search, config management, thesaurus publishing, settings management, splashscreen
+
+## ✅ Persistable Trait Current Implementation
+- **Location**: `crates/terraphim_persistence/src/lib.rs`
+- **Storage Backend**: Uses OpenDAL for storage abstraction (S3, filesystem, dashmap, etc.)
+- **Trait Methods**: `new`, `save`, `save_to_one`, `load`, `get_key`
+- **Implementations**: 
+  - `Thesaurus` saves as `thesaurus_{normalized_name}.json`
+  - `Config` saves as `{config_id}_config.json`
+- **Usage**: Service layer uses `ensure_thesaurus_loaded` for thesaurus persistence
+
+## 🔄 Current Focus: Memory-Only Storage for Tests
+- **Need**: Create memory-only persistable implementation for tests
+- **Approach**: Create `MemoryStorage` backend that doesn't require filesystem/external services
+- **Integration**: Add memory storage profile to `DeviceSettings`
+- **Benefits**: Faster tests, no external dependencies, isolated test environments
+
+## ✅ Integration Test Status (Previous)
+- All 7 integration tests pass for MCP server
+- Search functionality works with role-specific queries
+- Proper logging integration without stdout pollution
+- Added pagination, resource mapping, and error handling tests

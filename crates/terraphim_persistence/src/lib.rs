@@ -1,6 +1,7 @@
 pub mod error;
 pub mod settings;
 pub mod thesaurus;
+pub mod memory;
 
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
@@ -29,10 +30,28 @@ impl DeviceStorage {
             .await?;
         Ok(storage)
     }
+    
+    /// Initialize device storage with memory-only settings for tests
+    /// 
+    /// This is useful for tests that don't want to use filesystem or external services
+    pub async fn init_memory_only() -> Result<&'static DeviceStorage> {
+        let storage = DEVICE_STORAGE
+            .get_or_try_init(async {
+                let settings = memory::create_memory_only_device_settings()?;
+                let initialized_storage = init_device_storage_with_settings(settings).await?;
+                Ok::<DeviceStorage, Error>(initialized_storage)
+            })
+            .await?;
+        Ok(storage)
+    }
 }
 
 async fn init_device_storage() -> Result<DeviceStorage> {
     let settings = DeviceSettings::load_from_env_and_file(None)?;
+    init_device_storage_with_settings(settings).await
+}
+
+async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<DeviceStorage> {
     log::info!("Loaded settings: {:?}", settings);
 
     let operators = settings::parse_profiles(&settings).await?;
