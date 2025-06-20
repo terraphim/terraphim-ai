@@ -51,17 +51,17 @@ pub async fn build_thesaurus_from_haystack(
 ) -> Result<()> {
     // build thesaurus from haystack or load from remote
     // FIXME: introduce LRU cache for locally build thesaurus via persistance crate
-    println!("Building thesaurus from haystack");
+    log::debug!("Building thesaurus from haystack");
     let config = config_state.config.lock().await.clone();
     let roles = config.roles.clone();
     let default_role = config.default_role.clone();
     let role_name = search_query.role.clone().unwrap_or_default();
-    println!("Role name: {}", role_name);
+    log::debug!("Role name: {}", role_name);
     let role: &mut Role = &mut roles
         .get(&role_name)
         .unwrap_or(&roles[&default_role])
         .to_owned();
-    println!("Role: {:?}", role);
+    log::debug!("Role: {:?}", role);
     for haystack in &role.haystacks {
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
@@ -71,8 +71,7 @@ pub async fn build_thesaurus_from_haystack(
             .await?;
         match thesaurus.save().await {
             Ok(_) => {
-                log::debug!("Thesaurus saved");
-                println!("Thesaurus saved");
+                log::info!("Thesaurus saved");
             }
             Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
         }
@@ -87,9 +86,7 @@ pub async fn build_thesaurus_from_haystack(
         tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
         log::debug!("Thesaurus written to {:#?}", thesaurus_path);
         role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
-        log::info!("Make sure thesaurus updated in a role {}", role_name);
-        println!("Make sure thesaurus updated in a role {}", role_name);
-        // TODO: may be re-building all thesaurus on change using inotify is easier
+        log::debug!("Make sure thesaurus updated in a role {}", role_name);
 
         update_thesaurus(config_state, &role_name, thesaurus).await?;
     }
@@ -101,7 +98,7 @@ async fn update_thesaurus(
     role_name: &RoleName,
     thesaurus: Thesaurus,
 ) -> Result<()> {
-    println!("Updating thesaurus for role: {}", role_name);
+    log::debug!("Updating thesaurus for role: {}", role_name);
     let mut rolegraphs = config_state.roles.clone();
     let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
     match rolegraph {
@@ -296,7 +293,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 let lines = match &message.lines {
                     Data::Text { text } => text,
                     _ => {
-                        println!("Error: lines is not text: {:?}", message.lines);
+                        log::warn!("Error: lines is not text: {:?}", message.lines);
                         continue;
                     }
                 };
@@ -306,7 +303,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 // list of synonyms, which we can use to build the thesaurus
                 let Some((synonym_keyword, synonym)) = lines.split_once(LOGSEQ_KEY_VALUE_DELIMITER)
                 else {
-                    println!("Error: Expected key-value pair, got {}. Skipping", lines);
+                    log::warn!("Error: Expected key-value pair, got {}. Skipping", lines);
                     continue;
                 };
 
@@ -325,7 +322,7 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                         concept
                     }
                     None => {
-                        println!("Error: No concept found. Skipping");
+                        log::warn!("Error: No concept found. Skipping");
                         continue;
                     }
                 };

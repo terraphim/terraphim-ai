@@ -64,14 +64,14 @@ impl<'a> TerraphimService {
                 Err(ServiceError::Config("Automata path not found".into()))
             }
         }
-        println!("Loading thesaurus for role: {}", role_name);
-        println!("Role keys {:?}", self.config_state.roles.keys());
+        log::debug!("Loading thesaurus for role: {}", role_name);
+        log::debug!("Role keys {:?}", self.config_state.roles.keys());
         let mut rolegraphs = self.config_state.roles.clone();
         if let Some(rolegraph_value) = rolegraphs.get(role_name) {
             let thesaurus_result = rolegraph_value.lock().await.thesaurus.clone().load().await;
             match thesaurus_result {
                 Ok(thesaurus) => {
-                    println!("Thesaurus loaded: {:#?}", thesaurus);
+                    log::debug!("Thesaurus loaded: {:?}", thesaurus);
                     log::info!("Rolegraph loaded: for role name {:?}", role_name);
                     Ok(thesaurus)
                 }
@@ -186,7 +186,6 @@ impl<'a> TerraphimService {
                 // Apply to ripgrep vector of document output
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
-                println!("Ranking documents with thesaurus");
                 let documents = index.get_documents(scored_index_docs);
 
                 Ok(documents)
@@ -211,7 +210,7 @@ impl<'a> TerraphimService {
         let mut current_config = self.config_state.config.lock().await;
         *current_config = config.clone();
         current_config.save().await?;
-        println!("Config updated {:?}", current_config);
+        log::info!("Config updated");
         Ok(config)
     }
 }
@@ -230,13 +229,13 @@ mod tests {
         use terraphim_config::{ConfigBuilder, ConfigId};
         let device_settings =
         DeviceSettings::load_from_env_and_file(None).context("Failed to load settings").unwrap();
-        println!("Device settings: {:?}", device_settings);
+        log::debug!("Device settings: {:?}", device_settings);
       
           let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => config,
                 Err(e) => {
-                    println!("Failed to load config: {:?}", e);
+                    log::warn!("Failed to load config: {:?}", e);
                     let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
                     config
                 },
@@ -246,7 +245,7 @@ mod tests {
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let terraphim_service = TerraphimService::new(config_state);
         let config = terraphim_service.fetch_config().await;
-        println!("Config: {:?}", config);
+        log::debug!("Config: {:?}", config);
     }
 
 
@@ -258,13 +257,13 @@ mod tests {
         use terraphim_config::{ConfigBuilder, ConfigId};
         let device_settings =
         DeviceSettings::load_from_env_and_file(None).context("Failed to load settings").unwrap();
-        println!("Device settings: {:?}", device_settings);
+        log::debug!("Device settings: {:?}", device_settings);
       
           let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => config,
                 Err(e) => {
-                    println!("Failed to load config: {:?}", e);
+                    log::warn!("Failed to load config: {:?}", e);
                     let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
                     config
                 },
@@ -274,6 +273,6 @@ mod tests {
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let mut terraphim_service = TerraphimService::new(config_state);
         let documents = terraphim_service.search_documents_selected_role(&NormalizedTermValue::new("agent".to_string())).await.unwrap();
-        println!("Documents: {:?}", documents);
+        log::debug!("Documents: {:?}", documents);
     }     
 }  
