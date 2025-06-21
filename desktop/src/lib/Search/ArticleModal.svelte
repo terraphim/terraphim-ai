@@ -3,10 +3,42 @@
   import SvelteMarkdown from "svelte-markdown";
   import type { Document } from "./SearchResult";
   import NovelWrapper from '$lib/Editor/NovelWrapper.svelte';
+  import { invoke } from '@tauri-apps/api/tauri';
+  import { is_tauri } from '../stores';
 
   export let active: boolean = false;
   export let item: Document;
   let editing = false;
+
+  // Whenever the modal becomes active for a given item, refresh its content from persistence.
+  $: if (active && item && !editing) {
+    loadDocument();
+  }
+
+  async function loadDocument() {
+    if (!$is_tauri) return;
+    try {
+      const resp: any = await invoke('get_document', { document_id: item.id });
+      if (resp?.document) {
+        item = resp.document;
+      }
+    } catch (e) {
+      console.error('Failed to load document', e);
+    }
+  }
+
+  async function saveDocument() {
+    if (!$is_tauri) {
+      editing = false;
+      return;
+    }
+    try {
+      await invoke('create_document', { document: item });
+      editing = false;
+    } catch (e) {
+      console.error('Failed to save document', e);
+    }
+  }
 </script>
 
 <Modal bind:active>
@@ -16,7 +48,7 @@
     {#if editing}
       <!-- Pass the article body as default content and bind back for updates -->
       <NovelWrapper bind:html={item.body}/>
-      <button class="button is-primary" on:click={() => editing = false}>
+      <button class="button is-primary" on:click={saveDocument}>
         Save
       </button>
     {:else}
