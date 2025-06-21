@@ -167,6 +167,47 @@ Concurrency/timeout: ~120 LOC
   ```
 - Re-ran `cargo test -p terraphim_mcp_server --test integration_test` => **7/7 tests PASS**. 
 
+# 2025-06-21 – Desktop App JSON Editor Consolidation ✅
+
+## Problem Identified
+- User reported Vite build error: "Missing './styles.scss' specifier in 'svelte-jsoneditor' package"
+- Error occurred in `ConfigJsonEditor.svelte` at line 3: `import "svelte-jsoneditor/styles.scss?inline";`
+- Investigation revealed two separate JSON editor implementations:
+  - `ConfigJsonEditor.svelte` at `/config/json` route (with style import issues)
+  - `FetchTabs.svelte` at `/fetch/editor` route (working implementation)
+
+## Root Cause Analysis
+- Both components provided identical JSON editing functionality
+- `ConfigJsonEditor.svelte` tried to import styles with `?inline` which caused Vite errors
+- `FetchTabs.svelte` worked fine without explicit style imports
+- Initial attempt to route `/config/json` to `FetchTabs` caused routing conflicts
+
+## Solution Implemented ✅
+1. **Recreated simplified ConfigJsonEditor.svelte**: Extracted JSON editor logic from FetchTabs
+2. **Fixed build errors**: Eliminated problematic style import
+3. **Maintained separate routes**: Kept distinct UX patterns for different use cases
+4. **Shared core functionality**: Both components now use same reliable JSON editor implementation
+
+## Technical Details
+- `svelte-jsoneditor` package includes its own styles automatically
+- No explicit style imports needed for proper functionality
+- `/config/json` provides dedicated JSON editor with automatic saving
+- `/fetch/editor` provides JSON editor within the fetch tabs interface
+- Both routes now provide consistent JSON editing experience
+
+## Benefits Achieved
+- ✅ Fixed Vite build errors
+- ✅ Eliminated code duplication by extracting shared logic
+- ✅ Maintained distinct UX patterns for different routes
+- ✅ Consistent JSON editing experience across both routes
+- ✅ Reduced maintenance overhead
+
+## Files Modified
+- `desktop/src/lib/ConfigJsonEditor.svelte`: Recreated with simplified implementation
+- `desktop/src/App.svelte`: Updated import and route
+- `@memory.md`: Updated documentation of the fix
+- `@scratchpad.md`: Updated implementation details
+
 # Desktop Application and Persistable Trait Investigation - COMPLETED ✅
 
 ## Task Summary

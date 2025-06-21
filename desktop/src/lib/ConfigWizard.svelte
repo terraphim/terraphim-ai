@@ -12,14 +12,16 @@
     id: string;
     global_shortcut: string;
     default_theme: string;
+    default_role: string;
   };
   type HaystackForm = { path: string; read_only: boolean };
   type KnowledgeGraphForm = { url: string; local_path: string; local_type: string; public: boolean; publish: boolean };
-  type RoleForm = { name: string; theme: string; haystacks: HaystackForm[]; kg: KnowledgeGraphForm };
+  type RoleForm = { name: string; shortname: string; relevance_function: string; theme: string; haystacks: HaystackForm[]; kg: KnowledgeGraphForm };
   const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
     id: "Desktop",
     global_shortcut: "Ctrl+X",
     default_theme: "spacelab",
+    default_role: "Default",
     roles: []
   });
 
@@ -41,12 +43,15 @@
           id: current.id,
           global_shortcut: current.global_shortcut,
           default_theme: current.roles[current.default_role]?.theme ?? "spacelab",
+          default_role: current.default_role,
           roles: Object.values(current.roles).map((r:any)=>{
             const autoPath = r.kg?.automata_path;
             const url = autoPath?.Remote ?? "";
             const localPath = r.kg?.knowledge_graph_local?.path ?? "";
             return {
               name: r.name,
+              shortname: r.shortname,
+              relevance_function: r.relevance_function,
               theme: r.theme,
               haystacks: (r.haystacks ?? []).map((h:any)=>({path:h.path, read_only:h.read_only ?? false})),
               kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false }
@@ -69,7 +74,7 @@
   }
 
   function addRole() {
-    draft.update((d) => ({ ...d, roles: [...d.roles, { name: "New Role", theme: "spacelab", haystacks: [], kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false} }] }));
+    draft.update((d) => ({ ...d, roles: [...d.roles, { name: "New Role", shortname:"new", relevance_function: "TitleScorer", theme: "spacelab", haystacks: [], kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false} }] }));
   }
   function removeRole(idx: number) {
     draft.update((d) => ({ ...d, roles: d.roles.filter((_, i) => i !== idx) }));
@@ -94,6 +99,7 @@
     let updated = { ...existing } as any;
     updated.id = data.id;
     updated.global_shortcut = data.global_shortcut;
+    updated.default_role = data.default_role;
 
     // rebuild roles map
     const rolesMap: Record<string, any> = {};
@@ -102,15 +108,14 @@
       // clean key by removing potential wrapping quotes
       const cleanKey = key.replace(/^"|"$/g, "");
       rolesMap[cleanKey] = {
-        ...(existing.roles?.[key] ?? {
-          shortname: r.name,
-          kg: null,
-          haystacks: [],
-          relevance_function: "TitleScorer",
-          extra: {},
-        }),
+        // Preserve `extra` from existing config, or default for new roles.
+        extra: existing.roles?.[key]?.extra ?? {},
+
+        // Overwrite all other fields from the form
         name: r.name,
+        shortname: r.shortname,
         theme: r.theme,
+        relevance_function: r.relevance_function,
         haystacks: r.haystacks.map((h)=>({path: h.path, service:"Ripgrep", read_only: h.read_only})),
         kg: r.kg.url || r.kg.local_path ? {
           automata_path: r.kg.url ? { Remote: r.kg.url } : null,
@@ -177,6 +182,19 @@
         <input class="input" type="text" bind:value={$draft.default_theme} />
       </div>
     </div>
+
+    <div class="field">
+      <label class="label">Default Role</label>
+      <div class="control">
+        <div class="select">
+          <select bind:value={$draft.default_role}>
+            {#each $draft.roles as role}
+              <option value={role.name}>{role.name}</option>
+            {/each}
+          </select>
+        </div>
+      </div>
+    </div>
   {:else if currentStep === 2}
     <h4 class="title is-5">Roles</h4>
     {#each $draft.roles as roleItem, idx (roleItem.name)}
@@ -188,9 +206,21 @@
           </div>
         </div>
         <div class="field">
+          <label class="label">Short name</label>
+          <div class="control">
+            <input class="input" type="text" bind:value={$draft.roles[idx].shortname} />
+          </div>
+        </div>
+        <div class="field">
           <label class="label">Theme</label>
           <div class="control">
             <input class="input" type="text" bind:value={$draft.roles[idx].theme} />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Relevance function</label>
+          <div class="control">
+            <input class="input" type="text" bind:value={$draft.roles[idx].relevance_function} />
           </div>
         </div>
         <h5 class="title is-6">Haystacks</h5>

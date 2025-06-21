@@ -36,5 +36,3 @@ Example configuration for this KG:
 * to do list
 
 * todo list
-
-some strange **test**
