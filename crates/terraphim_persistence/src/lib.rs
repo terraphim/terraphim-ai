@@ -2,6 +2,7 @@ pub mod error;
 pub mod settings;
 pub mod thesaurus;
 pub mod memory;
+pub mod document;
 
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;

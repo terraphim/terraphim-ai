@@ -5,13 +5,16 @@ use std::result;
 mod names;
 mod scored;
 
-use crate::error::Result;
 use names::NameScorer;
 use scored::{Scored, SearchResults};
 use serde::{Serialize, Serializer};
 
 use terraphim_types::Document;
 use terraphim_types::SearchQuery;
+use crate::ServiceError;
+
+/// Score module local Result type using TerraphimService's error enum.
+type Result<T> = std::result::Result<T, ServiceError>;
 
 /// Sort the documents by relevance.
 ///
