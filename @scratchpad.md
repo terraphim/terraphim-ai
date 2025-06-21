@@ -293,3 +293,34 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out
 - `desktop/src/test-utils/setup.ts` - Simplified, no mocks
 
 **This is now a production-ready testing setup that validates real business logic instead of artificial mocks.** 
+
+# Terraphim AI Development Scratchpad
+
+## 2025-06-21: Fixed rmcp Dependency Issue
+
+### Problem
+- Build failure in terraphim_mcp_server crate
+- Error: `no matching package named `rmcp` found`
+- The dependency was specified with branch but couldn't be resolved
+
+### Solution
+- Updated dependency specification in Cargo.toml:
+  ```rust
+  // Before
+  rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main", features = ["server"] }
+  
+  // After
+  rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["server"] }
+  ```
+- Applied the same fix to the dev-dependencies section
+- The project now builds successfully
+
+### Next Steps
+- Fix test failures related to configuration issues
+- The tests fail with: `ConfigError(Deserialize("config error: missing field `default_data_path`"))`
+- Need to properly configure the test environment with the required settings
+
+## Notes
+- The rmcp crate is part of the Model Context Protocol Rust SDK
+- It's organized as a workspace with multiple crates
+- Using just the git URL without branch specification works correctly 

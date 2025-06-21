@@ -23,6 +23,9 @@ pub enum Error {
 
     #[error("Config error: {0}")]
     Config(#[from] TerraphimConfigError),
+
+    #[error("Persistence error: {0}")]
+    Persistence(#[from] terraphim_persistence::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main", features = ["server"] }
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["server"] }
 terraphim_types = { path = "../terraphim_types" }
 terraphim_service = { path = "../terraphim_service" }
 terraphim_config = { path = "../terraphim_config" }
@@ -31,7 +31,7 @@ tracing-log = "0.1"
 
 [dev-dependencies]
 anyhow = "1.0"
-rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main", features = ["client", "transport-child-process"] }
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["client", "transport-child-process"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 terraphim_config = { path = "../terraphim_config" }

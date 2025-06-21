@@ -255,3 +255,27 @@ The desktop app now has a robust, comprehensive testing strategy that covers all
 - Created `crates/terraphim_persistence/src/memory.rs` module
 - Utilities: `create_memory_only_device_settings()`, `create_test_device_settings()`
 - Memory-only persistence for test isolation without filesystem dependencies
+
+# Fixed rmcp Dependency Issue (2025-06-21)
+
+## Issue
+- The terraphim_mcp_server crate couldn't build due to dependency issues with the rmcp crate
+- Error: `no matching package named `rmcp` found`
+- The rmcp package is from the Model Context Protocol Rust SDK, which is hosted on GitHub
+
+## Solution
+- Updated the dependency specification in `crates/terraphim_mcp_server/Cargo.toml`
+- Changed from using branch specification to using the git repository directly
+- Original: `rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", branch = "main", features = ["server"] }`
+- Fixed: `rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["server"] }`
+- The same fix was applied to the dev-dependencies section
+
+## Results
+- Successfully resolved the dependency issue
+- The project now builds without errors
+- Tests still fail due to configuration issues, but that's unrelated to the rmcp dependency fix
+
+## Insights
+- The rmcp crate is part of a workspace in the rust-sdk repository
+- Using just the git URL without specifying branch or package works correctly
+- This approach allows Cargo to properly resolve the package within the workspace
