@@ -14,6 +14,7 @@
     <h2>{item.title}</h2>
 
     {#if editing}
+      <!-- Pass the article body as default content and bind back for updates -->
       <NovelWrapper bind:html={item.body}/>
       <button class="button is-primary" on:click={() => editing = false}>
         Save
