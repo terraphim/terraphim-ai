@@ -338,3 +338,37 @@ Status: ✅ Code changes implemented across crates.
 Next Steps:
 - Verify compilation & tests.
 - Ensure Tauri `create_document` flow saves both persistence and on-disk markdown. 
+
+## 2025-06-22 – Implementation Plan: terraphim-config Wizard
+
+Goal: Replace raw JSON editor with guided wizard.
+
+Tasks
+1. Backend
+   - [x] Derive `schemars::JsonSchema` for `terraphim_config::Config` and sub-structs.
+   - [x] Add REST handler: `/config/schema` & `get_config_schema()` returning schema.
+   - [x] Add equivalent Tauri command exposing schema.
+
+2. Frontend (Svelte)
+   - [ ] Create route `/config/wizard` with three pages and progress bar.
+   - [x] Create route `/config/wizard` with skeleton component and navigation.
+   - Page details:
+     • Page 1: id, global_shortcut, default_theme  
+     • Page 2: dynamic role card builder: add/edit/delete; nested haystack + kg forms  
+     • Page 3: read-only pretty print + save buttons.
+
+   - [ ] Build `configDraft` writable store; live validation w/ Zod.
+   - [ ] On save -> call existing `update_config` (Tauri or REST).
+   - [ ] Add "Open advanced editor" checkbox => navigate to `/fetch/editor` after save.
+
+3. Testing
+   - [ ] Vitest component tests for each wizard page.
+   - [ ] Playwright E2E: complete wizard, reload app, assert config applied.
+
+4. Incremental rollout
+   - [ ] Keep old editor but move under "Advanced".
+   - [ ] Once wizard stable deprecate old entry.
+
+Next steps
+1. Backend schema endpoint
+2. Frontend route & page 1 skeleton 

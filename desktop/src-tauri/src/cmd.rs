@@ -10,6 +10,9 @@ use terraphim_types::Thesaurus;
 use terraphim_types::{Document, SearchQuery};
 
 use serde::Serializer;
+use schemars::schema_for;
+use serde_json::Value;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Status {
     #[serde(rename = "success")]
@@ -211,4 +214,11 @@ pub async fn get_document(
         status: Status::Success,
         document: doc_opt,
     })
+}
+
+/// Get JSON Schema for Config for dynamic forms
+#[command]
+pub async fn get_config_schema() -> Result<Value> {
+    let schema = schema_for!(Config);
+    Ok(serde_json::to_value(&schema).expect("schema serialization"))
 }

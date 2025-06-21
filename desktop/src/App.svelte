@@ -8,6 +8,7 @@
     default as configStore,
   } from "./lib/ThemeSwitcher.svelte";
   import { theme } from "./lib/stores";
+  import ConfigWizard from "./lib/ConfigWizard.svelte";
   let visible = "is-hidden";
   function toggleVissible() {
     visible = "";
@@ -34,6 +35,7 @@
     <br />
 
     <Route path="/fetch/*"><FetchTabs /></Route>
+    <Route path="/config/wizard"><ConfigWizard/></Route>
   </main>
 
   <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>
@@ -46,7 +48,7 @@
                 <i class="fas fa-home"> </i>
               </span>
             </a>
-            <a class="navbar-item" href="/fetch/json">Configuration</a>
+            <a class="navbar-item" href="/config/wizard">Wizard</a>
             <a class="navbar-item" href="/contacts">Contacts</a>
           </div>
         </nav>

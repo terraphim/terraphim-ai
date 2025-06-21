@@ -37,6 +37,7 @@ serde_json = "1.0.104"
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
 ahash = "0.8.11"
+schemars = { version = "0.8", features = ["derive"] }
 
 [dev-dependencies]
 tokio-test = "0.4.4"

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
+use schemars::JsonSchema;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
@@ -60,7 +61,7 @@ pub enum TerraphimConfigError {
 ///
 /// It contains a user's knowledge graph, a list of haystacks, as
 /// well as preferences for the relevance function and theme
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct Role {
     pub shortname: Option<String>,
     pub name: RoleName,
@@ -70,6 +71,7 @@ pub struct Role {
     pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
     #[serde(flatten)]
+    #[schemars(skip)]
     pub extra: AHashMap<String, Value>,
 }
 
@@ -78,7 +80,7 @@ use anyhow::Context;
 ///
 /// Each service assumes documents to be stored in a specific format
 /// and uses a specific indexing algorithm
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, JsonSchema)]
 pub enum ServiceType {
     /// Use ripgrep as the indexing service
     Ripgrep,
@@ -88,7 +90,7 @@ pub enum ServiceType {
 ///
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct Haystack {
     /// The path to the haystack
     pub path: PathBuf,
@@ -103,9 +105,10 @@ pub struct Haystack {
 
 /// A knowledge graph is the collection of documents which were indexed
 /// using a specific service
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct KnowledgeGraph {
     /// automata path refering to the published automata and can be online url or local file with pre-build automata
+    #[schemars(with = "Option<String>")]
     pub automata_path: Option<AutomataPath>,
     /// Knowlege graph can be re-build from local files, for example Markdown files
     pub knowledge_graph_local: Option<KnowledgeGraphLocal>,
@@ -119,7 +122,7 @@ impl KnowledgeGraph {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct KnowledgeGraphLocal {
     pub input_type: KnowledgeGraphInputType,
     pub path: PathBuf,
@@ -413,7 +416,7 @@ impl Default for ConfigBuilder {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub enum ConfigId {
     Server,
     Desktop,
@@ -423,7 +426,7 @@ pub enum ConfigId {
 /// The Terraphim config is the main configuration for terraphim
 ///
 /// It contains the global shortcut, roles, and the default role
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 pub struct Config {
     /// Identifier for the config
     pub id: ConfigId,
@@ -431,6 +434,7 @@ pub struct Config {
     pub global_shortcut: String,
     /// User roles with their respective settings
     #[serde(with = "any_key_map")]
+    #[schemars(skip)]
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified
     pub default_role: RoleName,

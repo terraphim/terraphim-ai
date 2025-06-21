@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
+use schemars::schema_for;
+use serde_json::Value;
 
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
@@ -143,4 +145,10 @@ pub(crate) async fn update_config(
         status: Status::Success,
         config: config_new,
     })
+}
+
+/// Returns JSON Schema for Terraphim Config
+pub(crate) async fn get_config_schema() -> Json<Value> {
+    let schema = schema_for!(Config);
+    Json(serde_json::to_value(&schema).expect("schema serialization"))
 }
