@@ -4,6 +4,7 @@
   import { invoke } from '@tauri-apps/api/tauri';
   import { is_tauri } from '../stores';
   import type { Document } from "./SearchResult";
+  import SvelteMarkdown from 'svelte-markdown';
 
   export let active: boolean = false;
   export let item: Document;
@@ -13,6 +14,8 @@
   $: if (active && item && !editing) {
     loadDocument();
   }
+
+  $: isHtml = /<\w+/.test(item?.body ?? '');
 
   async function loadDocument() {
     if (!$is_tauri) return;
@@ -51,7 +54,11 @@
         Save
       </button>
     {:else}
-      <NovelWrapper html={item.body} readOnly={true}/>
+      {#if isHtml}
+        <div class="prose" tabindex="0">{@html item.body}</div>
+      {:else}
+        <SvelteMarkdown source={item.body} />
+      {/if}
       <button class="button is-light" on:click={() => editing = true}>
         Edit
       </button>

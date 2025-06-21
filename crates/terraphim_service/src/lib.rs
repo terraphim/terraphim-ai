@@ -104,6 +104,28 @@ impl<'a> TerraphimService {
         // search immediately.
         self.config_state.add_to_roles(&document).await?;
 
+        // 🔄 Persist the updated body back to on-disk Markdown files for every writable
+        // ripgrep haystack so that subsequent searches (and external tooling) see the
+        // changes instantly.
+        use terraphim_config::ServiceType;
+        use terraphim_middleware::indexer::RipgrepIndexer;
+
+        let ripgrep = RipgrepIndexer::default();
+        let config_snapshot = { self.config_state.config.lock().await.clone() };
+
+        for role in config_snapshot.roles.values() {
+            for haystack in &role.haystacks {
+                if haystack.service == ServiceType::Ripgrep && !haystack.read_only {
+                    if let Err(e) = ripgrep.update_document(&document).await {
+                        log::warn!(
+                            "Failed to write document {} to haystack {:?}: {:?}",
+                            document.id, haystack.path, e
+                        );
+                    }
+                }
+            }
+        }
+
         Ok(document)
     }
 

@@ -44,6 +44,7 @@ mod tests {
             haystacks: vec![Haystack {
                 path: docs_path.clone(),
                 service: ServiceType::Ripgrep,
+                read_only: false,
             }],
             extra: AHashMap::new(),
         };
@@ -94,6 +95,7 @@ mod tests {
             haystacks: vec![Haystack {
                 path: PathBuf::from("/tmp/system_operator/pages/"),
                 service: ServiceType::Ripgrep,
+                read_only: false,
             }],
             extra: AHashMap::new(),
         };
@@ -110,6 +112,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },

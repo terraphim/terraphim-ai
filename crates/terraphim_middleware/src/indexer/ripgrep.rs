@@ -48,6 +48,38 @@ impl IndexMiddleware for RipgrepIndexer {
     }
 }
 
+impl RipgrepIndexer {
+    /// Update the underlying Markdown file on disk with the edited document body.
+    ///
+    /// The `Document.url` field is expected to hold an absolute or haystack-relative
+    /// path to the original file. When haystacks are marked as read-only this
+    /// method SHOULD NOT be called.
+    pub async fn update_document(&self, document: &Document) -> Result<()> {
+        use tokio::fs;
+        use std::path::Path;
+
+        let path = Path::new(&document.url);
+        // Ensure the parent directory exists (it should, given the document was
+        // indexed from this path). If not, return an IO error via ?.
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                log::warn!("Parent directory does not exist for {:?}", path);
+            }
+        }
+
+        let mut content = document.body.clone();
+        // Heuristically detect HTML (presence of tags). If HTML detected, convert to Markdown.
+        if content.contains('<') && content.contains('>') {
+            log::debug!("Converting HTML content to Markdown for file {:?}", path);
+            content = html2md::parse_html(&content);
+        }
+
+        log::info!("Writing updated document back to markdown file: {:?}", path);
+        fs::write(path, content).await?;
+        Ok(())
+    }
+}
+
 #[cached]
 /// This is the inner function that indexes the documents
 /// which allows us to cache requests to the index service

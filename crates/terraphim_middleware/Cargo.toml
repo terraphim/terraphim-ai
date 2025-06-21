@@ -27,3 +27,4 @@ serde_json = "1.0.110"
 thiserror = "1.0.56"
 tokio = { version = "1.15.0", features = ["full"] }
 wasm-bindgen-futures = "0.4"
+html2md = "0.2"
