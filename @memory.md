@@ -297,3 +297,33 @@ The desktop app now has a robust, comprehensive testing strategy that covers all
 - Wizard leverages `schemars` JSON-Schema served at `/api/schema/settings` and a schema-driven form on the frontend.
 - Keeps existing "Edit JSON config" entry as an **Advanced** link for power users.
 - Implementation tasks recorded in @scratchpad.md.
+
+## ✅ DESKTOP APP JSON EDITOR CONSOLIDATION (2025-06-21)
+
+### Fixed Redundant JSON Editor Components
+
+**Problem Identified:**
+- Two separate JSON editor implementations existed:
+  - `ConfigJsonEditor.svelte` at `/config/json` route (with style import issues)
+  - `FetchTabs.svelte` at `/fetch/editor` route (working implementation)
+- Both provided identical functionality but with different UX patterns
+- `ConfigJsonEditor.svelte` had Vite build errors due to problematic style import
+
+**Solution Implemented:**
+- ✅ **Recreated simplified ConfigJsonEditor.svelte** without problematic style imports
+- ✅ **Extracted JSON editor logic** from FetchTabs.svelte into dedicated component
+- ✅ **Fixed Vite build errors** by eliminating problematic `svelte-jsoneditor/styles.scss?inline` import
+- ✅ **Maintained separate routes** for different use cases while sharing core functionality
+
+**Benefits:**
+- Fixed build errors and improved development experience
+- Eliminated code duplication by extracting shared logic
+- Maintained distinct UX patterns for different routes
+- Both `/config/json` and `/fetch/editor` now use reliable JSON editor implementation
+
+**Technical Details:**
+- The working implementation doesn't require explicit style imports
+- `svelte-jsoneditor` package includes its own styles automatically
+- `/config/json` provides dedicated JSON editor with automatic saving
+- `/fetch/editor` provides JSON editor within the fetch tabs interface
+- Both routes now provide consistent JSON editing experience
