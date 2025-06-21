@@ -89,6 +89,21 @@ export default defineConfig({
     alias: {
       '$lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
       '$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
+
+      // Map specific Svelte sub-paths back to the real runtime so they are **not** redirected to
+      // our shim (which would cause ENOTDIR errors like svelte-shim.js/store).
+      'svelte/internal': resolve(__dirname, 'node_modules/svelte/internal'),
+      'svelte/store': resolve(__dirname, 'node_modules/svelte/store'),
+      'svelte/transition': resolve(__dirname, 'node_modules/svelte/transition'),
+      'svelte/animate': resolve(__dirname, 'node_modules/svelte/animate'),
+      'svelte/easing': resolve(__dirname, 'node_modules/svelte/easing'),
+      'svelte/motion': resolve(__dirname, 'node_modules/svelte/motion'),
+
+      // Real runtime entry alias so the shim can import without causing an alias loop.
+      'svelte-original': resolve(__dirname, 'node_modules/svelte/index.mjs'),
+
+      // Any other bare `import "svelte"` should go to our shim that adds mount/unmount.
+      'svelte': fileURLToPath(new URL('./src/svelte-shim.js', import.meta.url)),
     }
   },
   clearScreen: false,

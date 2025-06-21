@@ -1,8 +1,7 @@
 use ahash::AHashMap;
-use terraphim_automata::{load_thesaurus, AutomataPath};
+use terraphim_automata::load_thesaurus;
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
-use terraphim_persistence::error;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
@@ -97,12 +96,31 @@ impl<'a> TerraphimService {
 
     /// Create document
     pub async fn create_document(&mut self, document: Document) -> Result<Document> {
+        // Persist the document using the fastest available Operator. The document becomes
+        // available on all profiles/devices thanks to the Persistable implementation.
+        document.save().await?;
+
+        // Index the freshly-saved document inside all role graphs so it can be discovered via
+        // search immediately.
         self.config_state.add_to_roles(&document).await?;
+
         Ok(document)
     }
 
     /// Get document by ID
     pub async fn get_document_by_id(&mut self, document_id: &str) -> Result<Option<Document>> {
+        // 1️⃣ Try to load the document directly from the persistence layer.
+        let mut placeholder = Document::default();
+        placeholder.id = document_id.to_string();
+        match placeholder.load().await {
+            Ok(doc) => return Ok(Some(doc)),
+            Err(e) => {
+                log::debug!("Document {} not found in persistence layer: {:?}. Falling back to search", document_id, e);
+            }
+        }
+
+        // 2️⃣ Fallback: search the haystacks/graphs – this covers the case where the document
+        // is not yet persisted but is already indexed in memory.
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::new(document_id.to_string()),
             limit: Some(1),
@@ -112,9 +130,7 @@ impl<'a> TerraphimService {
 
         let documents = self.search(&search_query).await?;
 
-        Ok(documents
-            .into_iter()
-            .find(|doc| doc.id == document_id))
+        Ok(documents.into_iter().find(|doc| doc.id == document_id))
     }
 
     /// Get the role for the given search query

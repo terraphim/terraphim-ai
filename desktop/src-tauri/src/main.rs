@@ -89,6 +89,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::get_config,
             cmd::update_config,
             cmd::publish_thesaurus,
+            cmd::create_document,
+            cmd::get_document,
             cmd::save_initial_settings,
             cmd::close_splashscreen
        ])

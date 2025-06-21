@@ -177,3 +177,38 @@ pub async fn close_splashscreen(window: Window) {
   // Show main window
   window.get_window("main").expect("no window labeled 'main' found").show().unwrap();
 }
+
+/// Response type for a single document
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DocumentResponse {
+    pub status: Status,
+    pub document: Option<Document>,
+}
+
+/// Create (or update) a document and persist it
+#[command]
+pub async fn create_document(
+    config_state: State<'_, ConfigState>,
+    document: Document,
+) -> Result<DocumentResponse> {
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let doc = terraphim_service.create_document(document).await?;
+    Ok(DocumentResponse {
+        status: Status::Success,
+        document: Some(doc),
+    })
+}
+
+/// Fetch a single document by its ID (tries persistence first, then falls back to search)
+#[command]
+pub async fn get_document(
+    config_state: State<'_, ConfigState>,
+    document_id: String,
+) -> Result<DocumentResponse> {
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let doc_opt = terraphim_service.get_document_by_id(&document_id).await?;
+    Ok(DocumentResponse {
+        status: Status::Success,
+        document: doc_opt,
+    })
+}

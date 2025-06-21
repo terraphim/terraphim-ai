@@ -2,19 +2,28 @@
   import { Modal } from "svelma";
   import SvelteMarkdown from "svelte-markdown";
   import type { Document } from "./SearchResult";
+  import NovelWrapper from '$lib/Editor/NovelWrapper.svelte';
+
   export let active: boolean = false;
   export let item: Document;
-
+  let editing = false;
 </script>
 
 <Modal bind:active>
   <div class="box wrapper">
-    <article class="card-content content">
-      <h2>{item.title}</h2>
-      <!-- {@html item.body} -->
+    <h2>{item.title}</h2>
 
+    {#if editing}
+      <NovelWrapper bind:html={item.body}/>
+      <button class="button is-primary" on:click={() => editing = false}>
+        Save
+      </button>
+    {:else}
       <SvelteMarkdown source={item.body} />
-    </article>
+      <button class="button is-light" on:click={() => editing = true}>
+        Edit
+      </button>
+    {/if}
   </div>
 </Modal>
 

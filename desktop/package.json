@@ -16,9 +16,15 @@
     "e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
+    "@playwright/test": "^1.44.1",
     "@sveltejs/vite-plugin-svelte": "^2.1.0",
     "@tauri-apps/cli": "^1.5.11",
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/svelte": "^4.2.3",
+    "@testing-library/user-event": "^14.5.2",
     "@tsconfig/svelte": "^4.0.1",
+    "@vitest/ui": "^1.6.0",
+    "jsdom": "^24.1.0",
     "svelte": "^3.58.0",
     "svelte-check": "^3.2.0",
     "svelte-preprocess": "^5.0.3",
@@ -26,17 +32,14 @@
     "tslib": "^2.5.0",
     "typescript": "^5.0.4",
     "vite": "^4.3.1",
-    "@testing-library/svelte": "^4.2.3",
-    "@testing-library/jest-dom": "^6.4.8",
-    "@testing-library/user-event": "^14.5.2",
-    "vitest": "^1.6.0",
-    "jsdom": "^24.1.0",
-    "@vitest/ui": "^1.6.0",
-    "@playwright/test": "^1.44.1"
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.4.0",
+    "@paralect/novel-svelte": "0.0.7",
     "@tauri-apps/api": "^1.2.0",
+    "@tiptap/core": "^2.22.1",
+    "@tiptap/starter-kit": "^2.22.1",
     "@tomic/lib": "^0.36.0",
     "@tomic/svelte": "^0.35.2",
     "bulma": "^0.9.4",
