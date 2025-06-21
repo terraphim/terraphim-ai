@@ -94,6 +94,11 @@ pub struct Haystack {
     pub path: PathBuf,
     /// The service used for indexing documents in the haystack
     pub service: ServiceType,
+    /// When set to `true` the haystack is treated as read-only; documents found
+    /// inside will not be modified on disk by Terraphim (e.g. via the Novel
+    /// editor). Defaults to `false` for backwards-compatibility.
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 /// A knowledge graph is the collection of documents which were indexed
@@ -202,6 +207,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -225,6 +231,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -248,6 +255,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -272,6 +280,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -287,6 +296,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -312,6 +322,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -335,6 +346,7 @@ impl ConfigBuilder {
                 haystacks: vec![Haystack {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },
@@ -680,6 +692,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: PathBuf::from("localsearch"),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -695,6 +708,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: PathBuf::from("localsearch"),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -718,6 +732,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -763,6 +778,7 @@ mod tests {
             haystacks: vec![Haystack {
                 path: PathBuf::from("localsearch"),
                 service: ServiceType::Ripgrep,
+                read_only: false,
             }],
             extra: AHashMap::new(),
         }

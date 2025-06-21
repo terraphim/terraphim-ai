@@ -279,3 +279,10 @@ The desktop app now has a robust, comprehensive testing strategy that covers all
 - The rmcp crate is part of a workspace in the rust-sdk repository
 - Using just the git URL without specifying branch or package works correctly
 - This approach allows Cargo to properly resolve the package within the workspace
+
+## 2025-06-21 – Writable Haystacks & Document Editing Support
+
+- Added `read_only` flag to `Haystack` config struct (default `false`).
+- Implemented `RipgrepIndexer::update_document` which writes edited document body back to the originating Markdown file.
+- Service layer now calls this method when `create_document` is invoked, but only for haystacks where `read_only == false`.
+- All haystack initializers updated accordingly; existing configs remain compatible via serde default.

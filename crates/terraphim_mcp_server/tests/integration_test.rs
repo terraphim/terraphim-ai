@@ -108,6 +108,7 @@ fn create_test_config() -> String {
                     role.haystacks = vec![Haystack {
                         path: path.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }];
                 }
                 break;
@@ -120,6 +121,7 @@ fn create_test_config() -> String {
             role.haystacks = vec![Haystack {
                 path: docs_src_path.clone(),
                 service: ServiceType::Ripgrep,
+                read_only: false,
             }];
         }
     }

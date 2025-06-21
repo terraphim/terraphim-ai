@@ -1,12 +1,13 @@
-# Terraphim documentation 
+Terraphim documentation
+==========
 
-This folder is a source for Terraphim documentation as well as demonstration for Terraphim Engineer role: 
+This folder is a source for Terraphim documentation as well as demonstration for Terraphim Engineer role:
 
 [kg](./kg) folder is an example of personal knowledge graph used for testing and fixtures
 
 Example configuration for this KG:
 
-```json
+```
 "Terraphim Engineer": {
   "shortname": "terraphim-engineer",
   "name": "Terraphim Engineer",
@@ -31,3 +32,9 @@ Example configuration for this KG:
   ]
 },
 ```
+
+* to do list
+
+* todo list
+
+some strange test

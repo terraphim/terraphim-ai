@@ -39,6 +39,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -62,6 +63,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -85,6 +87,7 @@ mod tests {
                     haystacks: vec![Haystack {
                         path: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
                     }],
                     extra: AHashMap::new(),
                 },

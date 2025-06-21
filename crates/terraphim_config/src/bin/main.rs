@@ -33,6 +33,7 @@ async fn main() -> Result<()> {
                 haystacks: vec![Haystack {
                     path: PathBuf::from("localsearch"),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
                 }],
                 extra: AHashMap::new(),
             },

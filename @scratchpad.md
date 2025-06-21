@@ -324,3 +324,17 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out
 - The rmcp crate is part of the Model Context Protocol Rust SDK
 - It's organized as a workspace with multiple crates
 - Using just the git URL without branch specification works correctly 
+
+### 2025-06-21 – Haystack read_only & Ripgrep update_document
+
+Task:
+1. Add `read_only: bool` to `Haystack` struct (default false).
+2. Update all Haystack initializers to include `read_only: false`.
+3. Implement `RipgrepIndexer::update_document()` to write edited HTML/markdown back to disk based on `Document.url`.
+4. Modify `TerraphimService::create_document` to call `update_document` for every writable ripgrep haystack.
+
+Status: ✅ Code changes implemented across crates.
+
+Next Steps:
+- Verify compilation & tests.
+- Ensure Tauri `create_document` flow saves both persistence and on-disk markdown. 
