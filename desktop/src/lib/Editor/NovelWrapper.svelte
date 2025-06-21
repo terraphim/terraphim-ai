@@ -14,5 +14,6 @@
 <NovelEditor
   defaultValue={html}
   isEditable={!readOnly}
+  disableLocalStorage={true}
   onUpdate={handleUpdate}
 />
