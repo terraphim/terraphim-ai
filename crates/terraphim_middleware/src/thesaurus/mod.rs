@@ -66,26 +66,31 @@ pub async fn build_thesaurus_from_haystack(
         log::debug!("Updating thesaurus for haystack: {:?}", haystack);
 
         let logseq = Logseq::default();
-        let thesaurus: Thesaurus = logseq
+        let mut thesaurus: Thesaurus = logseq
             .build(role_name.as_lowercase().to_string(), &haystack.path)
             .await?;
         match thesaurus.save().await {
             Ok(_) => {
-                log::info!("Thesaurus saved");
+                log::info!("Thesaurus for role `{}` saved to persistence", role_name);
+                // We reload the thesaurus from persistence to ensure we are using the
+                // canonical, persisted version going forward.
+                thesaurus = thesaurus.load().await?;
             }
             Err(e) => log::error!("Failed to save thesaurus: {:?}", e),
         }
-        let mut haystack_path = haystack.path.clone();
-        haystack_path.pop();
-        //FIXME: This is for debug only at the momment, to be removed and replaced with load from persistable
-        let thesaurus_path = haystack
-            .path
-            .join(format!("{}_thesaurus.json", role_name.clone()));
-
-        let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
-        tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
-        log::debug!("Thesaurus written to {:#?}", thesaurus_path);
-        role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
+        
+        // The following code wrote the thesaurus to a local file for debugging
+        // purposes. This is now removed to enforce using the persistence layer.
+        // let mut haystack_path = haystack.path.clone();
+        // haystack_path.pop();
+        // let thesaurus_path = haystack
+        //     .path
+        //     .join(format!("{}_thesaurus.json", role_name.clone()));
+        // let thesaurus_json = serde_json::to_string_pretty(&thesaurus)?;
+        // tokio::fs::write(&thesaurus_path, thesaurus_json).await?;
+        // log::debug!("Thesaurus written to {:#?}", thesaurus_path);
+        // role.kg.as_mut().unwrap().automata_path = Some(AutomataPath::Local(thesaurus_path));
+        
         log::debug!("Make sure thesaurus updated in a role {}", role_name);
 
         update_thesaurus(config_state, &role_name, thesaurus).await?;

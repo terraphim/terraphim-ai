@@ -37,7 +37,7 @@ async fn get_rolegraph() -> RoleGraph {
     let thesaurus = load_thesaurus(&AutomataPath::remote_example())
         .await
         .unwrap();
-    let rolegraph = RoleGraph::new(role, thesaurus).await;
+    let rolegraph = RoleGraph::new(role.into(), thesaurus).await;
     rolegraph.unwrap()
 }
 
