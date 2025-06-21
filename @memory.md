@@ -286,3 +286,14 @@ The desktop app now has a robust, comprehensive testing strategy that covers all
 - Implemented `RipgrepIndexer::update_document` which writes edited document body back to the originating Markdown file.
 - Service layer now calls this method when `create_document` is invoked, but only for haystacks where `read_only == false`.
 - All haystack initializers updated accordingly; existing configs remain compatible via serde default.
+
+## 2025-06-22 – Terraphim-Config Wizard UX Plan
+
+- Clarified that user-facing configuration is managed via **terraphim-config**, not terraphim-settings.
+- Designed a 3-step wizard to let non-technical users generate a valid `config.json`:
+  1. Global settings (id, global shortcut, default theme)  
+  2. Role cards with inline haystack & knowledge-graph builders  
+  3. Review & save (pretty TOML/JSON, download, advanced editor link)
+- Wizard leverages `schemars` JSON-Schema served at `/api/schema/settings` and a schema-driven form on the frontend.
+- Keeps existing "Edit JSON config" entry as an **Advanced** link for power users.
+- Implementation tasks recorded in @scratchpad.md.

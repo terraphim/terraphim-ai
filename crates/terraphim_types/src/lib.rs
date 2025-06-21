@@ -7,8 +7,9 @@ use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 
 use std::str::FromStr;
+use schemars::JsonSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
 pub struct RoleName {
     pub original: String,
     pub lowercase: String,
@@ -465,7 +466,7 @@ pub struct SearchQuery {
 
 /// Defines the relevance function (scorer) to be used for ranking search
 /// results for the `Role`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy, JsonSchema)]
 pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the Terraphim graph
     ///
@@ -483,7 +484,7 @@ pub enum RelevanceFunction {
 ///
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]

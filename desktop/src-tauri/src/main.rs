@@ -88,6 +88,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::search,
             cmd::get_config,
             cmd::update_config,
+            cmd::get_config_schema,
             cmd::publish_thesaurus,
             cmd::create_document,
             cmd::get_document,
