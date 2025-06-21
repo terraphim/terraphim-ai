@@ -1,10 +1,9 @@
 <script lang="ts">
   import { Modal } from "svelma";
-  import SvelteMarkdown from "svelte-markdown";
-  import type { Document } from "./SearchResult";
   import NovelWrapper from '$lib/Editor/NovelWrapper.svelte';
   import { invoke } from '@tauri-apps/api/tauri';
   import { is_tauri } from '../stores';
+  import type { Document } from "./SearchResult";
 
   export let active: boolean = false;
   export let item: Document;
@@ -52,7 +51,7 @@
         Save
       </button>
     {:else}
-      <SvelteMarkdown source={item.body} />
+      <NovelWrapper html={item.body} readOnly={true}/>
       <button class="button is-light" on:click={() => editing = true}>
         Edit
       </button>
