@@ -222,3 +222,22 @@ pub async fn get_config_schema() -> Result<Value> {
     let schema = schema_for!(Config);
     Ok(serde_json::to_value(&schema).expect("schema serialization"))
 }
+
+/// Select a role (change `selected_role`) without sending the entire config back and
+/// forth. Returns the updated `Config` so the frontend can reflect the change.
+#[command]
+pub async fn select_role(
+    config_state: State<'_, ConfigState>,
+    role_name: String,
+) -> Result<ConfigResponse> {
+    log::info!("Select role called: {}", role_name);
+    let terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let config = terraphim_service
+        .update_selected_role(terraphim_types::RoleName::new(&role_name))
+        .await?;
+
+    Ok(ConfigResponse {
+        status: Status::Success,
+        config,
+    })
+}

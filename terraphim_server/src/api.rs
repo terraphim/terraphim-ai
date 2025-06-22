@@ -152,3 +152,25 @@ pub(crate) async fn get_config_schema() -> Json<Value> {
     let schema = schema_for!(Config);
     Json(serde_json::to_value(&schema).expect("schema serialization"))
 }
+
+/// Request body for updating the selected role only
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SelectedRoleRequest {
+    pub selected_role: terraphim_types::RoleName,
+}
+
+/// Update only the selected role without replacing the whole config
+pub(crate) async fn update_selected_role(
+    State(config_state): State<ConfigState>,
+    Json(payload): Json<SelectedRoleRequest>,
+) -> Result<Json<ConfigResponse>> {
+    let terraphim_service = TerraphimService::new(config_state.clone());
+    let config = terraphim_service
+        .update_selected_role(payload.selected_role)
+        .await?;
+
+    Ok(Json(ConfigResponse {
+        status: Status::Success,
+        config,
+    }))
+}
