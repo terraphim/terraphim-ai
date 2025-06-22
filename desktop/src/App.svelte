@@ -29,12 +29,14 @@
 
 <div class="is-full-height">
   <main class="main-content">
-    <div class="navbar-end" style="position: absolute; top: 0; right: 0; z-index: 1000;">
-        <div class="navbar-item">
-          <ThemeSwitcher />
-        </div>
+    <div class="top-controls">
+      <div class="role-selector">
+        <ThemeSwitcher />
+      </div>
     </div>
-    <Route path="/"><Search /></Route>
+    <div class="search-area">
+      <Route path="/"><Search /></Route>
+    </div>
     <br />
 
     <Route path="/fetch/*"><FetchTabs /></Route>
@@ -77,6 +79,18 @@
     flex: 1;
     padding-left: 1em;
     padding-right: 1em;
+  }
+  .top-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+    padding-top: 0.5rem;
+  }
+  .role-selector {
+    min-width: 200px;
+  }
+  .search-area {
+    margin-top: 0;
   }
   footer {
     flex-shrink: 0;
