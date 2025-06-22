@@ -67,15 +67,56 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         std::process::exit(0);
                     }
                     "toggle" => {
-                        let window = app.get_window("main").unwrap();
-                        let new_title = if window.is_visible().unwrap() {
-                            window.hide().unwrap();
-                            "Show"
-                        } else {
-                            window.show().unwrap();
-                            "Hide"
-                        };
-                        item_handle.set_title(new_title).unwrap();
+                        // Try different window labels since the default might not be "main"
+                        let window_labels = ["main", ""];  // Empty string is the default label for the first window
+                        let mut window_found = false;
+                        
+                        for label in &window_labels {
+                            if let Some(window) = app.get_window(label) {
+                                let new_title = match window.is_visible() {
+                                    Ok(true) => {
+                                        let _ = window.hide();
+                                        "Show"
+                                    }
+                                    Ok(false) => {
+                                        let _ = window.show();
+                                        "Hide"
+                                    }
+                                    Err(e) => {
+                                        log::error!("Error checking window visibility: {:?}", e);
+                                        "Show/Hide"
+                                    }
+                                };
+                                let _ = item_handle.set_title(new_title);
+                                window_found = true;
+                                break;
+                            }
+                        }
+                        
+                        if !window_found {
+                            log::error!("No window found with labels: {:?}", window_labels);
+                            // Try to get any available window
+                            let windows = app.windows();
+                            if let Some((_, window)) = windows.iter().next() {
+                                let new_title = match window.is_visible() {
+                                    Ok(true) => {
+                                        let _ = window.hide();
+                                        "Show"
+                                    }
+                                    Ok(false) => {
+                                        let _ = window.show();
+                                        "Hide"
+                                    }
+                                    Err(e) => {
+                                        log::error!("Error checking window visibility: {:?}", e);
+                                        "Show/Hide"
+                                    }
+                                };
+                                let _ = item_handle.set_title(new_title);
+                            } else {
+                                log::error!("No windows available at all");
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -100,23 +141,36 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let settings = device_settings_read.clone();
             println!("Settings: {:?}", settings);
             let handle = app.handle();
-            let main_window = app.get_window("main").unwrap(); 
-            if !settings.initialized {           
-            tauri::async_runtime::spawn(async move {
-                let splashscreen_window = WindowBuilder::new(&handle, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
-                .title("Splashscreen")
-                .resizable(true)
-                .decorations(true)
-                .always_on_top(false)
-                .inner_size(800.0, 600.0).build().unwrap();
-                splashscreen_window.show().unwrap();
+            
+            // Try to get the main window with different possible labels
+            let main_window = ["main", ""].iter()
+                .filter_map(|label| app.get_window(label))
+                .next()
+                .or_else(|| {
+                    // If no window found with expected labels, get the first available window
+                    app.windows().values().next().cloned()
+                });
 
-                // Hide the main window initially
-                main_window.hide().unwrap();
-            });
+            if let Some(main_window) = main_window {
+                if !settings.initialized {           
+                    tauri::async_runtime::spawn(async move {
+                        let splashscreen_window = WindowBuilder::new(&handle, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
+                        .title("Splashscreen")
+                        .resizable(true)
+                        .decorations(true)
+                        .always_on_top(false)
+                        .inner_size(800.0, 600.0).build().unwrap();
+                        splashscreen_window.show().unwrap();
+
+                        // Hide the main window initially
+                        let _ = main_window.hide();
+                    });
+                } else {
+                    // Show the main window if device_settings.initialized is true
+                    let _ = main_window.show();
+                }
             } else {
-                // Show the main window if device_settings.initialized is true
-                main_window.show().unwrap();
+                log::error!("No main window found during setup");
             }
        
             Ok(())
@@ -127,18 +181,63 @@ async fn main() -> Result<(), Box<dyn Error>> {
     app.run(move |app_handle, e| match e {
         RunEvent::Ready => {
             let app_handle = app_handle.clone();
-            let window = app_handle.get_window("main").unwrap();
-            window.hide().unwrap();
-            app_handle
-                .global_shortcut_manager()
-                .register(&global_shortcut, move || {
-                    if window.is_visible().unwrap() {
-                        window.hide().unwrap();
-                    } else {
-                        window.show().unwrap();
-                    }
-                })
-                .unwrap();
+            
+            // Try to get the window with different possible labels
+            let window_labels = ["main", ""];
+            let mut window_found = false;
+            
+            for label in &window_labels {
+                if let Some(window) = app_handle.get_window(label) {
+                    let _ = window.hide();
+                    let window_clone = window.clone();
+                    app_handle
+                        .global_shortcut_manager()
+                        .register(&global_shortcut, move || {
+                            match window_clone.is_visible() {
+                                Ok(true) => {
+                                    let _ = window_clone.hide();
+                                }
+                                Ok(false) => {
+                                    let _ = window_clone.show();
+                                }
+                                Err(e) => {
+                                    log::error!("Error checking window visibility in global shortcut: {:?}", e);
+                                }
+                            }
+                        })
+                        .unwrap();
+                    window_found = true;
+                    break;
+                }
+            }
+            
+            if !window_found {
+                log::error!("No window found for global shortcut with labels: {:?}", window_labels);
+                // Try to get any available window
+                let windows = app_handle.windows();
+                if let Some((_, window)) = windows.iter().next() {
+                    let _ = window.hide();
+                    let window_clone = window.clone();
+                    app_handle
+                        .global_shortcut_manager()
+                        .register(&global_shortcut, move || {
+                            match window_clone.is_visible() {
+                                Ok(true) => {
+                                    let _ = window_clone.hide();
+                                }
+                                Ok(false) => {
+                                    let _ = window_clone.show();
+                                }
+                                Err(e) => {
+                                    log::error!("Error checking window visibility in global shortcut: {:?}", e);
+                                }
+                            }
+                        })
+                        .unwrap();
+                } else {
+                    log::error!("No windows available for global shortcut");
+                }
+            }
         }
         RunEvent::ExitRequested { api, .. } => {
             api.prevent_exit();

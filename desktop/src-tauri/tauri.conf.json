@@ -103,6 +103,7 @@
     },
     "windows": [
       {
+        "label": "main",
         "title": "Terraphim AI Search",
         "width": 800,
         "height": 600,

@@ -176,9 +176,32 @@ use tauri::{Manager, Window};
 #[tauri::command]
 pub async fn close_splashscreen(window: Window) {
   // Close splashscreen
-  window.get_window("splashscreen").expect("no window labeled 'splashscreen' found").close().unwrap();
-  // Show main window
-  window.get_window("main").expect("no window labeled 'main' found").show().unwrap();
+  if let Some(splashscreen) = window.get_window("splashscreen") {
+    let _ = splashscreen.close();
+  } else {
+    log::warn!("Splashscreen window not found");
+  }
+  
+  // Show main window - try different possible labels
+  let window_labels = ["main", ""];
+  let mut main_window_found = false;
+  
+  for label in &window_labels {
+    if let Some(main_window) = window.get_window(label) {
+      let _ = main_window.show();
+      main_window_found = true;
+      break;
+    }
+  }
+  
+  if !main_window_found {
+    log::error!("Main window not found with any expected label");
+    // Try to get any available window
+    let windows = window.windows();
+    if let Some((_, any_window)) = windows.iter().next() {
+      let _ = any_window.show();
+    }
+  }
 }
 
 /// Response type for a single document
