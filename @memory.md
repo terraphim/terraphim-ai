@@ -394,3 +394,24 @@ A dynamic system tray menu was implemented in the Tauri desktop app. It shows al
 - Updating the `on_system_tray_event` handler to asynchronously call the `select_role` command.
 - Rebuilding the menu with the updated configuration after a role change to reflect the new selection.
 This feature significantly improves the user experience for managing roles in the desktop application.
+
+## ✅ COMPLETED: Two-Way Role Synchronization (2025-06-22)
+
+Successfully implemented perfect synchronization between the Tauri system tray menu and the existing ThemeSwitcher component for role selection. Key achievements:
+
+**Backend Integration:**
+- Enhanced `select_role` command to handle menu rebuilding and event emission
+- Centralized role-change logic with `role_changed` event system
+- Flat menu structure with roles directly in system tray (no submenu)
+
+**Frontend Integration:**  
+- Updated ThemeSwitcher.svelte to use centralized `select_role` command
+- Added event listener for `role_changed` events from system tray
+- Maintained backward compatibility for non-Tauri environments
+
+**Two-Way Synchronization:**
+- System tray selection → Backend update → Event emission → ThemeSwitcher UI update
+- ThemeSwitcher selection → `select_role` command → Backend update → System tray menu rebuild
+- Both interfaces stay perfectly synchronized through centralized backend state
+
+Users can now change roles from either the system tray (quick access) or ThemeSwitcher component (full interface), with changes immediately reflected in both locations. The system maintains theme integration and thesaurus publishing based on role selection.

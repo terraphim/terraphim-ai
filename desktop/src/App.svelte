@@ -1,15 +1,14 @@
 <script lang="ts">
-  import "@fortawesome/fontawesome-free/css/all.css";
   import { Route } from "tinro";
   import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
   import Search from "./lib/Search/Search.svelte";
   import {
     default as ThemeSwitcher,
-    default as configStore,
   } from "./lib/ThemeSwitcher.svelte";
   import { theme } from "./lib/stores";
   import ConfigWizard from "./lib/ConfigWizard.svelte";
   import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
+
   let visible = "is-hidden";
   function toggleVissible() {
     visible = "";
@@ -25,14 +24,17 @@
     rel="stylesheet"
     href={`/assets/bulmaswatch/${$theme}/bulmaswatch.min.css`}
   />
+  <title>Terraphim</title>
 </svelte:head>
 
 <div class="is-full-height">
   <main class="main-content">
-    <ThemeSwitcher />
-    <Route path="/">
-      <Search />
-    </Route>
+    <div class="navbar-end" style="position: absolute; top: 0; right: 0; z-index: 1000;">
+        <div class="navbar-item">
+          <ThemeSwitcher />
+        </div>
+    </div>
+    <Route path="/"><Search /></Route>
     <br />
 
     <Route path="/fetch/*"><FetchTabs /></Route>
@@ -61,7 +63,8 @@
 </div>
 
 <style>
-  :root {
+  @import "@fortawesome/fontawesome-free/css/all.css";
+  :global(body) {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
       Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   }

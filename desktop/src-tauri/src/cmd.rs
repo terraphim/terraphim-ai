@@ -250,6 +250,7 @@ pub async fn get_config_schema() -> Result<Value> {
 /// forth. Returns the updated `Config` so the frontend can reflect the change.
 #[command]
 pub async fn select_role(
+    app_handle: tauri::AppHandle,
     config_state: State<'_, ConfigState>,
     role_name: String,
 ) -> Result<ConfigResponse> {
@@ -258,6 +259,11 @@ pub async fn select_role(
     let config = terraphim_service
         .update_selected_role(terraphim_types::RoleName::new(&role_name))
         .await?;
+
+    // Notify the frontend that the role has changed, sending the whole new config
+    if let Err(e) = app_handle.emit_all("role_changed", &config) {
+        log::error!("Failed to emit role_changed event: {}", e);
+    }
 
     Ok(ConfigResponse {
         status: Status::Success,

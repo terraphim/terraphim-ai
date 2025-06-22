@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tauri::{
     CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
-    SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu, WindowBuilder,
+    SystemTrayMenu, SystemTrayMenuItem, WindowBuilder,
 };
 
 use terraphim_config::ConfigState;
@@ -88,22 +88,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 if id.starts_with("change_role_") {
                     tauri::async_runtime::spawn(async move {
                         let role_name = id_clone.strip_prefix("change_role_").unwrap().to_string();
-                        log::info!("User requested to change role to {}", role_name);
+                        log::info!("User requested to change role from tray to {}", role_name);
                         let config_state: tauri::State<ConfigState> = app_handle.state();
 
-                        match cmd::select_role(config_state, role_name.clone()).await {
-                            Ok(new_config_response) => {
-                                let new_tray_menu = build_tray_menu(&new_config_response.config);
+                        match cmd::select_role(app_handle.clone(), config_state, role_name.clone()).await {
+                            Ok(config_response) => {
+                                let new_tray_menu = build_tray_menu(&config_response.config);
                                 if let Err(e) = app_handle.tray_handle().set_menu(new_tray_menu) {
                                     log::error!("Failed to set new tray menu: {}", e);
                                 }
-                                // Notify the frontend that the role has changed
-                                if let Err(e) = app_handle.emit_all("role_changed", role_name) {
-                                    log::error!("Failed to emit role_changed event: {}", e);
-                                }
                             }
                             Err(e) => {
-                                log::error!("Failed to select role: {}", e);
+                                log::error!("Failed to select role from tray menu: {}", e);
                             }
                         }
                     });

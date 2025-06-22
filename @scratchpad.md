@@ -457,6 +457,44 @@ Implement a dynamic system tray menu in the Tauri desktop app to show all availa
 ### Result:
 The desktop application now features a fully functional and dynamic system tray menu for switching roles. The UI automatically reflects the current selection, providing a much-improved user experience for role management, leveraging the recently added `select_role` API.
 
+## ✅ COMPLETED: Tauri Role-Switching System Tray Menu
+
+### Task:
+Implement a dynamic system tray menu in the Tauri desktop app to show all available roles, highlight the selected one, and allow changing the role directly from the menu. Ensure two-way synchronization between the system tray menu and the existing ThemeSwitcher component.
+
+### Implementation Details:
+
+**Backend Changes:**
+1. **`desktop/src-tauri/src/lib.rs`**: Added shared `build_tray_menu` function
+2. **`desktop/src-tauri/src/cmd.rs`**: Enhanced `select_role` command to handle menu rebuilding and event emission
+3. **`desktop/src-tauri/src/main.rs`**: 
+   - Removed "Change Role" submenu, placed roles directly in main menu after separator
+   - Centralized role-change logic in `select_role` command
+   - Added `role_changed` event emission to notify frontend
+
+**Frontend Changes:**
+4. **`desktop/src/lib/ThemeSwitcher.svelte`**: 
+   - Updated to use centralized `select_role` command instead of `update_config`
+   - Added event listener for `role_changed` events from system tray
+   - Refactored store updates into `updateStoresFromConfig` function
+   - Maintained backward compatibility for non-Tauri environments
+
+**Two-Way Synchronization Achieved:**
+- System tray role selection → Updates backend config → Emits `role_changed` event → Updates ThemeSwitcher UI
+- ThemeSwitcher role selection → Calls `select_role` command → Updates backend config → Rebuilds system tray menu
+- Both interfaces stay synchronized through the centralized backend state
+
+### Key Features:
+- **Flat Menu Structure**: Roles appear directly in system tray menu (no submenu)
+- **Visual Feedback**: Selected role is highlighted with checkmark
+- **Real-time Sync**: Changes in either interface immediately reflect in the other
+- **Theme Integration**: Role changes automatically update themes and thesaurus
+- **Error Handling**: Comprehensive logging and graceful error handling
+- **Backward Compatibility**: Non-Tauri environments still work with fallback logic
+
+### Result:
+Perfect synchronization between system tray menu and ThemeSwitcher component. Users can change roles from either interface, and both will immediately reflect the change. The system tray provides quick access without opening the main window, while the ThemeSwitcher provides the full interface experience.
+
 # Current Scratchpad
 
 ## ✅ COMPLETED: Tauri Window Management Crash Fix
