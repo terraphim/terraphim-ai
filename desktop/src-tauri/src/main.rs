@@ -19,9 +19,12 @@ use terraphim_config::ConfigState;
 use terraphim_settings::DeviceSettings;
 
 fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
-    let mut role_menu = SystemTrayMenu::new();
     let roles = &config.roles;
     let selected_role = &config.selected_role;
+
+    let mut menu = SystemTrayMenu::new()
+        .add_item(CustomMenuItem::new("toggle", "Show/Hide"))
+        .add_native_item(SystemTrayMenuItem::Separator);
 
     for (role_name, _role) in roles {
         // Use a unique id for each role menu item
@@ -30,16 +33,12 @@ fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
         if role_name == selected_role {
             menu_item.selected = true;
         }
-        role_menu = role_menu.add_item(menu_item);
+        menu = menu.add_item(menu_item);
     }
 
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let change_role_submenu = SystemTraySubmenu::new("Change Role", role_menu);
 
-    SystemTrayMenu::new()
-        .add_item(CustomMenuItem::new("toggle", "Show/Hide"))
-        .add_submenu(change_role_submenu)
-        .add_native_item(SystemTrayMenuItem::Separator)
+    menu.add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)
 }
 
@@ -88,15 +87,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 if id.starts_with("change_role_") {
                     tauri::async_runtime::spawn(async move {
-                        let role_name = id_clone.strip_prefix("change_role_").unwrap();
+                        let role_name = id_clone.strip_prefix("change_role_").unwrap().to_string();
                         log::info!("User requested to change role to {}", role_name);
                         let config_state: tauri::State<ConfigState> = app_handle.state();
 
-                        match cmd::select_role(config_state, role_name.to_string()).await {
+                        match cmd::select_role(config_state, role_name.clone()).await {
                             Ok(new_config_response) => {
                                 let new_tray_menu = build_tray_menu(&new_config_response.config);
                                 if let Err(e) = app_handle.tray_handle().set_menu(new_tray_menu) {
                                     log::error!("Failed to set new tray menu: {}", e);
+                                }
+                                // Notify the frontend that the role has changed
+                                if let Err(e) = app_handle.emit_all("role_changed", role_name) {
+                                    log::error!("Failed to emit role_changed event: {}", e);
                                 }
                             }
                             Err(e) => {
