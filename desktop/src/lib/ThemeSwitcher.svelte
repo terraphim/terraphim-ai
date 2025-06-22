@@ -55,12 +55,13 @@
     
     // Set theme based on selected role
     const selectedRoleSettings = config.roles[config.selected_role];
+    
     if (selectedRoleSettings) {
-      theme.set(selectedRoleSettings.theme || "default");
+      const newTheme = selectedRoleSettings.theme || "default";
+      theme.set(newTheme);
       
       // Handle thesaurus publishing
       if (selectedRoleSettings.kg?.publish) {
-        console.log("Publishing thesaurus for role", config.selected_role);
         if ($is_tauri) {
           invoke("publish_thesaurus", { roleName: config.selected_role }).then((res) => {
             console.log("publish_thesaurus response", res);
