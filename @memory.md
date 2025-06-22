@@ -327,3 +327,11 @@ The desktop app now has a robust, comprehensive testing strategy that covers all
 - `/config/json` provides dedicated JSON editor with automatic saving
 - `/fetch/editor` provides JSON editor within the fetch tabs interface
 - Both routes now provide consistent JSON editing experience
+
+## 2025-06-22 – Selected Role API & Command
+
+Added lightweight mechanism to switch `selected_role` across platforms:
+- New TerraphimService `update_selected_role` persists chosen role.
+- HTTP endpoint POST `/config/selected_role` in server for changing role.
+- Desktop Tauri command `select_role` exposes same functionality.
+This decouples role switching from heavy `update_config` flow.

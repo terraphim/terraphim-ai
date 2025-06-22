@@ -93,7 +93,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::create_document,
             cmd::get_document,
             cmd::save_initial_settings,
-            cmd::close_splashscreen
+            cmd::close_splashscreen,
+            cmd::select_role
        ])
         .setup(move |app| {
             let settings = device_settings_read.clone();

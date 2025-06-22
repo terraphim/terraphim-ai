@@ -413,3 +413,20 @@ Tasks
 Next steps
 1. Backend schema endpoint
 2. Frontend route & page 1 skeleton 
+
+## 2025-06-22 – Added Selected Role API & Command
+
+Implemented ability to change `selected_role` without sending full config.
+
+Changes:
+1. `terraphim_service` – new `update_selected_role` method to mutate only `Config.selected_role` and persist.
+2. Server `api.rs` – `SelectedRoleRequest` + `update_selected_role` handler; POST `/config/selected_role` route added in `terraphim_server/src/lib.rs`.
+3. Desktop Tauri – new `select_role` command in `cmd.rs`; registered in `main.rs`.
+
+Endpoint:
+POST /config/selected_role { "selected_role": "Engineer" }
+
+Tauri:
+`invoke('select_role', { roleName: 'Engineer' })` returns updated Config.
+
+No breaking changes to existing `update_config`. 

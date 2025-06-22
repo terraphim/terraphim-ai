@@ -251,6 +251,29 @@ impl<'a> TerraphimService {
         log::info!("Config updated");
         Ok(config)
     }
+
+    /// Update only the `selected_role` in the config without mutating the rest of the
+    /// configuration. Returns the up-to-date `Config` object.
+    pub async fn update_selected_role(
+        &self,
+        role_name: terraphim_types::RoleName,
+    ) -> Result<terraphim_config::Config> {
+        let mut current_config = self.config_state.config.lock().await;
+
+        // Ensure the role exists before updating.
+        if !current_config.roles.contains_key(&role_name) {
+            return Err(ServiceError::Config(format!(
+                "Role `{}` not found in config",
+                role_name
+            )));
+        }
+
+        current_config.selected_role = role_name;
+        current_config.save().await?;
+        log::info!("Selected role updated to {}", current_config.selected_role);
+
+        Ok(current_config.clone())
+    }
 }
 
 
