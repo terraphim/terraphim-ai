@@ -387,10 +387,10 @@ The desktop app now has a robust, comprehensive testing strategy that covers all
 - `/fetch/editor` provides JSON editor within the fetch tabs interface
 - Both routes now provide consistent JSON editing experience
 
-## 2025-06-22 – Selected Role API & Command
+## 2025-06-22 - Tauri Role-Switching System Tray Menu
 
-Added lightweight mechanism to switch `selected_role` across platforms:
-- New TerraphimService `update_selected_role` persists chosen role.
-- HTTP endpoint POST `/config/selected_role` in server for changing role.
-- Desktop Tauri command `select_role` exposes same functionality.
-This decouples role switching from heavy `update_config` flow.
+A dynamic system tray menu was implemented in the Tauri desktop app. It shows all available roles from the configuration, highlights the currently selected role with a checkmark, and allows users to switch roles directly from the menu. This was achieved by:
+- Creating a `build_tray_menu` function in `main.rs` to dynamically generate the menu.
+- Updating the `on_system_tray_event` handler to asynchronously call the `select_role` command.
+- Rebuilding the menu with the updated configuration after a role change to reflect the new selection.
+This feature significantly improves the user experience for managing roles in the desktop application.

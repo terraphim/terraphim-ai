@@ -429,7 +429,33 @@ POST /config/selected_role { "selected_role": "Engineer" }
 Tauri:
 `invoke('select_role', { roleName: 'Engineer' })` returns updated Config.
 
-No breaking changes to existing `update_config`. 
+No breaking changes to existing `update_config`.
+
+## 2025-06-22 - Tauri Role-Switching System Tray Menu
+
+### Task:
+Implement a dynamic system tray menu in the Tauri desktop app to show all available roles, highlight the selected one, and allow changing the role directly from the menu.
+
+### Implementation Details:
+1.  **`desktop/src-tauri/src/main.rs` Modified:**
+    *   Added a `build_tray_menu` function that constructs a `SystemTrayMenu` dynamically based on the current `terraphim_config::Config`.
+    *   This function iterates through the roles in the config, creating a submenu named "Change Role".
+    *   Each role is a `CustomMenuItem` with a unique ID like `change_role_{role_name}`.
+    *   The currently `selected_role` is marked with a checkmark (`.selected = true`).
+    *   The `on_system_tray_event` handler was updated to be asynchronous for role changes.
+    *   When a role menu item is clicked:
+        *   It spawns a `tauri::async_runtime` task.
+        *   It invokes the `select_role` Tauri command with the chosen role name.
+        *   On success, it receives the updated `Config` object.
+        *   It calls `build_tray_menu` again with the new config.
+        *   It updates the system tray by calling `app_handle.tray_handle().set_menu(...)`.
+    *   The logic correctly handles the `ConfigResponse` struct returned from the `select_role` command.
+
+2.  **`desktop/src-tauri/src/cmd.rs` Verified:**
+    *   Confirmed that the `select_role` command already returns a `Result<ConfigResponse>`, which contains the updated configuration needed by the UI to rebuild the menu. No changes were needed here.
+
+### Result:
+The desktop application now features a fully functional and dynamic system tray menu for switching roles. The UI automatically reflects the current selection, providing a much-improved user experience for role management, leveraging the recently added `select_role` API.
 
 # Current Scratchpad
 
