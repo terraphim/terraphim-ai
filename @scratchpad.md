@@ -430,3 +430,46 @@ Tauri:
 `invoke('select_role', { roleName: 'Engineer' })` returns updated Config.
 
 No breaking changes to existing `update_config`. 
+
+# Current Scratchpad
+
+## ✅ COMPLETED: Tauri Window Management Crash Fix
+
+**Task**: Patch Tauri show/hide menu crash due to API changes
+**Status**: COMPLETED ✅
+
+### What Was Done:
+1. **Root Cause Identified**: `app.get_window("main").unwrap()` was panicking because:
+   - Window label "main" wasn't properly configured
+   - API changes in newer Tauri versions
+   - Missing proper error handling
+
+2. **Solution Implemented**:
+   - Added explicit `"label": "main"` to `tauri.conf.json` window configuration
+   - Replaced all `.unwrap()` calls with safe pattern matching
+   - Implemented multi-label fallback system: ["main", ""] + first available window
+   - Added comprehensive error logging for debugging
+   - Fixed system tray toggle, global shortcut, setup, and splashscreen close functions
+
+3. **Files Modified**:
+   - `desktop/src-tauri/src/main.rs` - Robust window handling throughout
+   - `desktop/src-tauri/tauri.conf.json` - Added proper window label
+   - `desktop/src-tauri/src/cmd.rs` - Fixed close_splashscreen command
+
+4. **Result**: 
+   - Application no longer crashes when using system tray
+   - Works across different Tauri versions and configurations
+   - Graceful fallbacks ensure functionality even with unexpected window states
+   - Comprehensive logging for future debugging
+
+### Key Learnings:
+- Always add explicit window labels in Tauri configuration
+- Use pattern matching instead of `.unwrap()` for window operations
+- Implement fallback mechanisms for robust window handling
+- Add proper error logging for debugging window management issues
+
+## Next Available Tasks:
+- Continue with MCP server improvements
+- Add more integration test coverage
+- Work on desktop app testing infrastructure
+- Implement additional Tauri features 

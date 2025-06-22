@@ -5,6 +5,65 @@
 - The hang is during MCP handshake, not remote thesaurus fetch (remote URL resolves quickly).
 - Need to investigate why `rmcp` server doesn't send `initialize` response; may require explicit handler or use of `ServiceExt::serve` API.
 
+## ✅ TAURI WINDOW MANAGEMENT CRASH FIXED (2025-06-22)
+
+### Problem Resolved
+- **Issue**: Tauri system tray show/hide menu was crashing with `called Option::unwrap() on a None value`
+- **Root Cause**: `app.get_window("main")` was returning `None` because:
+  1. Window label wasn't properly configured in `tauri.conf.json`
+  2. API changes in newer Tauri versions require different window handling patterns
+  3. Missing proper error handling for window operations
+
+### Solution Implemented
+- **Fixed Window Configuration**: Added explicit `"label": "main"` to window config in `tauri.conf.json`
+- **Robust Window Detection**: Implemented fallback system that tries multiple window labels:
+  - Primary: `"main"` (explicitly configured)
+  - Fallback: `""` (default label for first window)
+  - Ultimate fallback: First available window from `app.windows()`
+- **Error-Safe Operations**: Replaced all `.unwrap()` calls with proper error handling using:
+  - `if let Some(window) = app.get_window(label)` pattern
+  - `match window.is_visible()` with `Ok`/`Err` handling
+  - `let _ = window.hide()` for non-critical operations
+- **Comprehensive Logging**: Added detailed error logging for debugging window issues
+
+### Files Modified
+1. **`desktop/src-tauri/src/main.rs`**:
+   - System tray event handler with multiple window label attempts
+   - Setup function with robust window detection
+   - Global shortcut handler with fallback mechanisms
+   - Added proper error handling throughout
+
+2. **`desktop/src-tauri/tauri.conf.json`**:
+   - Added explicit `"label": "main"` to window configuration
+
+3. **`desktop/src-tauri/src/cmd.rs`**:
+   - Fixed `close_splashscreen` command with safer window handling
+
+### Benefits
+- **Crash Prevention**: Application no longer crashes when system tray is used
+- **Robustness**: Works across different Tauri versions and window configurations
+- **Better UX**: Graceful fallbacks ensure functionality even if expected windows aren't found
+- **Debugging**: Comprehensive logging helps identify window management issues
+
+### Key Patterns for Future Reference
+```rust
+// Safe window retrieval with fallbacks
+let window_labels = ["main", ""];
+for label in &window_labels {
+    if let Some(window) = app.get_window(label) {
+        // Use window safely
+        break;
+    }
+}
+
+// Error-safe window operations
+match window.is_visible() {
+    Ok(true) => { let _ = window.hide(); },
+    Ok(false) => { let _ = window.show(); },
+    Err(e) => log::error!("Window error: {:?}", e),
+}
+```
+
 ## Current Task: Expand Integration Test for Resource Search
 
 - Created basic integration test at `crates/terraphim_mcp_server/tests/integration_test.rs`
