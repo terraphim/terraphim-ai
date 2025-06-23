@@ -205,4 +205,12 @@
   .suggestions li.active {
     background-color: #f5f5f5;
   }
+  /* Center logo and text on empty state */
+  .has-text-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+  }
 </style>
