@@ -51,7 +51,14 @@
   function updateStoresFromConfig(config: ConfigResponse['config']) {
     console.log("Updating stores from config:", config);
     configStore.set(config);
-    roles.set(Object.values(config.roles));
+    // Convert the roles map (keyed by role name) to an array and inject the
+    // `name` field so that each entry is self-contained. This makes look-ups by
+    // role name trivial later on.
+    const rolesArray = Object.entries(config.roles).map(([name, settings]) => ({
+      name,
+      ...settings
+    }));
+    roles.set(rolesArray);
     role.set(config.selected_role);
     
     // Set theme based on selected role
@@ -101,20 +108,24 @@
     const newRoleName = target.value;
     console.log("Role change requested:", newRoleName);
 
-    const roleSettings = $roles.find(r => r.name === newRoleName);
+    // Persist the newly selected role in the dedicated store **first** so that
+    // any reactive subscribers update immediately (e.g. App.svelte head link).
+    role.set(newRoleName);
+
+    const roleSettings = $roles.find((r) => r.name === newRoleName);
     if (!roleSettings) {
       console.error(`No role settings found for role: ${newRoleName}.`);
       return;
     }
 
-    const newTheme = roleSettings.theme || 'spacelab';
+    const newTheme = roleSettings.theme || "spacelab";
     theme.set(newTheme);
     console.log(`Theme changed to ${newTheme}`);
 
-    // Update selected role in the main config
-    configStore.update(config => {
-      config.selected_role = newRoleName;
-      return config;
+    // Update selected role in the main config object
+    configStore.update((cfg) => {
+      cfg.selected_role = newRoleName;
+      return cfg;
     });
 
     // In Tauri, notify the backend about the role change
@@ -146,7 +157,9 @@
 <div class="field is-grouped is-grouped-right">
   <div class="control">
     <div class="select">
-      <select bind:value={$role} on:change={updateRole}>
+      <!-- We set the current value explicitly and handle updates via `updateRole`.
+           Direct store binding with `$role` is avoided because `$role` is read-only. -->
+      <select value={$role} on:change={updateRole}>
         {#each $roles as r}
           <option value={r.name}>{r.name}</option>
         {/each}
