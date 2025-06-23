@@ -16,14 +16,7 @@
 </script>
 
 <svelte:head>
-  <meta
-    name="color-scheme"
-    content={$theme == "spacelab" ? "lumen darkly" : $theme}
-  />
-  <link
-    rel="stylesheet"
-    href={`/assets/bulmaswatch/${$theme}/bulmaswatch.min.css`}
-  />
+  <meta name="color-scheme" content={$theme} />
   <title>Terraphim</title>
 </svelte:head>
 
