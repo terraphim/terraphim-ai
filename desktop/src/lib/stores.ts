@@ -2,9 +2,11 @@ import { writable } from "svelte/store";
 import { CONFIG } from "../config";
 
 // TypeScript interfaces for Rust types
-interface Role {
+export interface Role {
   name: string;
   theme: string;
+  shortname?: string;
+  kg?: { publish?: boolean };
 }
 interface NormalisedThesaurus {
   id: string;
@@ -43,9 +45,8 @@ const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
 const isInitialSetupComplete = writable<boolean>(false);
 
-// FIXME: add default role
-// const roles = writable<Record<string, Role>>({}); // Store roles separately for easier access
-const roles = writable<{ [key: string]: { name: string; theme: string; kg?: { publish?: boolean } } }>({});
+// Roles should be an array of Role objects
+const roles = writable<Role[]>([]);
 
 let input = writable<string>("");
 const typeahead = writable<boolean>(false);

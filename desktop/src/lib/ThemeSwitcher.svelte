@@ -2,14 +2,14 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { listen } from "@tauri-apps/api/event";
   import { CONFIG } from "../config";
-  import { configStore, is_tauri, role, roles, theme, thesaurus, typeahead } from "./stores";
+  import { configStore, is_tauri, role, roles, theme, thesaurus, typeahead, type Role as RoleInterface } from "./stores";
 
   interface ConfigResponse {
     status: string;
     config: {
       id: string;
       global_shortcut: string;
-      roles: { [key: string]: { name: string; theme: string; kg?: { publish?: boolean } } };
+      roles: { [key: string]: RoleInterface };
       selected_role: string;
     };
   }
@@ -19,7 +19,7 @@
     try {
       is_tauri.set(window.__TAURI__ !== undefined);
       if ($is_tauri) {
-        console.log("test is_tauri True");
+        console.log("Loading config from Tauri");
         invoke<ConfigResponse>("get_config")
           .then((res) => {
             console.log("get_config response", res);
@@ -31,7 +31,7 @@
             console.error("Error fetching config in Tauri:", error)
           );
       } else {
-        console.log("test is_tauri False");
+        console.log("Loading config from server");
         configURL = `${CONFIG.ServerURL}/config/`;
         fetch(configURL)
           .then((response) => response.json())
@@ -48,16 +48,19 @@
     }
   }
 
-  function updateStoresFromConfig(config: any) {
+  function updateStoresFromConfig(config: ConfigResponse['config']) {
+    console.log("Updating stores from config:", config);
     configStore.set(config);
-    roles.set(Object.values(config.roles) as any);
+    roles.set(Object.values(config.roles));
     role.set(config.selected_role);
     
     // Set theme based on selected role
     const selectedRoleSettings = config.roles[config.selected_role];
+    console.log("Selected role settings:", selectedRoleSettings);
     
     if (selectedRoleSettings) {
-      const newTheme = selectedRoleSettings.theme || "default";
+      const newTheme = selectedRoleSettings.theme || "spacelab";
+      console.log("Setting theme to:", newTheme);
       theme.set(newTheme);
       
       // Handle thesaurus publishing
@@ -72,6 +75,9 @@
       } else {
         typeahead.set(false);
       }
+    } else {
+      console.warn("No role settings found for:", config.selected_role);
+      theme.set("spacelab"); // Default theme
     }
   }
 
@@ -79,7 +85,7 @@
   if (typeof window !== 'undefined' && window.__TAURI__) {
     listen('role_changed', (event) => {
       console.log('Role changed event received from backend:', event.payload);
-      updateStoresFromConfig(event.payload);
+      updateStoresFromConfig(event.payload as ConfigResponse['config']);
     });
   }
 
@@ -93,46 +99,46 @@
   function updateRole(event: Event) {
     const target = event.target as HTMLSelectElement;
     const newRoleName = target.value;
-    console.log("updateRole event received:", event);
-    console.log("Setting role to", newRoleName);
+    console.log("Role change requested:", newRoleName);
 
+    const roleSettings = $roles.find(r => r.name === newRoleName);
+    if (!roleSettings) {
+      console.error(`No role settings found for role: ${newRoleName}.`);
+      return;
+    }
+
+    const newTheme = roleSettings.theme || 'spacelab';
+    theme.set(newTheme);
+    console.log(`Theme changed to ${newTheme}`);
+
+    // Update selected role in the main config
+    configStore.update(config => {
+      config.selected_role = newRoleName;
+      return config;
+    });
+
+    // In Tauri, notify the backend about the role change
     if ($is_tauri) {
-      // Use the centralized select_role command
       invoke("select_role", { roleName: newRoleName })
-        .then((res: ConfigResponse) => {
-          console.log("select_role response", res);
-          if (res && res.status === "success") {
-            // The backend will emit a role_changed event, which our listener will handle
-            // But we can also update immediately for better UX
-            updateStoresFromConfig(res.config);
-          }
-        })
         .catch((e) => console.error("Error selecting role:", e));
-    } else {
-      // For non-Tauri environments, fall back to the old method
-      var selectedTheme = "default";
-      role.set(newRoleName);
-      
-      const rolesArray = Array.isArray($roles) ? $roles : Object.values($roles);
-      const roleSettings = rolesArray.find((r: any) => r.name === newRoleName);
-      console.log("Role settings ", roleSettings);
 
-      if (roleSettings) {
-        configStore.update(config => {
-          config.selected_role = roleSettings.shortname || newRoleName;
-          return config;
-        });
-        
-        if (roleSettings.kg?.publish) {
-          console.log("Publishing thesaurus for role", newRoleName);
+      // Handle thesaurus publishing
+      if (roleSettings.kg?.publish) {
+        console.log("Publishing thesaurus for role", newRoleName);
+        invoke("publish_thesaurus", { roleName: newRoleName }).then((res) => {
+          thesaurus.set(res as any);
           typeahead.set(true);
-        } else {
-          typeahead.set(false);
-        }
-        selectedTheme = roleSettings.theme;
+        });
+      } else {
+        typeahead.set(false);
       }
-      
-      theme.set(selectedTheme);
+    } else {
+        // For non-Tauri, update the config on the server
+        fetch(`${CONFIG.ServerURL}/config/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify($configStore),
+        }).catch(error => console.error("Error updating config on server:", error));
     }
   }
 </script>
@@ -141,8 +147,8 @@
   <div class="control">
     <div class="select">
       <select bind:value={$role} on:change={updateRole}>
-        {#each Object.values($roles) as { name, theme }}
-          <option value={name}>{name}</option>
+        {#each $roles as r}
+          <option value={r.name}>{r.name}</option>
         {/each}
       </select>
     </div>

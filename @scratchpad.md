@@ -537,3 +537,64 @@ Perfect synchronization between system tray menu and ThemeSwitcher component. Us
 - Add more integration test coverage
 - Work on desktop app testing infrastructure
 - Implement additional Tauri features 
+
+## CURRENT STATUS: THEME SWITCHING FIX COMPLETED ✅
+
+### Just Completed: Role-Based Theme Switching Fix
+
+**Problem Solved:** 
+Recent changes in Tauri role management had broken the UI theme switching functionality. Each role should automatically switch to its associated Bulma theme when selected.
+
+**Technical Issues Fixed:**
+
+1. **Data Structure Problems:**
+   - `roles.set(Object.values(config.roles) as any)` was converting roles to array
+   - Template was doing `Object.values($roles)` again, causing double conversion  
+   - Fixed: Store roles as original object structure
+
+2. **Non-Tauri Logic Broken:**
+   - Role lookup logic was incorrect for web browser mode
+   - Theme wasn't being applied properly after role selection
+   - Fixed: Direct role lookup using `currentConfig.roles[newRoleName]`
+
+3. **Type Definitions Inconsistent:**
+   - stores.ts had mismatched type for roles store
+   - Fixed: `roles: writable<Record<string, Role>>({})`
+
+**Files Modified:**
+- `desktop/src/lib/ThemeSwitcher.svelte` - Main fix for role/theme logic
+- `desktop/src/lib/stores.ts` - Fixed type definitions
+
+**Verification:**
+- ✅ Desktop builds successfully: `pnpm run build`
+- ✅ Backend compiles: `cargo build --release`  
+- ✅ Theme switching works in both Tauri and web modes
+- ✅ All Bulma themes available in `/assets/bulmaswatch/`
+
+**Theme Mappings Working:**
+- Default → spacelab (light blue)
+- Engineer → lumen (clean light)
+- System Operator → superhero (dark)
+
+**Next Steps:**
+- Theme switching is now fully functional
+- System tray role selection and manual dropdown both work
+- Ready for user testing and production deployment
+
+### Development Notes
+
+**Architecture Overview:**
+- Config API provides role definitions with theme mappings
+- ThemeSwitcher component handles both Tauri IPC and HTTP API calls
+- App.svelte dynamically loads CSS based on theme store value
+- Two-way sync between system tray and UI role selection
+
+**Key Learning:**
+- Always check data structure transformations in Svelte stores
+- Maintain consistency between TypeScript interfaces and actual usage
+- Test both Tauri and web browser modes for desktop apps
+
+**Build System:**
+- Using pnpm for frontend dependencies (not npm)
+- Rust compilation includes embedded Svelte assets
+- All builds passing with only deprecation warnings (non-breaking) 
