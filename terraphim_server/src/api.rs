@@ -16,6 +16,8 @@ use terraphim_config::ConfigState;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
+use terraphim_rolegraph::magic_unpair;
+use terraphim_types::RoleName;
 
 use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
@@ -172,5 +174,93 @@ pub(crate) async fn update_selected_role(
     Ok(Json(ConfigResponse {
         status: Status::Success,
         config,
+    }))
+}
+
+// NOTE: RoleGraph visualisation DTOs
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraphNodeDto {
+    pub id: u64,
+    pub label: String,
+    pub rank: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GraphEdgeDto {
+    pub source: u64,
+    pub target: u64,
+    pub rank: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RoleGraphResponseDto {
+    pub status: Status,
+    pub nodes: Vec<GraphNodeDto>,
+    pub edges: Vec<GraphEdgeDto>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RoleGraphQuery {
+    role: Option<String>,
+}
+
+/// Return nodes and edges for the RoleGraph of the requested role (or currently selected role if omitted)
+pub(crate) async fn get_rolegraph(
+    State(config_state): State<ConfigState>,
+    Query(query): Query<RoleGraphQuery>,
+) -> Result<Json<RoleGraphResponseDto>> {
+    // Determine which role we should use
+    let role_name: RoleName = if let Some(role_str) = query.role {
+        RoleName::new(&role_str)
+    } else {
+        config_state.get_selected_role().await
+    };
+
+    // Retrieve the rolegraph for the role
+    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
+        return Err(crate::error::ApiError(
+            StatusCode::NOT_FOUND,
+            anyhow::anyhow!(format!("Rolegraph not found for role: {role_name}")),
+        ));
+    };
+
+    let rolegraph = rolegraph_sync.lock().await;
+
+    // Build node DTOs
+    let nodes: Vec<GraphNodeDto> = rolegraph
+        .nodes_map()
+        .iter()
+        .map(|(&id, node)| {
+            let label = rolegraph
+                .ac_reverse_nterm
+                .get(&id)
+                .map(|v| v.as_str().to_string())
+                .unwrap_or_else(|| id.to_string());
+            GraphNodeDto {
+                id,
+                label,
+                rank: node.rank,
+            }
+        })
+        .collect();
+
+    // Build edge DTOs
+    let edges: Vec<GraphEdgeDto> = rolegraph
+        .edges_map()
+        .iter()
+        .map(|(&edge_id, edge)| {
+            let (source, target) = magic_unpair(edge_id);
+            GraphEdgeDto {
+                source,
+                target,
+                rank: edge.rank,
+            }
+        })
+        .collect();
+
+    Ok(Json(RoleGraphResponseDto {
+        status: Status::Success,
+        nodes,
+        edges,
     }))
 }

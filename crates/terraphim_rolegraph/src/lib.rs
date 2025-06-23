@@ -276,6 +276,16 @@ impl RoleGraph {
     pub fn document_count(&self) -> usize {
         self.documents.len()
     }
+
+    /// Public accessor for nodes collection
+    pub fn nodes_map(&self) -> &ahash::AHashMap<u64, Node> {
+        &self.nodes
+    }
+
+    /// Public accessor for edges collection
+    pub fn edges_map(&self) -> &ahash::AHashMap<u64, Edge> {
+        &self.edges
+    }
 }
 
 /// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`

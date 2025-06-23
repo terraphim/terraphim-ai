@@ -15,7 +15,7 @@ use tower_http::cors::{Any, CorsLayer};
 mod api;
 mod error;
 
-use api::{create_document, health, search_documents, search_documents_post};
+use api::{create_document, health, search_documents, search_documents_post, get_rolegraph};
 pub use api::{ConfigResponse, CreateDocumentResponse, SearchResponse};
 pub use error::{Result, Status};
 
@@ -46,6 +46,8 @@ pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState)
         .route("/config/schema/", get(api::get_config_schema))
         .route("/config/selected_role", post(api::update_selected_role))
         .route("/config/selected_role/", post(api::update_selected_role))
+        .route("/rolegraph", get(get_rolegraph))
+        .route("/rolegraph/", get(get_rolegraph))
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
