@@ -17,6 +17,10 @@ use tauri::{
 
 use terraphim_config::ConfigState;
 use terraphim_settings::DeviceSettings;
+use terraphim_mcp_server::McpService;
+use rmcp::service::ServiceExt;
+use tokio::io::{stdin, stdout};
+use tracing_subscriber::prelude::*;
 
 fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
     let roles = &config.roles;
@@ -42,8 +46,51 @@ fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
         .add_item(quit)
 }
 
+/// Runs the Terraphim MCP server over stdio (blocking)
+async fn run_mcp_server() -> anyhow::Result<()> {
+    // Initialise logging identical to the standalone terraphim_mcp_server binary so that
+    // feature-parity is preserved when using the desktop binary in server-only mode.
+    let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| "logs".to_string());
+    std::fs::create_dir_all(&log_dir)?;
+    let file_appender = tracing_appender::rolling::daily(&log_dir, "terraphim-mcp-server.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let _ = tracing_log::LogTracer::init();
+
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
+        .with(tracing_subscriber::EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()));
+    let _ = subscriber.try_init();
+
+    tracing::info!("Starting Terraphim MCP server (embedded in desktop binary)");
+
+    // Build a default server configuration
+    let config = terraphim_config::ConfigBuilder::new()
+        .build_default_server()
+        .build()
+        .expect("Failed to build default configuration");
+
+    let mut tmp_config = config.clone();
+    let config_state = terraphim_config::ConfigState::new(&mut tmp_config).await?;
+    let service = McpService::new(std::sync::Arc::new(config_state));
+
+    // Start serving over stdio.
+    let server = service.serve((stdin(), stdout())).await?;
+    tracing::info!("MCP server initialised – awaiting shutdown");
+    let reason = server.waiting().await?;
+    tracing::info!("MCP server shut down with reason: {:?}", reason);
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // Early CLI handling: if invoked with the `mcp-server` sub-command run the MCP server
+    // and exit. This allows the same desktop binary to be used as a pure head-less
+    // Terraphim MCP server that speaks over stdio so that external MCP clients can
+    // communicate with it via the Model Context Protocol.
+    if std::env::args().any(|arg| arg == "mcp-server" || arg == "--mcp-server") {
+        return run_mcp_server().await.map_err(|e| e.into());
+    }
+
     let device_settings = match DeviceSettings::load_from_env_and_file(None) {
         Ok(settings) => settings,
         Err(e) => {

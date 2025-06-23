@@ -6104,6 +6104,7 @@ dependencies = [
  "log",
  "mockall",
  "portpicker",
+ "rmcp",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -6114,6 +6115,7 @@ dependencies = [
  "tempfile",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_mcp_server",
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
@@ -6123,6 +6125,10 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
+ "tracing",
+ "tracing-appender",
+ "tracing-log 0.1.4",
+ "tracing-subscriber",
 ]
 
 [[package]]
