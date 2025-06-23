@@ -611,3 +611,31 @@ Changes:
 
 Next steps (if any):
 - Review E2E visual tests for FOUC regression - Clean up legacy Route typing errors (unrelated to theme work). 
+
+## 2025-06-23 – Embedded MCP Server in Desktop Binary ✅
+
+### Completed
+1. Added `terraphim_mcp_server` dependency to desktop Cargo.toml along with tracing crates.
+2. Implemented `run_mcp_server()` helper in `desktop/src-tauri/src/main.rs` which:
+   - Builds default server config
+   - Instantiates `McpService` and serves over stdio
+   - Mirrors standalone server logging
+3. Early CLI guard: if `mcp-server`/`--mcp-server` argument present → skip GUI and call `run_mcp_server()`.
+4. Added new CLI subcommand to `tauri.conf.json` for discoverability.
+5. Created `desktop_mcp_integration.rs` test that builds desktop binary, launches in server mode, performs tool list and basic search, then cancels.
+
+### Outcome
+- Single desktop binary can now be used both as GUI and as headless MCP server.
+- Allows using rust-sdk example clients out-of-the-box; good for demos and testing.
+- Integration tests pass locally (`cargo test -p terraphim_mcp_server --test desktop_mcp_integration`).
+
+### Next Tasks
+- [ ] Extend `desktop_mcp_integration` to mirror full server integration suite (pagination, list_resources, read_resource).
+- [ ] Decide whether to expose TCP/WebSocket transport for easier network access (currently stdio only).
+- [ ] Update documentation and README with usage examples:
+  ```bash
+  # GUI mode (default)
+  ./terraphim-ai-desktop
+  # Headless MCP server
+  ./terraphim-ai-desktop mcp-server > /tmp/mcp.log &
+  ```

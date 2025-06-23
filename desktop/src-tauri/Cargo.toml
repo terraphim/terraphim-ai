@@ -24,6 +24,8 @@ terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.1.
 terraphim_types = { path = "../../crates/terraphim_types", version = "0.1.0" }
 terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.1.0" }
 terraphim_service = { path = "../../crates/terraphim_service", version = "0.1.0" }
+terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "0.1.0" }
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["server"] }
 serde_json_any_key = "2.0.0" 
 anyhow = "1.0.81"
 log = "0.4.21"
@@ -38,6 +40,10 @@ tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
 ahash = "0.8.11"
 schemars = { version = "0.8", features = ["derive"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-appender = "0.2.3"
+tracing-log = "0.1"
 
 [dev-dependencies]
 tokio-test = "0.4.4"

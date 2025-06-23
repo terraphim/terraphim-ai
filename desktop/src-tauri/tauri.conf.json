@@ -47,6 +47,9 @@
               "description": "Update in background"
             }
           ]
+        },
+        "mcp-server": {
+          "description": "Run the Terraphim MCP server over stdio for external clients"
         }
       }
     },

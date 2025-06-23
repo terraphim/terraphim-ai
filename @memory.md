@@ -489,3 +489,14 @@ Users can now change roles from either the system tray (quick access) or ThemeSw
 ### 2025-06-23 – Bulmaswatch ThemeManager
 
 Implemented a central `themeManager.ts` that automatically swaps Bulmaswatch CSS whenever the `theme` store changes.  Removed static <link> from App.svelte and wired the manager in main.ts.  Fixes flicker and keeps ThemeSwitcher logic clean.
+
+## 2025-06-23 – Embedded MCP Server in Desktop Binary
+
+- Added `terraphim_mcp_server` dependency to desktop crate and logging crates.
+- Implemented `run_mcp_server()` in `desktop/src-tauri/src/main.rs` which launches MCP server over stdio using existing service implementation.
+- Desktop binary now supports `mcp-server` subcommand (also `--mcp-server`) defined in `tauri.conf.json` CLI; if provided, GUI is skipped and server runs head-less.
+- Integration test `desktop_mcp_integration.rs` validates:
+  - Desktop binary builds and launches in server mode via `TokioChildProcess` transport.
+  - `list_tools` returns expected tools.
+  - Basic `search` call succeeds (non-error response).
+- Result: Any MCP client (e.g. rust-sdk examples) can talk to the running Terraphim desktop app; simplifies distribution (single binary serves both GUI and CLI use-cases).
