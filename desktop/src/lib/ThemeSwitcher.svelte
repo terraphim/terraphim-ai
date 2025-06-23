@@ -50,7 +50,15 @@
 
   function updateStoresFromConfig(config: ConfigResponse['config']) {
     console.log("Updating stores from config:", config);
-    configStore.set(config);
+    // The global Config interface expects a `default_role` property which older
+    // backend versions might omit.  Provide a sensible fallback so TypeScript
+    // type-checks and downstream code remains happy.
+    const fullConfig = {
+      default_role: config.selected_role,
+      ...config,
+    };
+    // Cast is safe: we just guaranteed the presence of every required key.
+    configStore.set(fullConfig as any);
     // Convert the roles map (keyed by role name) to an array and inject the
     // `name` field so that each entry is self-contained. This makes look-ups by
     // role name trivial later on.

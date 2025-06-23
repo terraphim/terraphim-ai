@@ -598,3 +598,16 @@ Recent changes in Tauri role management had broken the UI theme switching functi
 - Using pnpm for frontend dependencies (not npm)
 - Rust compilation includes embedded Svelte assets
 - All builds passing with only deprecation warnings (non-breaking) 
+
+## 2025-06-23 – Bulmaswatch ThemeManager Implemented
+
+Objective: decouple stylesheet swapping from App.svelte and ThemeSwitcher and ensure flicker-free theme changes.
+
+Changes:
+1. **Created `desktop/src/lib/themeManager.ts`** → subscribes to `theme` store, injects `<link id="bulma-theme">` and removes old css once loaded. Updates `<meta name="color-scheme">`.
+2. **Bootstrapped in `desktop/src/main.ts`** before mounting Svelte app.
+3. **Removed hard-coded `<link>` from `App.svelte`** – now only meta tag remains.
+4. **Fixed TS error in `ThemeSwitcher.svelte`** by synthesising `default_role` when missing.
+
+Next steps (if any):
+- Review E2E visual tests for FOUC regression - Clean up legacy Route typing errors (unrelated to theme work). 

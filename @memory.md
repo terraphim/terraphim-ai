@@ -485,3 +485,7 @@ Users can now change roles from either the system tray (quick access) or ThemeSw
 - Project uses pnpm instead of npm for installing dependencies
 - Both Rust backend (cargo build) and Svelte frontend (npm run build) compile successfully
 - Desktop app ready for production deployment
+
+### 2025-06-23 – Bulmaswatch ThemeManager
+
+Implemented a central `themeManager.ts` that automatically swaps Bulmaswatch CSS whenever the `theme` store changes.  Removed static <link> from App.svelte and wired the manager in main.ts.  Fixes flicker and keeps ThemeSwitcher logic clean.
