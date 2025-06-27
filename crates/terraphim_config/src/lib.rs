@@ -312,9 +312,7 @@ impl ConfigBuilder {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(AutomataPath::from_local(
-                        default_data_path.join("Terraphim Engineer_thesaurus.json".to_string()),
-                    )),
+                    automata_path: Some(AutomataPath::remote_example()),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
                         path: default_data_path.join("kg"),

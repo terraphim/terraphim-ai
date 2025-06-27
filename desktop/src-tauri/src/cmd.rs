@@ -40,6 +40,12 @@ pub enum TerraphimTauriError {
 
     #[error("Service error: {0}")]
     Service(#[from] terraphim_service::ServiceError),
+
+    #[error("Settings error: {0}")]
+    Settings(#[from] terraphim_settings::Error),
+
+    #[error("{0}")]
+    Generic(String),
 }
 
 // Manually implement `Serialize` for our error type because some of the
@@ -53,7 +59,7 @@ impl Serialize for TerraphimTauriError {
     }
 }
 
-pub type Result<T> = anyhow::Result<T, TerraphimTauriError>;
+pub type Result<T> = std::result::Result<T, TerraphimTauriError>;
 
 /// Response type for showing the config
 ///
@@ -143,31 +149,41 @@ use tauri::async_runtime::Mutex;
 use std::sync::Arc;
 
 #[tauri::command]
-pub async fn save_initial_settings( config_state: tauri::State<'_, ConfigState>,
-    device_settings: tauri::State<'_, Arc<Mutex<DeviceSettings>>>,new_settings: InitialSettings) -> Result<()> {
-    println!("Saving initial settings: {:?}", new_settings);
-    println!("Device settings: {:?}", device_settings);
+pub async fn save_initial_settings(
+    config_state: tauri::State<'_, ConfigState>,
+    device_settings: tauri::State<'_, Arc<Mutex<DeviceSettings>>>,
+    new_settings: InitialSettings,
+) -> Result<()> {
+    log::info!("Saving initial settings: {:?}", new_settings);
     let mut settings = device_settings.lock().await;
-    let mut config = config_state.config.lock().await;
     let data_folder = PathBuf::from(&new_settings.data_folder);
-    println!("Data folder: {:?}", data_folder);
+    log::info!("Data folder: {:?}", data_folder);
+
     if !data_folder.exists() {
-        println!("Data folder does not exist");
+        log::info!("Creating data folder at {:?}", data_folder);
+        std::fs::create_dir_all(&data_folder)
+            .map_err(|e| TerraphimTauriError::Generic(e.to_string()))?;
     }
+
     if !data_folder.is_dir() {
-        println!("Selected path is not a folder");
+        return Err(TerraphimTauriError::Generic(
+            "Selected path is not a folder".to_string(),
+        ));
     }
-    
-    // Here you would typically save these settings to a file or database
-    // For this example, we'll just print them
-    println!("Data folder: {:?}", new_settings.data_folder);
-    println!("Global shortcut: {}", new_settings.global_shortcut);
+
+    // Update the default_data_path in settings
+    settings.default_data_path = new_settings.data_folder.to_string_lossy().to_string();
+
+    log::info!("Data folder set to: {:?}", new_settings.data_folder);
+    log::info!("Global shortcut set to: {}", new_settings.global_shortcut);
+
+    let mut config = config_state.config.lock().await;
     config.global_shortcut = new_settings.global_shortcut;
     let updated_config = config.clone();
-    drop(config);  // Release the lock before calling update_config
+    drop(config);
+
     update_config(config_state.clone(), updated_config).await?;
-    // settings.data_folder = data_folder;
-    settings.update_initialized_flag(None, true).unwrap();
+    settings.update_initialized_flag(None, true)?;
     drop(settings);
     Ok(())
 }

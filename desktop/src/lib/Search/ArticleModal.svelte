@@ -17,6 +17,8 @@
   }
 
   $: isHtml = /<\w+/.test(item?.body ?? '');
+  // Determine the original format for editing to preserve it
+  $: originalFormat = isHtml ? 'html' : 'markdown';
 
   async function loadDocument() {
     if (!$is_tauri) return;
@@ -79,7 +81,7 @@
 
     {#if editing}
       <!-- Pass the article body as default content and bind back for updates -->
-      <NovelWrapper bind:html={item.body}/>
+      <NovelWrapper bind:html={item.body} outputFormat={originalFormat}/>
       <div class="edit-controls">
         <button class="button is-primary" on:click={saveDocument}>
           Save
