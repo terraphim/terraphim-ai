@@ -52,6 +52,7 @@
     "svelte-jsoneditor": "^0.21.4",
     "svelte-markdown": "^0.4.1",
     "svelte-routing": "^2.13.0",
-    "tinro": "^0.6.12"
+    "tinro": "^0.6.12",
+    "tiptap-markdown": "^0.8.10"
   }
 }

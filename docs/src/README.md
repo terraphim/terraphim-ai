@@ -1,5 +1,4 @@
-Terraphim documentation
-==========
+# Terraphim documentation
 
 This folder is a source for Terraphim documentation as well as demonstration for Terraphim Engineer role:
 
@@ -33,6 +32,12 @@ Example configuration for this KG:
 },
 ```
 
-* to do list
+- to do list
 
-* todo list
+- todo list
+
+- [ ] My todo 
+
+- [ ] fix this
+
+- [ ] 
