@@ -12,6 +12,7 @@ terraphim_service = { path = "../terraphim_service" }
 terraphim_config = { path = "../terraphim_config" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_automata = { path = "../terraphim_automata" }
 
 ahash = "0.8.7"
 anyhow = "1.0.80"

@@ -12,7 +12,8 @@ use rmcp::{
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
-use tracing::error;
+use terraphim_automata::{AutocompleteIndex, AutocompleteConfig};
+use tracing::{error, info};
 use thiserror::Error;
 
 pub mod resource_mapper;
@@ -44,6 +45,7 @@ impl From<TerraphimMcpError> for ErrorData {
 pub struct McpService {
     config_state: Arc<ConfigState>,
     resource_mapper: Arc<TerraphimResourceMapper>,
+    autocomplete_index: Arc<tokio::sync::RwLock<Option<AutocompleteIndex>>>,
 }
 
 impl McpService {
@@ -52,6 +54,7 @@ impl McpService {
         Self {
             config_state,
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
+            autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -150,6 +153,176 @@ impl McpService {
             }
         }
     }
+
+    /// Build autocomplete index from current role's thesaurus
+    pub async fn build_autocomplete_index(
+        &self,
+        role: Option<String>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut service = self.terraphim_service().await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+        
+        // Check if the role exists and has proper knowledge graph configuration
+        let role_config = self.config_state.get_role(&role_name).await;
+        if let Some(role_cfg) = role_config {
+            // Check if role uses TerraphimGraph relevance function (required for knowledge graph)
+            if role_cfg.relevance_function != terraphim_types::RelevanceFunction::TerraphimGraph {
+                let error_content = Content::text(format!(
+                    "Role '{}' does not use knowledge graph ranking (TerraphimGraph). Autocomplete is only available for roles with knowledge graph-based ranking. Current relevance function: {:?}",
+                    role_name, role_cfg.relevance_function
+                ));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+            
+            // Check if role has knowledge graph configuration
+            let kg_is_properly_configured = role_cfg.kg.as_ref()
+                .map(|kg| kg.automata_path.is_some() || kg.knowledge_graph_local.is_some())
+                .unwrap_or(false);
+            
+            if !kg_is_properly_configured {
+                let error_content = Content::text(format!(
+                    "Role '{}' does not have a properly configured knowledge graph. Autocomplete requires a role with defined automata_path or local knowledge graph.",
+                    role_name
+                ));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+        } else {
+            let error_content = Content::text(format!(
+                "Role '{}' not found in configuration. Available roles: {:?}",
+                role_name,
+                self.config_state.roles.keys().collect::<Vec<_>>()
+            ));
+            return Ok(CallToolResult::error(vec![error_content]));
+        }
+        
+        // Load thesaurus for the role
+        match service.ensure_thesaurus_loaded(&role_name).await {
+            Ok(thesaurus_data) => {
+                if thesaurus_data.is_empty() {
+                    let error_content = Content::text(format!(
+                        "No thesaurus data available for role '{}'. Please ensure the role has a properly configured and loaded knowledge graph.",
+                        role_name
+                    ));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+                
+                info!("Building autocomplete index from {} thesaurus entries for role: {}", 
+                      thesaurus_data.len(), role_name);
+                
+                let config = AutocompleteConfig::default();
+                match terraphim_automata::build_autocomplete_index(thesaurus_data.clone(), Some(config)) {
+                    Ok(index) => {
+                        // Store the index with role context
+                        let mut autocomplete_lock = self.autocomplete_index.write().await;
+                        *autocomplete_lock = Some(index);
+                        
+                        let content = Content::text(format!(
+                            "Autocomplete index built successfully with {} terms for role '{}'",
+                            thesaurus_data.len(),
+                            role_name
+                        ));
+                        Ok(CallToolResult::success(vec![content]))
+                    }
+                    Err(e) => {
+                        error!("Failed to build autocomplete index: {}", e);
+                        let error_content = Content::text(format!("Failed to build autocomplete index: {}", e));
+                        Ok(CallToolResult::error(vec![error_content]))
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to load thesaurus for role '{}': {}", role_name, e);
+                let error_content = Content::text(format!(
+                    "Failed to load thesaurus for role '{}': {}. Please ensure the role has a valid knowledge graph configuration with accessible automata_path.",
+                    role_name, e
+                ));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Fuzzy autocomplete search using Jaro-Winkler similarity (default, faster)
+    pub async fn fuzzy_autocomplete_search(
+        &self,
+        query: String,
+        similarity: Option<f64>,
+        limit: Option<usize>,
+    ) -> Result<CallToolResult, McpError> {
+        let autocomplete_lock = self.autocomplete_index.read().await;
+        
+        if let Some(ref index) = *autocomplete_lock {
+            let min_similarity = similarity.unwrap_or(0.6);
+            let max_results = limit.unwrap_or(10);
+            
+            match terraphim_automata::fuzzy_autocomplete_search(index, &query, min_similarity, Some(max_results)) {
+                Ok(results) => {
+                    let mut contents = Vec::new();
+                    let summary = format!("Found {} autocomplete suggestions for '{}'", results.len(), query);
+                    contents.push(Content::text(summary));
+                    
+                    for result in results {
+                        let suggestion = format!("• {} (score: {:.3})", result.term, result.score);
+                        contents.push(Content::text(suggestion));
+                    }
+                    
+                    Ok(CallToolResult::success(contents))
+                }
+                Err(e) => {
+                    error!("Autocomplete search failed: {}", e);
+                    let error_content = Content::text(format!("Autocomplete search failed: {}", e));
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+        } else {
+            let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+            Ok(CallToolResult::error(vec![error_content]))
+        }
+    }
+
+    /// Fuzzy autocomplete search using Levenshtein distance (baseline comparison)
+    pub async fn fuzzy_autocomplete_search_levenshtein(
+        &self,
+        query: String,
+        max_edit_distance: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<CallToolResult, McpError> {
+        let autocomplete_lock = self.autocomplete_index.read().await;
+        
+        if let Some(ref index) = *autocomplete_lock {
+            let max_distance = max_edit_distance.unwrap_or(2);
+            let max_results = limit.unwrap_or(10);
+            
+            match terraphim_automata::fuzzy_autocomplete_search_levenshtein(index, &query, max_distance, Some(max_results)) {
+                Ok(results) => {
+                    let mut contents = Vec::new();
+                    let summary = format!("Found {} Levenshtein autocomplete suggestions for '{}'", results.len(), query);
+                    contents.push(Content::text(summary));
+                    
+                    for result in results {
+                        let suggestion = format!("• {} (score: {:.3})", result.term, result.score);
+                        contents.push(Content::text(suggestion));
+                    }
+                    
+                    Ok(CallToolResult::success(contents))
+                }
+                Err(e) => {
+                    error!("Levenshtein autocomplete search failed: {}", e);
+                    let error_content = Content::text(format!("Levenshtein autocomplete search failed: {}", e));
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+        } else {
+            let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+            Ok(CallToolResult::error(vec![error_content]))
+        }
+    }
 }
 
 impl ServerHandler for McpService {
@@ -196,6 +369,58 @@ impl ServerHandler for McpService {
             });
             let config_map = config_schema.as_object().unwrap().clone();
 
+            let build_autocomplete_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "role": {
+                        "type": "string",
+                        "description": "Optional role name to build autocomplete index for. If not provided, uses the currently selected role."
+                    }
+                },
+                "required": []
+            });
+            let build_autocomplete_map = build_autocomplete_schema.as_object().unwrap().clone();
+
+            let fuzzy_autocomplete_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The text to get autocomplete suggestions for"
+                    },
+                    "similarity": {
+                        "type": "number",
+                        "description": "Minimum Jaro-Winkler similarity threshold (0.0-1.0, default: 0.6)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of suggestions to return (default: 10)"
+                    }
+                },
+                "required": ["query"]
+            });
+            let fuzzy_autocomplete_map = fuzzy_autocomplete_schema.as_object().unwrap().clone();
+
+            let levenshtein_autocomplete_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The text to get autocomplete suggestions for"
+                    },
+                    "max_edit_distance": {
+                        "type": "integer",
+                        "description": "Maximum Levenshtein edit distance allowed (default: 2)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of suggestions to return (default: 10)"
+                    }
+                },
+                "required": ["query"]
+            });
+            let levenshtein_autocomplete_map = levenshtein_autocomplete_schema.as_object().unwrap().clone();
+
             let tools = vec![
                 Tool {
                     name: "search".into(),
@@ -207,6 +432,24 @@ impl ServerHandler for McpService {
                     name: "update_config_tool".into(),
                     description: Some("Update the Terraphim configuration".into()),
                     input_schema: Arc::new(config_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "build_autocomplete_index".into(),
+                    description: Some("Build FST-based autocomplete index from role's knowledge graph. Only available for roles with TerraphimGraph relevance function and configured knowledge graph.".into()),
+                    input_schema: Arc::new(build_autocomplete_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "fuzzy_autocomplete_search".into(),
+                    description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (default, faster and higher quality)".into()),
+                    input_schema: Arc::new(fuzzy_autocomplete_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "fuzzy_autocomplete_search_levenshtein".into(),
+                    description: Some("Perform fuzzy autocomplete search using Levenshtein distance (baseline comparison algorithm)".into()),
+                    input_schema: Arc::new(levenshtein_autocomplete_map),
                     annotations: None,
                 }
             ];
@@ -255,6 +498,53 @@ impl ServerHandler for McpService {
                         .to_string();
                     
                     self.update_config_tool(config_str).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "build_autocomplete_index" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let role = arguments.get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    
+                    self.build_autocomplete_index(role).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "fuzzy_autocomplete_search" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let query = arguments.get("query")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .to_string();
+                    
+                    let similarity = arguments.get("similarity")
+                        .and_then(|v| v.as_f64());
+                    
+                    let limit = arguments.get("limit")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as usize);
+                    
+                    self.fuzzy_autocomplete_search(query, similarity, limit).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "fuzzy_autocomplete_search_levenshtein" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let query = arguments.get("query")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .to_string();
+                    
+                    let max_edit_distance = arguments.get("max_edit_distance")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as usize);
+                    
+                    let limit = arguments.get("limit")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as usize);
+                    
+                    self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit).await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
