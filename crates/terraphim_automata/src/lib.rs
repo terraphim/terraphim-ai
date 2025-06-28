@@ -4,7 +4,9 @@ pub mod autocomplete;
 pub use matcher::{find_matches, Matched, replace_matches, LinkType};
 pub use autocomplete::{
     build_autocomplete_index, autocomplete_search, 
-    fuzzy_autocomplete_search, serialize_autocomplete_index, deserialize_autocomplete_index,
+    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein,
+    fuzzy_autocomplete_search_jaro_winkler, // Deprecated compatibility
+    serialize_autocomplete_index, deserialize_autocomplete_index,
     AutocompleteIndex, AutocompleteResult, AutocompleteConfig, AutocompleteMetadata
 };
 
