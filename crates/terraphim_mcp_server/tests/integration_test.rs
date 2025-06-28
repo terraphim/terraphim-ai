@@ -106,9 +106,10 @@ fn create_test_config() -> String {
                 println!("✅ Found docs/src at: {:?}", path);
                 for role in config.roles.values_mut() {
                     role.haystacks = vec![Haystack {
-                        path: path.clone(),
+                        location: path.to_string_lossy().to_string(),
                         service: ServiceType::Ripgrep,
                         read_only: false,
+                        atomic_server_secret: None,
                     }];
                 }
                 break;
@@ -119,9 +120,10 @@ fn create_test_config() -> String {
         // Update all roles to use docs/src
         for role in config.roles.values_mut() {
             role.haystacks = vec![Haystack {
-                path: docs_src_path.clone(),
+                location: docs_src_path.to_string_lossy().to_string(),
                 service: ServiceType::Ripgrep,
                 read_only: false,
+                atomic_server_secret: None,
             }];
         }
     }

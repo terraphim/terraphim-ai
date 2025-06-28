@@ -35,4 +35,8 @@ rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features 
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 terraphim_config = { path = "../terraphim_config" }
+terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
+terraphim_automata = { path = "../terraphim_automata" }  # For AutomataPath
 regex = "1"
+serial_test = "3.0"
+env_logger = "0.10"

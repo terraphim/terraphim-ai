@@ -1,3 +1,203 @@
+# MCP Server Search Tool Ranking Fix Plan - IN PROGRESS 🔧 (2025-01-28)
+
+## Current Status: MCP Validation Framework Ready, Final Step Needed
+
+### ✅ COMPLETED: MCP Server Rolegraph Validation Framework
+- **Test Framework**: `crates/terraphim_mcp_server/tests/mcp_rolegraph_validation_test.rs` ✅ WORKING
+- **Server Connection**: MCP client connects and responds to tool calls ✅ WORKING  
+- **Configuration API**: `update_config_tool` works correctly ✅ WORKING
+- **Role Setup**: "Terraphim Engineer" configuration applied ✅ WORKING
+- **Desktop Integration**: CLI works with `mcp-server` subcommand ✅ WORKING
+
+### ⚠️ CURRENT ISSUE: "Config error: Automata path not found"
+**Root Cause**: Need to build thesaurus from local KG files (`docs/src/kg`) before setting automata_path in role configuration.
+
+## COMPREHENSIVE FIX PLAN
+
+### Phase 1: Build Thesaurus from Local KG Files ✅ COMPLETED
+
+#### 1.1 Update MCP Test Configuration Builder
+**File**: `crates/terraphim_mcp_server/tests/mcp_rolegraph_validation_test.rs`
+**Function**: `create_terraphim_engineer_config()`
+
+**Changes Needed**:
+```rust
+// 1. Build thesaurus using Logseq builder (like middleware test does)
+let logseq_builder = Logseq::default();
+let thesaurus = logseq_builder
+    .build("Terraphim Engineer".to_string(), kg_path.clone())
+    .await?;
+
+// 2. Save thesaurus to persistence layer  
+thesaurus.save().await?;
+
+// 3. Set automata_path after building thesaurus
+let automata_path = AutomataPath::Local(thesaurus_path);
+terraphim_engineer_role.kg.as_mut().unwrap().automata_path = Some(automata_path);
+```
+
+#### 1.2 Add Required Dependencies ✅ COMPLETED
+**File**: `crates/terraphim_mcp_server/Cargo.toml`
+```toml
+[dev-dependencies]
+terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
+terraphim_automata = { path = "../terraphim_automata" }  # For AutomataPath
+terraphim_persistence = { path = "../terraphim_persistence" } # For thesaurus.save()
+```
+
+**✅ PHASE 1 SUCCESS ACHIEVED:**
+- ✅ Thesaurus building: "Built thesaurus with 10 entries from local KG"
+- ✅ Persistence working: "Saved thesaurus to persistence layer"  
+- ✅ Automata path set: Correctly pointed to temp file
+- ✅ **"Config error: Automata path not found" ELIMINATED**
+- ✅ MCP server connects and configuration updates successfully
+- ⚠️ **Next Issue**: Search still returns 0 documents (Phase 2 needed)
+
+### Phase 2: Debug Search Pipeline Issue ⚠️ CURRENT
+
+**✅ PROGRESS MADE:**
+- ✅ Fixed RipgrepCommand argument order: options before needle/haystack  
+- ✅ Verified ripgrep JSON output is correct: proper begin/match/context/end messages
+- ✅ Added debugging to RipgrepIndexer and RipgrepCommand
+
+**❌ NEW ISSUE DISCOVERED:**
+- MCP transport errors: "Error reading from stream: serde error expected value at line 1 column 1"
+- Search requests aren't reaching RipgrepIndexer (no debug output seen)
+- Transport closes prematurely
+
+**ANALYSIS:**
+The search pipeline is failing before it gets to document indexing. The MCP server has communication issues that prevent search requests from being processed.
+
+**Next Steps:**
+1. **Fix MCP Transport Issues**: Investigate serde parsing errors in MCP communication
+2. **Verify MCP Request Format**: Ensure search requests are properly formatted
+3. **Test Search Pipeline**: Once transport is fixed, verify RipgrepIndexer processes documents correctly
+
+### Phase 3: Validate Rankings and Complete Integration ⚠️ PENDING
+
+#### 2.1 Test Expected Search Results
+**Expected Results** (matching successful middleware test):
+- **"terraphim-graph"** → Found 1+ results, meaningful rank (e.g., rank 34)
+- **"graph embeddings"** → Found 1+ results, meaningful rank  
+- **"graph"** → Found 1+ results, meaningful rank
+- **"knowledge graph based embeddings"** → Found 1+ results, meaningful rank
+- **"terraphim graph scorer"** → Found 1+ results, meaningful rank
+
+#### 2.2 Add Ranking Validation
+```rust
+// Validate that search returns documents with proper ranking
+assert!(result_count > 0, "Should find documents for '{}'", query);
+
+// Extract and validate ranking from search results
+if let Some(first_result) = search_result.content.get(1) { // Skip summary
+    if let Some(resource) = first_result.as_resource() {
+        // Validate that document rank is meaningful (not 0 or empty)
+        // Compare with expected middleware test results
+    }
+}
+```
+
+### Phase 3: Fix All Roles Configuration 🎯 CRITICAL
+
+#### 3.1 Root Problem: Default Role Configurations
+**Current Issue**: Default "Engineer" role uses remote thesaurus, lacks local KG terms
+
+**Solution Strategy**:
+1. **Update Default Configuration**: Fix `desktop/default/settings.toml` and similar configs
+2. **Role Configuration Repair**: Ensure all roles with `TerraphimGraph` relevance have proper local KG setup
+3. **Validation Testing**: Test ALL roles, not just "Terraphim Engineer"
+
+#### 3.2 Multi-Role Validation Test
+**New Test Function**: `test_all_roles_search_validation()`
+```rust
+let roles_to_test = vec![
+    ("Default", "terraphim"),
+    ("Engineer", "graph embeddings"),  // Should work after fix
+    ("Terraphim Engineer", "terraphim-graph"), // Already working
+    ("System Operator", "service"),
+];
+
+for (role_name, search_term) in roles_to_test {
+    // Update config to use role
+    // Test search returns valid results
+    // Validate ranking scores
+}
+```
+
+### Phase 4: Integration Testing Expansion 🔧 ENHANCEMENT
+
+#### 4.1 End-to-End Workflow Testing
+1. **Role Switching**: Test config API role switching
+2. **Persistent Configuration**: Test config survives server restart
+3. **Search Pagination**: Test `limit`/`skip` parameters
+4. **Error Handling**: Test invalid queries, role failures
+
+#### 4.2 Performance Validation
+1. **Search Speed**: Measure search response times
+2. **Thesaurus Build Time**: Measure local KG thesaurus building
+3. **Memory Usage**: Monitor server memory consumption
+4. **Concurrent Search**: Test multiple simultaneous searches
+
+## IMPLEMENTATION BREAKDOWN
+
+### Step 1: Fix Current MCP Test ⚠️ IMMEDIATE
+**Estimated Time**: 2-3 hours
+**Priority**: CRITICAL
+**Files**: `mcp_rolegraph_validation_test.rs`
+**Goal**: Make existing test pass by building thesaurus from local KG
+
+### Step 2: Multi-Role Validation 🎯 HIGH PRIORITY  
+**Estimated Time**: 4-5 hours
+**Priority**: HIGH
+**Files**: MCP test + default configs
+**Goal**: Ensure ALL roles return valid search rankings
+
+### Step 3: Enhanced Integration Tests 🔧 MEDIUM PRIORITY
+**Estimated Time**: 6-8 hours
+**Priority**: MEDIUM  
+**Files**: New test functions
+**Goal**: Comprehensive MCP server validation
+
+### Step 4: Configuration Cleanup 📋 ONGOING
+**Estimated Time**: 2-3 hours
+**Priority**: MAINTENANCE
+**Files**: Default configs across project
+**Goal**: Fix default role configurations to use proper local KG
+
+## SUCCESS CRITERIA
+
+### ✅ PHASE 1 SUCCESS
+- MCP test passes without "Automata path not found" error
+- Search returns documents for "terraphim-graph" queries
+- Rankings match middleware test results (rank 34)
+
+### ✅ PHASE 2 SUCCESS  
+- All roles return valid search results for their domain terms
+- No roles return 0 results for expected queries
+- Ranking scores are consistent and meaningful
+
+### ✅ PHASE 3 SUCCESS
+- MCP server production-ready for all roles
+- Configuration errors eliminated
+- End-to-end workflow validated
+
+## REFERENCE IMPLEMENTATIONS
+
+### ✅ Successful Middleware Test
+**File**: `crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs`
+- **Status**: ALL TESTS PASS ✅
+- **Results**: Finds "terraphim-graph" document with rank 34 for all target terms  
+- **Configuration**: "Terraphim Engineer" role with local KG setup
+- **Thesaurus**: 10 entries extracted from `docs/src/kg/`
+
+### ✅ Logseq Thesaurus Builder
+**File**: `crates/terraphim_middleware/src/thesaurus/mod.rs`
+- **Function**: `Logseq::build()` - builds thesaurus from markdown files
+- **Integration**: `build_thesaurus_from_haystack()` - service layer integration
+- **Usage Pattern**: Parse `synonyms::` syntax from markdown files
+
+---
+
 # Rolegraph and Knowledge Graph Ranking Validation - COMPLETED ✅ (2025-01-28)
 
 ## Task Completed Successfully
@@ -1042,79 +1242,3 @@ cargo test test_rolegraph_knowledge_graph_ranking --test rolegraph_knowledge_gra
 **Status**: 🎯 **COMPLETE SUCCESS** - Rolegraph and knowledge graph ranking fully validated and working correctly.
 
 ## Previous Entries...
-
-# Rolegraph and Knowledge Graph Ranking Validation - COMPLETED ✅ (2025-01-28)
-
-## Task Completed Successfully
-**Objective**: Validate rolegraph and knowledge graph based ranking to ensure "terraphim engineer" role can find "terraphim-graph" document when searching for terms like "terraphim-graph", "graph embeddings", and "graph".
-
-## Root Cause Discovery ✅
-**Problem Identified**: The "Engineer" role was using a remote thesaurus from `https://staging-storage.terraphim.io/thesaurus_Default.json` containing 1,725 general entries that did NOT include local knowledge graph terms like "terraphim-graph" and "graph embeddings".
-
-**Solution**: The "Terraphim Engineer" role was already properly configured with:
-- Local knowledge graph path: `docs/src/kg`
-- TerraphimGraph relevance function
-- Access to local KG files containing proper synonyms
-
-## Comprehensive Test Implementation ✅
-
-### Test Suite: `crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs`
-
-**Three Tests Created:**
-
-1. **`test_rolegraph_knowledge_graph_ranking`** - Main integration test:
-   - Builds thesaurus from local markdown files (extracted 10 entries)
-   - Creates RoleGraph with TerraphimGraph relevance function  
-   - Indexes the terraphim-graph.md document
-   - Tests search with multiple query terms
-   - Validates haystack indexing integration
-
-2. **`test_build_thesaurus_from_kg_files`** - Validates thesaurus building from KG markdown files
-
-3. **`test_demonstrates_issue_with_wrong_thesaurus`** - Proves the problem by showing remote thesaurus lacks local terms
-
-## Validation Results - ALL TESTS PASS ✅
-
-### Search Performance:
-- **"terraphim-graph"** → Found 1 result, rank: 34
-- **"graph embeddings"** → Found 1 result, rank: 34  
-- **"graph"** → Found 1 result, rank: 34
-- **"knowledge graph based embeddings"** → Found 1 result, rank: 34
-- **"terraphim graph scorer"** → Found 1 result, rank: 34
-
-### Technical Metrics:
-- **Thesaurus Extraction**: 10 domain-specific terms from local KG files
-- **Document Coverage**: 100% success rate for finding terraphim-graph document
-- **Ranking Consistency**: All queries produced rank 34 (meaningful scoring)
-- **Configuration**: "Terraphim Engineer" role works perfectly with local KG setup
-
-## Key Findings ✅
-
-### Architecture Validation:
-- **Rolegraph System**: Works correctly when properly configured with local knowledge graph
-- **Knowledge Graph Ranking**: Produces meaningful relevance scores (consistent rank: 34)
-- **ThesaurusBuilder**: Correctly parses `synonyms::` syntax from markdown files
-- **Role Configuration**: Local KG configuration superior to remote generic thesaurus
-
-### Configuration Best Practices:
-- **Local vs Remote**: Local thesaurus (10 entries) provides better domain coverage than remote (1,725 entries)
-- **Domain Specificity**: Local knowledge graph files contain precise terminology mappings
-- **Integration**: Complete pipeline validation from thesaurus → rolegraph → search → indexing
-
-### Production Impact:
-- **System Works**: No fundamental issues with rolegraph/knowledge graph ranking
-- **Configuration Issue**: Problem was using wrong thesaurus source, not system architecture
-- **Documentation**: terraphim-graph.md properly contains target synonyms
-- **Performance**: Knowledge graph based ranking produces consistent, meaningful results
-
-## Final Status ✅
-- **Project Status**: Compiles successfully in release mode
-- **Test Coverage**: All 3 comprehensive tests pass
-- **Documentation**: Complete solution documented for future reference
-- **Memory/Scratchpad**: Updated with findings
-
-**Conclusion**: Successfully validated that rolegraph and knowledge graph based ranking works correctly, resolving the original issue of the terraphim-engineer role being unable to find the terraphim-graph document. The system architecture is sound; the issue was configuration-related (remote vs local thesaurus usage).
-
----
-
-// ... existing code ...

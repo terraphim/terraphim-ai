@@ -1,0 +1,826 @@
+[2m2025-06-28T13:34:50.817315Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:34:50.817750Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:34:50.818854Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:34:50.818935Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:34:50.819190Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:34:50.819247Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:34:50.819269Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:34:50.819275Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:34:51.111179Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:34:51.111203Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:34:51.111208Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:34:51.366945Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:34:51.367908Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:34:51.368063Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:34:51.368188Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:34:51.368964Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:34:51.504748Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:34:51.505111Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:34:52.125384Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Thesaurus for role `` saved to persistence    
+[2m2025-06-28T13:34:52.129613Z[0m [31mERROR[0m [2mterraphim_mcp_server[0m[2m:[0m Search failed: Config error: Automata path not found
+[2m2025-06-28T13:36:33.714783Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:36:33.715065Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:36:33.715813Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:36:33.715865Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:36:33.716021Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:36:33.716059Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:36:33.716073Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:36:33.716076Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:36:34.007830Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:36:34.007857Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:36:34.007861Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:36:34.305667Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:36:34.307046Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:36:34.307169Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:36:34.307363Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:36:34.308968Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:36:34.331188Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:36:34.331491Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "bucket": "staging-system-operator", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:36:34.995100Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Thesaurus for role `` saved to persistence    
+[2m2025-06-28T13:36:34.999239Z[0m [31mERROR[0m [2mterraphim_mcp_server[0m[2m:[0m Search failed: Config error: Automata path not found
+[2m2025-06-28T13:49:10.004582Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:49:10.004821Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:49:10.005506Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:49:10.005616Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:49:10.005999Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:49:10.006070Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:49:10.006096Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:49:10.006107Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:49:10.294402Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:49:10.294422Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:49:10.294426Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:49:10.547692Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:49:10.548559Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:49:10.548686Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:49:10.548803Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:49:10.549552Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:49:10.564477Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:49:10.564734Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1"}} }    
+[2m2025-06-28T13:49:10.565572Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:49:10.568082Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:50:10.668391Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:50:10.668893Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:50:10.670230Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:50:10.670329Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:50:10.670649Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:50:10.670720Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:50:10.670746Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:50:10.670753Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:50:10.964126Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:50:10.964151Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:50:10.964155Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:50:11.227461Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:50:11.228377Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:50:11.228500Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:50:11.228620Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:50:11.229393Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:50:11.242448Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:50:11.242716Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "region": "us-east-1", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:50:11.649834Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:50:11.662299Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:50:11.664308Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:50:11.688386Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:50:11.688776Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T13:50:11.688939Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:50:11.692879Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:50:11.693476Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:50:11.714847Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:50:11.715154Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:50:12.183160Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:50:12.191238Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:50:12.192503Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:50:12.213368Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:50:12.213733Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:50:12.647958Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:50:12.652114Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:50:12.652788Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:50:12.669745Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:50:12.670101Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:50:13.097625Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:50:13.103709Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:53:28.168678Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:53:28.169126Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:53:28.169905Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:53:28.170010Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:53:28.170344Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:53:28.170441Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:53:28.170449Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:53:28.460348Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:53:28.460377Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:53:28.460381Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:53:28.745306Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:53:28.745370Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:53:28.746273Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:53:28.746403Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:53:28.746525Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:53:28.747350Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:53:28.762921Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:53:28.763181Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T13:53:28.763917Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:53:28.766265Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:53:28.772193Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:53:28.788030Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:53:28.788335Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:53:29.294673Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:53:29.299629Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:53:29.308454Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:53:29.333556Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:53:29.334368Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:53:29.758477Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:53:29.768670Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:53:29.782071Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:53:29.801790Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:53:29.802191Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:53:30.240552Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:53:30.250155Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:53:30.265309Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:53:30.285452Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:53:30.285855Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3"}} }    
+[2m2025-06-28T13:53:30.286025Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:53:30.289963Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:54:42.167443Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:54:42.167731Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:54:42.168326Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:54:42.168369Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:54:42.168591Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:54:42.168691Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:54:42.168698Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:54:42.483666Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:54:42.483696Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:54:42.483699Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:54:42.746256Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:54:42.746309Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:54:42.747167Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:54:42.747303Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:54:42.747417Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:54:42.748211Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:54:42.762203Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:54:42.762453Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T13:54:42.763159Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:54:42.765451Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:54:42.772502Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:54:42.786809Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:54:42.787047Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:54:43.223272Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:54:43.232490Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:54:43.243452Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:54:43.265098Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:54:43.265446Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }    
+[2m2025-06-28T13:54:43.265608Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:54:43.268870Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:54:43.277326Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:54:43.291262Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:54:43.291547Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:54:43.735710Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:54:43.739942Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:54:43.750597Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:54:43.769247Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:54:43.769833Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T13:54:43.770011Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:54:43.773057Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:55:41.509534Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:55:41.509788Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:55:41.510401Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:55:41.510446Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:55:41.510622Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:55:41.510663Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:55:41.510668Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:55:41.816270Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:55:41.816293Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:55:41.816297Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:55:42.155385Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:55:42.155443Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:55:42.156288Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:55:42.156357Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:55:42.156485Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:55:42.157397Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:55:42.171877Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:55:42.172136Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:55:42.592284Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:55:42.596032Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:55:42.604877Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:55:42.622689Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:55:42.623106Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T13:55:42.623275Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:55:42.626092Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:55:42.633343Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:55:42.654920Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:55:42.655246Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:55:43.100932Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:55:43.108602Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:55:43.126774Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:55:43.165254Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:55:43.166286Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T13:55:43.167162Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:55:43.174603Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:55:43.192297Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:55:43.223999Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:55:43.225629Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:55:43.626246Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:55:43.632571Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:56:03.605340Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:56:03.605662Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:56:03.606327Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:56:03.606361Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:56:03.606553Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:56:03.606597Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:56:03.606602Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:56:03.932257Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:56:03.932280Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:56:03.932285Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:56:04.223524Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:56:04.223585Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:56:04.224300Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:56:04.224365Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:56:04.224480Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:56:04.225263Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:56:04.225319Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m RipgrepIndexer::index called with needle: 'terraphim-graph' haystack: "/Users/alex/projects/terraphim/terraphim-ai/docs/src"    
+[2m2025-06-28T13:56:04.225941Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Found 10 markdown files in haystack: ["/Users/alex/projects/terraphim/terraphim-ai/docs/src/ClaudeDesktop.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CODE_OF_CONDUCT.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/DesignDecisions.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/test_chat.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Architecture.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/SUMMARY.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CONTRIBUTE.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Introduction.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/README.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"]    
+[2m2025-06-28T13:56:04.233414Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Ripgrep returned 16 messages    
+[2m2025-06-28T13:56:04.233430Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 0: Begin(Begin { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }) })    
+[2m2025-06-28T13:56:04.233435Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 1: Match(Match { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "# Terraphim-graph \n" }, line_number: Some(1), absolute_offset: 0, submatches: [SubMatch { m: Text { text: "Terraphim-graph" }, start: 2, end: 17 }] })    
+[2m2025-06-28T13:56:04.233470Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 2: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(2), absolute_offset: 19, submatches: [] })    
+[2m2025-06-28T13:56:04.233474Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 3: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "## Terraphim Graph scorer\n" }, line_number: Some(3), absolute_offset: 20, submatches: [] })    
+[2m2025-06-28T13:56:04.233477Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 4: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(4), absolute_offset: 46, submatches: [] })    
+[2m2025-06-28T13:56:04.233480Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m index_inner called with 16 messages    
+[2m2025-06-28T13:56:04.233517Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 1: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:56:04.233550Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:56:04.233596Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 2: README (f190662f8e44d680)    
+[2m2025-06-28T13:56:04.233615Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: README (f190662f8e44d680)    
+[2m2025-06-28T13:56:04.233622Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner completed: 2 documents processed, 2 matches found, 2 documents in final index    
+[2m2025-06-28T13:56:04.233626Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner created 2 documents    
+[2m2025-06-28T13:56:04.233855Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Building thesaurus from haystack    
+[2m2025-06-28T13:56:04.233865Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role name:     
+[2m2025-06-28T13:56:04.233869Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role: Role { shortname: Some("Terraphim Engineer"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: Some(Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")), knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }], extra: {} }    
+[2m2025-06-28T13:56:04.233879Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for haystack: Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }    
+[2m2025-06-28T13:56:04.233886Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Running logseq with needle `::` and haystack `/Users/alex/projects/terraphim/terraphim-ai/docs/src`    
+[2m2025-06-28T13:56:04.241266Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:56:04.241531Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:56:04.691002Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:56:04.691100Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Make sure thesaurus updated in a role     
+[2m2025-06-28T13:56:04.691110Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for role:     
+[2m2025-06-28T13:56:04.696506Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:57:36.930770Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:57:36.931023Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:57:36.931617Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:57:36.931647Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:57:36.931820Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:57:36.931861Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:57:36.931866Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:57:36.931871Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:57:37.239956Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:57:37.239989Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:57:37.239994Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:57:37.500739Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:57:37.501644Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:57:37.501721Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:57:37.501835Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:57:37.502694Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:57:37.502757Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m RipgrepIndexer::index called with needle: 'terraphim-graph' haystack: "/Users/alex/projects/terraphim/terraphim-ai/docs/src"    
+[2m2025-06-28T13:57:37.503035Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Found 10 markdown files in haystack: ["/Users/alex/projects/terraphim/terraphim-ai/docs/src/ClaudeDesktop.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CODE_OF_CONDUCT.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/DesignDecisions.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/test_chat.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Architecture.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/SUMMARY.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CONTRIBUTE.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Introduction.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/README.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"]    
+[2m2025-06-28T13:57:37.510992Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Raw ripgrep output (3545 bytes): {"type":"begin","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"}}}
+{"type":"match","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"# Terraphim-graph \n"},"line_number":1,"absolute_offset":0,"submatches":[{"match":{"text":"Terraphim-graph"},"start":2,"end":17}]}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.m    
+[2m2025-06-28T13:57:37.511246Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m JSON decode produced 16 messages    
+[2m2025-06-28T13:57:37.511257Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Ripgrep returned 16 messages    
+[2m2025-06-28T13:57:37.511261Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 0: Begin(Begin { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }) })    
+[2m2025-06-28T13:57:37.511265Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 1: Match(Match { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "# Terraphim-graph \n" }, line_number: Some(1), absolute_offset: 0, submatches: [SubMatch { m: Text { text: "Terraphim-graph" }, start: 2, end: 17 }] })    
+[2m2025-06-28T13:57:37.511299Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 2: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(2), absolute_offset: 19, submatches: [] })    
+[2m2025-06-28T13:57:37.511303Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 3: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "## Terraphim Graph scorer\n" }, line_number: Some(3), absolute_offset: 20, submatches: [] })    
+[2m2025-06-28T13:57:37.511307Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 4: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(4), absolute_offset: 46, submatches: [] })    
+[2m2025-06-28T13:57:37.511311Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m index_inner called with 16 messages    
+[2m2025-06-28T13:57:37.511354Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 1: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:37.511385Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:37.511430Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 2: README (f190662f8e44d680)    
+[2m2025-06-28T13:57:37.511450Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: README (f190662f8e44d680)    
+[2m2025-06-28T13:57:37.511458Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner completed: 2 documents processed, 2 matches found, 2 documents in final index    
+[2m2025-06-28T13:57:37.511462Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner created 2 documents    
+[2m2025-06-28T13:57:37.511731Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Building thesaurus from haystack    
+[2m2025-06-28T13:57:37.511740Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role name:     
+[2m2025-06-28T13:57:37.511745Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role: Role { shortname: Some("Terraphim Engineer"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: Some(Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")), knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }], extra: {} }    
+[2m2025-06-28T13:57:37.511756Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for haystack: Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }    
+[2m2025-06-28T13:57:37.511764Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Running logseq with needle `::` and haystack `/Users/alex/projects/terraphim/terraphim-ai/docs/src`    
+[2m2025-06-28T13:57:37.518742Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:57:37.519009Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T13:57:37.519695Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:57:37.519855Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Make sure thesaurus updated in a role     
+[2m2025-06-28T13:57:37.519860Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for role:     
+[2m2025-06-28T13:57:37.522257Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:57:37.529550Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:57:37.529573Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m RipgrepIndexer::index called with needle: 'graph embeddings' haystack: "/Users/alex/projects/terraphim/terraphim-ai/docs/src"    
+[2m2025-06-28T13:57:37.529664Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Found 10 markdown files in haystack: ["/Users/alex/projects/terraphim/terraphim-ai/docs/src/ClaudeDesktop.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CODE_OF_CONDUCT.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/DesignDecisions.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/test_chat.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Architecture.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/SUMMARY.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CONTRIBUTE.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Introduction.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/README.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"]    
+[2m2025-06-28T13:57:37.535700Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Raw ripgrep output (9929 bytes): {"type":"begin","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"}}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"\n"},"line_number":2,"absolute_offset":19,"submatches":[]}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"## Terraphim Graph scorer\n"},"line_number":3,"ab    
+[2m2025-06-28T13:57:37.535958Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m JSON decode produced 34 messages    
+[2m2025-06-28T13:57:37.535970Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Ripgrep returned 34 messages    
+[2m2025-06-28T13:57:37.535974Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 0: Begin(Begin { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }) })    
+[2m2025-06-28T13:57:37.535979Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 1: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(2), absolute_offset: 19, submatches: [] })    
+[2m2025-06-28T13:57:37.535985Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 2: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "## Terraphim Graph scorer\n" }, line_number: Some(3), absolute_offset: 20, submatches: [] })    
+[2m2025-06-28T13:57:37.535988Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 3: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(4), absolute_offset: 46, submatches: [] })    
+[2m2025-06-28T13:57:37.535990Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 4: Match(Match { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "Terraphim Graph (scorer) is using unique graph embeddings, where the rank of the term is defined by number of synonyms connected to the concept.\n" }, line_number: Some(5), absolute_offset: 47, submatches: [SubMatch { m: Text { text: "graph embeddings" }, start: 41, end: 57 }] })    
+[2m2025-06-28T13:57:37.535995Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m index_inner called with 34 messages    
+[2m2025-06-28T13:57:37.536010Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 1: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:37.536062Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:37.536078Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 2: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:37.536108Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:37.536117Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 3: Introduction (f941884caf8f8e0)    
+[2m2025-06-28T13:57:37.536143Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: Introduction (f941884caf8f8e0)    
+[2m2025-06-28T13:57:37.536149Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner completed: 3 documents processed, 8 matches found, 3 documents in final index    
+[2m2025-06-28T13:57:37.536154Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner created 3 documents    
+[2m2025-06-28T13:57:37.537517Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Building thesaurus from haystack    
+[2m2025-06-28T13:57:37.537527Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role name:     
+[2m2025-06-28T13:57:37.537533Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role: Role { shortname: Some("Terraphim Engineer"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: Some(Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")), knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }], extra: {} }    
+[2m2025-06-28T13:57:37.537546Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for haystack: Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }    
+[2m2025-06-28T13:57:37.537552Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Running logseq with needle `::` and haystack `/Users/alex/projects/terraphim/terraphim-ai/docs/src`    
+[2m2025-06-28T13:57:37.544257Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:57:37.544506Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:57:37.964145Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:57:37.964218Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Make sure thesaurus updated in a role     
+[2m2025-06-28T13:57:37.964230Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for role:     
+[2m2025-06-28T13:57:37.970278Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:57:37.983514Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:57:37.983565Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m RipgrepIndexer::index called with needle: 'graph' haystack: "/Users/alex/projects/terraphim/terraphim-ai/docs/src"    
+[2m2025-06-28T13:57:37.983716Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Found 10 markdown files in haystack: ["/Users/alex/projects/terraphim/terraphim-ai/docs/src/ClaudeDesktop.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CODE_OF_CONDUCT.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/DesignDecisions.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/test_chat.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Architecture.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/SUMMARY.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CONTRIBUTE.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Introduction.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/README.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"]    
+[2m2025-06-28T13:57:37.993131Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Raw ripgrep output (31408 bytes): {"type":"begin","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"}}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"},"lines":{"text":"# Use cases for Terraphim AI\n"},"line_number":1,"absolute_offset":0,"submatches":[]}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"},"lines":{"text":"\n"},"line_number":2,"absolute_offset":29,"submat    
+[2m2025-06-28T13:57:37.994290Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m JSON decode produced 111 messages    
+[2m2025-06-28T13:57:37.994321Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Ripgrep returned 111 messages    
+[2m2025-06-28T13:57:37.994329Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 0: Begin(Begin { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md" }) })    
+[2m2025-06-28T13:57:37.994337Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 1: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md" }), lines: Text { text: "# Use cases for Terraphim AI\n" }, line_number: Some(1), absolute_offset: 0, submatches: [] })    
+[2m2025-06-28T13:57:37.994346Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 2: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md" }), lines: Text { text: "\n" }, line_number: Some(2), absolute_offset: 29, submatches: [] })    
+[2m2025-06-28T13:57:37.994352Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 3: Match(Match { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md" }), lines: Text { text: "## Search your local markdown files, build your own personal knowledge graph, then publish your knowledge to the web, then reuse\n" }, line_number: Some(3), absolute_offset: 30, submatches: [SubMatch { m: Text { text: "graph" }, start: 71, end: 76 }] })    
+[2m2025-06-28T13:57:37.994359Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 4: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md" }), lines: Text { text: "\n" }, line_number: Some(4), absolute_offset: 159, submatches: [] })    
+[2m2025-06-28T13:57:37.994364Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m index_inner called with 111 messages    
+[2m2025-06-28T13:57:37.994394Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 1: Use-cases (538c7fc68ddbd2b3)    
+[2m2025-06-28T13:57:37.994506Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: Use-cases (538c7fc68ddbd2b3)    
+[2m2025-06-28T13:57:37.994531Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 2: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:37.994601Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:37.994614Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 3: README (f190662f8e44d680)    
+[2m2025-06-28T13:57:37.994664Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: README (f190662f8e44d680)    
+[2m2025-06-28T13:57:37.994679Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 4: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:37.994735Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:37.994749Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 5: Introduction (f941884caf8f8e0)    
+[2m2025-06-28T13:57:37.994826Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: Introduction (f941884caf8f8e0)    
+[2m2025-06-28T13:57:37.994838Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 6: Architecture (3acb6dd995207dff)    
+[2m2025-06-28T13:57:37.994874Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: Architecture (3acb6dd995207dff)    
+[2m2025-06-28T13:57:37.994885Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 7: ClaudeDesktop (8f685563bff56620)    
+[2m2025-06-28T13:57:37.994906Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: ClaudeDesktop (8f685563bff56620)    
+[2m2025-06-28T13:57:37.994914Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner completed: 7 documents processed, 24 matches found, 7 documents in final index    
+[2m2025-06-28T13:57:37.994921Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner created 7 documents    
+[2m2025-06-28T13:57:37.999014Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Building thesaurus from haystack    
+[2m2025-06-28T13:57:37.999041Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role name:     
+[2m2025-06-28T13:57:37.999055Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role: Role { shortname: Some("Terraphim Engineer"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: Some(Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")), knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }], extra: {} }    
+[2m2025-06-28T13:57:37.999077Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for haystack: Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }    
+[2m2025-06-28T13:57:37.999090Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Running logseq with needle `::` and haystack `/Users/alex/projects/terraphim/terraphim-ai/docs/src`    
+[2m2025-06-28T13:57:38.008393Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:57:38.008824Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:57:38.495635Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:57:38.495721Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Make sure thesaurus updated in a role     
+[2m2025-06-28T13:57:38.495731Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for role:     
+[2m2025-06-28T13:57:38.500705Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:57:38.512188Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:57:38.512242Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m RipgrepIndexer::index called with needle: 'knowledge graph based embeddings' haystack: "/Users/alex/projects/terraphim/terraphim-ai/docs/src"    
+[2m2025-06-28T13:57:38.512451Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Found 10 markdown files in haystack: ["/Users/alex/projects/terraphim/terraphim-ai/docs/src/ClaudeDesktop.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CODE_OF_CONDUCT.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/DesignDecisions.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/test_chat.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Architecture.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/SUMMARY.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CONTRIBUTE.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Introduction.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/README.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"]    
+[2m2025-06-28T13:57:38.521788Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Raw ripgrep output (4674 bytes): {"type":"begin","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"}}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"\n"},"line_number":4,"absolute_offset":46,"submatches":[]}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"Terraphim Graph (scorer) is using unique graph em    
+[2m2025-06-28T13:57:38.522144Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m JSON decode produced 19 messages    
+[2m2025-06-28T13:57:38.522163Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Ripgrep returned 19 messages    
+[2m2025-06-28T13:57:38.522169Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 0: Begin(Begin { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }) })    
+[2m2025-06-28T13:57:38.522180Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 1: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(4), absolute_offset: 46, submatches: [] })    
+[2m2025-06-28T13:57:38.522190Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 2: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "Terraphim Graph (scorer) is using unique graph embeddings, where the rank of the term is defined by number of synonyms connected to the concept.\n" }, line_number: Some(5), absolute_offset: 47, submatches: [] })    
+[2m2025-06-28T13:57:38.522196Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 3: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(6), absolute_offset: 192, submatches: [] })    
+[2m2025-06-28T13:57:38.522201Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 4: Match(Match { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "synonyms:: graph embeddings, graph, knowledge graph based embeddings \n" }, line_number: Some(7), absolute_offset: 193, submatches: [SubMatch { m: Text { text: "knowledge graph based embeddings" }, start: 36, end: 68 }] })    
+[2m2025-06-28T13:57:38.522208Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m index_inner called with 19 messages    
+[2m2025-06-28T13:57:38.522234Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 1: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:38.522293Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:38.522316Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 2: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:38.522342Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:38.522351Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner completed: 2 documents processed, 2 matches found, 2 documents in final index    
+[2m2025-06-28T13:57:38.522357Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner created 2 documents    
+[2m2025-06-28T13:57:38.522699Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Building thesaurus from haystack    
+[2m2025-06-28T13:57:38.522718Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role name:     
+[2m2025-06-28T13:57:38.522726Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role: Role { shortname: Some("Terraphim Engineer"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: Some(Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")), knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }], extra: {} }    
+[2m2025-06-28T13:57:38.522743Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for haystack: Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }    
+[2m2025-06-28T13:57:38.522754Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Running logseq with needle `::` and haystack `/Users/alex/projects/terraphim/terraphim-ai/docs/src`    
+[2m2025-06-28T13:57:38.530348Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:57:38.530766Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T13:57:38.969893Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:57:38.969992Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Make sure thesaurus updated in a role     
+[2m2025-06-28T13:57:38.970004Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for role:     
+[2m2025-06-28T13:57:38.978812Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:57:38.992378Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T13:57:38.992420Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m RipgrepIndexer::index called with needle: 'terraphim graph scorer' haystack: "/Users/alex/projects/terraphim/terraphim-ai/docs/src"    
+[2m2025-06-28T13:57:38.992591Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Found 10 markdown files in haystack: ["/Users/alex/projects/terraphim/terraphim-ai/docs/src/ClaudeDesktop.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CODE_OF_CONDUCT.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/DesignDecisions.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/test_chat.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Architecture.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/SUMMARY.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/CONTRIBUTE.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Introduction.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/README.md", "/Users/alex/projects/terraphim/terraphim-ai/docs/src/Use-cases.md"]    
+[2m2025-06-28T13:57:39.003512Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Raw ripgrep output (4600 bytes): {"type":"begin","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"}}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"# Terraphim-graph \n"},"line_number":1,"absolute_offset":0,"submatches":[]}}
+{"type":"context","data":{"path":{"text":"/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md"},"lines":{"text":"\n"},"line_number":2,"absolute_o    
+[2m2025-06-28T13:57:39.003983Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m JSON decode produced 19 messages    
+[2m2025-06-28T13:57:39.004002Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Ripgrep returned 19 messages    
+[2m2025-06-28T13:57:39.004008Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 0: Begin(Begin { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }) })    
+[2m2025-06-28T13:57:39.004016Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 1: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "# Terraphim-graph \n" }, line_number: Some(1), absolute_offset: 0, submatches: [] })    
+[2m2025-06-28T13:57:39.004024Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 2: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(2), absolute_offset: 19, submatches: [] })    
+[2m2025-06-28T13:57:39.004030Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 3: Match(Match { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "## Terraphim Graph scorer\n" }, line_number: Some(3), absolute_offset: 20, submatches: [SubMatch { m: Text { text: "Terraphim Graph scorer" }, start: 3, end: 25 }] })    
+[2m2025-06-28T13:57:39.004036Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Message 4: Context(Context { path: Some(Text { text: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg/terraphim-graph.md" }), lines: Text { text: "\n" }, line_number: Some(4), absolute_offset: 46, submatches: [] })    
+[2m2025-06-28T13:57:39.004042Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m index_inner called with 19 messages    
+[2m2025-06-28T13:57:39.004067Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 1: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:39.004148Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (33be0d74329cc50d)    
+[2m2025-06-28T13:57:39.004170Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Creating document 2: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:39.004197Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Inserting document into index: terraphim-graph (937f833a18028c3f)    
+[2m2025-06-28T13:57:39.004207Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner completed: 2 documents processed, 3 matches found, 2 documents in final index    
+[2m2025-06-28T13:57:39.004213Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Index_inner created 2 documents    
+[2m2025-06-28T13:57:39.004534Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Building thesaurus from haystack    
+[2m2025-06-28T13:57:39.004554Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role name:     
+[2m2025-06-28T13:57:39.004562Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Role: Role { shortname: Some("Terraphim Engineer"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: Some(Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")), knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }], extra: {} }    
+[2m2025-06-28T13:57:39.004578Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for haystack: Haystack { location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None }    
+[2m2025-06-28T13:57:39.004589Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Running logseq with needle `::` and haystack `/Users/alex/projects/terraphim/terraphim-ai/docs/src`    
+[2m2025-06-28T13:57:39.012713Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:57:39.013190Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T13:57:39.476087Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T13:57:39.476183Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Make sure thesaurus updated in a role     
+[2m2025-06-28T13:57:39.476194Z[0m [34mDEBUG[0m [2mlog[0m[2m:[0m Updating thesaurus for role:     
+[2m2025-06-28T13:57:39.485150Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Role `Terraphim Engineer` does not exist or RoleGraph isn't populated    
+[2m2025-06-28T13:58:50.646696Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T13:58:50.647162Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T13:58:50.648803Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T13:58:50.648882Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T13:58:50.649042Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T13:58:50.649064Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T13:58:50.649067Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:58:50.942221Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T13:58:50.942251Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T13:58:50.942256Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T13:58:51.226456Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T13:58:51.226531Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T13:58:51.227437Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T13:58:51.227572Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T13:58:51.227690Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T13:58:51.228570Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
