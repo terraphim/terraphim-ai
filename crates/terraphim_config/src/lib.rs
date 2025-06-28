@@ -84,6 +84,8 @@ use anyhow::Context;
 pub enum ServiceType {
     /// Use ripgrep as the indexing service
     Ripgrep,
+    /// Use an Atomic Server as the indexing service
+    Atomic,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
@@ -101,6 +103,9 @@ pub struct Haystack {
     /// editor). Defaults to `false` for backwards-compatibility.
     #[serde(default)]
     pub read_only: bool,
+    /// The secret for connecting to an Atomic Server.
+    #[serde(default)]
+    pub atomic_server_secret: Option<String>,
 }
 
 /// A knowledge graph is the collection of documents which were indexed
@@ -211,6 +216,7 @@ impl ConfigBuilder {
                     path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -235,6 +241,7 @@ impl ConfigBuilder {
                     path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -259,6 +266,7 @@ impl ConfigBuilder {
                     path: system_operator_haystack.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -284,6 +292,7 @@ impl ConfigBuilder {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -300,6 +309,7 @@ impl ConfigBuilder {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -324,6 +334,7 @@ impl ConfigBuilder {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -348,6 +359,7 @@ impl ConfigBuilder {
                     path: default_data_path.clone(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    atomic_server_secret: None,
                 }],
                 extra: AHashMap::new(),
             },
@@ -695,6 +707,7 @@ mod tests {
                         path: PathBuf::from("localsearch"),
                         service: ServiceType::Ripgrep,
                         read_only: false,
+                        atomic_server_secret: None,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -711,6 +724,7 @@ mod tests {
                         path: PathBuf::from("localsearch"),
                         service: ServiceType::Ripgrep,
                         read_only: false,
+                        atomic_server_secret: None,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -735,6 +749,7 @@ mod tests {
                         path: PathBuf::from("/tmp/system_operator/pages/"),
                         service: ServiceType::Ripgrep,
                         read_only: false,
+                        atomic_server_secret: None,
                     }],
                     extra: AHashMap::new(),
                 },
@@ -781,6 +796,7 @@ mod tests {
                 path: PathBuf::from("localsearch"),
                 service: ServiceType::Ripgrep,
                 read_only: false,
+                atomic_server_secret: None,
             }],
             extra: AHashMap::new(),
         }

@@ -7,6 +7,7 @@ use terraphim_types::{Document, Index};
 use super::{hash_as_string, IndexMiddleware};
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
+use terraphim_config::Haystack;
 
 /// Middleware that uses ripgrep to index Markdown haystacks.
 #[derive(Default)]
@@ -20,17 +21,18 @@ impl IndexMiddleware for RipgrepIndexer {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    async fn index(&self, needle: &str, haystack: &Path) -> Result<Index> {
-        log::debug!("RipgrepIndexer::index called with needle: '{}' haystack: {:?}", needle, haystack);
+    async fn index(&self, needle: &str, haystack: &Haystack) -> Result<Index> {
+        let haystack_path = &haystack.path;
+        log::debug!("RipgrepIndexer::index called with needle: '{}' haystack: {:?}", needle, haystack_path);
         
         // Check if haystack path exists
-        if !haystack.exists() {
-            log::warn!("Haystack path does not exist: {:?}", haystack);
+        if !haystack_path.exists() {
+            log::warn!("Haystack path does not exist: {:?}", haystack_path);
             return Ok(Index::default());
         }
         
         // List files in haystack directory
-        if let Ok(entries) = fs::read_dir(haystack) {
+        if let Ok(entries) = fs::read_dir(haystack_path) {
             let files: Vec<_> = entries
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
@@ -38,7 +40,7 @@ impl IndexMiddleware for RipgrepIndexer {
             log::debug!("Found {} markdown files in haystack: {:?}", files.len(), files.iter().map(|e| e.path()).collect::<Vec<_>>());
         }
         
-        let messages = self.command.run(needle, haystack).await?;
+        let messages = self.command.run(needle, haystack_path).await?;
         log::debug!("Ripgrep returned {} messages", messages.len());
         
         let documents = index_inner(messages);
