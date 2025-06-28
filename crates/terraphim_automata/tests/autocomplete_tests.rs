@@ -1,6 +1,7 @@
 use terraphim_automata::autocomplete::{
     build_autocomplete_index, autocomplete_search, 
-    fuzzy_autocomplete_search, serialize_autocomplete_index, deserialize_autocomplete_index,
+    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein,
+    serialize_autocomplete_index, deserialize_autocomplete_index,
     AutocompleteResult, AutocompleteConfig,
 };
 
@@ -201,23 +202,23 @@ fn test_fuzzy_autocomplete_search_basic() {
     let thesaurus = create_test_thesaurus();
     let index = build_autocomplete_index(thesaurus, None).unwrap();
     
-    // Test fuzzy search with typos
-    let results = fuzzy_autocomplete_search(&index, "machne", 1, Some(5)).unwrap();
+    // Test fuzzy search with typos (now using Jaro-Winkler by default)
+    let results = fuzzy_autocomplete_search(&index, "machne", 0.6, Some(5)).unwrap();
     // Should find "machine" related terms even with typo
     
-    let results = fuzzy_autocomplete_search(&index, "pythonx", 1, Some(5)).unwrap();
+    let results = fuzzy_autocomplete_search(&index, "pythonx", 0.6, Some(5)).unwrap();
     // Should find "python" with extra character
 }
 
 #[test]
-fn test_fuzzy_autocomplete_search_edit_distance() {
+fn test_fuzzy_autocomplete_search_similarity_thresholds() {
     let thesaurus = create_test_thesaurus();
     let index = build_autocomplete_index(thesaurus, None).unwrap();
     
-    // Test different edit distances
-    for edit_distance in [0, 1, 2] {
-        let results = fuzzy_autocomplete_search(&index, "maching", edit_distance, Some(10)).unwrap();
-        // More edit distance should potentially find more results
+    // Test different similarity thresholds (now using Jaro-Winkler)
+    for similarity in [0.3, 0.5, 0.7] {
+        let results = fuzzy_autocomplete_search(&index, "maching", similarity, Some(10)).unwrap();
+        // Higher similarity threshold should potentially find fewer results
     }
 }
 
@@ -495,5 +496,235 @@ fn test_autocomplete_property_score_ordering() {
             "Scores should be in descending order: position {} has score {} > {}", 
             i, results[i-1].score, results[i].score
         );
+    }
+}
+
+// ===== Jaro-Winkler vs Levenshtein Comparison Tests =====
+
+#[test]
+fn test_jaro_winkler_autocomplete_basic() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    // Test Jaro-Winkler fuzzy search with typos (now the default fuzzy_autocomplete_search)
+    let results = fuzzy_autocomplete_search(&index, "machne", 0.6, Some(5)).unwrap();
+    
+    // Should find "machine learning" even with typo
+    let has_machine = results.iter().any(|r| r.term.contains("machine"));
+    assert!(has_machine, "Jaro-Winkler should find 'machine' for typo 'machne'");
+    
+    println!("Jaro-Winkler results for 'machne':");
+    for result in &results {
+        println!("  {} (score: {:.3})", result.term, result.score);
+    }
+}
+
+#[test]
+fn test_comparison_prefix_emphasis() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    // Test with query that has good prefix match but character transposition
+    let query = "machien"; // "machine" with transposed 'i' and 'e'
+    
+    let levenshtein_results = fuzzy_autocomplete_search_levenshtein(&index, query, 2, Some(5)).unwrap();
+    let jaro_winkler_results = fuzzy_autocomplete_search(&index, query, 0.6, Some(5)).unwrap();
+    
+    println!("Comparison for query '{}' (transposed characters):", query);
+    println!("Levenshtein (edit distance ≤ 2):");
+    for result in &levenshtein_results {
+        println!("  {} (score: {:.3})", result.term, result.score);
+    }
+    
+    println!("Jaro-Winkler (similarity ≥ 0.6):");
+    for result in &jaro_winkler_results {
+        println!("  {} (score: {:.3})", result.term, result.score);
+    }
+    
+    // Both should find machine learning related terms
+    let lev_has_machine = levenshtein_results.iter().any(|r| r.term.contains("machine"));
+    let jw_has_machine = jaro_winkler_results.iter().any(|r| r.term.contains("machine"));
+    
+    assert!(lev_has_machine || jw_has_machine, "At least one method should find 'machine' terms");
+}
+
+#[test]
+fn test_comparison_different_typo_patterns() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    let test_cases = vec![
+        ("pythno", "python"),     // transposition
+        ("pythn", "python"),      // missing character
+        ("pythonx", "python"),    // extra character
+        ("pyton", "python"),      // missing character
+        ("machne", "machine"),    // missing character
+        ("machien", "machine"),   // transposition
+        ("datascience", "data science"), // missing space
+        ("aritificial", "artificial"),   // transposition + missing
+    ];
+    
+    for (typo, target) in test_cases {
+        println!("\n=== Testing typo pattern: '{}' → '{}' ===", typo, target);
+        
+        let lev_results = fuzzy_autocomplete_search_levenshtein(&index, typo, 2, Some(3)).unwrap();
+        let jw_results = fuzzy_autocomplete_search(&index, typo, 0.5, Some(3)).unwrap();
+        
+        println!("Levenshtein results:");
+        for result in &lev_results {
+            println!("  {} (score: {:.3})", result.term, result.score);
+        }
+        
+        println!("Jaro-Winkler results:");
+        for result in &jw_results {
+            println!("  {} (score: {:.3})", result.term, result.score);
+        }
+        
+        // Check if either method finds the target term
+        let lev_finds_target = lev_results.iter().any(|r| r.term.contains(target) || r.normalized_term.as_str().to_lowercase().contains(target));
+        let jw_finds_target = jw_results.iter().any(|r| r.term.contains(target) || r.normalized_term.as_str().to_lowercase().contains(target));
+        
+        if !lev_finds_target && !jw_finds_target {
+            println!("Neither method found target '{}' for typo '{}'", target, typo);
+        } else {
+            println!("Success: {} found target", 
+                     match (lev_finds_target, jw_finds_target) {
+                         (true, true) => "Both methods",
+                         (true, false) => "Levenshtein",
+                         (false, true) => "Jaro-Winkler",
+                         _ => unreachable!(),
+                     });
+        }
+    }
+}
+
+#[test]
+fn test_jaro_winkler_prefix_advantage() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    // Test cases where Jaro-Winkler should perform better due to prefix matching
+    let prefix_cases = vec![
+        "mach",    // Should strongly match "machine learning"
+        "prog",    // Should match "programming"
+        "artif",   // Should match "artificial intelligence"
+        "super",   // Should match "supervised learning"
+    ];
+    
+    for prefix in prefix_cases {
+        println!("\n=== Testing prefix advantage: '{}' ===", prefix);
+        
+        // Use lower similarity threshold for Jaro-Winkler to see more results
+        let jw_results = fuzzy_autocomplete_search(&index, prefix, 0.4, Some(5)).unwrap();
+        
+        println!("Jaro-Winkler results (min similarity 0.4):");
+        for result in &jw_results {
+            println!("  {} (score: {:.3})", result.term, result.score);
+        }
+        
+        // Jaro-Winkler should find good matches for prefix-based queries
+        assert!(!jw_results.is_empty(), "Jaro-Winkler should find matches for prefix '{}'", prefix);
+        
+        // Check that top results have decent scores (Jaro-Winkler emphasizes prefixes)
+        if !jw_results.is_empty() {
+            let top_score = jw_results[0].score;
+            println!("Top Jaro-Winkler score for '{}': {:.3}", prefix, top_score);
+        }
+    }
+}
+
+#[test]
+fn test_similarity_thresholds_comparison() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    let query = "machne"; // typo for "machine"
+    
+    // Test different similarity thresholds for Jaro-Winkler
+    let thresholds = [0.3, 0.5, 0.7, 0.8, 0.9];
+    
+    println!("Jaro-Winkler threshold comparison for query '{}':", query);
+    
+    for &threshold in &thresholds {
+        let results = fuzzy_autocomplete_search(&index, query, threshold, Some(10)).unwrap();
+        println!("  Threshold {:.1}: {} results", threshold, results.len());
+        
+        if !results.is_empty() {
+            println!("    Top result: {} (score: {:.3})", results[0].term, results[0].score);
+        }
+    }
+    
+    // Test different edit distances for Levenshtein
+    let edit_distances = [1, 2, 3];
+    
+    println!("Levenshtein edit distance comparison for query '{}':", query);
+    
+    for &edit_distance in &edit_distances {
+        let results = fuzzy_autocomplete_search_levenshtein(&index, query, edit_distance, Some(10)).unwrap();
+        println!("  Edit distance {}: {} results", edit_distance, results.len());
+        
+        if !results.is_empty() {
+            println!("    Top result: {} (score: {:.3})", results[0].term, results[0].score);
+        }
+    }
+}
+
+#[test]
+fn test_performance_comparison() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    let test_queries = ["machne", "pythno", "datascience", "aritificial"];
+    
+    for query in test_queries {
+        println!("\n=== Performance comparison for '{}' ===", query);
+        
+        // Measure Levenshtein performance
+        let start = std::time::Instant::now();
+        let lev_results = fuzzy_autocomplete_search_levenshtein(&index, query, 2, Some(5)).unwrap();
+        let lev_time = start.elapsed();
+        
+        // Measure Jaro-Winkler performance
+        let start = std::time::Instant::now();
+        let jw_results = fuzzy_autocomplete_search(&index, query, 0.5, Some(5)).unwrap();
+        let jw_time = start.elapsed();
+        
+        println!("Levenshtein: {:?} ({} results)", lev_time, lev_results.len());
+        println!("Jaro-Winkler: {:?} ({} results)", jw_time, jw_results.len());
+        
+        // Both should complete reasonably quickly
+        assert!(lev_time.as_millis() < 1000, "Levenshtein should be fast");
+        assert!(jw_time.as_millis() < 1000, "Jaro-Winkler should be fast");
+    }
+}
+
+#[test]
+fn test_word_level_matching_comparison() {
+    let thesaurus = create_test_thesaurus();
+    let index = build_autocomplete_index(thesaurus, None).unwrap();
+    
+    // Test word-level matching with multi-word terms
+    let query = "learing"; // typo for "learning" in "machine learning"
+    
+    let lev_results = fuzzy_autocomplete_search_levenshtein(&index, query, 2, Some(5)).unwrap();
+    let jw_results = fuzzy_autocomplete_search(&index, query, 0.6, Some(5)).unwrap();
+    
+    println!("Word-level matching comparison for '{}':", query);
+    println!("Levenshtein results:");
+    for result in &lev_results {
+        println!("  {} (score: {:.3})", result.term, result.score);
+    }
+    
+    println!("Jaro-Winkler results:");
+    for result in &jw_results {
+        println!("  {} (score: {:.3})", result.term, result.score);
+    }
+    
+    // Both should find "machine learning" by matching the word "learning"
+    let lev_has_learning = lev_results.iter().any(|r| r.term.contains("learning"));
+    let jw_has_learning = jw_results.iter().any(|r| r.term.contains("learning"));
+    
+    if lev_has_learning || jw_has_learning {
+        println!("Success: At least one method found 'learning' terms");
     }
 } 

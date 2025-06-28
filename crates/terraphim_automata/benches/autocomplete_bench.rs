@@ -16,7 +16,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 
 use terraphim_automata::autocomplete::{
     build_autocomplete_index, autocomplete_search, fuzzy_autocomplete_search,
-    serialize_autocomplete_index, deserialize_autocomplete_index,
+    fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index, deserialize_autocomplete_index,
     AutocompleteIndex
 };
 use terraphim_types::{Thesaurus, NormalizedTerm, NormalizedTermValue};
@@ -184,9 +184,39 @@ fn bench_fuzzy_search(c: &mut Criterion) {
     
     for (query_name, query) in fuzzy_queries {
         c.bench_function(&format!("fuzzy_search_{}", query_name), |b| {
-            b.iter(|| fuzzy_autocomplete_search(&index, query, 1, Some(10)).unwrap())
+            b.iter(|| fuzzy_autocomplete_search(&index, query, 0.6, Some(10)).unwrap())
         });
     }
+}
+
+/// Benchmark comparison between Levenshtein and Jaro-Winkler fuzzy search
+fn bench_fuzzy_algorithm_comparison(c: &mut Criterion) {
+    let mut group = c.benchmark_group("fuzzy_algorithm_comparison");
+    
+    let index = create_benchmark_index(2000);
+    
+    let test_cases = vec![
+        ("transposition", "machien"),     // machine with transposed i/e
+        ("missing_char", "machne"),       // machine with missing i
+        ("extra_char", "machinee"),       // machine with extra e
+        ("prefix_match", "mach"),         // partial prefix
+        ("complex_typo", "aritificial"),  // artificial with multiple errors
+        ("word_space", "datascience"),    // data science without space
+    ];
+    
+    for (case_name, query) in test_cases {
+        // Benchmark Levenshtein distance approach
+        group.bench_function(&format!("levenshtein_{}", case_name), |b| {
+            b.iter(|| fuzzy_autocomplete_search_levenshtein(&index, query, 2, Some(10)).unwrap())
+        });
+        
+        // Benchmark Jaro-Winkler similarity approach (now the default)
+        group.bench_function(&format!("jaro_winkler_{}", case_name), |b| {
+            b.iter(|| fuzzy_autocomplete_search(&index, query, 0.5, Some(10)).unwrap())
+        });
+    }
+    
+    group.finish();
 }
 
 /// Benchmark serialization and deserialization performance
@@ -322,6 +352,7 @@ criterion_group!(
     bench_search_throughput,
     bench_search_result_limits,
     bench_fuzzy_search,
+    bench_fuzzy_algorithm_comparison,
     bench_serialization_throughput,
     bench_memory_scaling,
     bench_concurrent_search,
