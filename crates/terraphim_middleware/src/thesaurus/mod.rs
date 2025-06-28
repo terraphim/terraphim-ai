@@ -67,7 +67,7 @@ pub async fn build_thesaurus_from_haystack(
 
         let logseq = Logseq::default();
         let mut thesaurus: Thesaurus = logseq
-            .build(role_name.as_lowercase().to_string(), &haystack.path)
+            .build(role_name.as_lowercase().to_string(), PathBuf::from(&haystack.location))
             .await?;
         match thesaurus.save().await {
             Ok(_) => {

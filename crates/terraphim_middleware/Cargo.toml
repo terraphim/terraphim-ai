@@ -30,6 +30,7 @@ tokio = { version = "1.15.0", features = ["full"] }
 wasm-bindgen-futures = "0.4"
 html2md = "0.2"
 async-trait = "0.1.73"
+url = "2.4"
 
 [dev-dependencies]
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
@@ -41,3 +42,4 @@ serial_test = "2.0.0"
 uuid = { version = "1.8.0", features = ["v4"] }
 dotenvy = "0.15.7"
 walkdir = "2.4.0"
+env_logger = "0.10"

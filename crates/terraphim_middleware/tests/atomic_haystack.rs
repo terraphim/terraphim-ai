@@ -24,7 +24,7 @@ async fn test_atomic_haystack_indexer() {
     parent_properties.insert("https://atomicdata.dev/properties/isA".to_string(), json!(["https://atomicdata.dev/classes/Collection"]));
     parent_properties.insert("https://atomicdata.dev/properties/name".to_string(), json!("Test Articles"));
     parent_properties.insert("https://atomicdata.dev/properties/parent".to_string(), json!(server_url));
-    store.create_with_commit(&parent_subject, &parent_properties).await.unwrap();
+    store.create_with_commit(&parent_subject, parent_properties).await.unwrap();
 
     // 2. Create some test articles on the server
     let article1_subject = format!("{}/test/article/{}", server_url, Uuid::new_v4());
@@ -34,7 +34,7 @@ async fn test_atomic_haystack_indexer() {
     properties1.insert("https://atomicdata.dev/properties/description".to_string(), json!("A deep dive into Rust's ownership model and concurrency features."));
     properties1.insert("https://atomicdata.dev/properties/parent".to_string(), json!(parent_subject));
     
-    store.create_with_commit(&article1_subject, &properties1).await.unwrap();
+    store.create_with_commit(&article1_subject, properties1).await.unwrap();
 
     let article2_subject = format!("{}/test/article/{}", server_url, Uuid::new_v4());
     let mut properties2 = HashMap::new();
@@ -43,7 +43,7 @@ async fn test_atomic_haystack_indexer() {
     properties2.insert("https://atomicdata.dev/properties/description".to_string(), json!("Getting started with Svelte, the reactive UI framework."));
     properties2.insert("https://atomicdata.dev/properties/parent".to_string(), json!(parent_subject));
 
-    store.create_with_commit(&article2_subject, &properties2).await.unwrap();
+    store.create_with_commit(&article2_subject, properties2).await.unwrap();
 
     // Give the server a moment to index the new resources
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -53,10 +53,10 @@ async fn test_atomic_haystack_indexer() {
 
     // 4. Create a Haystack config
     let haystack = Haystack {
-        path: config.server_url.into(),
+        location: config.server_url.clone(),
         service: terraphim_config::ServiceType::Atomic,
         read_only: true,
-        atomic_server_secret: config.atomic_secret,
+        atomic_server_secret: std::env::var("ATOMIC_SERVER_SECRET").ok(),
     };
 
     // Poll the server until the document is indexed or we time out
@@ -75,7 +75,7 @@ async fn test_atomic_haystack_indexer() {
     assert_eq!(doc.title, "Test Article 1: The Magic of Rust");
     assert!(doc.description.as_ref().unwrap().contains("ownership model"));
 
-    // Clean up the created articles and parent
+    // Cleanup
     store.delete_with_commit(&article1_subject).await.unwrap();
     store.delete_with_commit(&article2_subject).await.unwrap();
     store.delete_with_commit(&parent_subject).await.unwrap();

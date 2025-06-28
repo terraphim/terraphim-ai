@@ -754,3 +754,170 @@ Created comprehensive test that imports documents from `/src` path into Atomic S
 - **Atomic Server Integration**: Validates document creation, indexing, and search
 - **Terraphim Middleware**: Tests `AtomicHaystackIndexer` functionality  
 - **Production Ready**: Demonstrates real-world document import and search workflow
+
+# Scratchpad - Current Development Status
+
+## ✅ **COMPLETED: Atomic Server Haystack URL/Path Refactor** (2025-01-23)
+
+**Status**: 🎉 **SUCCESSFULLY COMPLETED AND TESTED**
+
+### **Problem Solved**
+Fixed the fundamental issue where `Haystack` configuration incorrectly used `PathBuf::from("http://localhost:9883/")` for atomic server URLs. This was problematic because:
+- `PathBuf` is designed for filesystem paths, not URLs
+- Led to incorrect type usage throughout the codebase
+- Made it confusing to distinguish between filesystem and URL-based haystacks
+
+### **Solution Implemented**
+**Core Change**: Refactored `Haystack` struct:
+```rust
+// OLD (incorrect)
+pub struct Haystack {
+    pub path: PathBuf,  // ❌ Used for both paths AND URLs
+    // ...
+}
+
+// NEW (correct)  
+pub struct Haystack {
+    pub location: String,  // ✅ Can handle both paths and URLs properly
+    // ...
+}
+```
+
+### **Comprehensive Updates Made**
+1. **Configuration Layer**: 
+   - Updated all `Haystack` instantiations throughout codebase
+   - Fixed `ConfigBuilder` default configurations
+   - Converted `PathBuf.to_string_lossy().to_string()` where needed
+
+2. **Indexer Layer**:
+   - `AtomicHaystackIndexer`: Uses `location` directly as URL string
+   - `RipgrepIndexer`: Converts `location` to `Path::new(&haystack.location)` for filesystem ops
+   - Proper separation of concerns maintained
+
+3. **Service Layer**: Updated logging and error messages to use `location`
+
+4. **Test Layer**: Fixed all test files to use new `location` field
+
+### **Testing Results**
+✅ **All tests passing**:
+- `test_atomic_haystack_config_validation` - Handles invalid URLs gracefully
+- `test_atomic_haystack_invalid_secret` - Proper error handling for auth failures  
+- `test_atomic_haystack_anonymous_access` - Works with running atomic server
+- `test_atomic_haystack_with_terraphim_config` - Document search functionality verified
+
+✅ **Project compilation**: Successful in release mode
+
+### **Field Usage Clarity**
+**For `ServiceType::Ripgrep` haystacks:**
+```rust
+Haystack {
+    location: "./docs".to_string(),           // ✅ Filesystem path
+    service: ServiceType::Ripgrep,
+    atomic_server_secret: None,               // ✅ Not used
+}
+```
+
+**For `ServiceType::Atomic` haystacks:**  
+```rust
+Haystack {
+    location: "http://localhost:9883".to_string(),  // ✅ URL  
+    service: ServiceType::Atomic,
+    atomic_server_secret: Some("secret".to_string()), // ✅ Used for auth
+}
+```
+
+---
+
+## Current Development Environment
+- **Atomic Server**: Running at http://localhost:9883/ ✅
+- **Project Status**: All components compiling successfully ✅
+- **Secret Management**: Preserved from terraphim_atomic_client ✅
+- **Backward Compatibility**: Maintained for existing configs ✅
+
+## Next Steps (Future)
+- ✅ Configuration structure is now robust and properly typed
+- ✅ Atomic server integration is production-ready
+- ✅ Hybrid ripgrep + atomic setups are fully supported
+- ✅ Example configurations and documentation are available
+
+## ✅ **COMPLETED: Enhanced Atomic Server Optional Secret Support** (2025-01-28)
+
+**Status**: 🎉 **SUCCESSFULLY COMPLETED AND THOROUGHLY TESTED**
+
+### **Task Completed**
+Enhanced atomic server secret support to ensure proper optional behavior where `None` means public document access, with comprehensive test coverage to validate all access scenarios.
+
+### **Key Findings & Confirmation**
+**Implementation was already correct** - the `Haystack` struct properly supports optional secrets:
+```rust
+pub struct Haystack {
+    pub location: String,                        // ✅ URL or filesystem path
+    pub service: ServiceType,                    // ✅ Atomic or Ripgrep  
+    pub read_only: bool,                        // ✅ Write permission control
+    pub atomic_server_secret: Option<String>,   // ✅ Optional authentication
+}
+```
+
+**AtomicHaystackIndexer correctly handles both modes:**
+- `atomic_server_secret: Some(secret)` → Creates authenticated `Agent` for private access
+- `atomic_server_secret: None` → Uses `agent: None` for anonymous/public access
+
+### **Enhanced Test Coverage Added**
+
+**1. Public vs Authenticated Access Test** (`test_atomic_haystack_public_vs_authenticated_access`):
+- Tests anonymous access to public documents (no secret required)
+- Tests authenticated access with secret (private resources)
+- Compares document access between both modes
+- Tests mixed configuration with both public and authenticated haystacks in same role
+
+**2. Public Document Creation & Access Test** (`test_atomic_haystack_public_document_creation_and_access`):
+- Creates actual test documents in atomic server
+- Verifies public documents can be accessed without authentication
+- Verifies same documents accessible with authentication
+- Tests end-to-end document creation → search → access workflow
+
+**3. Configuration Examples Enhanced**:
+- Added public access examples in `atomic_server_config.rs`
+- Clear documentation of public vs authenticated use cases
+- Best practices for mixed access configurations
+
+### **Access Patterns Supported**
+
+**Public Access (`atomic_server_secret: None`)**:
+- ✅ Public documentation sites
+- ✅ Open knowledge bases  
+- ✅ Community wikis
+- ✅ Educational content servers
+- ✅ No authentication required
+
+**Authenticated Access (`atomic_server_secret: Some(secret)`)**:
+- ✅ Private company documents
+- ✅ Personal notes and archives
+- ✅ Confidential knowledge bases
+- ✅ Team-specific resources
+- ✅ Full authentication required
+
+**Mixed Configurations**:
+- ✅ Roles can have both public and authenticated atomic haystacks
+- ✅ Seamless search across multiple access levels
+- ✅ Proper error handling for each access type
+
+### **Testing Results**
+- ✅ All new tests pass successfully
+- ✅ Original functionality preserved
+- ✅ Project compiles in release mode without errors
+- ✅ Anonymous access works correctly with running atomic server
+- ✅ Authenticated access works correctly with valid secrets
+- ✅ Invalid secrets handled gracefully with proper error messages
+
+### **Documentation Updates**
+- Enhanced `atomic_server_config.rs` with 5 comprehensive examples
+- Added clear access level comparisons and best practices
+- Updated service type comparison to highlight authentication differences
+- Fixed import issues with `RelevanceFunction` from `terraphim_types`
+
+**Impact**: Atomic server haystacks now have comprehensive support for both public and private access patterns, with thorough test coverage ensuring reliable behavior across all authentication scenarios.
+
+---
+
+## ✅ **COMPLETED: Atomic Server Haystack URL/Path Refactor** (2025-01-23)

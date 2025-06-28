@@ -223,7 +223,7 @@ async fn test_document_import_and_search() {
     // 3. Test searching the imported documents
     let indexer = AtomicHaystackIndexer::default();
     let haystack = Haystack {
-        path: config.server_url.into(),
+        location: config.server_url.clone(),
         service: terraphim_config::ServiceType::Atomic,
         read_only: true,
         atomic_server_secret: std::env::var("ATOMIC_SERVER_SECRET").ok(),
