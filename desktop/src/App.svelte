@@ -2,9 +2,7 @@
   import { Route } from "tinro";
   import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
   import Search from "./lib/Search/Search.svelte";
-  import {
-    default as ThemeSwitcher,
-  } from "./lib/ThemeSwitcher.svelte";
+  import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
   import { theme } from "./lib/stores";
   import ConfigWizard from "./lib/ConfigWizard.svelte";
   import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
@@ -33,8 +31,8 @@
     <br />
 
     <Route path="/fetch/*"><FetchTabs /></Route>
-    <Route path="/config/wizard"><ConfigWizard/></Route>
-    <Route path="/config/json"><ConfigJsonEditor/></Route>
+    <Route path="/config/wizard"><ConfigWizard /></Route>
+    <Route path="/config/json"><ConfigJsonEditor /></Route>
   </main>
 
   <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>

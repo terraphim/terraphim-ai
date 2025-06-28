@@ -32,12 +32,11 @@ Example configuration for this KG:
 },
 ```
 
-- to do list
+- [ ] 
 
+- to do list
 - todo list
 
-- [ ] My todo 
+- [ ] My todo
 
-- [ ] fix this
-
-- [ ] 
+- \[ \]

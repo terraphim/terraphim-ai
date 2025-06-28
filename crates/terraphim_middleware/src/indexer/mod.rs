@@ -9,6 +9,7 @@ use crate::{Error, Result};
 mod ripgrep;
 
 pub use ripgrep::RipgrepIndexer;
+use crate::haystack::AtomicHaystackIndexer;
 
 fn hash_as_string<T: Hash>(t: &T) -> String {
     let mut s = DefaultHasher::new();
@@ -27,11 +28,10 @@ pub trait IndexMiddleware {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    // Note: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
     fn index(
         &self,
         needle: &str,
-        haystack: &Path,
+        haystack: &terraphim_config::Haystack,
     ) -> impl std::future::Future<Output = Result<Index>> + Send;
 }
 
@@ -46,6 +46,7 @@ pub async fn search_haystacks(
     let needle = search_query.search_term.as_str();
 
     let ripgrep = RipgrepIndexer::default();
+    let atomic = AtomicHaystackIndexer::default();
     let mut full_index = Index::new();
 
     let role = config
@@ -60,7 +61,11 @@ pub async fn search_haystacks(
             ServiceType::Ripgrep => {
                 // Search through documents using ripgrep
                 // This indexes the haystack using the ripgrep middleware
-                ripgrep.index(needle, &haystack.path).await?
+                ripgrep.index(needle, haystack).await?
+            }
+            ServiceType::Atomic => {
+                // Search through documents using atomic-server
+                atomic.index(needle, haystack).await?
             }
         };
 

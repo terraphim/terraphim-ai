@@ -4,8 +4,10 @@ use terraphim_config::TerraphimConfigError;
 mod command;
 pub mod indexer;
 pub mod thesaurus;
+pub mod haystack;
 
-pub use indexer::search_haystacks;
+pub use indexer::{search_haystacks, RipgrepIndexer};
+pub use haystack::AtomicHaystackIndexer;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
