@@ -190,9 +190,9 @@ impl RipgrepCommand {
             stdout.read_to_string(&mut data).await.map(|_| data)
         };
         let output = read.await?;
-        println!("🔍 Raw ripgrep output ({} bytes): {}", output.len(), &output[..std::cmp::min(200, output.len())]);
+        log::debug!("Raw ripgrep output ({} bytes): {}", output.len(), &output[..std::cmp::min(500, output.len())]);
         let messages = json_decode(&output)?;
-        println!("🔍 JSON decode produced {} messages", messages.len());
+        log::debug!("JSON decode produced {} messages", messages.len());
         Ok(messages)
     }
 }
