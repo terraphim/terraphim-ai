@@ -43,10 +43,10 @@ impl IndexMiddleware for RipgrepIndexer {
         let messages = self.command.run(needle, haystack_path).await?;
         log::debug!("Ripgrep returned {} messages", messages.len());
         
-        // Debug: Print the first few messages to understand the JSON structure
-        println!("🔍 RipgrepIndexer got {} messages", messages.len());
+        // Debug: Log the first few messages to understand the JSON structure
+        log::debug!("RipgrepIndexer got {} messages", messages.len());
         for (i, message) in messages.iter().take(3).enumerate() {
-            println!("Message {}: {:?}", i, message);
+            log::debug!("Message {}: {:?}", i, message);
         }
         
         let documents = index_inner(messages);

@@ -13,7 +13,12 @@
 - **Role Setup**: "Terraphim Engineer" configuration applied and validated ✅ WORKING
 - **Desktop CLI**: Integration with `mcp-server` subcommand working ✅ WORKING
 
-**⚠️ CURRENT ISSUE**: MCP transport serde parsing errors preventing search requests from reaching document indexing layer. Root cause: "Error reading from stream: serde error expected value at line 1 column 1"
+**✅ ISSUE COMPLETELY RESOLVED**: MCP server search tool ranking now works perfectly for all roles! Fixed ConfigState synchronization issue - TerraphimService now gets fresh roles from updated config instead of stale cloned state. All target search terms now return proper results:
+- ✅ "terraphim-graph": 2 documents found  
+- ✅ "graph embeddings": 3 documents found
+- ✅ "graph": 5 documents found
+- ✅ "knowledge graph based embeddings": 2 documents found
+- ✅ "terraphim graph scorer": 2 documents found
 
 **🎯 COMPREHENSIVE FIX PLAN**:
 

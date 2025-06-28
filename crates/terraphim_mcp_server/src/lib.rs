@@ -56,8 +56,19 @@ impl McpService {
     }
 
     /// Create a Terraphim service instance from the current configuration
-    pub fn terraphim_service(&self) -> TerraphimService {
-        TerraphimService::new((*self.config_state).clone())
+    pub async fn terraphim_service(&self) -> Result<TerraphimService, anyhow::Error> {
+        // Instead of cloning the old ConfigState (which has stale roles), 
+        // create a fresh ConfigState from the current config to ensure roles are up-to-date
+        let config = self.config_state.config.clone();
+        let current_config = config.lock().await;
+        let mut fresh_config = current_config.clone();
+        drop(current_config);
+        
+        let fresh_config_state = terraphim_config::ConfigState::new(&mut fresh_config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create fresh ConfigState: {}", e))?;
+            
+        Ok(TerraphimService::new(fresh_config_state))
     }
 
     /// Update the configuration
@@ -76,7 +87,8 @@ impl McpService {
         limit: Option<i32>,
         skip: Option<i32>,
     ) -> Result<CallToolResult, McpError> {
-        let mut service = self.terraphim_service();
+        let mut service = self.terraphim_service().await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::from(query),
             limit: limit.map(|l| l as usize),
@@ -257,7 +269,8 @@ impl ServerHandler for McpService {
         _context: RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> + Send + '_ {
         async move {
-            let mut service = self.terraphim_service();
+            let mut service = self.terraphim_service().await
+                .map_err(|e| TerraphimMcpError::Anyhow(e))?;
             let search_query = terraphim_types::SearchQuery {
                 search_term: terraphim_types::NormalizedTermValue::new("".to_string()),
                 limit: None,
@@ -289,7 +302,8 @@ impl ServerHandler for McpService {
                 .resource_mapper
                 .uri_to_id(&request.uri)
                 .map_err(TerraphimMcpError::Anyhow)?;
-            let mut service = self.terraphim_service();
+            let mut service = self.terraphim_service().await
+                .map_err(|e| TerraphimMcpError::Anyhow(e))?;
             let document = service
                 .get_document_by_id(&doc_id)
                 .await
