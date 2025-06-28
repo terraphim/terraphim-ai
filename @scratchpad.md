@@ -991,3 +991,105 @@ The FST-based autocomplete functionality is now fully integrated into the Terrap
 - ✅ Integration with existing Terraphim knowledge graph and role management systems
 
 **The autocomplete feature is ready for production use with MCP-compatible applications.**
+
+# Terraphim AI Scratchpad
+
+## Current Task: Fix End-to-End Test Server Configuration Issues
+
+### 🔍 **Debugging Analysis:**
+
+**Server Logs Show:**
+```
+[SERVER ERROR] [2025-06-28T21:51:51Z INFO  terraphim_server] Failed to load config: OpenDal(ConfigInvalid (permanent) at  => open db
+    Context:
+       service: sled
+       datadir: /tmp/sled
+    Source:
+       IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+```
+
+**Configuration Issues:**
+1. Server loads from user settings: `/Users/alex/Library/Application Support/com.aks.terraphim/settings.toml`
+2. Uses "Default" role instead of "Terraphim Engineer" role
+3. Tries to use remote thesaurus: `https://staging-storage.terraphim.io/thesaurus_Default.json`
+4. Database lock prevents proper initialization
+
+**Test Configuration Created:**
+```json
+{
+  "id": "Desktop",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Terraphim Engineer": {
+      "shortname": "Terraphim Engineer",
+      "name": "Terraphim Engineer",
+      "relevance_function": "TerraphimGraph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "Markdown",
+          "path": "./docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "./docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
+}
+```
+
+### 🛠️ **Immediate Fixes Needed:**
+
+1. **Force Server to Use Test Config:**
+   - Set `CONFIG_PATH` environment variable correctly
+   - Ensure server reads from test config instead of user settings
+
+2. **Fix Database Lock:**
+   - Clear `/tmp/sled` directory before starting server
+   - Use unique database path for tests
+
+3. **Update Server Startup:**
+   - Pass config file path as command line argument
+   - Override default settings loading
+
+4. **Test Configuration Validation:**
+   - Verify server actually loads the test config
+   - Check that "Terraphim Engineer" role is active
+
+### 📊 **Test Results Summary:**
+- **5/8 tests passing** (62.5% success rate)
+- **3 tests failing** due to server configuration
+- **Server starts successfully** but with wrong configuration
+- **Frontend works correctly** on port 5173
+- **API endpoints respond** but return 500 errors
+
+### 🎯 **Expected vs Actual:**
+- **Expected**: All searches return 1 result with rank 34 (from Rust middleware test)
+- **Actual**: All searches return "Internal Server Error" (500)
+- **Root Cause**: Server using wrong role and remote thesaurus instead of local KG
+
+### 🔧 **Next Implementation Steps:**
+1. Modify `TerraphimServerManager` to force test config usage
+2. Add database cleanup before server start
+3. Update server startup command to use config file
+4. Add configuration validation in tests
+5. Fix role switching test to handle missing UI elements
+
+### 📝 **Code Changes Needed:**
+- Update server manager to pass `--config` argument
+- Add database cleanup in test setup
+- Modify server startup to override default config path
+- Add configuration validation checks
+- Update test expectations based on actual server behavior
