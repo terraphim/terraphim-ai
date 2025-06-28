@@ -1,5 +1,57 @@
 # Terraphim MCP Server Learnings
 
+## 🔧 MCP SERVER SEARCH TOOL RANKING FIX PLAN - IN PROGRESS (2025-01-28)
+
+### Current Status: MCP Validation Framework Ready, Final Implementation Step Needed
+
+**Task**: Fix MCP search tool to return valid ranking for all roles, eliminating 0-result searches and ensuring proper knowledge graph-based ranking.
+
+**✅ COMPLETED ACHIEVEMENTS**:
+- **MCP Server Framework**: `crates/terraphim_mcp_server/tests/mcp_rolegraph_validation_test.rs` ✅ WORKING
+- **Server Integration**: MCP client connects and responds to tool calls correctly ✅ WORKING  
+- **Configuration API**: `update_config_tool` updates server configuration successfully ✅ WORKING
+- **Role Setup**: "Terraphim Engineer" configuration applied and validated ✅ WORKING
+- **Desktop CLI**: Integration with `mcp-server` subcommand working ✅ WORKING
+
+**⚠️ CURRENT ISSUE**: MCP transport serde parsing errors preventing search requests from reaching document indexing layer. Root cause: "Error reading from stream: serde error expected value at line 1 column 1"
+
+**🎯 COMPREHENSIVE FIX PLAN**:
+
+**Phase 1 (CRITICAL)**: Build Thesaurus from Local KG Files
+- Update `create_terraphim_engineer_config()` in MCP test to use Logseq builder
+- Build thesaurus using `Logseq::build("Terraphim Engineer", kg_path)` from local markdown files
+- Save thesaurus to persistence layer with `thesaurus.save().await`
+- Set automata_path after building thesaurus: `AutomataPath::Local(thesaurus_path)`
+- Add required dependencies: terraphim_middleware, terraphim_persistence
+
+**Phase 2 (HIGH PRIORITY)**: Validate Search Returns Proper Rankings
+- Test expected results matching successful middleware test (rank 34 for "terraphim-graph")
+- Validate all search terms: "terraphim-graph", "graph embeddings", "graph", "knowledge graph based embeddings"
+- Add ranking validation to extract and verify meaningful document ranks
+- Compare results with reference middleware test that successfully finds documents
+
+**Phase 3 (CRITICAL)**: Fix All Roles Configuration
+- **Root Problem**: Default "Engineer" role uses remote thesaurus (1,725 entries) missing local KG terms
+- **Solution**: Update default configurations (desktop/default/settings.toml) for all roles with TerraphimGraph relevance
+- **Multi-Role Test**: Create `test_all_roles_search_validation()` testing Default, Engineer, Terraphim Engineer, System Operator
+- **Validation**: Ensure NO roles return 0 results for expected domain-specific queries
+
+**Phase 4 (ENHANCEMENT)**: Integration Testing Expansion
+- End-to-end workflow testing: role switching, persistent config, search pagination
+- Performance validation: search speed, thesaurus build time, memory usage, concurrent search
+
+**📊 SUCCESS CRITERIA**:
+- ✅ Phase 1: MCP test passes without "Automata path not found" error, search returns documents for "terraphim-graph"
+- ✅ Phase 2: All roles return valid search results for domain terms, consistent meaningful rankings  
+- ✅ Phase 3: MCP server production-ready for all roles, configuration errors eliminated
+
+**🔍 REFERENCE IMPLEMENTATIONS**:
+- **Successful Middleware Test**: `crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs` - ALL TESTS PASS, finds "terraphim-graph" document with rank 34, extracts 10 entries from local KG vs 1,725 from remote
+- **Logseq Thesaurus Builder**: `crates/terraphim_middleware/src/thesaurus/mod.rs` - builds thesaurus from markdown files with `synonyms::` syntax
+- **Knowledge Graph Files**: `docs/src/kg/terraphim-graph.md` contains proper synonyms for target search terms
+
+**🎯 PRODUCTION IMPACT**: Framework is production-ready for final implementation step to complete end-to-end validation of MCP server search with proper role configuration and eliminate ranking issues across all roles.
+
 ## ✅ ROLEGRAPH AND KNOWLEDGE GRAPH RANKING VALIDATION - COMPLETED SUCCESSFULLY (2025-01-28)
 
 ### Comprehensive Rolegraph and Knowledge Graph Based Ranking Test Suite - COMPLETED ✅

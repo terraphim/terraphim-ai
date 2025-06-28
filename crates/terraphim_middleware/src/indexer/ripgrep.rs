@@ -43,6 +43,12 @@ impl IndexMiddleware for RipgrepIndexer {
         let messages = self.command.run(needle, haystack_path).await?;
         log::debug!("Ripgrep returned {} messages", messages.len());
         
+        // Debug: Print the first few messages to understand the JSON structure
+        println!("🔍 RipgrepIndexer got {} messages", messages.len());
+        for (i, message) in messages.iter().take(3).enumerate() {
+            println!("Message {}: {:?}", i, message);
+        }
+        
         let documents = index_inner(messages);
         log::debug!("Index_inner created {} documents", documents.len());
         
@@ -82,7 +88,7 @@ impl RipgrepIndexer {
     }
 }
 
-#[cached]
+// #[cached] - temporarily disabled for debugging
 /// This is the inner function that indexes the documents
 /// which allows us to cache requests to the index service
 fn index_inner(messages: Vec<Message>) -> Index {

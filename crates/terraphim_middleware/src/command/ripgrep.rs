@@ -173,10 +173,10 @@ impl RipgrepCommand {
     /// JSON output. Learn more about ripgrep's JSON output here:
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
-        // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle.to_string(), haystack.to_string_lossy().to_string()]
+        // Put options first, then needle, then haystack (correct ripgrep argument order)
+        let args: Vec<String> = self.default_args.clone()
             .into_iter()
-            .chain(self.default_args.clone())
+            .chain(vec![needle.to_string(), haystack.to_string_lossy().to_string()])
             .collect();
 
         let mut child = Command::new(&self.command)
@@ -190,6 +190,9 @@ impl RipgrepCommand {
             stdout.read_to_string(&mut data).await.map(|_| data)
         };
         let output = read.await?;
-        json_decode(&output)
+        println!("🔍 Raw ripgrep output ({} bytes): {}", output.len(), &output[..std::cmp::min(200, output.len())]);
+        let messages = json_decode(&output)?;
+        println!("🔍 JSON decode produced {} messages", messages.len());
+        Ok(messages)
     }
 }
