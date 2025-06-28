@@ -1,4 +1,10 @@
 import { chromium, FullConfig } from '@playwright/test';
+import { writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = join(__filename, '..');
 
 async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...');
@@ -10,12 +16,9 @@ async function globalSetup(config: FullConfig) {
   }
   
   // Setup test data directory
-  const fs = require('fs');
-  const path = require('path');
-  
-  const testDataDir = path.join(__dirname, '../test-data');
-  if (!fs.existsSync(testDataDir)) {
-    fs.mkdirSync(testDataDir, { recursive: true });
+  const testDataDir = join(__dirname, '../test-data');
+  if (!existsSync(testDataDir)) {
+    mkdirSync(testDataDir, { recursive: true });
     console.log('Created test data directory');
   }
   
@@ -27,7 +30,7 @@ async function globalSetup(config: FullConfig) {
         name: 'Test Knowledge Graph',
         description: 'Test data for E2E tests',
         publish: false,
-        path: path.join(testDataDir, 'test-documents'),
+        path: join(testDataDir, 'test-documents'),
         role: 'test_role'
       }
     ],
@@ -36,15 +39,15 @@ async function globalSetup(config: FullConfig) {
     server_url: 'http://localhost:3000'
   };
   
-  fs.writeFileSync(
-    path.join(testDataDir, 'test-config.json'),
+  writeFileSync(
+    join(testDataDir, 'test-config.json'),
     JSON.stringify(testConfig, null, 2)
   );
   
   // Create test documents
-  const docsDir = path.join(testDataDir, 'test-documents');
-  if (!fs.existsSync(docsDir)) {
-    fs.mkdirSync(docsDir, { recursive: true });
+  const docsDir = join(testDataDir, 'test-documents');
+  if (!existsSync(docsDir)) {
+    mkdirSync(docsDir, { recursive: true });
   }
   
   const testDocuments = [
@@ -67,7 +70,7 @@ Including topics like deep learning and computer vision.
   ];
   
   testDocuments.forEach(doc => {
-    fs.writeFileSync(path.join(docsDir, doc.name), doc.content);
+    writeFileSync(join(docsDir, doc.name), doc.content);
   });
   
   console.log('✅ Global setup completed');
