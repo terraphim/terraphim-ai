@@ -302,9 +302,17 @@ impl ConfigBuilder {
             Role {
                 shortname: Some("Engineer".to_string()),
                 name: "Engineer".to_string().into(),
-                relevance_function: RelevanceFunction::TitleScorer,
+                relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
-                kg: None,
+                kg: Some(KnowledgeGraph {
+                    automata_path: Some(automata_path.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: default_data_path.join("docs").join("src").join("kg"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
                 haystacks: vec![Haystack {
                     location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
@@ -322,10 +330,10 @@ impl ConfigBuilder {
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(AutomataPath::remote_example()),
+                    automata_path: Some(automata_path.clone()),
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
-                        path: default_data_path.join("kg"),
+                        path: default_data_path.join("docs").join("src").join("kg"),
                     }),
                     public: true,
                     publish: true,

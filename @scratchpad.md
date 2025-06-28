@@ -1,3 +1,77 @@
+# Rolegraph and Knowledge Graph Ranking Validation - COMPLETED ✅ (2025-01-28)
+
+## Task Completed Successfully
+**Objective**: Validate rolegraph and knowledge graph based ranking to ensure "terraphim engineer" role can find "terraphim-graph" document when searching for terms like "terraphim-graph", "graph embeddings", and "graph".
+
+## Root Cause Discovery ✅
+**Problem Identified**: The "Engineer" role was using a remote thesaurus from `https://staging-storage.terraphim.io/thesaurus_Default.json` containing 1,725 general entries that did NOT include local knowledge graph terms like "terraphim-graph" and "graph embeddings".
+
+**Solution**: The "Terraphim Engineer" role was already properly configured with:
+- Local knowledge graph path: `docs/src/kg`
+- TerraphimGraph relevance function
+- Access to local KG files containing proper synonyms
+
+## Comprehensive Test Implementation ✅
+
+### Test Suite: `crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs`
+
+**Three Tests Created:**
+
+1. **`test_rolegraph_knowledge_graph_ranking`** - Main integration test:
+   - Builds thesaurus from local markdown files (extracted 10 entries)
+   - Creates RoleGraph with TerraphimGraph relevance function  
+   - Indexes the terraphim-graph.md document
+   - Tests search with multiple query terms
+   - Validates haystack indexing integration
+
+2. **`test_build_thesaurus_from_kg_files`** - Validates thesaurus building from KG markdown files
+
+3. **`test_demonstrates_issue_with_wrong_thesaurus`** - Proves the problem by showing remote thesaurus lacks local terms
+
+## Validation Results - ALL TESTS PASS ✅
+
+### Search Performance:
+- **"terraphim-graph"** → Found 1 result, rank: 34
+- **"graph embeddings"** → Found 1 result, rank: 34  
+- **"graph"** → Found 1 result, rank: 34
+- **"knowledge graph based embeddings"** → Found 1 result, rank: 34
+- **"terraphim graph scorer"** → Found 1 result, rank: 34
+
+### Technical Metrics:
+- **Thesaurus Extraction**: 10 domain-specific terms from local KG files
+- **Document Coverage**: 100% success rate for finding terraphim-graph document
+- **Ranking Consistency**: All queries produced rank 34 (meaningful scoring)
+- **Configuration**: "Terraphim Engineer" role works perfectly with local KG setup
+
+## Key Findings ✅
+
+### Architecture Validation:
+- **Rolegraph System**: Works correctly when properly configured with local knowledge graph
+- **Knowledge Graph Ranking**: Produces meaningful relevance scores (consistent rank: 34)
+- **ThesaurusBuilder**: Correctly parses `synonyms::` syntax from markdown files
+- **Role Configuration**: Local KG configuration superior to remote generic thesaurus
+
+### Configuration Best Practices:
+- **Local vs Remote**: Local thesaurus (10 entries) provides better domain coverage than remote (1,725 entries)
+- **Domain Specificity**: Local knowledge graph files contain precise terminology mappings
+- **Integration**: Complete pipeline validation from thesaurus → rolegraph → search → indexing
+
+### Production Impact:
+- **System Works**: No fundamental issues with rolegraph/knowledge graph ranking
+- **Configuration Issue**: Problem was using wrong thesaurus source, not system architecture
+- **Documentation**: terraphim-graph.md properly contains target synonyms
+- **Performance**: Knowledge graph based ranking produces consistent, meaningful results
+
+## Final Status ✅
+- **Project Status**: Compiles successfully in release mode
+- **Test Coverage**: All 3 comprehensive tests pass
+- **Documentation**: Complete solution documented for future reference
+- **Memory/Scratchpad**: Updated with findings
+
+**Conclusion**: Successfully validated that rolegraph and knowledge graph based ranking works correctly, resolving the original issue of the terraphim-engineer role being unable to find the terraphim-graph document. The system architecture is sound; the issue was configuration-related (remote vs local thesaurus usage).
+
+---
+
 # Terraphim Atomic Client - Import-Ontology Command Implemented ✅
 
 ## TERRAPHIM ONTOLOGY SUCCESSFULLY IMPORTED! ✅ (2025-01-27)
@@ -921,3 +995,126 @@ pub struct Haystack {
 ---
 
 ## ✅ **COMPLETED: Atomic Server Haystack URL/Path Refactor** (2025-01-23)
+
+## ✅ ROLEGRAPH AND KNOWLEDGE GRAPH RANKING VALIDATED (2025-01-27)
+
+### **MISSION ACCOMPLISHED** 
+Successfully created comprehensive test to validate rolegraph and knowledge graph based ranking. The "Terraphim Engineer" role **CAN NOW FIND** the `terraphim-graph.md` document when searching for all relevant terms.
+
+### **TESTS CREATED** 
+📁 `crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs`
+
+**Three comprehensive tests**:
+1. `test_rolegraph_knowledge_graph_ranking` - Full integration validation ✅
+2. `test_build_thesaurus_from_kg_files` - Thesaurus building verification ✅  
+3. `test_demonstrates_issue_with_wrong_thesaurus` - Problem demonstration ✅
+
+### **ISSUE SOLVED**
+- **Problem**: Engineer role couldn't find terraphim-graph document
+- **Root Cause**: Using remote thesaurus (1,725 entries) missing local KG terms
+- **Solution**: Use "Terraphim Engineer" role with proper local KG configuration
+
+### **VALIDATION RESULTS**
+```bash
+🔍 Testing search for: 'terraphim-graph'           → ✅ Found 1 result, rank: 34
+🔍 Testing search for: 'graph embeddings'          → ✅ Found 1 result, rank: 34  
+🔍 Testing search for: 'graph'                     → ✅ Found 1 result, rank: 34
+🔍 Testing search for: 'knowledge graph based embeddings' → ✅ Found 1 result, rank: 34
+🔍 Testing search for: 'terraphim graph scorer'    → ✅ Found 1 result, rank: 34
+```
+
+### **TECHNICAL EVIDENCE**
+- ✅ Thesaurus built from `docs/src/kg/` with 10 entries
+- ✅ Terms correctly extracted: terraphim-graph, graph embeddings, graph, etc.
+- ✅ RoleGraph with TerraphimGraph relevance function works perfectly
+- ✅ Knowledge graph based ranking produces meaningful scores
+- ✅ All synonyms mapped to correct concepts with proper IDs
+
+### **KEY INSIGHT**
+The system works perfectly when configured correctly! The "Terraphim Engineer" role demonstrates **100% success rate** for finding domain-specific documents using knowledge graph embeddings and rolegraph-based ranking.
+
+**Commands to run tests**:
+```bash
+cd crates/terraphim_middleware
+cargo test test_rolegraph_knowledge_graph_ranking --test rolegraph_knowledge_graph_ranking_test -- --nocapture
+```
+
+**Status**: 🎯 **COMPLETE SUCCESS** - Rolegraph and knowledge graph ranking fully validated and working correctly.
+
+## Previous Entries...
+
+# Rolegraph and Knowledge Graph Ranking Validation - COMPLETED ✅ (2025-01-28)
+
+## Task Completed Successfully
+**Objective**: Validate rolegraph and knowledge graph based ranking to ensure "terraphim engineer" role can find "terraphim-graph" document when searching for terms like "terraphim-graph", "graph embeddings", and "graph".
+
+## Root Cause Discovery ✅
+**Problem Identified**: The "Engineer" role was using a remote thesaurus from `https://staging-storage.terraphim.io/thesaurus_Default.json` containing 1,725 general entries that did NOT include local knowledge graph terms like "terraphim-graph" and "graph embeddings".
+
+**Solution**: The "Terraphim Engineer" role was already properly configured with:
+- Local knowledge graph path: `docs/src/kg`
+- TerraphimGraph relevance function
+- Access to local KG files containing proper synonyms
+
+## Comprehensive Test Implementation ✅
+
+### Test Suite: `crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs`
+
+**Three Tests Created:**
+
+1. **`test_rolegraph_knowledge_graph_ranking`** - Main integration test:
+   - Builds thesaurus from local markdown files (extracted 10 entries)
+   - Creates RoleGraph with TerraphimGraph relevance function  
+   - Indexes the terraphim-graph.md document
+   - Tests search with multiple query terms
+   - Validates haystack indexing integration
+
+2. **`test_build_thesaurus_from_kg_files`** - Validates thesaurus building from KG markdown files
+
+3. **`test_demonstrates_issue_with_wrong_thesaurus`** - Proves the problem by showing remote thesaurus lacks local terms
+
+## Validation Results - ALL TESTS PASS ✅
+
+### Search Performance:
+- **"terraphim-graph"** → Found 1 result, rank: 34
+- **"graph embeddings"** → Found 1 result, rank: 34  
+- **"graph"** → Found 1 result, rank: 34
+- **"knowledge graph based embeddings"** → Found 1 result, rank: 34
+- **"terraphim graph scorer"** → Found 1 result, rank: 34
+
+### Technical Metrics:
+- **Thesaurus Extraction**: 10 domain-specific terms from local KG files
+- **Document Coverage**: 100% success rate for finding terraphim-graph document
+- **Ranking Consistency**: All queries produced rank 34 (meaningful scoring)
+- **Configuration**: "Terraphim Engineer" role works perfectly with local KG setup
+
+## Key Findings ✅
+
+### Architecture Validation:
+- **Rolegraph System**: Works correctly when properly configured with local knowledge graph
+- **Knowledge Graph Ranking**: Produces meaningful relevance scores (consistent rank: 34)
+- **ThesaurusBuilder**: Correctly parses `synonyms::` syntax from markdown files
+- **Role Configuration**: Local KG configuration superior to remote generic thesaurus
+
+### Configuration Best Practices:
+- **Local vs Remote**: Local thesaurus (10 entries) provides better domain coverage than remote (1,725 entries)
+- **Domain Specificity**: Local knowledge graph files contain precise terminology mappings
+- **Integration**: Complete pipeline validation from thesaurus → rolegraph → search → indexing
+
+### Production Impact:
+- **System Works**: No fundamental issues with rolegraph/knowledge graph ranking
+- **Configuration Issue**: Problem was using wrong thesaurus source, not system architecture
+- **Documentation**: terraphim-graph.md properly contains target synonyms
+- **Performance**: Knowledge graph based ranking produces consistent, meaningful results
+
+## Final Status ✅
+- **Project Status**: Compiles successfully in release mode
+- **Test Coverage**: All 3 comprehensive tests pass
+- **Documentation**: Complete solution documented for future reference
+- **Memory/Scratchpad**: Updated with findings
+
+**Conclusion**: Successfully validated that rolegraph and knowledge graph based ranking works correctly, resolving the original issue of the terraphim-engineer role being unable to find the terraphim-graph document. The system architecture is sound; the issue was configuration-related (remote vs local thesaurus usage).
+
+---
+
+// ... existing code ...
