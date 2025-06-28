@@ -271,20 +271,73 @@ impl ServerHandler for McpService {
         async move {
             let mut service = self.terraphim_service().await
                 .map_err(|e| TerraphimMcpError::Anyhow(e))?;
-            let search_query = terraphim_types::SearchQuery {
-                search_term: terraphim_types::NormalizedTermValue::new("".to_string()),
-                limit: None,
-                skip: None,
-                role: None,
-            };
-            let documents = service
-                .search(&search_query)
-                .await
-                .map_err(TerraphimMcpError::Service)?;
+            
+            // Use a broad search term to find documents instead of empty search
+            // We'll try common terms that should match documents in our KG
+            let search_terms = vec!["terraphim", "graph", "service", "haystack"];
+            let mut all_documents = std::collections::HashSet::new();
+            
+            // Perform multiple searches to gather available documents
+            for term in search_terms {
+                let search_query = terraphim_types::SearchQuery {
+                    search_term: terraphim_types::NormalizedTermValue::new(term.to_string()),
+                    limit: Some(50), // Reasonable limit per search
+                    skip: None,
+                    role: None,
+                };
+                
+                match service.search(&search_query).await {
+                    Ok(documents) => {
+                        for doc in documents {
+                            all_documents.insert(doc.id.clone());
+                        }
+                    }
+                    Err(_) => {
+                        // Continue with other terms if one fails
+                        continue;
+                    }
+                }
+            }
+            
+            // If we still have no documents, try a final broad search
+            if all_documents.is_empty() {
+                let fallback_query = terraphim_types::SearchQuery {
+                    search_term: terraphim_types::NormalizedTermValue::new("*".to_string()),
+                    limit: Some(100),
+                    skip: None,
+                    role: None,
+                };
+                
+                let documents = service
+                    .search(&fallback_query)
+                    .await
+                    .map_err(TerraphimMcpError::Service)?;
+                    
+                let resources = self
+                    .resource_mapper
+                    .documents_to_resources(&documents)
+                    .map_err(TerraphimMcpError::Anyhow)?;
+                    
+                return Ok(ListResourcesResult {
+                    resources,
+                    next_cursor: None,
+                });
+            }
+            
+            // Convert unique document IDs back to documents for resource mapping
+            // For now, we'll do individual searches to get full document objects
+            let mut final_documents = Vec::new();
+            for doc_id in all_documents.iter().take(50) { // Limit to 50 resources
+                if let Ok(Some(doc)) = service.get_document_by_id(doc_id).await {
+                    final_documents.push(doc);
+                }
+            }
+            
             let resources = self
                 .resource_mapper
-                .documents_to_resources(&documents)
+                .documents_to_resources(&final_documents)
                 .map_err(TerraphimMcpError::Anyhow)?;
+                
             Ok(ListResourcesResult {
                 resources,
                 next_cursor: None,

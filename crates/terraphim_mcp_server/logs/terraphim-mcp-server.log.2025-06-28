@@ -1099,3 +1099,880 @@ Context:
 Source:
    IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
 )    
+[2m2025-06-28T14:17:37.804183Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T14:17:37.804638Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:17:37.806434Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T14:17:37.806463Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T14:17:37.806579Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T14:17:37.806599Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T14:17:37.806602Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T14:17:37.806605Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T14:17:38.082047Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T14:17:38.082073Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T14:17:38.082077Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T14:17:38.342843Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T14:17:38.344056Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T14:17:38.344176Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T14:17:38.344301Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T14:17:39.661709Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer    
+[2m2025-06-28T14:17:39.661804Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly    
+[2m2025-06-28T14:17:39.661823Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")    
+[2m2025-06-28T14:17:39.666566Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:17:39.732585Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:17:39.732873Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:17:40.267499Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:17:40.269835Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:17:40.270288Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:17:40.784247Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:35.258961Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T14:18:35.259218Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:35.260193Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T14:18:35.260229Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T14:18:35.260530Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T14:18:35.260589Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T14:18:35.260597Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T14:18:35.573814Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T14:18:35.573842Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T14:18:35.573846Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T14:18:35.824513Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T14:18:35.824578Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T14:18:35.825838Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T14:18:35.825957Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T14:18:35.826089Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T14:18:37.221487Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer    
+[2m2025-06-28T14:18:37.221592Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly    
+[2m2025-06-28T14:18:37.221602Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")    
+[2m2025-06-28T14:18:37.226725Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:37.252483Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:37.252863Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}} }    
+[2m2025-06-28T14:18:37.253846Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:37.255807Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:37.256060Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T14:18:37.256154Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:37.257990Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:37.275654Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:37.275972Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "bucket": "staging-system-operator", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:37.684183Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:37.686738Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:37.687175Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "bucket": "staging-system-operator", "region": "us-east-1"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:38.137763Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:38.140524Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:38.158673Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:38.159046Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1"}} }    
+[2m2025-06-28T14:18:38.159201Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:38.161062Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:38.161316Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}} }    
+[2m2025-06-28T14:18:38.161416Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:38.163326Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:38.178340Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:38.178628Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T14:18:38.178746Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:38.180269Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:38.180476Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:38.614242Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:38.621568Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:38.622551Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:39.131508Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:39.158862Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:39.159443Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3"}} }    
+[2m2025-06-28T14:18:39.159716Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:39.162194Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:39.162568Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:39.572618Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:39.575870Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:39.576437Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "bucket": "staging-system-operator", "region": "us-east-1"}} }    
+[2m2025-06-28T14:18:39.576641Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:39.596529Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:39.596918Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:40.086608Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:40.089411Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:40.089972Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "region": "us-east-1", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}} }    
+[2m2025-06-28T14:18:40.090145Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:40.092558Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:40.092879Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T14:18:40.093016Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:40.111734Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:40.112079Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:40.579710Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:40.581867Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:40.582256Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:41.059237Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:41.065886Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:41.066860Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:41.535182Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:41.558435Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:41.558960Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:42.007485Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:42.010117Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:42.010619Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T14:18:42.010771Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:42.013132Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:42.013467Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1"}} }    
+[2m2025-06-28T14:18:42.013634Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:42.029608Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:42.030050Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:42.474619Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:42.480983Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:42.482552Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:42.908991Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:42.912941Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:42.913582Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"bucket": "staging-system-operator", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T14:18:42.913866Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:42.931493Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:42.931856Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "region": "us-east-1", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:43.334802Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:43.337020Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:43.337415Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"region": "us-east-1", "type": "s3", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T14:18:43.337531Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:43.339559Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:43.339832Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "region": "us-east-1", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:43.729011Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:43.746988Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:43.747398Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T14:18:43.747567Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:43.749564Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:43.749860Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:44.177626Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:44.185154Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:44.186271Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "type": "s3"}} }    
+[2m2025-06-28T14:18:44.187013Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:44.209947Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:44.210448Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:44.626019Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:44.628640Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:44.629189Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "region": "us-east-1", "type": "s3"}} }    
+[2m2025-06-28T14:18:44.629350Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:44.631775Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:44.632243Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:45.072084Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:18:45.099093Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:45.099666Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:18:45.512040Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:18:45.515122Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:18:45.515690Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:18:45.934865Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:36.619901Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-28T14:19:36.620187Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:36.620743Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
+[2m2025-06-28T14:19:36.620765Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
+[2m2025-06-28T14:19:36.620908Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-06-28T14:19:36.620937Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
+[2m2025-06-28T14:19:36.620940Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly    
+[2m2025-06-28T14:19:36.620943Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T14:19:36.894547Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
+[2m2025-06-28T14:19:36.894571Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly    
+[2m2025-06-28T14:19:36.894574Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-28T14:19:37.185656Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-28T14:19:37.186846Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-28T14:19:37.186967Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-28T14:19:37.187082Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-28T14:19:38.583043Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer    
+[2m2025-06-28T14:19:38.583106Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly    
+[2m2025-06-28T14:19:38.583116Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")    
+[2m2025-06-28T14:19:38.586480Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:38.606907Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:38.607296Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:39.028654Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:39.032050Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:39.032668Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:39.448897Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:39.453678Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer    
+[2m2025-06-28T14:19:39.453708Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly    
+[2m2025-06-28T14:19:39.453716Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")    
+[2m2025-06-28T14:19:39.456526Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:39.478386Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:39.478764Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}} }    
+[2m2025-06-28T14:19:39.478927Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:39.480675Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:39.480911Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:39.909400Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:39.911922Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:39.930236Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:39.930543Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T14:19:39.930676Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:39.932409Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:39.932627Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }    
+[2m2025-06-28T14:19:39.932703Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:39.934415Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:39.950303Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:39.950561Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:40.374958Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:40.380763Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:40.381682Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"region": "us-east-1", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}} }    
+[2m2025-06-28T14:19:40.382106Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:40.386168Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:40.409554Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:40.410074Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:40.814862Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:40.817450Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:40.817973Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:41.194722Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:41.198849Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:41.199559Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }    
+[2m2025-06-28T14:19:41.199907Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:41.220087Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:41.220458Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:41.648019Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:41.651227Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:41.651858Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1"}} }    
+[2m2025-06-28T14:19:41.652101Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:41.654956Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:41.655407Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T14:19:41.655630Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:41.674789Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:41.675171Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:42.098378Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:42.104275Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:42.105278Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:42.572093Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:42.575134Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:42.575688Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:43.123949Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:43.145739Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:43.146264Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:43.538879Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:43.542996Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:43.543615Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:44.083645Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:44.090506Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.091562Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"type": "s3", "region": "us-east-1", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }    
+[2m2025-06-28T14:19:44.092220Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:44.116360Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.116742Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "region": "us-east-1"}} }    
+[2m2025-06-28T14:19:44.116913Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:44.118879Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.119156Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:44.620229Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:44.627198Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.628235Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T14:19:44.628876Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:44.653190Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.653579Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T14:19:44.653750Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:44.655749Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.656017Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator"}} }    
+[2m2025-06-28T14:19:44.656113Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:44.658138Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:44.658391Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:45.072060Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:45.087317Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:45.087656Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:45.455189Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:45.460047Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:45.460907Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T14:19:45.461335Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:45.464986Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:45.465598Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:45.998787Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:46.031258Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.031696Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "bucket": "staging-system-operator", "type": "s3"}} }    
+[2m2025-06-28T14:19:46.031879Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:46.034021Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.034304Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }    
+[2m2025-06-28T14:19:46.457509Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:46.462806Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.463846Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:46.854986Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:46.883403Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.884031Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}} }    
+[2m2025-06-28T14:19:46.884331Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:46.886928Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.887323Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }    
+[2m2025-06-28T14:19:46.887505Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:46.889910Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.890245Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "bucket": "staging-system-operator", "type": "s3"}} }    
+[2m2025-06-28T14:19:46.890412Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}    
+[2m2025-06-28T14:19:46.908293Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:46.908628Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }    
+[2m2025-06-28T14:19:47.384659Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    
+[2m2025-06-28T14:19:47.388734Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
+[2m2025-06-28T14:19:47.389383Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}} }    
+[2m2025-06-28T14:19:47.389634Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)    

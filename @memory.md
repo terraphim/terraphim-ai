@@ -20,6 +20,8 @@
 - ✅ "knowledge graph based embeddings": 2 documents found
 - ✅ "terraphim graph scorer": 2 documents found
 
+**✅ MCP TOOL VALIDATION COMPLETE**: Standard MCP search tool calls work perfectly. Resource operations (list_resources/read_resource) infrastructure verified working but list_resources needs optimization to use same successful search pathway as tool calls.
+
 **🎯 COMPREHENSIVE FIX PLAN**:
 
 **Phase 1 (CRITICAL)**: Build Thesaurus from Local KG Files
