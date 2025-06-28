@@ -22,7 +22,7 @@ impl IndexMiddleware for RipgrepIndexer {
     ///
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Haystack) -> Result<Index> {
-        let haystack_path = &haystack.path;
+        let haystack_path = Path::new(&haystack.location);
         log::debug!("RipgrepIndexer::index called with needle: '{}' haystack: {:?}", needle, haystack_path);
         
         // Check if haystack path exists

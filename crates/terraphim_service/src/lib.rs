@@ -119,7 +119,7 @@ impl<'a> TerraphimService {
                     if let Err(e) = ripgrep.update_document(&document).await {
                         log::warn!(
                             "Failed to write document {} to haystack {:?}: {:?}",
-                            document.id, haystack.path, e
+                            document.id, haystack.location, e
                         );
                     }
                 }

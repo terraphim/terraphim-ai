@@ -94,8 +94,8 @@ pub enum ServiceType {
 /// Each haystack is indexed using a specific service
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct Haystack {
-    /// The path to the haystack
-    pub path: PathBuf,
+    /// The location of the haystack - can be a filesystem path or URL
+    pub location: String,
     /// The service used for indexing documents in the haystack
     pub service: ServiceType,
     /// When set to `true` the haystack is treated as read-only; documents found
@@ -213,7 +213,7 @@ impl ConfigBuilder {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
+                    location: system_operator_haystack.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -238,7 +238,7 @@ impl ConfigBuilder {
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
+                    location: system_operator_haystack.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -263,7 +263,7 @@ impl ConfigBuilder {
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: system_operator_haystack.clone(),
+                    location: system_operator_haystack.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -289,7 +289,7 @@ impl ConfigBuilder {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
-                    path: default_data_path.clone(),
+                    location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -306,7 +306,7 @@ impl ConfigBuilder {
                 theme: "lumen".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
-                    path: default_data_path.clone(),
+                    location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -331,7 +331,7 @@ impl ConfigBuilder {
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: default_data_path.clone(),
+                    location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -356,7 +356,7 @@ impl ConfigBuilder {
                     publish: true,
                 }),
                 haystacks: vec![Haystack {
-                    path: default_data_path.clone(),
+                    location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
@@ -704,7 +704,7 @@ mod tests {
                     theme: "spacelab".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
-                        path: PathBuf::from("localsearch"),
+                        location: "localsearch".to_string(),
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
@@ -721,7 +721,7 @@ mod tests {
                     theme: "lumen".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
-                        path: PathBuf::from("localsearch"),
+                        location: "localsearch".to_string(),
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
@@ -746,7 +746,7 @@ mod tests {
                         publish: true,
                     }),
                     haystacks: vec![Haystack {
-                        path: PathBuf::from("/tmp/system_operator/pages/"),
+                        location: "/tmp/system_operator/pages/".to_string(),
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
@@ -793,7 +793,7 @@ mod tests {
                 publish: true,
             }),
             haystacks: vec![Haystack {
-                path: PathBuf::from("localsearch"),
+                location: "localsearch".to_string(),
                 service: ServiceType::Ripgrep,
                 read_only: false,
                 atomic_server_secret: None,
