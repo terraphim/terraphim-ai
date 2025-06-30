@@ -11,6 +11,11 @@ use terraphim_config::ConfigState;
 use terraphim_types::IndexedDocument;
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
+use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
+use terraphim_automata::load_thesaurus;
+use terraphim_config::Config;
+use terraphim_types::{RoleName, RelevanceFunction, Document};
 
 mod api;
 mod error;
@@ -22,12 +27,107 @@ pub use error::{Result, Status};
 // use axum_embed::ServeEmbed;
 static INDEX_HTML: &str = "index.html";
 
-#[derive(RustEmbed, Clone)]
-#[folder = "dist/"]
+#[derive(RustEmbed)]
+#[folder = "../desktop/dist"]
 struct Assets;
 
-pub async fn axum_server(server_hostname: SocketAddr, config_state: ConfigState) -> Result<()> {
+pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
+    
+    let mut config = config_state.config.lock().await.clone();
+    let mut local_rolegraphs = ahash::AHashMap::new();
+    
+    for (role_name, role) in &mut config.roles {
+        if role.relevance_function == RelevanceFunction::TerraphimGraph {
+            if let Some(kg) = &role.kg {
+                if kg.automata_path.is_none() && kg.knowledge_graph_local.is_some() {
+                    log::info!("Building rolegraph for role '{}' from local files", role_name);
+                    
+                    let kg_local = kg.knowledge_graph_local.as_ref().unwrap();
+                    log::info!("Knowledge graph path: {:?}", kg_local.path);
+                    
+                    // Check if the directory exists
+                    if !kg_local.path.exists() {
+                        log::warn!("Knowledge graph directory does not exist: {:?}", kg_local.path);
+                        continue;
+                    }
+                    
+                    // List files in the directory
+                    if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
+                        let files: Vec<_> = entries
+                            .filter_map(|entry| entry.ok())
+                            .filter(|entry| {
+                                if let Some(ext) = entry.path().extension() {
+                                    ext == "md" || ext == "markdown"
+                                } else {
+                                    false
+                                }
+                            })
+                            .collect();
+                        
+                        log::info!("Found {} markdown files in {:?}", files.len(), kg_local.path);
+                        for file in &files {
+                            log::info!("  - {:?}", file.path());
+                        }
+                    }
+                    
+                    // Build thesaurus using Logseq builder
+                    let builder = Logseq::default();
+                    log::info!("Created Logseq builder for path: {:?}", kg_local.path);
+                    
+                    match builder.build(role_name.to_string(), kg_local.path.clone()).await {
+                        Ok(thesaurus) => {
+                            log::info!("Successfully built and indexed rolegraph for role '{}' with {} terms and {} documents", role_name, thesaurus.len(), files.len());
+                            // Create rolegraph
+                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                            log::info!("Successfully created rolegraph for role '{}'", role_name);
+                            
+                            // Index documents from knowledge graph files into the rolegraph
+                            let mut rolegraph_with_docs = rolegraph;
+                            
+                            // Index the knowledge graph markdown files as documents
+                            if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
+                                for entry in entries.filter_map(|e| e.ok()) {
+                                    if let Some(ext) = entry.path().extension() {
+                                        if ext == "md" || ext == "markdown" {
+                                            if let Ok(content) = tokio::fs::read_to_string(&entry.path()).await {
+                                                let document = Document {
+                                                    id: entry.file_name().to_string_lossy().to_string(),
+                                                    url: entry.path().to_string_lossy().to_string(),
+                                                    title: entry.file_name().to_string_lossy().to_string(),
+                                                    body: content,
+                                                    description: None,
+                                                    stub: None,
+                                                    tags: None,
+                                                    rank: None,
+                                                };
+                                                
+                                                rolegraph_with_docs.insert_document(&document.id.clone(), document);
+                                                log::info!("Indexed document '{}' into rolegraph", entry.file_name().to_string_lossy());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Store in local rolegraphs map
+                            local_rolegraphs.insert(role_name.clone(), RoleGraphSync::from(rolegraph_with_docs));
+                            log::info!("Stored rolegraph in local map for role '{}'", role_name);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to build thesaurus for role '{}': {}", role_name, e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Merge local rolegraphs with existing ones
+    for (role_name, rolegraph) in local_rolegraphs {
+        config_state.roles.insert(role_name, rolegraph);
+    }
+    
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
