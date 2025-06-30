@@ -122,7 +122,7 @@ pub struct KnowledgeGraph {
 }
 /// check KG set correctly
 impl KnowledgeGraph {
-    fn is_set(&self) -> bool {
+    pub fn is_set(&self) -> bool {
         self.automata_path.is_some() || self.knowledge_graph_local.is_some()
     }
 }
@@ -537,27 +537,17 @@ impl ConfigState {
         for (name, role) in &config.roles {
             let role_name = name.clone();
             log::info!("Creating role {}", role_name);
-            // FIXME: this looks like local KG is never re-build
-            // check if role have configured local KG or automata_path
-            // skip role if incorrectly configured
             if role.relevance_function == RelevanceFunction::TerraphimGraph {
-                if role.kg.as_ref().is_some_and(|kg| kg.is_set()) {
-                    //FIXME: turn into errors
-                    log::info!("Role {} is configured correctly", role_name);
-                    let automata_url = role
-                        .kg
-                        .as_ref()
-                        .unwrap()
-                        .automata_path
-                        .as_ref()
-                        .unwrap()
-                        .clone();
-                    log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_url);
-                    let thesaurus = load_thesaurus(&automata_url).await?;
-                    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
-                    roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
-                } else {
-                    log::info!("Role {} is configured to use KG ranking but is missing remote url or local configuration", role_name );
+                if let Some(kg) = &role.kg {
+                    if let Some(automata_path) = &kg.automata_path {
+                        log::info!("Role {} is configured correctly with automata_path", role_name);
+                        log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_path);
+                        let thesaurus = load_thesaurus(automata_path).await?;
+                        let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                        roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
+                    } else {
+                        log::info!("Role {} has no automata_path, skipping rolegraph build in config (will be handled by server)", role_name);
+                    }
                 }
             }
         }
