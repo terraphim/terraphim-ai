@@ -13,9 +13,7 @@ use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
-use terraphim_automata::load_thesaurus;
-use terraphim_config::Config;
-use terraphim_types::{RoleName, RelevanceFunction, Document};
+use terraphim_types::{RelevanceFunction, Document};
 
 mod api;
 mod error;
@@ -53,8 +51,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                     }
                     
                     // List files in the directory
-                    if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
-                        let files: Vec<_> = entries
+                    let files: Vec<_> = if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
+                        entries
                             .filter_map(|entry| entry.ok())
                             .filter(|entry| {
                                 if let Some(ext) = entry.path().extension() {
@@ -63,12 +61,14 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                     false
                                 }
                             })
-                            .collect();
-                        
-                        log::info!("Found {} markdown files in {:?}", files.len(), kg_local.path);
-                        for file in &files {
-                            log::info!("  - {:?}", file.path());
-                        }
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
+                    
+                    log::info!("Found {} markdown files in {:?}", files.len(), kg_local.path);
+                    for file in &files {
+                        log::info!("  - {:?}", file.path());
                     }
                     
                     // Build thesaurus using Logseq builder

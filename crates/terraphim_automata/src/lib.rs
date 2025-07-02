@@ -221,10 +221,31 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "remote-loading"))]
     #[test]
     fn test_load_thesaurus_from_file_sync() {
         let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
         let thesaurus = load_thesaurus(&automata_path).unwrap();
+        assert_eq!(thesaurus.len(), 3);
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,
+            1_u64
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("bar")).unwrap().id,
+            2_u64
+        );
+        assert_eq!(
+            thesaurus.get(&NormalizedTermValue::from("baz")).unwrap().id,
+            1_u64
+        );
+    }
+
+    #[cfg(feature = "remote-loading")]
+    #[tokio::test]
+    async fn test_load_thesaurus_from_file_async() {
+        let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
+        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
             thesaurus.get(&NormalizedTermValue::from("foo")).unwrap().id,

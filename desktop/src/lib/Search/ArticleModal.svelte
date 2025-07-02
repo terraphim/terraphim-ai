@@ -8,10 +8,17 @@
 
   export let active: boolean = false;
   export let item: Document;
+  export let initialEdit: boolean = false;
   let editing = false;
   let contentElement: HTMLElement;
 
+  // Set initial edit mode when modal becomes active
+  $: if (active && initialEdit) {
+    editing = true;
+  }
+
   // Whenever the modal becomes active for a given item, refresh its content from persistence.
+  // Only load document if not in edit mode to avoid interfering with initialEdit
   $: if (active && item && !editing) {
     loadDocument();
   }
