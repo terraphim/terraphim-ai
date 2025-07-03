@@ -9,6 +9,7 @@ use terraphim_persistence::Persistable;
 
 use std::error::Error;
 use std::sync::Arc;
+use std::path::Path;
 use tokio::sync::Mutex;
 use tauri::{
     CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
@@ -21,6 +22,76 @@ use terraphim_mcp_server::McpService;
 use rmcp::service::ServiceExt;
 use tokio::io::{stdin, stdout};
 use tracing_subscriber::prelude::*;
+
+/// Initialize user data folder with bundled docs/src content if empty
+async fn initialize_user_data_folder(app_handle: &tauri::AppHandle, device_settings: &DeviceSettings) -> Result<(), Box<dyn Error>> {
+    let data_path = Path::new(&device_settings.default_data_path);
+    
+    // Check if data folder exists and has content
+    let should_initialize = if !data_path.exists() {
+        log::info!("User data folder does not exist, creating: {:?}", data_path);
+        std::fs::create_dir_all(data_path)?;
+        true
+    } else {
+        // Check if folder is empty or missing key directories
+        let kg_path = data_path.join("kg");
+        let has_kg = kg_path.exists() && kg_path.read_dir()?.next().is_some();
+        let has_docs = data_path.read_dir()?.any(|entry| {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                path.is_file() && path.extension().map_or(false, |ext| ext == "md")
+            } else {
+                false
+            }
+        });
+        
+        if !has_kg || !has_docs {
+            log::info!("User data folder missing content, will initialize: kg={}, docs={}", has_kg, has_docs);
+            true
+        } else {
+            log::info!("User data folder already initialized");
+            false
+        }
+    };
+    
+    if should_initialize {
+        // Get the bundled docs/src content
+        let resource_dir = app_handle.path_resolver().resource_dir()
+            .ok_or("Failed to get resource directory")?;
+        let bundled_docs_src = resource_dir.join("docs").join("src");
+        
+        if bundled_docs_src.exists() {
+            log::info!("Copying bundled content from {:?} to {:?}", bundled_docs_src, data_path);
+            copy_dir_all(&bundled_docs_src, data_path)?;
+            log::info!("Successfully initialized user data folder");
+        } else {
+            log::warn!("Bundled docs/src not found at {:?}", bundled_docs_src);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Recursively copy a directory and all its contents
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
+    
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        
+        if src_path.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    
+    Ok(())
+}
 
 fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
     let roles = &config.roles;
@@ -99,6 +170,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let device_settings_read=device_settings.clone();
+    
+
+    
     let device_settings = Arc::new(Mutex::new(device_settings));
     
     log::info!("Device settings: {:?}", device_settings.lock().await);
@@ -228,6 +302,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let settings = device_settings_read.clone();
             println!("Settings: {:?}", settings);
             let handle = app.handle();
+            
+            // Initialize user data folder with bundled content if needed
+            let handle_clone = handle.clone();
+            let settings_clone = settings.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = initialize_user_data_folder(&handle_clone, &settings_clone).await {
+                    log::error!("Failed to initialize user data folder: {:?}", e);
+                }
+            });
             
             // Try to get the main window with different possible labels
             let main_window = ["main", ""].iter()

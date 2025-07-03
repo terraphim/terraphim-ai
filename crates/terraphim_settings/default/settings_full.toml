@@ -13,7 +13,10 @@ secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 
 [profiles.sled]
 type = "sled"
-datadir= "/tmp/opendal/sled"
+datadir= "/tmp/terraphim/sled"
+
+[profiles.memory]
+type = "memory"
 
 [profiles.dash]
 type = "dashmap"
