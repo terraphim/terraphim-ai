@@ -1,7 +1,8 @@
 use ahash::AHashMap;
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
 use terraphim_config::{ConfigState, Role};
-use terraphim_middleware::thesaurus::{self, build_thesaurus_from_haystack};
+use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
@@ -75,12 +76,12 @@ impl<'a> TerraphimService {
                                 log::info!("Building thesaurus from local KG files: {:?}", kg_local.path);
                                 
                                 // Build thesaurus using Logseq builder
-                                use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
                                 let logseq_builder = Logseq::default();
-                                let mut thesaurus = logseq_builder
+                                let thesaurus = logseq_builder
                                     .build(role_name.as_lowercase().to_string(), kg_local.path.clone())
                                     .await
-                                    .map_err(|e| ServiceError::Config(format!("Failed to build thesaurus: {:?}", e)))?;
+                                    .map_err(|e| ServiceError::Config(format!("Failed to build thesaurus: {:?}", e)));
+                                let mut thesaurus = thesaurus?;
                                 
                                 // Save to persistence layer
                                 match thesaurus.save().await {
@@ -118,12 +119,12 @@ impl<'a> TerraphimService {
                         log::info!("Building thesaurus from local KG files (no automata path): {:?}", kg_local.path);
                         
                         // Build thesaurus using Logseq builder
-                        use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
                         let logseq_builder = Logseq::default();
-                        let mut thesaurus = logseq_builder
+                        let thesaurus = logseq_builder
                             .build(role_name.as_lowercase().to_string(), kg_local.path.clone())
                             .await
-                            .map_err(|e| ServiceError::Config(format!("Failed to build thesaurus: {:?}", e)))?;
+                            .map_err(|e| ServiceError::Config(format!("Failed to build thesaurus: {:?}", e)));
+                        let mut thesaurus = thesaurus?;
                         
                         // Save to persistence layer
                         match thesaurus.save().await {
@@ -311,7 +312,7 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
-                let thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
+                let _thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
                 let scored_index_docs: Vec<IndexedDocument> = self
                     .config_state
                     .search_indexed_documents(search_query, &role)

@@ -7,11 +7,11 @@ use axum::{
     Extension, Router,
 };
 use rust_embed::RustEmbed;
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_types::IndexedDocument;
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
-use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{RelevanceFunction, Document};
 

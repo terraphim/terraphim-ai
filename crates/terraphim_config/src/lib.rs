@@ -1,6 +1,9 @@
 use std::{path::PathBuf, sync::Arc};
 
-use terraphim_automata::{load_thesaurus, AutomataPath};
+use terraphim_automata::{
+    builder::{Logseq, ThesaurusBuilder},
+    load_thesaurus, AutomataPath,
+};
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
@@ -495,21 +498,53 @@ impl ConfigState {
                     if let Some(automata_path) = &kg.automata_path {
                         log::info!("Role {} is configured correctly with automata_path", role_name);
                         log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_path);
-                        
+
                         // Try to load from automata path first
                         match load_thesaurus(automata_path).await {
                             Ok(thesaurus) => {
                                 log::info!("Successfully loaded thesaurus from automata path");
-                                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                let rolegraph =
+                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
                                 roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
                             }
                             Err(e) => {
                                 log::warn!("Failed to load thesaurus from automata path: {:?}", e);
-                                log::info!("Thesaurus will be built by service layer when needed");
+                            }
+                        }
+                    } else if let Some(kg_local) = &kg.knowledge_graph_local {
+                        // If automata_path is None, but a local KG is defined, build it now
+                        log::info!(
+                            "Role {} has no automata_path, building thesaurus from local KG files at {:?}",
+                            role_name,
+                            kg_local.path
+                        );
+                        let logseq_builder = Logseq::default();
+                        match logseq_builder
+                            .build(
+                                role_name.as_lowercase().to_string(),
+                                kg_local.path.clone(),
+                            )
+                            .await
+                        {
+                            Ok(thesaurus) => {
+                                log::info!(
+                                    "Successfully built thesaurus from local KG for role {}",
+                                    role_name
+                                );
+                                let rolegraph =
+                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to build thesaurus from local KG for role {}: {:?}",
+                                    role_name,
+                                    e
+                                );
                             }
                         }
                     } else {
-                        log::info!("Role {} has no automata_path, thesaurus will be built by service layer when needed", role_name);
+                        log::warn!("Role {} is configured for TerraphimGraph but has neither automata_path nor knowledge_graph_local defined.", role_name);
                     }
                 }
             }

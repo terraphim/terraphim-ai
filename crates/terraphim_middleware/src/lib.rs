@@ -1,4 +1,5 @@
 use serde_json as json;
+use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;
 
 mod command;
@@ -28,6 +29,9 @@ pub enum Error {
 
     #[error("Persistence error: {0}")]
     Persistence(#[from] terraphim_persistence::Error),
+
+    #[error("Builder error: {0}")]
+    Builder(#[from] BuilderError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
