@@ -1,0 +1,30 @@
+server_hostname = "${TERRAPHIM_SERVER_HOSTNAME:-127.0.0.1:8000}"
+api_endpoint="${TERRAPHIM_SERVER_API_ENDPOINT:-http://localhost:8000/api}"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+
+[profiles.s3]
+type = "s3"
+bucket = "staging-system-operator"
+region = "${TERRAPHIM_PROFILE_S3_REGION:-us-east-1}"
+endpoint = "${TERRAPHIM_PROFILE_S3_ENDPOINT:-https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com}"
+access_key_id = "${AWS_ACCESS_KEY_ID}"
+secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
+
+[profiles.sled]
+type = "sled"
+datadir= "/tmp/opendal/sled"
+
+[profiles.dash]
+type = "dashmap"
+root = "/tmp/dashmaptest"
+
+[profiles.rock]
+type = "rocksdb"
+datadir = "/tmp/opendal/rocksdb" 
+
+[profiles.atomicserver]
+endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"
+type = "atomicserver"
+private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
+public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
+parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}" 

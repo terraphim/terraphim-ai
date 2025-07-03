@@ -1,0 +1,72 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
+} 
