@@ -55,6 +55,9 @@ pub enum TerraphimConfigError {
 
     #[error("IO error")]
     Io(#[from] std::io::Error),
+
+    #[error("Config error")]
+    Config(String),
 }
 
 /// A role is a collection of settings for a specific user
@@ -276,7 +279,7 @@ impl ConfigBuilder {
 
     pub fn build_default_desktop(mut self) -> Self {
         let default_data_path = self.get_default_data_path();
-        let automata_path = AutomataPath::from_local(default_data_path.join("term_to_id.json"));
+        // Remove the automata_path - let it be built from local KG files during startup
         log::info!("Documents path: {:?}", default_data_path);
         self.config.id = ConfigId::Desktop;
         self.global_shortcut("Ctrl+X")
@@ -298,42 +301,17 @@ impl ConfigBuilder {
             },
         )
         .add_role(
-            "Engineer",
-            Role {
-                shortname: Some("Engineer".to_string()),
-                name: "Engineer".to_string().into(),
-                relevance_function: RelevanceFunction::TerraphimGraph,
-                theme: "lumen".to_string(),
-                kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_path.clone()),
-                    knowledge_graph_local: Some(KnowledgeGraphLocal {
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: default_data_path.join("docs").join("src").join("kg"),
-                    }),
-                    public: true,
-                    publish: true,
-                }),
-                haystacks: vec![Haystack {
-                    location: default_data_path.to_string_lossy().to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: false,
-                    atomic_server_secret: None,
-                }],
-                extra: AHashMap::new(),
-            },
-        )
-        .add_role(
             "Terraphim Engineer",
             Role {
-                shortname: Some("Terraphim Engineer".to_string()),
+                shortname: Some("TerraEng".to_string()),
                 name: "Terraphim Engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_path.clone()),
+                    automata_path: None, // Set to None so it builds from local KG files during startup
                     knowledge_graph_local: Some(KnowledgeGraphLocal {
                         input_type: KnowledgeGraphInputType::Markdown,
-                        path: default_data_path.join("docs").join("src").join("kg"),
+                        path: default_data_path.join("kg"),
                     }),
                     public: true,
                     publish: true,
@@ -347,32 +325,7 @@ impl ConfigBuilder {
                 extra: AHashMap::new(),
             },
         )
-        .add_role(
-            "System Operator",
-            Role {
-                shortname: Some("operator".to_string()),
-                name: "System Operator".to_string().into(),
-                relevance_function: RelevanceFunction::TitleScorer,
-                theme: "superhero".to_string(),
-                kg: Some(KnowledgeGraph {
-                    automata_path: Some(automata_path.clone()),
-                    knowledge_graph_local: Some(KnowledgeGraphLocal {
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: PathBuf::from("/tmp/system_operator/pages/"),
-                    }),
-                    public: true,
-                    publish: true,
-                }),
-                haystacks: vec![Haystack {
-                    location: default_data_path.to_string_lossy().to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: false,
-                    atomic_server_secret: None,
-                }],
-                extra: AHashMap::new(),
-            },
-        )
-        .default_role("Default").unwrap()
+        .default_role("Terraphim Engineer").unwrap()
     }
 
 
@@ -542,11 +495,21 @@ impl ConfigState {
                     if let Some(automata_path) = &kg.automata_path {
                         log::info!("Role {} is configured correctly with automata_path", role_name);
                         log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_path);
-                        let thesaurus = load_thesaurus(automata_path).await?;
-                        let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
-                        roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
+                        
+                        // Try to load from automata path first
+                        match load_thesaurus(automata_path).await {
+                            Ok(thesaurus) => {
+                                log::info!("Successfully loaded thesaurus from automata path");
+                                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to load thesaurus from automata path: {:?}", e);
+                                log::info!("Thesaurus will be built by service layer when needed");
+                            }
+                        }
                     } else {
-                        log::info!("Role {} has no automata_path, skipping rolegraph build in config (will be handled by server)", role_name);
+                        log::info!("Role {} has no automata_path, thesaurus will be built by service layer when needed", role_name);
                     }
                 }
             }
