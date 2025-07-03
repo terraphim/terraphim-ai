@@ -6457,6 +6457,7 @@ dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
  "bincode",
+ "cached",
  "criterion 0.5.1",
  "fst",
  "lazy_static",

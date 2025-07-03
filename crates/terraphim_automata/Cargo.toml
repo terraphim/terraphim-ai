@@ -23,11 +23,12 @@ reqwest = { version = "0.12.8", features = ["json", "rustls-tls"], optional = tr
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1"
 thiserror = "1.0.30"
-tokio = { version = "1", features = ["io-util", "time","macros","rt","rt-multi-thread"], optional = true }
+tokio = { version = "1", features = ["io-util", "time","macros","rt","rt-multi-thread", "process"], optional = true }
 strsim = "0.11"
 log = "0.4"
 wasm-bindgen-futures = "0.4.1"
 wasm-bindgen = { version = "0.2.51" }
+cached = { version = "0.47.0", features = ["proc_macro", "async", "serde", "ahash"] }
 
 [[bench]]
 name = "autocomplete_bench"

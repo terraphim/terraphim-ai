@@ -1,5 +1,7 @@
-pub mod matcher;
+pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
+pub mod builder;
+pub mod matcher;
 
 pub use matcher::{find_matches, Matched, replace_matches, LinkType};
 pub use autocomplete::{
