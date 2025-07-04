@@ -107,4 +107,10 @@ export default defineConfig({
     }
   },
   clearScreen: false,
+  server: {
+    proxy: {
+      '/rolegraph': 'http://localhost:8000',
+      '/documents': 'http://localhost:8000',
+    }
+  },
 })
