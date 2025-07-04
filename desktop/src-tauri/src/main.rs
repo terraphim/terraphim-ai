@@ -121,7 +121,10 @@ fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
 async fn run_mcp_server() -> anyhow::Result<()> {
     // Initialise logging identical to the standalone terraphim_mcp_server binary so that
     // feature-parity is preserved when using the desktop binary in server-only mode.
-    let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| "logs".to_string());
+    let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
+        // Use /tmp for logs when running as MCP server to avoid permission issues
+        "/tmp/terraphim-logs".to_string()
+    });
     std::fs::create_dir_all(&log_dir)?;
     let file_appender = tracing_appender::rolling::daily(&log_dir, "terraphim-mcp-server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -129,16 +132,16 @@ async fn run_mcp_server() -> anyhow::Result<()> {
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
-        .with(tracing_subscriber::EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()));
+        .with(tracing_subscriber::EnvFilter::from_default_env().add_directive(tracing::Level::WARN.into()));
     let _ = subscriber.try_init();
 
     tracing::info!("Starting Terraphim MCP server (embedded in desktop binary)");
 
-    // Build a default server configuration
+    // Use desktop configuration for consistent experience between desktop and MCP server modes
     let config = terraphim_config::ConfigBuilder::new()
-        .build_default_server()
+        .build_default_desktop()
         .build()
-        .expect("Failed to build default configuration");
+        .expect("Failed to build default desktop configuration");
 
     let mut tmp_config = config.clone();
     let config_state = terraphim_config::ConfigState::new(&mut tmp_config).await?;
@@ -300,7 +303,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
        ])
         .setup(move |app| {
             let settings = device_settings_read.clone();
-            println!("Settings: {:?}", settings);
             let handle = app.handle();
             
             // Initialize user data folder with bundled content if needed
