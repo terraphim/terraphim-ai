@@ -1,20 +1,20 @@
-use anyhow::Result;
 use rmcp::{
-    model::CallToolRequestParam,
     service::ServiceExt,
     transport::TokioChildProcess,
+    model::{CallToolRequestParam},
 };
-use serial_test::serial;
 use serde_json::json;
+use serial_test::serial;
+use tokio::process::Command;
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
+use terraphim_persistence::Persistable;
+use anyhow::Result;
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
 };
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
-use tokio::process::Command;
 
 // Additional imports for thesaurus building
-use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
-use terraphim_persistence::Persistable;
 use terraphim_automata::AutomataPath;
 
 /// Create a comprehensive test configuration with the "Terraphim Engineer" role

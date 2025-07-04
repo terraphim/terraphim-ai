@@ -1,67 +1,146 @@
 # Using Terraphim Desktop with Claude via MCP
 
-Terraphim AI Desktop can act as a **Model-Context Protocol** (MCP) server so that Claude Desktop (Anthropic) can directly query your local knowledge graph.
+Terraphim AI provides **two ways** to expose MCP (Model Context Protocol) server functionality for Claude Desktop integration:
+
+## MCP Server Options
+
+### Option 1: Desktop Binary with MCP Mode (✅ **RECOMMENDED**)
+
+The `terraphim-ai-desktop` binary can run in MCP server mode, providing the exact same configuration as the desktop application:
+
+```bash
+./target/debug/terraphim-ai-desktop mcp-server
+```
+
+**Advantages:**
+- ✅ **Identical configuration** to desktop app (uses `build_default_desktop()`)
+- ✅ **Terraphim Engineer role** with local knowledge graph by default
+- ✅ **Consistent behavior** between GUI and MCP modes
+- ✅ **Single binary** for both desktop and MCP server functionality
+
+### Option 2: Standalone MCP Server Binary
+
+The dedicated `terraphim_mcp_server` binary provides MCP server functionality:
+
+```bash  
+./target/debug/terraphim_mcp_server
+```
+
+**Note:** This binary now also uses the desktop configuration for consistency.
 
 ## Prerequisites
 
-* Build the Terraphim AI Desktop binary:
+* Build the Terraphim AI binaries:
   ```bash
   cd /path/to/terraphim-ai
+  
+  # Build desktop binary (includes MCP server mode)
   cargo build --package terraphim-ai-desktop
+  
+  # Optional: Build standalone MCP server
+  cargo build --package terraphim_mcp_server
   ```
-  The binary will be at `./target/debug/terraphim-ai-desktop` (or `./target/release/terraphim-ai-desktop` for release builds).
+
 * Claude Desktop ≥ v0.3.0 with MCP client capability.
 
-## Start the MCP server
+> **Important:** Always use **absolute paths** to binaries in Claude Desktop configuration.
 
-Run the desktop binary with the `mcp-server` sub-command. This skips the GUI and exposes the MCP JSON-RPC interface over *stdin/stdout*:
+## Claude Desktop Configuration
 
-```bash
-# Headless server (recommended for Claude integration)
-./target/debug/terraphim-ai-desktop mcp-server \
-  > /tmp/terraphim_mcp.log 2>&1   # optional: redirect logs to file
+### ✅ **RECOMMENDED: Desktop Binary Method**
+
+Configure Claude Desktop to use the desktop binary in MCP server mode:
+
+**Executable:**
+```
+/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim-ai-desktop
 ```
 
-Or, equivalently:
-
-```bash
-./target/debug/terraphim-ai-desktop --mcp-server
+**Arguments:**
+```
+mcp-server
 ```
 
-> **Note:** The server prints only MCP JSON-RPC messages to stdout. Always redirect logs to a file to avoid interfering with MCP communication.
+### Alternative: Standalone MCP Server Method
 
-## Configure Claude Desktop
+**Executable:**
+```
+/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim_mcp_server
+```
 
-Claude Desktop expects an executable that speaks MCP on *stdio*. Configure it to launch Terraphim in server mode:
+**Arguments:** *(leave empty)*
 
-1. Open **Settings → Tools → Custom MCP backend**.
-2. Set **Executable** to the absolute path of your `terraphim-ai-desktop` binary (e.g., `/absolute/path/to/terraphim-ai/target/debug/terraphim-ai-desktop`).
-3. Set **Arguments** to:
-   ```
-   mcp-server
-   ```
-4. *(Optional)* Enable **Reuse process** so Claude keeps the Terraphim process alive between sessions.
+## Configuration Steps
 
-Save and connect—Claude will send the standard `initialize` handshake followed by tool calls such as `search`.
+1. Open **Claude Desktop → Settings → Tools → Custom MCP backend**
+2. Set **Executable** to the **absolute path** of your chosen binary
+3. Set **Arguments** as specified above  
+4. *(Optional)* Enable **Reuse process** to keep the server alive between sessions
+5. Save and connect
 
-> ℹ️  Terraphim automatically returns ranked search results from your local haystacks. Update your configuration as usual to tweak roles, thesauri, or haystacks; the running server picks up `update_config_tool` calls from Claude.
+## Default Configuration
+
+Both MCP server options now use the **desktop configuration** which provides:
+
+- **Default Role:** "Terraphim Engineer" 
+- **Knowledge Graph:** Local KG built from `docs/src/kg/` (10 entries)
+- **Relevance Function:** TerraphimGraph
+- **Haystacks:** Local markdown files in `docs/src/`
+- **Theme:** Superhero (for desktop UI)
+
+## Verification
+
+Test your setup manually:
+
+```bash
+# Test desktop binary in MCP mode
+echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | ./target/debug/terraphim-ai-desktop mcp-server 2>/dev/null
+
+# Test standalone MCP server  
+echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | ./target/debug/terraphim_mcp_server 2>/dev/null
+```
+
+Both should return a JSON response with `"serverInfo":{"name":"terraphim-mcp","version":"0.1.0"}`.
+
+## Available Search Capabilities
+
+With the default Terraphim Engineer configuration, Claude can search for:
+
+- **Terraphim-specific terms:** "terraphim-graph", "graph embeddings", "knowledge graph based embeddings"
+- **Technical concepts:** "haystack", "service", "middleware", "provider"  
+- **General terms:** "graph", "agent", "datasource"
+
+Example search queries that work:
+- "How does terraphim-graph scoring work?"
+- "What is a haystack in Terraphim?"
+- "Explain graph embeddings"
 
 ## Troubleshooting
 
-| Symptom                                 | Fix                                                                                   |
-|------------------------------------------|--------------------------------------------------------------------------------------|
-| Claude hangs on **initializing**         | Ensure `terraphim-ai-desktop` is reachable and not printing extra logs to stdout.    |
-|                                          | Redirect logs to a file as shown above.                                              |
-| `search` returns empty results           | Verify your config points to correct haystack paths and that documents are indexed.  |
-| Binary not found on Windows              | Use `terraphim-ai-desktop.exe` in *Executable* and keep it with its dependent DLLs.  |
-| No search results or wrong role/graph    | Check your configuration and ensure the correct role and knowledge graph are loaded. |
-| MCP server does not start                | Rebuild the binary and check for errors.                                             |
+| Symptom | Fix |
+|---------|-----|
+| Claude hangs on **initializing** | Ensure binary is reachable and **redirect stderr** (`2>&1`) |
+| `search` returns empty results | ✅ **FIXED:** Both binaries now use desktop configuration with proper KG |
+| Binary not found (ENOENT error) | **Use absolute path** to binary |
+| Read-only file system (os error 30) | ✅ **FIXED:** MCP server uses `/tmp/terraphim-logs` for logging |
+| No search results for known terms | Verify the binary uses desktop configuration (should find 10 KG entries) |
 
-## Related commands
+## Related Commands
 
-* **GUI mode (default):** double-click the binary or run `./target/debug/terraphim-ai-desktop`.
-* **Headless MCP server:** `./target/debug/terraphim-ai-desktop mcp-server`.
-* **Log directory:** set `TERRAPHIM_LOG_DIR` env var (defaults to `./logs`).
+* **GUI mode (default):** `./target/debug/terraphim-ai-desktop`
+* **MCP server mode (desktop binary):** `./target/debug/terraphim-ai-desktop mcp-server`  
+* **Standalone MCP server:** `./target/debug/terraphim_mcp_server`
+* **Set log directory:** `TERRAPHIM_LOG_DIR=/custom/path ./target/debug/...`
 
 ---
-For advanced usage and integration test examples see `crates/terraphim_mcp_server/tests/desktop_mcp_integration.rs`. 
+
+## Why Two Options?
+
+- **Desktop Binary (`terraphim-ai-desktop mcp-server`)**: ✅ **Best for most users** - guarantees identical behavior to desktop app
+- **Standalone MCP Server (`terraphim_mcp_server`)**: Useful for deployment scenarios where you only need MCP functionality
+
+Both now use the same desktop configuration ensuring consistent search results and knowledge graph functionality.
+
+**Tags:**
+
+- terraphim-graph 
