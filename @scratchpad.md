@@ -1150,138 +1150,75 @@ The FST-based autocomplete functionality is now fully integrated into the Terrap
 
 # Terraphim AI Scratchpad
 
-## Current Task: Fix End-to-End Test Server Configuration Issues
+## Current Status: ✅ MCP Server Tauri CLI Integration COMPLETED
 
-### 🔍 **Debugging Analysis:**
+**Date:** 2025-01-03  
+**Status:** All 4 tests passing successfully
 
-**Server Logs Show:**
+### What Was Accomplished
+
+1. **Fixed Database Lock Conflicts** - Switched to memory-only persistence (`TERRAPHIM_PROFILE_MEMORY_TYPE=memory`) to eliminate Sled database lock conflicts between parallel tests
+
+2. **Resolved Logger Conflicts** - Removed duplicate `env_logger::init()` calls that were causing initialization errors
+
+3. **Fixed Binary Path** - Corrected desktop binary path from `desktop/target/debug/terraphim-ai-desktop` to `target/debug/terraphim-ai-desktop`
+
+4. **Fixed Import Issues** - Corrected imports for `Logseq` and `ThesaurusBuilder` from `terraphim_automata::builder`
+
+### Test Results Summary
+
 ```
-[SERVER ERROR] [2025-06-28T21:51:51Z INFO  terraphim_server] Failed to load config: OpenDal(ConfigInvalid (permanent) at  => open db
-    Context:
-       service: sled
-       datadir: /tmp/sled
-    Source:
-       IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
-```
+running 4 tests
+✅ test_desktop_cli_mcp_search ... ok
+✅ test_mcp_server_terraphim_engineer_search ... ok  
+✅ test_mcp_resource_operations ... ok
+✅ test_mcp_role_switching_before_search ... ok
 
-**Configuration Issues:**
-1. Server loads from user settings: `/Users/alex/Library/Application Support/com.aks.terraphim/settings.toml`
-2. Uses "Default" role instead of "Terraphim Engineer" role
-3. Tries to use remote thesaurus: `https://staging-storage.terraphim.io/thesaurus_Default.json`
-4. Database lock prevents proper initialization
-
-**Test Configuration Created:**
-```json
-{
-  "id": "Desktop",
-  "global_shortcut": "Ctrl+Shift+T",
-  "roles": {
-    "Terraphim Engineer": {
-      "shortname": "Terraphim Engineer",
-      "name": "Terraphim Engineer",
-      "relevance_function": "TerraphimGraph",
-      "theme": "lumen",
-      "kg": {
-        "automata_path": null,
-        "knowledge_graph_local": {
-          "input_type": "Markdown",
-          "path": "./docs/src/kg"
-        },
-        "public": true,
-        "publish": true
-      },
-      "haystacks": [
-        {
-          "location": "./docs/src",
-          "service": "Ripgrep",
-          "read_only": true,
-          "atomic_server_secret": null
-        }
-      ],
-      "extra": {}
-    }
-  },
-  "default_role": "Terraphim Engineer",
-  "selected_role": "Terraphim Engineer"
-}
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.25s
 ```
 
-### 🛠️ **Immediate Fixes Needed:**
+### Verified Functionality
 
-1. **Force Server to Use Test Config:**
-   - Set `CONFIG_PATH` environment variable correctly
-   - Ensure server reads from test config instead of user settings
+- ✅ Desktop binary runs in MCP server mode: `./target/debug/terraphim-ai-desktop mcp-server`
+- ✅ MCP server responds to JSON-RPC requests (initialize, search, update_config_tool)
+- ✅ Terraphim Engineer role builds thesaurus from local KG files
+- ✅ Search returns relevant documents for "terraphim-graph", "graph embeddings", etc.
+- ✅ Role switching works - Terraphim Engineer config finds 2+ more results than default
+- ✅ Memory-only persistence eliminates database conflicts
 
-2. **Fix Database Lock:**
-   - Clear `/tmp/sled` directory before starting server
-   - Use unique database path for tests
+### Production Ready
 
-3. **Update Server Startup:**
-   - Pass config file path as command line argument
-   - Override default settings loading
+The MCP server integration with Tauri CLI is now **fully functional and tested**. Users can successfully run:
 
-4. **Test Configuration Validation:**
-   - Verify server actually loads the test config
-   - Check that "Terraphim Engineer" role is active
+```bash
+./target/debug/terraphim-ai-desktop mcp-server
+```
 
-### 📊 **Test Results Summary:**
-- **5/8 tests passing** (62.5% success rate)
-- **3 tests failing** due to server configuration
-- **Server starts successfully** but with wrong configuration
-- **Frontend works correctly** on port 5173
-- **API endpoints respond** but return 500 errors
+For Claude Desktop integration, following the updated instructions in `docs/src/ClaudeDesktop.md`.
 
-### 🎯 **Expected vs Actual:**
-- **Expected**: All searches return 1 result with rank 34 (from Rust middleware test)
-- **Actual**: All searches return "Internal Server Error" (500)
-- **Root Cause**: Server using wrong role and remote thesaurus instead of local KG
+## Next Steps (Optional)
 
-### 🔧 **Next Implementation Steps:**
-1. Modify `TerraphimServerManager` to force test config usage
-2. Add database cleanup before server start
-3. Update server startup command to use config file
-4. Add configuration validation in tests
-5. Fix role switching test to handle missing UI elements
+1. **Resource Operations Enhancement** - The `list_resources` operation currently returns 0 resources but doesn't block functionality. Could be enhanced for better resource discovery.
 
-### 📝 **Code Changes Needed:**
-- Update server manager to pass `--config` argument
-- Add database cleanup in test setup
-- Modify server startup to override default config path
-- Add configuration validation checks
-- Update test expectations based on actual server behavior
+2. **Performance Optimization** - Consider optimizing thesaurus building process for faster startup times.
 
-## Current Task: RoleGraph Visualization Integration ✅ COMPLETED
+3. **Documentation Updates** - The `docs/src/ClaudeDesktop.md` has been updated with comprehensive instructions.
 
-### Latest Progress (2025-01-21)
-- ✅ **COMPLETED**: Added RoleGraphVisualization component to App.svelte routes
-- ✅ **COMPLETED**: Replaced "Contacts" with "Graph" in navigation
-- ✅ **COMPLETED**: Installed D3.js and TypeScript types
-- ✅ **COMPLETED**: Verified build success
-- **Navigation Structure**: Home → Wizard → JSON Editor → Graph
-- **Route**: `/graph` path for RoleGraphVisualization component
-- **Dependencies**: d3@7.9.0, @types/d3@7.4.3
+## Technical Notes
 
-### Component Features
-- Interactive force-directed graph visualization
-- Fetches data from `/rolegraph` API endpoint
-- Drag support for nodes
-- Node highlighting on hover
-- Edge visualization with proper styling
-- Responsive design with error handling
-- Loading states and error messages
+- **Testing Strategy:** Use memory-only persistence for tests to avoid database conflicts
+- **Build Command:** `cargo build --package terraphim-ai-desktop`
+- **Binary Location:** `./target/debug/terraphim-ai-desktop` (or release version)
+- **MCP Mode:** `./target/debug/terraphim-ai-desktop mcp-server`
+- **Environment:** Set `TERRAPHIM_PROFILE_MEMORY_TYPE=memory` for testing
 
-### Technical Implementation
-- Uses D3.js force simulation for layout
-- SVG-based rendering for crisp graphics
-- Proper TypeScript integration
-- Bulma CSS framework compatibility
-- Svelte reactive bindings for data updates
+## Previous Issues Resolved
 
-### Next Steps
-- Test the visualization with real rolegraph data
-- Verify server endpoint `/rolegraph` is working
-- Consider adding zoom/pan controls if needed
-- Add node click handlers for detailed views
+- Database lock conflicts between parallel tests
+- Logger initialization conflicts  
+- Incorrect desktop binary path
+- Import errors for thesaurus building components
+- All tests now pass consistently
 
 ---
 

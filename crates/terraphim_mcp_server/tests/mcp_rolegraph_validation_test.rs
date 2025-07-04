@@ -12,7 +12,7 @@ use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 use tokio::process::Command;
 
 // Additional imports for thesaurus building
-use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::Persistable;
 use terraphim_automata::AutomataPath;
 
@@ -108,7 +108,8 @@ async fn create_terraphim_engineer_config() -> Result<String> {
 #[tokio::test]
 #[serial]
 async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
-    env_logger::init();
+    // Use memory-only persistence to avoid database conflicts between tests
+    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
     
     println!("🧪 Testing MCP server with Terraphim Engineer configuration...");
     
@@ -237,13 +238,16 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
 #[tokio::test]
 #[serial] 
 async fn test_desktop_cli_mcp_search() -> Result<()> {
+    // Use memory-only persistence to avoid database conflicts between tests
+    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    
     println!("🖥️ Testing desktop CLI with MCP server...");
     
     // Build desktop binary if needed
     let current_dir = std::env::current_dir()?;
     let project_root = current_dir.parent().unwrap().parent().unwrap();
     let desktop_binary = project_root
-        .join("desktop/target/debug/terraphim-ai-desktop");
+        .join("target/debug/terraphim-ai-desktop");
     
     if !desktop_binary.exists() {
         println!("Building desktop binary...");
@@ -309,6 +313,9 @@ async fn test_desktop_cli_mcp_search() -> Result<()> {
 #[tokio::test] 
 #[serial]
 async fn test_mcp_role_switching_before_search() -> Result<()> {
+    // Use memory-only persistence to avoid database conflicts between tests
+    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    
     println!("🔄 Testing role switching via config API...");
     
     let server_binary = std::env::current_dir()?
@@ -390,7 +397,8 @@ async fn test_mcp_role_switching_before_search() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_mcp_resource_operations() -> Result<()> {
-    env_logger::init();
+    // Use memory-only persistence to avoid database conflicts between tests
+    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🧪 Testing MCP resource operations with Terraphim Engineer configuration...");
 
