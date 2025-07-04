@@ -15,13 +15,12 @@
   let selectedNode: Document | null = null;
   let showModal = false;
   let startInEditMode = false;
-  let clickTimer: number | null = null;
+  let debugMessage = '';
 
-  // Full-screen dimensions
+  // Dimensions
   let width = window.innerWidth;
   let height = window.innerHeight;
 
-  // Update dimensions on resize
   function updateDimensions() {
     width = window.innerWidth;
     height = window.innerHeight;
@@ -46,7 +45,6 @@
     }
   }
 
-  // Convert graph node to Document for ModalArticle
   function nodeToDocument(node: any): Document {
     return {
       id: `kg-node-${node.id}`,
@@ -59,27 +57,27 @@
     };
   }
 
-  function handleNodeClick(nodeData: any) {
-    if (clickTimer) {
-      // Double-click detected
-      clearTimeout(clickTimer);
-      clickTimer = null;
-      handleNodeDoubleClick(nodeData);
-    } else {
-      // Single-click detected
-      clickTimer = window.setTimeout(() => {
-        clickTimer = null;
-        selectedNode = nodeToDocument(nodeData);
-        startInEditMode = false;
-        showModal = true;
-      }, 250); // ms
-    }
+  function handleNodeClick(event: any, nodeData: any) {
+    event.stopPropagation();
+    console.log('Node clicked:', nodeData.label);
+    selectedNode = nodeToDocument(nodeData);
+    startInEditMode = false;
+    showModal = true;
   }
 
-  function handleNodeDoubleClick(nodeData: any) {
+  function handleNodeRightClick(event: any, nodeData: any) {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('Node right-clicked:', nodeData.label);
+    debugMessage = `Right-clicked: ${nodeData.label}`;
     selectedNode = nodeToDocument(nodeData);
     startInEditMode = true;
     showModal = true;
+    
+    // Clear debug message after 2 seconds
+    setTimeout(() => {
+      debugMessage = '';
+    }, 2000);
   }
 
   function handleModalClose() {
@@ -92,7 +90,6 @@
     if (!selectedNode) return;
     
     try {
-      // Save the updated KG record using the document API
       const response = await fetch('/documents', {
         method: 'POST',
         headers: {
@@ -103,9 +100,6 @@
       
       if (response.ok) {
         console.log('Successfully saved KG record:', selectedNode.id);
-        // Optionally refresh the graph to reflect changes
-        // await fetchGraph();
-        // if (!error) renderGraph();
       } else {
         console.error('Failed to save KG record:', response.statusText);
       }
@@ -127,72 +121,86 @@
       .attr('width', width)
       .attr('height', height);
 
-    // Add zoom and pan behavior
+    // Zoom and pan behavior
     const zoom = d3.zoom()
       .scaleExtent([0.1, 10])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
 
-    // Apply zoom to svg but filter out double-click events on nodes
-    svg.call(zoom)
-      .on('dblclick.zoom', null); // Disable double-click zoom
+    svg.call(zoom);
 
-    // Create main group for zooming/panning
     const g = svg.append('g');
 
+    // Force simulation
     const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(edges).id((d: any) => d.id).distance(120))
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('link', d3.forceLink(edges).id((d: any) => d.id).distance(100))
+      .force('charge', d3.forceManyBody().strength(-200))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(25));
+      .force('collision', d3.forceCollide().radius(20));
 
+    // Render edges with thickness based on weight
     const link = g.append('g')
       .attr('class', 'links')
       .selectAll('line')
       .data(edges)
       .enter().append('line')
-      .attr('stroke', '#999')
-      .attr('stroke-opacity', 0.6)
-      .attr('stroke-width', (d: any) => Math.sqrt(d.rank || 1));
+      .attr('stroke', '#666')
+      .attr('stroke-opacity', 0.7)
+      .attr('stroke-width', (d: any) => {
+        // Edge thickness based on weight/rank
+        const weight = d.weight || d.rank || 1;
+        return Math.max(1, Math.min(8, weight * 2));
+      });
 
+    // Render nodes
     const node = g.append('g')
       .attr('class', 'nodes')
       .selectAll('circle')
       .data(nodes)
       .enter().append('circle')
-      .attr('r', (d: any) => Math.max(8, Math.sqrt(d.rank || 1) * 3))
+      .attr('r', (d: any) => {
+        // Node size based on rank
+        const rank = d.rank || 1;
+        return Math.max(6, Math.min(20, rank * 2));
+      })
       .attr('fill', (d: any) => {
-        // Color nodes based on rank
-        const intensity = Math.min(d.rank / 10, 1);
-        return d3.interpolateBlues(0.3 + intensity * 0.7);
+        // Node color based on rank
+        const rank = d.rank || 1;
+        const intensity = Math.min(rank / 10, 1);
+        return d3.interpolateBlues(0.2 + intensity * 0.6);
       })
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
-      .on('click', (event, d) => {
-        event.stopPropagation();
-        handleNodeClick(d);
-      })
+      .on('click', (event, d) => handleNodeClick(event, d))
+      .on('contextmenu', (event, d) => handleNodeRightClick(event, d))
       .on('mouseover', function(event, d) {
         d3.select(this)
           .transition()
-          .duration(100)
-          .attr('r', (d: any) => Math.max(12, Math.sqrt(d.rank || 1) * 4))
-          .attr('stroke-width', 3);
+          .duration(150)
+          .attr('stroke-width', 3)
+          .attr('r', (d: any) => {
+            const rank = d.rank || 1;
+            return Math.max(8, Math.min(24, rank * 2.5));
+          });
       })
       .on('mouseout', function(event, d) {
         d3.select(this)
           .transition()
-          .duration(100)
-          .attr('r', (d: any) => Math.max(8, Math.sqrt(d.rank || 1) * 3))
-          .attr('stroke-width', 2);
+          .duration(150)
+          .attr('stroke-width', 2)
+          .attr('r', (d: any) => {
+            const rank = d.rank || 1;
+            return Math.max(6, Math.min(20, rank * 2));
+          });
       })
       .call(d3.drag()
         .on('start', dragstarted)
         .on('drag', dragged)
         .on('end', dragended));
 
+    // Node labels
     const label = g.append('g')
       .attr('class', 'labels')
       .selectAll('text')
@@ -200,15 +208,16 @@
       .enter().append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '.35em')
-      .attr('font-size', '12px')
+      .attr('font-size', '11px')
       .attr('font-family', 'Arial, sans-serif')
       .attr('fill', '#333')
       .attr('pointer-events', 'none')
       .text((d: any) => {
-        // Truncate long labels
-        return d.label.length > 15 ? d.label.substring(0, 15) + '...' : d.label;
+        // Show full label on hover, truncated otherwise
+        return d.label.length > 12 ? d.label.substring(0, 12) + '...' : d.label;
       });
 
+    // Update positions on simulation tick
     simulation.on('tick', () => {
       link
         .attr('x1', (d: any) => d.source.x)
@@ -248,10 +257,21 @@
       if (!error) renderGraph();
     });
     
-    // Add resize listener
+    // Prevent browser context menu on the graph container
+    const preventContextMenu = (e: Event) => {
+      e.preventDefault();
+    };
+    
+    if (container) {
+      container.addEventListener('contextmenu', preventContextMenu);
+    }
+    
     window.addEventListener('resize', updateDimensions);
     
     return () => {
+      if (container) {
+        container.removeEventListener('contextmenu', preventContextMenu);
+      }
       window.removeEventListener('resize', updateDimensions);
     };
   });
@@ -259,7 +279,7 @@
 
 <svelte:window bind:innerWidth={width} bind:innerHeight={height} />
 
-<!-- Full-screen graph container -->
+<!-- Graph container -->
 <div 
   bind:this={container} 
   class="graph-container"
@@ -291,40 +311,50 @@
   </button>
 {/if}
 
-<!-- Instructions overlay -->
+<!-- Simple controls info -->
 {#if !loading && !error && nodes.length > 0}
-  <div class="instructions">
-    <p><i class="fas fa-info-circle"></i> Click nodes to view • Double-click to edit • Drag to rearrange • Scroll to zoom</p>
+  <div class="controls-info">
+    <span><strong>Left-click:</strong> View node • <strong>Right-click:</strong> Edit node • <strong>Drag:</strong> Move • <strong>Scroll:</strong> Zoom</span>
+  </div>
+{/if}
+
+<!-- Debug message -->
+{#if debugMessage}
+  <div class="debug-message">
+    {debugMessage}
   </div>
 {/if}
 
 <!-- Modal for viewing/editing KG records -->
 {#if selectedNode}
-  <ArticleModal 
-    bind:active={showModal} 
-    item={selectedNode}
-    initialEdit={startInEditMode}
-    on:close={handleModalClose}
-    on:save={handleModalSave}
-  />
+  {#key selectedNode.id}
+    <ArticleModal 
+      bind:active={showModal} 
+      item={selectedNode}
+      initialEdit={startInEditMode}
+      on:close={handleModalClose}
+      on:save={handleModalSave}
+    />
+  {/key}
 {/if}
 
 <style>
   .graph-container {
     position: relative;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    z-index: 100;
   }
 
   .graph-container.fullscreen {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 1000;
+    z-index: 100;
     border-radius: 0;
-    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   }
 
   .loading-overlay, .error-overlay {
@@ -364,7 +394,7 @@
     position: fixed;
     top: 20px;
     right: 20px;
-    z-index: 1001;
+    z-index: 150;
     background: rgba(255, 255, 255, 0.9);
     border: none;
     border-radius: 50%;
@@ -388,24 +418,34 @@
     color: #333;
   }
 
-  .instructions {
+  .controls-info {
     position: fixed;
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1001;
+    z-index: 150;
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
-    padding: 10px 20px;
-    border-radius: 25px;
+    padding: 8px 16px;
+    border-radius: 20px;
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: #666;
   }
 
-  .instructions i {
-    color: #3498db;
-    margin-right: 0.5rem;
+  .debug-message {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 150;
+    background: rgba(52, 152, 219, 0.9);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   /* Global styles for graph elements */
@@ -414,16 +454,31 @@
   }
 
   :global(.graph-container .links line) {
-    transition: stroke-width 0.3s ease;
+    transition: stroke-width 0.2s ease;
   }
 
   :global(.graph-container .nodes circle) {
-    transition: all 0.3s ease;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.2));
   }
 
   :global(.graph-container .labels text) {
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.9);
     font-weight: 500;
+  }
+
+  /* Ensure Bulma/Svelma modal sits above the graph */
+  :global(.modal) {
+    z-index: 2000 !important;
+  }
+
+  /* Let background stay behind card */
+  :global(.modal-background) {
+    z-index: 100 !important;
+  }
+
+  :global(.modal-card),
+  :global(.modal-content) {
+    z-index: 2010 !important;
   }
 </style> 
