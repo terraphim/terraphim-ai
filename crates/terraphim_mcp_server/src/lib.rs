@@ -92,11 +92,19 @@ impl McpService {
     ) -> Result<CallToolResult, McpError> {
         let mut service = self.terraphim_service().await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+        
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::from(query),
             limit: limit.map(|l| l as usize),
             skip: skip.map(|s| s as usize),
-            role: role.map(RoleName::from),
+            role: Some(role_name),
         };
 
         match service.search(&search_query).await {

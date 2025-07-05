@@ -6454,6 +6454,7 @@ dependencies = [
 name = "terraphim_mcp_server"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "anyhow",
  "clap 4.5.40",
  "env_logger 0.10.2",
