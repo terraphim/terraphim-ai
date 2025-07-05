@@ -157,10 +157,10 @@
   {#if currentStep === 1}
     <!-- Step 1: Global settings -->
     <div class="field">
-      <label class="label">Configuration ID</label>
+      <label class="label" for="config-id">Configuration ID</label>
       <div class="control">
         <div class="select">
-          <select bind:value={$draft.id}>
+          <select id="config-id" bind:value={$draft.id}>
             <option>Desktop</option>
             <option>Server</option>
             <option>Embedded</option>
@@ -170,24 +170,24 @@
     </div>
 
     <div class="field">
-      <label class="label">Global shortcut</label>
+      <label class="label" for="global-shortcut">Global shortcut</label>
       <div class="control">
-        <input class="input" type="text" bind:value={$draft.global_shortcut} />
+        <input class="input" id="global-shortcut" type="text" bind:value={$draft.global_shortcut} />
       </div>
     </div>
 
     <div class="field">
-      <label class="label">Default theme</label>
+      <label class="label" for="default-theme">Default theme</label>
       <div class="control">
-        <input class="input" type="text" bind:value={$draft.default_theme} />
+        <input class="input" id="default-theme" type="text" bind:value={$draft.default_theme} />
       </div>
     </div>
 
     <div class="field">
-      <label class="label">Default Role</label>
+      <label class="label" for="default-role">Default Role</label>
       <div class="control">
         <div class="select">
-          <select bind:value={$draft.default_role}>
+          <select id="default-role" bind:value={$draft.default_role}>
             {#each $draft.roles as role}
               <option value={role.name}>{role.name}</option>
             {/each}
@@ -200,37 +200,38 @@
     {#each $draft.roles as roleItem, idx (roleItem.name)}
       <div class="box">
         <div class="field">
-          <label class="label">Role name</label>
+          <label class="label" for={`role-name-${idx}`}>Role name</label>
           <div class="control">
-            <input class="input" type="text" bind:value={$draft.roles[idx].name} />
+            <input class="input" id={`role-name-${idx}`} type="text" bind:value={$draft.roles[idx].name} />
           </div>
         </div>
         <div class="field">
-          <label class="label">Short name</label>
+          <label class="label" for={`role-shortname-${idx}`}>Short name</label>
           <div class="control">
-            <input class="input" type="text" bind:value={$draft.roles[idx].shortname} />
+            <input class="input" id={`role-shortname-${idx}`} type="text" bind:value={$draft.roles[idx].shortname} />
           </div>
         </div>
         <div class="field">
-          <label class="label">Theme</label>
+          <label class="label" for={`role-theme-${idx}`}>Theme</label>
           <div class="control">
-            <input class="input" type="text" bind:value={$draft.roles[idx].theme} />
+            <input class="input" id={`role-theme-${idx}`} type="text" bind:value={$draft.roles[idx].theme} />
           </div>
         </div>
         <div class="field">
-          <label class="label">Relevance function</label>
+          <label class="label" for={`role-relevance-${idx}`}>Relevance function</label>
           <div class="control">
-            <input class="input" type="text" bind:value={$draft.roles[idx].relevance_function} />
+            <input class="input" id={`role-relevance-${idx}`} type="text" bind:value={$draft.roles[idx].relevance_function} />
           </div>
         </div>
         <h5 class="title is-6">Haystacks</h5>
         {#each roleItem.haystacks as hs, hIdx}
           <div class="field is-grouped">
             <div class="control is-expanded">
-              <input class="input" type="text" placeholder="/path/to/haystack" bind:value={$draft.roles[idx].haystacks[hIdx].path} />
+              <label class="label" for={`haystack-path-${idx}-${hIdx}`}>Path</label>
+              <input class="input" id={`haystack-path-${idx}-${hIdx}`} type="text" placeholder="/path/to/haystack" bind:value={$draft.roles[idx].haystacks[hIdx].path} />
             </div>
-            <label class="checkbox" style="margin-right:0.5rem">
-              <input type="checkbox" bind:checked={$draft.roles[idx].haystacks[hIdx].read_only} />
+            <label class="checkbox" for={`haystack-readonly-${idx}-${hIdx}`} style="margin-right:0.5rem">
+              <input id={`haystack-readonly-${idx}-${hIdx}`} type="checkbox" bind:checked={$draft.roles[idx].haystacks[hIdx].read_only} />
               &nbsp;Read-only
             </label>
             <button class="button is-small is-danger" on:click={() => removeHaystack(idx,hIdx)}>-</button>
@@ -240,41 +241,38 @@
 
         <h5 class="title is-6">Knowledge Graph</h5>
         <div class="field">
-          <label class="label">Remote automata URL</label>
+          <label class="label" for={`kg-url-${idx}`}>Remote automata URL</label>
           <div class="control">
-            <input class="input" type="text" placeholder="https://example.com/thesaurus.json" bind:value={$draft.roles[idx].kg.url} />
+            <input class="input" id={`kg-url-${idx}`} type="text" placeholder="https://example.com/thesaurus.json" bind:value={$draft.roles[idx].kg.url} />
           </div>
         </div>
         <div class="field">
-          <label class="label">Local KG path</label>
+          <label class="label" for={`kg-local-path-${idx}`}>Local KG path</label>
           <div class="control">
-            <input class="input" type="text" placeholder="/path/to/markdown" bind:value={$draft.roles[idx].kg.local_path} />
+            <input class="input" id={`kg-local-path-${idx}`} type="text" placeholder="/path/to/markdown" bind:value={$draft.roles[idx].kg.local_path} />
           </div>
         </div>
         <div class="field is-grouped">
           <div class="control">
+            <label class="label" for={`kg-local-type-${idx}`}>Local KG type</label>
             <div class="select">
-              <select bind:value={$draft.roles[idx].kg.local_type}>
+              <select id={`kg-local-type-${idx}`} bind:value={$draft.roles[idx].kg.local_type}>
                 <option value="markdown">markdown</option>
                 <option value="json">json</option>
               </select>
             </div>
           </div>
-          <div class="control">
-            <label class="label">Local KG type</label>
-          </div>
         </div>
         <div class="field is-grouped">
-          <label class="checkbox" style="margin-right:1rem">
-            <input type="checkbox" bind:checked={$draft.roles[idx].kg.public} />
+          <label class="checkbox" for={`kg-public-${idx}`} style="margin-right:1rem">
+            <input id={`kg-public-${idx}`} type="checkbox" bind:checked={$draft.roles[idx].kg.public} />
             &nbsp;Public
           </label>
-          <label class="checkbox">
-            <input type="checkbox" bind:checked={$draft.roles[idx].kg.publish} />
+          <label class="checkbox" for={`kg-publish-${idx}`}>
+            <input id={`kg-publish-${idx}`} type="checkbox" bind:checked={$draft.roles[idx].kg.publish} />
             &nbsp;Publish
           </label>
         </div>
-
         <hr />
         <button class="button is-small is-danger" on:click={() => removeRole(idx)}>Remove Role</button>
       </div>
