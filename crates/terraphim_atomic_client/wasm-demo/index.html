@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Atomic WASM CRUD Demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body{font-family:sans-serif;margin:2rem;max-width:45rem}
+        button,input{margin:.3rem 0;padding:.4rem .7rem}
+        pre{background:#f6f8fa;padding:1rem;border-radius:4px;white-space:pre-wrap}
+    </style>
+    <!-- Trunk compiles this crate as a cdylib (no main fn) -->
+    <link data-trunk rel="rust" href="Cargo.toml" />
+</head>
+<body>
+<h1>Atomic-Server WebAssembly CRUD Demo</h1>
+<p><a href="tests.html" style="font-size:0.9rem">Standalone tests page</a></p>
+<label>Atomic server URL<br>
+    <input id="url" size="40" value="http://localhost:9883" />
+</label><br>
+<label>Agent secret (base64)<br>
+    <textarea id="secret" rows="3" cols="60" placeholder="paste secret here"></textarea>
+</label><br>
+
+<button id="init">init client</button>
+<button id="create">create</button>
+<button id="read">read</button>
+<button id="update">update</button>
+<button id="delete">delete</button>
+<input id="searchq" placeholder="search term" />
+<button id="search">search</button>
+<button id="run_tests">run WASM tests</button>
+
+<h2>Output</h2>
+<pre id="out"></pre>
+
+<h2>Tests</h2>
+<pre id="tests_out"></pre>
+
+<script type="module">
+    const out = document.getElementById("out");
+    const testsOut = document.getElementById("tests_out");
+    const log = (m) => (out.textContent += m + "\n");
+
+    // Wait for Trunk to finish loading WASM & bindings
+    window.addEventListener("TrunkApplicationStarted", ({ detail: { wasm } }) => {
+        const wasmBindings = window.wasmBindings || wasm;
+
+        const q = (id) => document.getElementById(id);
+
+        q("init").onclick = async () => {
+            try {
+                await wasmBindings.init_client(q("url").value, q("secret").value);
+                log("client ready");
+            } catch (e) {
+                log(`err: ${e}`);
+            }
+        };
+
+        q("create").onclick = async () => {
+            try { log(await wasmBindings.create()); } catch(e){ log(e); }
+        };
+
+        q("read").onclick = async () => {
+            try { log(await wasmBindings.read()); } catch(e){ log(e); }
+        };
+
+        q("update").onclick = async () => {
+            try { log(await wasmBindings.update()); } catch(e){ log(e); }
+        };
+
+        q("delete").onclick = async () => {
+            try { log(await wasmBindings.delete_res()); } catch(e){ log(e); }
+        };
+
+        q("search").onclick = async () => {
+            try { log(await wasmBindings.search(q("searchq").value)); } catch(e){ log(e); }
+        };
+
+        q("run_tests").onclick = async () => {
+            testsOut.textContent = "running tests...\n";
+            try {
+                const resStr = await wasmBindings.run_tests();
+                const results = JSON.parse(resStr);
+                testsOut.textContent = results.map(r => `${r.success ? '✅' : '❌'} ${r.name}${r.success ? '' : ' – ' + r.message}`).join('\n');
+            } catch(e) {
+                testsOut.textContent += "Error: " + e;
+            }
+        };
+    });
+</script>
+</body>
+</html> 
