@@ -1,0 +1,56 @@
+{
+  "id": "atomic-title-scorer",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Atomic Title Scorer": {
+      "shortname": "title-scorer",
+      "name": "Atomic Title Scorer",
+      "relevance_function": "title-scorer",
+      "theme": "cerulean",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "engineer",
+      "name": "Engineer",
+      "relevance_function": "title-scorer",
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Atomic Title Scorer",
+  "selected_role": "Atomic Title Scorer"
+} 
