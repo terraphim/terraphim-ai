@@ -1,0 +1,263 @@
+[
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/document",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/node", 
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/edge",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/thesaurus",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/role",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/indexed-document",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/search-query",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/config",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/haystack",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/knowledge-graph"
+    ],
+    "https://atomicdata.dev/properties/description": "Ontology for Terraphim AI system, defining classes and properties for documents, knowledge graphs, roles, and search functionality.",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/properties": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/id",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/url",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/title",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/body",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/rank",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/role-name",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/theme",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/tags",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/search-term",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/path"
+    ],
+    "https://atomicdata.dev/properties/shortname": "terraphim"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A document is a piece of content that gets indexed and searched in Terraphim.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/document",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/id",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/url",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/title",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/body"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A node represents a single concept and its connections to other concepts in the knowledge graph.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/node",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/id",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/rank"
+    ],
+    "https://atomicdata.dev/properties/shortname": "node"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "An edge represents a relationship between two nodes in the knowledge graph.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/edge",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/id",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/rank"
+    ],
+    "https://atomicdata.dev/properties/shortname": "edge"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A thesaurus is a dictionary with synonyms which map to higher-level concepts.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/thesaurus",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "thesaurus"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A role defines user-specific settings including theme, knowledge graph, and haystacks.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/role",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/role-name",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/theme"
+    ],
+    "https://atomicdata.dev/properties/shortname": "role"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "An indexed document contains references to its position in the knowledge graph.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/indexed-document",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/id",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/rank",
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/tags"
+    ],
+    "https://atomicdata.dev/properties/shortname": "indexed-document"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A search query contains the search term and pagination parameters.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/search-query",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/search-term"
+    ],
+    "https://atomicdata.dev/properties/shortname": "search-query"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "The main configuration for Terraphim containing roles and global settings.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/config",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "config"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A haystack is a collection of documents that can be indexed and searched.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/haystack",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/path"
+    ],
+    "https://atomicdata.dev/properties/shortname": "haystack"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A knowledge graph configuration containing automata path and local settings.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/knowledge-graph",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "knowledge-graph"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Unique identifier for a resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/id",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "id"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "URL to the document or resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/url",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "url"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Title of the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/title",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "The main content body of the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/body",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "body"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Rank or relevance score of the document in search results.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/rank",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "rank"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Name of the user role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/role-name",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "role-name"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "UI theme name for the role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/theme",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "theme"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Tags associated with the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/tags",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "tags"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The search term for querying documents.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/search-term",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "search-term"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "File system path to the haystack or knowledge graph data.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jezwvdrkqjjc4t741gra3m2h/terraphim/property/path",
+    "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
+    "https://atomicdata.dev/properties/shortname": "path"
+  }
+] 

@@ -1,0 +1,23 @@
+Agent subject: http://localhost:9883/agents/zZ2S0HTg17PM5YLQJHYkyFxG/BaL0uXShw7KaB1CJOg=
+Public key: zZ2S0HTg17PM5YLQJHYkyFxG/BaL0uXShw7KaB1CJOg=
+Resource subject: http://localhost:9883/test-resource-1750161090
+String to sign: {"https://atomicdata.dev/properties/createdAt":1750161090,"https://atomicdata.dev/properties/isA":["https://atomicdata.dev/classes/Commit"],"https://atomicdata.dev/properties/set":{"https://atomicdata.dev/properties/description":"A test resource created by the Rust client","https://atomicdata.dev/properties/shortname":"test-resource-1750161090"},"https://atomicdata.dev/properties/signer":"http://localhost:9883/agents/zZ2S0HTg17PM5YLQJHYkyFxG/BaL0uXShw7KaB1CJOg=","https://atomicdata.dev/properties/subject":"http://localhost:9883/test-resource-1750161090"}
+Signature: agvQaM4lWscSotRVNTGrU2CJmOXSq8VHcBVxn3QZ1mgGB9qifWksTJMWDZeMT7unUggBNcgVziknw6O2C3yIAA==
+
+Final commit JSON:
+{
+  "https://atomicdata.dev/properties/createdAt": 1750161090,
+  "https://atomicdata.dev/properties/isA": [
+    "https://atomicdata.dev/classes/Commit"
+  ],
+  "https://atomicdata.dev/properties/set": {
+    "https://atomicdata.dev/properties/description": "A test resource created by the Rust client",
+    "https://atomicdata.dev/properties/shortname": "test-resource-1750161090"
+  },
+  "https://atomicdata.dev/properties/signature": "agvQaM4lWscSotRVNTGrU2CJmOXSq8VHcBVxn3QZ1mgGB9qifWksTJMWDZeMT7unUggBNcgVziknw6O2C3yIAA==",
+  "https://atomicdata.dev/properties/signer": "http://localhost:9883/agents/zZ2S0HTg17PM5YLQJHYkyFxG/BaL0uXShw7KaB1CJOg=",
+  "https://atomicdata.dev/properties/subject": "http://localhost:9883/test-resource-1750161090"
+}
+
+To send this commit to the server, run:
+curl -X POST -H "Content-Type: application/json" -d '{"https://atomicdata.dev/properties/createdAt":1750161090,"https://atomicdata.dev/properties/isA":["https://atomicdata.dev/classes/Commit"],"https://atomicdata.dev/properties/set":{"https://atomicdata.dev/properties/description":"A test resource created by the Rust client","https://atomicdata.dev/properties/shortname":"test-resource-1750161090"},"https://atomicdata.dev/properties/signature":"agvQaM4lWscSotRVNTGrU2CJmOXSq8VHcBVxn3QZ1mgGB9qifWksTJMWDZeMT7unUggBNcgVziknw6O2C3yIAA==","https://atomicdata.dev/properties/signer":"http://localhost:9883/agents/zZ2S0HTg17PM5YLQJHYkyFxG/BaL0uXShw7KaB1CJOg=","https://atomicdata.dev/properties/subject":"http://localhost:9883/test-resource-1750161090"}' http://localhost:9883/commit
