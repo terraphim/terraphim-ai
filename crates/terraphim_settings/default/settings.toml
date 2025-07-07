@@ -3,6 +3,14 @@ api_endpoint="http://localhost:8000/api"
 initialized = "${TERRAPHIM_INITIALIZED:-false}"
 default_data_path = "${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}"
 
-[profiles.sled]
-type = "sled"
-datadir= "/tmp/sled"
+[profiles.rocksdb]
+type = "rocksdb"
+datadir= "/tmp/terraphim_rocksdb"
+
+[profiles.dash]
+type = "dashmap"
+root = "/tmp/dashmaptest"
+
+[profiles.rock]
+type = "rocksdb"
+datadir = "/tmp/opendal/rocksdb"

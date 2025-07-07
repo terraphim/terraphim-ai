@@ -52,7 +52,6 @@ url = { version = "2.3.1", features = ["serde"] }
 async-once-cell = "0.5.3"
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 thiserror = "1.0.53"
-serde_json_any_key = "2.0.0"
 schemars = { version = "0.8", features = ["derive"] }
 
 [dev-dependencies]

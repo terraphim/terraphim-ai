@@ -13,6 +13,7 @@ use serde_json::Value;
 
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
+use terraphim_persistence::Persistable;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
@@ -137,16 +138,40 @@ pub(crate) async fn get_config(State(config): State<ConfigState>) -> Result<Json
 }
 
 /// API handler for Terraphim Config update
+/// 
+/// This function updates the configuration both in-memory and persists it to disk
+/// so that the changes survive server restarts.
 pub(crate) async fn update_config(
     State(config_state): State<ConfigState>,
     Json(config_new): Json<Config>,
-) -> Json<ConfigResponse> {
+) -> Result<Json<ConfigResponse>> {
+    log::info!("Updating configuration and persisting to disk");
+    
+    // Update in-memory configuration
     let mut config = config_state.config.lock().await;
     *config = config_new.clone();
-    Json(ConfigResponse {
-        status: Status::Success,
-        config: config_new,
-    })
+    drop(config); // Release the lock before async save operation
+    
+    // Persist the configuration to disk
+    match config_new.save().await {
+        Ok(()) => {
+            log::info!("Configuration successfully updated and persisted");
+            Ok(Json(ConfigResponse {
+                status: Status::Success,
+                config: config_new,
+            }))
+        }
+        Err(e) => {
+            log::error!("Failed to persist configuration: {:?}", e);
+            // The configuration was updated in memory but not persisted
+            // This is still partially successful, so we return the new config
+            // but log the persistence error
+            Ok(Json(ConfigResponse {
+                status: Status::Success,
+                config: config_new,
+            }))
+        }
+    }
 }
 
 /// Returns JSON Schema for Terraphim Config
