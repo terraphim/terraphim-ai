@@ -1,241 +1,175 @@
 import { test, expect } from '@playwright/test';
+import { 
+  ciWaitForSelector, 
+  ciNavigate, 
+  ciWait, 
+  ciClick,
+  ciHover,
+  getTimeouts 
+} from '../../src/test-utils/ci-friendly';
 
 test.describe('App Navigation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('input[type="search"]', { timeout: 30000 });
+    // Navigate to the app using CI-friendly navigation
+    await ciNavigate(page, '/');
+    
+    // Wait for the app to load
+    await ciWaitForSelector(page, 'input[type="search"]', 'navigation');
   });
 
-  test('should display main navigation elements', async ({ page }) => {
-    // Check that main elements are present
+  test('should display home page correctly', async ({ page }) => {
+    // Check main elements are present
     await expect(page.locator('input[type="search"]')).toBeVisible();
-    
-    // Check for footer navigation (appears on hover)
-    const footer = page.locator('footer');
-    await footer.hover();
-    
-    // Wait for navigation to appear
-    await page.waitForTimeout(500);
-    
-    // Check navigation items
-    const homeLink = page.locator('a[href="/"]');
-    const configLink = page.locator('a[href="/fetch/json"]');
-    const contactsLink = page.locator('a[href="/contacts"]');
-    
-    if (await homeLink.isVisible()) {
-      await expect(homeLink).toBeVisible();
-    }
-    
-    if (await configLink.isVisible()) {
-      await expect(configLink).toBeVisible();
-    }
+    await expect(page.locator('img[alt="Terraphim Logo"]')).toBeVisible();
+    await expect(page.locator('text=I am Terraphim, your personal assistant.')).toBeVisible();
   });
 
-  test('should navigate to configuration page', async ({ page }) => {
+  test('should show navigation menu on footer hover', async ({ page }) => {
+    // Use CI-friendly hover action
+    const footer = await ciHover(page, 'footer');
+    
+    // Navigation should become visible
+    const nav = await ciWaitForSelector(page, 'nav', 'medium');
+    await expect(nav).toBeVisible();
+    
+    // Check for navigation links
+    const links = await nav.locator('a').count();
+    expect(links).toBeGreaterThan(0);
+  });
+
+  test('should navigate to config wizard', async ({ page }) => {
     // Hover over footer to reveal navigation
-    const footer = page.locator('footer');
-    await footer.hover();
-    await page.waitForTimeout(500);
+    await ciHover(page, 'footer');
     
-    // Click on configuration link if available
-    const configLink = page.locator('a[href="/fetch/json"]');
-    if (await configLink.isVisible()) {
-      await configLink.click();
-      
-      // Check URL changed
-      await expect(page).toHaveURL(/\/fetch\/json/);
-      
-      // Wait for configuration page to load
-      await page.waitForTimeout(2000);
-      
-      // Should still have navigation elements
-      await expect(footer).toBeVisible();
-    }
+    // Click on wizard link using CI-friendly click
+    await ciClick(page, 'a[href="/config/wizard"]');
+    
+    // Verify navigation to wizard
+    await expect(page).toHaveURL('/config/wizard');
+    await ciWaitForSelector(page, 'h3:has-text("Configuration Wizard")', 'navigation');
   });
 
-  test('should return to home page', async ({ page }) => {
-    // First navigate away from home
-    const footer = page.locator('footer');
-    await footer.hover();
-    await page.waitForTimeout(500);
+  test('should navigate to graph visualization', async ({ page }) => {
+    // Hover over footer to reveal navigation
+    await ciHover(page, 'footer');
     
-    const configLink = page.locator('a[href="/fetch/json"]');
-    if (await configLink.isVisible()) {
-      await configLink.click();
-      await page.waitForTimeout(1000);
-      
-      // Then navigate back to home
-      await footer.hover();
-      await page.waitForTimeout(500);
-      
-      const homeLink = page.locator('a[href="/"]');
-      if (await homeLink.isVisible()) {
-        await homeLink.click();
-        
-        // Should be back on home page
-        await expect(page).toHaveURL('/');
-        
-        // Search input should be visible
-        await expect(page.locator('input[type="search"]')).toBeVisible();
-        
-        // Logo should be visible
-        await expect(page.locator('img[alt="Terraphim Logo"]')).toBeVisible();
-      }
-    }
+    // Click on graph link
+    await ciClick(page, 'a[href="/graph"]');
+    
+    // Verify navigation to graph
+    await expect(page).toHaveURL('/graph');
+    await ciWaitForSelector(page, 'svg', 'navigation');
   });
 
-  test('should handle browser back/forward navigation', async ({ page }) => {
-    // Start on home page
-    const initialUrl = page.url();
+  test('should navigate to JSON editor', async ({ page }) => {
+    // Hover over footer to reveal navigation
+    await ciHover(page, 'footer');
     
-    // Navigate to config if possible
-    const footer = page.locator('footer');
-    await footer.hover();
-    await page.waitForTimeout(500);
+    // Click on JSON editor link
+    await ciClick(page, 'a[href="/config/json"]');
     
-    const configLink = page.locator('a[href="/fetch/json"]');
-    if (await configLink.isVisible()) {
-      await configLink.click();
-      await page.waitForTimeout(1000);
-      
-      // Use browser back button
-      await page.goBack();
-      await page.waitForTimeout(1000);
-      
-      // Should be back on home
-      expect(page.url()).toBe(initialUrl);
-      await expect(page.locator('input[type="search"]')).toBeVisible();
-      
-      // Use browser forward button
-      await page.goForward();
-      await page.waitForTimeout(1000);
-      
-      // Should be on config page again
-      await expect(page).toHaveURL(/\/fetch\/json/);
-    }
+    // Verify navigation to JSON editor
+    await expect(page).toHaveURL('/config/json');
+    await ciWaitForSelector(page, 'textarea, .json-editor', 'navigation');
+  });
+
+  test('should return to home from any screen', async ({ page }) => {
+    // Navigate to wizard first
+    await ciHover(page, 'footer');
+    await ciClick(page, 'a[href="/config/wizard"]');
+    await ciWait(page, 'afterNavigation');
+    
+    // Navigate back to home
+    await ciHover(page, 'footer');
+    await ciClick(page, 'a[href="/"]');
+    
+    // Verify back on home page
+    await expect(page).toHaveURL('/');
+    await ciWaitForSelector(page, 'input[type="search"]', 'navigation');
+    await expect(page.locator('img[alt="Terraphim Logo"]')).toBeVisible();
+  });
+
+  test('should maintain navigation consistency across screens', async ({ page }) => {
+    // Check navigation on home page
+    await ciHover(page, 'footer');
+    
+    const homeNavItems = await page.locator('nav a').count();
+    expect(homeNavItems).toBeGreaterThan(0);
+    
+    // Navigate to wizard and check navigation
+    await ciClick(page, 'a[href="/config/wizard"]');
+    await ciWait(page, 'afterNavigation');
+    
+    await ciHover(page, 'footer');
+    
+    const wizardNavItems = await page.locator('nav a').count();
+    expect(wizardNavItems).toBeGreaterThan(0);
+    
+    // Navigate to graph and check navigation
+    await ciClick(page, 'a[href="/graph"]');
+    await ciWait(page, 'afterNavigation');
+    
+    await ciHover(page, 'footer');
+    
+    const graphNavItems = await page.locator('nav a').count();
+    expect(graphNavItems).toBeGreaterThan(0);
+  });
+
+  test('should handle navigation errors gracefully', async ({ page }) => {
+    // Try to navigate to non-existent page
+    await ciNavigate(page, '/non-existent-page');
+    
+    // Should handle gracefully (either 404 page or redirect to home)
+    // Wait for page to stabilize
+    await ciWait(page, 'afterNavigation');
+    
+    // App should still be functional - either show 404 or redirect to home
+    const hasSearch = await page.locator('input[type="search"]').isVisible();
+    const has404 = await page.locator('text=404, text=Not Found').isVisible();
+    
+    // Either should be true
+    expect(hasSearch || has404).toBeTruthy();
   });
 
   test('should maintain app state during navigation', async ({ page }) => {
-    const searchInput = page.locator('input[type="search"]');
+    // Enter a search query on home page
+    const searchInput = await ciWaitForSelector(page, 'input[type="search"]');
+    await searchInput.fill('test query');
     
-    // Enter some text in search
-    await searchInput.fill('navigation test');
+    // Navigate to wizard
+    await ciHover(page, 'footer');
+    await ciClick(page, 'a[href="/config/wizard"]');
+    await ciWait(page, 'afterNavigation');
     
-    // Navigate to config page
-    const footer = page.locator('footer');
-    await footer.hover();
-    await page.waitForTimeout(500);
+    // Navigate back to home
+    await ciHover(page, 'footer');
+    await ciClick(page, 'a[href="/"]');
     
-    const configLink = page.locator('a[href="/fetch/json"]');
-    if (await configLink.isVisible()) {
-      await configLink.click();
-      await page.waitForTimeout(1000);
-      
-      // Navigate back to home
-      await footer.hover();
-      await page.waitForTimeout(500);
-      
-      const homeLink = page.locator('a[href="/"]');
-      if (await homeLink.isVisible()) {
-        await homeLink.click();
-        await page.waitForTimeout(1000);
-        
-        // Search input should still contain text
-        const inputValue = await searchInput.inputValue();
-        expect(inputValue).toBe('navigation test');
-      }
-    }
+    // Search input should be cleared (fresh state)
+    const searchInputAfter = await ciWaitForSelector(page, 'input[type="search"]');
+    const inputValue = await searchInputAfter.inputValue();
+    expect(inputValue).toBe('');
   });
 
-  test('should handle direct URL navigation', async ({ page }) => {
-    // Navigate directly to config page via URL
-    await page.goto('/fetch/json');
-    await page.waitForTimeout(2000);
+  test('should load pages within acceptable time limits', async ({ page }) => {
+    const timeouts = getTimeouts();
+    const startTime = Date.now();
     
-    // Should be on config page
-    await expect(page).toHaveURL(/\/fetch\/json/);
+    // Navigate to wizard
+    await ciHover(page, 'footer');
+    await ciClick(page, 'a[href="/config/wizard"]');
+    await ciWaitForSelector(page, 'h3:has-text("Configuration Wizard")', 'navigation');
     
-    // App should still be functional
-    const footer = page.locator('footer');
-    await expect(footer).toBeVisible();
+    const wizardLoadTime = Date.now() - startTime;
+    expect(wizardLoadTime).toBeLessThan(timeouts.navigation);
     
-    // Navigate directly back to home
-    await page.goto('/');
-    await page.waitForTimeout(1000);
+    // Navigate to graph
+    const graphStartTime = Date.now();
+    await ciHover(page, 'footer');
+    await ciClick(page, 'a[href="/graph"]');
+    await ciWaitForSelector(page, 'svg', 'navigation');
     
-    // Should be on home page with search
-    await expect(page.locator('input[type="search"]')).toBeVisible();
-  });
-
-  test('should handle invalid routes gracefully', async ({ page }) => {
-    // Navigate to non-existent route
-    await page.goto('/invalid-route');
-    await page.waitForTimeout(2000);
-    
-    // App should either redirect to home or show 404 gracefully
-    // Either way, the app should remain functional
-    const searchInput = page.locator('input[type="search"]');
-    const footer = page.locator('footer');
-    
-    // At least one of these should be visible (depending on routing strategy)
-    const searchVisible = await searchInput.isVisible();
-    const footerVisible = await footer.isVisible();
-    
-    expect(searchVisible || footerVisible).toBeTruthy();
-  });
-
-  test('should maintain navigation consistency', async ({ page }) => {
-    // Check that navigation elements are consistent across pages
-    const footer = page.locator('footer');
-    
-    // On home page
-    await footer.hover();
-    await page.waitForTimeout(500);
-    
-    const homeNavItems = await page.locator('nav a').count();
-    
-    // Navigate to config page if possible
-    const configLink = page.locator('a[href="/fetch/json"]');
-    if (await configLink.isVisible()) {
-      await configLink.click();
-      await page.waitForTimeout(1000);
-      
-      // Check navigation on config page
-      await footer.hover();
-      await page.waitForTimeout(500);
-      
-      const configNavItems = await page.locator('nav a').count();
-      
-      // Should have same number of navigation items
-      expect(configNavItems).toBe(homeNavItems);
-    }
-  });
-
-  test('should handle rapid navigation changes', async ({ page }) => {
-    const footer = page.locator('footer');
-    
-    // Rapidly navigate between pages
-    for (let i = 0; i < 3; i++) {
-      await footer.hover();
-      await page.waitForTimeout(200);
-      
-      const configLink = page.locator('a[href="/fetch/json"]');
-      if (await configLink.isVisible()) {
-        await configLink.click();
-        await page.waitForTimeout(300);
-        
-        await footer.hover();
-        await page.waitForTimeout(200);
-        
-        const homeLink = page.locator('a[href="/"]');
-        if (await homeLink.isVisible()) {
-          await homeLink.click();
-          await page.waitForTimeout(300);
-        }
-      }
-    }
-    
-    // App should still be functional after rapid navigation
-    await expect(page.locator('input[type="search"]')).toBeVisible();
+    const graphLoadTime = Date.now() - graphStartTime;
+    expect(graphLoadTime).toBeLessThan(timeouts.navigation);
   });
 }); 

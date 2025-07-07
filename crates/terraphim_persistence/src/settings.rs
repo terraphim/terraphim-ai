@@ -139,9 +139,11 @@ pub async fn parse_profile(
         Scheme::Redis => Operator::from_map::<services::Redis>(profile.clone())?.finish(),
         #[cfg(feature = "services-rocksdb")]
         Scheme::Rocksdb => Operator::from_map::<services::Rocksdb>(profile.clone())?.finish(),
+        #[cfg(feature = "services-redb")]
+        Scheme::Redb => Operator::from_map::<services::Redb>(profile.clone())?.finish(),
+        #[cfg(feature = "services-sqlite")]
+        Scheme::Sqlite => Operator::from_map::<services::Sqlite>(profile.clone())?.finish(),
         Scheme::S3 => Operator::from_map::<services::S3>(profile.clone())?.finish(),
-        #[cfg(feature = "services-sled")]
-        Scheme::Sled => Operator::from_map::<services::Sled>(profile.clone())?.finish(),
         Scheme::Webdav => Operator::from_map::<services::Webdav>(profile.clone())?.finish(),
         Scheme::Webhdfs => Operator::from_map::<services::Webhdfs>(profile.clone())?.finish(),
         _ => {

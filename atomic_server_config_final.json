@@ -1,0 +1,74 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": "eyJwcml2YXRlS2V5IjoiUnlndmxLR1VERzkvbG9DWTVLQ0hyUURybkpFRzdQN1A5SEtiK0JFOE5TMD0iLCJwdWJsaWNLZXkiOiJseG95Z0xmVU52VGZPZHdHRTlCZDhwakFtM3RFWHloSlpMWENDbDNVblZjPSIsInN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMvYWdlbnRzL2x4b3lnTGZVTnZUZk9kd0dFOUJkOHBqQW0zdEVYeWhKWkxYQ0NsM1VuVmM9IiwiY2xpZW50Ijp7fX0="
+        },
+        {
+          "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+          "service": "Ripgrep",
+          "read_only": false,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "title-scorer",
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": "eyJwcml2YXRlS2V5IjoiUnlndmxLR1VERzkvbG9DWTVLQ0hyUURybkpFRzdQN1A5SEtiK0JFOE5TMD0iLCJwdWJsaWNLZXkiOiJseG95Z0xmVU52VGZPZHdHRTlCZDhwakFtM3RFWHloSlpMWENDbDNVblZjPSIsInN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMvYWdlbnRzL2x4b3lnTGZVTnZUZk9kd0dFOUJkOHBqQW0zdEVYeWhKWkxYQ0NsM1VuVmM9IiwiY2xpZW50Ijp7fX0="
+        },
+        {
+          "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+          "service": "Ripgrep",
+          "read_only": false,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "System Operator": {
+      "shortname": "SysOp",
+      "name": "System Operator",
+      "relevance_function": "title-scorer",
+      "theme": "superhero",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": "eyJwcml2YXRlS2V5IjoiUnlndmxLR1VERzkvbG9DWTVLQ0hyUURybkpFRzdQN1A5SEtiK0JFOE5TMD0iLCJwdWJsaWNLZXkiOiJseG95Z0xmVU52VGZPZHdHRTlCZDhwakFtM3RFWHloSlpMWENDbDNVblZjPSIsInN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMvYWdlbnRzL2x4b3lnTGZVTnZUZk9kd0dFOUJkOHBqQW0zdEVYeWhKWkxYQ0NsM1VuVmM9IiwiY2xpZW50Ijp7fX0="
+        },
+        {
+          "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/",
+          "service": "Ripgrep",
+          "read_only": false,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Default",
+  "selected_role": "Default"
+} 

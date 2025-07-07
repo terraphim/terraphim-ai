@@ -1,13 +1,33 @@
 import { chromium, FullConfig } from '@playwright/test';
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, '..');
 
+// Load .env file from project root  
+function loadEnvFile() {
+  const envPath = join(__dirname, '../../.env');
+  if (existsSync(envPath)) {
+    const envContent = readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+      const [key, value] = line.split('=');
+      if (key && value) {
+        process.env[key.trim()] = value.trim().replace(/^"(.*)"$/, '$1');
+      }
+    });
+    console.log('✅ Loaded .env file for tests');
+  } else {
+    console.log('⚠️ No .env file found at', envPath);
+  }
+}
+
 async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...');
+  
+  // Load environment variables from .env file
+  loadEnvFile();
   
   // In CI environment, we might need to build the app first
   if (process.env.CI) {

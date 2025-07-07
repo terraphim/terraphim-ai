@@ -1,0 +1,73 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+X",
+  "roles": {
+    "\"Default\"": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": "ATOMIC_SERVER_SECRET_PLACEHOLDER"
+        }
+      ]
+    },
+    "\"Engineer\"": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": {
+          "Remote": "https://staging-storage.terraphim.io/thesaurus_Default.json"
+        },
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": "ATOMIC_SERVER_SECRET_PLACEHOLDER"
+        }
+      ]
+    },
+    "\"System Operator\"": {
+      "shortname": "operator",
+      "name": "System Operator",
+      "relevance_function": "terraphim-graph",
+      "theme": "superhero",
+      "kg": {
+        "automata_path": {
+          "Remote": "https://staging-storage.terraphim.io/thesaurus_Default.json"
+        },
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack/"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": "ATOMIC_SERVER_SECRET_PLACEHOLDER"
+        }
+      ]
+    }
+  },
+  "default_role": "Default",
+  "selected_role": "Default"
+} 

@@ -57,10 +57,13 @@ async fn run_server() -> Result<()> {
     
         let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
             Ok(mut local_config) => match local_config.load().await {
-                Ok(config) => config,
+                Ok(config) => {
+                    log::info!("Successfully loaded saved configuration from disk");
+                    config
+                },
                 Err(e) => {
-                    log::info!("Failed to load config: {:?}", e);
-                    ConfigBuilder::new().build_default_server().build().unwrap()
+                    log::info!("Failed to load saved config, using default: {:?}", e);
+                    ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build().unwrap()
                 }
             },
         Err(e) => panic!("Failed to build config: {e:?}"),

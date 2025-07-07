@@ -25,7 +25,6 @@ pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 use opendal::Result as OpendalResult;
 
 type PersistenceResult<T> = std::result::Result<T, terraphim_persistence::Error>;
-use serde_json_any_key::*;
 
 #[derive(Error, Debug)]
 pub enum TerraphimConfigError {
@@ -407,7 +406,6 @@ pub struct Config {
     /// Global shortcut for activating terraphim desktop
     pub global_shortcut: String,
     /// User roles with their respective settings
-    #[serde(with = "any_key_map")]
     #[schemars(skip)]
     pub roles: AHashMap<RoleName, Role>,
     /// The default role to use if no role is specified

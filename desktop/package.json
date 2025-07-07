@@ -14,7 +14,16 @@
     "test:ui": "vitest --ui",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "test:e2e:ci": "CI=true playwright test --reporter=line --bail=1"
+    "e2e:ci": "CI=true playwright test --reporter=line --bail=1 --workers=1",
+    "e2e:headed": "playwright test --headed",
+    "e2e:debug": "playwright test --debug",
+    "test:e2e:ci": "CI=true playwright test --reporter=github,html,json --workers=1 --retries=3",
+    "test:atomic": "CI=true bash scripts/run-atomic-haystack-tests.sh",
+    "test:atomic:ci": "CI=true bash scripts/run-atomic-haystack-tests.sh --ci",
+    "test:atomic:only": "CI=true playwright test tests/e2e/atomic-server-haystack.spec.ts --workers=1 --retries=3",
+    "test:haystack": "CI=true playwright test tests/e2e/atomic-server-haystack.spec.ts tests/e2e/rolegraph-search-validation.spec.ts --workers=1 --retries=3",
+    "test:all": "CI=true yarn run test && yarn run e2e:ci",
+    "test:all:ci": "CI=true yarn run test:coverage && yarn run test:e2e:ci && yarn run test:atomic:ci"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.1",

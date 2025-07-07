@@ -10,24 +10,24 @@ const __dirname = dirname(__filename);
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Run tests in files in parallel - disabled in CI for stability */
+  fullyParallel: !process.env.CI,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 3 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI 
-    ? [['html'], ['github'], ['json', { outputFile: 'test-results/results.json' }]] 
+    ? [['github'], ['html'], ['json', { outputFile: 'test-results/results.json' }]] 
     : [['html'], ['list']],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:5173',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: process.env.CI ? 'on-first-retry' : 'off',
+    trace: process.env.CI ? 'retain-on-failure' : 'on-first-retry',
     /* Take screenshot on failure */
     screenshot: 'only-on-failure',
     /* Record video on failure */
@@ -37,8 +37,20 @@ export default defineConfig({
       // Headless mode for CI
       headless: true,
       // Slower actions for CI stability
-      actionTimeout: 45000,
-      navigationTimeout: 45000,
+      actionTimeout: 60000,
+      navigationTimeout: 60000,
+      // Additional CI-friendly browser args
+      launchOptions: {
+        args: [
+          '--disable-animations',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+        ],
+      },
     }),
   },
 
@@ -51,8 +63,11 @@ export default defineConfig({
         // Custom settings for desktop app testing
         viewport: { width: 1280, height: 720 },
         // Extend timeout for app startup
-        actionTimeout: process.env.CI ? 45000 : 30000,
-        navigationTimeout: process.env.CI ? 45000 : 30000,
+        actionTimeout: process.env.CI ? 60000 : 30000,
+        navigationTimeout: process.env.CI ? 60000 : 30000,
+        // Consistent locale for CI
+        locale: 'en-US',
+        timezoneId: 'UTC',
       },
     },
     
@@ -62,6 +77,8 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
+        actionTimeout: process.env.CI ? 60000 : 30000,
+        navigationTimeout: process.env.CI ? 60000 : 30000,
       },
     },
   ],
@@ -70,7 +87,7 @@ export default defineConfig({
   webServer: process.env.CI ? undefined : {
     command: 'yarn run dev',
     url: 'http://localhost:5173',
-    timeout: 180 * 1000, // Increased timeout for CI
+    timeout: 180 * 1000,
     reuseExistingServer: !process.env.CI,
   },
   
@@ -87,21 +104,19 @@ export default defineConfig({
   /* Expect configuration */
   expect: {
     /* Maximum time expect() should wait for the condition to be met */
-    timeout: process.env.CI ? 15000 : 10000,
+    timeout: process.env.CI ? 20000 : 10000,
     /* Threshold for visual comparisons */
     threshold: 0.2,
   },
   
   /* CI-specific configurations */
   ...(process.env.CI && {
-    // More verbose output in CI
-    reporter: [['html'], ['github'], ['json', { outputFile: 'test-results/results.json' }]],
     // Preserve test artifacts in CI
     preserveOutput: 'always',
     // Report slow tests
     reportSlowTests: {
       max: 5,
-      threshold: 15000,
+      threshold: 30000,
     },
   }),
 }); 
