@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
+  import { invoke } from '@tauri-apps/api/tauri';
+  import { is_tauri, role } from './stores';
   import ArticleModal from './Search/ArticleModal.svelte';
   import type { Document } from './Search/SearchResult';
+  import type { RoleGraphResponse } from './generated/types';
 
   export let apiUrl: string = '/rolegraph';
   export let fullscreen: boolean = true;
@@ -33,13 +36,29 @@
     loading = true;
     error = null;
     try {
-      const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
-      const data = await res.json();
-      nodes = data.nodes;
-      edges = data.edges;
+      if ($is_tauri) {
+        console.log("Loading rolegraph from Tauri");
+        const response = await invoke<RoleGraphResponse>('get_rolegraph', { 
+          roleName: $role || undefined 
+        });
+        if (response && response.status === 'success') {
+          nodes = response.nodes;
+          edges = response.edges;
+        } else {
+          throw new Error(`Tauri rolegraph fetch failed: ${response?.status || 'unknown error'}`);
+        }
+      } else {
+        console.log("Loading rolegraph from server");
+        const url = $role ? `${apiUrl}?role=${encodeURIComponent($role)}` : apiUrl;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+        const data = await res.json();
+        nodes = data.nodes;
+        edges = data.edges;
+      }
     } catch (e) {
       error = e.message;
+      console.error("Error fetching rolegraph:", e);
     } finally {
       loading = false;
     }
@@ -53,7 +72,8 @@
       body: `# ${node.label}\n\n**Knowledge Graph Node**\n\nID: ${node.id}\nRank: ${node.rank}\n\nThis is a concept node from the knowledge graph. You can edit this content to add more information about "${node.label}".`,
       description: `Knowledge graph concept: ${node.label}`,
       tags: ['knowledge-graph', 'concept'],
-      rank: node.rank
+      rank: node.rank,
+      stub: `Knowledge graph concept: ${node.label}`
     };
   }
 

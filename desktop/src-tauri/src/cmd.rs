@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
+use terraphim_rolegraph::magic_unpair;
 use terraphim_types::Thesaurus;
 use terraphim_types::{Document, SearchQuery};
 
@@ -266,6 +267,99 @@ pub async fn get_document(
 pub async fn get_config_schema() -> Result<Value> {
     let schema = schema_for!(Config);
     Ok(serde_json::to_value(&schema).expect("schema serialization"))
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct GraphNodeDto {
+    pub id: u64,
+    pub label: String,
+    pub rank: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct GraphEdgeDto {
+    pub source: u64,
+    pub target: u64,
+    pub weight: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct RoleGraphResponse {
+    pub status: Status,
+    pub nodes: Vec<GraphNodeDto>,
+    pub edges: Vec<GraphEdgeDto>,
+}
+
+/// Get role graph visualization data for the specified role
+#[command]
+pub async fn get_rolegraph(
+    config_state: State<'_, ConfigState>,
+    role_name: Option<String>,
+) -> Result<RoleGraphResponse> {
+    log::info!("Get rolegraph called for role: {:?}", role_name);
+    
+    let config = {
+        let config_guard = config_state.config.lock().await;
+        config_guard.clone()
+    };
+    
+    // Use provided role or fall back to selected role
+    let role = match role_name {
+        Some(name) => terraphim_types::RoleName::new(&name),
+        None => config.selected_role.clone(),
+    };
+    
+    // Check if role exists and has a rolegraph
+    let Some(rolegraph_sync) = config_state.roles.get(&role) else {
+        return Err(TerraphimTauriError::Generic(format!(
+            "Role '{}' not found or has no knowledge graph configured", 
+            role.original
+        )));
+    };
+    
+    let rolegraph = rolegraph_sync.lock().await;
+    
+    // Convert rolegraph nodes to DTOs
+    let nodes: Vec<GraphNodeDto> = rolegraph
+        .nodes_map()
+        .iter()
+        .map(|(id, node)| {
+            let label = rolegraph
+                .ac_reverse_nterm
+                .get(id)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("Node {}", id));
+            
+            GraphNodeDto {
+                id: *id,
+                label,
+                rank: node.rank as f64,
+            }
+        })
+        .collect();
+    
+    // Convert rolegraph edges to DTOs using magic_unpair to get source and target
+    let edges: Vec<GraphEdgeDto> = rolegraph
+        .edges_map()
+        .iter()
+        .map(|(&edge_id, edge)| {
+            let (source, target) = magic_unpair(edge_id);
+            GraphEdgeDto {
+                source,
+                target,
+                weight: edge.rank as f64,
+            }
+        })
+        .collect();
+    
+    Ok(RoleGraphResponse {
+        status: Status::Success,
+        nodes,
+        edges,
+    })
 }
 
 /// Select a role (change `selected_role`) without sending the entire config back and
