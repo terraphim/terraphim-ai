@@ -2,7 +2,7 @@ use serde_json as json;
 use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;
 
-mod command;
+pub mod command;
 pub mod indexer;
 pub mod thesaurus;
 pub mod haystack;

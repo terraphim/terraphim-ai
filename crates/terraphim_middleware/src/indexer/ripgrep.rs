@@ -39,7 +39,19 @@ impl IndexMiddleware for RipgrepIndexer {
             log::debug!("Found {} markdown files in haystack: {:?}", files.len(), files.iter().map(|e| e.path()).collect::<Vec<_>>());
         }
         
-        let messages = self.command.run(needle, haystack_path).await?;
+        // Parse extra parameters from haystack configuration
+        let extra_args = self.command.parse_extra_parameters(haystack.get_extra_parameters());
+        if !extra_args.is_empty() {
+            log::info!("Using extra ripgrep parameters: {:?}", extra_args);
+        }
+        
+        // Run ripgrep with extra arguments if any
+        let messages = if extra_args.is_empty() {
+            self.command.run(needle, haystack_path).await?
+        } else {
+            self.command.run_with_extra_args(needle, haystack_path, &extra_args).await?
+        };
+        
         log::debug!("Ripgrep returned {} messages", messages.len());
         
         // Debug: Log the first few messages to understand the JSON structure

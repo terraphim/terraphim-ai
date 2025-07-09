@@ -135,18 +135,16 @@ async fn test_dual_haystack_comprehensive_validation() {
                 theme: "cosmo".to_string(),
                 kg: None,
                 haystacks: vec![
-                    Haystack {
-                        location: server_url.clone(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: atomic_secret.clone(),
-                    },
-                    Haystack {
-                        location: "../../docs/src".to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: true,
-                        atomic_server_secret: None,
-                    },
+                    Haystack::new(
+                        server_url.clone(),
+                        ServiceType::Atomic,
+                        true,
+                    ).with_atomic_secret(atomic_secret.clone()),
+                    Haystack::new(
+                        "../../docs/src".to_string(),
+                        ServiceType::Ripgrep,
+                        true,
+                    ),
                 ],
                 extra: ahash::AHashMap::new(),
             },
@@ -174,18 +172,16 @@ async fn test_dual_haystack_comprehensive_validation() {
                     publish: true,
                 }),
                 haystacks: vec![
-                    Haystack {
-                        location: server_url.clone(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: atomic_secret.clone(),
-                    },
-                    Haystack {
-                        location: "../../docs/src".to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: true,
-                        atomic_server_secret: None,
-                    },
+                    Haystack::new(
+                        server_url.clone(),
+                        ServiceType::Atomic,
+                        true,
+                    ).with_atomic_secret(atomic_secret.clone()),
+                    Haystack::new(
+                        "../../docs/src".to_string(),
+                        ServiceType::Ripgrep,
+                        true,
+                    ),
                 ],
                 extra: ahash::AHashMap::new(),
             },
@@ -204,12 +200,11 @@ async fn test_dual_haystack_comprehensive_validation() {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "cerulean".to_string(),
                 kg: None,
-                haystacks: vec![Haystack {
-                    location: server_url.clone(),
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: atomic_secret.clone(),
-                }],
+                haystacks: vec![Haystack::new(
+                    server_url.clone(),
+                    ServiceType::Atomic,
+                    true,
+                ).with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -226,12 +221,11 @@ async fn test_dual_haystack_comprehensive_validation() {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "journal".to_string(),
                 kg: None,
-                haystacks: vec![Haystack {
-                    location: "../../docs/src".to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: true,
-                    atomic_server_secret: None,
-                }],
+                haystacks: vec![Haystack::new(
+                    "../../docs/src".to_string(),
+                    ServiceType::Ripgrep,
+                    true,
+                )],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -523,18 +517,16 @@ async fn test_source_differentiation_validation() {
                 theme: "flatly".to_string(),
                 kg: None,
                 haystacks: vec![
-                    Haystack {
-                        location: server_url.clone(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: atomic_secret.clone(),
-                    },
-                    Haystack {
-                        location: "../../docs/src".to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: true,
-                        atomic_server_secret: None,
-                    },
+                    Haystack::new(
+                        server_url.clone(),
+                        ServiceType::Atomic,
+                        true,
+                    ).with_atomic_secret(atomic_secret.clone()),
+                    Haystack::new(
+                        "../../docs/src".to_string(),
+                        ServiceType::Ripgrep,
+                        true,
+                    ),
                 ],
                 extra: ahash::AHashMap::new(),
             },

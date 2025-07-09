@@ -107,12 +107,11 @@ async fn test_atomic_haystack_with_terraphim_config() {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
-                haystacks: vec![Haystack {
-                    location: server_url.clone(), // Use server URL directly as location
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: atomic_secret.clone(),
-                }],
+                haystacks: vec![Haystack::new(
+                    server_url.clone(), // Use server URL directly as location
+                    ServiceType::Atomic,
+                    true,
+                ).with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -218,12 +217,11 @@ async fn test_atomic_haystack_with_terraphim_config() {
 #[tokio::test]
 async fn test_atomic_haystack_config_validation() {
     // Test that atomic haystack requires proper URL in location
-    let haystack = Haystack {
-        location: "invalid-url".to_string(),
-        service: ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: None,
-    };
+    let haystack = Haystack::new(
+        "invalid-url".to_string(),
+        ServiceType::Atomic,
+        true,
+    );
     
     let indexer = AtomicHaystackIndexer::default();
     let result = indexer.index("test", &haystack).await;
@@ -237,12 +235,11 @@ async fn test_atomic_haystack_config_validation() {
 /// Test atomic haystack with invalid secret
 #[tokio::test]
 async fn test_atomic_haystack_invalid_secret() {
-    let haystack = Haystack {
-        location: "http://localhost:9883".to_string(),
-        service: ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: Some("invalid-secret".to_string()),
-    };
+    let haystack = Haystack::new(
+        "http://localhost:9883".to_string(),
+        ServiceType::Atomic,
+        true,
+    ).with_atomic_secret(Some("invalid-secret".to_string()));
     
     let indexer = AtomicHaystackIndexer::default();
     let result = indexer.index("test", &haystack).await;
@@ -258,12 +255,12 @@ async fn test_atomic_haystack_invalid_secret() {
 #[tokio::test]
 #[ignore] // Requires running Atomic Server
 async fn test_atomic_haystack_anonymous_access() {
-    let haystack = Haystack {
-        location: "http://localhost:9883".to_string(),
-        service: ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: None, // No secret = anonymous access
-    };
+    let haystack = Haystack::new(
+        "http://localhost:9883".to_string(),
+        ServiceType::Atomic,
+        true,
+        // No secret = anonymous access (atomic_server_secret: None is default)
+    );
     
     let indexer = AtomicHaystackIndexer::default();
     let result = indexer.index("test", &haystack).await;
@@ -289,12 +286,12 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
     
     // 1. Test anonymous access (public documents)
     log::info!("📖 Testing anonymous access to public documents");
-    let public_haystack = Haystack {
-        location: server_url.clone(),
-        service: ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: None, // No secret = public access
-    };
+    let public_haystack = Haystack::new(
+        server_url.clone(),
+        ServiceType::Atomic,
+        true,
+        // No secret = public access (atomic_server_secret: None is default)
+    );
     
     let indexer = AtomicHaystackIndexer::default();
     
@@ -315,12 +312,11 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
     // 2. Test authenticated access (if secret is available)
     if let Some(secret) = atomic_secret {
         log::info!("🔐 Testing authenticated access with secret");
-        let auth_haystack = Haystack {
-            location: server_url.clone(),
-            service: ServiceType::Atomic,
-            read_only: true,
-            atomic_server_secret: Some(secret), // With secret = authenticated access
-        };
+        let auth_haystack = Haystack::new(
+            server_url.clone(),
+            ServiceType::Atomic,
+            true,
+        ).with_atomic_secret(Some(secret)); // With secret = authenticated access
         
         let auth_result = indexer.index("test", &auth_haystack).await;
         assert!(auth_result.is_ok(), "Authenticated access should work");
@@ -351,22 +347,21 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
     log::info!("⚙️ Testing configuration with mixed access haystacks");
     
     let mut haystacks = vec![
-        Haystack {
-            location: server_url.clone(),
-            service: ServiceType::Atomic,
-            read_only: true,
-            atomic_server_secret: None, // Public haystack
-        }
+        Haystack::new(
+            server_url.clone(),
+            ServiceType::Atomic,
+            true,
+            // Public haystack (atomic_server_secret: None is default)
+        )
     ];
     
     // Add authenticated haystack if secret is available
     if let Some(secret) = std::env::var("ATOMIC_SERVER_SECRET").ok() {
-        haystacks.push(Haystack {
-            location: server_url.clone(),
-            service: ServiceType::Atomic,
-            read_only: true,
-            atomic_server_secret: Some(secret), // Authenticated haystack
-        });
+        haystacks.push(Haystack::new(
+            server_url.clone(),
+            ServiceType::Atomic,
+            true,
+        ).with_atomic_secret(Some(secret))); // Authenticated haystack
     }
     
     let config = ConfigBuilder::new()
@@ -470,12 +465,12 @@ async fn test_atomic_haystack_public_document_creation_and_access() {
     
     // Test 1: Access with no secret (anonymous/public access)
     log::info!("🌐 Testing anonymous access to public document");
-    let public_haystack = Haystack {
-        location: server_url.clone(),
-        service: ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: None, // No secret = public access
-    };
+    let public_haystack = Haystack::new(
+        server_url.clone(),
+        ServiceType::Atomic,
+        true,
+        // No secret = public access (atomic_server_secret: None is default)
+    );
     
     let indexer = AtomicHaystackIndexer::default();
     let public_result = indexer.index("Public Test", &public_haystack).await;
@@ -496,12 +491,11 @@ async fn test_atomic_haystack_public_document_creation_and_access() {
     
     // Test 2: Access with secret (authenticated access)
     log::info!("🔐 Testing authenticated access to same documents");
-    let auth_haystack = Haystack {
-        location: server_url.clone(),
-        service: ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: Some(secret.clone()), // With secret = authenticated access
-    };
+    let auth_haystack = Haystack::new(
+        server_url.clone(),
+        ServiceType::Atomic,
+        true,
+    ).with_atomic_secret(Some(secret.clone())); // With secret = authenticated access
     
     let auth_result = indexer.index("Public Test", &auth_haystack).await;
     assert!(auth_result.is_ok(), "Authenticated access should work");

@@ -97,12 +97,11 @@ async fn test_atomic_haystack_title_scorer_role() {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "cerulean".to_string(),
                 kg: None, // No knowledge graph for title scorer
-                haystacks: vec![Haystack {
-                    location: server_url.clone(),
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: atomic_secret.clone(),
-                }],
+                haystacks: vec![Haystack::new(
+                    server_url.clone(),
+                    ServiceType::Atomic,
+                    true,
+                ).with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -339,12 +338,11 @@ async fn test_atomic_haystack_graph_embeddings_role() {
                     public: true,
                     publish: true,
                 }),
-                haystacks: vec![Haystack {
-                    location: server_url.clone(),
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: atomic_secret.clone(),
-                }],
+                haystacks: vec![Haystack::new(
+                    server_url.clone(),
+                    ServiceType::Atomic,
+                    true,
+                ).with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
             },
         )
