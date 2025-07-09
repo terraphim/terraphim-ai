@@ -97,7 +97,7 @@ pub enum ServiceType {
 ///
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
 pub struct Haystack {
     /// The location of the haystack - can be a filesystem path or URL
     pub location: String,
@@ -109,8 +109,93 @@ pub struct Haystack {
     #[serde(default)]
     pub read_only: bool,
     /// The secret for connecting to an Atomic Server.
+    /// This field is only serialized for Atomic service haystacks.
     #[serde(default)]
     pub atomic_server_secret: Option<String>,
+    /// Extra parameters specific to the service type.
+    /// For Ripgrep: can include additional command-line arguments like filtering by tags.
+    /// For Atomic: can include additional API parameters.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub extra_parameters: std::collections::HashMap<String, String>,
+}
+
+impl Serialize for Haystack {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        
+        // Determine how many fields to include based on service type
+        let mut field_count = 3; // location, service, read_only
+        
+        // Include atomic_server_secret only for Atomic service and if it's present
+        let include_atomic_secret = self.service == ServiceType::Atomic && self.atomic_server_secret.is_some();
+        if include_atomic_secret {
+            field_count += 1;
+        }
+        
+        // Include extra_parameters if not empty
+        if !self.extra_parameters.is_empty() {
+            field_count += 1;
+        }
+        
+        let mut state = serializer.serialize_struct("Haystack", field_count)?;
+        state.serialize_field("location", &self.location)?;
+        state.serialize_field("service", &self.service)?;
+        state.serialize_field("read_only", &self.read_only)?;
+        
+        // Only include atomic_server_secret for Atomic service
+        if include_atomic_secret {
+            state.serialize_field("atomic_server_secret", &self.atomic_server_secret)?;
+        }
+        
+        // Include extra_parameters if not empty
+        if !self.extra_parameters.is_empty() {
+            state.serialize_field("extra_parameters", &self.extra_parameters)?;
+        }
+        
+        state.end()
+    }
+}
+
+impl Haystack {
+    /// Create a new Haystack with extra parameters
+    pub fn new(location: String, service: ServiceType, read_only: bool) -> Self {
+        Self {
+            location,
+            service,
+            read_only,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+        }
+    }
+    
+    /// Create a new Haystack with atomic server secret
+    pub fn with_atomic_secret(mut self, secret: Option<String>) -> Self {
+        // Only set secret for Atomic service
+        if self.service == ServiceType::Atomic {
+            self.atomic_server_secret = secret;
+        }
+        self
+    }
+    
+    /// Add extra parameters to the haystack
+    pub fn with_extra_parameters(mut self, params: std::collections::HashMap<String, String>) -> Self {
+        self.extra_parameters = params;
+        self
+    }
+    
+    /// Add a single extra parameter
+    pub fn with_extra_parameter(mut self, key: String, value: String) -> Self {
+        self.extra_parameters.insert(key, value);
+        self
+    }
+    
+    /// Get a reference to extra parameters for this service type
+    pub fn get_extra_parameters(&self) -> &std::collections::HashMap<String, String> {
+        &self.extra_parameters
+    }
 }
 
 /// A knowledge graph is the collection of documents which were indexed
@@ -223,6 +308,7 @@ impl ConfigBuilder {
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: AHashMap::new(),
             },
@@ -248,6 +334,7 @@ impl ConfigBuilder {
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: AHashMap::new(),
             },
@@ -273,6 +360,7 @@ impl ConfigBuilder {
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: AHashMap::new(),
             },
@@ -299,6 +387,7 @@ impl ConfigBuilder {
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: AHashMap::new(),
             },
@@ -324,6 +413,7 @@ impl ConfigBuilder {
                     service: ServiceType::Ripgrep,
                     read_only: false,
                     atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: AHashMap::new(),
             },
@@ -710,6 +800,7 @@ mod tests {
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
                 },
@@ -727,6 +818,7 @@ mod tests {
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
                 },
@@ -752,6 +844,7 @@ mod tests {
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
                 },
@@ -799,6 +892,7 @@ mod tests {
                 service: ServiceType::Ripgrep,
                 read_only: false,
                 atomic_server_secret: None,
+                extra_parameters: std::collections::HashMap::new(),
             }],
             extra: AHashMap::new(),
         }

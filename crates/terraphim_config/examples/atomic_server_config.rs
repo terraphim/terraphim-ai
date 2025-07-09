@@ -23,12 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
-                haystacks: vec![Haystack {
-                    location: "http://localhost:9883".to_string(), // Atomic server URL
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: Some("your-base64-secret-here".to_string()),
-                }],
+                haystacks: vec![Haystack::new(
+                    "http://localhost:9883".to_string(), // Atomic server URL
+                    ServiceType::Atomic,
+                    true,
+                ).with_atomic_secret(Some("your-base64-secret-here".to_string()))],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -55,19 +54,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 kg: None,
                 haystacks: vec![
                     // Local filesystem haystack using ripgrep
-                    Haystack {
-                        location: "./docs".to_string(), // Local filesystem path
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None, // Not used for ripgrep
-                    },
+                    Haystack::new(
+                        "./docs".to_string(), // Local filesystem path
+                        ServiceType::Ripgrep,
+                        false,
+                    ),
                     // Remote atomic server haystack
-                    Haystack {
-                        location: "http://localhost:9883".to_string(), // Atomic server URL
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: Some("your-base64-secret-here".to_string()),
-                    },
+                    Haystack::new(
+                        "http://localhost:9883".to_string(), // Atomic server URL
+                        ServiceType::Atomic,
+                        true,
+                    ).with_atomic_secret(Some("your-base64-secret-here".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
             },
@@ -82,18 +79,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 kg: None,
                 haystacks: vec![
                     // Multiple atomic server instances
-                    Haystack {
-                        location: "http://localhost:9883".to_string(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: Some("secret-for-server-1".to_string()),
-                    },
-                    Haystack {
-                        location: "https://example.com/atomic".to_string(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: Some("secret-for-server-2".to_string()),
-                    },
+                    Haystack::new(
+                        "http://localhost:9883".to_string(),
+                        ServiceType::Atomic,
+                        true,
+                    ).with_atomic_secret(Some("secret-for-server-1".to_string())),
+                    Haystack::new(
+                        "https://example.com/atomic".to_string(),
+                        ServiceType::Atomic,
+                        true,
+                    ).with_atomic_secret(Some("secret-for-server-2".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
             },
@@ -121,12 +116,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
-                haystacks: vec![Haystack {
-                    location: "http://localhost:9883".to_string(),
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: None, // No authentication
-                }],
+                haystacks: vec![Haystack::new(
+                    "http://localhost:9883".to_string(),
+                    ServiceType::Atomic,
+                    true,
+                    // No authentication (atomic_server_secret: None is default)
+                )],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -152,19 +147,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 kg: None,
                 haystacks: vec![
                     // Public documentation server
-                    Haystack {
-                        location: "https://docs.example.com".to_string(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: None, // Public access to documentation
-                    },
+                    Haystack::new(
+                        "https://docs.example.com".to_string(),
+                        ServiceType::Atomic,
+                        true,
+                        // Public access to documentation (atomic_server_secret: None is default)
+                    ),
                     // Public knowledge base
-                    Haystack {
-                        location: "https://kb.company.com".to_string(),
-                        service: ServiceType::Atomic,
-                        read_only: true,
-                        atomic_server_secret: None, // Public company knowledge base
-                    },
+                    Haystack::new(
+                        "https://kb.company.com".to_string(),
+                        ServiceType::Atomic,
+                        true,
+                        // Public company knowledge base (atomic_server_secret: None is default)
+                    ),
                 ],
                 extra: ahash::AHashMap::new(),
             },
@@ -250,12 +245,11 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "default".to_string(),
                 kg: None,
-                haystacks: vec![Haystack {
-                    location: server_url,
-                    service: ServiceType::Atomic,
+                haystacks: vec![Haystack::new(
+                    server_url,
+                    ServiceType::Atomic,
                     read_only,
-                    atomic_server_secret: secret,
-                }],
+                ).with_atomic_secret(secret)],
                 extra: ahash::AHashMap::new(),
             },
         )

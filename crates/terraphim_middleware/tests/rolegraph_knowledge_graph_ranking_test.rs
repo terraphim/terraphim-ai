@@ -42,12 +42,11 @@ async fn test_rolegraph_knowledge_graph_ranking() {
             public: true,
             publish: true,
         }),
-        haystacks: vec![Haystack {
-            location: docs_src_path.to_string_lossy().to_string(),
-            service: ServiceType::Ripgrep,
-            read_only: true,
-            atomic_server_secret: None,
-        }],
+        haystacks: vec![Haystack::new(
+            docs_src_path.to_string_lossy().to_string(),
+            ServiceType::Ripgrep,
+            true,
+        )],
         extra: ahash::AHashMap::new(),
     };
 
@@ -152,12 +151,11 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         .expect("Failed to build config");
 
     // Index documents using ripgrep
-    let haystack = Haystack {
-        location: docs_src_path.to_string_lossy().to_string(),
-        service: ServiceType::Ripgrep,
-        read_only: true,
-        atomic_server_secret: None,
-    };
+    let haystack = Haystack::new(
+        docs_src_path.to_string_lossy().to_string(),
+        ServiceType::Ripgrep,
+        true,
+    );
 
     let indexer = RipgrepIndexer::default();
     let index = indexer

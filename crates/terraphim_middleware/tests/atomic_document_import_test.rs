@@ -221,12 +221,11 @@ async fn test_document_import_and_search() {
 
     // 3. Test searching the imported documents
     let indexer = AtomicHaystackIndexer::default();
-    let haystack = Haystack {
-        location: config.server_url.clone(),
-        service: terraphim_config::ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: std::env::var("ATOMIC_SERVER_SECRET").ok(),
-    };
+    let haystack = Haystack::new(
+        config.server_url.clone(),
+        terraphim_config::ServiceType::Atomic,
+        true,
+    ).with_atomic_secret(std::env::var("ATOMIC_SERVER_SECRET").ok());
 
     // Test search with various terms that should be found in the documents
     let search_terms = vec![

@@ -52,12 +52,11 @@ async fn test_atomic_haystack_indexer() {
     let indexer = AtomicHaystackIndexer::default();
 
     // 4. Create a Haystack config
-    let haystack = Haystack {
-        location: config.server_url.clone(),
-        service: terraphim_config::ServiceType::Atomic,
-        read_only: true,
-        atomic_server_secret: std::env::var("ATOMIC_SERVER_SECRET").ok(),
-    };
+    let haystack = Haystack::new(
+        config.server_url.clone(),
+        terraphim_config::ServiceType::Atomic,
+        true,
+    ).with_atomic_secret(std::env::var("ATOMIC_SERVER_SECRET").ok());
 
     // Poll the server until the document is indexed or we time out
     let mut index = terraphim_types::Index::new();
