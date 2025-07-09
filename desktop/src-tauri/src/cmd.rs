@@ -12,8 +12,10 @@ use terraphim_types::{Document, SearchQuery};
 use serde::Serializer;
 use schemars::schema_for;
 use serde_json::Value;
+use tsify::Tsify;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum Status {
     #[serde(rename = "success")]
     Success,
@@ -64,7 +66,8 @@ pub type Result<T> = std::result::Result<T, TerraphimTauriError>;
 /// Response type for showing the config
 ///
 /// This is also used when updating the config
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct ConfigResponse {
     /// Status of the config fetch
     pub status: Status,
@@ -76,7 +79,8 @@ pub struct ConfigResponse {
 ///
 /// This is used when searching for documents
 /// and returning the results
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct SearchResponse {
     /// Status of the search
     pub status: Status,
@@ -140,7 +144,8 @@ pub async fn publish_thesaurus(
 
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct InitialSettings {
     data_folder: PathBuf,
     global_shortcut: String,
@@ -221,7 +226,8 @@ pub async fn close_splashscreen(window: Window) {
 }
 
 /// Response type for a single document
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DocumentResponse {
     pub status: Status,
     pub document: Option<Document>,

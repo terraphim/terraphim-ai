@@ -29,6 +29,7 @@ log = "0.4"
 wasm-bindgen-futures = "0.4.1"
 wasm-bindgen = { version = "0.2.51" }
 cached = { version = "0.47.0", features = ["proc_macro", "async", "serde", "ahash"] }
+tsify = { version = "0.4", features = ["js"], optional = true }
 
 [[bench]]
 name = "autocomplete_bench"
@@ -38,6 +39,7 @@ harness = false
 default = []
 remote-loading = ["tokio", "reqwest"]
 tokio-runtime = ["tokio"]
+typescript = ["tsify"]
 
 [dev-dependencies]
 criterion = "0.5"
