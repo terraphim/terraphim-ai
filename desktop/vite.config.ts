@@ -116,9 +116,12 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        // Suppress deprecation warnings from third-party dependencies
+        // Suppress all warnings from third-party dependencies
         quietDeps: true,
-        silenceDeprecations: ['legacy-js-api', 'import', 'global-builtin', 'color-functions']
+        // Silence deprecation warnings for all known categories
+        silenceDeprecations: ['legacy-js-api', 'import', 'global-builtin', 'color-functions', 'mixed-decls'],
+        // Add verbose flag to control output
+        verbose: false
       }
     }
   },
