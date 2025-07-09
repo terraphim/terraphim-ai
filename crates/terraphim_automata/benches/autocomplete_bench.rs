@@ -21,8 +21,6 @@ use terraphim_automata::autocomplete::{
 };
 use terraphim_types::{Thesaurus, NormalizedTerm, NormalizedTermValue};
 
-#[cfg(feature = "remote-loading")]
-use terraphim_automata::{load_thesaurus, AutomataPath};
 
 #[cfg(feature = "tokio-runtime")]
 use tokio::runtime::Runtime;

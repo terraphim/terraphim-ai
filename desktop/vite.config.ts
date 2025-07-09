@@ -113,4 +113,30 @@ export default defineConfig({
       '/documents': 'http://localhost:8000',
     }
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // Suppress deprecation warnings from third-party dependencies
+        quietDeps: true,
+        silenceDeprecations: ['legacy-js-api', 'import', 'global-builtin', 'color-functions']
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor libraries
+          'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
+          'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
+          'vendor-charts': ['d3'],
+          'vendor-atomic': ['@tomic/lib', '@tomic/svelte'],
+          'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
+          // Large components
+          'novel-editor': ['@paralect/novel-svelte']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000 // Increase limit to 1MB
+  }
 })

@@ -1,0 +1,52 @@
+Reading environment variables...
+Found env var: ATOMIC_SERVER_URL = http://localhost:9883/
+Found env var: ATOMIC_SERVER_SECRET = [REDACTED]
+Found ATOMIC_SERVER_SECRET, length: 292
+Agent created successfully with subject: http://localhost:9883/agents/tuktb7vNcllfCGd6nxZsucNJYDGD+uqpEi8ywtEP5pA=
+Search results: Object {
+    "@id": String("http://localhost:9883/search?q=Terraphim"),
+    "https://atomicdata.dev/properties/description": String("Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. "),
+    "https://atomicdata.dev/properties/endpoint/parameters": Array [
+        String("https://atomicdata.dev/properties/search/query"),
+        String("https://atomicdata.dev/properties/search/limit"),
+        String("https://atomicdata.dev/properties/search/property"),
+    ],
+    "https://atomicdata.dev/properties/endpoint/results": Array [
+        String("http://localhost:9883/terraphim-drive"),
+        String("http://localhost:9883/test-role-comparison-682f0abe-c8b0-4d92-8f4b-6f96220a5843/terraphim-architecture"),
+        String("http://localhost:9883/test-title-scorer-192c0197-70a2-4a72-b0a7-f6cd322a7607/terraphim-arch"),
+        String("http://localhost:9883/test-title-scorer-e1d8b499-7488-4cc2-b880-f0a90a229b91/terraphim-arch"),
+        String("http://localhost:9883/test-title-scorer-fb406f69-8b83-49ce-bc06-7eab8e995ac2/terraphim-arch"),
+        String("http://localhost:9883/test-title-scorer-0e65de86-2cd2-4650-ade6-39dca5bf2f5d/terraphim-arch"),
+        String("http://localhost:9883/test-title-scorer-0e65de86-2cd2-4650-ade6-39dca5bf2f5d/terraphim-guide"),
+        String("http://localhost:9883/test-title-scorer-e26bb414-f597-4291-8f28-8ff47884fd0b/terraphim-arch"),
+        String("http://localhost:9883/test-title-scorer-e26bb414-f597-4291-8f28-8ff47884fd0b/terraphim-guide"),
+        String("http://localhost:9883/terraphim-drive/terraphim"),
+        String("http://localhost:9883/atomic-terraphim-guide"),
+        String("http://localhost:9883/claudedesktop"),
+        String("http://localhost:9883/readme"),
+        String("http://localhost:9883/use-cases"),
+        String("http://localhost:9883/service"),
+        String("http://localhost:9883/terraphim-graph"),
+        String("https://common.terraphim.io/agents/MrgyRNWCpoiuC1UVVJ/DGhYP+2Pv3ZFxf0Y30oYWDKw="),
+        String("http://localhost:9883/terraphim-drive/terraphim/class/document"),
+        String("http://localhost:9883/terraphim-drive/terraphim/class/config"),
+        String("http://localhost:9883/test-title-scorer-192c0197-70a2-4a72-b0a7-f6cd322a7607/atomic-server"),
+        String("http://localhost:9883/test-title-scorer-192c0197-70a2-4a72-b0a7-f6cd322a7607/search-algorithms"),
+        String("http://localhost:9883/test-title-scorer-e1d8b499-7488-4cc2-b880-f0a90a229b91/atomic-server"),
+        String("http://localhost:9883/test-title-scorer-e1d8b499-7488-4cc2-b880-f0a90a229b91/search-algorithms"),
+        String("http://localhost:9883/test-title-scorer-fb406f69-8b83-49ce-bc06-7eab8e995ac2/atomic-server"),
+        String("http://localhost:9883/test-title-scorer-fb406f69-8b83-49ce-bc06-7eab8e995ac2/search-algorithms"),
+        String("http://localhost:9883/test-title-scorer-0e65de86-2cd2-4650-ade6-39dca5bf2f5d/atomic-server"),
+        String("http://localhost:9883/test-title-scorer-0e65de86-2cd2-4650-ade6-39dca5bf2f5d/search-algorithms"),
+        String("http://localhost:9883/test-title-scorer-e26bb414-f597-4291-8f28-8ff47884fd0b/atomic-server"),
+        String("http://localhost:9883/test-title-scorer-e26bb414-f597-4291-8f28-8ff47884fd0b/search-algorithms"),
+        String("http://localhost:9883/atomic-search-functionality"),
+    ],
+    "https://atomicdata.dev/properties/isA": Array [
+        String("https://atomicdata.dev/classes/Endpoint"),
+    ],
+    "https://atomicdata.dev/properties/lastCommit": String("http://localhost:9883/commits/I5hSfIw1a7kXY5+ZVYVya3lOg+Be4LeZ96vlNL5q3CSH4umA6q7frNCZtZa+ikzmio5AQUL1O4ezCIlxigt3Dw=="),
+    "https://atomicdata.dev/properties/parent": String("http://localhost:9883/endpoints"),
+    "https://atomicdata.dev/properties/shortname": String("search"),
+}

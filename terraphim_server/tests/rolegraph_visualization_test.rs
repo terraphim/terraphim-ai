@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     use ahash::AHashMap;
-    use terraphim_automata::AutomataPath;
+    
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
@@ -16,7 +16,7 @@ mod tests {
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
         ServiceType,
     };
-    use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction, RoleName};
+    use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 
     use serial_test::serial;
 

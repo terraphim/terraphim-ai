@@ -220,9 +220,11 @@ pub enum Similarity {
     Levenshtein,
     /// Computes the Jaro edit distance between two names and converts it to a
     /// similarity.
+    #[allow(dead_code)]
     Jaro,
     /// Computes the Jaro-Winkler edit distance between two names and converts
     /// it to a similarity.
+    #[allow(dead_code)]
     JaroWinkler,
 }
 

@@ -1,7 +1,6 @@
 use crate::{error::AtomicError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use base64::{engine::general_purpose::STANDARD, Engine};
 use crate::auth::Agent;
 use serde_json::Value;
 

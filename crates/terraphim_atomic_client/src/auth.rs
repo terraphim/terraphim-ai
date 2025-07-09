@@ -11,8 +11,6 @@ use crate::{
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 #[cfg(not(feature = "native"))]
 use std::collections::HashMap;
-#[cfg(feature = "native")]
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Arc;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json;

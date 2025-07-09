@@ -1,11 +1,10 @@
 use terraphim_config::Haystack;
 use terraphim_middleware::{haystack::AtomicHaystackIndexer, indexer::IndexMiddleware};
 use terraphim_atomic_client::{self, Store};
-use terraphim_types::Document;
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use uuid::Uuid;
 use walkdir::WalkDir;
 

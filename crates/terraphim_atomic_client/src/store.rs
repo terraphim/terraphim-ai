@@ -3,9 +3,6 @@ use crate::{
     types::{Commit, Resource, Config},
     Result,
 };
-#[cfg(feature = "native")]
-use crate::http;
-use std::sync::Arc;
 use std::collections::HashMap;
 use url::Url;
 use serde::{Serialize, Deserialize};
@@ -336,7 +333,7 @@ impl Store {
         let server_url = self.config.server_url.trim_end_matches('/');
         let url = format!("{}/search", server_url);
         
-        let mut request = self.client.get(&url)
+        let request = self.client.get(&url)
             .query(&[("q", query)])
             .header("Accept", "application/json");
         

@@ -1,4 +1,3 @@
-use cached::proc_macro::cached;
 use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;

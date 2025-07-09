@@ -3,12 +3,12 @@
 #[cfg(test)]
 mod tests {
     use ahash::AHashMap;
-    use terraphim_automata::AutomataPath;
+    
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
     use reqwest::{Client, StatusCode};
-    use std::{net::SocketAddr, path::PathBuf, time::Duration};
+    use std::{net::SocketAddr, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
         ServiceType,

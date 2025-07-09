@@ -18,13 +18,21 @@ datadir= "/tmp/terraphim/sled"
 [profiles.memory]
 type = "memory"
 
-[profiles.dash]
+[profiles.dashmap]
 type = "dashmap"
 root = "/tmp/dashmaptest"
 
 [profiles.rock]
 type = "rocksdb"
 datadir = "/tmp/opendal/rocksdb" 
+
+[profiles.redb]
+type = "redb"
+datadir = "/tmp/terraphim_redb"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"
 
 [profiles.atomicserver]
 endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"

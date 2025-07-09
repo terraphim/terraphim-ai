@@ -2,13 +2,6 @@
 //!
 //! This module provides HTTP client implementations for both native and WASM targets.
 
-use crate::{
-    auth::get_authentication_headers,
-    error::AtomicError,
-    types::{Commit, Config},
-    Result,
-};
-use serde_json::Value;
 
 #[cfg(feature = "native")]
 pub mod native {

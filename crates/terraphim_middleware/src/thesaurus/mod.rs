@@ -25,14 +25,13 @@
 //! The logic as follows: if you ask for concept by name you get concept, if you ask (get) for any of the synonyms you will get concept with id,
 //! its pre-computed reverse tree traversal - any of the synonyms (leaf) maps into the concepts (root)
 
-use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
-use terraphim_automata::AutomataPath;
+pub use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_config::Role;
 use terraphim_persistence::Persistable;
-use terraphim_rolegraph::{Error as RoleGraphError, RoleGraph, RoleGraphSync};
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::SearchQuery;
-use terraphim_types::{Concept, NormalizedTerm, RoleName, Thesaurus};
+use terraphim_types::{RoleName, Thesaurus};
 
 use crate::Result;
 use std::path::PathBuf;

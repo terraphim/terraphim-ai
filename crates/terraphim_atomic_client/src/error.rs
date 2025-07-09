@@ -62,6 +62,7 @@ pub enum AtomicError {
 }
 
 /// Result type for the Atomic Server Client.
+#[allow(dead_code)]
 pub type Result<T> = std::result::Result<T, AtomicError>;
 
 #[cfg(feature = "native")]
