@@ -7,10 +7,21 @@ default_data_path = "${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}"
 type = "rocksdb"
 datadir= "/tmp/terraphim_rocksdb"
 
-[profiles.dash]
+[profiles.dashmap]
 type = "dashmap"
 root = "/tmp/dashmaptest"
 
 [profiles.rock]
 type = "rocksdb"
 datadir = "/tmp/opendal/rocksdb"
+
+[profiles.redb]
+type = "redb"
+datadir = "/tmp/terraphim_redb"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"
+
+[profiles.memory]
+type = "memory"

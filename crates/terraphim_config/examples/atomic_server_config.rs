@@ -1,6 +1,5 @@
 use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
-use std::path::PathBuf;
 
 /// Example demonstrating how to configure Terraphim with atomic server haystacks
 /// 

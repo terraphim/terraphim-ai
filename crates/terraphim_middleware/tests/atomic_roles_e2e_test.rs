@@ -749,3 +749,455 @@ async fn test_atomic_roles_config_validation() {
 
     log::info!("✅ Atomic roles configuration validation test completed successfully");
 } 
+
+/// Test comprehensive atomic server haystack role configurations including:
+/// 1. Pure atomic roles (TitleScorer and TerraphimGraph)
+/// 2. Hybrid roles (Atomic + Ripgrep haystacks)
+/// 3. Role switching and comparison
+/// 4. Configuration validation
+#[tokio::test]
+async fn test_comprehensive_atomic_haystack_roles() {
+    // Initialize logging for test debugging
+    let _ = env_logger::try_init();
+
+    // Load atomic server configuration from environment
+    dotenvy::dotenv().ok();
+    let server_url = std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
+    let atomic_secret = std::env::var("ATOMIC_SERVER_SECRET").ok();
+    
+    if atomic_secret.is_none() {
+        log::warn!("ATOMIC_SERVER_SECRET not set, test may fail with authentication");
+    }
+
+    // Create atomic store for setup and cleanup
+    let atomic_config = terraphim_atomic_client::Config {
+        server_url: server_url.clone(),
+        agent: atomic_secret.as_ref().and_then(|secret| {
+            terraphim_atomic_client::Agent::from_base64(secret).ok()
+        }),
+    };
+    let store = Store::new(atomic_config).expect("Failed to create atomic store");
+
+    // 1. Create test documents in the atomic server
+    let test_id = Uuid::new_v4();
+    let server_base = server_url.trim_end_matches('/');
+    
+    // Create parent collection for test documents
+    let parent_subject = format!("{}/test-comprehensive-roles-{}", server_base, test_id);
+    let mut parent_properties = HashMap::new();
+    parent_properties.insert(
+        "https://atomicdata.dev/properties/name".to_string(),
+        json!("Comprehensive Roles Test Collection")
+    );
+    parent_properties.insert(
+        "https://atomicdata.dev/properties/description".to_string(),
+        json!("Test collection for comprehensive atomic haystack role testing")
+    );
+    parent_properties.insert(
+        "https://atomicdata.dev/properties/isA".to_string(),
+        json!(["https://atomicdata.dev/classes/Collection"])
+    );
+    parent_properties.insert(
+        "https://atomicdata.dev/properties/parent".to_string(),
+        json!(server_base)
+    );
+
+    store.create_with_commit(&parent_subject, parent_properties)
+        .await
+        .expect("Failed to create parent collection");
+
+    // Create diverse test documents for different search scenarios
+    let test_documents = vec![
+        (
+            format!("{}/atomic-integration-guide", parent_subject),
+            "ATOMIC: Integration Guide",
+            "Complete guide for integrating Terraphim with atomic server. Covers authentication, configuration, and advanced search features."
+        ),
+        (
+            format!("{}/semantic-search-algorithms", parent_subject),
+            "ATOMIC: Semantic Search Algorithms",
+            "Advanced semantic search algorithms using graph embeddings, vector spaces, and knowledge graphs for improved relevance."
+        ),
+        (
+            format!("{}/hybrid-haystack-configuration", parent_subject),
+            "ATOMIC: Hybrid Haystack Configuration",
+            "Configuration guide for setting up hybrid haystacks combining atomic server and ripgrep for comprehensive document search."
+        ),
+        (
+            format!("{}/role-based-search", parent_subject),
+            "ATOMIC: Role-Based Search",
+            "Role-based search functionality allowing different user roles to access different search capabilities and document sets."
+        ),
+        (
+            format!("{}/performance-optimization", parent_subject),
+            "ATOMIC: Performance Optimization",
+            "Performance optimization techniques for atomic server integration including caching, indexing, and query optimization."
+        ),
+    ];
+
+    let mut created_documents = Vec::new();
+    for (subject, title, description) in &test_documents {
+        let mut properties = HashMap::new();
+        properties.insert(
+            "https://atomicdata.dev/properties/name".to_string(),
+            json!(title)
+        );
+        properties.insert(
+            "https://atomicdata.dev/properties/description".to_string(),
+            json!(description)
+        );
+        properties.insert(
+            "https://atomicdata.dev/properties/isA".to_string(),
+            json!(["https://atomicdata.dev/classes/Article"])
+        );
+        properties.insert(
+            "https://atomicdata.dev/properties/parent".to_string(),
+            json!(parent_subject)
+        );
+
+        store.create_with_commit(subject, properties)
+            .await
+            .expect("Failed to create test document");
+        created_documents.push(subject.clone());
+        log::debug!("Created test document: {}", title);
+    }
+
+    log::info!("Created {} test documents in atomic server", created_documents.len());
+
+    // 2. Create comprehensive role configurations
+    
+    // Pure Atomic Title Scorer Role
+    let pure_atomic_title_config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+1")
+        .add_role(
+            "PureAtomicTitle",
+            Role {
+                shortname: Some("pure-atomic-title".to_string()),
+                name: "Pure Atomic Title".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: server_url.clone(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: atomic_secret.clone(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
+        .build()
+        .expect("Failed to build pure atomic title config");
+
+    // Pure Atomic Graph Embeddings Role
+    let pure_atomic_graph_config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+2")
+        .add_role(
+            "PureAtomicGraph",
+            Role {
+                shortname: Some("pure-atomic-graph".to_string()),
+                name: "Pure Atomic Graph".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "superhero".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    location: server_url.clone(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: atomic_secret.clone(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
+        .build()
+        .expect("Failed to build pure atomic graph config");
+
+    // Hybrid Role: Atomic + Ripgrep with Title Scorer
+    let hybrid_title_config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+3")
+        .add_role(
+            "HybridTitle",
+            Role {
+                shortname: Some("hybrid-title".to_string()),
+                name: "Hybrid Title".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "lumen".to_string(),
+                kg: None,
+                haystacks: vec![
+                    Haystack {
+                        location: server_url.clone(),
+                        service: ServiceType::Atomic,
+                        read_only: true,
+                        atomic_server_secret: atomic_secret.clone(),
+                    },
+                    Haystack {
+                        location: "docs/src".to_string(),
+                        service: ServiceType::Ripgrep,
+                        read_only: true,
+                        atomic_server_secret: None,
+                    },
+                ],
+                extra: ahash::AHashMap::new(),
+            },
+        )
+        .build()
+        .expect("Failed to build hybrid title config");
+
+    // Hybrid Role: Atomic + Ripgrep with Graph Embeddings
+    let hybrid_graph_config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+4")
+        .add_role(
+            "HybridGraph",
+            Role {
+                shortname: Some("hybrid-graph".to_string()),
+                name: "Hybrid Graph".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "darkly".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![
+                    Haystack {
+                        location: server_url.clone(),
+                        service: ServiceType::Atomic,
+                        read_only: true,
+                        atomic_server_secret: atomic_secret.clone(),
+                    },
+                    Haystack {
+                        location: "docs/src".to_string(),
+                        service: ServiceType::Ripgrep,
+                        read_only: true,
+                        atomic_server_secret: None,
+                    },
+                ],
+                extra: ahash::AHashMap::new(),
+            },
+        )
+        .build()
+        .expect("Failed to build hybrid graph config");
+
+    // 3. Test each role configuration
+    let configs = vec![
+        ("PureAtomicTitle", pure_atomic_title_config),
+        ("PureAtomicGraph", pure_atomic_graph_config),
+        ("HybridTitle", hybrid_title_config),
+        ("HybridGraph", hybrid_graph_config),
+    ];
+
+    let search_terms = vec!["integration", "semantic", "configuration", "performance"];
+    let mut all_results = HashMap::new();
+
+    for (role_name, config) in &configs {
+        log::info!("Testing role: {}", role_name);
+        
+        // Validate configuration structure
+        let role = config.roles.values().next().unwrap();
+        match *role_name {
+            "PureAtomicTitle" | "PureAtomicGraph" => {
+                assert_eq!(role.haystacks.len(), 1, "Pure atomic roles should have 1 haystack");
+                assert_eq!(role.haystacks[0].service, ServiceType::Atomic);
+            },
+            "HybridTitle" | "HybridGraph" => {
+                assert_eq!(role.haystacks.len(), 2, "Hybrid roles should have 2 haystacks");
+                assert!(role.haystacks.iter().any(|h| h.service == ServiceType::Atomic));
+                assert!(role.haystacks.iter().any(|h| h.service == ServiceType::Ripgrep));
+            },
+            _ => panic!("Unknown role name: {}", role_name),
+        }
+
+        // Test search functionality for each role
+        let indexer = AtomicHaystackIndexer::default();
+        let role_results = &mut all_results.entry(role_name.to_string()).or_insert_with(HashMap::new);
+
+        for search_term in &search_terms {
+            let search_start = std::time::Instant::now();
+            
+            // Test search across all haystacks for this role
+            let mut total_results = 0;
+            for haystack in &role.haystacks {
+                if haystack.service == ServiceType::Atomic {
+                    match indexer.index(search_term, haystack).await {
+                        Ok(results) => {
+                            total_results += results.len();
+                            log::debug!("Role {}, haystack {:?}, term '{}': {} results", 
+                                       role_name, haystack.service, search_term, results.len());
+                        },
+                        Err(e) => {
+                            log::warn!("Search failed for role {}, term '{}': {}", role_name, search_term, e);
+                        }
+                    }
+                }
+            }
+            
+            let search_duration = search_start.elapsed();
+            role_results.insert(search_term.to_string(), (total_results, search_duration));
+            log::info!("Role {}, term '{}': {} total results in {:?}", 
+                      role_name, search_term, total_results, search_duration);
+        }
+    }
+
+    // 4. Validate search results and performance
+    for (role_name, results) in &all_results {
+        log::info!("=== Results Summary for {} ===", role_name);
+        for (term, (count, duration)) in results {
+            log::info!("  '{}': {} results in {:?}", term, count, duration);
+            
+            // Validate that we get reasonable results
+            if atomic_secret.is_some() {
+                assert!(*count > 0, "Role {} should find results for term '{}'", role_name, term);
+            }
+            
+            // Validate reasonable performance (less than 5 seconds per search)
+            assert!(duration.as_secs() < 5, "Search should complete within 5 seconds");
+        }
+    }
+
+    // 5. Test role comparison - hybrid roles should generally find more results
+    if atomic_secret.is_some() {
+        for search_term in &search_terms {
+            let pure_title_count = all_results.get("PureAtomicTitle")
+                .and_then(|r| r.get(*search_term))
+                .map(|(count, _)| *count)
+                .unwrap_or(0);
+            
+            let hybrid_title_count = all_results.get("HybridTitle")
+                .and_then(|r| r.get(*search_term))
+                .map(|(count, _)| *count)
+                .unwrap_or(0);
+            
+            log::info!("Term '{}': Pure={}, Hybrid={}", search_term, pure_title_count, hybrid_title_count);
+            
+            // Hybrid should generally find more or equal results (has additional ripgrep haystack)
+            // Note: This is not always guaranteed depending on document overlap
+            if hybrid_title_count < pure_title_count {
+                log::warn!("Hybrid role found fewer results than pure atomic for '{}' - this may indicate an issue", search_term);
+            }
+        }
+    }
+
+    // 6. Test configuration serialization and deserialization
+    for (role_name, config) in &configs {
+        let json_str = serde_json::to_string_pretty(config)
+            .expect("Failed to serialize config");
+        
+        let deserialized_config: terraphim_config::Config = serde_json::from_str(&json_str)
+            .expect("Failed to deserialize config");
+        
+        assert_eq!(config.roles.len(), deserialized_config.roles.len(), 
+                  "Serialized config should maintain role count for {}", role_name);
+        
+        log::debug!("Role {} config serialization validated", role_name);
+    }
+
+    // 7. Cleanup - delete test documents
+    log::info!("Cleaning up test documents");
+    for doc_subject in &created_documents {
+        match store.delete_with_commit(doc_subject).await {
+            Ok(_) => log::debug!("Deleted test document: {}", doc_subject),
+            Err(e) => log::warn!("Failed to delete test document {}: {}", doc_subject, e),
+        }
+    }
+    
+    // Delete parent collection
+    match store.delete_with_commit(&parent_subject).await {
+        Ok(_) => log::info!("Deleted parent collection: {}", parent_subject),
+        Err(e) => log::warn!("Failed to delete parent collection {}: {}", parent_subject, e),
+    }
+
+    log::info!("✅ Comprehensive atomic haystack roles test completed successfully");
+}
+
+/// Test atomic server error handling and graceful degradation
+#[tokio::test]
+async fn test_atomic_haystack_error_handling() {
+    // Initialize logging for test debugging
+    let _ = env_logger::try_init();
+
+    // Test with invalid atomic server URL
+    let invalid_config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+E")
+        .add_role(
+            "InvalidAtomic",
+            Role {
+                shortname: Some("invalid-atomic".to_string()),
+                name: "Invalid Atomic".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: "http://localhost:9999".to_string(), // Non-existent server
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: Some("invalid_secret".to_string()),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
+        .build()
+        .expect("Failed to build invalid config");
+
+    // Test search with invalid configuration - should handle errors gracefully
+    let indexer = AtomicHaystackIndexer::default();
+    let role = invalid_config.roles.values().next().unwrap();
+    let haystack = &role.haystacks[0];
+
+    let search_result = indexer.index("test", haystack).await;
+    
+    // Should return an error, not panic
+    assert!(search_result.is_err(), "Search with invalid atomic server should return error");
+    log::info!("✅ Error handling test: Got expected error - {}", search_result.unwrap_err());
+
+    // Test with missing secret
+    let no_secret_config = ConfigBuilder::new()
+        .global_shortcut("Ctrl+N")
+        .add_role(
+            "NoSecretAtomic",
+            Role {
+                shortname: Some("no-secret-atomic".to_string()),
+                name: "No Secret Atomic".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: "http://localhost:9883".to_string(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: None, // No authentication secret
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
+        .build()
+        .expect("Failed to build no-secret config");
+
+    let no_secret_role = no_secret_config.roles.values().next().unwrap();
+    let no_secret_haystack = &no_secret_role.haystacks[0];
+
+    let no_secret_result = indexer.index("test", no_secret_haystack).await;
+    
+    // May succeed (anonymous access) or fail (authentication required) - both are valid
+    match no_secret_result {
+        Ok(results) => {
+            log::info!("✅ Anonymous access test: Found {} results", results.len());
+        },
+        Err(e) => {
+            log::info!("✅ Authentication required test: Got expected error - {}", e);
+        }
+    }
+
+    log::info!("✅ Atomic haystack error handling test completed successfully");
+} 

@@ -147,6 +147,16 @@
             <li
               class:active={index === suggestionIndex}
               on:click={() => applySuggestion(suggestion)}
+              on:keydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  applySuggestion(suggestion);
+                }
+              }}
+              tabindex="0"
+              role="option"
+              aria-selected={index === suggestionIndex}
+              aria-label={`Apply suggestion: ${suggestion}`}
             >
               {suggestion}
             </li>

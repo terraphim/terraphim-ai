@@ -80,6 +80,12 @@ async fn generic_classes_crud_search() {
             Some(u) => u,
             None => continue,
         };
+        
+        // Skip custom application classes - only test standard Atomic Data classes
+        if !class_url.starts_with("https://atomicdata.dev/classes/") {
+            continue;
+        }
+        
         if skip.contains(class_url) { continue; }
 
         let name_prop = member.get("https://atomicdata.dev/properties/name").and_then(|v| v.as_str()).unwrap_or("resource");

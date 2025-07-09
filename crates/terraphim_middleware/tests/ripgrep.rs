@@ -1,5 +1,4 @@
 use serial_test::serial;
-use std::path::PathBuf;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::{RelevanceFunction, RoleName};
 use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};

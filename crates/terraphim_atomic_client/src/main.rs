@@ -260,7 +260,7 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         // Always send JSON-AD regardless of chosen output format.
         let body = serde_json::to_vec(&resources)?;
 
-        use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, ACCEPT};
+        use reqwest::header::{HeaderValue, CONTENT_TYPE, ACCEPT};
         let client = reqwest::Client::new();
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers = terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -562,7 +562,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                 continue;
             }
             // Skip read/write properties that contain agent references
-            if (prop == "https://atomicdata.dev/properties/read" || prop == "https://atomicdata.dev/properties/write") {
+            if prop == "https://atomicdata.dev/properties/read" || prop == "https://atomicdata.dev/properties/write" {
                 if let serde_json::Value::Array(arr) = val {
                     let filtered: Vec<serde_json::Value> = arr.iter()
                         .filter(|v| {
@@ -648,7 +648,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         // Always send JSON-AD transformed payload for validation
         let body = serde_json::to_vec(&transformed)?;
 
-        use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, ACCEPT};
+        use reqwest::header::{HeaderValue, CONTENT_TYPE, ACCEPT};
         let client = reqwest::Client::new();
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers = terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -873,7 +873,7 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                 continue;
             }
             // Skip read/write properties that contain agent references
-            if (prop == "https://atomicdata.dev/properties/read" || prop == "https://atomicdata.dev/properties/write") {
+            if prop == "https://atomicdata.dev/properties/read" || prop == "https://atomicdata.dev/properties/write" {
                 if let serde_json::Value::Array(arr) = val {
                     let filtered: Vec<serde_json::Value> = arr.iter()
                         .filter(|v| {
@@ -1053,7 +1053,7 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 
 #[cfg(feature = "native")]
 fn sort_resources_by_dependencies(
-    mut resources: Vec<serde_json::Map<String, serde_json::Value>>,
+    resources: Vec<serde_json::Map<String, serde_json::Value>>,
     parent_url: &str
 ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>, Box<dyn std::error::Error>> {
     // Define dependency order: ontology -> classes -> properties

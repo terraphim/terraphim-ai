@@ -5,7 +5,6 @@ use terraphim_atomic_client::{self, Store};
 use terraphim_types::{SearchQuery, Index};
 use serde_json::json;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use uuid::Uuid;
 
 /// Test that demonstrates atomic server haystack integration with terraphim config

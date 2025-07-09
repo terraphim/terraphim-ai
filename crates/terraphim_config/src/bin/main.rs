@@ -1,13 +1,12 @@
 use ahash::AHashMap;
-use std::path::PathBuf;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Result, Role, ServiceType,
+    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType,
     TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
-use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
+use terraphim_types::RelevanceFunction;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -46,7 +45,7 @@ async fn main() -> Result<()> {
 
     println!("key: {}", config.get_key());
     config.save().await?;
-    config.save_to_one("dash").await?;
+    config.save_to_one("dashmap").await?;
 
     println!("saved obj: {:?} to all", config);
     let (_ops, fastest_op) = config.load_config().await?;

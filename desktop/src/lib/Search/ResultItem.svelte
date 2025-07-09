@@ -73,11 +73,16 @@
                 </span>
               </a>
             {/if}
-            <a href="#" class="level-item" aria-label="like">
+            <button 
+              type="button" 
+              class="level-item button is-ghost" 
+              aria-label="Add to favorites"
+              on:click={() => {/* TODO: Implement add to favorites */}}
+            >
               <span class="icon is-medium">
                 <i class="fas fa-plus" aria-hidden="true" />
               </span>
-            </a>
+            </button>
             <a
             href={`vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`}
             class="level-item"

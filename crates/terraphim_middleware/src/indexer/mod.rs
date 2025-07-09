@@ -1,6 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
 use terraphim_config::{ConfigState, ServiceType};
 use terraphim_types::{Index, SearchQuery};
 

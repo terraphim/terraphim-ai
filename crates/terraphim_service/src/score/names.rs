@@ -14,20 +14,24 @@ pub enum NameScorer {
     OkapiBM25,
     /// TFIDF is the traditional TF-IDF ranking function, which does not
     /// incorporate document length.
+    #[allow(dead_code)]
     TFIDF,
     /// Jaccard is a ranking function determined by computing the similarity
     /// of ngrams between the query and a name in the index. The similarity
     /// is computed by dividing the number of ngrams in common by the total
     /// number of distinct ngrams in both the query and the name combined.
+    #[allow(dead_code)]
     Jaccard,
     /// QueryRatio is a ranking function that represents the ratio of query
     /// terms that matched a name. It is computed by dividing the number of
     /// ngrams in common by the total number of ngrams in the query only.
+    #[allow(dead_code)]
     QueryRatio,
 }
 
 impl NameScorer {
     /// Returns a list of strings representing the possible scorer values.
+    #[allow(dead_code)]
     pub fn possible_names() -> &'static [&'static str] {
         &["okapibm25", "tfidf", "jaccard", "queryratio"]
     }

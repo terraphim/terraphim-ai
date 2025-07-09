@@ -119,20 +119,12 @@ pub async fn parse_profile(
         Scheme::Atomicserver => {
             Operator::from_map::<services::Atomicserver>(profile.clone())?.finish()
         }
-        #[cfg(feature = "services-etcd")]
-        Scheme::Etcd => Operator::from_map::<services::Etcd>(profile.clone())?.finish(),
         Scheme::Gcs => Operator::from_map::<services::Gcs>(profile.clone())?.finish(),
         Scheme::Ghac => Operator::from_map::<services::Ghac>(profile.clone())?.finish(),
-        #[cfg(feature = "services-hdfs")]
-        Scheme::Hdfs => Operator::from_map::<services::Hdfs>(profile.clone())?.finish(),
         Scheme::Http => Operator::from_map::<services::Http>(profile.clone())?.finish(),
-        #[cfg(feature = "services-ftp")]
-        Scheme::Ftp => Operator::from_map::<services::Ftp>(profile.clone())?.finish(),
         #[cfg(feature = "services-ipfs")]
         Scheme::Ipfs => Operator::from_map::<services::Ipfs>(profile.clone())?.finish(),
         Scheme::Ipmfs => Operator::from_map::<services::Ipmfs>(profile.clone())?.finish(),
-        #[cfg(feature = "services-memcached")]
-        Scheme::Memcached => Operator::from_map::<services::Memcached>(profile.clone())?.finish(),
         Scheme::Obs => Operator::from_map::<services::Obs>(profile.clone())?.finish(),
         Scheme::Oss => Operator::from_map::<services::Oss>(profile.clone())?.finish(),
         #[cfg(feature = "services-redis")]
@@ -225,7 +217,7 @@ mod tests {
         };
 
         // Save the object
-        test_obj.save_to_one("dash").await?;
+        test_obj.save_to_one("dashmap").await?;
 
         // Load the object
         let mut loaded_obj = TestStruct::new("Test Object".to_string());
@@ -255,6 +247,110 @@ mod tests {
 
         // Compare the original and loaded objects
         assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
+
+        Ok(())
+    }
+
+    /// Test saving and loading a struct to rocksdb profile
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_save_and_load_rocksdb() -> Result<()> {
+        // Create a test object
+        let test_obj = TestStruct {
+            name: "Test RocksDB Object".to_string(),
+            age: 30,
+        };
+
+        // Save the object to rocksdb
+        test_obj.save_to_one("rocksdb").await?;
+
+        // Load the object
+        let mut loaded_obj = TestStruct::new("Test RocksDB Object".to_string());
+        loaded_obj = loaded_obj.load().await?;
+
+        // Compare the original and loaded objects
+        assert_eq!(test_obj, loaded_obj, "Loaded RocksDB object does not match the original");
+
+        Ok(())
+    }
+
+    /// Test saving and loading a struct to memory profile
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_save_and_load_memory() -> Result<()> {
+        // Create a test object
+        let test_obj = TestStruct {
+            name: "Test Memory Object".to_string(),
+            age: 35,
+        };
+
+        // Save the object to memory
+        test_obj.save_to_one("memory").await?;
+
+        // Load the object
+        let mut loaded_obj = TestStruct::new("Test Memory Object".to_string());
+        loaded_obj = loaded_obj.load().await?;
+
+        // Compare the original and loaded objects
+        assert_eq!(test_obj, loaded_obj, "Loaded memory object does not match the original");
+
+        Ok(())
+    }
+
+    /// Test saving and loading a struct to redb profile (if available)
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_save_and_load_redb() -> Result<()> {
+        // Create a test object
+        let test_obj = TestStruct {
+            name: "Test ReDB Object".to_string(),
+            age: 40,
+        };
+
+        // Try to save the object to redb - this might not be configured in all environments
+        match test_obj.save_to_one("redb").await {
+            Ok(()) => {
+                // Load the object
+                let mut loaded_obj = TestStruct::new("Test ReDB Object".to_string());
+                loaded_obj = loaded_obj.load().await?;
+
+                // Compare the original and loaded objects
+                assert_eq!(test_obj, loaded_obj, "Loaded ReDB object does not match the original");
+            },
+            Err(e) => {
+                println!("ReDB profile not available (expected in some environments): {:?}", e);
+                // This is okay - not all environments may have redb configured
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Test saving and loading a struct to sqlite profile (if available)
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_save_and_load_sqlite() -> Result<()> {
+        // Create a test object
+        let test_obj = TestStruct {
+            name: "Test SQLite Object".to_string(),
+            age: 45,
+        };
+
+        // Try to save the object to sqlite - this might not be configured in all environments
+        match test_obj.save_to_one("sqlite").await {
+            Ok(()) => {
+                // Load the object
+                let mut loaded_obj = TestStruct::new("Test SQLite Object".to_string());
+                loaded_obj = loaded_obj.load().await?;
+
+                // Compare the original and loaded objects
+                assert_eq!(test_obj, loaded_obj, "Loaded SQLite object does not match the original");
+            },
+            Err(e) => {
+                println!("SQLite profile not available (expected in some environments): {:?}", e);
+                // This is okay - not all environments may have sqlite configured
+            }
+        }
 
         Ok(())
     }

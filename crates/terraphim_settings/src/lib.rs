@@ -153,8 +153,8 @@ fn init_config_file(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
 mod tests {
     use super::*;
     use test_log::test;
-    use tempfile::tempdir;
-    use envtestkit::lock::{lock_read, lock_test};
+    
+    use envtestkit::lock::lock_test;
     use envtestkit::set_env;
     use std::ffi::OsString;
 
