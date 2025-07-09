@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
+#[cfg(feature = "typescript")]
+use tsify::Tsify;
 
 use terraphim_types::Thesaurus;
 
@@ -47,6 +49,8 @@ pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 ///
 /// It can either be a local file path or a URL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum AutomataPath {
     Local(PathBuf),
     Remote(String),

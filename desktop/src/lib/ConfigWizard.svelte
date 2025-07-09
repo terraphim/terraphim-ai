@@ -6,17 +6,53 @@
   import { writable, get } from "svelte/store";
   // @ts-ignore
   import { configStore } from "$lib/stores";
+  // Import generated types
+  import type { 
+    Config, 
+    Role, 
+    Haystack, 
+    KnowledgeGraph, 
+    ServiceType,
+    ConfigId,
+    RelevanceFunction,
+    KnowledgeGraphInputType
+  } from "./generated/types";
 
   const schema = writable<any>(null);
+  
+  // Form types derived from generated types
   type ConfigDraft = {
-    id: string;
+    id: ConfigId;
     global_shortcut: string;
     default_theme: string;
     default_role: string;
   };
-  type HaystackForm = { path: string; read_only: boolean };
-  type KnowledgeGraphForm = { url: string; local_path: string; local_type: string; public: boolean; publish: boolean };
-  type RoleForm = { name: string; shortname: string; relevance_function: string; theme: string; haystacks: HaystackForm[]; kg: KnowledgeGraphForm };
+  
+  // HaystackForm now matches the generated Haystack type
+  type HaystackForm = { 
+    path: string; 
+    read_only: boolean; 
+    service: ServiceType;
+    atomic_server_secret?: string;
+    extra_parameters: { [key: string]: string };
+  };
+  
+  type KnowledgeGraphForm = { 
+    url: string; 
+    local_path: string; 
+    local_type: KnowledgeGraphInputType; 
+    public: boolean; 
+    publish: boolean 
+  };
+  
+  type RoleForm = { 
+    name: string; 
+    shortname: string; 
+    relevance_function: RelevanceFunction; 
+    theme: string; 
+    haystacks: HaystackForm[]; 
+    kg: KnowledgeGraphForm 
+  };
   const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
     id: "Desktop",
     global_shortcut: "Ctrl+X",
@@ -53,7 +89,13 @@
               shortname: r.shortname,
               relevance_function: r.relevance_function,
               theme: r.theme,
-              haystacks: (r.haystacks ?? []).map((h:any)=>({path:h.path, read_only:h.read_only ?? false})),
+              haystacks: (r.haystacks ?? []).map((h:any)=>({
+                path: h.location || h.path || "", // Handle both old and new field names
+                read_only: h.read_only ?? false,
+                service: h.service || "Ripgrep",
+                atomic_server_secret: h.atomic_server_secret || "",
+                extra_parameters: h.extra_parameters || {}
+              })),
               kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false }
             };
           })
@@ -74,7 +116,14 @@
   }
 
   function addRole() {
-    draft.update((d) => ({ ...d, roles: [...d.roles, { name: "New Role", shortname:"new", relevance_function: "TitleScorer", theme: "spacelab", haystacks: [], kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false} }] }));
+    draft.update((d) => ({ ...d, roles: [...d.roles, { 
+      name: "New Role", 
+      shortname:"new", 
+      relevance_function: "title-scorer", 
+      theme: "spacelab", 
+      haystacks: [], 
+      kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false} 
+    }] }));
   }
   function removeRole(idx: number) {
     draft.update((d) => ({ ...d, roles: d.roles.filter((_, i) => i !== idx) }));
@@ -82,7 +131,13 @@
 
   function addHaystack(roleIdx:number){
     draft.update(d=>{
-      d.roles[roleIdx].haystacks.push({path:"", read_only:false});
+      d.roles[roleIdx].haystacks.push({
+        path:"", 
+        read_only:false, 
+        service: "Ripgrep",
+        atomic_server_secret: "",
+        extra_parameters: {}
+      });
       return d;
     });
   }
@@ -91,6 +146,41 @@
       d.roles[roleIdx].haystacks=d.roles[roleIdx].haystacks.filter((_,i)=>i!==hsIdx);
       return d;
     })
+  }
+
+  // Add/remove extra parameter functions
+  function addExtraParameter(roleIdx: number, hsIdx: number, key: string = "", value: string = "") {
+    draft.update(d => {
+      if (!d.roles[roleIdx].haystacks[hsIdx].extra_parameters) {
+        d.roles[roleIdx].haystacks[hsIdx].extra_parameters = {};
+      }
+      const newKey = key || `param_${Date.now()}`;
+      d.roles[roleIdx].haystacks[hsIdx].extra_parameters[newKey] = value;
+      return d;
+    });
+  }
+
+  function removeExtraParameter(roleIdx: number, hsIdx: number, paramKey: string) {
+    draft.update(d => {
+      delete d.roles[roleIdx].haystacks[hsIdx].extra_parameters[paramKey];
+      return d;
+    });
+  }
+
+  function updateExtraParameterKey(roleIdx: number, hsIdx: number, oldKey: string, newKey: string) {
+    draft.update(d => {
+      const params = d.roles[roleIdx].haystacks[hsIdx].extra_parameters;
+      if (params[oldKey] !== undefined && oldKey !== newKey) {
+        params[newKey] = params[oldKey];
+        delete params[oldKey];
+      }
+      return d;
+    });
+  }
+
+  function handleParameterKeyChange(roleIdx: number, hsIdx: number, oldKey: string, event: any) {
+    const newKey = event.target.value;
+    updateExtraParameterKey(roleIdx, hsIdx, oldKey, newKey);
   }
 
   async function save() {
@@ -116,7 +206,13 @@
         shortname: r.shortname,
         theme: r.theme,
         relevance_function: r.relevance_function,
-        haystacks: r.haystacks.map((h)=>({path: h.path, service:"Ripgrep", read_only: h.read_only})),
+        haystacks: r.haystacks.map((h)=>({
+          location: h.path, // Use location field as expected by backend
+          service: h.service,
+          read_only: h.read_only,
+          atomic_server_secret: h.service === "Atomic" ? h.atomic_server_secret : undefined,
+          extra_parameters: h.extra_parameters || {}
+        })),
         kg: r.kg.url || r.kg.local_path ? {
           automata_path: r.kg.url ? { Remote: r.kg.url } : null,
           knowledge_graph_local: r.kg.local_path ? { input_type: r.kg.local_type, path: r.kg.local_path } : null,
@@ -223,18 +319,143 @@
             <input class="input" id={`role-relevance-${idx}`} type="text" bind:value={$draft.roles[idx].relevance_function} />
           </div>
         </div>
+        
         <h5 class="title is-6">Haystacks</h5>
         {#each roleItem.haystacks as hs, hIdx}
-          <div class="field is-grouped">
-            <div class="control is-expanded">
-              <label class="label" for={`haystack-path-${idx}-${hIdx}`}>Path</label>
-              <input class="input" id={`haystack-path-${idx}-${hIdx}`} type="text" placeholder="/path/to/haystack" bind:value={$draft.roles[idx].haystacks[hIdx].path} />
+          <div class="box is-light">
+            <!-- Service Type Selection -->
+            <div class="field">
+              <label class="label" for={`haystack-service-${idx}-${hIdx}`}>Service Type</label>
+              <div class="control">
+                <div class="select">
+                  <select id={`haystack-service-${idx}-${hIdx}`} bind:value={$draft.roles[idx].haystacks[hIdx].service}>
+                    <option value="Ripgrep">Ripgrep (File Search)</option>
+                    <option value="Atomic">Atomic Server</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <label class="checkbox" for={`haystack-readonly-${idx}-${hIdx}`} style="margin-right:0.5rem">
-              <input id={`haystack-readonly-${idx}-${hIdx}`} type="checkbox" bind:checked={$draft.roles[idx].haystacks[hIdx].read_only} />
-              &nbsp;Read-only
-            </label>
-            <button class="button is-small is-danger" on:click={() => removeHaystack(idx,hIdx)}>-</button>
+
+            <!-- Path Field -->
+            <div class="field">
+              <label class="label" for={`haystack-path-${idx}-${hIdx}`}>
+                {#if $draft.roles[idx].haystacks[hIdx].service === "Atomic"}
+                  Server URL
+                {:else}
+                  Directory Path
+                {/if}
+              </label>
+              <div class="control">
+                <input 
+                  class="input" 
+                  id={`haystack-path-${idx}-${hIdx}`} 
+                  type="text" 
+                  placeholder={$draft.roles[idx].haystacks[hIdx].service === "Atomic" ? "https://localhost:9883" : "/path/to/documents"} 
+                  bind:value={$draft.roles[idx].haystacks[hIdx].path} 
+                />
+              </div>
+            </div>
+
+            <!-- Atomic Server Secret (only for Atomic service) -->
+            {#if $draft.roles[idx].haystacks[hIdx].service === "Atomic"}
+              <div class="field">
+                <label class="label" for={`haystack-secret-${idx}-${hIdx}`}>Atomic Server Secret</label>
+                <div class="control">
+                  <input 
+                    class="input" 
+                    id={`haystack-secret-${idx}-${hIdx}`} 
+                    type="password" 
+                    placeholder="Base64 encoded secret (optional)" 
+                    bind:value={$draft.roles[idx].haystacks[hIdx].atomic_server_secret} 
+                  />
+                </div>
+                <p class="help">Leave empty for anonymous access</p>
+              </div>
+            {/if}
+
+            <!-- Extra Parameters (only for Ripgrep service) -->
+            {#if $draft.roles[idx].haystacks[hIdx].service === "Ripgrep"}
+              <div class="field">
+                <label class="label">Extra Parameters (for filtering)</label>
+                {#each Object.entries($draft.roles[idx].haystacks[hIdx].extra_parameters || {}) as [paramKey, paramValue], paramIdx}
+                  <div class="field is-grouped">
+                                                              <div class="control">
+                       <input 
+                         class="input" 
+                         type="text" 
+                         placeholder="Parameter name"
+                         value={paramKey}
+                         on:blur={(e) => handleParameterKeyChange(idx, hIdx, paramKey, e)}
+                       />
+                     </div>
+                    <div class="control is-expanded">
+                      <input 
+                        class="input" 
+                        type="text" 
+                        placeholder="Parameter value"
+                        bind:value={$draft.roles[idx].haystacks[hIdx].extra_parameters[paramKey]}
+                      />
+                    </div>
+                    <div class="control">
+                      <button 
+                        class="button is-small is-danger" 
+                        on:click={() => removeExtraParameter(idx, hIdx, paramKey)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+                
+                <!-- Predefined parameter buttons for common use cases -->
+                <div class="field is-grouped">
+                  <div class="control">
+                    <button 
+                      class="button is-small is-link is-light" 
+                      on:click={() => addExtraParameter(idx, hIdx, "tag", "#rust")}
+                    >
+                      + Tag Filter
+                    </button>
+                  </div>
+                  <div class="control">
+                    <button 
+                      class="button is-small is-link is-light" 
+                      on:click={() => addExtraParameter(idx, hIdx, "max_count", "10")}
+                    >
+                      + Max Results
+                    </button>
+                  </div>
+                  <div class="control">
+                    <button 
+                      class="button is-small is-link is-light" 
+                      on:click={() => addExtraParameter(idx, hIdx, "", "")}
+                    >
+                      + Custom Parameter
+                    </button>
+                  </div>
+                </div>
+                
+                <p class="help">
+                  Common parameters: <code>tag</code> (e.g., "#rust"), <code>glob</code> (e.g., "*.md"), 
+                  <code>max_count</code> (e.g., "10"), <code>context</code> (e.g., "5")
+                </p>
+              </div>
+            {/if}
+
+            <!-- Read-only checkbox -->
+            <div class="field">
+              <label class="checkbox" for={`haystack-readonly-${idx}-${hIdx}`}>
+                <input id={`haystack-readonly-${idx}-${hIdx}`} type="checkbox" bind:checked={$draft.roles[idx].haystacks[hIdx].read_only} />
+                &nbsp;Read-only
+              </label>
+            </div>
+
+            <!-- Remove haystack button -->
+            <div class="field">
+              <button class="button is-small is-danger" on:click={() => removeHaystack(idx, hIdx)}>
+                Remove Haystack
+              </button>
+            </div>
           </div>
         {/each}
         <button class="button is-small" on:click={() => addHaystack(idx)}>Add Haystack</button>

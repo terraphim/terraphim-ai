@@ -19,6 +19,8 @@ use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use schemars::JsonSchema;
+#[cfg(feature = "typescript")]
+use tsify::Tsify;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
@@ -67,6 +69,8 @@ pub enum TerraphimConfigError {
 /// It contains a user's knowledge graph, a list of haystacks, as
 /// well as preferences for the relevance function and theme
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
     pub shortname: Option<String>,
     pub name: RoleName,
@@ -86,6 +90,8 @@ use anyhow::Context;
 /// Each service assumes documents to be stored in a specific format
 /// and uses a specific indexing algorithm
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ServiceType {
     /// Use ripgrep as the indexing service
     Ripgrep,
@@ -98,6 +104,8 @@ pub enum ServiceType {
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Haystack {
     /// The location of the haystack - can be a filesystem path or URL
     pub location: String,
@@ -201,6 +209,8 @@ impl Haystack {
 /// A knowledge graph is the collection of documents which were indexed
 /// using a specific service
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct KnowledgeGraph {
     /// automata path refering to the published automata and can be online url or local file with pre-build automata
     #[schemars(with = "Option<String>")]
@@ -218,6 +228,8 @@ impl KnowledgeGraph {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct KnowledgeGraphLocal {
     pub input_type: KnowledgeGraphInputType,
     pub path: PathBuf,
@@ -481,6 +493,8 @@ impl Default for ConfigBuilder {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ConfigId {
     Server,
     Desktop,
@@ -491,6 +505,8 @@ pub enum ConfigId {
 ///
 /// It contains the global shortcut, roles, and the default role
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Config {
     /// Identifier for the config
     pub id: ConfigId,

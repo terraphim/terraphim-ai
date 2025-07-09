@@ -8,8 +8,12 @@ use std::ops::{Deref, DerefMut};
 
 use std::str::FromStr;
 use schemars::JsonSchema;
+#[cfg(feature = "typescript")]
+use tsify::Tsify;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RoleName {
     pub original: String,
     pub lowercase: String,
@@ -76,6 +80,8 @@ impl<'de> Deserialize<'de> for RoleName {
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
 #[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
@@ -182,6 +188,8 @@ impl Display for Concept {
 /// It holds the title, body, description, tags, and rank.
 /// The `id` is a unique identifier for the document.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Document {
     /// Unique identifier for the document
     pub id: String,
@@ -457,6 +465,8 @@ impl IndexedDocument {
 /// Query type for searching documents in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SearchQuery {
     pub search_term: NormalizedTermValue,
     pub skip: Option<usize>,
@@ -467,6 +477,8 @@ pub struct SearchQuery {
 /// Defines the relevance function (scorer) to be used for ranking search
 /// results for the `Role`.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the Terraphim graph
     ///
@@ -485,6 +497,8 @@ pub enum RelevanceFunction {
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]

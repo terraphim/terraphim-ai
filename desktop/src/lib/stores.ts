@@ -1,40 +1,29 @@
 import { writable } from "svelte/store";
 import { CONFIG } from "../config";
+// Import generated types instead of manual definitions
+import type { 
+  Role, 
+  Config, 
+  ConfigResponse,
+  RoleName 
+} from "./generated/types";
 
-// TypeScript interfaces for Rust types
-export interface Role {
-  name: string;
-  theme: string;
-  shortname?: string;
-  kg?: { publish?: boolean };
-}
+// Custom interface for thesaurus (not in generated types)
 interface NormalisedThesaurus {
   id: string;
   term: string;
 }
+
 // writable key value store for thesaurus, where value is id and normalised term
 const thesaurus = writable<Array<Record<string, NormalisedThesaurus>>>([]);
 
-interface Config {
-  id: string;
-  global_shortcut: string;
-  roles: Record<string, Role>;
-  default_role: string;
-  selected_role: string;
-}
-
-interface ConfigResponse {
-  status: string;
-  config: Config;
-}
-
-// Default empty configuration
+// Default empty configuration - updated to match generated Config type
 const defaultConfig: Config = {
-  id: "",
+  id: "Desktop" as const,
   global_shortcut: "",
-  roles: {},
-  default_role: "",
-  selected_role: ""
+  roles: {} as Record<string, Role>,
+  default_role: { original: "", lowercase: "" } as RoleName,
+  selected_role: { original: "", lowercase: "" } as RoleName
 };
 
 const theme = writable<string>("spacelab");
@@ -45,7 +34,7 @@ const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
 const isInitialSetupComplete = writable<boolean>(false);
 
-// Roles should be an array of Role objects
+// Roles should be an array of Role objects - using generated Role type
 const roles = writable<Role[]>([]);
 
 let input = writable<string>("");
