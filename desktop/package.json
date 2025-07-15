@@ -21,6 +21,9 @@
     "test:atomic": "CI=true bash scripts/run-atomic-haystack-tests.sh",
     "test:atomic:ci": "CI=true bash scripts/run-atomic-haystack-tests.sh --ci",
     "test:atomic:only": "CI=true playwright test tests/e2e/atomic-server-haystack.spec.ts --workers=1 --retries=3",
+    "test:atomic:connection": "CI=true playwright test tests/e2e/atomic-connection.spec.ts --workers=1 --retries=3",
+    "test:atomic:search": "CI=true playwright test tests/e2e/atomic-haystack-search-validation.spec.ts --workers=1 --retries=3",
+    "test:atomic:lib": "CI=true playwright test tests/e2e/atomic-lib-integration.spec.ts --workers=1 --retries=3",
     "test:haystack": "CI=true playwright test tests/e2e/atomic-server-haystack.spec.ts tests/e2e/rolegraph-search-validation.spec.ts --workers=1 --retries=3",
     "test:all": "CI=true yarn run test && yarn run e2e:ci",
     "test:all:ci": "CI=true yarn run test:coverage && yarn run test:e2e:ci && yarn run test:atomic:ci"

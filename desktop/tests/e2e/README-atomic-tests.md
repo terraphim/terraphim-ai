@@ -1,233 +1,309 @@
 # Atomic Server Haystack Integration Tests
 
-This document describes the comprehensive Playwright tests for atomic server haystack integration in Terraphim.
+This directory contains comprehensive Playwright tests for atomic server haystack integration with CI-friendly features.
 
 ## Overview
 
-The atomic server haystack integration tests validate:
+The atomic server integration tests validate:
 
-1. **Atomic Server Connectivity** - Connection to atomic-server instances
-2. **Document Creation** - Creating searchable documents in atomic server
-3. **Search Functionality** - Searching through atomic server haystacks
-4. **Dual Haystack Integration** - Combined Atomic + Ripgrep haystack searches
-5. **Configuration Management** - Dynamic configuration updates
-6. **Error Handling** - Graceful degradation when atomic server is unavailable
+- **Atomic Server Connectivity**: Connection, authentication, and credential validation
+- **Terraphim Server Integration**: Configuration updates and role management  
+- **Haystack Search Functionality**: End-to-end search through atomic server backend
+- **Dual Haystack Support**: Combined Atomic + Ripgrep haystack operations
+- **Error Handling**: Graceful handling of various error conditions
+- **CI Compatibility**: Optimized execution for continuous integration environments
 
 ## Test Files
 
-- `atomic-server-haystack.spec.ts` - Main test suite for atomic server integration
-- `run-atomic-haystack-tests.sh` - Setup script with atomic server management
+### 1. `atomic-server-haystack.spec.ts` (Primary Integration Test)
+**Comprehensive test suite covering the complete atomic haystack integration flow:**
+
+- ✅ Atomic server connectivity and credential validation
+- ✅ Terraphim server configuration with atomic roles  
+- ✅ Search functionality with multiple search terms
+- ✅ Dual haystack (Atomic + Ripgrep) configuration and testing
+- ✅ Error handling and edge cases
+- ✅ CI-friendly features and performance validation
+
+### 2. `atomic-connection.spec.ts` (Connection Testing)
+**Focused on atomic server connection and basic integration:**
+
+- ✅ Basic atomic server connectivity
+- ✅ Environment variable validation
+- ✅ Terraphim server startup with atomic configuration
+- ✅ Simple search functionality testing
+
+### 3. `atomic-haystack-search-validation.spec.ts` (Search Validation) 
+**Detailed search functionality validation:**
+
+- ✅ Multiple search term testing
+- ✅ Result structure validation
+- ✅ Response time monitoring
+- ✅ Document ranking verification
 
 ## Prerequisites
 
-### Required Software
+### 1. Environment Setup
 
-1. **atomic-server** - Install with `cargo install atomic-server`
-2. **Terraphim server binary** - Build with `cargo build --release`
-3. **yarn** - Frontend package manager
-4. **Playwright** - Install with `yarn install` then `yarn playwright install`
+Create `.env` file in project root:
+```bash
+ATOMIC_SERVER_URL="http://localhost:9883"
+ATOMIC_SERVER_SECRET="<base64-encoded-agent-credentials>"
+```
 
-### Environment Setup
+### 2. Atomic Server Running
 
-The tests automatically:
-- Start an atomic server instance on port 9883
-- Create test documents in atomic server
-- Start Terraphim server with atomic configuration
-- Run comprehensive integration tests
-- Clean up all resources after completion
+Ensure atomic server is running:
+```bash
+../atomic-server/target/release/atomic-server --port 9883 --data-dir /path/to/data
+```
+
+### 3. Dependencies Installed
+
+```bash
+cd desktop
+yarn install
+```
 
 ## Running Tests
 
-### Quick Start
+### Quick Commands (from desktop directory)
 
 ```bash
-# Run all atomic server haystack tests with setup
-yarn test:atomic
+# Run all atomic haystack tests
+yarn run test:atomic
 
-# CI mode (headless, verbose reporting)
-yarn test:atomic:ci
+# Run specific test files
+yarn run test:atomic:only          # atomic-server-haystack.spec.ts
+yarn run test:atomic:connection    # atomic-connection.spec.ts  
+yarn run test:atomic:search        # atomic-haystack-search-validation.spec.ts
 
-# Run only the test file (assumes servers already running)
-yarn test:atomic:only
+# Run in CI mode
+yarn run test:atomic:ci
 
-# Run both atomic and rolegraph search tests
-yarn test:haystack
+# Run combined haystack tests
+yarn run test:haystack
 ```
 
-### Manual Setup
-
-If you want to run tests manually:
+### Advanced Usage
 
 ```bash
-# 1. Start atomic server
-atomic-server --port 9883 --data-dir /tmp/atomic_test --allow-origin "*"
+# Using the test runner script directly
+bash scripts/run-atomic-haystack-tests.sh
 
-# 2. Start Terraphim server
-cd ../terraphim_server
-cargo run --release
+# CI mode with enhanced reporting
+bash scripts/run-atomic-haystack-tests.sh --ci
 
-# 3. Run tests
-yarn playwright test tests/e2e/atomic-server-haystack.spec.ts
+# Run specific test
+bash scripts/run-atomic-haystack-tests.sh --test=atomic-connection.spec.ts
+
+# Show help
+bash scripts/run-atomic-haystack-tests.sh --help
 ```
 
-### CI Integration
-
-For continuous integration:
+### Manual Playwright Execution
 
 ```bash
-CI=true yarn test:atomic:ci
+# All atomic tests with CI settings
+CI=true playwright test tests/e2e/atomic-*.spec.ts --workers=1 --retries=3
+
+# Specific test in debug mode
+playwright test tests/e2e/atomic-server-haystack.spec.ts --debug
+
+# Headed mode for visual debugging  
+playwright test tests/e2e/atomic-server-haystack.spec.ts --headed
 ```
 
-This runs tests in:
-- Headless mode
-- Single worker (no parallelization)
-- 2 retries on failure
-- Extended timeouts (120s)
-- Comprehensive reporting (GitHub, HTML, JSON)
+## CI-Friendly Features
 
-## Test Structure
+### Optimized for Continuous Integration
 
-### Test Suites
+- **Headless Execution**: All tests run without UI in CI environments
+- **Enhanced Timeouts**: Extended timeouts for CI stability (120s vs 60s)
+- **Retry Logic**: Automatic retries on CI (3x vs 1x)
+- **Memory-Only Storage**: Terraphim server uses memory storage for faster, isolated tests
+- **Comprehensive Reporting**: JSON, HTML, and GitHub-formatted reports
+- **Sequential Execution**: Single worker to avoid resource conflicts
+- **Graceful Error Handling**: Proper cleanup and informative error messages
 
-1. **Atomic Server Haystack Integration**
-   - Server connectivity verification
-   - Document search via API
-   - UI search functionality
+### Environment Detection
 
-2. **Dual Haystack Integration**
-   - Combined Atomic + Ripgrep searches
-   - Source differentiation (ATOMIC: vs regular docs)
-   - Graceful degradation testing
+Tests automatically detect CI environment via `CI=true` and adjust:
 
-3. **Configuration Tests**
-   - Dynamic configuration updates
-   - Authentication validation
-   - URL configuration validation
-
-### Test Data
-
-The tests create standardized test documents:
-
-```json
-[
-  {
-    "title": "ATOMIC: Terraphim User Guide",
-    "body": "Comprehensive guide for using Terraphim with atomic server integration...",
-    "class": "Article"
-  },
-  {
-    "title": "ATOMIC: Search Features", 
-    "body": "Advanced search capabilities in Terraphim using atomic server backend...",
-    "class": "Article"
-  },
-  {
-    "title": "ATOMIC: Configuration & Roles",
-    "body": "Configuration guide for atomic server integration in Terraphim roles...",
-    "class": "Article"
-  }
-]
+```typescript
+const isCI = Boolean(process.env.CI);
+if (isCI) {
+  // Use CI-optimized settings
+  actionTimeout: 60000,
+  navigationTimeout: 60000,  
+  retries: 3,
+  workers: 1
+}
 ```
 
-## Configuration Examples
+### Timeout Configuration
 
-### Atomic-Only Configuration
+- **CI Environment**: 120s test timeout, 60s action timeout
+- **Development**: 60s test timeout, 30s action timeout
+- **Network Requests**: 15s timeout with AbortSignal for all fetch operations
+
+## Test Architecture
+
+### Server Management
+
+Each test suite includes a `TerraphimServerManager` class that:
+
+- ✅ Automatically builds Terraphim server if needed (release or debug)
+- ✅ Starts server with memory-only storage for isolation
+- ✅ Waits for server readiness with health checks
+- ✅ Properly shuts down and cleans up after tests
+
+### Configuration Management
+
+Tests create temporary role configurations:
 
 ```json
 {
-  "id": "Desktop",
   "roles": {
-    "Atomic Test": {
-      "haystacks": [
-        {
-          "location": "http://localhost:9883",
-          "service": "Atomic",
-          "read_only": true,
-          "atomic_server_secret": "test_secret_123"
-        }
-      ]
+    "Atomic Haystack Tester": {
+      "shortname": "AtomicTest",
+      "haystacks": [{
+        "location": "http://localhost:9883",
+        "service": "Atomic", 
+        "atomic_server_secret": "<secret>"
+      }]
     }
   }
 }
 ```
 
-### Dual Haystack Configuration
+### Search Testing Strategy
 
-```json
-{
-  "id": "Desktop", 
-  "roles": {
-    "Test Engineer": {
-      "haystacks": [
-        {
-          "location": "http://localhost:9883",
-          "service": "Atomic",
-          "read_only": true,
-          "atomic_server_secret": "test_secret_123"
-        },
-        {
-          "location": "./docs/src",
-          "service": "Ripgrep",
-          "read_only": true,
-          "atomic_server_secret": null
-        }
-      ]
-    }
-  }
-}
-```
-
-## Expected Results
-
-### Successful Test Run
-
-```
-🎯 Starting Atomic Server Haystack Integration Tests
-==================================================
-✅ Prerequisites check completed
-✅ Atomic server started successfully
-✅ Test documents created in atomic server  
-✅ Terraphim server started successfully
-✅ All atomic server haystack tests passed! 🎉
-```
-
-### Test Metrics
-
-- **Test Count**: ~15 comprehensive integration tests
-- **Duration**: 2-5 minutes (including setup/teardown)
-- **Coverage**: Server connectivity, document CRUD, search functionality, error handling
-- **Validation**: API responses, UI behavior, configuration persistence
+1. **Multiple Search Terms**: Tests various keywords (test, article, data, atomic)
+2. **Result Validation**: Verifies document structure (id, title, url, rank)
+3. **Success Metrics**: Expects at least 1 successful search per test
+4. **Performance Monitoring**: Tracks response times and success rates
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Port conflicts**: Ensure ports 8000 and 9883 are available
-2. **Binary not found**: Build Terraphim with `cargo build --release`
-3. **atomic-server missing**: Install with `cargo install atomic-server`
-4. **Timeout issues**: Increase timeout values in CI environments
+**1. "Atomic server not accessible"**
+```bash
+# Check if atomic server is running
+curl http://localhost:9883
+
+# Start atomic server if needed
+../atomic-server/target/release/atomic-server --port 9883
+```
+
+**2. "ATOMIC_SERVER_SECRET environment variable is required"**
+```bash
+# Verify .env file exists in project root
+cat ../.env
+
+# Should contain:
+# ATOMIC_SERVER_SECRET=eyJ...
+```
+
+**3. "Terraphim server binary not found"**
+```bash
+# Build Terraphim server
+cd .. && cargo build --release
+
+# Or use debug build
+cd .. && cargo build
+```
+
+**4. Tests timeout in CI**
+```bash
+# Increase timeout for CI
+CI=true playwright test tests/e2e/atomic-*.spec.ts --timeout=180000
+```
 
 ### Debug Mode
 
-Add environment variables for detailed logging:
+For detailed debugging:
 
 ```bash
-RUST_LOG=debug yarn test:atomic
+# Run with debug logs
+DEBUG=pw:test playwright test tests/e2e/atomic-server-haystack.spec.ts
+
+# Interactive debugging
+playwright test tests/e2e/atomic-server-haystack.spec.ts --debug
+
+# Save screenshots on failure  
+playwright test tests/e2e/atomic-server-haystack.spec.ts --screenshot=only-on-failure
 ```
 
-### Test Artifacts
+### Test Reports
 
-Check `test-results/` directory for:
-- HTML test reports
-- Screenshots of failures
-- Video recordings (CI mode)
-- JSON test results
+After test execution, reports are available:
 
-## Integration with Existing Tests
+- **HTML Report**: `desktop/playwright-report/index.html`
+- **JSON Results**: `desktop/test-results/results.json`
+- **Screenshots**: `desktop/test-results/` (on failures)
 
-These tests complement the existing rolegraph search validation tests:
+## Integration with Frontend
 
-- **rolegraph-search-validation.spec.ts** - Tests ripgrep haystack functionality
-- **atomic-server-haystack.spec.ts** - Tests atomic server haystack functionality  
-- **Combined testing** - Use `yarn test:haystack` to run both test suites
+These tests validate the complete flow:
 
-This ensures comprehensive validation of all haystack types and search functionality in Terraphim. 
+1. **Frontend Configuration**: Terraphim UI configuration updates
+2. **Backend Processing**: Terraphim server role and haystack management
+3. **Atomic Integration**: Communication with atomic server
+4. **Search Results**: End-to-end search functionality
+5. **Error Handling**: Graceful degradation and user feedback
+
+## Memory and Performance
+
+### Memory Usage Optimization
+
+- **Memory-Only Storage**: No persistent storage during tests
+- **Process Isolation**: Each test suite runs independent server instances
+- **Cleanup**: Automatic cleanup of temporary files and processes
+
+### Performance Expectations
+
+- **Server Startup**: ~5-10 seconds
+- **Configuration Update**: ~2-3 seconds  
+- **Search Response**: ~1-5 seconds per query
+- **Total Test Duration**: ~30-60 seconds per test file
+
+## Contributing
+
+When adding new atomic server integration tests:
+
+1. **Follow Naming Convention**: `atomic-<feature>.spec.ts`
+2. **Use TerraphimServerManager**: For consistent server lifecycle
+3. **Add CI-Friendly Features**: Proper timeouts and error handling
+4. **Update Package.json**: Add corresponding npm/yarn scripts
+5. **Document in README**: Update this documentation
+
+### Test Template
+
+```typescript
+import { test, expect } from '@playwright/test';
+// ... other imports
+
+test.describe('Your Atomic Feature', () => {
+  let terraphimServer: TerraphimServerManager;
+  
+  test.beforeAll(async () => {
+    // Setup server and configuration
+  });
+  
+  test.afterAll(async () => {
+    // Cleanup
+  });
+  
+  test('should validate your feature', async () => {
+    // Test implementation with CI-friendly timeouts
+  });
+});
+```
+
+## Status
+
+✅ **Production Ready**: All atomic haystack integration tests are comprehensive, stable, and CI-friendly.
+
+The test suite provides complete validation of atomic server integration from frontend configuration through backend search functionality, ensuring robust operation in both development and production environments. 

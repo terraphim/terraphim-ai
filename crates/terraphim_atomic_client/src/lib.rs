@@ -63,7 +63,7 @@ pub use auth::get_authentication_headers;
 pub type Result<T> = std::result::Result<T, AtomicError>;
 
 // Re-export commonly used types for convenience
-pub use types::{Commit, Config, Resource};
+pub use types::{Commit, CommitBuilder, Config, Resource};
 pub use store::Store;
 
 #[cfg(all(target_arch = "wasm32", feature = "export_store"))]

@@ -82,6 +82,10 @@ pub struct Agent {
     pub subject: String,
     /// The Ed25519 keypair for signing requests
     pub keypair: Arc<Keypair>,
+    /// The timestamp when the agent was created
+    pub created_at: i64,
+    /// The name of the agent (optional)
+    pub name: Option<String>,
 }
 
 impl Agent {
@@ -100,6 +104,8 @@ impl Agent {
         Self {
             subject: format!("http://localhost:9883/agents/{}", public_key_b64),
             keypair: Arc::new(keypair),
+            created_at: crate::time_utils::unix_timestamp_secs(),
+            name: None,
         }
     }
     
@@ -166,6 +172,8 @@ impl Agent {
         Ok(Self {
             subject: subject.to_string(),
             keypair: Arc::new(keypair),
+            created_at: crate::time_utils::unix_timestamp_secs(),
+            name: None,
         })
     }
     
@@ -190,5 +198,136 @@ impl Agent {
     /// The public key as a base64-encoded string
     pub fn get_public_key_base64(&self) -> String {
         STANDARD.encode(self.keypair.public.as_bytes())
+    }
+
+    /// Creates a new agent with the given name and randomly generated keypair.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the agent
+    /// * `server_url` - The base URL of the atomic server
+    ///
+    /// # Returns
+    ///
+    /// A new agent with the given name and a random keypair
+    pub fn new_with_name(name: String, server_url: String) -> Self {
+        use rand_core::{OsRng as RngCore};
+        let mut csprng = RngCore;
+        let keypair = Keypair::generate(&mut csprng);
+        let public_key_b64 = STANDARD.encode(keypair.public.as_bytes());
+        
+        Self {
+            subject: format!("{}/agents/{}", server_url.trim_end_matches('/'), public_key_b64),
+            keypair: Arc::new(keypair),
+            created_at: crate::time_utils::unix_timestamp_secs(),
+            name: Some(name),
+        }
+    }
+
+    /// Creates a new agent from a private key.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key_base64` - The base64-encoded private key
+    /// * `server_url` - The base URL of the atomic server
+    /// * `name` - The name of the agent (optional)
+    ///
+    /// # Returns
+    ///
+    /// A new agent or an error if the private key is invalid
+    pub fn new_from_private_key(
+        private_key_base64: &str,
+        server_url: String,
+        name: Option<String>,
+    ) -> Result<Self> {
+        // Decode the private key
+        let private_key_bytes = STANDARD.decode(private_key_base64)?;
+        
+        // Create the keypair from the private key bytes
+        let mut keypair_bytes = [0u8; 64];
+        keypair_bytes[..32].copy_from_slice(&private_key_bytes);
+        
+        // Derive the public key from the private key
+        let secret_key = ed25519_dalek::SecretKey::from_bytes(&private_key_bytes)
+            .map_err(|e| AtomicError::Authentication(format!("Failed to create secret key: {:?}", e)))?;
+        let public_key = PublicKey::from(&secret_key);
+        let public_key_bytes = public_key.as_bytes();
+        
+        // Copy the public key bytes to the last 32 bytes of the keypair
+        keypair_bytes[32..].copy_from_slice(public_key_bytes);
+        
+        let keypair = Keypair::from_bytes(&keypair_bytes)
+            .map_err(|e| AtomicError::Authentication(format!("Failed to create keypair: {:?}", e)))?;
+        
+        let public_key_b64 = STANDARD.encode(public_key_bytes);
+        
+        Ok(Self {
+            subject: format!("{}/agents/{}", server_url.trim_end_matches('/'), public_key_b64),
+            keypair: Arc::new(keypair),
+            created_at: crate::time_utils::unix_timestamp_secs(),
+            name,
+        })
+    }
+
+    /// Creates a new agent from a public key only (read-only agent).
+    ///
+    /// # Arguments
+    ///
+    /// * `public_key_base64` - The base64-encoded public key
+    /// * `server_url` - The base URL of the atomic server
+    ///
+    /// # Returns
+    ///
+    /// A new read-only agent or an error if the public key is invalid
+    pub fn new_from_public_key(public_key_base64: &str, server_url: String) -> Result<Self> {
+        // Decode and validate the public key
+        let public_key_bytes = STANDARD.decode(public_key_base64)?;
+        if public_key_bytes.len() != 32 {
+            return Err(AtomicError::Authentication(
+                "Invalid public key length, should be 32 bytes".to_string()
+            ));
+        }
+        
+        // Create a dummy keypair with zeros for the private key (this agent won't be able to sign)
+        let mut keypair_bytes = [0u8; 64];
+        keypair_bytes[32..].copy_from_slice(&public_key_bytes);
+        
+        // This will fail if used for signing, but that's intended for read-only agents
+        let keypair = Keypair::from_bytes(&keypair_bytes)
+            .map_err(|e| AtomicError::Authentication(format!("Failed to create keypair: {:?}", e)))?;
+        
+        Ok(Self {
+            subject: format!("{}/agents/{}", server_url.trim_end_matches('/'), public_key_base64),
+            keypair: Arc::new(keypair),
+            created_at: crate::time_utils::unix_timestamp_secs(),
+            name: None,
+        })
+    }
+
+    /// Gets the name of the agent.
+    ///
+    /// # Returns
+    ///
+    /// The name of the agent, if set
+    pub fn get_name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Sets the name of the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name to set
+    pub fn set_name(&mut self, name: String) {
+        self.name = Some(name);
+    }
+
+    /// Gets the creation timestamp of the agent.
+    ///
+    /// # Returns
+    ///
+    /// The creation timestamp as a Unix timestamp
+    pub fn get_created_at(&self) -> i64 {
+        self.created_at
     }
 }
