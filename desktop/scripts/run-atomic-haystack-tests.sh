@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Atomic Server Haystack Integration Test Script
-# This script sets up atomic server, populates it with test data, and runs comprehensive Playwright tests
+# This script runs comprehensive Playwright tests for atomic haystack integration
 
 set -e  # Exit on any error
 
@@ -11,7 +11,6 @@ TERRAPHIM_SERVER_PORT=8000
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DESKTOP_DIR="$PROJECT_ROOT/desktop"
-ATOMIC_SERVER_DIR="/tmp/atomic_test_$(date +%s)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -37,60 +36,25 @@ log_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-# Cleanup function
-cleanup() {
-    log_info "🧹 Cleaning up test environment..."
-    
-    # Stop atomic server
-    if [ ! -z "$ATOMIC_SERVER_PID" ]; then
-        log_info "Stopping atomic server (PID: $ATOMIC_SERVER_PID)"
-        kill -TERM "$ATOMIC_SERVER_PID" 2>/dev/null || true
-        sleep 2
-        kill -KILL "$ATOMIC_SERVER_PID" 2>/dev/null || true
-    fi
-    
-    # Stop Terraphim server
-    if [ ! -z "$TERRAPHIM_SERVER_PID" ]; then
-        log_info "Stopping Terraphim server (PID: $TERRAPHIM_SERVER_PID)"
-        kill -TERM "$TERRAPHIM_SERVER_PID" 2>/dev/null || true
-        sleep 2
-        kill -KILL "$TERRAPHIM_SERVER_PID" 2>/dev/null || true
-    fi
-    
-    # Clean up atomic server data directory
-    if [ -d "$ATOMIC_SERVER_DIR" ]; then
-        rm -rf "$ATOMIC_SERVER_DIR"
-        log_info "Cleaned up atomic server data directory"
-    fi
-    
-    # Clean up any remaining processes
-    pkill -f "atomic-server.*$ATOMIC_SERVER_PORT" 2>/dev/null || true
-    pkill -f "terraphim_server.*$TERRAPHIM_SERVER_PORT" 2>/dev/null || true
-    
-    log_success "Cleanup completed"
-}
-
-# Set up cleanup trap
-trap cleanup EXIT INT TERM
-
 # Check prerequisites
 check_prerequisites() {
     log_info "🔍 Checking prerequisites..."
     
-    # Check if atomic-server is available
-    if ! command -v atomic-server &> /dev/null; then
-        log_error "atomic-server command not found. Please install atomic-server."
-        log_info "Install with: cargo install atomic-server"
+    # Check if atomic server is running
+    if ! curl -s "http://localhost:$ATOMIC_SERVER_PORT" > /dev/null 2>&1; then
+        log_error "Atomic server not running on port $ATOMIC_SERVER_PORT"
+        log_info "Please ensure atomic server is running: ../atomic-server/target/release/atomic-server --port $ATOMIC_SERVER_PORT"
         exit 1
     fi
     
-    # Check if Terraphim server binary exists
-    TERRAPHIM_SERVER_BINARY="$PROJECT_ROOT/target/release/terraphim_server"
-    if [ ! -f "$TERRAPHIM_SERVER_BINARY" ]; then
-        TERRAPHIM_SERVER_BINARY="$PROJECT_ROOT/target/debug/terraphim_server"
-        if [ ! -f "$TERRAPHIM_SERVER_BINARY" ]; then
-            log_error "Terraphim server binary not found. Please build the project first."
-            log_info "Build with: cargo build --release"
+    # Check environment variables
+    if [ -z "$ATOMIC_SERVER_SECRET" ]; then
+        log_warning "ATOMIC_SERVER_SECRET not set. Loading from .env file..."
+        if [ -f "$PROJECT_ROOT/.env" ]; then
+            export $(cat "$PROJECT_ROOT/.env" | grep -v '^#' | xargs)
+            log_success "Loaded environment from .env file"
+        else
+            log_error "No .env file found and ATOMIC_SERVER_SECRET not set"
             exit 1
         fi
     fi
@@ -111,185 +75,146 @@ check_prerequisites() {
     log_success "Prerequisites check completed"
 }
 
-# Start atomic server
-start_atomic_server() {
-    log_info "🚀 Starting atomic server on port $ATOMIC_SERVER_PORT..."
+# Build Terraphim server if needed
+build_terraphim_server() {
+    log_info "🔨 Checking Terraphim server build..."
     
-    # Create data directory
-    mkdir -p "$ATOMIC_SERVER_DIR"
-    
-    # Start atomic server in background
-    atomic-server \
-        --port "$ATOMIC_SERVER_PORT" \
-        --data-dir "$ATOMIC_SERVER_DIR" \
-        --allow-origin "*" \
-        --log-level info \
-        > "$ATOMIC_SERVER_DIR/atomic-server.log" 2>&1 &
-    
-    ATOMIC_SERVER_PID=$!
-    
-    # Wait for atomic server to start
-    log_info "⏳ Waiting for atomic server to start..."
-    for i in {1..30}; do
-        if curl -s "http://localhost:$ATOMIC_SERVER_PORT" > /dev/null 2>&1; then
-            log_success "Atomic server started successfully (PID: $ATOMIC_SERVER_PID)"
-            return 0
-        fi
-        sleep 1
-        log_info "Attempt $i/30: Waiting for atomic server..."
-    done
-    
-    log_error "Atomic server failed to start within 30 seconds"
-    cat "$ATOMIC_SERVER_DIR/atomic-server.log"
-    return 1
-}
-
-# Populate atomic server with test data
-populate_atomic_server() {
-    log_info "📄 Populating atomic server with test documents..."
-    
-    # Use our existing setup script to populate atomic server
     cd "$PROJECT_ROOT"
     
-    if [ -f "scripts/setup_terraphim_full.sh" ]; then
-        log_info "Using setup_terraphim_full.sh to populate atomic server..."
-        
-        # Run the setup script with atomic server parameters
-        bash scripts/setup_terraphim_full.sh \
-            "http://localhost:$ATOMIC_SERVER_PORT" \
-            "test_agent" \
-            "http://localhost:$TERRAPHIM_SERVER_PORT" \
-            --atomic-only
-    else
-        # Fallback: use the atomic client directly
-        log_info "Using atomic client to populate test documents..."
-        
-        # Create test documents using atomic client
-        ./target/release/terraphim_atomic_client create \
-            --server "http://localhost:$ATOMIC_SERVER_PORT" \
-            --agent "test_agent" \
-            --class "Article" \
-            --name "ATOMIC: Terraphim User Guide" \
-            --description "Comprehensive guide for using Terraphim with atomic server integration."
-        
-        ./target/release/terraphim_atomic_client create \
-            --server "http://localhost:$ATOMIC_SERVER_PORT" \
-            --agent "test_agent" \
-            --class "Article" \
-            --name "ATOMIC: Search Features" \
-            --description "Advanced search capabilities in Terraphim using atomic server backend."
-        
-        ./target/release/terraphim_atomic_client create \
-            --server "http://localhost:$ATOMIC_SERVER_PORT" \
-            --agent "test_agent" \
-            --class "Article" \
-            --name "ATOMIC: Configuration & Roles" \
-            --description "Configuration guide for atomic server integration in Terraphim roles."
+    TERRAPHIM_SERVER_BINARY="$PROJECT_ROOT/target/release/terraphim_server"
+    if [ ! -f "$TERRAPHIM_SERVER_BINARY" ]; then
+        TERRAPHIM_SERVER_BINARY="$PROJECT_ROOT/target/debug/terraphim_server"
+        if [ ! -f "$TERRAPHIM_SERVER_BINARY" ]; then
+            log_info "Building Terraphim server..."
+            cargo build --release
+            if [ $? -ne 0 ]; then
+                log_warning "Release build failed, trying debug build..."
+                cargo build
+                TERRAPHIM_SERVER_BINARY="$PROJECT_ROOT/target/debug/terraphim_server"
+            else
+                TERRAPHIM_SERVER_BINARY="$PROJECT_ROOT/target/release/terraphim_server"
+            fi
+        fi
     fi
     
-    log_success "Test documents created in atomic server"
+    if [ ! -f "$TERRAPHIM_SERVER_BINARY" ]; then
+        log_error "Failed to build Terraphim server"
+        exit 1
+    fi
+    
+    log_success "Terraphim server binary ready: $TERRAPHIM_SERVER_BINARY"
 }
 
-# Start Terraphim server
-start_terraphim_server() {
-    log_info "🚀 Starting Terraphim server on port $TERRAPHIM_SERVER_PORT..."
-    
-    cd "$PROJECT_ROOT/terraphim_server"
-    
-    # Start Terraphim server with test configuration
-    RUST_LOG=info \
-    TEST_MODE=true \
-    "$TERRAPHIM_SERVER_BINARY" > /tmp/terraphim_test.log 2>&1 &
-    
-    TERRAPHIM_SERVER_PID=$!
-    
-    # Wait for Terraphim server to start
-    log_info "⏳ Waiting for Terraphim server to start..."
-    for i in {1..30}; do
-        if curl -s "http://localhost:$TERRAPHIM_SERVER_PORT/health" > /dev/null 2>&1; then
-            log_success "Terraphim server started successfully (PID: $TERRAPHIM_SERVER_PID)"
-            return 0
-        fi
-        sleep 1
-        log_info "Attempt $i/30: Waiting for Terraphim server..."
-    done
-    
-    log_error "Terraphim server failed to start within 30 seconds"
-    cat /tmp/terraphim_test.log
-    return 1
-}
-
-# Run Playwright tests
+# Run atomic haystack tests
 run_tests() {
-    log_info "🧪 Running atomic server haystack integration tests..."
+    log_info "🧪 Running atomic haystack integration tests..."
     
     cd "$DESKTOP_DIR"
     
-    # Set environment variables for tests
-    export ATOMIC_SERVER_URL="http://localhost:$ATOMIC_SERVER_PORT"
-    export TERRAPHIM_SERVER_URL="http://localhost:$TERRAPHIM_SERVER_PORT"
-    export SERVER_BINARY_PATH="$TERRAPHIM_SERVER_BINARY"
-    export ATOMIC_SERVER_PATH="$(which atomic-server)"
+    # Set CI environment for consistent behavior
+    export CI=true
     
-    # Run specific atomic server haystack tests
-    if [ "$CI" = "true" ]; then
-        log_info "Running tests in CI mode (headless, verbose)"
-        yarn playwright test tests/e2e/atomic-server-haystack.spec.ts \
-            --reporter=github,html,json \
-            --output-dir=test-results \
-            --workers=1 \
-            --retries=2 \
-            --timeout=120000
+    # Parse command line arguments
+    CI_MODE=false
+    SPECIFIC_TEST=""
+    
+    for arg in "$@"; do
+        case $arg in
+            --ci)
+                CI_MODE=true
+                ;;
+            --test=*)
+                SPECIFIC_TEST="${arg#*=}"
+                ;;
+        esac
+    done
+    
+    # Determine which tests to run
+    if [ -n "$SPECIFIC_TEST" ]; then
+        TEST_PATTERN="tests/e2e/$SPECIFIC_TEST"
+        log_info "Running specific test: $SPECIFIC_TEST"
     else
-        log_info "Running tests in development mode"
-        yarn playwright test tests/e2e/atomic-server-haystack.spec.ts \
-            --reporter=html,list \
-            --output-dir=test-results \
-            --timeout=60000
+        TEST_PATTERN="tests/e2e/atomic-server-haystack.spec.ts tests/e2e/atomic-connection.spec.ts tests/e2e/atomic-haystack-search-validation.spec.ts"
+        log_info "Running all atomic haystack tests"
     fi
     
-    local test_exit_code=$?
-    
-    if [ $test_exit_code -eq 0 ]; then
-        log_success "All atomic server haystack tests passed! 🎉"
+    # Configure test execution based on CI mode
+    if [ "$CI_MODE" = true ]; then
+        PLAYWRIGHT_ARGS="--reporter=github,html,json --workers=1 --retries=3 --timeout=120000"
+        log_info "Running in CI mode with enhanced reporting"
     else
-        log_error "Some tests failed (exit code: $test_exit_code)"
-        log_info "Check test-results/ directory for detailed reports"
+        PLAYWRIGHT_ARGS="--reporter=list,html --workers=1 --retries=1 --timeout=60000"
+        log_info "Running in development mode"
     fi
     
-    return $test_exit_code
+    # Run the tests
+    yarn playwright test $TEST_PATTERN $PLAYWRIGHT_ARGS
+    
+    TEST_EXIT_CODE=$?
+    
+    if [ $TEST_EXIT_CODE -eq 0 ]; then
+        log_success "All atomic haystack tests passed!"
+    else
+        log_error "Some atomic haystack tests failed (exit code: $TEST_EXIT_CODE)"
+        
+        # Show test results location
+        if [ -f "test-results/results.json" ]; then
+            log_info "Test results available at: $DESKTOP_DIR/test-results/"
+        fi
+        
+        # Show playwright report location
+        if [ -f "playwright-report/index.html" ]; then
+            log_info "Playwright report: $DESKTOP_DIR/playwright-report/index.html"
+        fi
+    fi
+    
+    return $TEST_EXIT_CODE
 }
 
-# Main execution flow
+# Display usage information
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --ci                 Run in CI mode with enhanced reporting"
+    echo "  --test=<filename>    Run specific test file (e.g., --test=atomic-server-haystack.spec.ts)"
+    echo "  --help               Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                                    # Run all atomic haystack tests"
+    echo "  $0 --ci                              # Run in CI mode"
+    echo "  $0 --test=atomic-connection.spec.ts  # Run specific test"
+}
+
+# Main execution
 main() {
-    log_info "🎯 Starting Atomic Server Haystack Integration Tests"
-    log_info "=================================================="
+    # Handle help flag
+    for arg in "$@"; do
+        if [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; then
+            show_usage
+            exit 0
+        fi
+    done
     
-    # Step 1: Check prerequisites
+    log_info "🚀 Starting atomic haystack integration tests..."
+    log_info "Project root: $PROJECT_ROOT"
+    log_info "Desktop directory: $DESKTOP_DIR"
+    
+    # Execute test pipeline
     check_prerequisites
+    build_terraphim_server
+    run_tests "$@"
     
-    # Step 2: Start atomic server
-    start_atomic_server
+    EXIT_CODE=$?
     
-    # Step 3: Populate atomic server with test data
-    populate_atomic_server
-    
-    # Step 4: Start Terraphim server
-    start_terraphim_server
-    
-    # Step 5: Run the tests
-    run_tests
-    
-    local final_exit_code=$?
-    
-    if [ $final_exit_code -eq 0 ]; then
-        log_success "🎉 Atomic Server Haystack Integration Tests completed successfully!"
+    if [ $EXIT_CODE -eq 0 ]; then
+        log_success "🎉 Atomic haystack integration tests completed successfully!"
     else
-        log_error "❌ Tests failed. Check the logs above for details."
+        log_error "💥 Atomic haystack integration tests failed!"
     fi
     
-    return $final_exit_code
+    exit $EXIT_CODE
 }
 
-# Run main function
+# Run main function with all arguments
 main "$@" 

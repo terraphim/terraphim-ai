@@ -88,6 +88,14 @@ pub struct Commit {
     #[serde(rename = "https://atomicdata.dev/properties/set", skip_serializing_if = "Option::is_none")]
     pub set: Option<HashMap<String, Value>>,
     
+    /// The set of property URLs that need to be removed
+    #[serde(rename = "https://atomicdata.dev/properties/remove", skip_serializing_if = "Option::is_none")]
+    pub remove: Option<Vec<String>>,
+    
+    /// List of Properties and Arrays to be appended to them
+    #[serde(rename = "https://atomicdata.dev/properties/push", skip_serializing_if = "Option::is_none")]
+    pub push: Option<HashMap<String, Value>>,
+    
     /// Whether to delete the resource
     #[serde(rename = "https://atomicdata.dev/properties/destroy", skip_serializing_if = "Option::is_none")]
     pub destroy: Option<bool>,
@@ -104,9 +112,16 @@ pub struct Commit {
     #[serde(rename = "https://atomicdata.dev/properties/createdAt")]
     pub created_at: i64,
     
+    /// The previously applied commit to this Resource
+    #[serde(rename = "https://atomicdata.dev/properties/previousCommit", skip_serializing_if = "Option::is_none")]
+    pub previous_commit: Option<String>,
+    
     /// The classes of the commit
     #[serde(rename = "https://atomicdata.dev/properties/isA")]
     pub is_a: Vec<String>,
+    
+    /// The URL of the Commit
+    pub url: Option<String>,
 }
 
 impl Commit {
@@ -131,11 +146,15 @@ impl Commit {
         let commit = Self {
             subject,
             set: Some(properties),
+            remove: None,
+            push: None,
             destroy: None,
             signature: None,
             signer: agent.subject.clone(),
             created_at: now,
+            previous_commit: None,
             is_a: vec!["https://atomicdata.dev/classes/Commit".to_string()],
+            url: None,
         };
         
         Ok(commit)
@@ -157,14 +176,114 @@ impl Commit {
         let commit = Self {
             subject,
             set: None,
+            remove: None,
+            push: None,
             destroy: Some(true),
             signature: None,
             signer: agent.subject.clone(),
             created_at: now,
+            previous_commit: None,
             is_a: vec!["https://atomicdata.dev/classes/Commit".to_string()],
+            url: None,
         };
         
         Ok(commit)
+    }
+
+    /// Adds a property to remove from the resource.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property URL to remove
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to self for method chaining
+    pub fn add_remove(&mut self, property: String) -> &mut Self {
+        if let Some(ref mut remove) = self.remove {
+            remove.push(property);
+        } else {
+            self.remove = Some(vec![property]);
+        }
+        self
+    }
+
+    /// Adds a property to push to an array.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property URL to push to
+    /// * `value` - The value to push
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to self for method chaining
+    pub fn add_push(&mut self, property: String, value: Value) -> &mut Self {
+        if let Some(ref mut push) = self.push {
+            push.insert(property, value);
+        } else {
+            let mut push_map = HashMap::new();
+            push_map.insert(property, value);
+            self.push = Some(push_map);
+        }
+        self
+    }
+
+    /// Sets the previous commit for audit trail.
+    ///
+    /// # Arguments
+    ///
+    /// * `previous_commit` - The URL of the previous commit
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to self for method chaining
+    pub fn set_previous_commit(&mut self, previous_commit: String) -> &mut Self {
+        self.previous_commit = Some(previous_commit);
+        self
+    }
+
+    /// Sets the URL of the commit.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The URL of the commit
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to self for method chaining
+    pub fn set_url(&mut self, url: String) -> &mut Self {
+        self.url = Some(url);
+        self
+    }
+
+    /// Validates the commit for basic consistency.
+    ///
+    /// # Returns
+    ///
+    /// A Result indicating whether the commit is valid or an error
+    pub fn validate(&self) -> Result<()> {
+        // Check for circular parent references
+        if let Some(ref set) = self.set {
+            if let Some(parent) = set.get("https://atomicdata.dev/properties/parent") {
+                if parent.as_str() == Some(&self.subject) {
+                    return Err(AtomicError::Parse("Circular parent reference".to_string()));
+                }
+            }
+        }
+
+        // Check timestamp is not in the future (with some tolerance)
+        let now = crate::time_utils::unix_timestamp_secs();
+        if self.created_at > now + 60 {
+            return Err(AtomicError::Parse("Commit timestamp is in the future".to_string()));
+        }
+
+        // Check timestamp is not too old (24 hours)
+        if self.created_at < now - 86400 {
+            return Err(AtomicError::Parse("Commit timestamp is too old".to_string()));
+        }
+
+        Ok(())
     }
 
     /// Signs the commit using the given agent.
@@ -177,6 +296,9 @@ impl Commit {
     ///
     /// A Result containing the signed Commit instance or an error
     pub fn sign(mut self, agent: &Agent) -> Result<Self> {
+        // Validate the commit before signing
+        self.validate()?;
+
         // Serialize to canonical JSON
         let commit_json = serde_jcs::to_string(&self)
             .map_err(|e| AtomicError::Json(e))?;
@@ -197,5 +319,199 @@ impl Commit {
         let json = serde_json::to_value(self)
             .map_err(|e| AtomicError::Json(e))?;
         Ok(json)
+    }
+}
+
+/// Builder for creating commits with a fluent interface.
+/// Use this for more complex commit operations.
+#[derive(Debug, Clone)]
+pub struct CommitBuilder {
+    /// The subject URL that is to be modified by this commit
+    subject: String,
+    /// The set of properties that need to be added or updated
+    set: HashMap<String, Value>,
+    /// The set of property URLs that need to be removed
+    remove: Vec<String>,
+    /// The set of properties and values to be appended to arrays
+    push: HashMap<String, Value>,
+    /// If set to true, deletes the entire resource
+    destroy: bool,
+    /// The previous commit that was applied to the target resource
+    previous_commit: Option<String>,
+}
+
+impl CommitBuilder {
+    /// Creates a new CommitBuilder for the given subject.
+    ///
+    /// # Arguments
+    ///
+    /// * `subject` - The subject URL of the resource to modify
+    ///
+    /// # Returns
+    ///
+    /// A new CommitBuilder instance
+    pub fn new(subject: String) -> Self {
+        Self {
+            subject,
+            set: HashMap::new(),
+            remove: Vec::new(),
+            push: HashMap::new(),
+            destroy: false,
+            previous_commit: None,
+        }
+    }
+
+    /// Sets a property on the resource.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property URL to set
+    /// * `value` - The value to set
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn set(mut self, property: String, value: Value) -> Self {
+        self.set.insert(property, value);
+        self
+    }
+
+    /// Adds a property to remove from the resource.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property URL to remove
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn remove(mut self, property: String) -> Self {
+        self.remove.push(property);
+        self
+    }
+
+    /// Adds a value to push to an array property.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property URL to push to
+    /// * `value` - The value to push
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn push(mut self, property: String, value: Value) -> Self {
+        self.push.insert(property, value);
+        self
+    }
+
+    /// Marks the resource for deletion.
+    ///
+    /// # Arguments
+    ///
+    /// * `destroy` - Whether to destroy the resource
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn destroy(mut self, destroy: bool) -> Self {
+        self.destroy = destroy;
+        self
+    }
+
+    /// Sets the previous commit for audit trail.
+    ///
+    /// # Arguments
+    ///
+    /// * `previous_commit` - The URL of the previous commit
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn set_previous_commit(mut self, previous_commit: String) -> Self {
+        self.previous_commit = Some(previous_commit);
+        self
+    }
+
+    /// Builds and signs the commit with the given agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent` - The agent to sign the commit with
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the signed Commit or an error
+    pub fn sign(self, agent: &Agent) -> Result<Commit> {
+        let now = crate::time_utils::unix_timestamp_secs();
+
+        let commit = Commit {
+            subject: self.subject,
+            set: if self.set.is_empty() {
+                None
+            } else {
+                Some(self.set)
+            },
+            remove: if self.remove.is_empty() {
+                None
+            } else {
+                Some(self.remove)
+            },
+            push: if self.push.is_empty() {
+                None
+            } else {
+                Some(self.push)
+            },
+            destroy: if self.destroy { Some(true) } else { None },
+            signature: None,
+            signer: agent.subject.clone(),
+            created_at: now,
+            previous_commit: self.previous_commit,
+            is_a: vec!["https://atomicdata.dev/classes/Commit".to_string()],
+            url: None,
+        };
+
+        commit.sign(agent)
+    }
+
+    /// Builds the commit without signing it.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent` - The agent to use for the signer field
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the unsigned Commit or an error
+    pub fn build(self, agent: &Agent) -> Result<Commit> {
+        let now = crate::time_utils::unix_timestamp_secs();
+
+        let commit = Commit {
+            subject: self.subject,
+            set: if self.set.is_empty() {
+                None
+            } else {
+                Some(self.set)
+            },
+            remove: if self.remove.is_empty() {
+                None
+            } else {
+                Some(self.remove)
+            },
+            push: if self.push.is_empty() {
+                None
+            } else {
+                Some(self.push)
+            },
+            destroy: if self.destroy { Some(true) } else { None },
+            signature: None,
+            signer: agent.subject.clone(),
+            created_at: now,
+            previous_commit: self.previous_commit,
+            is_a: vec!["https://atomicdata.dev/classes/Commit".to_string()],
+            url: None,
+        };
+
+        Ok(commit)
     }
 }
