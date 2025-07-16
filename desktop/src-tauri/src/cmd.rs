@@ -89,6 +89,17 @@ pub struct SearchResponse {
     pub results: Vec<Document>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct DocumentListResponse {
+    /// Status of the search
+    pub status: Status,
+    /// The document results
+    pub results: Vec<Document>,
+    /// The total number of documents found
+    pub total: usize,
+}
+
 /// Search All TerraphimGraphs defined in a config by query param
 #[command]
 pub async fn search(
@@ -384,5 +395,33 @@ pub async fn select_role(
     Ok(ConfigResponse {
         status: Status::Success,
         config,
+    })
+}
+
+/// Find documents that contain a given knowledge graph term
+/// 
+/// This command searches for documents that were the source of a knowledge graph term.
+/// For example, given "haystack", it will find documents like "haystack.md" that contain
+/// this term or its synonyms ("datasource", "service", "agent").
+#[command]
+pub async fn find_documents_for_kg_term(
+    config_state: tauri::State<'_, ConfigState>,
+    role_name: String,
+    term: String,
+) -> Result<DocumentListResponse> {
+    log::debug!("Finding documents for KG term '{}' in role '{}'", term, role_name);
+    
+    let role_name = role_name.into();
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
+    
+    let results = terraphim_service.find_documents_for_kg_term(&role_name, &term).await?;
+    let total = results.len();
+    
+    log::debug!("Found {} documents for KG term '{}'", total, term);
+    
+    Ok(DocumentListResponse {
+        status: Status::Success,
+        results,
+        total,
     })
 }

@@ -289,3 +289,37 @@ pub(crate) async fn get_rolegraph(
         edges,
     }))
 }
+
+/// Query parameters for KG term search
+#[derive(Debug, Deserialize)]
+pub struct KgSearchQuery {
+    /// The knowledge graph term to search for
+    pub term: String,
+}
+
+/// Find documents that contain a given knowledge graph term
+/// 
+/// This endpoint searches for documents that were the source of a knowledge graph term.
+/// For example, given "haystack", it will find documents like "haystack.md" that contain
+/// this term or its synonyms ("datasource", "service", "agent").
+pub(crate) async fn find_documents_by_kg_term(
+    State(config_state): State<ConfigState>,
+    axum::extract::Path(role_name): axum::extract::Path<String>,
+    Query(query): Query<KgSearchQuery>,
+) -> Result<Json<SearchResponse>> {
+    log::debug!("Finding documents for KG term '{}' in role '{}'", query.term, role_name);
+    
+    let role_name = RoleName::new(&role_name);
+    let mut terraphim_service = TerraphimService::new(config_state);
+    
+    let results = terraphim_service.find_documents_for_kg_term(&role_name, &query.term).await?;
+    let total = results.len();
+    
+    log::debug!("Found {} documents for KG term '{}'", total, query.term);
+    
+    Ok(Json(SearchResponse {
+        status: Status::Success,
+        results,
+        total,
+    }))
+}

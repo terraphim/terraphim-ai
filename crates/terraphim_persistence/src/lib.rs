@@ -11,6 +11,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use terraphim_settings::DeviceSettings;
 
 use std::collections::HashMap;
+use terraphim_types::Document;
 
 pub use error::{Error, Result};
 
@@ -151,4 +152,32 @@ pub trait Persistable: Serialize + DeserializeOwned {
         let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
         re.replace_all(key, "").to_lowercase()
     }
+}
+
+/// Load multiple documents by their IDs
+/// 
+/// This function efficiently loads multiple documents using their IDs.
+/// It attempts to load each document, but continues processing even if some documents fail to load.
+/// Returns a vector of successfully loaded documents.
+pub async fn load_documents_by_ids(document_ids: &[String]) -> Result<Vec<Document>> {
+    log::debug!("Loading {} documents by IDs: {:?}", document_ids.len(), document_ids);
+    
+    let mut documents = Vec::new();
+    
+    for doc_id in document_ids {
+        let mut doc = Document::new(doc_id.clone());
+        match doc.load().await {
+            Ok(loaded_doc) => {
+                documents.push(loaded_doc);
+                log::trace!("Successfully loaded document: {}", doc_id);
+            }
+            Err(e) => {
+                log::warn!("Failed to load document '{}': {}", doc_id, e);
+                // Continue processing other documents even if this one fails
+            }
+        }
+    }
+    
+    log::debug!("Successfully loaded {} out of {} documents", documents.len(), document_ids.len());
+    Ok(documents)
 }

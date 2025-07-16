@@ -46,6 +46,7 @@ mod tests {
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
                 },

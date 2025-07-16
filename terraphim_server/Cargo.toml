@@ -45,6 +45,7 @@ schemars = "0.8"
 [dev-dependencies]
 serial_test = "3.0.0"
 tempfile = "3.10.1"
+urlencoding = "2.1.3"
 
 [build-dependencies]
 static-files = "0.2"
