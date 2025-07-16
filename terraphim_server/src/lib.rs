@@ -9,6 +9,7 @@ use axum::{
 use rust_embed::RustEmbed;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
+use terraphim_persistence::Persistable;
 use terraphim_types::IndexedDocument;
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
@@ -102,8 +103,16 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     rank: None,
                                                 };
                                                 
+                                                // Save document to persistence layer first
+                                                if let Err(e) = document.save().await {
+                                                    log::error!("Failed to save document '{}' to persistence: {}", document.id, e);
+                                                } else {
+                                                    log::info!("✅ Saved document '{}' to persistence layer", document.id);
+                                                }
+                                                
+                                                // Then add to rolegraph for KG indexing
                                                 rolegraph_with_docs.insert_document(&document.id.clone(), document);
-                                                log::info!("Indexed document '{}' into rolegraph", entry.file_name().to_string_lossy());
+                                                log::info!("✅ Indexed document '{}' into rolegraph", entry.file_name().to_string_lossy());
                                             }
                                         }
                                     }

@@ -55,22 +55,96 @@ async fn run_server() -> Result<()> {
         });
 
     
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
-            Ok(mut local_config) => match local_config.load().await {
-                Ok(config) => {
-                    log::info!("Successfully loaded saved configuration from disk");
-                    config
+    let mut config = {
+        // Try to load terraphim_engineer_config.json first
+        let engineer_config_path = std::path::Path::new("terraphim_server/default/terraphim_engineer_config.json");
+        if engineer_config_path.exists() {
+            log::info!("Loading Terraphim Engineer configuration from {:?}", engineer_config_path);
+            match std::fs::read_to_string(engineer_config_path) {
+                Ok(config_content) => {
+                    match serde_json::from_str::<terraphim_config::Config>(&config_content) {
+                        Ok(mut engineer_config) => {
+                            log::info!("✅ Successfully loaded Terraphim Engineer configuration");
+                            // Try to load saved config, but if it fails, use the engineer config as fallback
+                            match engineer_config.load().await {
+                                Ok(saved_config) => {
+                                    log::info!("✅ Successfully loaded saved configuration from disk");
+                                    saved_config
+                                },
+                                Err(e) => {
+                                    log::info!("No saved config found, using Terraphim Engineer config: {:?}", e);
+                                    engineer_config
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            log::warn!("Failed to parse Terraphim Engineer config: {:?}", e);
+                            log::info!("Falling back to default server configuration");
+                            match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
+                                Ok(mut local_config) => match local_config.load().await {
+                                    Ok(config) => {
+                                        log::info!("Successfully loaded saved configuration from disk");
+                                        config
+                                    },
+                                    Err(e) => {
+                                        log::info!("Failed to load saved config, using default: {:?}", e);
+                                        ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build().unwrap()
+                                    }
+                                },
+                                Err(e) => panic!("Failed to build config: {e:?}"),
+                            }
+                        }
+                    }
                 },
                 Err(e) => {
-                    log::info!("Failed to load saved config, using default: {:?}", e);
-                    ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build().unwrap()
+                    log::warn!("Failed to read Terraphim Engineer config file: {:?}", e);
+                    log::info!("Falling back to default server configuration");
+                    match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
+                        Ok(mut local_config) => match local_config.load().await {
+                            Ok(config) => {
+                                log::info!("Successfully loaded saved configuration from disk");
+                                config
+                            },
+                            Err(e) => {
+                                log::info!("Failed to load saved config, using default: {:?}", e);
+                                ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build().unwrap()
+                            }
+                        },
+                        Err(e) => panic!("Failed to build config: {e:?}"),
+                    }
                 }
-            },
-        Err(e) => panic!("Failed to build config: {e:?}"),
+            }
+        } else {
+            log::info!("Terraphim Engineer config not found at {:?}", engineer_config_path);
+            log::info!("Using default server configuration");
+            match ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build() {
+                Ok(mut local_config) => match local_config.load().await {
+                    Ok(config) => {
+                        log::info!("Successfully loaded saved configuration from disk");
+                        config
+                    },
+                    Err(e) => {
+                        log::info!("Failed to load saved config, using default: {:?}", e);
+                        ConfigBuilder::new_with_id(ConfigId::Server).build_default_server().build().unwrap()
+                    }
+                },
+                Err(e) => panic!("Failed to build config: {e:?}"),
+            }
+        }
     };
+
     let config_state = ConfigState::new(&mut config)
         .await
         .context("Failed to load config")?;
+
+    // Log available roles for debugging
+    log::info!("Server started with {} roles:", config.roles.len());
+    for (role_name, role) in &config.roles {
+        log::info!("  - Role: {} (relevance: {:?}, kg: {})", 
+                   role_name, 
+                   role.relevance_function,
+                   role.kg.is_some());
+    }
 
     // Example of adding a role for testing
     // let role = "system operator2".to_string();
