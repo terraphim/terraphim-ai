@@ -72,6 +72,11 @@ export interface SearchResponse {
     status: Status;
     results: Document[];
 }
+export interface DocumentListResponse {
+    status: Status;
+    results: Document[];
+    total: number;
+}
 export interface DocumentResponse {
     status: Status;
     document: Document | undefined;

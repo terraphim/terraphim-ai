@@ -286,6 +286,45 @@ impl RoleGraph {
     pub fn edges_map(&self) -> &ahash::AHashMap<u64, Edge> {
         &self.edges
     }
+
+    /// Find document IDs that contain a given term in their content
+    /// 
+    /// This method searches for documents that were the source of a knowledge graph term.
+    /// For example, given "haystack", it will find documents like "haystack.md" that contain
+    /// this term or its synonyms ("datasource", "service", "agent").
+    /// 
+    /// Returns a vector of document IDs that contain the term.
+    pub fn find_document_ids_for_term(&self, term: &str) -> Vec<String> {
+        log::debug!("Finding document IDs for term: '{}'", term);
+        
+        // First, find all node IDs that match this term
+        let matching_node_ids = self.find_matching_node_ids(term);
+        log::trace!("Found {} matching node IDs: {:?}", matching_node_ids.len(), matching_node_ids);
+        
+        let mut document_ids = std::collections::HashSet::new();
+        
+        // For each matching node, find all edges connected to it
+        for node_id in matching_node_ids {
+            if let Some(node) = self.nodes.get(&node_id) {
+                log::trace!("Processing node {} with {} connected edges", node_id, node.connected_with.len());
+                
+                // For each edge connected to this node, get the documents
+                for edge_id in &node.connected_with {
+                    if let Some(edge) = self.edges.get(edge_id) {
+                        // Add all document IDs from this edge
+                        for doc_id in edge.doc_hash.keys() {
+                            document_ids.insert(doc_id.clone());
+                            log::trace!("Found document '{}' connected to node {}", doc_id, node_id);
+                        }
+                    }
+                }
+            }
+        }
+        
+        let result: Vec<String> = document_ids.into_iter().collect();
+        log::debug!("Found {} unique document IDs for term '{}': {:?}", result.len(), term, result);
+        result
+    }
 }
 
 /// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`

@@ -1,5 +1,26 @@
 # Terraphim MCP Server Learnings
 
+## ✅ KNOWLEDGE GRAPH TERM TO DOCUMENT LOOKUP - COMPLETED SUCCESSFULLY (2025-01-29)
+
+### KG Term to Document Lookup Implementation - COMPLETED ✅
+
+**Task**: Created comprehensive API and Tauri command system for finding source documents from knowledge graph terms.
+
+**Example Use Case**: Given "operation strategy" → finds document where "operation strategy" appears in title or synonyms.
+
+**✅ COMPLETE IMPLEMENTATION DELIVERED**:
+
+1. **RoleGraph Enhancement** - Added `find_document_ids_for_term()` method that traverses term → node_id → edges → document_ids
+2. **Persistence Layer** - Added `load_documents_by_ids()` for efficient batch document loading  
+3. **Service Layer** - Created `find_documents_for_kg_term()` in TerraphimService with full orchestration
+4. **API Endpoint** - Added `GET /roles/{role_name}/kg_search?term=<term>` with proper error handling
+5. **Tauri Integration** - Created `find_documents_for_kg_term` command with `DocumentListResponse` TypeScript bindings
+6. **Comprehensive Testing** - Integration test validates complete flow including "haystack" → "haystack.md" example
+
+**Technical Achievement**: Complete bidirectional linking between KG concepts and source documents. From "haystack" term → finds haystack.md with synonyms ("datasource", "service", "agent").
+
+**Status**: ✅ Production-ready with type safety, comprehensive testing, error handling. All components compile successfully.
+
 ## ✅ TERRAPHIM ATOMIC CLIENT ENHANCEMENT - COMPLETED SUCCESSFULLY (2025-01-29)
 
 ### Enhanced Atomic Client Implementation - COMPLETED ✅

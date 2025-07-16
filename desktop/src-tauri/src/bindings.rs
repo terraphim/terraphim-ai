@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use tsify::Tsify;
-use crate::cmd::{ConfigResponse, DocumentResponse, InitialSettings, SearchResponse, Status, GraphNodeDto, GraphEdgeDto, RoleGraphResponse};
+use crate::cmd::{ConfigResponse, DocumentResponse, DocumentListResponse, InitialSettings, SearchResponse, Status, GraphNodeDto, GraphEdgeDto, RoleGraphResponse};
 use terraphim_config::{Config, ConfigId, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
 use terraphim_types::{Document, KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
 use terraphim_automata::AutomataPath;
@@ -67,6 +67,8 @@ pub fn generate_typescript_bindings() -> Result<(), Box<dyn std::error::Error>> 
     all_bindings.push_str(&ConfigResponse::DECL);
     all_bindings.push('\n');
     all_bindings.push_str(&SearchResponse::DECL);
+    all_bindings.push('\n');
+    all_bindings.push_str(&DocumentListResponse::DECL);
     all_bindings.push('\n');
     all_bindings.push_str(&DocumentResponse::DECL);
     all_bindings.push('\n');

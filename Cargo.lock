@@ -6708,6 +6708,7 @@ dependencies = [
  "tower-http 0.4.4",
  "ulid",
  "url",
+ "urlencoding",
  "walkdir",
 ]
 

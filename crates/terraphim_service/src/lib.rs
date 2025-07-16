@@ -328,6 +328,43 @@ impl<'a> TerraphimService {
         }
     }
 
+    /// Find documents that contain a given knowledge graph term
+    /// 
+    /// This method searches for documents that were the source of a knowledge graph term.
+    /// For example, given "haystack", it will find documents like "haystack.md" that contain
+    /// this term or its synonyms ("datasource", "service", "agent").
+    /// 
+    /// Returns a vector of Documents that contain the term.
+    pub async fn find_documents_for_kg_term(&mut self, role_name: &RoleName, term: &str) -> Result<Vec<Document>> {
+        log::debug!("Finding documents for KG term '{}' in role '{}'", term, role_name);
+        
+        // Ensure the thesaurus is loaded for this role
+        let _thesaurus = self.ensure_thesaurus_loaded(role_name).await?;
+        
+        // Get the role's rolegraph
+        let rolegraph_sync = self.config_state.roles.get(role_name)
+            .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found", role_name)))?;
+        
+        let rolegraph = rolegraph_sync.lock().await;
+        
+        // Find document IDs that contain this term
+        let document_ids = rolegraph.find_document_ids_for_term(term);
+        drop(rolegraph); // Release the lock early
+        
+        if document_ids.is_empty() {
+            log::debug!("No documents found for term '{}'", term);
+            return Ok(Vec::new());
+        }
+        
+        log::debug!("Found {} document IDs for term '{}': {:?}", document_ids.len(), term, document_ids);
+        
+        // Load the actual documents using the persistence layer
+        let documents = terraphim_persistence::load_documents_by_ids(&document_ids).await?;
+        
+        log::debug!("Successfully loaded {} documents for term '{}'", documents.len(), term);
+        Ok(documents)
+    }
+
     /// Fetch the current config
     pub async fn fetch_config(&self) -> terraphim_config::Config {
         let current_config = self.config_state.config.lock().await;
