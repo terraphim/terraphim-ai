@@ -4,14 +4,142 @@
   import ArticleModal from "./ArticleModal.svelte";
   import type { Document } from "./SearchResult";
   import configStore from "../ThemeSwitcher.svelte";
-  import { role } from "../stores";
+  import { role, is_tauri, serverUrl } from "../stores";
+  import { CONFIG } from "../../config";
+  import { invoke } from '@tauri-apps/api/tauri';
+  import type { DocumentListResponse } from "../generated/types";
 
   export let document: Document;
   let showModal = false;
+  let showKgModal = false;
+  let kgDocument: Document | null = null;
+  let kgTerm: string | null = null;
+  let kgRank: number | null = null;
+  let loadingKg = false;
 
   const onTitleClick = () => {
     showModal = true;
   };
+
+  async function handleTagClick(tag: string) {
+    loadingKg = true;
+    kgTerm = tag;
+    
+    // Add debugging information
+    console.log('🔍 KG Search Debug Info:');
+    console.log('  Tag clicked:', tag);
+    console.log('  Current role:', $role);
+    console.log('  Is Tauri mode:', $is_tauri);
+    
+    try {
+      if ($is_tauri) {
+        // Use Tauri command for desktop app
+        console.log('  Making Tauri invoke call...');
+        console.log('  Tauri command: find_documents_for_kg_term');
+        console.log('  Tauri params:', { roleName: $role, term: tag });
+        
+        const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
+          roleName: $role,
+          term: tag
+        });
+        
+        console.log('  📥 Tauri response received:');
+        console.log('    Status:', response.status);
+        console.log('    Results count:', response.results?.length || 0);
+        console.log('    Total:', response.total || 0);
+        console.log('    Full response:', JSON.stringify(response, null, 2));
+        
+        if (response.status === 'success' && response.results && response.results.length > 0) {
+          // Get the first (highest-ranked) document
+          kgDocument = response.results[0];
+          kgRank = kgDocument.rank || 0;
+          console.log('  ✅ Found KG document:');
+          console.log('    Title:', kgDocument.title);
+          console.log('    Rank:', kgRank);
+          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+          showKgModal = true;
+        } else {
+          console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
+          console.warn('    This could indicate:');
+          console.warn('    1. Knowledge graph not built for this role');
+          console.warn('    2. Term not found in knowledge graph');
+          console.warn('    3. Role not configured with TerraphimGraph relevance function');
+          console.warn('    Suggestion: Check server logs for KG building status');
+        }
+      } else {
+        // Use HTTP fetch for web mode
+        console.log('  Making HTTP fetch call...');
+        const baseUrl = CONFIG.ServerURL;
+        const encodedRole = encodeURIComponent($role);
+        const encodedTerm = encodeURIComponent(tag);
+        const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
+        
+        console.log('  📤 HTTP Request details:');
+        console.log('    Base URL:', baseUrl);
+        console.log('    Role (encoded):', encodedRole);
+        console.log('    Term (encoded):', encodedTerm);
+        console.log('    Full URL:', url);
+        
+        const response = await fetch(url);
+        
+        console.log('  📥 HTTP Response received:');
+        console.log('    Status code:', response.status);
+        console.log('    Status text:', response.statusText);
+        console.log('    Headers:', Object.fromEntries(response.headers.entries()));
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('  📄 Response data:');
+        console.log('    Status:', data.status);
+        console.log('    Results count:', data.results?.length || 0);
+        console.log('    Total:', data.total || 0);
+        console.log('    Full response:', JSON.stringify(data, null, 2));
+        
+        if (data.status === 'success' && data.results && data.results.length > 0) {
+          // Get the first (highest-ranked) document
+          kgDocument = data.results[0];
+          kgRank = kgDocument.rank || 0;
+          console.log('  ✅ Found KG document:');
+          console.log('    Title:', kgDocument.title);
+          console.log('    Rank:', kgRank);
+          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+          showKgModal = true;
+        } else {
+          console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
+          console.warn('    This could indicate:');
+          console.warn('    1. Server not configured with Terraphim Engineer role');
+          console.warn('    2. Knowledge graph not built on server');
+          console.warn('    3. Term not found in knowledge graph');
+          console.warn('    Suggestion: Check server logs at startup for KG building status');
+          console.warn('    API URL tested:', url);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching KG document:');
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+      console.error('  Request details:', {
+        tag,
+        role: $role,
+        isTauri: $is_tauri,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!$is_tauri && error.message?.includes('Failed to fetch')) {
+        console.error('  💡 Network error suggestions:');
+        console.error('    1. Check if server is running on expected port');
+        console.error('    2. Check CORS configuration');
+        console.error('    3. Verify server URL in CONFIG.ServerURL');
+      }
+      
+      // Graceful fallback: could show error message or do nothing
+    } finally {
+      loadingKg = false;
+    }
+  }
 
   if (configStore[$role] !== undefined) {
     console.log("Have attribute", configStore[$role]);
@@ -31,11 +159,14 @@
           {#if document.tags}
           <Taglist>
               {#each document.tags as tag}
-              <!-- FIXME: link shall be config parameter for KG -->
-                <a
-                  href="https://terraphim.github.io/terraphim-project/#/page/{tag}"
-                  target="_blank"><Tag rounded>{tag}</Tag></a
+                <button 
+                  class="tag-button" 
+                  on:click={() => handleTagClick(tag)}
+                  disabled={loadingKg}
+                  title="Click to view knowledge graph document"
                 >
+                  <Tag rounded>{tag}</Tag>
+                </button>
               {/each}
           </Taglist>
           {/if}
@@ -98,7 +229,19 @@
     </div>
   </article>
 </div>
+
+<!-- Original document modal -->
 <ArticleModal bind:active={showModal} item={document} />
+
+<!-- KG document modal -->
+{#if kgDocument}
+  <ArticleModal 
+    bind:active={showKgModal} 
+    item={kgDocument} 
+    kgTerm={kgTerm}
+    kgRank={kgRank}
+  />
+{/if}
 
 <style lang="scss">
   button {
@@ -110,6 +253,25 @@
     outline: inherit;
     display: block;
   }
+  
+  .tag-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    outline: inherit;
+    display: inline-block;
+    
+    &:hover {
+      opacity: 0.8;
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+  
   .title {
     font-size: 1.3em;
     margin-bottom: 0px;

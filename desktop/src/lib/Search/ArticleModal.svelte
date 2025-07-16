@@ -9,6 +9,10 @@
   export let active: boolean = false;
   export let item: Document;
   export let initialEdit: boolean = false;
+  // New props for KG context
+  export let kgTerm: string | null = null;
+  export let kgRank: number | null = null;
+  
   let editing = false;
   let contentElement: HTMLElement;
 
@@ -84,6 +88,17 @@
 
 <Modal bind:active>
   <div class="box wrapper">
+    <!-- KG Context Header -->
+    {#if kgTerm && kgRank !== null}
+      <div class="kg-context">
+        <h3 class="subtitle is-6">
+          <span class="tag is-info">Knowledge Graph</span>
+          Term: <strong>{kgTerm}</strong> | Rank: <strong>{kgRank}</strong>
+        </h3>
+        <hr />
+      </div>
+    {/if}
+    
     <h2>{item.title}</h2>
 
     {#if editing}
