@@ -173,12 +173,18 @@ fn index_inner(messages: Vec<Message>) -> Index {
                         continue;
                     }
                 };
-                match document.description {
-                    Some(description) => {
-                        document.description = Some(description + " " + &lines);
-                    }
-                    None => {
-                        document.description = Some(lines.clone());
+                
+                // Only use the first match for description to avoid long concatenations
+                // Limit description to 200 characters for readability
+                if document.description.is_none() {
+                    let cleaned_lines = lines.trim();
+                    if !cleaned_lines.is_empty() {
+                        let description = if cleaned_lines.len() > 200 {
+                            format!("{}...", &cleaned_lines[..197])
+                        } else {
+                            cleaned_lines.to_string()
+                        };
+                        document.description = Some(description);
                     }
                 }
             }
@@ -202,12 +208,18 @@ fn index_inner(messages: Vec<Message>) -> Index {
                         continue;
                     }
                 };
-                match document.description {
-                    Some(description) => {
-                        document.description = Some(description + " " + &lines);
-                    }
-                    None => {
-                        document.description = Some(lines.clone());
+                
+                // Only use the first context for description to avoid long concatenations
+                // Limit description to 200 characters for readability  
+                if document.description.is_none() {
+                    let cleaned_lines = lines.trim();
+                    if !cleaned_lines.is_empty() {
+                        let description = if cleaned_lines.len() > 200 {
+                            format!("{}...", &cleaned_lines[..197])
+                        } else {
+                            cleaned_lines.to_string()
+                        };
+                        document.description = Some(description);
                     }
                 }
             }
