@@ -8,6 +8,7 @@
   import { CONFIG } from "../../config";
   import { invoke } from '@tauri-apps/api/tauri';
   import type { DocumentListResponse } from "../generated/types";
+  import SvelteMarkdown from 'svelte-markdown';
 
   export let document: Document;
   let showModal = false;
@@ -182,10 +183,16 @@
               {document.title}
             </h2>
           </button>
-          <small
-            >Description: {document.description ||
-              "No description available"}</small
-          >
+          <div class="description">
+            <small class="description-label">Description:</small>
+            <div class="description-content">
+              {#if document.description}
+                <SvelteMarkdown source={document.description} />
+              {:else}
+                <small class="no-description">No description available</small>
+              {/if}
+            </div>
+          </div>
           <br />
         </div>
       </div>
@@ -280,5 +287,55 @@
     &:focus {
       text-decoration: underline;
     }
+  }
+  
+  .description {
+    margin-top: 0.5rem;
+  }
+  
+  .description-label {
+    font-weight: 600;
+    color: #666;
+    margin-right: 0.5rem;
+  }
+  
+  .description-content {
+    display: inline;
+    
+    // Style markdown content within description
+    :global(p) {
+      display: inline;
+      margin: 0;
+    }
+    
+    :global(strong) {
+      font-weight: 600;
+    }
+    
+    :global(em) {
+      font-style: italic;
+    }
+    
+    :global(code) {
+      background-color: #f5f5f5;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    
+    :global(a) {
+      color: #3273dc;
+      text-decoration: none;
+      
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+  
+  .no-description {
+    color: #999;
+    font-style: italic;
   }
 </style>

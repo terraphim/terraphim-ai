@@ -16,6 +16,64 @@ use tower_http::cors::{Any, CorsLayer};
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{RelevanceFunction, Document};
 
+/// Create a proper description from document content
+/// Includes the first header and/or meaningful paragraph, limiting to 300 characters
+fn create_document_description(content: &str) -> Option<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut description_parts = Vec::new();
+    let mut found_header = false;
+    
+    for line in lines {
+        let trimmed = line.trim();
+        
+        // Skip empty lines, frontmatter, and comments
+        if trimmed.is_empty() || 
+           trimmed.starts_with("---") ||
+           trimmed.starts_with("<!--") {
+            continue;
+        }
+        
+        // Check if this is a markdown header
+        if trimmed.starts_with('#') {
+            if !found_header {
+                // Include the first header (remove # symbols and clean up)
+                let header_text = trimmed.trim_start_matches('#').trim();
+                if !header_text.is_empty() {
+                    description_parts.push(header_text.to_string());
+                    found_header = true;
+                }
+            }
+            continue;
+        }
+        
+        // Found a meaningful paragraph
+        if trimmed.len() > 15 { // Minimum meaningful length
+            description_parts.push(trimmed.to_string());
+            break; // Only take one paragraph after header
+        }
+    }
+    
+    if description_parts.is_empty() {
+        return None;
+    }
+    
+    // Combine header and paragraph with separator
+    let combined = if description_parts.len() > 1 {
+        format!("{} - {}", description_parts[0], description_parts[1])
+    } else {
+        description_parts[0].clone()
+    };
+    
+    // Limit total length to 300 characters
+    let description = if combined.len() > 300 {
+        format!("{}...", &combined[..297])
+    } else {
+        combined
+    };
+    
+    Some(description)
+}
+
 mod api;
 mod error;
 
@@ -92,16 +150,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                     if let Some(ext) = entry.path().extension() {
                                         if ext == "md" || ext == "markdown" {
                                             if let Ok(content) = tokio::fs::read_to_string(&entry.path()).await {
-                                                let document = Document {
-                                                    id: entry.file_name().to_string_lossy().to_string(),
-                                                    url: entry.path().to_string_lossy().to_string(),
-                                                    title: entry.file_name().to_string_lossy().to_string(),
-                                                    body: content,
-                                                    description: None,
-                                                    stub: None,
-                                                    tags: None,
-                                                    rank: None,
-                                                };
+                                                                                // Create a proper description from the document content
+                                let description = create_document_description(&content);
+                                
+                                let document = Document {
+                                    id: entry.file_name().to_string_lossy().to_string(),
+                                    url: entry.path().to_string_lossy().to_string(),
+                                    title: entry.file_name().to_string_lossy().to_string(),
+                                    body: content,
+                                    description,
+                                    stub: None,
+                                    tags: None,
+                                    rank: None,
+                                };
                                                 
                                                 // Save document to persistence layer first
                                                 if let Err(e) = document.save().await {
