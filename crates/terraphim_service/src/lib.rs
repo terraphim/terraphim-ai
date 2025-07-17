@@ -10,6 +10,14 @@ use terraphim_types::{
 };
 mod score;
 
+/// Normalize a filename to be used as a document ID
+/// 
+/// This ensures consistent ID generation between server startup and edit API
+fn normalize_filename_to_id(filename: &str) -> String {
+    let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
+    re.replace_all(filename, "").to_lowercase()
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
     #[error("An error occurred: {0}")]
@@ -227,29 +235,65 @@ impl<'a> TerraphimService {
     }
 
     /// Get document by ID
+    /// 
+    /// This method supports both normalized IDs (e.g., "haystackmd") and original filenames (e.g., "haystack.md").
+    /// It tries to find the document using the provided ID first, then tries with a normalized version,
+    /// and finally falls back to searching by title.
     pub async fn get_document_by_id(&mut self, document_id: &str) -> Result<Option<Document>> {
-        // 1️⃣ Try to load the document directly from the persistence layer.
+        log::debug!("Getting document by ID: '{}'", document_id);
+        
+        // 1️⃣ Try to load the document directly using the provided ID
         let mut placeholder = Document::default();
         placeholder.id = document_id.to_string();
         match placeholder.load().await {
-            Ok(doc) => return Ok(Some(doc)),
+            Ok(doc) => {
+                log::debug!("Found document '{}' with direct ID lookup", document_id);
+                return Ok(Some(doc));
+            }
             Err(e) => {
-                log::debug!("Document {} not found in persistence layer: {:?}. Falling back to search", document_id, e);
+                log::debug!("Document '{}' not found with direct lookup: {:?}", document_id, e);
             }
         }
 
-        // 2️⃣ Fallback: search the haystacks/graphs – this covers the case where the document
-        // is not yet persisted but is already indexed in memory.
+        // 2️⃣ If the provided ID looks like a filename, try with normalized ID
+        if document_id.contains('.') || document_id.contains('-') || document_id.contains('_') {
+            let normalized_id = normalize_filename_to_id(document_id);
+            log::debug!("Trying normalized ID '{}' for filename '{}'", normalized_id, document_id);
+            
+            let mut normalized_placeholder = Document::default();
+            normalized_placeholder.id = normalized_id.clone();
+            match normalized_placeholder.load().await {
+                Ok(doc) => {
+                    log::debug!("Found document '{}' with normalized ID '{}'", document_id, normalized_id);
+                    return Ok(Some(doc));
+                }
+                Err(e) => {
+                    log::debug!("Document '{}' not found with normalized ID '{}': {:?}", document_id, normalized_id, e);
+                }
+            }
+        }
+
+        // 3️⃣ Fallback: search by title (for documents where title contains the original filename)
+        log::debug!("Falling back to search for document '{}'", document_id);
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::new(document_id.to_string()),
-            limit: Some(1),
+            limit: Some(5), // Get a few results to check titles
             skip: None,
             role: None,
         };
 
         let documents = self.search(&search_query).await?;
+        
+        // Look for a document whose title matches the requested ID
+        for doc in documents {
+            if doc.title == document_id || doc.id == document_id {
+                log::debug!("Found document '{}' via search fallback", document_id);
+                return Ok(Some(doc));
+            }
+        }
 
-        Ok(documents.into_iter().find(|doc| doc.id == document_id))
+        log::debug!("Document '{}' not found anywhere", document_id);
+        Ok(None)
     }
 
     /// Get the role for the given search query
@@ -303,10 +347,48 @@ impl<'a> TerraphimService {
                 let total_length = documents.len();
                 let mut docs_ranked = Vec::new();
                 for (idx, doc) in documents.iter().enumerate() {
-                    let document: &mut terraphim_types::Document = &mut doc.clone();
+                    let mut document: terraphim_types::Document = doc.clone();
                     let rank = (total_length - idx).try_into().unwrap();
                     document.rank = Some(rank);
-                    docs_ranked.push(document.clone());
+                    
+                    // 🔄 Replace ripgrep description with persistence layer description for better quality
+                    // Try direct persistence lookup first
+                    let mut placeholder = Document::default();
+                    placeholder.id = document.id.clone();
+                    if let Ok(persisted_doc) = placeholder.load().await {
+                        if let Some(better_description) = persisted_doc.description {
+                            log::debug!("Replaced ripgrep description for '{}' with persistence description", document.title);
+                            document.description = Some(better_description);
+                        }
+                    } else {
+                        // Try normalized ID based on document title (filename)
+                        // For KG files, the title might be "haystack" but persistence ID is "haystackmd"
+                        let normalized_id = normalize_filename_to_id(&document.title);
+                        
+                        let mut normalized_placeholder = Document::default();
+                        normalized_placeholder.id = normalized_id.clone();
+                        if let Ok(persisted_doc) = normalized_placeholder.load().await {
+                            if let Some(better_description) = persisted_doc.description {
+                                log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized from title: {})", document.title, normalized_id);
+                                document.description = Some(better_description);
+                            }
+                        } else {
+                            // Try with "md" suffix for KG files (title "haystack" -> ID "haystackmd")
+                            let normalized_id_with_md = format!("{}md", normalized_id);
+                            let mut md_placeholder = Document::default();
+                            md_placeholder.id = normalized_id_with_md.clone();
+                            if let Ok(persisted_doc) = md_placeholder.load().await {
+                                if let Some(better_description) = persisted_doc.description {
+                                    log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized with md: {})", document.title, normalized_id_with_md);
+                                    document.description = Some(better_description);
+                                }
+                            } else {
+                                log::debug!("No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')", document.title, document.id, normalized_id, normalized_id_with_md);
+                            }
+                        }
+                    }
+                    
+                    docs_ranked.push(document);
                 }
                 Ok(docs_ranked)
             }
@@ -321,7 +403,46 @@ impl<'a> TerraphimService {
                 // Apply to ripgrep vector of document output
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
-                let documents = index.get_documents(scored_index_docs);
+                let mut documents = index.get_documents(scored_index_docs);
+                
+                // 🔄 Replace ripgrep descriptions with persistence layer descriptions for better quality
+                for document in &mut documents {
+                    // Try direct persistence lookup first
+                    let mut placeholder = Document::default();
+                    placeholder.id = document.id.clone();
+                    if let Ok(persisted_doc) = placeholder.load().await {
+                        if let Some(better_description) = persisted_doc.description {
+                            log::debug!("Replaced ripgrep description for '{}' with persistence description", document.title);
+                            document.description = Some(better_description);
+                        }
+                    } else {
+                        // Try normalized ID based on document title (filename)
+                        // For KG files, the title might be "haystack" but persistence ID is "haystackmd"
+                        let normalized_id = normalize_filename_to_id(&document.title);
+                        
+                        let mut normalized_placeholder = Document::default();
+                        normalized_placeholder.id = normalized_id.clone();
+                        if let Ok(persisted_doc) = normalized_placeholder.load().await {
+                            if let Some(better_description) = persisted_doc.description {
+                                log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized from title: {})", document.title, normalized_id);
+                                document.description = Some(better_description);
+                            }
+                        } else {
+                            // Try with "md" suffix for KG files (title "haystack" -> ID "haystackmd")
+                            let normalized_id_with_md = format!("{}md", normalized_id);
+                            let mut md_placeholder = Document::default();
+                            md_placeholder.id = normalized_id_with_md.clone();
+                            if let Ok(persisted_doc) = md_placeholder.load().await {
+                                if let Some(better_description) = persisted_doc.description {
+                                    log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized with md: {})", document.title, normalized_id_with_md);
+                                    document.description = Some(better_description);
+                                }
+                            } else {
+                                log::debug!("No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')", document.title, document.id, normalized_id, normalized_id_with_md);
+                            }
+                        }
+                    }
+                }
 
                 Ok(documents)
             }

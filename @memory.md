@@ -1,10 +1,10 @@
 # Terraphim MCP Server Learnings
 
-## ✅ SEARCH RESULTS MARKDOWN RENDERING FIX - COMPLETED SUCCESSFULLY (2025-01-31)
+## ✅ COMPREHENSIVE SEARCH RESULTS & KG LOOKUP FIX - COMPLETED SUCCESSFULLY (2025-01-31)
 
-### Search Results Enhancement (Markdown + Description Fix) - COMPLETED ✅
+### Comprehensive Search Enhancement - COMPLETED ✅
 
-**Task**: Fixed two critical issues with search results: broken markdown rendering and descriptions showing "whole articles" instead of proper summaries.
+**Task**: Fixed multiple critical issues with search results and knowledge graph lookup functionality that were preventing proper user experience.
 
 **Problems Identified**: 
 1. Markdown content displayed as raw text using basic HTML instead of proper rendering
