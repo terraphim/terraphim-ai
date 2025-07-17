@@ -15,13 +15,16 @@ use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{RelevanceFunction, Document};
+use regex::Regex;
+use walkdir::WalkDir;
 
 /// Create a proper description from document content
-/// Includes the first header and/or meaningful paragraph, limiting to 300 characters
+/// Collects multiple meaningful sentences to create informative descriptions
 fn create_document_description(content: &str) -> Option<String> {
     let lines: Vec<&str> = content.lines().collect();
     let mut description_parts = Vec::new();
     let mut found_header = false;
+    let mut content_lines = 0;
     
     for line in lines {
         let trimmed = line.trim();
@@ -38,7 +41,7 @@ fn create_document_description(content: &str) -> Option<String> {
             if !found_header {
                 // Include the first header (remove # symbols and clean up)
                 let header_text = trimmed.trim_start_matches('#').trim();
-                if !header_text.is_empty() {
+                if !header_text.is_empty() && header_text.len() > 3 {
                     description_parts.push(header_text.to_string());
                     found_header = true;
                 }
@@ -46,10 +49,29 @@ fn create_document_description(content: &str) -> Option<String> {
             continue;
         }
         
-        // Found a meaningful paragraph
-        if trimmed.len() > 15 { // Minimum meaningful length
-            description_parts.push(trimmed.to_string());
-            break; // Only take one paragraph after header
+        // Handle synonyms specially for KG files
+        if trimmed.starts_with("synonyms::") {
+            let synonym_text = trimmed.trim_start_matches("synonyms::").trim();
+            if !synonym_text.is_empty() {
+                description_parts.push(format!("synonyms: {}", synonym_text));
+            }
+            continue;
+        }
+        
+        // Found a meaningful paragraph - collect multiple lines for better context
+        if trimmed.len() > 20 && content_lines < 3 { // Get up to 3 meaningful content lines
+            // Skip lines that are just metadata or formatting
+            if !trimmed.starts_with("tags::") &&
+               !trimmed.starts_with("![") && // Skip image references
+               !trimmed.starts_with("```") { // Skip code blocks
+                description_parts.push(trimmed.to_string());
+                content_lines += 1;
+            }
+        }
+        
+        // Stop if we have enough content
+        if description_parts.len() >= 4 || content_lines >= 3 {
+            break;
         }
     }
     
@@ -57,16 +79,26 @@ fn create_document_description(content: &str) -> Option<String> {
         return None;
     }
     
-    // Combine header and paragraph with separator
-    let combined = if description_parts.len() > 1 {
-        format!("{} - {}", description_parts[0], description_parts[1])
-    } else {
+    // Combine all parts intelligently
+    let combined = if description_parts.len() == 1 {
         description_parts[0].clone()
+    } else {
+        // Join header with content using appropriate separators
+        let mut result = description_parts[0].clone();
+        for (i, part) in description_parts.iter().skip(1).enumerate() {
+            if i == 0 {
+                result.push_str(" - ");
+            } else {
+                result.push_str(" ");
+            }
+            result.push_str(part);
+        }
+        result
     };
     
-    // Limit total length to 300 characters
-    let description = if combined.len() > 300 {
-        format!("{}...", &combined[..297])
+    // Limit total length to 400 characters for more informative descriptions
+    let description = if combined.len() > 400 {
+        format!("{}...", &combined[..397])
     } else {
         combined
     };
@@ -153,10 +185,17 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                                                 // Create a proper description from the document content
                                 let description = create_document_description(&content);
                                 
+                                // Use normalized ID to match what persistence layer uses
+                                let filename = entry.file_name().to_string_lossy().to_string();
+                                let normalized_id = {
+                                    let re = Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
+                                    re.replace_all(&filename, "").to_lowercase()
+                                };
+                                
                                 let document = Document {
-                                    id: entry.file_name().to_string_lossy().to_string(),
+                                    id: normalized_id.clone(),
                                     url: entry.path().to_string_lossy().to_string(),
-                                    title: entry.file_name().to_string_lossy().to_string(),
+                                    title: filename.clone(), // Keep original filename as title for display
                                     body: content,
                                     description,
                                     stub: None,
@@ -171,15 +210,74 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     log::info!("✅ Saved document '{}' to persistence layer", document.id);
                                                 }
                                                 
-                                                // Then add to rolegraph for KG indexing
-                                                rolegraph_with_docs.insert_document(&document.id.clone(), document);
-                                                log::info!("✅ Indexed document '{}' into rolegraph", entry.file_name().to_string_lossy());
+                                                // Then add to rolegraph for KG indexing using the same normalized ID
+                                                rolegraph_with_docs.insert_document(&normalized_id, document);
+                                                log::info!("✅ Indexed document '{}' into rolegraph", filename);
                                             }
                                         }
                                     }
                                 }
                             }
                             
+                            // Also process and save all documents from haystack directories (recursively)
+                            for haystack in &role.haystacks {
+                                if haystack.service == terraphim_config::ServiceType::Ripgrep {
+                                    log::info!("Processing haystack documents from: {} (recursive)", haystack.location);
+                                    
+                                    let mut processed_count = 0;
+                                    
+                                    // Use walkdir for recursive directory traversal
+                                    for entry in WalkDir::new(&haystack.location)
+                                        .into_iter()
+                                        .filter_map(|e| e.ok())
+                                        .filter(|e| e.file_type().is_file())
+                                    {
+                                        if let Some(ext) = entry.path().extension() {
+                                            if ext == "md" || ext == "markdown" {
+                                                if let Ok(content) = tokio::fs::read_to_string(&entry.path()).await {
+                                                    // Create a proper description from the document content
+                                                    let description = create_document_description(&content);
+                                                    
+                                                    // Use normalized ID to match what persistence layer uses
+                                                    let filename = entry.file_name().to_string_lossy().to_string();
+                                                    let normalized_id = {
+                                                        let re = Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
+                                                        re.replace_all(&filename, "").to_lowercase()
+                                                    };
+                                                    
+                                                    // Skip if this is already a KG document (avoid duplicates)
+                                                    if let Some(kg_local) = &kg.knowledge_graph_local {
+                                                        if entry.path().starts_with(&kg_local.path) {
+                                                            continue; // Skip KG files, already processed above
+                                                        }
+                                                    }
+                                                    
+                                                    let document = Document {
+                                                        id: normalized_id.clone(),
+                                                        url: entry.path().to_string_lossy().to_string(),
+                                                        title: filename.clone(), // Keep original filename as title for display
+                                                        body: content,
+                                                        description,
+                                                        stub: None,
+                                                        tags: None,
+                                                        rank: None,
+                                                    };
+                                                    
+                                                    // Save document to persistence layer
+                                                    if let Err(e) = document.save().await {
+                                                        log::debug!("Failed to save haystack document '{}' to persistence: {}", document.id, e);
+                                                    } else {
+                                                        log::debug!("✅ Saved haystack document '{}' to persistence layer", document.id);
+                                                        processed_count += 1;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    log::info!("✅ Processed {} documents from haystack: {} (recursive)", processed_count, haystack.location);
+                                }
+                            }
+
                             // Store in local rolegraphs map
                             local_rolegraphs.insert(role_name.clone(), RoleGraphSync::from(rolegraph_with_docs));
                             log::info!("Stored rolegraph in local map for role '{}'", role_name);
