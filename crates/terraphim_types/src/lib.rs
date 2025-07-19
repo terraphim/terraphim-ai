@@ -30,6 +30,10 @@ impl RoleName {
     pub fn as_lowercase(&self) -> &str {
         &self.lowercase
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.original
+    }
 }
 
 impl fmt::Display for RoleName {

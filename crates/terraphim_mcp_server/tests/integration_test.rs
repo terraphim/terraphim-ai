@@ -110,6 +110,7 @@ fn create_test_config() -> String {
                         service: ServiceType::Ripgrep,
                         read_only: false,
                         atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }];
                 }
                 break;
@@ -124,6 +125,7 @@ fn create_test_config() -> String {
                 service: ServiceType::Ripgrep,
                 read_only: false,
                 atomic_server_secret: None,
+                extra_parameters: std::collections::HashMap::new(),
             }];
         }
     }

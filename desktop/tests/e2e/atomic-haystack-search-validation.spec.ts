@@ -7,12 +7,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ATOMIC_SERVER_URL = process.env.ATOMIC_SERVER_URL || "http://localhost:9883/"\;
+const ATOMIC_SERVER_URL = process.env.ATOMIC_SERVER_URL || "http://localhost:9883/";
 const ATOMIC_SERVER_SECRET = process.env.ATOMIC_SERVER_SECRET;
 
-if (!ATOMIC_SERVER_SECRET) {
-  throw new Error('ATOMIC_SERVER_SECRET environment variable is required');
-}
+// Skip tests if atomic server secret is not available
+const shouldSkipAtomicTests = !ATOMIC_SERVER_SECRET;
 
 class TerraphimServerManager {
   private process: ChildProcess | null = null;
@@ -93,6 +92,7 @@ class TerraphimServerManager {
 }
 
 test.describe('Atomic Haystack Document Search Validation', () => {
+  test.skip(shouldSkipAtomicTests, "ATOMIC_SERVER_SECRET not available");
   let terraphimServer: TerraphimServerManager;
   const configPath = path.join(__dirname, 'atomic-haystack-config.json');
 

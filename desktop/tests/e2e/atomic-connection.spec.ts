@@ -10,9 +10,10 @@ const __dirname = path.dirname(__filename);
 const ATOMIC_SERVER_URL = process.env.ATOMIC_SERVER_URL || "http://localhost:9883/";
 const ATOMIC_SERVER_SECRET = process.env.ATOMIC_SERVER_SECRET;
 
-if (!ATOMIC_SERVER_SECRET) {
-  throw new Error("ATOMIC_SERVER_SECRET environment variable is required");
-}
+// Skip tests if atomic server secret is not available
+const shouldSkipAtomicTests = !ATOMIC_SERVER_SECRET;
+
+
 
 class TerraphimServerManager {
   private process: ChildProcess | null = null;
@@ -95,12 +96,14 @@ class TerraphimServerManager {
 
 test.describe("Atomic Server Tests", () => {
   test("should connect to atomic server", async () => {
+    test.skip(shouldSkipAtomicTests, "ATOMIC_SERVER_SECRET not available");
     const response = await fetch(ATOMIC_SERVER_URL);
     expect(response.status).toBeLessThan(500);
     console.log("✅ Atomic server is accessible");
   });
 
   test("should validate environment variables", async () => {
+    test.skip(shouldSkipAtomicTests, "ATOMIC_SERVER_SECRET not available");
     expect(ATOMIC_SERVER_URL).toBeTruthy();
     expect(ATOMIC_SERVER_SECRET).toBeTruthy();
     expect(ATOMIC_SERVER_URL).toMatch(/^https?:\/\//);
@@ -109,6 +112,7 @@ test.describe("Atomic Server Tests", () => {
 });
 
 test.describe("Complete Atomic Server Integration", () => {
+  test.skip(shouldSkipAtomicTests, "ATOMIC_SERVER_SECRET not available");
   let terraphimServer: TerraphimServerManager;
   const configPath = path.join(__dirname, 'atomic-integration-config.json');
 
