@@ -80,6 +80,7 @@ async fn create_autocomplete_test_config() -> Result<String> {
             service: ServiceType::Ripgrep,
             read_only: true,
             atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
     };
