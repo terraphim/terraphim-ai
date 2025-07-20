@@ -274,33 +274,70 @@ impl<'a> TerraphimService {
             }
         };
 
-        // Convert thesaurus to custom KG link format
+        // Filter thesaurus to only include meaningful terms and avoid over-linking
         let mut kg_thesaurus = Thesaurus::new(format!("kg_links_{}", role.name));
-        for (key, value) in &thesaurus {
-            // Create KG links in the format [term](kg:actual_term)
+        
+        // Very selective KG term filtering to avoid clutter:
+        // Only include highly specific, domain-relevant terms 
+        let excluded_common_terms = ["service", "haystack", "system", "config", "configuration", "type", "method", "function", "class", "component", "module", "library", "framework", "interface", "api", "data", "file", "path", "url", "string", "number", "value", "option", "parameter", "field", "property", "attribute", "element", "item", "object", "array", "list", "map", "set", "collection", "server", "client", "request", "response", "error", "result", "success", "failure", "true", "false", "null", "undefined", "empty", "full", "start", "end", "begin", "finish", "create", "delete", "update", "read", "write", "load", "save", "process", "handle", "manage", "control", "execute", "run", "call", "invoke", "trigger", "event", "action", "command", "query", "search", "filter", "sort", "order", "group", "match", "find", "replace", "insert", "remove", "add", "set", "get", "put", "post", "head", "patch", "delete"];
+        
+        let mut sorted_terms: Vec<_> = (&thesaurus).into_iter()
+            .filter(|(key, _)| {
+                let term = key.as_str();
+                
+                // Exclude empty terms, very short terms, and common technical terms
+                if term.is_empty() || term.len() < 5 || excluded_common_terms.contains(&term) {
+                    return false;
+                }
+                
+                // Only include highly specific terms:
+                // 1. Very long compound terms (>12 chars) OR
+                // 2. Hyphenated compound terms OR  
+                // 3. Terms with unique patterns (contains "graph", "terraphim", etc.)
+                term.len() > 12 || 
+                term.contains('-') || 
+                term.contains("graph") ||
+                term.contains("terraphim") ||
+                term.contains("knowledge") ||
+                term.contains("embedding")
+            })
+            .collect();
+        sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id));  // Sort by relevance (ID)
+        
+        // Take only the top 3 most specific terms to minimize clutter
+        let max_kg_terms = 3;
+        for (key, value) in sorted_terms.into_iter().take(max_kg_terms) {
             let mut kg_value = value.clone();
             kg_value.url = Some(format!("kg:{}", key));
             kg_thesaurus.insert(key.clone(), kg_value);
         }
+        
+        let kg_terms_count = kg_thesaurus.len();
+        log::debug!("Filtered KG thesaurus from {} to {} terms for preprocessing", 
+                   thesaurus.len(), kg_terms_count);
 
-        // Apply KG term replacement to document body
-        match replace_matches(&document.body, kg_thesaurus, LinkType::MarkdownLinks) {
-            Ok(processed_bytes) => {
-                match String::from_utf8(processed_bytes) {
-                    Ok(processed_content) => {
-                        log::debug!("Successfully preprocessed document '{}' with {} KG terms", 
-                                   document.title, thesaurus.len());
-                        document.body = processed_content;
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to convert processed content to UTF-8 for document '{}': {:?}", 
-                                  document.title, e);
+        // Apply KG term replacement to document body (only if we have terms to replace)
+        if !kg_thesaurus.is_empty() {
+            match replace_matches(&document.body, kg_thesaurus, LinkType::MarkdownLinks) {
+                Ok(processed_bytes) => {
+                    match String::from_utf8(processed_bytes) {
+                        Ok(processed_content) => {
+                            log::debug!("Successfully preprocessed document '{}' with {} KG terms", 
+                                       document.title, kg_terms_count);
+                            document.body = processed_content;
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to convert processed content to UTF-8 for document '{}': {:?}", 
+                                      document.title, e);
+                        }
                     }
                 }
+                Err(e) => {
+                    log::warn!("Failed to replace KG terms in document '{}': {:?}", document.title, e);
+                }
             }
-            Err(e) => {
-                log::warn!("Failed to replace KG terms in document '{}': {:?}", document.title, e);
-            }
+        } else {
+            log::debug!("No KG terms to process for document '{}'", document.title);
         }
 
         Ok(document)
@@ -407,17 +444,14 @@ impl<'a> TerraphimService {
     /// 
     /// This helper method checks if the selected role has terraphim_it enabled
     /// and applies KG term preprocessing accordingly.
+    /// 
+    /// NOTE: Disabled to prevent double processing - KG preprocessing is now only applied
+    /// during search results to avoid processing documents multiple times.
     async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
-        // Get the currently selected role
-        let selected_role_name = self.config_state.get_selected_role().await;
-        
-        let Some(role) = self.config_state.get_role(&selected_role_name).await else {
-            log::warn!("Selected role '{}' not found in config, returning document without KG preprocessing", selected_role_name);
-            return Ok(document);
-        };
-
-        // Apply preprocessing if conditions are met
-        self.preprocess_document_content(document, &role).await
+        // DISABLED: KG preprocessing is already applied in search results
+        // to prevent double processing that creates "links to links"
+        log::debug!("Skipping KG preprocessing for individual document load to prevent double processing");
+        Ok(document)
     }
 
     /// Get the role for the given search query
@@ -514,7 +548,19 @@ impl<'a> TerraphimService {
                     
                     docs_ranked.push(document);
                 }
-                Ok(docs_ranked)
+                
+                // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
+                if role.terraphim_it {
+                    log::debug!("Applying KG preprocessing to {} search results for role '{}'", docs_ranked.len(), role.name);
+                    let mut processed_docs = Vec::new();
+                    for document in docs_ranked {
+                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        processed_docs.push(processed_doc);
+                    }
+                    Ok(processed_docs)
+                } else {
+                    Ok(docs_ranked)
+                }
             }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
@@ -568,7 +614,18 @@ impl<'a> TerraphimService {
                     }
                 }
 
-                Ok(documents)
+                // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
+                if role.terraphim_it {
+                    log::debug!("Applying KG preprocessing to {} search results for role '{}'", documents.len(), role.name);
+                    let mut processed_docs = Vec::new();
+                    for document in documents {
+                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        processed_docs.push(processed_doc);
+                    }
+                    Ok(processed_docs)
+                } else {
+                    Ok(documents)
+                }
             }
         }
     }

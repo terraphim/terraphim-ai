@@ -7424,9 +7424,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 - ✅ `test_mcp_resource_operations` - Resource operations working (minor issue with list_resources but doesn't block functionality)
 - ✅ `test_mcp_role_switching_before_search` - Role switching via config API working correctly
 
-**Production Status:** MCP server fully functional via Tauri CLI with comprehensive test coverage.
-
-## ✅ PLAYWRIGHT CONFIG WIZARD TESTS - COMPLETED SUCCESSFULLY (2025-01-28)
+**Production Status:** MCP server fully functional via Tauri CLI with comprehensive test coverage.## ✅ PLAYWRIGHT CONFIG WIZARD TESTS - COMPLETED SUCCESSFULLY (2025-01-28)
 
 ### Comprehensive Playwright Test Suite for Configuration Wizard - COMPLETED ✅
 
@@ -7844,3 +7842,4 @@ const EXPECTED_RESULTS = {
   'terraphim-graph': { minResults: 1, expectedRank: 34 },
   'graph embeddings': { minResults: 1, expectedRank: 34 },
   'graph': { minResults: 1,
+
