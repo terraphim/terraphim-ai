@@ -11,6 +11,9 @@ use terraphim_types::{
 };
 mod score;
 
+#[cfg(feature = "openrouter")]
+pub mod openrouter;
+
 /// Normalize a filename to be used as a document ID
 /// 
 /// This ensures consistent ID generation between server startup and edit API
@@ -32,6 +35,10 @@ pub enum ServiceError {
 
     #[error("Config error: {0}")]
     Config(String),
+
+    #[cfg(feature = "openrouter")]
+    #[error("OpenRouter error: {0}")]
+    OpenRouter(#[from] crate::openrouter::OpenRouterError),
 }
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
@@ -458,6 +465,87 @@ impl<'a> TerraphimService {
         Ok(document)
     }
 
+    /// Enhance document descriptions with AI-generated summaries using OpenRouter
+    /// 
+    /// This method uses the OpenRouter service to generate intelligent summaries
+    /// of document content, replacing basic text excerpts with AI-powered descriptions.
+    #[cfg(feature = "openrouter")]
+    async fn enhance_descriptions_with_ai(&self, mut documents: Vec<Document>, role: &Role) -> Result<Vec<Document>> {
+        use crate::openrouter::OpenRouterService;
+        
+        // Create the OpenRouter service
+        let api_key = role.openrouter_api_key.as_ref().unwrap();
+        let model = role.openrouter_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
+        
+        let openrouter_service = match OpenRouterService::new(api_key, model) {
+            Ok(service) => service,
+            Err(e) => {
+                log::error!("Failed to create OpenRouter service for role '{}': {:?}", role.name, e);
+                return Ok(documents); // Return original documents on service creation failure
+            }
+        };
+        
+        log::info!("Enhancing {} document descriptions with OpenRouter model: {}", documents.len(), model);
+        
+        let mut enhanced_count = 0;
+        let mut error_count = 0;
+        
+        for document in &mut documents {
+            // Only enhance documents that have meaningful content and don't already have high-quality descriptions
+            if self.should_generate_ai_summary(document) {
+                let summary_length = 250; // Target length for summaries
+                
+                match openrouter_service.generate_summary(&document.body, summary_length).await {
+                    Ok(ai_summary) => {
+                        log::debug!("Generated AI summary for '{}': {} characters", document.title, ai_summary.len());
+                        document.description = Some(ai_summary);
+                        enhanced_count += 1;
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to generate AI summary for '{}': {:?}", document.title, e);
+                        error_count += 1;
+                        // Keep existing description as fallback
+                    }
+                }
+            } else {
+                log::debug!("Skipping AI summary for '{}' (not suitable for enhancement)", document.title);
+            }
+        }
+        
+        log::info!("OpenRouter enhancement complete: {} enhanced, {} errors, {} skipped", 
+                  enhanced_count, error_count, documents.len() - enhanced_count - error_count);
+        
+        Ok(documents)
+    }
+
+    /// Determine if a document should receive an AI-generated summary
+    /// 
+    /// This helper method checks various criteria to decide whether a document
+    /// would benefit from AI summarization.
+    #[cfg(feature = "openrouter")]
+    fn should_generate_ai_summary(&self, document: &Document) -> bool {
+        // Don't enhance if the document body is too short to summarize meaningfully
+        if document.body.trim().len() < 200 {
+            return false;
+        }
+        
+        // Don't enhance if we already have a high-quality description
+        if let Some(ref description) = document.description {
+            // If the description is substantial and doesn't look like a simple excerpt, keep it
+            if description.len() > 100 && !description.ends_with("...") {
+                return false;
+            }
+        }
+        
+        // Don't enhance very large documents (cost control)
+        if document.body.len() > 8000 {
+            return false;
+        }
+        
+        // Good candidates for AI summarization
+        true
+    }
+
     /// Get the role for the given search query
     async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
         let search_role = match &search_query.role {
@@ -553,6 +641,13 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document);
                 }
                 
+                // Apply OpenRouter AI summarization if enabled for this role
+                #[cfg(feature = "openrouter")]
+                if role.has_openrouter_config() {
+                    log::debug!("Applying OpenRouter AI summarization to {} search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                }
+                
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
                 if role.terraphim_it {
                     log::debug!("Applying KG preprocessing to {} search results for role '{}'", docs_ranked.len(), role.name);
@@ -616,6 +711,13 @@ impl<'a> TerraphimService {
                             }
                         }
                     }
+                }
+
+                // Apply OpenRouter AI summarization if enabled for this role
+                #[cfg(feature = "openrouter")]
+                if role.has_openrouter_config() {
+                    log::debug!("Applying OpenRouter AI summarization to {} search results for role '{}'", documents.len(), role.name);
+                    documents = self.enhance_descriptions_with_ai(documents, &role).await?;
                 }
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)

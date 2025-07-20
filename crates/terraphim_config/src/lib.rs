@@ -80,9 +80,49 @@ pub struct Role {
     pub theme: String,
     pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
+    /// Enable AI-powered article summaries using OpenRouter
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_enabled: bool,
+    /// API key for OpenRouter service
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_api_key: Option<String>,
+    /// Model to use for generating summaries (e.g., "openai/gpt-3.5-turbo")
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_model: Option<String>,
     #[serde(flatten)]
     #[schemars(skip)]
     pub extra: AHashMap<String, Value>,
+}
+
+impl Role {
+    /// Check if OpenRouter is properly configured for this role
+    #[cfg(feature = "openrouter")]
+    pub fn has_openrouter_config(&self) -> bool {
+        self.openrouter_enabled && 
+        self.openrouter_api_key.is_some() && 
+        self.openrouter_model.is_some()
+    }
+
+    /// Check if OpenRouter is properly configured (stub when feature is disabled)
+    #[cfg(not(feature = "openrouter"))]
+    pub fn has_openrouter_config(&self) -> bool {
+        false
+    }
+
+    /// Get the OpenRouter model name, providing a sensible default
+    #[cfg(feature = "openrouter")]
+    pub fn get_openrouter_model(&self) -> Option<&str> {
+        self.openrouter_model.as_deref()
+    }
+
+    /// Get the OpenRouter model name (stub when feature is disabled)
+    #[cfg(not(feature = "openrouter"))]
+    pub fn get_openrouter_model(&self) -> Option<&str> {
+        None
+    }
 }
 
 use anyhow::Context;
@@ -324,6 +364,12 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -351,6 +397,12 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -378,6 +430,12 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -406,6 +464,12 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -433,6 +497,12 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
                 extra: AHashMap::new(),
             },
         )

@@ -44,6 +44,10 @@ schemars = "0.8"
 regex = "1.11.0"
 walkdir = "2.4"
 
+[features]
+default = []
+openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+
 [dev-dependencies]
 serial_test = "3.0.0"
 tempfile = "3.10.1"
