@@ -308,7 +308,11 @@ impl<'a> TerraphimService {
         let max_kg_terms = 3;
         for (key, value) in sorted_terms.into_iter().take(max_kg_terms) {
             let mut kg_value = value.clone();
-            kg_value.url = Some(format!("kg:{}", key));
+            // IMPORTANT: Keep the original term (key) as visible text, link to root concept (value.value)
+            // This creates links like: [graph embeddings](kg:terraphim-graph)
+            // where "graph embeddings" stays visible but links to the root concept "terraphim-graph"
+            kg_value.value = key.clone(); // Keep original term as visible text
+            kg_value.url = Some(format!("kg:{}", value.value)); // Link to the root concept
             kg_thesaurus.insert(key.clone(), kg_value);
         }
         
