@@ -1,5 +1,94 @@
 # Terraphim MCP Server Learnings
 
+## ✅ KNOWLEDGE GRAPH AUTO-LINKING IMPLEMENTATION - COMPLETED SUCCESSFULLY (2025-01-31)
+
+### KG Term Auto-linking in Article Content - COMPLETED ✅
+
+**Task**: Enhanced article viewing experience by automatically converting Knowledge Graph terms into clickable markdown links when `terraphim_it` parameter is enabled in role configuration.
+
+**User Request**: "I added parameter terraphim_it to role config, if it's true and role have configured KG pre-process article content using replace_matches function to make a markdown link to each matched knowledge graph using find_documents_for_kg_term"
+
+**✅ COMPREHENSIVE IMPLEMENTATION DELIVERED**:
+
+#### **1. Backend Implementation (Rust) - COMPLETED ✅**
+
+**A. Enhanced Role Configuration Structure**:
+- **Added `terraphim_it: bool` Field**: Extended `Role` struct in `crates/terraphim_config/src/lib.rs`
+- **Role Configuration Updates**: Updated all role configurations across the codebase
+  - **Engineer & System Operator**: `terraphim_it: true` (KG auto-linking enabled)
+  - **Default & Test Roles**: `terraphim_it: false` (standard behavior)
+- **Backward Compatibility**: All existing configurations updated without breaking changes
+
+**B. KG Preprocessing Function Implementation**:
+- **Location**: `crates/terraphim_service/src/lib.rs`
+- **Function**: `preprocess_document_content()` method added to `TerraphimService`
+- **Logic Implementation**:
+  ```rust
+  // When terraphim_it: true and role has KG configured:
+  // 1. Load the role's thesaurus/knowledge graph
+  // 2. Convert thesaurus to custom KG link format  
+  // 3. Apply replace_matches() with LinkType::MarkdownLinks
+  // 4. Transform terms to [term](kg:actual_term) format
+  ```
+- **KG Link Protocol**: Uses `kg:` protocol for internal KG term references
+- **Integration**: Seamlessly integrated with `replace_matches` function from `terraphim_automata`
+
+**C. Document Loading Integration**:
+- **Enhanced `get_document_by_id()`**: Modified to automatically apply KG preprocessing
+- **Conditional Processing**: Only processes documents when:
+  - Role has `terraphim_it: true` 
+  - Role has configured knowledge graph
+  - Document content contains KG terms
+- **Performance**: Efficient processing with thesaurus caching
+
+#### **2. Frontend Implementation (Svelte) - COMPLETED ✅**
+
+**A. KG Link Click Handling (`ArticleModal.svelte`)**:
+- **Protocol Detection**: Automatic detection of `kg:` protocol links in markdown content
+- **Click Handler**: `handleContentClick()` function intercepts KG link clicks
+- **API Integration**: Calls `find_documents_for_kg_term` endpoint for both Tauri and web modes
+- **Comprehensive Debugging**: Extensive logging for troubleshooting
+
+**B. KG Document Modal System**:
+- **Nested Modal Structure**: Added secondary modal for displaying KG documents
+- **Context Preservation**: Maintains original document context with KG term and rank information
+- **Navigation Flow**: Smooth transition from article → KG term → KG document
+- **Styling Consistency**: Follows existing modal design patterns
+
+**C. Visual Enhancement and User Experience**:
+- **KG Link Styling**: Distinctive purple color scheme with link icons
+- **Hover Effects**: Smooth transitions and background color changes
+- **Loading States**: Loading indicators during KG document fetching
+- **Error Handling**: Graceful fallback for network errors and missing documents
+
+#### **3. Technical Implementation Summary - COMPLETED ✅**
+
+**A. Configuration Integration**:
+- ✅ All `Role` struct initializations updated with `terraphim_it` field
+- ✅ Proper default values set for all role types  
+- ✅ Backward compatibility maintained across all configurations
+
+**B. Compilation and Testing**:
+- ✅ **Rust Backend**: `cargo check --workspace` passes successfully
+- ✅ **Svelte Frontend**: `yarn build` completes without errors  
+- ✅ **Tauri Desktop**: Complete project compilation verified
+- ✅ **Integration Testing**: KG link functionality validated
+
+**C. User Experience Features**:
+- ✅ **Visual Feedback**: Purple KG links with hover effects and icons
+- ✅ **Context Preservation**: KG term and rank information maintained
+- ✅ **Error Handling**: Graceful fallbacks for all error scenarios
+- ✅ **Performance**: Efficient thesaurus caching and async operations
+
+**Status**: ✅ **PRODUCTION READY** - Complete KG auto-linking functionality successfully implemented. Users can now seamlessly explore knowledge graph terms directly within document content through automatically generated clickable links.
+
+**Benefits Achieved**:
+- **Enhanced Discovery**: Automatic KG term recognition in document content
+- **Seamless Navigation**: Click-through exploration of related concepts
+- **Role-Based Control**: Configurable feature via `terraphim_it` parameter
+- **Visual Distinction**: Clear identification of KG links vs regular links
+- **Comprehensive Coverage**: Works in both Tauri desktop and web modes
+
 ## ✅ COMPREHENSIVE SEARCH RESULTS & KG LOOKUP FIX - COMPLETED SUCCESSFULLY (2025-01-31)
 
 ### Comprehensive Search Enhancement - COMPLETED ✅
