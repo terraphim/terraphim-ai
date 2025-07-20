@@ -6,6 +6,7 @@
       "shortname": "Default",
       "name": "Default",
       "relevance_function": "title-scorer",
+      "terraphim_it": false,
       "theme": "spacelab",
       "kg": null,
       "haystacks": [
@@ -22,6 +23,7 @@
       "shortname": "TerraEng",
       "name": "Terraphim Engineer",
       "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
       "theme": "lumen",
       "kg": {
         "automata_path": null,
@@ -46,6 +48,7 @@
       "shortname": "Engineer",
       "name": "Engineer",
       "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
       "theme": "lumen",
       "kg": {
         "automata_path": null,

@@ -1,6 +1,7 @@
 use ahash::AHashMap;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
+use terraphim_automata::{replace_matches, LinkType};
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
@@ -78,35 +79,114 @@ impl<'a> TerraphimService {
                         }
                         Err(e) => {
                             log::warn!("Failed to load thesaurus from automata path: {:?}", e);
-                            
-                            // If automata path fails, try to build from local KG files
+                            // Fallback to building from local KG if available
                             if let Some(kg_local) = &kg.knowledge_graph_local {
-                                log::info!("Building thesaurus from local KG files: {:?}", kg_local.path);
-                                
-                                // Build thesaurus using Logseq builder
+                                log::info!(
+                                    "Fallback: building thesaurus from local KG for role {}",
+                                    role_name
+                                );
                                 let logseq_builder = Logseq::default();
-                                let thesaurus = logseq_builder
-                                    .build(role_name.as_lowercase().to_string(), kg_local.path.clone())
+                                match logseq_builder
+                                    .build(
+                                        role_name.as_lowercase().to_string(),
+                                        kg_local.path.clone(),
+                                    )
                                     .await
-                                    .map_err(|e| ServiceError::Config(format!("Failed to build thesaurus: {:?}", e)));
-                                let mut thesaurus = thesaurus?;
-                                
-                                // Save to persistence layer
-                                match thesaurus.save().await {
-                                    Ok(_) => {
-                                        log::info!("Thesaurus for role `{}` saved to persistence", role_name);
-                                        // Reload from persistence to get canonical version
-                                        thesaurus = thesaurus.load().await
-                                            .map_err(|e| ServiceError::Config(format!("Failed to reload thesaurus: {:?}", e)))?;
+                                {
+                                    Ok(thesaurus) => {
+                                        let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                                        match rolegraph {
+                                            Ok(rolegraph) => {
+                                                let rolegraph_value = RoleGraphSync::from(rolegraph);
+                                                rolegraphs.insert(role_name.clone(), rolegraph_value);
+                                            }
+                                            Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                                        }
+                                        
+                                        Ok(thesaurus)
                                     }
                                     Err(e) => {
-                                        log::warn!("Failed to save thesaurus to persistence: {:?}", e);
-                                        // Continue with in-memory thesaurus
+                                        log::error!(
+                                            "Failed to build thesaurus from local KG for role {}: {:?}",
+                                            role_name,
+                                            e
+                                        );
+                                        Err(ServiceError::Config("Failed to load or build thesaurus".into()))
                                     }
                                 }
-                                
-                                // Create rolegraph
-                                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                            } else {
+                                log::error!(
+                                    "No fallback available for role {}: no local KG path configured",
+                                    role_name
+                                );
+                                Err(ServiceError::Config("No automata path and no local KG available".into()))
+                            }
+                        }
+                    }
+                } else if let Some(kg_local) = &kg.knowledge_graph_local {
+                    // Build thesaurus from local KG
+                    log::info!(
+                        "Role {} has no automata_path, building thesaurus from local KG files at {:?}",
+                        role_name,
+                        kg_local.path
+                    );
+                    let logseq_builder = Logseq::default();
+                    match logseq_builder
+                        .build(
+                            role_name.as_lowercase().to_string(),
+                            kg_local.path.clone(),
+                        )
+                        .await
+                    {
+                        Ok(thesaurus) => {
+                            log::info!(
+                                "Successfully built thesaurus from local KG for role {}",
+                                role_name
+                            );
+                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                            match rolegraph {
+                                Ok(rolegraph) => {
+                                    let rolegraph_value = RoleGraphSync::from(rolegraph);
+                                    rolegraphs.insert(role_name.clone(), rolegraph_value);
+                                }
+                                Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                            }
+                            
+                            Ok(thesaurus)
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to build thesaurus from local KG for role {}: {:?}",
+                                role_name,
+                                e
+                            );
+                            Err(ServiceError::Config("Failed to build thesaurus from local KG".into()))
+                        }
+                    }
+                } else {
+                    log::warn!("Role {} is configured for TerraphimGraph but has neither automata_path nor knowledge_graph_local defined.", role_name);
+                    if let Some(kg_local) = &kg.knowledge_graph_local {
+                        // Build thesaurus from local KG files during startup
+                        log::info!(
+                            "Building thesaurus from local KG files for role {} at {:?}",
+                            role_name,
+                            kg_local.path
+                        );
+                        let logseq_builder = Logseq::default();
+                        match logseq_builder
+                            .build(
+                                role_name.as_lowercase().to_string(),
+                                kg_local.path.clone(),
+                            )
+                            .await
+                        {
+                            Ok(thesaurus) => {
+                                log::info!(
+                                    "Successfully built thesaurus from local KG for role {}",
+                                    role_name
+                                );
+                                let rolegraph =
+                                    RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
                                 match rolegraph {
                                     Ok(rolegraph) => {
                                         let rolegraph_value = RoleGraphSync::from(rolegraph);
@@ -116,49 +196,16 @@ impl<'a> TerraphimService {
                                 }
                                 
                                 Ok(thesaurus)
-                            } else {
-                                Err(ServiceError::Config("No local knowledge graph path available".into()))
-                            }
-                        }
-                    }
-                } else {
-                    // automata_path is None, build from local KG files
-                    if let Some(kg_local) = &kg.knowledge_graph_local {
-                        log::info!("Building thesaurus from local KG files (no automata path): {:?}", kg_local.path);
-                        
-                        // Build thesaurus using Logseq builder
-                        let logseq_builder = Logseq::default();
-                        let thesaurus = logseq_builder
-                            .build(role_name.as_lowercase().to_string(), kg_local.path.clone())
-                            .await
-                            .map_err(|e| ServiceError::Config(format!("Failed to build thesaurus: {:?}", e)));
-                        let mut thesaurus = thesaurus?;
-                        
-                        // Save to persistence layer
-                        match thesaurus.save().await {
-                            Ok(_) => {
-                                log::info!("Thesaurus for role `{}` saved to persistence", role_name);
-                                // Reload from persistence to get canonical version
-                                thesaurus = thesaurus.load().await
-                                    .map_err(|e| ServiceError::Config(format!("Failed to reload thesaurus: {:?}", e)))?;
                             }
                             Err(e) => {
-                                log::warn!("Failed to save thesaurus to persistence: {:?}", e);
-                                // Continue with in-memory thesaurus
+                                log::error!(
+                                    "Failed to build thesaurus from local KG for role {}: {:?}",
+                                    role_name,
+                                    e
+                                );
+                                Err(ServiceError::Config("Failed to build thesaurus from local KG".into()))
                             }
                         }
-                        
-                        // Create rolegraph
-                        let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
-                        match rolegraph {
-                            Ok(rolegraph) => {
-                                let rolegraph_value = RoleGraphSync::from(rolegraph);
-                                rolegraphs.insert(role_name.clone(), rolegraph_value);
-                            }
-                            Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
-                        }
-                        
-                        Ok(thesaurus)
                     } else {
                         Err(ServiceError::Config("No local knowledge graph path available".into()))
                     }
@@ -197,6 +244,66 @@ impl<'a> TerraphimService {
             )
             .await
         }
+    }
+
+    /// Preprocess document content to create clickable KG links when terraphim_it is enabled
+    /// 
+    /// This function replaces KG terms in the document body with markdown links
+    /// in the format [term](kg:term) which can be intercepted by the frontend
+    /// to display KG documents when clicked.
+    pub async fn preprocess_document_content(&mut self, mut document: Document, role: &Role) -> Result<Document> {
+        // Only preprocess if terraphim_it is enabled and role has KG configured
+        if !role.terraphim_it {
+            log::debug!("terraphim_it disabled for role {}, skipping KG preprocessing", role.name);
+            return Ok(document);
+        }
+
+        let Some(_kg) = &role.kg else {
+            log::debug!("No KG configured for role {}, skipping KG preprocessing", role.name);
+            return Ok(document);
+        };
+
+        log::debug!("Preprocessing document '{}' for KG term linking in role '{}'", document.title, role.name);
+
+        // Load thesaurus for the role
+        let thesaurus = match self.ensure_thesaurus_loaded(&role.name).await {
+            Ok(thesaurus) => thesaurus,
+            Err(e) => {
+                log::warn!("Failed to load thesaurus for role {}: {:?}", role.name, e);
+                return Ok(document); // Return original document if thesaurus fails to load
+            }
+        };
+
+        // Convert thesaurus to custom KG link format
+        let mut kg_thesaurus = Thesaurus::new(format!("kg_links_{}", role.name));
+        for (key, value) in &thesaurus {
+            // Create KG links in the format [term](kg:actual_term)
+            let mut kg_value = value.clone();
+            kg_value.url = Some(format!("kg:{}", key));
+            kg_thesaurus.insert(key.clone(), kg_value);
+        }
+
+        // Apply KG term replacement to document body
+        match replace_matches(&document.body, kg_thesaurus, LinkType::MarkdownLinks) {
+            Ok(processed_bytes) => {
+                match String::from_utf8(processed_bytes) {
+                    Ok(processed_content) => {
+                        log::debug!("Successfully preprocessed document '{}' with {} KG terms", 
+                                   document.title, thesaurus.len());
+                        document.body = processed_content;
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to convert processed content to UTF-8 for document '{}': {:?}", 
+                                  document.title, e);
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to replace KG terms in document '{}': {:?}", document.title, e);
+            }
+        }
+
+        Ok(document)
     }
 
     /// Create document
@@ -248,7 +355,7 @@ impl<'a> TerraphimService {
         match placeholder.load().await {
             Ok(doc) => {
                 log::debug!("Found document '{}' with direct ID lookup", document_id);
-                return Ok(Some(doc));
+                return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
             }
             Err(e) => {
                 log::debug!("Document '{}' not found with direct lookup: {:?}", document_id, e);
@@ -265,7 +372,7 @@ impl<'a> TerraphimService {
             match normalized_placeholder.load().await {
                 Ok(doc) => {
                     log::debug!("Found document '{}' with normalized ID '{}'", document_id, normalized_id);
-                    return Ok(Some(doc));
+                    return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
                 }
                 Err(e) => {
                     log::debug!("Document '{}' not found with normalized ID '{}': {:?}", document_id, normalized_id, e);
@@ -288,12 +395,29 @@ impl<'a> TerraphimService {
         for doc in documents {
             if doc.title == document_id || doc.id == document_id {
                 log::debug!("Found document '{}' via search fallback", document_id);
-                return Ok(Some(doc));
+                return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
             }
         }
 
         log::debug!("Document '{}' not found anywhere", document_id);
         Ok(None)
+    }
+
+    /// Apply KG preprocessing to a document if needed based on the current selected role
+    /// 
+    /// This helper method checks if the selected role has terraphim_it enabled
+    /// and applies KG term preprocessing accordingly.
+    async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
+        // Get the currently selected role
+        let selected_role_name = self.config_state.get_selected_role().await;
+        
+        let Some(role) = self.config_state.get_role(&selected_role_name).await else {
+            log::warn!("Selected role '{}' not found in config, returning document without KG preprocessing", selected_role_name);
+            return Ok(document);
+        };
+
+        // Apply preprocessing if conditions are met
+        self.preprocess_document_content(document, &role).await
     }
 
     /// Get the role for the given search query
@@ -455,12 +579,16 @@ impl<'a> TerraphimService {
     /// For example, given "haystack", it will find documents like "haystack.md" that contain
     /// this term or its synonyms ("datasource", "service", "agent").
     /// 
-    /// Returns a vector of Documents that contain the term.
+    /// Returns a vector of Documents that contain the term, with KG preprocessing applied if enabled for the role.
     pub async fn find_documents_for_kg_term(&mut self, role_name: &RoleName, term: &str) -> Result<Vec<Document>> {
         log::debug!("Finding documents for KG term '{}' in role '{}'", term, role_name);
         
         // Ensure the thesaurus is loaded for this role
         let _thesaurus = self.ensure_thesaurus_loaded(role_name).await?;
+        
+        // Get the role configuration to check if KG preprocessing should be applied
+        let role = self.config_state.get_role(role_name).await
+            .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found in config", role_name)))?;
         
         // Get the role's rolegraph
         let rolegraph_sync = self.config_state.roles.get(role_name)
@@ -480,9 +608,22 @@ impl<'a> TerraphimService {
         log::debug!("Found {} document IDs for term '{}': {:?}", document_ids.len(), term, document_ids);
         
         // Load the actual documents using the persistence layer
-        let documents = terraphim_persistence::load_documents_by_ids(&document_ids).await?;
+        let mut documents = terraphim_persistence::load_documents_by_ids(&document_ids).await?;
         
-        log::debug!("Successfully loaded {} documents for term '{}'", documents.len(), term);
+        // Apply KG preprocessing if enabled for this role
+        if role.terraphim_it {
+            log::debug!("Applying KG preprocessing for role '{}' with terraphim_it enabled", role_name);
+            let mut processed_documents = Vec::new();
+            for document in documents {
+                let processed_doc = self.preprocess_document_content(document, &role).await?;
+                processed_documents.push(processed_doc);
+            }
+            documents = processed_documents;
+        } else {
+            log::debug!("terraphim_it disabled for role '{}', skipping KG preprocessing", role_name);
+        }
+        
+        log::debug!("Successfully loaded and processed {} documents for term '{}'", documents.len(), term);
         Ok(documents)
     }
 

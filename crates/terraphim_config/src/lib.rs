@@ -76,6 +76,7 @@ pub struct Role {
     pub name: RoleName,
     /// The relevance function used to rank search results
     pub relevance_function: RelevanceFunction,
+    pub terraphim_it: bool,
     pub theme: String,
     pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
@@ -313,6 +314,7 @@ impl ConfigBuilder {
                 shortname: Some("Default".to_string()),
                 name: "Default".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -331,6 +333,7 @@ impl ConfigBuilder {
                 shortname: Some("Engineer".into()),
                 name: "Engineer".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(automata_remote.clone()),
@@ -357,6 +360,7 @@ impl ConfigBuilder {
                 shortname: Some("operator".to_string()),
                 name: "System Operator".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "superhero".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(automata_remote.clone()),
@@ -392,6 +396,7 @@ impl ConfigBuilder {
                 shortname: Some("Default".to_string()),
                 name: "Default".to_string().into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -410,6 +415,7 @@ impl ConfigBuilder {
                 shortname: Some("TerraEng".to_string()),
                 name: "Terraphim Engineer".to_string().into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: None, // Set to None so it builds from local KG files during startup
@@ -809,6 +815,7 @@ mod tests {
                     shortname: Some("Default".to_string()),
                     name: "Default".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
+                    terraphim_it: false,
                     theme: "spacelab".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
@@ -827,6 +834,7 @@ mod tests {
                     shortname: Some("Engineer".to_string()),
                     name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
+                    terraphim_it: false,
                     theme: "lumen".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
@@ -845,6 +853,7 @@ mod tests {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".into(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
+                    terraphim_it: true,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
                         automata_path: Some(automata_remote.clone()),
@@ -896,6 +905,7 @@ mod tests {
             shortname: Some("father".into()),
             name: "Father".into(),
             relevance_function: RelevanceFunction::TitleScorer,
+            terraphim_it: false,
             theme: "lumen".to_string(),
             kg: Some(KnowledgeGraph {
                 automata_path: Some(AutomataPath::local_example()),

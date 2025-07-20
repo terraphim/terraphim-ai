@@ -22,6 +22,7 @@ async fn main() -> Result<()> {
                 shortname: Some("Engineer".to_string()),
                 name: "Engineer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::local_example()),
