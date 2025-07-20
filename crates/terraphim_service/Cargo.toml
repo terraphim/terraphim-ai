@@ -28,6 +28,13 @@ log = "0.4.21"
 strsim = "0.11.1"
 regex = "1.11.0"
 
+# OpenRouter integration dependencies (optional)
+reqwest = { workspace = true, optional = true }
+
+[features]
+default = []
+openrouter = ["reqwest"]
+
 [dev-dependencies]
 tokio = { version = "1.35.0", features = ["full"] }
 terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }

@@ -6722,6 +6722,7 @@ dependencies = [
  "log",
  "opendal",
  "regex",
+ "reqwest 0.12.20",
  "serde",
  "serde_json",
  "strsim 0.11.1",

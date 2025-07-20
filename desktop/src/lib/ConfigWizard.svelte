@@ -51,7 +51,10 @@
     relevance_function: RelevanceFunction; 
     theme: string; 
     haystacks: HaystackForm[]; 
-    kg: KnowledgeGraphForm 
+    kg: KnowledgeGraphForm;
+    openrouter_enabled?: boolean;
+    openrouter_api_key?: string;
+    openrouter_model?: string;
   };
   const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
     id: "Desktop",
@@ -96,7 +99,10 @@
                 atomic_server_secret: h.atomic_server_secret || "",
                 extra_parameters: h.extra_parameters || {}
               })),
-              kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false }
+              kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false },
+              openrouter_enabled: r.openrouter_enabled ?? false,
+              openrouter_api_key: r.openrouter_api_key ?? "",
+              openrouter_model: r.openrouter_model ?? "openai/gpt-3.5-turbo"
             };
           })
         }));
@@ -122,7 +128,10 @@
       relevance_function: "title-scorer", 
       theme: "spacelab", 
       haystacks: [], 
-      kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false} 
+      kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false},
+      openrouter_enabled: false,
+      openrouter_api_key: "",
+      openrouter_model: "openai/gpt-3.5-turbo"
     }] }));
   }
   function removeRole(idx: number) {
@@ -218,7 +227,13 @@
           knowledge_graph_local: r.kg.local_path ? { input_type: r.kg.local_type, path: r.kg.local_path } : null,
           public: r.kg.public,
           publish: r.kg.publish
-        } : null
+        } : null,
+        // Include OpenRouter fields if enabled
+        ...(r.openrouter_enabled && {
+          openrouter_enabled: r.openrouter_enabled,
+          openrouter_api_key: r.openrouter_api_key,
+          openrouter_model: r.openrouter_model
+        })
       };
     });
     updated.roles = rolesMap;
@@ -459,6 +474,48 @@
           </div>
         {/each}
         <button class="button is-small" on:click={() => addHaystack(idx)}>Add Haystack</button>
+
+        <!-- OpenRouter AI Configuration -->
+        <h5 class="title is-6">AI-Enhanced Summaries (OpenRouter)</h5>
+        <div class="field">
+          <label class="checkbox" for={`openrouter-enabled-${idx}`}>
+            <input id={`openrouter-enabled-${idx}`} type="checkbox" bind:checked={$draft.roles[idx].openrouter_enabled} />
+            &nbsp;Enable AI-generated article summaries
+          </label>
+          <p class="help">Generate intelligent summaries using OpenRouter's language models</p>
+        </div>
+
+        {#if $draft.roles[idx].openrouter_enabled}
+          <div class="field">
+            <label class="label" for={`openrouter-api-key-${idx}`}>OpenRouter API Key</label>
+            <div class="control">
+              <input 
+                class="input" 
+                id={`openrouter-api-key-${idx}`} 
+                type="password" 
+                placeholder="sk-or-v1-..." 
+                bind:value={$draft.roles[idx].openrouter_api_key} 
+              />
+            </div>
+            <p class="help">Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a></p>
+          </div>
+
+          <div class="field">
+            <label class="label" for={`openrouter-model-${idx}`}>Model</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id={`openrouter-model-${idx}`} bind:value={$draft.roles[idx].openrouter_model}>
+                  <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo (Fast & Affordable)</option>
+                  <option value="openai/gpt-4">GPT-4 (High Quality)</option>
+                  <option value="anthropic/claude-3-sonnet">Claude 3 Sonnet (Balanced)</option>
+                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Fast)</option>
+                  <option value="mistralai/mixtral-8x7b-instruct">Mixtral 8x7B (Open Source)</option>
+                </select>
+              </div>
+            </div>
+            <p class="help">Choose the language model for generating summaries. Different models offer different speed/quality tradeoffs.</p>
+          </div>
+        {/if}
 
         <h5 class="title is-6">Knowledge Graph</h5>
         <div class="field">
