@@ -6456,6 +6456,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tempfile",
+ "terraphim_atomic_client",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_mcp_server",

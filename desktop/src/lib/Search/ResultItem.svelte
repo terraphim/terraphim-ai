@@ -2,17 +2,19 @@
   import { Taglist, Tag } from "svelma";
   import { fade } from "svelte/transition";
   import ArticleModal from "./ArticleModal.svelte";
+  import AtomicSaveModal from "./AtomicSaveModal.svelte";
   import type { Document } from "./SearchResult";
   import configStore from "../ThemeSwitcher.svelte";
-  import { role, is_tauri, serverUrl } from "../stores";
+  import { role, is_tauri, serverUrl, configStore as roleConfigStore } from "../stores";
   import { CONFIG } from "../../config";
   import { invoke } from '@tauri-apps/api/tauri';
-  import type { DocumentListResponse } from "../generated/types";
+  import type { DocumentListResponse, Role, Haystack } from "../generated/types";
   import SvelteMarkdown from 'svelte-markdown';
 
   export let document: Document;
   let showModal = false;
   let showKgModal = false;
+  let showAtomicSaveModal = false;
   let kgDocument: Document | null = null;
   let kgTerm: string | null = null;
   let kgRank: number | null = null;
@@ -25,8 +27,62 @@
   let showAiSummary = false;
   let summaryFromCache = false;
 
+  // Check if current role has atomic server configuration
+  $: hasAtomicServer = checkAtomicServerAvailable();
+
+  function checkAtomicServerAvailable(): boolean {
+    const currentRoleName = $role;
+    const config = $roleConfigStore;
+    
+    if (!config?.roles || !currentRoleName) {
+      return false;
+    }
+
+    // Find the current role object - handle the complex role structure
+    let currentRole: Role | null = null;
+    
+    try {
+      // Handle both string keys and RoleName objects in the roles map
+      for (const [roleName, roleConfig] of Object.entries(config.roles)) {
+        // Cast roleConfig to Role type for proper access
+        const role = roleConfig as Role;
+        
+        // Check various ways the role name might match
+        const roleNameStr = typeof role.name === 'object' 
+          ? role.name.original 
+          : String(role.name);
+          
+        if (roleName === currentRoleName || roleNameStr === currentRoleName) {
+          currentRole = role;
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn('Error checking role configuration:', error);
+      return false;
+    }
+
+    if (!currentRole) {
+      return false;
+    }
+
+    // Check if role has any writable atomic server haystacks
+    const atomicHaystacks = currentRole.haystacks?.filter(haystack => 
+      haystack.service === "Atomic" && 
+      haystack.location &&
+      !haystack.read_only
+    ) || [];
+
+    return atomicHaystacks.length > 0;
+  }
+
   const onTitleClick = () => {
     showModal = true;
+  };
+
+  const onAtomicSaveClick = () => {
+    console.log('🔄 Opening atomic save modal for document:', document.title);
+    showAtomicSaveModal = true;
   };
 
   async function handleTagClick(tag: string) {
@@ -412,6 +468,19 @@
                 <i class="fas fa-plus" aria-hidden="true" />
               </span>
             </button>
+            {#if hasAtomicServer}
+              <button 
+                type="button" 
+                class="level-item button is-ghost" 
+                aria-label="Save to Atomic Server"
+                on:click={onAtomicSaveClick}
+                title="Save article to Atomic Server"
+              >
+                <span class="icon is-medium has-text-primary">
+                  <i class="fas fa-cloud-upload-alt" aria-hidden="true" />
+                </span>
+              </button>
+            {/if}
             <a
             href={`vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`}
             class="level-item"
@@ -438,6 +507,14 @@
     item={kgDocument} 
     kgTerm={kgTerm}
     kgRank={kgRank}
+  />
+{/if}
+
+<!-- Atomic Save Modal -->
+{#if hasAtomicServer}
+  <AtomicSaveModal 
+    bind:active={showAtomicSaveModal} 
+    document={document}
   />
 {/if}
 
