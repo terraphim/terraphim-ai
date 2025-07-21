@@ -18,6 +18,13 @@
   let kgRank: number | null = null;
   let loadingKg = false;
 
+  // Summarization state
+  let aiSummary: string | null = null;
+  let summaryLoading = false;
+  let summaryError: string | null = null;
+  let showAiSummary = false;
+  let summaryFromCache = false;
+
   const onTitleClick = () => {
     showModal = true;
   };
@@ -142,6 +149,104 @@
     }
   }
 
+  async function generateSummary() {
+    if (summaryLoading || !document.id || !$role) return;
+    
+    summaryLoading = true;
+    summaryError = null;
+    
+    console.log('🤖 AI Summary Debug Info:');
+    console.log('  Document ID:', document.id);
+    console.log('  Current role:', $role);
+    console.log('  Is Tauri mode:', $is_tauri);
+    
+    try {
+      const requestBody = {
+        document_id: document.id,
+        role: $role,
+        max_length: 250,
+        force_regenerate: false
+      };
+      
+      console.log('  📤 Summarization request:', requestBody);
+      
+      let response;
+      
+      if ($is_tauri) {
+        // For Tauri mode, we'll make an HTTP request directly
+        // as we don't have a Tauri command for summarization yet
+        const baseUrl = CONFIG.ServerURL;
+        const url = `${baseUrl}/documents/summarize`;
+        
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+      } else {
+        // Web mode - direct HTTP request
+        const baseUrl = CONFIG.ServerURL;
+        const url = `${baseUrl}/documents/summarize`;
+        
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+      }
+      
+      console.log('  📥 Summary response received:');
+      console.log('    Status code:', response.status);
+      console.log('    Status text:', response.statusText);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('  📄 Summary response data:', data);
+      
+      if (data.status === 'Success' && data.summary) {
+        aiSummary = data.summary;
+        summaryFromCache = data.from_cache || false;
+        showAiSummary = true;
+        console.log('  ✅ Summary generated successfully');
+        console.log('    Summary length:', aiSummary.length, 'characters');
+        console.log('    From cache:', summaryFromCache);
+        console.log('    Model used:', data.model_used);
+      } else {
+        summaryError = data.error || 'Failed to generate summary';
+        console.error('  ❌ Summary generation failed:', summaryError);
+      }
+    } catch (error) {
+      console.error('❌ Error generating summary:');
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+      console.error('  Request details:', {
+        documentId: document.id,
+        role: $role,
+        isTauri: $is_tauri,
+        timestamp: new Date().toISOString()
+      });
+      
+      summaryError = error.message || 'Network error occurred';
+      
+      if (error.message?.includes('Failed to fetch')) {
+        console.error('  💡 Network error suggestions:');
+        console.error('    1. Check if server is running on expected port');
+        console.error('    2. Verify OpenRouter is enabled for this role');
+        console.error('    3. Check OPENROUTER_KEY environment variable');
+        console.error('    4. Verify server URL in CONFIG.ServerURL');
+      }
+    } finally {
+      summaryLoading = false;
+    }
+  }
+
   if (configStore[$role] !== undefined) {
     console.log("Have attribute", configStore[$role]);
     if (configStore[$role].hasOwnProperty("enableLogseq")) {
@@ -193,6 +298,92 @@
               {/if}
             </div>
           </div>
+          
+          <!-- AI Summary Section -->
+          <div class="ai-summary-section">
+            {#if !showAiSummary && !summaryLoading && !summaryError}
+              <button 
+                class="button is-small is-info is-outlined ai-summary-button"
+                on:click={generateSummary}
+                disabled={summaryLoading}
+                title="Generate AI-powered summary using OpenRouter"
+              >
+                <span class="icon is-small">
+                  <i class="fas fa-magic" aria-hidden="true"></i>
+                </span>
+                <span>AI Summary</span>
+              </button>
+            {/if}
+            
+            {#if summaryLoading}
+              <div class="ai-summary-loading">
+                <span class="icon">
+                  <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                </span>
+                <small>Generating AI summary...</small>
+              </div>
+            {/if}
+            
+            {#if summaryError}
+              <div class="ai-summary-error">
+                <span class="icon has-text-danger">
+                  <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                </span>
+                <small class="has-text-danger">Summary error: {summaryError}</small>
+                <button 
+                  class="button is-small is-text"
+                  on:click={() => { summaryError = null; generateSummary(); }}
+                  title="Retry generating summary"
+                >
+                  Retry
+                </button>
+              </div>
+            {/if}
+            
+            {#if showAiSummary && aiSummary}
+              <div class="ai-summary" transition:fade>
+                <div class="ai-summary-header">
+                  <small class="ai-summary-label">
+                    <span class="icon is-small">
+                      <i class="fas fa-robot" aria-hidden="true"></i>
+                    </span>
+                    AI Summary
+                    {#if summaryFromCache}
+                      <span class="tag is-small is-light">cached</span>
+                    {:else}
+                      <span class="tag is-small is-success">fresh</span>
+                    {/if}
+                  </small>
+                  <button 
+                    class="button is-small is-text"
+                    on:click={() => showAiSummary = false}
+                    title="Hide AI summary"
+                  >
+                    <span class="icon is-small">
+                      <i class="fas fa-times" aria-hidden="true"></i>
+                    </span>
+                  </button>
+                </div>
+                <div class="ai-summary-content">
+                  <SvelteMarkdown source={aiSummary} />
+                </div>
+                <div class="ai-summary-actions">
+                  <button 
+                    class="button is-small is-text"
+                    on:click={() => { generateSummary(); }}
+                    disabled={summaryLoading}
+                    title="Regenerate summary"
+                  >
+                    <span class="icon is-small">
+                      <i class="fas fa-redo" aria-hidden="true"></i>
+                    </span>
+                    <span>Regenerate</span>
+                  </button>
+                </div>
+              </div>
+            {/if}
+          </div>
+          
           <br />
         </div>
       </div>
@@ -337,5 +528,96 @@
   .no-description {
     color: #999;
     font-style: italic;
+  }
+  
+  /* AI Summary Styling */
+  .ai-summary-section {
+    margin-top: 0.75rem;
+  }
+  
+  .ai-summary-button {
+    margin-top: 0.5rem;
+  }
+  
+  .ai-summary-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    color: #3273dc;
+  }
+  
+  .ai-summary-error {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .ai-summary {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-left: 4px solid #3273dc;
+    border-radius: 4px;
+  }
+  
+  .ai-summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .ai-summary-label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 600;
+    color: #3273dc;
+  }
+  
+  .ai-summary-content {
+    margin-bottom: 0.5rem;
+    
+    // Style markdown content within AI summary
+    :global(p) {
+      margin: 0 0 0.5rem 0;
+      line-height: 1.4;
+    }
+    
+    :global(p:last-child) {
+      margin-bottom: 0;
+    }
+    
+    :global(strong) {
+      font-weight: 600;
+    }
+    
+    :global(em) {
+      font-style: italic;
+    }
+    
+    :global(code) {
+      background-color: #e8e8e8;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    
+    :global(a) {
+      color: #3273dc;
+      text-decoration: none;
+      
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+  
+  .ai-summary-actions {
+    display: flex;
+    justify-content: flex-end;
   }
 </style>
