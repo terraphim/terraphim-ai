@@ -301,7 +301,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::close_splashscreen,
             cmd::select_role,
             cmd::get_rolegraph,
-            cmd::find_documents_for_kg_term
+            cmd::find_documents_for_kg_term,
+            cmd::save_article_to_atomic
        ])
         .setup(move |app| {
             let settings = device_settings_read.clone();

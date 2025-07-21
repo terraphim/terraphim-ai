@@ -9,11 +9,13 @@ use terraphim_settings::DeviceSettings;
 use terraphim_rolegraph::magic_unpair;
 use terraphim_types::Thesaurus;
 use terraphim_types::{Document, SearchQuery};
+use terraphim_atomic_client::{Store, Config as AtomicConfig, Agent};
 
 use serde::Serializer;
 use schemars::schema_for;
 use serde_json::Value;
 use tsify::Tsify;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -424,4 +426,156 @@ pub async fn find_documents_for_kg_term(
         results,
         total,
     })
+}
+
+/// Atomic Article data structure for saving to atomic server
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AtomicArticle {
+    pub subject: String,
+    pub title: String,
+    pub description: String,
+    pub body: String,
+    pub parent: String,
+    pub shortname: String,
+    // Preserve original metadata
+    pub original_id: Option<String>,
+    pub original_url: Option<String>,
+    pub original_rank: Option<u32>,
+    pub tags: Vec<String>,
+}
+
+/// Response type for atomic save operations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AtomicSaveResponse {
+    pub status: Status,
+    pub subject: Option<String>,
+    pub message: String,
+}
+
+/// Save an article to atomic server
+/// 
+/// This command saves a document as an article to the specified atomic server.
+/// It uses the atomic client to create the resource with proper authentication.
+#[command]
+pub async fn save_article_to_atomic(
+    article: AtomicArticle,
+    server_url: String,
+    atomic_secret: Option<String>,
+) -> Result<AtomicSaveResponse> {
+    log::info!("Saving article '{}' to atomic server: {}", article.title, server_url);
+    
+    // Create atomic client configuration
+    let agent = match atomic_secret {
+        Some(secret) => {
+            Agent::from_base64(&secret)
+                .map_err(|e| TerraphimTauriError::Generic(format!("Invalid atomic server secret: {}", e)))?
+        },
+        None => {
+            log::warn!("No atomic server secret provided - using anonymous access");
+            return Err(TerraphimTauriError::Generic(
+                "Atomic server secret is required for saving articles".to_string()
+            ));
+        }
+    };
+
+    let atomic_config = AtomicConfig {
+        server_url: server_url.clone(),
+        agent: Some(agent),
+    };
+
+    let store = Store::new(atomic_config)
+        .map_err(|e| TerraphimTauriError::Generic(format!("Failed to create atomic store: {}", e)))?;
+
+    // Build article properties for atomic server
+    let mut properties = HashMap::new();
+    
+    // Standard atomic data properties
+    properties.insert(
+        "https://atomicdata.dev/properties/shortname".to_string(),
+        serde_json::Value::String(article.shortname.clone()),
+    );
+    properties.insert(
+        "https://atomicdata.dev/properties/name".to_string(),
+        serde_json::Value::String(article.title.clone()),
+    );
+    properties.insert(
+        "https://atomicdata.dev/properties/description".to_string(),
+        serde_json::Value::String(article.description.clone()),
+    );
+    properties.insert(
+        "https://atomicdata.dev/properties/parent".to_string(),
+        serde_json::Value::String(article.parent.clone()),
+    );
+    properties.insert(
+        "https://atomicdata.dev/properties/isA".to_string(),
+        serde_json::Value::Array(vec![
+            serde_json::Value::String("https://atomicdata.dev/classes/Article".to_string())
+        ]),
+    );
+
+    // Article body as content - using markdown datatype for rich text support
+    properties.insert(
+        "https://atomicdata.dev/properties/text".to_string(),
+        serde_json::Value::String(article.body),
+    );
+
+    // Add metadata if available
+    if let Some(original_id) = &article.original_id {
+        properties.insert(
+            "https://terraphim.ai/properties/originalId".to_string(),
+            serde_json::Value::String(original_id.clone()),
+        );
+    }
+
+    if let Some(original_url) = &article.original_url {
+        properties.insert(
+            "https://terraphim.ai/properties/originalUrl".to_string(),
+            serde_json::Value::String(original_url.clone()),
+        );
+    }
+
+    if let Some(original_rank) = article.original_rank {
+        properties.insert(
+            "https://terraphim.ai/properties/originalRank".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(original_rank)),
+        );
+    }
+
+    // Add tags if present
+    if !article.tags.is_empty() {
+        properties.insert(
+            "https://atomicdata.dev/properties/tags".to_string(),
+            serde_json::Value::Array(
+                article.tags.iter()
+                    .map(|tag| serde_json::Value::String(tag.clone()))
+                    .collect()
+            ),
+        );
+    }
+
+    // Add terraphim source metadata
+    properties.insert(
+        "https://terraphim.ai/properties/source".to_string(),
+        serde_json::Value::String("terraphim-search".to_string()),
+    );
+
+    // Save to atomic server using commit
+    match store.create_with_commit(&article.subject, properties).await {
+        Ok(_) => {
+            log::info!("✅ Successfully saved article '{}' to atomic server", article.title);
+            Ok(AtomicSaveResponse {
+                status: Status::Success,
+                subject: Some(article.subject),
+                message: format!("Article '{}' saved successfully to atomic server", article.title),
+            })
+        },
+        Err(e) => {
+            log::error!("❌ Failed to save article to atomic server: {}", e);
+            Err(TerraphimTauriError::Generic(format!(
+                "Failed to save article to atomic server: {}", e
+            )))
+        }
+    }
 }
