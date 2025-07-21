@@ -790,6 +790,67 @@ impl<'a> TerraphimService {
         Ok(documents)
     }
 
+    /// Generate a summary for a document using OpenRouter
+    /// 
+    /// This method takes a document and generates an AI-powered summary using the OpenRouter service.
+    /// The summary is generated based on the document's content and can be customized with different
+    /// models and length constraints.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `document` - The document to summarize
+    /// * `api_key` - The OpenRouter API key
+    /// * `model` - The model to use for summarization (e.g., "openai/gpt-3.5-turbo")
+    /// * `max_length` - Maximum length of the summary in characters
+    /// 
+    /// # Returns
+    /// 
+    /// Returns a `Result<String>` containing the generated summary or an error if summarization fails.
+    #[cfg(feature = "openrouter")]
+    pub async fn generate_document_summary(
+        &self,
+        document: &Document,
+        api_key: &str,
+        model: &str,
+        max_length: usize,
+    ) -> Result<String> {
+        use crate::openrouter::OpenRouterService;
+        
+        log::debug!("Generating summary for document '{}' using model '{}'", document.id, model);
+        
+        // Create the OpenRouter service
+        let openrouter_service = OpenRouterService::new(api_key, model)
+            .map_err(|e| ServiceError::OpenRouter(e))?;
+        
+        // Use the document body for summarization
+        let content = &document.body;
+        
+        if content.trim().is_empty() {
+            return Err(ServiceError::Config("Document body is empty, cannot generate summary".to_string()));
+        }
+        
+        // Generate the summary
+        let summary = openrouter_service.generate_summary(content, max_length).await
+            .map_err(|e| ServiceError::OpenRouter(e))?;
+        
+        log::info!("Generated {}-character summary for document '{}' using model '{}'", 
+                  summary.len(), document.id, model);
+        
+        Ok(summary)
+    }
+
+    /// Generate a summary for a document using OpenRouter (stub when feature is disabled)
+    #[cfg(not(feature = "openrouter"))]
+    pub async fn generate_document_summary(
+        &self,
+        _document: &Document,
+        _api_key: &str,
+        _model: &str,
+        _max_length: usize,
+    ) -> Result<String> {
+        Err(ServiceError::Config("OpenRouter feature not enabled during compilation".to_string()))
+    }
+
     /// Fetch the current config
     pub async fn fetch_config(&self) -> terraphim_config::Config {
         let current_config = self.config_state.config.lock().await;

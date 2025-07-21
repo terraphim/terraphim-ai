@@ -1,0 +1,103 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+A",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "AI Engineer": {
+      "shortname": "AI-Eng",
+      "name": "AI Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "superhero",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "openrouter_enabled": true,
+      "openrouter_api_key": null,
+      "openrouter_model": "openai/gpt-3.5-turbo",
+      "extra": {}
+    },
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "AI Engineer",
+  "selected_role": "AI Engineer"
+} 
