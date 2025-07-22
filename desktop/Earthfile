@@ -1,10 +1,25 @@
 VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
-FROM node:18-bullseye
+# Build from base OS instead of pre-built Node image
+FROM ubuntu:24.04
 
 WORKDIR /code/desktop
 
+# Install Node.js and dependencies from base OS
+node-setup:
+    ENV DEBIAN_FRONTEND=noninteractive
+    ENV DEBCONF_NONINTERACTIVE_SEEN=true
+    RUN apt-get update -qq
+    RUN apt-get install -yqq --no-install-recommends curl ca-certificates gnupg
+    # Install Node.js 20 from NodeSource official repository
+    RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    RUN apt-get install -yqq nodejs
+    # Install Yarn
+    RUN npm install -g yarn
+    RUN node --version && npm --version && yarn --version
+
 deps:
+    FROM +node-setup
     COPY --keep-ts . .
     RUN yarn install --frozen-lockfile
 

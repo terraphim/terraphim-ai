@@ -39,7 +39,7 @@
       if ($is_tauri) {
         console.log("Loading rolegraph from Tauri");
         const response = await invoke<RoleGraphResponse>('get_rolegraph', { 
-          roleName: $role || undefined 
+          role_name: $role || undefined 
         });
         if (response && response.status === 'success') {
           nodes = response.nodes;

@@ -1,6 +1,6 @@
 VERSION 0.7
 PROJECT applied-knowledge-systems/terraphim-firecracker
-FROM ubuntu:18.04
+FROM ubuntu:22.04
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -53,7 +53,7 @@ build-kernel:
 
 
 kernel:
-    FROM alpine:3.16
+    FROM alpine:3.20
     RUN wget https://s3.amazonaws.com/spec.ccfc.min/img/hello/kernel/hello-vmlinux.bin -O kernel.bin
     SAVE ARTIFACT kernel.bin
 
@@ -73,20 +73,22 @@ rootfs:
 
 
 bionic-image:
-    FROM ghcr.io/applied-knowledge-systems/terraphim-fastapiapp:bionic
-    ENV DEBIAN_FRONTEND noninteractive
-    ENV DEBCONF_NONINTERACTIVE_SEEN true
-    RUN rm -rfv /var/lib/apt/lists/*
-    RUN apt clean
+    FROM ubuntu:18.04
+    ENV DEBIAN_FRONTEND=noninteractive
+    ENV DEBCONF_NONINTERACTIVE_SEEN=true
     RUN apt-get update
-    RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends udev systemd-sysv openssh-server iproute2 curl \
+    RUN apt-get install -yqq --no-install-recommends udev systemd-sysv openssh-server iproute2 curl \
       dbus \
       kmod \
       iputils-ping \
       net-tools \
       rng-tools \
       sudo \
-      wget
+      wget \
+      ca-certificates \
+      build-essential \
+      python3 \
+      python3-pip
     RUN systemctl enable redis 
     RUN apt-get clean && rm -rf /var/lib/apt/lists/*
     RUN mkdir "/etc/systemd/system/serial-getty@ttyS0.service.d/"
@@ -159,7 +161,7 @@ save-keys:
     SAVE ARTIFACT keypairs AS LOCAL keypairs
 
 firecracker-minimal:
-    FROM ubuntu:18.04
+    FROM ubuntu:22.04
     WORKDIR artifacts
 
     COPY +rootfs/rootfs.bionic .

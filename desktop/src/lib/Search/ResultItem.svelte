@@ -100,10 +100,10 @@
         // Use Tauri command for desktop app
         console.log('  Making Tauri invoke call...');
         console.log('  Tauri command: find_documents_for_kg_term');
-        console.log('  Tauri params:', { roleName: $role, term: tag });
+        console.log('  Tauri params:', { role_name: $role, term: tag });
         
         const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
-          roleName: $role,
+          role_name: $role,
           term: tag
         });
         
@@ -283,7 +283,7 @@
       console.error('  Error type:', error.constructor.name);
       console.error('  Error message:', error.message || error);
       console.error('  Request details:', {
-        documentId: document.id,
+        document_id: document.id,
         role: $role,
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()

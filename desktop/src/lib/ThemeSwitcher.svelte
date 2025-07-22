@@ -81,7 +81,7 @@
       // Handle thesaurus publishing
       if (selectedRoleSettings.kg?.publish) {
         if ($is_tauri) {
-          invoke("publish_thesaurus", { roleName: config.selected_role }).then((res) => {
+          invoke("publish_thesaurus", { role_name: config.selected_role }).then((res) => {
             console.log("publish_thesaurus response", res);
             thesaurus.set(res as any);
             typeahead.set(true);
@@ -138,13 +138,13 @@
 
     // In Tauri, notify the backend about the role change
     if ($is_tauri) {
-      invoke("select_role", { roleName: newRoleName })
+      invoke("select_role", { role_name: newRoleName })
         .catch((e) => console.error("Error selecting role:", e));
 
       // Handle thesaurus publishing
       if (roleSettings.kg?.publish) {
         console.log("Publishing thesaurus for role", newRoleName);
-        invoke("publish_thesaurus", { roleName: newRoleName }).then((res) => {
+        invoke("publish_thesaurus", { role_name: newRoleName }).then((res) => {
           thesaurus.set(res as any);
           typeahead.set(true);
         });

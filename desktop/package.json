@@ -26,7 +26,13 @@
     "test:atomic:lib": "CI=true playwright test tests/e2e/atomic-lib-integration.spec.ts --workers=1 --retries=3",
     "test:haystack": "CI=true playwright test tests/e2e/atomic-server-haystack.spec.ts tests/e2e/rolegraph-search-validation.spec.ts --workers=1 --retries=3",
     "test:all": "CI=true yarn run test && yarn run e2e:ci",
-    "test:all:ci": "CI=true yarn run test:coverage && yarn run test:e2e:ci && yarn run test:atomic:ci"
+    "test:all:ci": "CI=true yarn run test:coverage && yarn run test:e2e:ci && yarn run test:atomic:ci",
+    "test:webdriver": "playwright test --config=playwright.webdriver.config.ts",
+    "test:webdriver:headed": "playwright test --config=playwright.webdriver.config.ts --headed",
+    "test:webdriver:ui": "playwright test --config=playwright.webdriver.config.ts --ui",
+    "test:webdriver:ci": "CI=true playwright test --config=playwright.webdriver.config.ts --reporter=line --workers=1",
+    "test:webdriver:simple": "playwright test tests/webdriver/kg-graph-simple-webdriver.spec.ts --headed",
+    "test:webdriver:simple:ci": "CI=true playwright test tests/webdriver/kg-graph-simple-webdriver.spec.ts --reporter=line"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.1",
@@ -41,6 +47,7 @@
     "@vitest/ui": "^1.6.0",
     "jsdom": "^24.1.0",
     "sass": "1.77.8",
+    "selenium-webdriver": "^4.34.0",
     "svelte": "^3.58.0",
     "svelte-check": "^3.2.0",
     "svelte-preprocess": "^5.0.3",
