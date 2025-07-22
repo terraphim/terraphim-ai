@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
+members = ["crates/*", "terraphim_server", "desktop/src-tauri", "crates/terraphim_onepassword_cli"]
 default-members = ["terraphim_server"]
 
 [workspace.dependencies]
