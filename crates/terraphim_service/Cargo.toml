@@ -27,6 +27,7 @@ serde = { version = "1.0.198", features = ["serde_derive"] }
 log = "0.4.21"
 strsim = "0.11.1"
 regex = "1.11.0"
+tokio = { workspace = true }
 
 # OpenRouter integration dependencies (optional)
 reqwest = { workspace = true, optional = true }
