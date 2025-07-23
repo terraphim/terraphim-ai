@@ -178,6 +178,12 @@
     <div class="content has-text-grey has-text-centered">
       <img src={logo} alt="Terraphim Logo" />
       <p>I am Terraphim, your personal assistant.</p>
+      <button class="button is-primary" data-testid="wizard-start" on:click={() => window.location.href = '/config/wizard'}>
+        <span class="icon">
+          <i class="fas fa-magic"></i>
+        </span>
+        <span>Configuration Wizard</span>
+      </button>
     </div>
   </section>
 {/if}

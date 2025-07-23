@@ -114,6 +114,7 @@
 
   let currentStep = 1;
   const totalSteps = 3;
+  let saveStatus = ''; // 'success' or 'error'
   function next() {
     if (currentStep < totalSteps) currentStep += 1;
   }
@@ -248,23 +249,42 @@
       if (get(is_tauri)) {
         await invoke("update_config", { configNew: updated });
       } else {
-        await fetch("/config", {
+        const response = await fetch("/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updated),
         });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
       configStore.set(updated);
-      alert("Configuration saved");
+      saveStatus = 'success';
+      setTimeout(() => { saveStatus = ''; }, 3000); // Clear status after 3 seconds
     } catch (e) {
       console.error(e);
-      alert("Failed to save config");
+      saveStatus = 'error';
+      setTimeout(() => { saveStatus = ''; }, 3000); // Clear status after 3 seconds
     }
   }
 </script>
 
 <div class="box">
   <h3 class="title is-4">Configuration Wizard</h3>
+  
+  {#if saveStatus === 'success'}
+    <div class="notification is-success" data-testid="wizard-success">
+      <button class="delete" on:click={() => saveStatus = ''}></button>
+      Configuration saved successfully!
+    </div>
+  {/if}
+  
+  {#if saveStatus === 'error'}
+    <div class="notification is-danger" data-testid="wizard-error">
+      <button class="delete" on:click={() => saveStatus = ''}></button>
+      Failed to save configuration. Please try again.
+    </div>
+  {/if}
   {#if currentStep === 1}
     <!-- Step 1: Global settings -->
     <div class="field">
@@ -467,13 +487,13 @@
 
             <!-- Remove haystack button -->
             <div class="field">
-              <button class="button is-small is-danger" on:click={() => removeHaystack(idx, hIdx)}>
+              <button class="button is-small is-danger" data-testid="remove-haystack-{idx}-{hIdx}" on:click={() => removeHaystack(idx, hIdx)}>
                 Remove Haystack
               </button>
             </div>
           </div>
         {/each}
-        <button class="button is-small" on:click={() => addHaystack(idx)}>Add Haystack</button>
+        <button class="button is-small" data-testid="add-haystack-{idx}" on:click={() => addHaystack(idx)}>Add Haystack</button>
 
         <!-- OpenRouter AI Configuration -->
         <h5 class="title is-6">AI-Enhanced Summaries (OpenRouter)</h5>
@@ -552,26 +572,46 @@
           </label>
         </div>
         <hr />
-        <button class="button is-small is-danger" on:click={() => removeRole(idx)}>Remove Role</button>
+        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => removeRole(idx)}>Remove Role</button>
       </div>
     {/each}
-    <button class="button is-link is-light" on:click={addRole}>Add Role</button>
+    <button class="button is-link is-light" data-testid="add-role" on:click={addRole}>Add Role</button>
   {:else}
     <h4 class="title is-5">Review</h4>
+    <div class="content">
+      <h5>Configuration Summary:</h5>
+      <ul>
+        <li><strong>Configuration ID:</strong> {$draft.id}</li>
+        <li><strong>Global Shortcut:</strong> {$draft.global_shortcut}</li>
+        <li><strong>Default Theme:</strong> {$draft.default_theme}</li>
+        <li><strong>Default Role:</strong> {$draft.default_role}</li>
+      </ul>
+      
+      <h5>Roles:</h5>
+      {#each $draft.roles as role, idx}
+        <div class="box">
+          <h6 data-testid="review-role-name-{idx}">{role.name}</h6>
+          <p><strong>Shortname:</strong> {role.shortname}</p>
+          <p><strong>Theme:</strong> {role.theme}</p>
+          <p><strong>Relevance Function:</strong> {role.relevance_function}</p>
+          <button class="button is-small" data-testid="edit-role-{idx}" on:click={() => { currentStep = 2; }}>Edit Role</button>
+        </div>
+      {/each}
+    </div>
     <pre style="max-height:300px;overflow:auto">{JSON.stringify($draft, null, 2)}</pre>
   {/if}
 
   <nav class="level">
     <div class="level-left">
       {#if currentStep > 1}
-        <button class="button" on:click={prev}>Back</button>
+        <button class="button" data-testid="wizard-back" on:click={prev}>Back</button>
       {/if}
     </div>
     <div class="level-right">
       {#if currentStep < totalSteps}
-        <button class="button is-primary" on:click={next}>Next</button>
+        <button class="button is-primary" data-testid="wizard-next" on:click={next}>Next</button>
       {:else}
-        <button class="button is-success" on:click={save}>Save</button>
+        <button class="button is-success" data-testid="wizard-save" on:click={save}>Save</button>
       {/if}
     </div>
   </nav>
