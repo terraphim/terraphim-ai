@@ -1,8 +1,0 @@
-{
-  "configFile": "terraphim_engineer_test_config_final.json",
-  "atomicServerUrl": "http://localhost:9883",
-  "hasAtomicSecret": true,
-  "hasOpenRouterKey": true,
-  "openRouterModel": "openai/gpt-3.5-turbo",
-  "testRole": "Terraphim Engineer Test"
-}
