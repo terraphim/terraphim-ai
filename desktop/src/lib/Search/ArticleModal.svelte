@@ -50,7 +50,7 @@
   async function loadDocument() {
     if (!$is_tauri) return;
     try {
-      const resp: any = await invoke('get_document', { document_id: item.id });
+      const resp: any = await invoke('get_document', { documentId: item.id });
       if (resp?.document) {
         item = resp.document;
       }
@@ -88,10 +88,10 @@
         // Use Tauri command for desktop app
         console.log('  Making Tauri invoke call...');
         console.log('  Tauri command: find_documents_for_kg_term');
-        console.log('  Tauri params:', { role_name: $role, term: term });
+        console.log('  Tauri params:', { roleName: $role, term: term });
         
         const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
-          role_name: $role,
+          roleName: $role,
           term: term
         });
         
