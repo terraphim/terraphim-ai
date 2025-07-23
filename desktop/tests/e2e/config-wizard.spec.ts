@@ -287,7 +287,7 @@ test.describe('Configuration Wizard', () => {
     // We'll make a direct API call to verify the endpoint is working
     
     // First, get the current configuration
-    const response = await page.request.get('/config');
+    const response = await page.request.get('http://localhost:8000/config');
     expect(response.status()).toBe(200);
     
     const configData = await response.json();
@@ -302,7 +302,7 @@ test.describe('Configuration Wizard', () => {
     };
     
     // Update the configuration via API
-    const updateResponse = await page.request.post('/config', {
+    const updateResponse = await page.request.post('http://localhost:8000/config', {
       data: testConfig,
       headers: {
         'Content-Type': 'application/json'
@@ -316,7 +316,7 @@ test.describe('Configuration Wizard', () => {
     expect(updateData.config.global_shortcut).toBe('Ctrl+Test+Wizard');
     
     // Verify the update by fetching the config again
-    const verifyResponse = await page.request.get('/config');
+    const verifyResponse = await page.request.get('http://localhost:8000/config');
     const verifyData = await verifyResponse.json();
     expect(verifyData.config.global_shortcut).toBe('Ctrl+Test+Wizard');
   });
