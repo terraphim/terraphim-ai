@@ -131,8 +131,14 @@ impl Agent {
         let subject = secret["subject"].as_str()
             .ok_or_else(|| AtomicError::Authentication("Missing subject in secret".to_string()))?;
         
-        // Decode the private key
-        let private_key_bytes = STANDARD.decode(private_key)?;
+        // Decode the private key with padding fix
+        let private_key_bytes = {
+            let mut padded_key = private_key.to_string();
+            while padded_key.len() % 4 != 0 {
+                padded_key.push('=');
+            }
+            STANDARD.decode(&padded_key)?
+        };
         
         // Create the keypair from the private key bytes
         // For Ed25519 version 1.0, we need to use from_bytes
@@ -143,7 +149,13 @@ impl Agent {
         // Get the public key from the secret or derive it from the private key
         let public_key_bytes = match secret["publicKey"].as_str() {
             Some(public_key_str) => {
-                match STANDARD.decode(public_key_str) {
+                match {
+                    let mut padded_key = public_key_str.to_string();
+                    while padded_key.len() % 4 != 0 {
+                        padded_key.push('=');
+                    }
+                    STANDARD.decode(&padded_key)
+                } {
                     Ok(bytes) => bytes,
                     Err(_) => {
                         // If we can't decode the public key, derive it from the private key
@@ -240,8 +252,14 @@ impl Agent {
         server_url: String,
         name: Option<String>,
     ) -> Result<Self> {
-        // Decode the private key
-        let private_key_bytes = STANDARD.decode(private_key_base64)?;
+        // Decode the private key with padding fix
+        let private_key_bytes = {
+            let mut padded_key = private_key_base64.to_string();
+            while padded_key.len() % 4 != 0 {
+                padded_key.push('=');
+            }
+            STANDARD.decode(&padded_key)?
+        };
         
         // Create the keypair from the private key bytes
         let mut keypair_bytes = [0u8; 64];
@@ -280,8 +298,14 @@ impl Agent {
     ///
     /// A new read-only agent or an error if the public key is invalid
     pub fn new_from_public_key(public_key_base64: &str, server_url: String) -> Result<Self> {
-        // Decode and validate the public key
-        let public_key_bytes = STANDARD.decode(public_key_base64)?;
+        // Decode and validate the public key with padding fix
+        let public_key_bytes = {
+            let mut padded_key = public_key_base64.to_string();
+            while padded_key.len() % 4 != 0 {
+                padded_key.push('=');
+            }
+            STANDARD.decode(&padded_key)?
+        };
         if public_key_bytes.len() != 32 {
             return Err(AtomicError::Authentication(
                 "Invalid public key length, should be 32 bytes".to_string()
