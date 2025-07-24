@@ -1,5 +1,5 @@
 use terraphim_atomic_client::{Agent, Commit, CommitBuilder, Config, Store};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 
 #[test]

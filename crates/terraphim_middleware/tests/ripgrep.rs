@@ -8,6 +8,7 @@ fn create_test_role() -> Role {
         shortname: Some("Test".to_string()),
         name: "Test".into(),
         relevance_function: RelevanceFunction::TitleScorer,
+        terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
         haystacks: vec![Haystack {
@@ -32,7 +33,7 @@ fn create_test_config() -> terraphim_config::Config {
 #[tokio::test]
 #[serial]
 async fn test_indexer() {
-    let config = create_test_config();
+    let _config = create_test_config();
     let haystack = Haystack {
         location: "fixtures/haystack".to_string(),
         service: ServiceType::Ripgrep,

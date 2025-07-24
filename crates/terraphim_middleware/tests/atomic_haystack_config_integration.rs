@@ -105,6 +105,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
                 shortname: Some("AtomicUser".to_string()),
                 name: "AtomicUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack::new(
@@ -138,7 +139,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
         let mut index = Index::new();
         
         // Poll with retries to account for search indexing delays
-        for attempt in 0..10 {
+        for _attempt in 0..10 {
             index = indexer.index(search_term, haystack).await
                 .expect(&format!("Search failed for term: {}", search_term));
             
@@ -372,6 +373,7 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
                 shortname: Some("MixedAccessUser".to_string()),
                 name: "MixedAccessUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks,

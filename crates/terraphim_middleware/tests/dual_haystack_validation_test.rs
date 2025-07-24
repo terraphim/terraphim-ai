@@ -132,6 +132,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 shortname: Some("dual-title".to_string()),
                 name: "Dual Haystack Title Scorer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cosmo".to_string(),
                 kg: None,
                 haystacks: vec![
@@ -161,6 +162,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 shortname: Some("dual-graph".to_string()),
                 name: "Dual Haystack Graph Embeddings".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "darkly".to_string(),
                 kg: Some(terraphim_config::KnowledgeGraph {
                     automata_path: None,
@@ -198,6 +200,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 shortname: Some("single-atomic".to_string()),
                 name: "Single Atomic Reference".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None,
                 haystacks: vec![Haystack::new(
@@ -219,6 +222,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 shortname: Some("single-ripgrep".to_string()),
                 name: "Single Ripgrep Reference".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "journal".to_string(),
                 kg: None,
                 haystacks: vec![Haystack::new(
@@ -514,6 +518,7 @@ async fn test_source_differentiation_validation() {
                 shortname: Some("source-diff".to_string()),
                 name: "Source Differentiation Test".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "flatly".to_string(),
                 kg: None,
                 haystacks: vec![

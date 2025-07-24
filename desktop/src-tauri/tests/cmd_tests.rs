@@ -1,15 +1,10 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::path::PathBuf;
 
-use terraphim_ai_desktop::{
-    search, get_config, update_config,
-    Status
-};
-use terraphim_config::{ConfigBuilder, ConfigState, Role, Haystack, ServiceType};
+use terraphim_config::{ConfigBuilder, ConfigState, Haystack, ServiceType};
 use terraphim_types::RelevanceFunction;
 use terraphim_settings::DeviceSettings;
-use terraphim_types::{SearchQuery, RoleName};
+use terraphim_types::SearchQuery;
 use terraphim_persistence::memory::create_test_device_settings as create_memory_settings;
 use terraphim_service::TerraphimService;
 
@@ -173,6 +168,7 @@ async fn test_atomic_haystack_role_configuration() {
                 shortname: Some("atomic-role".to_string()),
                 name: "Atomic Role".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -229,6 +225,7 @@ async fn test_hybrid_haystack_role_configuration() {
                 shortname: Some("hybrid-role".to_string()),
                 name: "Hybrid Role".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cosmo".to_string(),
                 kg: None,
                 haystacks: vec![
@@ -291,6 +288,7 @@ async fn test_multiple_atomic_roles_configuration() {
                 shortname: Some("atomic-role-1".to_string()),
                 name: "Atomic Role 1".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "flatly".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -309,6 +307,7 @@ async fn test_multiple_atomic_roles_configuration() {
                 shortname: Some("atomic-role-2".to_string()),
                 name: "Atomic Role 2".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "journal".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -361,7 +360,7 @@ async fn test_multiple_atomic_roles_configuration() {
 #[tokio::test]
 async fn test_config_update_with_atomic_roles() {
     let config_state = create_test_config_state().await;
-    let device_settings = create_test_device_settings_wrapped();
+    let _device_settings = create_test_device_settings_wrapped();
 
     // Create initial config with atomic role
     let initial_config = ConfigBuilder::new()
@@ -372,6 +371,7 @@ async fn test_config_update_with_atomic_roles() {
                 shortname: Some("atomic-title".to_string()),
                 name: "Atomic Title".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "litera".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {

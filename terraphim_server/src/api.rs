@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State, Path},
+    extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
     Extension, Json,
@@ -391,7 +391,7 @@ pub(crate) async fn summarize_document(
     let config = config_state.config.lock().await;
     
     // Get the role configuration
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(_role) = config.roles.get(&role_name) else {
         return Ok(Json(SummarizeDocumentResponse {
             status: Status::Error,
             document_id: request.document_id,
@@ -526,7 +526,7 @@ pub(crate) async fn get_summarization_status(
     let role_name = RoleName::new(&query.role);
     let config = config_state.config.lock().await;
     
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(_role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Role '{}' not found", query.role)),

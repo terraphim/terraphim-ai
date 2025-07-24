@@ -32,6 +32,7 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         shortname: Some("Terraphim Engineer".to_string()),
         name: "Terraphim Engineer".to_string().into(),
         relevance_function: RelevanceFunction::TerraphimGraph,
+        terraphim_it: true,
         theme: "lumen".to_string(),
         kg: Some(KnowledgeGraph {
             automata_path: None, // Will be set after building thesaurus

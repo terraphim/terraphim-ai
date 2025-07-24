@@ -31,6 +31,7 @@ mod tests {
                     shortname: Some("Engineer".into()),
                     name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
+                    terraphim_it: true,
                     theme: "lumen".to_string(),
                     kg: Some(KnowledgeGraph {
                         automata_path: None, // Will be built from local files

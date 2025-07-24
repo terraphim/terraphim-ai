@@ -1,5 +1,5 @@
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
-use terraphim_types::{RelevanceFunction, SearchQuery, Index};
+use terraphim_types::{RelevanceFunction, SearchQuery};
 use terraphim_middleware::{haystack::AtomicHaystackIndexer, indexer::IndexMiddleware, search_haystacks};
 use terraphim_atomic_client::{self, Store};
 use serde_json::json;
@@ -95,6 +95,7 @@ async fn test_atomic_haystack_title_scorer_role() {
                 shortname: Some("title-scorer".to_string()),
                 name: "Atomic Title Scorer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None, // No knowledge graph for title scorer
                 haystacks: vec![Haystack::new(
@@ -127,16 +128,13 @@ async fn test_atomic_haystack_title_scorer_role() {
     for (search_term, expected_min_results) in search_terms {
         log::info!("Testing title-based search for: '{}'", search_term);
         
-        let mut found_docs = 0;
-        let mut index = Index::new();
-        
         // Single search call - indexing should be instant for local server
         let start_time = std::time::Instant::now();
-        index = indexer.index(search_term, haystack).await
+        let index = indexer.index(search_term, haystack).await
             .expect(&format!("Search failed for term: {}", search_term));
         let search_duration = start_time.elapsed();
         
-        found_docs = index.len();
+        let found_docs = index.len();
         log::info!("  Search took {:?} and found {} documents for '{}' (expected at least {})", 
                   search_duration, found_docs, search_term, expected_min_results);
         
@@ -328,6 +326,7 @@ async fn test_atomic_haystack_graph_embeddings_role() {
                 shortname: Some("graph-embeddings".to_string()),
                 name: "Atomic Graph Embeddings".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "superhero".to_string(),
                 kg: Some(terraphim_config::KnowledgeGraph {
                     automata_path: None, // Will be built from local files
@@ -367,16 +366,13 @@ async fn test_atomic_haystack_graph_embeddings_role() {
     for (search_term, expected_min_results) in search_terms {
         log::info!("Testing graph-based search for: '{}'", search_term);
         
-        let mut found_docs = 0;
-        let mut index = Index::new();
-        
         // Single search call - indexing should be instant for local server
         let start_time = std::time::Instant::now();
-        index = indexer.index(search_term, haystack).await
+        let index = indexer.index(search_term, haystack).await
             .expect(&format!("Search failed for term: {}", search_term));
         let search_duration = start_time.elapsed();
         
-        found_docs = index.len();
+        let found_docs = index.len();
         log::info!("  Search took {:?} and found {} documents for '{}' (expected at least {})", 
                   search_duration, found_docs, search_term, expected_min_results);
         
@@ -527,6 +523,7 @@ async fn test_atomic_haystack_role_comparison() {
                 shortname: Some("title-scorer".to_string()),
                 name: "Title Scorer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -550,6 +547,7 @@ async fn test_atomic_haystack_role_comparison() {
                 shortname: Some("graph-embeddings".to_string()),
                 name: "Graph Embeddings".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "superhero".to_string(),
                 kg: Some(terraphim_config::KnowledgeGraph {
                     automata_path: None,
@@ -688,6 +686,7 @@ async fn test_atomic_roles_config_validation() {
                 shortname: Some("title-scorer".to_string()),
                 name: "Title Scorer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None, // Title scorer doesn't need knowledge graph
                 haystacks: vec![Haystack {
@@ -719,6 +718,7 @@ async fn test_atomic_roles_config_validation() {
                 shortname: Some("graph-embeddings".to_string()),
                 name: "Graph Embeddings".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "superhero".to_string(),
                 kg: Some(terraphim_config::KnowledgeGraph {
                     automata_path: None,
@@ -877,6 +877,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                 shortname: Some("pure-atomic-title".to_string()),
                 name: "Pure Atomic Title".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -901,6 +902,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                 shortname: Some("pure-atomic-graph".to_string()),
                 name: "Pure Atomic Graph".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "superhero".to_string(),
                 kg: Some(terraphim_config::KnowledgeGraph {
                     automata_path: None,
@@ -933,6 +935,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                 shortname: Some("hybrid-title".to_string()),
                 name: "Hybrid Title".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "lumen".to_string(),
                 kg: None,
                 haystacks: vec![
@@ -966,6 +969,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                 shortname: Some("hybrid-graph".to_string()),
                 name: "Hybrid Graph".into(),
                 relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
                 theme: "darkly".to_string(),
                 kg: Some(terraphim_config::KnowledgeGraph {
                     automata_path: None,
@@ -1144,6 +1148,7 @@ async fn test_atomic_haystack_error_handling() {
                 shortname: Some("invalid-atomic".to_string()),
                 name: "Invalid Atomic".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {
@@ -1179,6 +1184,7 @@ async fn test_atomic_haystack_error_handling() {
                 shortname: Some("no-secret-atomic".to_string()),
                 name: "No Secret Atomic".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "cerulean".to_string(),
                 kg: None,
                 haystacks: vec![Haystack {

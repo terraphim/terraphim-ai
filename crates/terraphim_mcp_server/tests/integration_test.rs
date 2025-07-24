@@ -433,7 +433,7 @@ async fn test_search_pagination() -> Result<()> {
     // Expect at most 3 items (heading + up to 2 resources)
     assert!(first_page.content.len() <= 3);
 
-    let first_batch_count = first_page
+    let _first_batch_count = first_page
         .content
         .iter()
         .filter(|c| c.as_resource().is_some())

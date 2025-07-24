@@ -2,7 +2,7 @@ use serde_json;
 use std::collections::HashMap;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
-use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer, command::ripgrep::RipgrepCommand};
+use terraphim_middleware::{command::ripgrep::RipgrepCommand};
 
 /// Test that demonstrates the security improvement: atomic_server_secret is not serialized for Ripgrep haystacks
 #[tokio::test]
@@ -233,6 +233,7 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
         shortname: Some("RustDeveloper".to_string()),
         name: "Rust Developer".into(),
         relevance_function: RelevanceFunction::TitleScorer,
+        terraphim_it: false,
         theme: "rust".to_string(),
         kg: None,
         haystacks: vec![Haystack {

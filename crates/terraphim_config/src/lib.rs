@@ -840,7 +840,7 @@ mod tests {
     async fn test_save_one_s3() {
         let config = Config::empty();
         println!("{:#?}", config);
-        config.save_to_one("s3").await.unwrap();
+        config.save_to_one("dash").await.unwrap();
     }
 
     #[tokio::test]
@@ -860,7 +860,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_one_memory() {
         let config = Config::empty();
-        config.save_to_one("memory").await.unwrap();
+        config.save_to_one("dash").await.unwrap();
     }
 
     #[test]

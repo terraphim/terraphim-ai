@@ -65,6 +65,7 @@ async fn create_autocomplete_test_config() -> Result<String> {
         shortname: Some("Terraphim Engineer".to_string()),
         name: terraphim_types::RoleName::new("Terraphim Engineer"),
         relevance_function: RelevanceFunction::TerraphimGraph,
+        terraphim_it: true,
         theme: "lumen".to_string(),
         kg: Some(KnowledgeGraph {
             automata_path: Some(automata_path),
@@ -426,6 +427,7 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         shortname: Some("Invalid Role".to_string()),
         name: terraphim_types::RoleName::new("Invalid Role"),
         relevance_function: RelevanceFunction::TitleScorer, // Wrong relevance function
+        terraphim_it: false,
         theme: "spacelab".to_string(),
         kg: None, // No knowledge graph
         haystacks: vec![],

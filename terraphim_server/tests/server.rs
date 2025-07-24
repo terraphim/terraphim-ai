@@ -34,6 +34,7 @@ mod tests {
                     shortname: Some("Default".to_string()),
                     name: "Default".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
+                    terraphim_it: false,
                     theme: "spacelab".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
@@ -52,6 +53,7 @@ mod tests {
                     shortname: Some("Engineer".into()),
                     name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TitleScorer,
+                    terraphim_it: false,
                     theme: "lumen".to_string(),
                     kg: Some(KnowledgeGraph {
                         automata_path: Some(automata_path.clone()),
@@ -78,6 +80,7 @@ mod tests {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".into(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
+                    terraphim_it: true,
                     theme: "superhero".to_string(),
                     kg: Some(KnowledgeGraph {
                         automata_path: Some(automata_path),

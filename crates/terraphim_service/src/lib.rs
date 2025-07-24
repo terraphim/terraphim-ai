@@ -65,7 +65,8 @@ impl<'a> TerraphimService {
             rolegraphs: &mut AHashMap<RoleName, RoleGraphSync>,
         ) -> Result<Thesaurus> {
             let config = config_state.config.lock().await;
-            let role = config.roles.get(role_name).cloned().unwrap();
+            let role = config.roles.get(role_name).cloned()
+                .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found in configuration", role_name)))?;
             if let Some(kg) = &role.kg {
                 if let Some(automata_path) = &kg.automata_path {
                     log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_path);
@@ -474,7 +475,8 @@ impl<'a> TerraphimService {
         use crate::openrouter::OpenRouterService;
         
         // Create the OpenRouter service
-        let api_key = role.openrouter_api_key.as_ref().unwrap();
+        let api_key = role.openrouter_api_key.as_ref()
+            .ok_or_else(|| ServiceError::Config(format!("OpenRouter API key not configured for role '{}'", role.name)))?;
         let model = role.openrouter_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
         
         let openrouter_service = match OpenRouterService::new(api_key, model) {
@@ -1096,7 +1098,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_atomic_data_persistence_skip() {
-        use terraphim_types::{Document, SearchQuery, NormalizedTermValue, RoleName};
+        use terraphim_types::{SearchQuery, NormalizedTermValue, RoleName};
         use terraphim_config::{Config, Role, Haystack, ServiceType};
         use terraphim_persistence::DeviceStorage;
         use ahash::AHashMap;

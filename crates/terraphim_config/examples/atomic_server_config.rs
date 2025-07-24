@@ -21,6 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shortname: Some("AtomicUser".to_string()),
                 name: "AtomicUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack::new(
@@ -42,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 2: Hybrid configuration with both ripgrep and atomic server
     println!("\n📋 Example 2: Hybrid Ripgrep + Atomic Server Configuration");
     
-    let hybrid_config = ConfigBuilder::new()
+    let _hybrid_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+Shift+T")
         .add_role(
             "LocalResearcher",
@@ -50,6 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shortname: Some("LocalResearcher".to_string()),
                 name: "LocalResearcher".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "lumen".to_string(),
                 kg: None,
                 haystacks: vec![
@@ -75,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shortname: Some("RemoteResearcher".to_string()),
                 name: "RemoteResearcher".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "superhero".to_string(),
                 kg: None,
                 haystacks: vec![
@@ -106,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 3: Anonymous access to atomic server
     println!("\n📋 Example 3: Anonymous Access to Atomic Server");
     
-    let anonymous_config = ConfigBuilder::new()
+    let _anonymous_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+Alt+T")
         .add_role(
             "AnonymousUser",
@@ -114,6 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shortname: Some("AnonymousUser".to_string()),
                 name: "AnonymousUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![Haystack::new(
@@ -135,7 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 4: Public document server configuration
     println!("\n📋 Example 4: Public Document Server Configuration");
     
-    let public_docs_config = ConfigBuilder::new()
+    let _public_docs_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+P")
         .add_role(
             "PublicReader",
@@ -143,6 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shortname: Some("PublicReader".to_string()),
                 name: "PublicReader".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "flatly".to_string(),
                 kg: None,
                 haystacks: vec![
@@ -243,6 +248,7 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 shortname: Some("EnvironmentUser".to_string()),
                 name: "EnvironmentUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "default".to_string(),
                 kg: None,
                 haystacks: vec![Haystack::new(

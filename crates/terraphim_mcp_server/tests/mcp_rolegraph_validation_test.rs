@@ -74,6 +74,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
         shortname: Some("Terraphim Engineer".to_string()),
         name: terraphim_types::RoleName::new("Terraphim Engineer"),
         relevance_function: RelevanceFunction::TerraphimGraph,
+        terraphim_it: true,
         theme: "lumen".to_string(),
         kg: Some(KnowledgeGraph {
             automata_path: Some(automata_path), // Now set after building thesaurus

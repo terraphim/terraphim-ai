@@ -77,7 +77,7 @@ mod tests {
             "https://atomicdata.dev/properties/name".to_string(),
             json!(format!("Test Resource {}", timestamp)),
         );
-        let resource = Resource {
+        let _resource = Resource {
             subject: test_resource_id.clone(),
             properties: properties.clone(),
         };
