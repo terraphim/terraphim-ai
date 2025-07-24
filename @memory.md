@@ -700,7 +700,7 @@ let test_haystack = Haystack::new("tests/", ServiceType::Ripgrep, true)
 
 #### **Complete Frontend Haystack Support (✅ WORKING)**
 - **Updated TypeScript Types**: Enhanced `HaystackForm` with all new fields
-```typescript
+```
 type HaystackForm = { 
   path: string; 
   read_only: boolean; 
@@ -1022,7 +1022,7 @@ Term: 'graph' -> Concept: 'terraphim-graph' (ID: 3)
 - **Desktop Tests**: 19/22 ✅ PASSING (3 expected server-offline failures)
 - **MCP Tests**: 8/10 ✅ PASSING (2 infrastructure issues)
 
-### **Production Readiness Status:**
+### **Production readiness Status:**
 - **✅ Core Functionality**: Knowledge-based scoring working perfectly
 - **✅ Search Performance**: Fast, consistent results with meaningful rankings
 - **✅ Integration**: Complete pipeline from KG files to search results validated
@@ -6782,7 +6782,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 3. **Maintained Compatibility:** Users can still override with `TERRAPHIM_LOG_DIR` environment variable
 
 **Code Change:**
-```rust
+```
 // Before: Used relative "logs" path
 let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| "logs".to_string());
 
