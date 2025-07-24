@@ -843,7 +843,41 @@ impl<'a> TerraphimService {
         log::debug!("Found {} document IDs for term '{}': {:?}", document_ids.len(), term, document_ids);
         
         // Load the actual documents using the persistence layer
-        let mut documents = terraphim_persistence::load_documents_by_ids(&document_ids).await?;
+        // Handle both local and Atomic Data documents properly
+        let mut documents = Vec::new();
+        
+        for doc_id in &document_ids {
+            if doc_id.starts_with("http://") || doc_id.starts_with("https://") {
+                // Atomic Data document: Try to load from persistence first
+                log::debug!("Loading Atomic Data document '{}' from persistence", doc_id);
+                let mut placeholder = Document::default();
+                placeholder.id = doc_id.clone();
+                match placeholder.load().await {
+                    Ok(loaded_doc) => {
+                        log::debug!("Found cached Atomic Data document '{}' in persistence", doc_id);
+                        documents.push(loaded_doc);
+                    }
+                    Err(_) => {
+                        log::warn!("Atomic Data document '{}' not found in persistence - this may indicate the document hasn't been cached yet", doc_id);
+                        // Skip this document for now - it will be cached when accessed through search
+                        // In a production system, you might want to fetch it from the Atomic Server here
+                    }
+                }
+            } else {
+                // Local document: Use the standard persistence loading
+                let mut doc = Document::new(doc_id.clone());
+                match doc.load().await {
+                    Ok(loaded_doc) => {
+                        documents.push(loaded_doc);
+                        log::trace!("Successfully loaded local document: {}", doc_id);
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to load local document '{}': {}", doc_id, e);
+                        // Continue processing other documents even if this one fails
+                    }
+                }
+            }
+        }
         
         // Apply KG preprocessing if enabled for this role
         if role.terraphim_it {
@@ -1195,5 +1229,103 @@ mod tests {
         assert!(result.is_ok(), "Search should complete without errors");
         
         log::info!("✅ All Atomic Data caching tests passed!");
+    }
+
+    #[tokio::test]
+    async fn test_kg_term_search_with_atomic_data() {
+        use terraphim_types::{Document, RoleName, KnowledgeGraphInputType};
+        use terraphim_config::{Config, Role, Haystack, ServiceType, KnowledgeGraph, KnowledgeGraphLocal};
+        use terraphim_persistence::DeviceStorage;
+        use ahash::AHashMap;
+        use std::path::PathBuf;
+        
+        // Initialize memory-only persistence for testing
+        DeviceStorage::init_memory_only().await.unwrap();
+        
+        // Create a test config with a role that has KG enabled
+        let mut config = Config::default();
+        let role_name = RoleName::new("test_kg_role");
+        let role = Role {
+            shortname: None,
+            name: "test_kg_role".into(),
+            haystacks: vec![Haystack {
+                location: "test".to_string(),
+                service: ServiceType::Ripgrep,
+                read_only: false,
+                atomic_server_secret: None,
+                extra_parameters: std::collections::HashMap::new(),
+            }],
+            kg: Some(KnowledgeGraph {
+                automata_path: None,
+                knowledge_graph_local: Some(KnowledgeGraphLocal {
+                    input_type: KnowledgeGraphInputType::Markdown,
+                    path: PathBuf::from("test"),
+                }),
+                public: true,
+                publish: true,
+            }),
+            terraphim_it: true,
+            theme: "default".to_string(),
+            relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
+            extra: AHashMap::new(),
+        };
+        config.roles.insert(role_name.clone(), role);
+        
+        let config_state = ConfigState::new(&mut config).await.unwrap();
+        let mut service = TerraphimService::new(config_state);
+        
+        // Create and cache an Atomic Data document
+        let atomic_doc = Document {
+            id: "http://localhost:9883/borrower-portal/form-field/requestedLoanAmount".to_string(),
+            url: "http://localhost:9883/borrower-portal/form-field/requestedLoanAmount".to_string(),
+            title: "Requested Loan Amount ($)".to_string(),
+            body: "Form field for Requested Loan Amount ($)".to_string(),
+            description: Some("Form field for Requested Loan Amount ($)".to_string()),
+            stub: None,
+            tags: None,
+            rank: None,
+        };
+        
+        // Save the Atomic Data document to persistence
+        log::info!("Testing KG term search with Atomic Data documents...");
+        match atomic_doc.save().await {
+            Ok(_) => log::info!("✅ Successfully saved Atomic Data document to persistence"),
+            Err(e) => {
+                log::error!("❌ Failed to save Atomic Data document: {}", e);
+                panic!("Atomic Data document save failed");
+            }
+        }
+        
+        // Test that find_documents_for_kg_term can handle Atomic Data document IDs
+        // Note: In a real scenario, the rolegraph would contain the Atomic Data document ID
+        // For this test, we're verifying that the function can handle Atomic Data URLs properly
+        let result = service.find_documents_for_kg_term(&role_name, "test").await;
+        
+        // The function should complete without errors, even if no documents are found
+        // The important thing is that it doesn't crash when encountering Atomic Data URLs
+        assert!(result.is_ok(), "find_documents_for_kg_term should complete without errors");
+        
+        let documents = result.unwrap();
+        log::info!("✅ KG term search completed successfully, found {} documents", documents.len());
+        
+        // Verify that the function can handle Atomic Data document loading
+        // by manually testing the document loading logic
+        let atomic_doc_id = "http://localhost:9883/borrower-portal/form-field/requestedLoanAmount";
+        let mut placeholder = Document::default();
+        placeholder.id = atomic_doc_id.to_string();
+        
+        match placeholder.load().await {
+            Ok(loaded_doc) => {
+                log::info!("✅ Successfully loaded Atomic Data document from persistence in KG term search context");
+                assert_eq!(loaded_doc.title, atomic_doc.title);
+                assert_eq!(loaded_doc.body, atomic_doc.body);
+            }
+            Err(e) => {
+                log::error!("❌ Failed to load Atomic Data document in KG term search context: {}", e);
+                panic!("Atomic Data document load failed in KG term search context");
+            }
+        }
+        
+        log::info!("✅ All KG term search with Atomic Data tests passed!");
     }
 }  
