@@ -38,7 +38,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/document",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+"https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/id",
       "terraphim/property/url",
@@ -53,7 +53,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/node",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/id",
       "terraphim/property/rank"
@@ -66,7 +66,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/edge",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/id",
       "terraphim/property/rank"
@@ -79,7 +79,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/thesaurus",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name"
     ],
@@ -91,7 +91,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/role",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/role-name",
       "terraphim/property/theme"
@@ -104,7 +104,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/indexed-document",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/id",
       "terraphim/property/rank",
@@ -118,7 +118,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/search-query",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/search-term"
     ],
@@ -130,7 +130,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/config",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name"
     ],
@@ -142,7 +142,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/haystack",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "terraphim/property/path"
     ],
@@ -154,7 +154,7 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/class/knowledge-graph",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name"
     ],
@@ -167,7 +167,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/id",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "id"
   },
   {
@@ -177,7 +177,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/url",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "url"
   },
   {
@@ -187,7 +187,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/title",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "title"
   },
   {
@@ -197,7 +197,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/body",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "body"
   },
   {
@@ -207,7 +207,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/rank",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "rank"
   },
   {
@@ -217,7 +217,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/role-name",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "role-name"
   },
   {
@@ -227,7 +227,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/theme",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "theme"
   },
   {
@@ -237,7 +237,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/tags",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "tags"
   },
   {
@@ -247,7 +247,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/search-term",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "search-term"
   },
   {
@@ -257,7 +257,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/localId": "terraphim/property/path",
-    "https://atomicdata.dev/properties/parent": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim",
     "https://atomicdata.dev/properties/shortname": "path"
   }
 ] 

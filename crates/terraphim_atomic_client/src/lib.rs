@@ -53,6 +53,8 @@ mod auth;
 pub mod store;
 pub mod http;
 pub mod time_utils;
+#[cfg(feature = "native")]
+pub mod import;
 
 pub use error::AtomicError;
 pub use auth::Agent;

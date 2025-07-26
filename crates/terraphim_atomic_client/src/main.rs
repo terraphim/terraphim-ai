@@ -1168,7 +1168,8 @@ async fn import_single_resource(
         
         // Convert relative URLs in arrays to absolute URLs
         let processed_value = if key == "https://atomicdata.dev/properties/classes" || 
-                                  key == "https://atomicdata.dev/properties/properties" {
+                                  key == "https://atomicdata.dev/properties/properties" ||
+                                  key == "https://atomicdata.dev/properties/requires" {
             convert_relative_urls_in_array(value, parent_url)?
         } else if key == "https://atomicdata.dev/properties/parent" {
             // Parent should be a localId reference, not a URL

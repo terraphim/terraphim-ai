@@ -6,6 +6,112 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
+use std::sync::Once;
+
+/// Ensures the Terraphim ontology is imported into the Atomic Server
+/// This includes the terraphim/property/body property needed for document content
+static ONTOLOGY_SETUP: Once = Once::new();
+
+/// Sets up the required Terraphim properties manually
+async fn setup_ontology_once() -> Result<(), Box<dyn std::error::Error>> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static SETUP_DONE: AtomicBool = AtomicBool::new(false);
+    
+    if SETUP_DONE.load(Ordering::Acquire) {
+        return Ok(());
+    }
+    
+    let server_url = std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
+    let config = terraphim_atomic_client::Config::from_env()?;
+    let store = Store::new(config)?;
+    
+    let server_base = server_url.trim_end_matches('/');
+    
+    // First, create the terraphim-drive if it doesn't exist
+    let drive_subject = format!("{}/terraphim-drive", server_base);
+    match store.get_resource(&drive_subject).await {
+        Ok(_) => {
+            log::info!("Terraphim drive already exists: {}", drive_subject);
+        }
+        Err(_) => {
+            let mut drive_properties = HashMap::new();
+            drive_properties.insert("https://atomicdata.dev/properties/isA".to_string(), 
+                                  json!(["https://atomicdata.dev/classes/Drive"]));
+            drive_properties.insert("https://atomicdata.dev/properties/name".to_string(), 
+                                  json!("Terraphim Drive"));
+            drive_properties.insert("https://atomicdata.dev/properties/description".to_string(), 
+                                  json!("Drive for Terraphim resources"));
+            drive_properties.insert("https://atomicdata.dev/properties/parent".to_string(), 
+                                  json!(server_base));
+            
+            match store.create_with_commit(&drive_subject, drive_properties).await {
+                Ok(_) => log::info!("✅ Created terraphim-drive: {}", drive_subject),
+                Err(e) => log::warn!("Failed to create terraphim-drive (may already exist): {}", e),
+            }
+        }
+    }
+    
+    // Create the terraphim ontology resource
+    let ontology_subject = format!("{}/terraphim", drive_subject);
+    match store.get_resource(&ontology_subject).await {
+        Ok(_) => {
+            log::info!("Terraphim ontology already exists: {}", ontology_subject);
+        }
+        Err(_) => {
+            let mut ontology_properties = HashMap::new();
+            ontology_properties.insert("https://atomicdata.dev/properties/isA".to_string(), 
+                                     json!(["https://atomicdata.dev/class/ontology"]));
+            ontology_properties.insert("https://atomicdata.dev/properties/name".to_string(), 
+                                     json!("Terraphim Ontology"));
+            ontology_properties.insert("https://atomicdata.dev/properties/description".to_string(), 
+                                     json!("Ontology for Terraphim AI system"));
+            ontology_properties.insert("https://atomicdata.dev/properties/parent".to_string(), 
+                                     json!(&drive_subject));
+            ontology_properties.insert("https://atomicdata.dev/properties/shortname".to_string(), 
+                                     json!("terraphim"));
+            
+            match store.create_with_commit(&ontology_subject, ontology_properties).await {
+                Ok(_) => log::info!("✅ Created terraphim ontology: {}", ontology_subject),
+                Err(e) => log::warn!("Failed to create terraphim ontology (may already exist): {}", e),
+            }
+        }
+    }
+    
+    // Create the body property
+    let body_property_subject = format!("{}/property/body", ontology_subject);
+    match store.get_resource(&body_property_subject).await {
+        Ok(_) => {
+            log::info!("✅ Terraphim body property already exists: {}", body_property_subject);
+        }
+        Err(_) => {
+            let mut body_properties = HashMap::new();
+            body_properties.insert("https://atomicdata.dev/properties/isA".to_string(), 
+                                 json!(["https://atomicdata.dev/classes/Property"]));
+            body_properties.insert("https://atomicdata.dev/properties/name".to_string(), 
+                                 json!("Body"));
+            body_properties.insert("https://atomicdata.dev/properties/description".to_string(), 
+                                 json!("The main content body of the document"));
+            body_properties.insert("https://atomicdata.dev/properties/datatype".to_string(), 
+                                 json!("https://atomicdata.dev/datatypes/markdown"));
+            body_properties.insert("https://atomicdata.dev/properties/parent".to_string(), 
+                                 json!(&ontology_subject));
+            body_properties.insert("https://atomicdata.dev/properties/shortname".to_string(), 
+                                 json!("body"));
+            
+            match store.create_with_commit(&body_property_subject, body_properties).await {
+                Ok(_) => log::info!("✅ Created terraphim body property: {}", body_property_subject),
+                Err(e) => {
+                    log::error!("Failed to create body property: {}", e);
+                    return Err(e.into());
+                }
+            }
+        }
+    }
+    
+    SETUP_DONE.store(true, Ordering::Release);
+    log::info!("✅ Terraphim ontology setup completed");
+    Ok(())
+}
 
 /// Test that demonstrates atomic server haystack integration with Title Scorer role
 /// This test creates a complete config with atomic server haystack using TitleScorer,
@@ -24,6 +130,9 @@ async fn test_atomic_haystack_title_scorer_role() {
         log::warn!("ATOMIC_SERVER_SECRET not set, test may fail with authentication");
     }
 
+    // Ensure ontology is imported before running test
+    setup_ontology_once().await.expect("Failed to setup ontology");
+    
     // Create atomic store for setup and cleanup
     let atomic_config = terraphim_atomic_client::Config {
         server_url: server_url.clone(),
@@ -452,6 +561,9 @@ async fn test_atomic_haystack_role_comparison() {
     if atomic_secret.is_none() {
         log::warn!("ATOMIC_SERVER_SECRET not set, test may fail with authentication");
     }
+
+    // Ensure ontology is setup before running test
+    setup_ontology_once().await.expect("Failed to setup ontology");
 
     // Create atomic store for setup and cleanup
     let atomic_config = terraphim_atomic_client::Config {
