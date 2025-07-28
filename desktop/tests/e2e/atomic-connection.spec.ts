@@ -136,7 +136,8 @@ test.describe("Complete Atomic Server Integration", () => {
               atomic_server_secret: ATOMIC_SERVER_SECRET
             }
           ],
-          extra: {}
+          extra: {},
+          terraphim_it: false
         }
       },
       default_role: "Atomic Integration Test",

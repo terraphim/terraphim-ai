@@ -18,6 +18,10 @@
 - [Terraphim Automata](./components/terraphim-automata.md)
 - [Terraphim Atomic Client](./components/terraphim-atomic-client.md)
 
+## Integrations
+
+- [Atomic Server Integration](./atomic-server-integration.md)
+
 ## Scoring Algorithms
 
 - [Title Scorer](./scorers/Title-Scorer.md)
