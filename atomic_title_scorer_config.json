@@ -18,6 +18,54 @@
       ],
       "extra": {}
     },
+    "BM25 Scorer": {
+      "shortname": "bm25",
+      "name": "BM25 Scorer",
+      "relevance_function": "bm25",
+      "theme": "flatly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "BM25F Scorer": {
+      "shortname": "bm25f",
+      "name": "BM25F Scorer",
+      "relevance_function": "bm25f",
+      "theme": "journal",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "BM25Plus Scorer": {
+      "shortname": "bm25plus",
+      "name": "BM25Plus Scorer",
+      "relevance_function": "bm25plus",
+      "theme": "pulse",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
     "Engineer": {
       "shortname": "engineer",
       "name": "Engineer",

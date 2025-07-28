@@ -40,6 +40,32 @@
         }
       ],
       "extra": {}
+    },
+    "BM25 Scorer": {
+      "shortname": "bm25",
+      "name": "BM25 Scorer",
+      "relevance_function": "bm25",
+      "theme": "flatly",
+      "haystacks": [
+        {
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "service": "Ripgrep"
+        }
+      ],
+      "extra": {}
+    },
+    "BM25F Scorer": {
+      "shortname": "bm25f",
+      "name": "BM25F Scorer",
+      "relevance_function": "bm25f",
+      "theme": "journal",
+      "haystacks": [
+        {
+          "path": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "service": "Ripgrep"
+        }
+      ],
+      "extra": {}
     }
   },
   "default_role": "Default",

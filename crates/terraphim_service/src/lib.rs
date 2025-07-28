@@ -10,6 +10,7 @@ use terraphim_types::{
     Document, Index, IndexedDocument, NormalizedTermValue,RelevanceFunction, RoleName, SearchQuery, Thesaurus,
 };
 mod score;
+use crate::score::Query;
 
 #[cfg(feature = "openrouter")]
 pub mod openrouter;
@@ -593,7 +594,8 @@ impl<'a> TerraphimService {
 
                 log::debug!("Sorting documents by relevance");
                 // Sort the documents by relevance
-                let documents = score::sort_documents(search_query, documents);
+                let query = Query::new(&search_query.search_term.to_string());
+                let documents = score::sort_documents(&query, documents);
                 let total_length = documents.len();
                 let mut docs_ranked = Vec::new();
                 for (idx, doc) in documents.iter().enumerate() {
@@ -697,6 +699,117 @@ impl<'a> TerraphimService {
                     Ok(docs_ranked)
                 }
             }
+            RelevanceFunction::BM25 => {
+                log::debug!("Searching haystack with BM25 scorer");
+                
+                let documents = index.get_all_documents();
+                
+                log::debug!("Sorting documents by BM25 relevance");
+                let query = Query::new(&search_query.search_term.to_string()).name_scorer(score::QueryScorer::BM25);
+                let documents = score::sort_documents(&query, documents);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let mut document: terraphim_types::Document = doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document);
+                }
+                
+                // Apply OpenRouter AI summarization if enabled for this role
+                #[cfg(feature = "openrouter")]
+                if role.has_openrouter_config() {
+                    log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                }
+                
+                // Apply KG preprocessing if enabled for this role
+                if role.terraphim_it {
+                    log::debug!("Applying KG preprocessing to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
+                    let mut processed_docs = Vec::new();
+                    for document in docs_ranked {
+                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        processed_docs.push(processed_doc);
+                    }
+                    Ok(processed_docs)
+                } else {
+                    Ok(docs_ranked)
+                }
+            }
+            RelevanceFunction::BM25F => {
+                log::debug!("Searching haystack with BM25F scorer");
+                
+                let documents = index.get_all_documents();
+                
+                log::debug!("Sorting documents by BM25F relevance");
+                let query = Query::new(&search_query.search_term.to_string()).name_scorer(score::QueryScorer::BM25F);
+                let documents = score::sort_documents(&query, documents);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let mut document: terraphim_types::Document = doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document);
+                }
+                
+                // Apply OpenRouter AI summarization if enabled for this role
+                #[cfg(feature = "openrouter")]
+                if role.has_openrouter_config() {
+                    log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                }
+                
+                // Apply KG preprocessing if enabled for this role
+                if role.terraphim_it {
+                    log::debug!("Applying KG preprocessing to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
+                    let mut processed_docs = Vec::new();
+                    for document in docs_ranked {
+                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        processed_docs.push(processed_doc);
+                    }
+                    Ok(processed_docs)
+                } else {
+                    Ok(docs_ranked)
+                }
+            }
+            RelevanceFunction::BM25Plus => {
+                log::debug!("Searching haystack with BM25Plus scorer");
+                
+                let documents = index.get_all_documents();
+                
+                log::debug!("Sorting documents by BM25Plus relevance");
+                let query = Query::new(&search_query.search_term.to_string()).name_scorer(score::QueryScorer::BM25Plus);
+                let documents = score::sort_documents(&query, documents);
+                let total_length = documents.len();
+                let mut docs_ranked = Vec::new();
+                for (idx, doc) in documents.iter().enumerate() {
+                    let mut document: terraphim_types::Document = doc.clone();
+                    let rank = (total_length - idx).try_into().unwrap();
+                    document.rank = Some(rank);
+                    docs_ranked.push(document);
+                }
+                
+                // Apply OpenRouter AI summarization if enabled for this role
+                #[cfg(feature = "openrouter")]
+                if role.has_openrouter_config() {
+                    log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                }
+                
+                // Apply KG preprocessing if enabled for this role
+                if role.terraphim_it {
+                    log::debug!("Applying KG preprocessing to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
+                    let mut processed_docs = Vec::new();
+                    for document in docs_ranked {
+                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        processed_docs.push(processed_doc);
+                    }
+                    Ok(processed_docs)
+                } else {
+                    Ok(docs_ranked)
+                }
+            }
             RelevanceFunction::TerraphimGraph => {
                 self.build_thesaurus(search_query).await?;
                 let _thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
@@ -709,6 +822,34 @@ impl<'a> TerraphimService {
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
                 let mut documents = index.get_documents(scored_index_docs);
+                
+                // Apply TF-IDF scoring to enhance Terraphim Graph ranking
+                if !documents.is_empty() {
+                    log::debug!("Applying TF-IDF scoring to {} documents for enhanced ranking", documents.len());
+                    
+                    use crate::score::bm25_additional::TFIDFScorer;
+                    let mut tfidf_scorer = TFIDFScorer::new();
+                    tfidf_scorer.initialize(&documents);
+                    
+                    // Re-score documents using TF-IDF
+                    let query_text = &search_query.search_term.to_string();
+                    for document in &mut documents {
+                        let tfidf_score = tfidf_scorer.score(query_text, document);
+                        // Combine TF-IDF score with existing rank using a weighted approach
+                        if let Some(rank) = document.rank {
+                            document.rank = Some(rank + (tfidf_score * 0.3) as u64); // 30% weight for TF-IDF
+                        } else {
+                            document.rank = Some((tfidf_score * 10.0) as u64); // Scale TF-IDF for ranking
+                        }
+                    }
+                    
+                    // Re-sort documents by the new combined rank
+                    documents.sort_by(|a, b| {
+                        b.rank.unwrap_or(0).cmp(&a.rank.unwrap_or(0))
+                    });
+                    
+                    log::debug!("TF-IDF scoring applied successfully");
+                }
                 
                 // 🔄 Enhanced persistence layer integration for both local and Atomic Data documents
                 for document in &mut documents {
