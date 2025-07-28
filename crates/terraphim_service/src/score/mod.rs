@@ -4,9 +4,15 @@ use std::result;
 
 mod names;
 mod scored;
+mod bm25;
+pub mod bm25_additional;
+#[cfg(test)]
+mod bm25_test;
 
-use names::NameScorer;
+pub use names::QueryScorer;
 use scored::{Scored, SearchResults};
+use bm25::{BM25FScorer, BM25PlusScorer};
+use bm25_additional::{OkapiBM25Scorer, TFIDFScorer, JaccardScorer, QueryRatioScorer};
 use serde::{Serialize, Serializer};
 
 use terraphim_types::Document;
@@ -20,32 +26,68 @@ type Result<T> = std::result::Result<T, ServiceError>;
 ///
 /// The `relevance_function` parameter is used to determine how the documents
 /// should be sorted.
-pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> Vec<Document> {
-    log::debug!("Sorting documents by relevance");
-
-    // Create a new scorer
-    let mut scorer = Scorer::new();
-
-    // Create a new query
-    let query = Query::new(search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
-
-    // Score the documents
-    let mut results = scorer.score(&query, documents).unwrap();
-    results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
-    log::debug!("Rescore results {:#?}", results);
-    results
-        .into_vec()
-        .iter()
-        .map(|s| s.clone().into_value())
-        .collect()
+pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> {
+    let mut scorer = Scorer::new().with_similarity(query.similarity);
+    
+    // Initialize the appropriate scorer based on the query's name_scorer
+    match query.name_scorer {
+        QueryScorer::BM25 => {
+            let bm25_scorer = OkapiBM25Scorer::new();
+            scorer = scorer.with_scorer(Box::new(bm25_scorer));
+        }
+        QueryScorer::BM25F => {
+            let bm25f_scorer = BM25FScorer::new();
+            scorer = scorer.with_scorer(Box::new(bm25f_scorer));
+        }
+        QueryScorer::BM25Plus => {
+            let bm25plus_scorer = BM25PlusScorer::new();
+            scorer = scorer.with_scorer(Box::new(bm25plus_scorer));
+        }
+        QueryScorer::TFIDF => {
+            let tfidf_scorer = TFIDFScorer::new();
+            scorer = scorer.with_scorer(Box::new(tfidf_scorer));
+        }
+        QueryScorer::Jaccard => {
+            let jaccard_scorer = JaccardScorer::new();
+            scorer = scorer.with_scorer(Box::new(jaccard_scorer));
+        }
+        QueryScorer::QueryRatio => {
+            let query_ratio_scorer = QueryRatioScorer::new();
+            scorer = scorer.with_scorer(Box::new(query_ratio_scorer));
+        }
+        _ => {
+            // For OkapiBM25 and other cases, use similarity scoring
+        }
+    }
+    
+    match scorer.score_documents(query, documents.clone()) {
+        Ok(results) => results.into_iter().map(|scored| scored.into_value()).collect(),
+        Err(_) => documents,
+    }
 }
 
 #[derive(Debug)]
-pub struct Scorer {}
+pub struct Scorer {
+    similarity: Similarity,
+    scorer: Option<Box<dyn std::any::Any>>,
+}
 
 impl Scorer {
     pub fn new() -> Scorer {
-        Scorer {}
+        Scorer {
+            similarity: Similarity::default(),
+            scorer: None,
+        }
+    }
+
+    pub fn with_similarity(mut self, similarity: Similarity) -> Scorer {
+        self.similarity = similarity;
+        self
+    }
+
+    pub fn with_scorer(mut self, scorer: Box<dyn std::any::Any>) -> Scorer {
+        self.scorer = Some(scorer);
+        self
     }
 
     /// Execute a search with the given `Query`.
@@ -95,9 +137,58 @@ impl Scorer {
         for document in documents {
             results.push(Scored::new(document));
         }
-        log::debug!("Similarity {:?}", query.similarity);
-        log::debug!("Query {:?}", query);
-        results.rescore(|document| self.similarity(query, &document.title));
+        
+        match query.name_scorer {
+            QueryScorer::BM25 => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(bm25_scorer) = scorer.downcast_ref::<OkapiBM25Scorer>() {
+                        results.rescore(|document| bm25_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::BM25F => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(bm25f_scorer) = scorer.downcast_ref::<BM25FScorer>() {
+                        results.rescore(|document| bm25f_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::BM25Plus => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(bm25plus_scorer) = scorer.downcast_ref::<BM25PlusScorer>() {
+                        results.rescore(|document| bm25plus_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::TFIDF => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(tfidf_scorer) = scorer.downcast_ref::<TFIDFScorer>() {
+                        results.rescore(|document| tfidf_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::Jaccard => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(jaccard_scorer) = scorer.downcast_ref::<JaccardScorer>() {
+                        results.rescore(|document| jaccard_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::QueryRatio => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(query_ratio_scorer) = scorer.downcast_ref::<QueryRatioScorer>() {
+                        results.rescore(|document| query_ratio_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            _ => {
+                // Fall back to similarity scoring for OkapiBM25 and other cases
+                log::debug!("Similarity {:?}", query.similarity);
+                log::debug!("Query {:?}", query);
+                results.rescore(|document| self.similarity(query, &document.title));
+            }
+        }
+        
         log::debug!("results after rescoring: {:#?}", results);
         Ok(results)
     }
@@ -126,7 +217,7 @@ impl Scorer {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
     name: String,
-    name_scorer: NameScorer,
+    name_scorer: QueryScorer,
     similarity: Similarity,
     size: usize,
 }
@@ -136,7 +227,7 @@ impl Query {
     pub fn new(name: &str) -> Query {
         Query {
             name: name.to_string(),
-            name_scorer: NameScorer::default(),
+            name_scorer: QueryScorer::default(),
             similarity: Similarity::default(),
             size: 30,
         }
@@ -147,6 +238,14 @@ impl Query {
     /// Searching with an empty query always yields no results.
     pub fn is_empty(&self) -> bool {
         self.name.is_empty()
+    }
+
+    /// Set the name scorer to use for ranking.
+    ///
+    /// The name scorer determines which algorithm is used to rank documents.
+    pub fn name_scorer(mut self, scorer: QueryScorer) -> Query {
+        self.name_scorer = scorer;
+        self
     }
 
     /// Set the similarity function.

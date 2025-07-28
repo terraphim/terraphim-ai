@@ -494,6 +494,15 @@ pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the title of a document
     #[serde(rename = "title-scorer")]
     TitleScorer,
+    /// BM25 (Okapi BM25) relevance function for probabilistic ranking
+    #[serde(rename = "bm25")]
+    BM25,
+    /// BM25F relevance function with field-specific weights (title, body, description, tags)
+    #[serde(rename = "bm25f")]
+    BM25F,
+    /// BM25Plus relevance function with enhanced parameters for fine-tuning
+    #[serde(rename = "bm25plus")]
+    BM25Plus,
 }
 
 /// Defines all supported inputs for the knowledge graph.
