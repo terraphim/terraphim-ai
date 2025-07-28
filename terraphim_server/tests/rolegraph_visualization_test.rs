@@ -43,6 +43,7 @@ mod tests {
                         extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    terraphim_it: false,
                 },
             )
             .add_role(
@@ -69,6 +70,7 @@ mod tests {
                         extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    terraphim_it: false,
                 },
             )
             .add_role(
@@ -95,6 +97,7 @@ mod tests {
                         extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    terraphim_it: false,
                 },
             )
             .build()

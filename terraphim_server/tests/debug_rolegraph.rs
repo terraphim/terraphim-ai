@@ -28,6 +28,7 @@ mod tests {
             .add_role(
                 "Engineer".into(),
                 Role {
+                    terraphim_it: true,
                     shortname: Some("Engineer".into()),
                     name: "Engineer".into(),
                     relevance_function: RelevanceFunction::TerraphimGraph,
