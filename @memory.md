@@ -1,5 +1,63 @@
 # Terraphim AI Project Memory
 
+## ✅ COMPONENT DIAGRAM CREATION - COMPLETED SUCCESSFULLY (2025-01-31)
+
+### Comprehensive Terraphim Repository Component Architecture - COMPLETED ✅
+
+**Task**: Create a component diagram in Mermaid format of the Terraphim repository architecture, highlighting the core Terraphim crates and their relationships.
+
+**✅ COMPREHENSIVE COMPONENT DIAGRAM DELIVERED**:
+
+#### **1. Mermaid Component Diagram** (✅ CREATED)
+- **File Location**: `docs/component-diagram.md` with complete Mermaid diagram
+- **Visual Design**: Color-coded components with Terraphim crates highlighted in green
+- **Comprehensive Coverage**: All 13 core Terraphim crates, applications, and external systems
+- **Relationship Mapping**: Complete dependency and data flow relationships
+- **Professional Styling**: Custom CSS classes for different component types
+
+#### **2. Core Terraphim Crates Highlighted** (✅ DOCUMENTED)
+- **terraphim_types**: Shared data structures and types (foundation layer)
+- **terraphim_config**: Configuration management with role-based settings
+- **terraphim_settings**: Environment and settings management
+- **terraphim_persistence**: Data persistence layer for documents and state
+- **terraphim_automata**: FST-based autocomplete and string matching
+- **terraphim_rolegraph**: Knowledge graph implementation with role-based search
+- **terraphim_middleware**: Integration services and document indexing
+- **terraphim_service**: Core business logic and search functionality
+- **terraphim_atomic_client**: Atomic server integration client
+- **terraphim_mcp_server**: Model Context Protocol server implementation
+- **terraphim_build_args**: Build-time configuration management
+- **terraphim-markdown-parser**: Markdown document processing
+- **terraphim_onepassword_cli**: 1Password CLI integration
+
+#### **3. Application Architecture** (✅ MAPPED)
+- **Desktop App**: Tauri + Svelte with system tray and global shortcuts
+- **Web Server**: Axum-based server for API and web interface
+- **Node.js Bindings**: NAPI-based Node.js integration
+- **VS Code Extension**: TypeScript-based VS Code extension
+
+#### **4. External System Integration** (✅ DOCUMENTED)
+- **Atomic Server**: External knowledge management system (localhost:9883)
+- **GitHub**: Source code and documentation repositories
+- **S3 Storage**: Cloud storage for configurations and data
+- **OpenRouter**: AI API integration for document enhancement
+
+#### **5. Data Flow and Dependencies** (✅ MAPPED)
+- **Type System**: terraphim_types serves as foundation for all components
+- **Configuration Flow**: terraphim_config and terraphim_settings manage application state
+- **Search Pipeline**: terraphim_automata → terraphim_rolegraph → terraphim_service
+- **Integration Layer**: terraphim_middleware connects external systems to core services
+- **Application Integration**: All applications depend on core Terraphim crates
+
+#### **6. Architecture Patterns** (✅ DOCUMENTED)
+- **Modular Design**: Each crate has a specific responsibility
+- **Type Safety**: Shared types ensure consistency across components
+- **Async Runtime**: Tokio-based async operations throughout
+- **Cross-Platform**: Support for desktop, web, and Node.js environments
+- **Extensible**: Plugin-based architecture with MCP server support
+
+**Status**: ✅ **PRODUCTION READY** - Comprehensive component diagram successfully created and saved to docs/component-diagram.md, providing complete visual representation of Terraphim repository architecture with highlighted core crates and their relationships.
+
 ## ✅ COMPREHENSIVE END-TO-END PROOF - COMPLETED SUCCESSFULLY (2025-01-31)
 
 ### Complete Functionality Validation with Terraphim Engineer Test Role - COMPLETED ✅
@@ -41,6 +99,54 @@
 ```
 
 **Status**: ✅ **PRODUCTION READY** - Complete end-to-end functionality proven working with comprehensive test coverage, environment variable configuration, and all major features integrated and validated.
+
+## ✅ DATA-DRIVEN MENU SYSTEM WITH DOWNLOAD TO MARKDOWN - COMPLETED SUCCESSFULLY (2025-01-31)
+
+### Comprehensive Menu System with Download Functionality - COMPLETED ✅
+
+**Task**: Make the menu data-driven: download to markdown shall be always visible, save to atomic server shall be visible if atomic server configured and have a popup widget (already written) which allows to select parent and add article to atomic server.
+
+**✅ COMPLETE IMPLEMENTATION DELIVERED**:
+
+#### **1. Data-Driven Menu System** (`desktop/src/lib/Search/ResultItem.svelte`)
+- **Dynamic Menu Generation**: `generateMenuItems()` function creates menu based on document and role configuration
+- **Conditional Visibility**: Menu items show/hide based on document properties and role capabilities
+- **Consistent UI**: All menu items use standardized button/link components with proper accessibility
+- **Extensible Design**: Easy to add new menu items by extending the menu configuration
+
+#### **2. Download to Markdown Feature** (✅ ALWAYS VISIBLE)
+- **Complete Markdown Export**: Downloads document as properly formatted markdown file
+- **Metadata Preservation**: Includes source, rank, URL, tags, and download timestamp
+- **Structured Content**: Organized with description and main content sections
+- **Safe Filenames**: Generates URL-safe filenames with timestamps
+- **Browser Download**: Uses Blob API for direct file download without server roundtrip
+
+#### **3. Menu Item Configuration**
+```typescript
+// Always visible items
+- Download to Markdown (download icon)
+- Open in VSCode (code icon)
+- Add to Favorites (plus icon, disabled placeholder)
+
+// Conditionally visible items  
+- Save to Atomic Server (cloud upload icon, only if configured)
+- Open URL (link icon, only if document.url exists)
+```
+
+#### **4. Enhanced User Experience**
+- **Visual Consistency**: All menu items use Bulma styling with proper hover states
+- **Accessibility**: Proper ARIA labels, titles, and keyboard navigation
+- **Disabled States**: Graceful handling of unavailable features
+- **Icon System**: FontAwesome icons for clear visual identification
+- **Tooltips**: Helpful tooltips explaining each action
+
+#### **5. Technical Implementation**
+- **Reactive Menu**: Menu updates automatically when role or document changes
+- **Type Safety**: Full TypeScript support with proper type definitions
+- **Error Handling**: Graceful fallbacks for missing features
+- **Performance**: Efficient menu generation without unnecessary re-renders
+
+**Status**: ✅ **PRODUCTION READY** - Data-driven menu system with download to markdown functionality fully implemented and integrated. Menu items dynamically show based on configuration and document properties.
 
 # Terraphim AI Build Argument Management
 

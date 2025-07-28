@@ -30,6 +30,75 @@
   // Check if current role has atomic server configuration
   $: hasAtomicServer = checkAtomicServerAvailable();
 
+  // Data-driven menu configuration
+  $: menuItems = generateMenuItems();
+
+  function generateMenuItems() {
+    const items = [];
+
+    // Always show download to markdown
+    items.push({
+      id: 'download-markdown',
+      label: 'Download to Markdown',
+      icon: 'fas fa-download',
+      action: () => downloadToMarkdown(),
+      visible: true,
+      title: 'Download document as markdown file'
+    });
+
+    // Show atomic save only if configured
+    if (hasAtomicServer) {
+      items.push({
+        id: 'save-atomic',
+        label: 'Save to Atomic Server',
+        icon: 'fas fa-cloud-upload-alt',
+        action: () => onAtomicSaveClick(),
+        visible: true,
+        title: 'Save article to Atomic Server',
+        className: 'has-text-primary'
+      });
+    }
+
+    // Show external URL if available
+    if (document.url) {
+      items.push({
+        id: 'external-url',
+        label: 'Open URL',
+        icon: 'fas fa-link',
+        action: () => window.open(document.url, '_blank'),
+        visible: true,
+        title: 'Open original URL in new tab',
+        isLink: true,
+        href: document.url
+      });
+    }
+
+    // Show VSCode integration
+    items.push({
+      id: 'open-vscode',
+      label: 'Open in VSCode',
+      icon: 'fas fa-code',
+      action: () => openInVSCode(),
+      visible: true,
+      title: 'Open document in VSCode',
+      isLink: true,
+      href: `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`
+    });
+
+    // TODO: Add to favorites (placeholder for future implementation)
+    items.push({
+      id: 'add-favorites',
+      label: 'Add to Favorites',
+      icon: 'fas fa-plus',
+      action: () => {/* TODO: Implement add to favorites */},
+      visible: true,
+      title: 'Add to favorites (coming soon)',
+      disabled: true
+    });
+
+    return items;
+  }
+
   function checkAtomicServerAvailable(): boolean {
     const currentRoleName = $role;
     const config = $roleConfigStore;
@@ -303,6 +372,53 @@
     }
   }
 
+  function downloadToMarkdown() {
+    console.log('📥 Downloading document as markdown:', document.title);
+    
+    // Create markdown content
+    let markdownContent = `# ${document.title}\n\n`;
+    
+    // Add metadata
+    markdownContent += `**Source:** Terraphim Search\n`;
+    markdownContent += `**Rank:** ${document.rank}\n`;
+    if (document.url) {
+      markdownContent += `**URL:** ${document.url}\n`;
+    }
+    if (document.tags && document.tags.length > 0) {
+      markdownContent += `**Tags:** ${document.tags.join(', ')}\n`;
+    }
+    markdownContent += `**Downloaded:** ${new Date().toISOString()}\n\n`;
+    
+    // Add description if available
+    if (document.description) {
+      markdownContent += `## Description\n\n${document.description}\n\n`;
+    }
+    
+    // Add main content
+    markdownContent += `## Content\n\n${document.body}\n`;
+    
+    // Create filename
+    const filename = `${document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.md`;
+    
+    // Create and download file
+    const blob = new Blob([markdownContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = window.document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('✅ Markdown file downloaded:', filename);
+  }
+
+  function openInVSCode() {
+    const vscodeUrl = `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`;
+    window.open(vscodeUrl, '_blank');
+  }
+
   if (configStore[$role] !== undefined) {
     console.log("Have attribute", configStore[$role]);
     if (configStore[$role].hasOwnProperty("enableLogseq")) {
@@ -446,50 +562,47 @@
       <div class="level-right">
         <nav class="level is-mobile" transition:fade>
           <div class="level-right">
-            {#if "url" in document}
-              <a
-                href={document.url}
-                target="_blank"
-                class="level-item"
-                aria-label="URL"
-              >
-                <span class="icon is-medium">
-                  <i class="fas fa-link" />
-                </span>
-              </a>
-            {/if}
-            <button 
-              type="button" 
-              class="level-item button is-ghost" 
-              aria-label="Add to favorites"
-              on:click={() => {/* TODO: Implement add to favorites */}}
-            >
-              <span class="icon is-medium">
-                <i class="fas fa-plus" aria-hidden="true" />
-              </span>
-            </button>
-            {#if hasAtomicServer}
-              <button 
-                type="button" 
-                class="level-item button is-ghost" 
-                aria-label="Save to Atomic Server"
-                on:click={onAtomicSaveClick}
-                title="Save article to Atomic Server"
-              >
-                <span class="icon is-medium has-text-primary">
-                  <i class="fas fa-cloud-upload-alt" aria-hidden="true" />
-                </span>
-              </button>
-            {/if}
-            <a
-            href={`vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`}
-            class="level-item"
-            aria-label="Open in VSCode"
-          >
-            <span class="icon is-medium">
-              <i class="fas fa-code" aria-hidden="true" />
-            </span>
-          </a>
+            {#each menuItems as item}
+              {#if item.visible}
+                {#if item.disabled}
+                  <button
+                    type="button"
+                    class="level-item button is-ghost"
+                    aria-label={item.title}
+                    title={item.title}
+                    disabled={true}
+                  >
+                    <span class="icon is-medium" class:has-text-primary={item.className}>
+                      <i class={item.icon} />
+                    </span>
+                  </button>
+                {:else if item.isLink}
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    class="level-item"
+                    aria-label={item.title}
+                    title={item.title}
+                  >
+                    <span class="icon is-medium" class:has-text-primary={item.className}>
+                      <i class={item.icon} />
+                    </span>
+                  </a>
+                {:else}
+                  <button
+                    type="button"
+                    class="level-item button is-ghost"
+                    aria-label={item.title}
+                    on:click={item.action}
+                    title={item.title}
+                  >
+                    <span class="icon is-medium" class:has-text-primary={item.className}>
+                      <i class={item.icon} />
+                    </span>
+                  </button>
+                {/if}
+              {/if}
+            {/each}
           </div>
         </nav>
       </div>

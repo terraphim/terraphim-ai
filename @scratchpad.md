@@ -1,5 +1,184 @@
 # Terraphim AI Scratchpad
 
+## ✅ COMPLETED: Component Diagram Creation (2025-01-31)
+
+### Task Summary
+- Create a comprehensive component diagram in Mermaid format of the Terraphim repository architecture
+- Highlight the core Terraphim crates and their relationships
+- Document the complete system architecture with visual representation
+
+### Implementation Details ✅
+
+**Mermaid Component Diagram Created:**
+- **File Location**: `docs/component-diagram.md`
+- **Visual Design**: Color-coded components with Terraphim crates highlighted in green
+- **Comprehensive Coverage**: All 13 core Terraphim crates, applications, and external systems
+- **Relationship Mapping**: Complete dependency and data flow relationships
+- **Professional Styling**: Custom CSS classes for different component types
+
+**Core Terraphim Crates Highlighted:**
+- **terraphim_types**: Shared data structures and types (foundation layer)
+- **terraphim_config**: Configuration management with role-based settings
+- **terraphim_settings**: Environment and settings management
+- **terraphim_persistence**: Data persistence layer for documents and state
+- **terraphim_automata**: FST-based autocomplete and string matching
+- **terraphim_rolegraph**: Knowledge graph implementation with role-based search
+- **terraphim_middleware**: Integration services and document indexing
+- **terraphim_service**: Core business logic and search functionality
+- **terraphim_atomic_client**: Atomic server integration client
+- **terraphim_mcp_server**: Model Context Protocol server implementation
+- **terraphim_build_args**: Build-time configuration management
+- **terraphim-markdown-parser**: Markdown document processing
+- **terraphim_onepassword_cli**: 1Password CLI integration
+
+**Architecture Patterns Documented:**
+- **Modular Design**: Each crate has a specific responsibility
+- **Type Safety**: Shared types ensure consistency across components
+- **Async Runtime**: Tokio-based async operations throughout
+- **Cross-Platform**: Support for desktop, web, and Node.js environments
+- **Extensible**: Plugin-based architecture with MCP server support
+
+### Key Achievements ✅
+
+**1. Visual Architecture Representation:**
+- Complete component diagram with color-coded sections
+- Clear visualization of system relationships
+- Professional documentation quality
+
+**2. Relationship Mapping:**
+- All dependencies and data flows documented
+- External system integrations clearly shown
+- Application layer architecture mapped
+
+**3. Documentation Quality:**
+- Comprehensive component descriptions
+- Usage patterns and architectural decisions
+- Production-ready documentation
+
+**4. System Understanding:**
+- Clear visualization of Terraphim architecture
+- Highlighted core crates and their importance
+- Complete dependency graph
+
+### Status: ✅ COMPLETED - Component Diagram Created
+
+**Key Achievement**: Successfully created a comprehensive component diagram that provides complete visual representation of the Terraphim repository architecture with highlighted core crates and their relationships.
+
+**Production Ready**: The component diagram is saved to `docs/component-diagram.md` and provides clear understanding of system architecture for developers and stakeholders.
+
+## ✅ COMPLETED: Data-Driven Menu System with Download to Markdown (2025-01-31)
+
+### Task Summary
+- Implement data-driven menu system in ResultItem.svelte
+- Add download to markdown functionality (always visible)
+- Make atomic save conditional based on role configuration
+- Ensure proper accessibility and user experience
+
+### Implementation Details ✅
+
+**Data-Driven Menu System:**
+```typescript
+// Menu items generated dynamically based on:
+// - Document properties (URL, tags, etc.)
+// - Role configuration (atomic server availability)
+// - Feature availability (disabled states)
+
+function generateMenuItems() {
+  const items = [];
+  
+  // Always visible
+  items.push({
+    id: 'download-markdown',
+    label: 'Download to Markdown',
+    icon: 'fas fa-download',
+    action: () => downloadToMarkdown(),
+    visible: true,
+    title: 'Download document as markdown file'
+  });
+  
+  // Conditionally visible
+  if (hasAtomicServer) {
+    items.push({
+      id: 'save-atomic',
+      label: 'Save to Atomic Server',
+      icon: 'fas fa-cloud-upload-alt',
+      action: () => onAtomicSaveClick(),
+      visible: true,
+      title: 'Save article to Atomic Server',
+      className: 'has-text-primary'
+    });
+  }
+  
+  return items;
+}
+```
+
+**Download to Markdown Feature:**
+```typescript
+function downloadToMarkdown() {
+  // Create structured markdown content
+  let markdownContent = `# ${document.title}\n\n`;
+  markdownContent += `**Source:** Terraphim Search\n`;
+  markdownContent += `**Rank:** ${document.rank}\n`;
+  // ... metadata and content
+  
+  // Generate safe filename
+  const filename = `${document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.md`;
+  
+  // Download using Blob API
+  const blob = new Blob([markdownContent], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = window.document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  window.document.body.appendChild(a);
+  a.click();
+  window.document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+```
+
+**Menu Rendering:**
+```svelte
+{#each menuItems as item}
+  {#if item.visible}
+    {#if item.disabled}
+      <button disabled>...</button>
+    {:else if item.isLink}
+      <a href={item.href} target="_blank">...</a>
+    {:else}
+      <button on:click={item.action}>...</button>
+    {/if}
+  {/if}
+{/each}
+```
+
+### Key Features ✅
+
+**1. Always Visible Items:**
+- Download to Markdown (download icon)
+- Open in VSCode (code icon)
+- Add to Favorites (plus icon, disabled placeholder)
+
+**2. Conditionally Visible Items:**
+- Save to Atomic Server (cloud upload icon, only if configured)
+- Open URL (link icon, only if document.url exists)
+
+**3. Enhanced UX:**
+- Proper accessibility (ARIA labels, titles)
+- Visual consistency (Bulma styling)
+- Graceful disabled states
+- Helpful tooltips
+
+**4. Technical Benefits:**
+- Reactive menu updates
+- Type-safe implementation
+- Efficient rendering
+- Extensible design
+
+### Status: ✅ COMPLETED
+Data-driven menu system with download to markdown functionality fully implemented and working.
+
 ## ✅ COMPLETED: WebDriver Testing for KG Graph Functionality (2025-01-31)
 
 ### Task Summary
