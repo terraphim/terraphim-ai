@@ -8,7 +8,10 @@ pub mod thesaurus;
 pub mod haystack;
 
 pub use indexer::{search_haystacks, RipgrepIndexer};
-pub use haystack::AtomicHaystackIndexer;
+pub use haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer};
+
+#[cfg(test)]
+mod tests;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -32,6 +35,9 @@ pub enum Error {
 
     #[error("Builder error: {0}")]
     Builder(#[from] BuilderError),
+
+    #[error("HTTP request error: {0}")]
+    Http(#[from] reqwest::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

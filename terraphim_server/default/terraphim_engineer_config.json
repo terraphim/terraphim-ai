@@ -14,7 +14,8 @@
           "location": "docs/src",
           "service": "Ripgrep",
           "read_only": true,
-          "atomic_server_secret": null
+          "atomic_server_secret": null,
+          "extra_parameters": {}
         }
       ],
       "extra": {}
@@ -39,7 +40,8 @@
           "location": "docs/src",
           "service": "Ripgrep",
           "read_only": true,
-          "atomic_server_secret": null
+          "atomic_server_secret": null,
+          "extra_parameters": {}
         }
       ],
       "extra": {}
@@ -64,7 +66,26 @@
           "location": "docs/src",
           "service": "Ripgrep",
           "read_only": true,
-          "atomic_server_secret": null
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://query.rs",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
         }
       ],
       "extra": {}

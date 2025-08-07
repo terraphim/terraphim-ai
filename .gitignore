@@ -31,3 +31,4 @@ docs/src/*.json
 demo_data
 rust-sdk
 .env
+.aider*
