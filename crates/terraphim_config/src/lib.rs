@@ -138,6 +138,8 @@ pub enum ServiceType {
     Ripgrep,
     /// Use an Atomic Server as the indexing service
     Atomic,
+    /// Use query.rs as the indexing service
+    QueryRs,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched

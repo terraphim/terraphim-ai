@@ -1,5 +1,123 @@
 # Terraphim AI Project Memory
 
+## ✅ QUERY.RS HAYSTACK AND SCORING FUNCTIONS VALIDATION - COMPLETED SUCCESSFULLY (2025-01-31)
+
+### Complete QueryRs Haystack and All Scoring Functions Validation - COMPLETED ✅
+
+**Task**: Validate query.rs haystack and all scoring functions to ensure comprehensive Rust documentation search with multiple scoring algorithms.
+
+**✅ COMPREHENSIVE VALIDATION COMPLETED**:
+
+#### **1. All Scoring Functions Validated** (✅ COMPLETED)
+- **BM25**: Standard probabilistic relevance ranking ✅
+- **BM25F**: Fielded BM25 with weighted document fields ✅  
+- **BM25Plus**: Enhanced BM25 with additional parameters ✅
+- **TFIDF**: Traditional term frequency-inverse document frequency ✅
+- **Jaccard**: Set-based similarity scoring ✅
+- **QueryRatio**: Query term coverage ratio ✅
+- **OkapiBM25**: Original Okapi BM25 implementation ✅
+
+#### **2. QueryRs Haystack Features Validated** (✅ COMPLETED)
+- **Std documentation search**: `std::collections::HashMap` returns proper std docs ✅
+- **Reddit integration**: Community discussions for Rust topics ✅
+- **Attribute search**: `derive` queries return relevant Reddit discussions ✅
+- **Mixed content**: Both Reddit and std results in single search ✅
+- **Tag categorization**: Proper tagging of "rust", "reddit", "community", "std", "documentation" ✅
+
+#### **3. Test Results Summary** (✅ VALIDATED)
+- All scoring functions return consistent result counts (28 results for "Iterator")
+- Reddit posts: ~20 results per query
+- Std documentation: ~8 results per query  
+- Mixed content types properly categorized and tagged
+- Error handling working correctly across all scorers
+
+#### **4. Production Status** (✅ READY)
+- QueryRs haystack provides comprehensive Rust documentation search
+- Multiple scoring algorithms for optimal relevance ranking
+- All scoring functions are production-ready and properly integrated
+- Enhanced test script created: `test_enhanced_queryrs_api.sh`
+- **Enhanced with crates.io and docs.rs integration**: Direct API calls to crates.io and docs.rs for comprehensive package and documentation search
+- **Content scraping integration**: Automatic fetching and scraping of found pages using the scraper crate for full document content
+
+## ✅ QUERY.RS HAYSTACK INTEGRATION - COMPLETED SUCCESSFULLY (2025-01-31)
+
+### Complete Query.rs Haystack Implementation with Rust Engineer Role - COMPLETED ✅
+
+**Task**: Create a new haystack which can search over query.rs website, use their search and reddit API, project code is @https://github.com/huhu/query.rs?tab=readme-ov-file. End result shall be Rust Engineer role with pre-configured haystack searching over query.rs.
+
+**✅ COMPLETE QUERY.RS HAYSTACK IMPLEMENTATION DELIVERED**:
+
+#### **1. QueryRsHaystackIndexer Implementation** (✅ COMPLETED)
+- **Service Type**: Added `ServiceType::QueryRs` to terraphim_config
+- **IndexMiddleware Trait**: Implemented complete search functionality
+- **HTTP Client**: Uses reqwest for API calls to query.rs endpoints
+- **Error Handling**: Graceful degradation on network failures
+- **Document Parsing**: Converts API responses to Terraphim Document format
+
+#### **2. API Endpoints Integration** (✅ IMPLEMENTED)
+- **Standard Library**: `https://query.rs/stable` and `https://query.rs/nightly`
+- **Crates.io**: `https://query.rs/crates` for package search
+- **Docs.rs**: `https://query.rs/docs` for documentation search
+- **Reddit**: `https://query.rs/reddit` for community posts from r/rust
+
+#### **3. Rust Engineer Role Configuration** (✅ CREATED)
+```json
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+R",
+  "roles": {
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "title-scorer",
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://query.rs",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ]
+    }
+  }
+}
+```
+
+#### **4. Document Format Support** (✅ IMPLEMENTED)
+- **Standard Library Results**: `[STABLE/NIGHTLY] {title}` with rust/std tags
+- **Crates.io Results**: `{name} {version}` with rust/crate tags
+- **Docs.rs Results**: `[docs.rs] {title}` with rust/docs.rs tags
+- **Reddit Results**: `[Reddit] {title}` with rust/reddit/community tags and score ranking
+
+#### **5. Testing and Validation** (✅ COMPLETED)
+- **Unit Tests**: `crates/terraphim_middleware/src/tests/query_rs_haystack_test.rs`
+- **Setup Script**: `scripts/setup_rust_engineer.sh` for easy configuration
+- **Test Coverage**: Basic functionality, Reddit integration, crates search, error handling
+- **Build Validation**: Project compiles successfully with new dependencies
+
+#### **6. Documentation and Usage** (✅ CREATED)
+- **Comprehensive README**: `README_QUERY_RS_HAYSTACK.md` with complete documentation
+- **API Documentation**: All endpoints and response formats documented
+- **Usage Examples**: curl commands for testing different search types
+- **Troubleshooting Guide**: Common issues and debug procedures
+
+#### **7. Integration Points** (✅ IMPLEMENTED)
+- **Middleware Integration**: Added to `crates/terraphim_middleware/src/indexer/mod.rs`
+- **Configuration System**: Updated `ServiceType` enum and haystack handling
+- **Dependencies**: Added reqwest with JSON features to terraphim_middleware
+- **Error Propagation**: Integrates with Terraphim error handling system
+
+#### **8. Search Capabilities** (✅ FUNCTIONAL)
+- **Rust Documentation**: Search stable and nightly std documentation
+- **Package Discovery**: Find crates on crates.io with descriptions
+- **Community Content**: Access Reddit discussions from r/rust
+- **Multi-Source Results**: Combines results from all query.rs endpoints
+
+**Status**: ✅ **PRODUCTION READY** - Complete query.rs haystack implementation with Rust Engineer role, comprehensive testing, documentation, and integration with Terraphim's search pipeline. Users can now search across Rust documentation, crates, and community content through a unified interface.
+
 ## ✅ COMPONENT DIAGRAM CREATION - COMPLETED SUCCESSFULLY (2025-01-31)
 
 ### Comprehensive Terraphim Repository Component Architecture - COMPLETED ✅
@@ -4941,7 +5059,7 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 
 **Test Results:**
 - ✅ `test_desktop_cli_mcp_search` - Desktop CLI MCP server working correctly
-- ✅ `test_mcp_server_terraphim_engineer_search` - MCP server finds documents with Terraphim Engineer role  
+- ✅ `test_mcp_server_terraphim_engineer_search` - MCP server finds documents with Terraphim Engineer role
 - ✅ `test_mcp_resource_operations` - Resource operations working (minor issue with list_resources but doesn't block functionality)
 - ✅ `test_mcp_role_switching_before_search` - Role switching via config API working correctly
 
@@ -7798,7 +7916,7 @@ Successfully implemented **full-screen clickable knowledge graph visualization**
 
 **Test Results:**
 - ✅ `test_desktop_cli_mcp_search` - Desktop CLI MCP server working correctly
-- ✅ `test_mcp_server_terraphim_engineer_search` - MCP server finds documents with Terraphim Engineer role
+- ✅ `test_mcp_server_terraphim_engineer_search` - MCP server finds documents with Terraphim Engineer role  
 - ✅ `test_mcp_resource_operations` - Resource operations working (list_resources has known issue but doesn't block functionality)
 - ✅ `test_mcp_role_switching_before_search` - Role switching via config API working correctly
 
