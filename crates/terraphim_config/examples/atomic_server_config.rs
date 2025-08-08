@@ -18,6 +18,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_role(
             "AtomicUser",
             Role {
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
                 shortname: Some("AtomicUser".to_string()),
                 name: "AtomicUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -47,6 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_role(
             "LocalResearcher",
             Role {
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
                 shortname: Some("LocalResearcher".to_string()),
                 name: "LocalResearcher".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -72,6 +78,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_role(
             "RemoteResearcher", 
             Role {
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
                 shortname: Some("RemoteResearcher".to_string()),
                 name: "RemoteResearcher".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -111,6 +120,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_role(
             "AnonymousUser",
             Role {
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
                 shortname: Some("AnonymousUser".to_string()),
                 name: "AnonymousUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -140,6 +152,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_role(
             "PublicReader",
             Role {
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
                 shortname: Some("PublicReader".to_string()),
                 name: "PublicReader".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -240,6 +255,9 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
         .add_role(
             "EnvironmentUser",
             Role {
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
+terraphim_it: "example.ai",
                 shortname: Some("EnvironmentUser".to_string()),
                 name: "EnvironmentUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
