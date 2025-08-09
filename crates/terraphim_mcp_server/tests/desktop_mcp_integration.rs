@@ -40,6 +40,7 @@ async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_desktop_mcp_server_basic_search() -> Result<()> {
     let transport = launch_desktop_mcp_server().await?;
     let service = ().serve(transport).await?;

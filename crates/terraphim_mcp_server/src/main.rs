@@ -3,6 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use rmcp::ServiceExt;
+use rmcp::transport::sse_server::{SseServer, SseServerConfig};
+use std::net::SocketAddr;
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_mcp_server::McpService;
 use tokio::io;
@@ -21,6 +23,14 @@ struct Args {
     /// Enable verbose logging (INFO level instead of WARN)
     #[arg(short, long)]
     verbose: bool,
+
+    /// Start SSE server instead of stdio transport
+    #[arg(long, default_value_t = false)]
+    sse: bool,
+
+    /// SSE bind address (when --sse)
+    #[arg(long, default_value = "127.0.0.1:8000")]
+    bind: String,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -88,14 +98,47 @@ async fn main() -> Result<()> {
 
     // Create the router
     let service = McpService::new(Arc::new(config_state));
+    // Build autocomplete index by default in background
+    let service_clone = service.clone();
+    tokio::spawn(async move {
+        service_clone.init_autocomplete_default().await;
+    });
     tracing::info!("Initialized Terraphim MCP service");
 
-    // Create and run MCP server using stdout/stdin transport
-    let server = service.serve((io::stdin(), io::stdout())).await?;
-    tracing::info!("MCP server initialized and ready to handle requests");
+    if args.sse {
+        let bind_addr: SocketAddr = args.bind.parse().expect("invalid bind address");
+        let sse_config = SseServerConfig {
+            bind: bind_addr,
+            sse_path: "/sse".to_string(),
+            post_path: "/message".to_string(),
+            ct: tokio_util::sync::CancellationToken::new(),
+            sse_keep_alive: None,
+        };
+        let (sse_server, router) = SseServer::new(sse_config);
 
-    let reason = server.waiting().await?;
-    tracing::info!("MCP server shut down with reason: {:?}", reason);
+        let listener = tokio::net::TcpListener::bind(sse_server.config.bind).await?;
+        let ct = sse_server.config.ct.child_token();
+        let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+            ct.cancelled().await;
+            tracing::info!("sse server cancelled");
+        });
+        tokio::spawn(async move {
+            if let Err(e) = server.await {
+                tracing::error!(error = %e, "sse server shutdown with error");
+            }
+        });
+
+        let cancel = sse_server.with_service(move || service.clone());
+        tracing::info!("SSE MCP server started on {}", args.bind);
+        tokio::signal::ctrl_c().await?;
+        cancel.cancel();
+    } else {
+        // Create and run MCP server using stdout/stdin transport
+        let server = service.serve((io::stdin(), io::stdout())).await?;
+        tracing::info!("MCP server initialized and ready to handle requests");
+        let reason = server.waiting().await?;
+        tracing::info!("MCP server shut down with reason: {:?}", reason);
+    }
 
     Ok(())
 } 

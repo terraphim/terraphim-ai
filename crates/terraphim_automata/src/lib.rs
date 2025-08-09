@@ -11,6 +11,17 @@ pub use autocomplete::{
     AutocompleteIndex, AutocompleteResult, AutocompleteConfig, AutocompleteMetadata
 };
 
+// Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
+pub mod autocomplete_helpers {
+    use super::autocomplete::{AutocompleteIndex, AutocompleteMetadata};
+    pub fn iter_metadata<'a>(index: &'a AutocompleteIndex) -> impl Iterator<Item = (&'a str, &'a AutocompleteMetadata)> {
+        index.metadata_iter()
+    }
+    pub fn get_metadata<'a>(index: &'a AutocompleteIndex, term: &str) -> Option<&'a AutocompleteMetadata> {
+        index.metadata_get(term)
+    }
+}
+
 #[cfg(feature = "remote-loading")]
 pub use autocomplete::load_autocomplete_index;
 use serde::{Deserialize, Serialize};
