@@ -34,9 +34,11 @@ reqwest = { workspace = true, optional = true }
 
 [features]
 default = []
-openrouter = ["reqwest"]
+openrouter = ["reqwest", "terraphim_config/openrouter"]
 
 [dev-dependencies]
 tokio = { version = "1.35.0", features = ["full"] }
 terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
 anyhow = "1.0.82"
+wiremock = "0.6"
+serial_test = "3.0"

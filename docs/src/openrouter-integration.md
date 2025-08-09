@@ -37,9 +37,11 @@ Using the Configuration Wizard in the UI:
 1. Navigate to `/config/wizard`
 2. Select or create a role
 3. Enable "AI-Enhanced Summaries (OpenRouter)"
-4. Enter your API key
-5. Choose a model (e.g., "GPT-3.5 Turbo" for fast, affordable summaries)
-6. Save the configuration
+4. Optionally enable "Auto-summarize search results"
+5. Enable "Chat interface" and pick a Chat model, optionally add a System prompt
+6. Enter your API key
+7. Choose a model (e.g., "GPT-3.5 Turbo" for fast, affordable summaries)
+8. Save the configuration
 
 ## Supported Models
 
@@ -66,6 +68,10 @@ Using the Configuration Wizard in the UI:
       "openrouter_enabled": true,
       "openrouter_api_key": "sk-or-v1-your-api-key-here",
       "openrouter_model": "openai/gpt-3.5-turbo",
+      "openrouter_auto_summarize": true,
+      "openrouter_chat_enabled": true,
+      "openrouter_chat_model": "openai/gpt-3.5-turbo",
+      "openrouter_chat_system_prompt": "You are a helpful Rust engineer assistant."
       "haystacks": [...],
       "kg": {...}
     }
@@ -91,9 +97,31 @@ When OpenRouter is enabled for a role, the search pipeline:
 
 1. **Executes Normal Search**: Retrieves documents using standard indexing
 2. **Filters Candidates**: Identifies documents suitable for AI summarization
-3. **Generates Summaries**: Calls OpenRouter API to create intelligent summaries
+3. **Generates Summaries (optional)**: Calls OpenRouter API to create intelligent summaries when auto-summarize is enabled
 4. **Replaces Descriptions**: Substitutes basic excerpts with AI summaries
 5. **Returns Enhanced Results**: Users see contextual, meaningful descriptions
+## Chat API
+
+POST `/chat`
+
+Request:
+
+```json
+{
+  "role": "AI Engineer",
+  "messages": [
+    { "role": "user", "content": "Summarize iterator adapters in Rust" }
+  ],
+  "model": "openai/gpt-3.5-turbo"
+}
+```
+
+Response:
+
+```json
+{ "status": "Success", "message": "...", "model_used": "openai/gpt-3.5-turbo" }
+```
+
 
 ### Content Filtering
 

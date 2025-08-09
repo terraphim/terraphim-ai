@@ -7,6 +7,7 @@
   import ConfigWizard from "./lib/ConfigWizard.svelte";
   import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
   import RoleGraphVisualization from "./lib/RoleGraphVisualization.svelte";
+  import Chat from "./lib/Chat/Chat.svelte";
 
   let visible = "is-hidden";
   function toggleVissible() {
@@ -35,6 +36,7 @@
     <Route path="/config/wizard"><ConfigWizard /></Route>
     <Route path="/config/json"><ConfigJsonEditor /></Route>
     <Route path="/graph"><RoleGraphVisualization /></Route>
+    <Route path="/chat"><Chat /></Route>
   </main>
 
   <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>
@@ -50,6 +52,7 @@
             <a class="navbar-item" href="/config/wizard">Wizard</a>
             <a class="navbar-item" href="/config/json">JSON&nbsp;Editor</a>
             <a class="navbar-item" href="/graph">Graph</a>
+            <a class="navbar-item" href="/chat">Chat</a>
           </div>
         </nav>
       </Route>

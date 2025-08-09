@@ -2467,6 +2467,14 @@ const EXPECTED_RESULTS = {
 };
 ```
 
+## OpenRouter Summarization + Chat (2025-08-08)
+
+- Added OpenRouter options to role config: `openrouter_auto_summarize`, `openrouter_chat_enabled`, `openrouter_chat_model`, `openrouter_chat_system_prompt`.
+- Server exposes POST `/chat` and `/documents/summarize` (compiled with `--features openrouter`).
+- Desktop includes `/chat` route with minimal chat UI; `ConfigWizard.svelte` exposes new settings.
+- Build: `cargo build -p terraphim_server --features openrouter`; `yarn run build` in desktop.
+
+
 #### ⚙️ **Configuration Management**
 
 **Terraphim Engineer Configuration** (identical to successful middleware test):
