@@ -376,6 +376,232 @@ pub struct SummarizationStatusResponse {
     pub cached_summaries_count: u32,
 }
 
+/// Chat message exchanged with the assistant
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChatMessage {
+    pub role: String,   // "system" | "user" | "assistant"
+    pub content: String,
+}
+
+/// Chat request payload
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChatRequest {
+    /// Role to use for chat (determines OpenRouter configuration)
+    pub role: String,
+    /// Conversation so far
+    pub messages: Vec<ChatMessage>,
+    /// Optional model override
+    pub model: Option<String>,
+}
+
+/// Chat response payload
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChatResponse {
+    pub status: Status,
+    pub message: Option<String>,
+    pub model_used: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Handle chat completion via OpenRouter
+pub(crate) async fn chat_completion(
+    State(config_state): State<ConfigState>,
+    Json(request): Json<ChatRequest>,
+) -> Result<Json<ChatResponse>> {
+    let role_name = RoleName::new(&request.role);
+    let config = config_state.config.lock().await;
+
+    let Some(role_ref) = config.roles.get(&role_name) else {
+        return Ok(Json(ChatResponse {
+            status: Status::Error,
+            message: None,
+            model_used: None,
+            error: Some(format!("Role '{}' not found", request.role)),
+        }));
+    };
+
+    #[cfg(feature = "openrouter")]
+    {
+        if !role_ref.has_openrouter_config() || !role_ref.openrouter_chat_enabled {
+            return Ok(Json(ChatResponse {
+                status: Status::Error,
+                message: None,
+                model_used: None,
+                error: Some("OpenRouter chat not enabled or not configured for this role".to_string()),
+            }));
+        }
+
+        // Clone role data to use after releasing the lock
+        let role = role_ref.clone();
+
+        let api_key = if let Some(key) = &role.openrouter_api_key {
+            key.clone()
+        } else {
+            std::env::var("OPENROUTER_KEY").map_err(|_| {
+                crate::error::ApiError(
+                    StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("OpenRouter API key not found in role configuration or OPENROUTER_KEY environment variable"),
+                )
+            })?
+        };
+
+        let model = request
+            .model
+            .or_else(|| role.openrouter_chat_model.clone())
+            .or_else(|| role.openrouter_model.clone())
+            .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
+
+        drop(config);
+
+        // Build messages array; optionally inject system prompt
+        let mut messages_json: Vec<serde_json::Value> = Vec::new();
+        if let Some(system) = &role.openrouter_chat_system_prompt {
+            messages_json.push(serde_json::json!({"role":"system","content":system}));
+        }
+        for m in request.messages.iter() {
+            messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
+        }
+
+        #[allow(unused_mut)]
+        let mut used_model = model.clone();
+
+        // Call OpenRouter via service module
+        #[cfg(feature = "openrouter")]
+        {
+            use terraphim_service::openrouter::OpenRouterService;
+            match OpenRouterService::new(&api_key, &model) {
+                Ok(client) => {
+                    match client.chat_completion(messages_json, Some(1024), Some(0.2)).await {
+                        Ok(reply) => {
+                            return Ok(Json(ChatResponse {
+                                status: Status::Success,
+                                message: Some(reply),
+                                model_used: Some(used_model),
+                                error: None,
+                            }));
+                        }
+                        Err(e) => {
+                            return Ok(Json(ChatResponse {
+                                status: Status::Error,
+                                message: None,
+                                model_used: Some(used_model),
+                                error: Some(format!("Chat failed: {}", e)),
+                            }));
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Ok(Json(ChatResponse {
+                        status: Status::Error,
+                        message: None,
+                        model_used: None,
+                        error: Some(format!("Failed to initialize OpenRouter: {}", e)),
+                    }));
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "openrouter"))]
+    {
+        Ok(Json(ChatResponse {
+            status: Status::Error,
+            message: None,
+            model_used: None,
+            error: Some("OpenRouter feature not enabled during compilation".to_string()),
+        }))
+    }
+}
+
+/// Verify OpenRouter API key and fetch available models
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OpenRouterModelsRequest {
+    pub role: String,
+    pub api_key: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OpenRouterModelsResponse {
+    pub status: Status,
+    pub models: Vec<String>,
+    pub error: Option<String>,
+}
+
+#[allow(dead_code)]
+pub(crate) async fn list_openrouter_models(
+    State(config_state): State<ConfigState>,
+    Json(req): Json<OpenRouterModelsRequest>,
+) -> Result<Json<OpenRouterModelsResponse>> {
+    let role_name = RoleName::new(&req.role);
+    let config = config_state.config.lock().await;
+    let Some(role) = config.roles.get(&role_name) else {
+        return Ok(Json(OpenRouterModelsResponse {
+            status: Status::Error,
+            models: vec![],
+            error: Some(format!("Role '{}' not found", req.role)),
+        }));
+    };
+
+    #[cfg(feature = "openrouter")]
+    {
+        // Determine API key preference: request -> role -> env
+        let api_key = if let Some(k) = &req.api_key {
+            k.clone()
+        } else if let Some(k) = &role.openrouter_api_key {
+            k.clone()
+        } else {
+            match std::env::var("OPENROUTER_KEY") {
+                Ok(v) => v,
+                Err(_) => {
+                    return Ok(Json(OpenRouterModelsResponse {
+                        status: Status::Error,
+                        models: vec![],
+                        error: Some("Missing OpenRouter API key".to_string()),
+                    }))
+                }
+            }
+        };
+
+        // Any valid model string works for constructing the client
+        let seed_model = role
+            .openrouter_model
+            .clone()
+            .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
+
+        drop(config);
+
+        use terraphim_service::openrouter::OpenRouterService;
+        match OpenRouterService::new(&api_key, &seed_model) {
+            Ok(client) => match client.list_models().await {
+                Ok(models) => Ok(Json(OpenRouterModelsResponse {
+                    status: Status::Success,
+                    models,
+                    error: None,
+                })),
+                Err(e) => Ok(Json(OpenRouterModelsResponse {
+                    status: Status::Error,
+                    models: vec![],
+                    error: Some(format!("Failed to list models: {}", e)),
+                })),
+            },
+            Err(e) => Ok(Json(OpenRouterModelsResponse {
+                status: Status::Error,
+                models: vec![],
+                error: Some(format!("Failed to init OpenRouter client: {}", e)),
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "openrouter"))]
+    {
+        Ok(Json(OpenRouterModelsResponse {
+            status: Status::Error,
+            models: vec![],
+            error: Some("OpenRouter feature not enabled during compilation".to_string()),
+        }))
+    }
+}
+
 /// Generate or retrieve a summary for a document using OpenRouter
 /// 
 /// This endpoint generates AI-powered summaries for documents using the OpenRouter service.
@@ -391,7 +617,7 @@ pub(crate) async fn summarize_document(
     let config = config_state.config.lock().await;
     
     // Get the role configuration
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(SummarizeDocumentResponse {
             status: Status::Error,
             document_id: request.document_id,
@@ -405,7 +631,7 @@ pub(crate) async fn summarize_document(
     // Check if OpenRouter is enabled and configured for this role
     #[cfg(feature = "openrouter")]
     {
-        if !role.has_openrouter_config() {
+        if !role_ref.has_openrouter_config() {
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
@@ -415,6 +641,9 @@ pub(crate) async fn summarize_document(
                 error: Some("OpenRouter not properly configured for this role".to_string()),
             }));
         }
+        
+        // Clone role to use after dropping lock
+        let role = role_ref.clone();
         
         // Get the API key from environment variable if not set in role
         let api_key = if let Some(key) = &role.openrouter_api_key {
@@ -437,8 +666,8 @@ pub(crate) async fn summarize_document(
         let mut terraphim_service = TerraphimService::new(config_state);
         
         // Try to load existing document first
-        let document = match terraphim_service.get_document_by_id(&request.document_id, &role_name).await {
-            Ok(doc) => doc,
+        let document_opt = match terraphim_service.get_document_by_id(&request.document_id).await {
+            Ok(doc_opt) => doc_opt,
             Err(e) => {
                 log::error!("Failed to load document '{}': {:?}", request.document_id, e);
                 return Ok(Json(SummarizeDocumentResponse {
@@ -450,6 +679,16 @@ pub(crate) async fn summarize_document(
                     error: Some(format!("Document not found: {}", e)),
                 }));
             }
+        };
+        let Some(document) = document_opt else {
+            return Ok(Json(SummarizeDocumentResponse {
+                status: Status::Error,
+                document_id: request.document_id,
+                summary: None,
+                model_used: None,
+                from_cache: false,
+                error: Some("Document not found".to_string()),
+            }));
         };
         
         // Check if we already have a summary and don't need to regenerate

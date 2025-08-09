@@ -310,6 +310,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/documents/summarize/", post(api::summarize_document))
         .route("/summarization/status", get(api::get_summarization_status))
         .route("/summarization/status/", get(api::get_summarization_status))
+        .route("/chat", post(api::chat_completion))
+        .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))
         .route("/config/", get(api::get_config))
         .route("/config", post(api::update_config))

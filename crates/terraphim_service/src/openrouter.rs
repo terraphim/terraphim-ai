@@ -76,11 +76,15 @@ impl OpenRouterService {
         
         let client = reqwest::Client::new();
         
+        // Allow overriding base URL for testing via env var
+        let base_url = std::env::var("OPENROUTER_BASE_URL")
+            .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
+
         Ok(Self {
             client,
             api_key: api_key.to_string(),
             model: model.to_string(),
-            base_url: "https://openrouter.ai/api/v1".to_string(),
+            base_url,
         })
     }
     
@@ -217,6 +221,83 @@ impl OpenRouterService {
             ("anthropic/claude-3-haiku", "Fast processing", "High throughput"),
             ("mistralai/mixtral-8x7b-instruct", "Open source option", "Cost effective"),
         ]
+    }
+
+    /// Perform a multi-turn chat completion with an array of messages
+    pub async fn chat_completion(
+        &self,
+        messages: Vec<serde_json::Value>,
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+    ) -> Result<String> {
+        let request_body = serde_json::json!({
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_tokens.unwrap_or(512),
+            "temperature": temperature.unwrap_or(0.2),
+            "stream": false
+        });
+
+        let response = self.client
+            .post(&format!("{}/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("HTTP-Referer", "https://terraphim.ai")
+            .header("X-Title", "Terraphim AI")
+            .json(&request_body)
+            .send()
+            .await?;
+
+        if response.status() == 429 {
+            return Err(OpenRouterError::RateLimited);
+        }
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(OpenRouterError::ApiError(error_text));
+        }
+
+        let response_json: serde_json::Value = response.json().await?;
+        let content = response_json
+            .get("choices")
+            .and_then(|c| c.get(0))
+            .and_then(|c| c.get("message"))
+            .and_then(|m| m.get("content"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string();
+        Ok(content)
+    }
+
+    /// Fetch available models from OpenRouter
+    pub async fn list_models(&self) -> Result<Vec<String>> {
+        let response = self.client
+            .get(&format!("{}/models", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("HTTP-Referer", "https://terraphim.ai")
+            .header("X-Title", "Terraphim AI")
+            .send()
+            .await?;
+
+        if response.status() == 429 {
+            return Err(OpenRouterError::RateLimited);
+        }
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(OpenRouterError::ApiError(error_text));
+        }
+
+        let json: serde_json::Value = response.json().await?;
+        // Accept both { data: [ {id: ..}, ... ] } and { models: [...] }
+        let models = if let Some(arr) = json.get("data").and_then(|v| v.as_array()) {
+            arr.iter()
+                .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        } else if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
+            arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+        } else {
+            Vec::new()
+        };
+        Ok(models)
     }
 }
 

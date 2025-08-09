@@ -55,6 +55,11 @@
     openrouter_enabled?: boolean;
     openrouter_api_key?: string;
     openrouter_model?: string;
+    // Auto-summarize and Chat settings
+    openrouter_auto_summarize?: boolean;
+    openrouter_chat_enabled?: boolean;
+    openrouter_chat_model?: string;
+    openrouter_chat_system_prompt?: string;
   };
   const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
     id: "Desktop",
@@ -87,7 +92,7 @@
             const autoPath = r.kg?.automata_path;
             const url = autoPath?.Remote ?? "";
             const localPath = r.kg?.knowledge_graph_local?.path ?? "";
-            return {
+          return {
               name: r.name,
               shortname: r.shortname,
               relevance_function: r.relevance_function,
@@ -102,7 +107,11 @@
               kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false },
               openrouter_enabled: r.openrouter_enabled ?? false,
               openrouter_api_key: r.openrouter_api_key ?? "",
-              openrouter_model: r.openrouter_model ?? "openai/gpt-3.5-turbo"
+            openrouter_model: r.openrouter_model ?? "openai/gpt-3.5-turbo",
+            openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
+            openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
+            openrouter_chat_model: r.openrouter_chat_model ?? (r.openrouter_model ?? "openai/gpt-3.5-turbo"),
+            openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? ""
             };
           })
         }));
@@ -132,7 +141,11 @@
       kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false},
       openrouter_enabled: false,
       openrouter_api_key: "",
-      openrouter_model: "openai/gpt-3.5-turbo"
+      openrouter_model: "openai/gpt-3.5-turbo",
+      openrouter_auto_summarize: false,
+      openrouter_chat_enabled: false,
+      openrouter_chat_model: "openai/gpt-3.5-turbo",
+      openrouter_chat_system_prompt: ""
     }] }));
   }
   function removeRole(idx: number) {
@@ -233,7 +246,11 @@
         ...(r.openrouter_enabled && {
           openrouter_enabled: r.openrouter_enabled,
           openrouter_api_key: r.openrouter_api_key,
-          openrouter_model: r.openrouter_model
+          openrouter_model: r.openrouter_model,
+          openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
+          openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
+          openrouter_chat_model: r.openrouter_chat_model ?? r.openrouter_model,
+          openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? ""
         })
       };
     });
@@ -535,6 +552,45 @@
             </div>
             <p class="help">Choose the language model for generating summaries. Different models offer different speed/quality tradeoffs.</p>
           </div>
+
+          <div class="field">
+            <label class="checkbox" for={`openrouter-auto-summarize-${idx}`}>
+              <input id={`openrouter-auto-summarize-${idx}`} type="checkbox" bind:checked={$draft.roles[idx].openrouter_auto_summarize} />
+              &nbsp;Automatically summarize search results
+            </label>
+            <p class="help">When enabled, summaries will be generated and shown in search results.</p>
+          </div>
+
+          <div class="field">
+            <label class="checkbox" for={`openrouter-chat-enabled-${idx}`}>
+              <input id={`openrouter-chat-enabled-${idx}`} type="checkbox" bind:checked={$draft.roles[idx].openrouter_chat_enabled} />
+              &nbsp;Enable Chat interface (OpenRouter)
+            </label>
+          </div>
+
+          {#if $draft.roles[idx].openrouter_chat_enabled}
+            <div class="field">
+              <label class="label" for={`openrouter-chat-model-${idx}`}>Chat Model</label>
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select id={`openrouter-chat-model-${idx}`} bind:value={$draft.roles[idx].openrouter_chat_model}>
+                    <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="openai/gpt-4">GPT-4</option>
+                    <option value="anthropic/claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+                    <option value="mistralai/mixtral-8x7b-instruct">Mixtral 8x7B</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label" for={`openrouter-chat-system-${idx}`}>System Prompt (optional)</label>
+              <div class="control">
+                <textarea class="textarea" id={`openrouter-chat-system-${idx}`} rows="3" placeholder="You are a helpful Rust engineer assistant..." bind:value={$draft.roles[idx].openrouter_chat_system_prompt} />
+              </div>
+            </div>
+          {/if}
         {/if}
 
         <h5 class="title is-6">Knowledge Graph</h5>

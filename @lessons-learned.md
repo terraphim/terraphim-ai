@@ -136,6 +136,32 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 
 ### 🚀 Future Enhancements
 
+## OpenRouter Summarization + Chat (2025-08-08)
+
+### Key Insights
+- Feature-gated integration lets default builds stay lean; enable with `--features openrouter` on server/desktop.
+- Role config needs sensible defaults for all OpenRouter fields to avoid initializer errors.
+- Summarization must handle `Option<Document>` carefully and avoid holding config locks across awaits.
+
+### Implementation Notes
+- Backend:
+  - Added endpoints: POST `/documents/summarize`, POST `/chat` (axum).
+  - `OpenRouterService` used for summaries and chat completions; rate-limit and error paths covered.
+  - `Role` extended with: `openrouter_auto_summarize`, `openrouter_chat_enabled`, `openrouter_chat_model`, `openrouter_chat_system_prompt`.
+  - Fixed borrow checker issues by cloning role prior to dropping lock; corrected `get_document_by_id` usage.
+- Desktop:
+  - `ConfigWizard.svelte` updated to expose auto-summarize and chat settings.
+  - New `Chat.svelte` with minimal streaming-free chat UI (Enter to send, model hint, error display).
+
+### Testing
+- Build server: `cargo build -p terraphim_server --features openrouter` (compiles green).
+- Manual chat test via curl:
+  ```bash
+  curl -s X POST "$SERVER/chat" -H 'Content-Type: application/json' -d '{"role":"Default","messages":[{"role":"user","content":"hello"}]}' | jq
+  ```
+
+### Future Work
+- Add streaming SSE for chat, caching for summaries, and model list fetch UI.
 1. **Advanced Query Syntax**
    - Support for `optionfn:findtrait:Iterator` syntax
    - Function signature search

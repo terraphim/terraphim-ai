@@ -679,9 +679,9 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document);
                 }
                 
-                // Apply OpenRouter AI summarization if enabled for this role
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() {
+                if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
                 }
@@ -716,9 +716,9 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document);
                 }
                 
-                // Apply OpenRouter AI summarization if enabled for this role
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() {
+                if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
                 }
@@ -753,9 +753,9 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document);
                 }
                 
-                // Apply OpenRouter AI summarization if enabled for this role
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() {
+                if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
                 }
@@ -790,9 +790,9 @@ impl<'a> TerraphimService {
                     docs_ranked.push(document);
                 }
                 
-                // Apply OpenRouter AI summarization if enabled for this role
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() {
+                if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
                 }
@@ -1262,6 +1262,20 @@ mod tests {
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
+            #[cfg(feature = "openrouter")]
+            openrouter_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_api_key: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_model: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_auto_summarize: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_system_prompt: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -1313,6 +1327,20 @@ mod tests {
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
+            #[cfg(feature = "openrouter")]
+            openrouter_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_api_key: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_model: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_auto_summarize: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_system_prompt: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -1408,6 +1436,20 @@ mod tests {
             terraphim_it: true,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
+            #[cfg(feature = "openrouter")]
+            openrouter_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_api_key: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_model: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_auto_summarize: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_system_prompt: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);

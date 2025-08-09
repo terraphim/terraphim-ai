@@ -147,6 +147,30 @@ cargo run --bin terraphim_server -- --config terraphim_server/default/terraphim_
 ./test_enhanced_queryrs_api.sh
 ```
 
+## OpenRouter Summarization + Chat (2025-08-08)
+
+Status: Implemented and validated compile
+
+- Server
+  - Added/chat endpoints: `/chat`, `/documents/summarize` (feature-gated)
+  - Fixed borrowing and option handling in summarization flow
+  - Role defaults extended for OpenRouter chat/auto-summarize fields
+- Desktop
+  - `ConfigWizard.svelte`: new fields for auto-summarize and chat (model + system prompt)
+  - New `Chat.svelte` page and route `/chat`
+- Docs
+  - Updated `docs/src/openrouter-integration.md` with auto-summarize + chat config and API examples
+
+Build/Run
+- Server: `cargo build -p terraphim_server --features openrouter`
+- Desktop (web): `yarn run dev` → navigate to `/chat`
+
+Config fields
+- `openrouter_enabled`, `openrouter_api_key`, `openrouter_model`
+- `openrouter_auto_summarize` (bool)
+- `openrouter_chat_enabled` (bool), `openrouter_chat_model` (string), `openrouter_chat_system_prompt` (string)
+
+
 ## Previous Work
 
 ### Atomic Server Integration

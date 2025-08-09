@@ -92,6 +92,22 @@ pub struct Role {
     #[cfg(feature = "openrouter")]
     #[serde(default)]
     pub openrouter_model: Option<String>,
+    /// Automatically summarize search results using OpenRouter
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_auto_summarize: bool,
+    /// Enable Chat interface backed by OpenRouter
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_chat_enabled: bool,
+    /// Optional system prompt to use for chat conversations
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_chat_system_prompt: Option<String>,
+    /// Optional chat model override (falls back to openrouter_model)
+    #[cfg(feature = "openrouter")]
+    #[serde(default)]
+    pub openrouter_chat_model: Option<String>,
     #[serde(flatten)]
     #[schemars(skip)]
     pub extra: AHashMap<String, Value>,
@@ -372,6 +388,14 @@ impl ConfigBuilder {
                 openrouter_api_key: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -405,6 +429,14 @@ impl ConfigBuilder {
                 openrouter_api_key: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -438,6 +470,14 @@ impl ConfigBuilder {
                 openrouter_api_key: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -472,6 +512,14 @@ impl ConfigBuilder {
                 openrouter_api_key: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -505,6 +553,14 @@ impl ConfigBuilder {
                 openrouter_api_key: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
