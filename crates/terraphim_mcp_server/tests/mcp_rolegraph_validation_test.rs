@@ -14,11 +14,16 @@ use tokio::process::Command;
 // Additional imports for thesaurus building
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::Persistable;
+use terraphim_persistence::DeviceStorage;
 use terraphim_automata::AutomataPath;
 
 /// Create a configuration with the correct "Terraphim Engineer" role
 /// that uses local KG files and builds thesaurus from local markdown files
 async fn create_terraphim_engineer_config() -> Result<String> {
+    // Use memory-only persistence to avoid RocksDB filesystem issues in CI
+    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    std::env::set_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    let _ = DeviceStorage::init_memory_only().await;
     let current_dir = std::env::current_dir()?;
     let project_root = current_dir.parent().unwrap().parent().unwrap();
     let docs_src_path = project_root.join("docs/src");
@@ -74,6 +79,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
         shortname: Some("Terraphim Engineer".to_string()),
         name: terraphim_types::RoleName::new("Terraphim Engineer"),
         relevance_function: RelevanceFunction::TerraphimGraph,
+        terraphim_it: true,
         theme: "lumen".to_string(),
         kg: Some(KnowledgeGraph {
             automata_path: Some(automata_path), // Now set after building thesaurus

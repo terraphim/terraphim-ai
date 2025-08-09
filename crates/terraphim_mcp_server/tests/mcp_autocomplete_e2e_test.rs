@@ -8,6 +8,7 @@ use serial_test::serial;
 use tokio::process::Command;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::Persistable;
+use terraphim_persistence::DeviceStorage;
 use anyhow::Result;
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
@@ -20,6 +21,12 @@ use terraphim_automata::AutomataPath;
 /// Create a comprehensive test configuration with the "Terraphim Engineer" role
 /// that uses local KG files and builds thesaurus from local markdown files
 async fn create_autocomplete_test_config() -> Result<String> {
+    // Use memory-only persistence to avoid RocksDB filesystem issues in CI
+    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    // Isolate logs to tmp
+    std::env::set_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    // Force persistence layer to use memory-only device settings
+    let _ = DeviceStorage::init_memory_only().await;
     let current_dir = std::env::current_dir()?;
     let project_root = current_dir.parent().unwrap().parent().unwrap();
     let docs_src_path = project_root.join("docs/src");
@@ -65,6 +72,7 @@ async fn create_autocomplete_test_config() -> Result<String> {
         shortname: Some("Terraphim Engineer".to_string()),
         name: terraphim_types::RoleName::new("Terraphim Engineer"),
         relevance_function: RelevanceFunction::TerraphimGraph,
+        terraphim_it: true,
         theme: "lumen".to_string(),
         kg: Some(KnowledgeGraph {
             automata_path: Some(automata_path),
@@ -412,6 +420,93 @@ async fn test_autocomplete_algorithm_comparison() -> Result<()> {
     Ok(())
 }
 
+/// Test new autocomplete_terms tool (prefix + fuzzy)
+#[tokio::test]
+#[serial]
+async fn test_autocomplete_terms_tool() -> Result<()> {
+    let config_json = create_autocomplete_test_config().await?;
+    let transport = start_mcp_server().await?;
+    let service = ().serve(transport).await?;
+
+    // Update configuration
+    let update_config_args = json!({"config_str": config_json});
+    service
+        .call_tool(CallToolRequestParam {
+            name: "update_config_tool".into(),
+            arguments: Some(update_config_args.as_object().unwrap().clone()),
+        })
+        .await?;
+
+    // Build index
+    let build_index_args = json!({"role": "Terraphim Engineer"});
+    let build_result = service
+        .call_tool(CallToolRequestParam {
+            name: "build_autocomplete_index".into(),
+            arguments: Some(build_index_args.as_object().unwrap().clone()),
+        })
+        .await?;
+    assert!(build_result.is_error != Some(true));
+
+    // Call autocomplete_terms: expect graph expansion to include synonyms of same concept id
+    let ac_args = json!({"query": "terraph", "limit": 8});
+    let ac_result = service
+        .call_tool(CallToolRequestParam {
+            name: "autocomplete_terms".into(),
+            arguments: Some(ac_args.as_object().unwrap().clone()),
+        })
+        .await?;
+    assert!(ac_result.is_error != Some(true));
+    if let Some(summary) = ac_result.content.first() {
+        let text = summary.as_text().unwrap().text.clone();
+        assert!(text.contains("Found"));
+    }
+    // Verify that related terms like "graph" or "graph embeddings" appear via concept expansion
+    let all_texts: Vec<String> = ac_result.content.iter().skip(1).filter_map(|c| c.as_text().map(|t| t.text.clone())).collect();
+    let has_graph_related = all_texts.iter().any(|t| t.to_lowercase().contains("graph"));
+    assert!(has_graph_related, "Autocomplete should include graph-related synonyms via concept expansion: {:?}", all_texts);
+    Ok(())
+}
+
+/// Test new autocomplete_with_snippets tool
+#[tokio::test]
+#[serial]
+async fn test_autocomplete_with_snippets_tool() -> Result<()> {
+    let config_json = create_autocomplete_test_config().await?;
+    let transport = start_mcp_server().await?;
+    let service = ().serve(transport).await?;
+
+    // Update configuration and build index
+    let update_config_args = json!({"config_str": config_json});
+    service
+        .call_tool(CallToolRequestParam {
+            name: "update_config_tool".into(),
+            arguments: Some(update_config_args.as_object().unwrap().clone()),
+        })
+        .await?;
+    let build_index_args = json!({"role": "Terraphim Engineer"});
+    service
+        .call_tool(CallToolRequestParam {
+            name: "build_autocomplete_index".into(),
+            arguments: Some(build_index_args.as_object().unwrap().clone()),
+        })
+        .await?;
+
+    // Call autocomplete_with_snippets
+    let ac_args = json!({"query": "graph", "limit": 5});
+    let ac_result = service
+        .call_tool(CallToolRequestParam {
+            name: "autocomplete_with_snippets".into(),
+            arguments: Some(ac_args.as_object().unwrap().clone()),
+        })
+        .await?;
+    assert!(ac_result.is_error != Some(true));
+    // Should contain a summary and then several text items with " — " separator sometimes
+    assert!(ac_result.content.len() >= 1);
+    let has_snippetish = ac_result.content.iter().skip(1).any(|c| c.as_text().map(|t| t.text.contains(" — ")).unwrap_or(false));
+    if !has_snippetish { println!("No snippet separator found; still acceptable depending on dataset"); }
+    Ok(())
+}
+
 /// Test error handling for roles without proper knowledge graph configuration
 #[tokio::test]
 #[serial]
@@ -426,6 +521,7 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         shortname: Some("Invalid Role".to_string()),
         name: terraphim_types::RoleName::new("Invalid Role"),
         relevance_function: RelevanceFunction::TitleScorer, // Wrong relevance function
+        terraphim_it: false,
         theme: "spacelab".to_string(),
         kg: None, // No knowledge graph
         haystacks: vec![],

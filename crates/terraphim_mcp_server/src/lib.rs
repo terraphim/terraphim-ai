@@ -12,7 +12,7 @@ use rmcp::{
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
-use terraphim_automata::{AutocompleteIndex, AutocompleteConfig};
+use terraphim_automata::{AutocompleteIndex, AutocompleteConfig, AutocompleteResult};
 use tracing::{error, info};
 use thiserror::Error;
 
@@ -55,6 +55,19 @@ impl McpService {
             config_state,
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
             autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
+        }
+    }
+
+    /// Initialize autocomplete index for the currently selected role, if possible
+    pub async fn init_autocomplete_default(&self) {
+        if let Ok(result) = self.build_autocomplete_index(None).await {
+            if result.is_error == Some(true) {
+                tracing::debug!("Autocomplete init skipped: {:?}", result.content);
+            } else {
+                tracing::info!("Autocomplete index initialized by default");
+            }
+        } else {
+            tracing::debug!("Autocomplete init failed");
         }
     }
 
@@ -256,6 +269,121 @@ impl McpService {
         }
     }
 
+    /// Autocomplete terms (prefix + fuzzy) returning structured results
+    pub async fn autocomplete_terms(
+        &self,
+        query: String,
+        limit: Option<usize>,
+    ) -> Result<CallToolResult, McpError> {
+        let autocomplete_lock = self.autocomplete_index.read().await;
+        if let Some(ref index) = *autocomplete_lock {
+            let max_results = limit.unwrap_or(10);
+            let mut combined: Vec<AutocompleteResult> = Vec::new();
+            // Prefer exact/prefix first
+            if let Ok(mut exact) = terraphim_automata::autocomplete_search(index, &query, Some(max_results)) {
+                combined.append(&mut exact);
+            }
+            // Fill remaining with fuzzy
+            if combined.len() < max_results {
+                let remaining = max_results - combined.len();
+                if let Ok(mut fuzzy) = terraphim_automata::fuzzy_autocomplete_search(index, &query, 0.6, Some(remaining)) {
+                    combined.append(&mut fuzzy);
+                }
+            }
+            // Graph embeddings-style expansion: include additional synonyms sharing the same concept id
+            if combined.len() < max_results {
+                use std::collections::HashSet;
+                let mut seen_terms: HashSet<String> = combined.iter().map(|r| r.term.clone()).collect();
+                let concept_ids: HashSet<u64> = combined.iter().map(|r| r.id).collect();
+                let mut candidates: Vec<AutocompleteResult> = Vec::new();
+                // Iterate over all metadata and pick terms with same concept id
+                for (term, meta) in terraphim_automata::autocomplete_helpers::iter_metadata(index) {
+                    if concept_ids.contains(&meta.id) && !seen_terms.contains(term) {
+                        candidates.push(AutocompleteResult {
+                            term: meta.original_term.clone(),
+                            normalized_term: meta.normalized_term.clone(),
+                            id: meta.id,
+                            url: meta.url.clone(),
+                            score: meta.id as f64,
+                        });
+                    }
+                }
+                // Prefer shorter terms, stable order
+                candidates.sort_by(|a, b| a.term.len().cmp(&b.term.len()).then_with(|| a.term.cmp(&b.term)));
+                for cand in candidates {
+                    if combined.len() >= max_results { break; }
+                    if seen_terms.insert(cand.term.clone()) {
+                        combined.push(cand);
+                    }
+                }
+            }
+            let mut contents = Vec::new();
+            contents.push(Content::text(format!("Found {} suggestions", combined.len())));
+            for r in combined.into_iter().take(max_results) {
+                let line = format!("{}", r.term);
+                contents.push(Content::text(line));
+            }
+            return Ok(CallToolResult::success(contents));
+        }
+        let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+        Ok(CallToolResult::error(vec![error_content]))
+    }
+
+    /// Autocomplete with snippets: returns term and a short snippet (stub/description) when available
+    pub async fn autocomplete_with_snippets(
+        &self,
+        query: String,
+        limit: Option<usize>,
+    ) -> Result<CallToolResult, McpError> {
+        // We only need the terms from automata index, snippets will be pulled from documents when possible
+        let autocomplete_lock = self.autocomplete_index.read().await;
+        if let Some(ref index) = *autocomplete_lock {
+            let max_results = limit.unwrap_or(10);
+            let mut results: Vec<AutocompleteResult> = Vec::new();
+            if let Ok(mut prefix) = terraphim_automata::autocomplete_search(index, &query, Some(max_results)) {
+                results.append(&mut prefix);
+            }
+            if results.len() < max_results {
+                let remaining = max_results - results.len();
+                if let Ok(mut fuzzy) = terraphim_automata::fuzzy_autocomplete_search(index, &query, 0.6, Some(remaining)) {
+                    results.append(&mut fuzzy);
+                }
+            }
+
+            // Build snippets by searching for each term to fetch a related document and use its stub/description/body excerpt
+            let mut service = self.terraphim_service().await
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+            let mut contents = Vec::new();
+            contents.push(Content::text(format!("Found {} suggestions", results.len())));
+            for r in results.into_iter().take(max_results) {
+                let sq = SearchQuery {
+                    search_term: NormalizedTermValue::from(r.term.clone()),
+                    skip: Some(0),
+                    limit: Some(1),
+                    role: None,
+                };
+                let snippet = match service.search(&sq).await {
+                    Ok(docs) if !docs.is_empty() => {
+                        let d = &docs[0];
+                        if let Some(stub) = &d.stub { stub.clone() }
+                        else if let Some(desc) = &d.description { desc.clone() }
+                        else {
+                            let body = d.body.as_str();
+                            let snip = body.chars().take(160).collect::<String>();
+                            snip
+                        }
+                    }
+                    _ => String::new(),
+                };
+                let line = if snippet.is_empty() { r.term } else { format!("{} — {}", r.term, snippet) };
+                contents.push(Content::text(line));
+            }
+            return Ok(CallToolResult::success(contents));
+        }
+        let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+        Ok(CallToolResult::error(vec![error_content]))
+    }
+
     /// Fuzzy autocomplete search using Jaro-Winkler similarity (default, faster)
     pub async fn fuzzy_autocomplete_search(
         &self,
@@ -389,6 +517,26 @@ impl ServerHandler for McpService {
             });
             let build_autocomplete_map = build_autocomplete_schema.as_object().unwrap().clone();
 
+            let autocomplete_terms_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Prefix or term for suggestions" },
+                    "limit": { "type": "integer", "description": "Max suggestions (default 10)" }
+                },
+                "required": ["query"]
+            });
+            let autocomplete_terms_map = autocomplete_terms_schema.as_object().unwrap().clone();
+
+            let autocomplete_snippets_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Prefix or term for suggestions with snippets" },
+                    "limit": { "type": "integer", "description": "Max suggestions (default 10)" }
+                },
+                "required": ["query"]
+            });
+            let autocomplete_snippets_map = autocomplete_snippets_schema.as_object().unwrap().clone();
+
             let fuzzy_autocomplete_schema = serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -452,6 +600,18 @@ impl ServerHandler for McpService {
                     name: "fuzzy_autocomplete_search".into(),
                     description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (default, faster and higher quality)".into()),
                     input_schema: Arc::new(fuzzy_autocomplete_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "autocomplete_terms".into(),
+                    description: Some("Autocomplete terms using FST prefix + fuzzy fallback".into()),
+                    input_schema: Arc::new(autocomplete_terms_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "autocomplete_with_snippets".into(),
+                    description: Some("Autocomplete and return short snippets from matching documents".into()),
+                    input_schema: Arc::new(autocomplete_snippets_map),
                     annotations: None,
                 },
                 Tool {
@@ -534,6 +694,28 @@ impl ServerHandler for McpService {
                         .map(|i| i as usize);
                     
                     self.fuzzy_autocomplete_search(query, similarity, limit).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "autocomplete_terms" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let query = arguments.get("query")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .to_string();
+                    let limit = arguments.get("limit").and_then(|v| v.as_i64()).map(|i| i as usize);
+                    self.autocomplete_terms(query, limit).await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "autocomplete_with_snippets" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let query = arguments.get("query")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .to_string();
+                    let limit = arguments.get("limit").and_then(|v| v.as_i64()).map(|i| i as usize);
+                    self.autocomplete_with_snippets(query, limit).await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }

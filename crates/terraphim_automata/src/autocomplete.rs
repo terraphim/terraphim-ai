@@ -70,6 +70,16 @@ impl AutocompleteIndex {
     pub fn is_empty(&self) -> bool {
         self.metadata.is_empty()
     }
+
+    /// Iterate over metadata entries (term -> metadata)
+    pub fn metadata_iter(&self) -> impl Iterator<Item = (&str, &AutocompleteMetadata)> {
+        self.metadata.iter().map(|(k, v)| (k.as_str(), v))
+    }
+
+    /// Lookup metadata by term key (lowercased key as stored in index)
+    pub fn metadata_get(&self, term: &str) -> Option<&AutocompleteMetadata> {
+        self.metadata.get(term)
+    }
 }
 
 /// Build autocomplete index from existing thesaurus
