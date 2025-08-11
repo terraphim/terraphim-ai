@@ -351,6 +351,19 @@ The build argument management has been implemented for the Terraphim AI project:
 
 **Status**: ✅ **PRODUCTION READY** - Complete atomic server article save functionality successfully implemented with comprehensive testing and type safety.
 
+## TUI Interface Plan and Progress (2025-08-11)
+
+- Created new crate `crates/terraphim_tui` (bin `terraphim-tui`) and added it to workspace members.
+- MVP includes: interactive ratatui shell (input/results/status) with in-pane results and rolegraph-based suggestions; non-interactive subcommands: `search`, `roles list|select`, `config show|set`, `graph` (ASCII adjacency), `chat`.
+- Goals: parity with desktop for search/typeahead, roles, basic config editing, textual rolegraph; optional OpenRouter chat/summaries.
+- Architecture: tokio event loops with bounded channels, provider abstraction for LLM (OpenRouter default), plan/approve/execute mode inspired by Claude Code and Goose CLI.
+- Next: expand config set coverage; improve ASCII rolegraph (filters, top-k by metric); optional TUI chat pane.
+
+Recent additions (2025-08-11)
+- Added minimal `config set` in TUI for `selected_role`, `global_shortcut`, and `role.<name>.theme`.
+- Implemented ASCII rolegraph adjacency listing (top-k nodes with top neighbors).
+- Added `chat` subcommand to call OpenRouter-backed `/chat` endpoint (optional by feature/config).
+
 # Terraphim MCP Server Learnings
 
 ## 🚀 OPENROUTER MODEL INTEGRATION WITH FEATURE GUARDS - IMPLEMENTATION PLAN (2025-01-31)

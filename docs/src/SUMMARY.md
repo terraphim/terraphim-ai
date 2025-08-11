@@ -7,6 +7,7 @@
 - [Design Decisions](./DesignDecisions.md)
 - [Use cases](./Use-cases.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
+ - [Terraphim TUI](./tui.md)
 
 ## Crates Overview
 

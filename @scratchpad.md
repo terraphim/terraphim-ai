@@ -1,6 +1,24 @@
 # Terraphim AI Project Scratchpad
 
 ## Current Task: QueryRs Haystack and Scoring Functions Validation
+## TUI Interface Implementation (2025-08-11)
+
+Plan & Progress
+- Create `crates/terraphim_tui` with `tokio`, `ratatui`, `crossterm`, `clap`, `jiff`, reusing `terraphim_types`.
+- Map desktop features: Search (typeahead), Roles (list/select), Config (edit basics), Rolegraph (text), OpenRouter (optional).
+- CLI subcommands: `search`, `roles list|select`, `config show|set|wizard` (later), `graph show`, `chat` (optional).
+- Agentic enhancements (inspired by Claude Code, Goose): plan/approve/execute, provider abstraction, budgets, run records.
+
+Status
+- Scaffolded workspace member and crate `terraphim_tui`.
+- MVP interactive: in-pane results and suggestions sourced from rolegraph nodes.
+ - CLI: search, roles list/select, config show/set (selected_role/global_shortcut/role.<name>.theme), graph ASCII adjacency (top-k neighbors), chat (OpenRouter-backed endpoint).
+- Next: expand config set coverage, add ASCII graph filters, optionally stream chat into TUI.
+
+References
+- Claude Code: https://github.com/anthropics/claude-code
+- Goose CLI: https://github.com/block/goose/tree/main/bin
+
 
 ### ✅ VALIDATION COMPLETED SUCCESSFULLY
 
