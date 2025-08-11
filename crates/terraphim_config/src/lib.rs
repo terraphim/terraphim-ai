@@ -156,6 +156,8 @@ pub enum ServiceType {
     Atomic,
     /// Use query.rs as the indexing service
     QueryRs,
+    /// Use ClickUp API as the indexing service
+    ClickUp,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
