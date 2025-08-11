@@ -329,6 +329,12 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 - Proper integration requires updating all consuming components 
 
 ## ClickUp Haystack Integration (2025-08-09)
+- TUI porting is easiest when reusing existing request/response types and centralizing network access in a small client module shared by native and wasm targets.
+- Keep interactive TUI rendering loops decoupled from async I/O using bounded channels and `tokio::select!` to avoid blocking the UI; debounce typeahead to reduce API pressure.
+- Provide non-interactive subcommands mirroring TUI actions for CI-friendly testing and automation.
+- Plan/approve/execute flows (inspired by Claude Code and Goose) improve safety for repo-affecting actions; run-records and cost budgets help observability.
+- Rolegraph-derived suggestions are a pragmatic substitute for published thesaurus in early TUI; later swap to thesaurus endpoint when available.
+- Minimal `config set` support should target safe, high-value keys first (selected_role, global_shortcut, role theme) and only POST well-formed Config objects.
 
 - Prefer list-based search (`/api/v2/list/{list_id}/task?search=...`) when `list_id` is provided; otherwise team-wide search via `/api/v2/team/{team_id}/task?query=...`.
 - Map `text_content` (preferred) or `description` into `Document.body`; construct URL as `https://app.clickup.com/t/<task_id>`.

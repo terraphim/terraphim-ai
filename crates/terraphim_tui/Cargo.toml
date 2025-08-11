@@ -1,0 +1,30 @@
+[package]
+name = "terraphim_tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+ratatui = "0.28"
+crossterm = "0.27"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+jiff = "0.1"
+urlencoding = "2.1"
+
+terraphim_types = { path = "../terraphim_types" }
+terraphim_settings = { path = "../terraphim_settings" }
+terraphim_persistence = { path = "../terraphim_persistence" }
+terraphim_config = { path = "../terraphim_config" }
+
+[[bin]]
+name = "terraphim-tui"
+path = "src/main.rs"
+
