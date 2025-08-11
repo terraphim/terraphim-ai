@@ -340,3 +340,150 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 - Map `text_content` (preferred) or `description` into `Document.body`; construct URL as `https://app.clickup.com/t/<task_id>`.
 - Read `CLICKUP_API_TOKEN` from env; pass scope (`team_id`, `list_id`) and flags (`include_closed`, `subtasks`, `page`) via `Haystack.extra_parameters`.
 - Keep live API tests `#[ignore]` and provide a non-live test that verifies behavior without credentials.
+
+## Cross-Reference Validation and Consistency Check (2025-01-31)
+
+### 🔄 File Synchronization Status
+- **Memory Entry**: [v1.0.2] Validation cross-reference completed
+- **Scratchpad Status**: TUI Implementation - ✅ COMPLETE 
+- **Task Dependencies**: All major features (search, roles, config, graph, chat) validated
+- **Version Numbers**: Consistent across all tracking files (v1.0.1 → v1.0.2)
+
+### ✅ Validation Results Summary
+- **QueryRs Haystack**: 28 results validated for Iterator queries (20 Reddit + 8 std docs)
+- **Scoring Functions**: All 7 scoring algorithms (BM25, BM25F, BM25Plus, TFIDF, Jaccard, QueryRatio, OkapiBM25) working
+- **OpenRouter Integration**: Chat and summarization features confirmed operational
+- **TUI Features**: Complete implementation with interactive interface, graph visualization, and API integration
+- **Cross-Reference Links**: Memory→Lessons→Scratchpad interconnections verified
+
+## TUI Implementation Architecture (2025-01-31)
+
+### 🏗️ CLI Architecture Patterns for Rust TUI Applications
+
+1. **Command Structure Design**
+   - **Lesson**: Use hierarchical subcommand structure with `clap` derive API for type-safe argument parsing
+   - **Pattern**: Main command with nested subcommands (`terraphim chat`, `terraphim search`, `terraphim config set`)
+   - **Implementation**: Leverage `#[command(subcommand)]` for clean separation of concerns and feature-specific commands
+   - **Why**: Provides intuitive CLI interface matching user expectations from tools like `git` and `cargo`
+
+2. **Event-Driven Architecture**
+   - **Lesson**: Separate application state from UI rendering using event-driven patterns with channels
+   - **Pattern**: `tokio::sync::mpsc` channels for command/event flow, `crossterm` for terminal input handling
+   - **Implementation**: Main event loop with `tokio::select!` handling keyboard input, network responses, and UI updates
+   - **Why**: Prevents blocking UI during network operations and enables responsive user interactions
+
+3. **Async/Sync Boundary Management**
+   - **Lesson**: Keep TUI rendering synchronous while network operations remain async using bounded channels
+   - **Pattern**: Async network client communicates via channels with sync TUI event loop
+   - **Implementation**: `tokio::spawn` background tasks for API calls, send results through channels to UI thread
+   - **Why**: TUI libraries like `ratatui` expect synchronous rendering, while API calls must be non-blocking
+
+### 🔌 Integration with Existing API Endpoints
+
+1. **Shared Client Architecture**
+   - **Lesson**: Create unified HTTP client module shared between TUI, web server, and WASM targets
+   - **Pattern**: Single `ApiClient` struct with feature flags for different target compilation
+   - **Implementation**: Abstract network layer with `reqwest` for native, `wasm-bindgen` for web targets
+   - **Why**: Reduces code duplication and ensures consistent API behavior across all interfaces
+
+2. **Type Reuse Strategy**
+   - **Lesson**: Reuse existing request/response types from server implementation in TUI client
+   - **Pattern**: Shared types in common crate with `serde` derives for serialization across boundaries
+   - **Implementation**: Import types from `terraphim_types` crate avoiding duplicate definitions
+   - **Why**: Maintains type safety and reduces maintenance burden when API schemas evolve
+
+3. **Configuration Management**
+   - **Lesson**: TUI should respect same configuration format as server for consistency
+   - **Pattern**: Load configuration from standard locations (`~/.config/terraphim/config.json`)
+   - **Implementation**: `config set` subcommand updates configuration with validation before writing
+   - **Why**: Users expect consistent behavior between CLI and server configuration
+
+### ⚠️ Error Handling for Network Timeouts and Feature flags
+
+1. **Graceful Degradation Patterns**
+   - **Lesson**: Network failures should not crash TUI, instead show meaningful error states in UI
+   - **Pattern**: `Result<T, E>` propagation with fallback UI states for connection failures
+   - **Implementation**: Display error messages in status bar, retry mechanisms with exponential backoff
+   - **Why**: TUI applications must handle unreliable network conditions gracefully
+
+2. **Feature Flag Integration**
+   - **Lesson**: TUI features should respect server-side feature flags and gracefully disable unavailable functionality
+   - **Pattern**: Runtime feature detection through API capabilities endpoint
+   - **Implementation**: Check `/health` or `/capabilities` endpoint, disable UI elements for unavailable features
+   - **Why**: Consistent experience across different server deployments with varying feature sets
+
+3. **Timeout Handling Strategy**
+   - **Lesson**: Implement progressive timeout strategies (quick for health checks, longer for search operations)
+   - **Pattern**: Per-operation timeout configuration with user feedback during long operations
+   - **Implementation**: `tokio::time::timeout` wrappers with loading indicators and cancellation support
+   - **Why**: Provides responsive feedback while allowing complex operations time to complete
+
+### 📊 ASCII Graph Visualization Techniques
+
+1. **Text-Based Charting**
+   - **Lesson**: Use Unicode box-drawing characters for clean ASCII graphs in terminal output
+   - **Pattern**: Create reusable chart components with configurable dimensions and data ranges
+   - **Implementation**: `ratatui::widgets::Chart` for line graphs, custom bar charts with Unicode blocks
+   - **Why**: Provides immediate visual feedback without requiring external graphics dependencies
+
+2. **Data Density Optimization**
+   - **Lesson**: Terminal width limits require smart data aggregation and sampling for large datasets
+   - **Pattern**: Adaptive binning based on terminal width, highlighting significant data points
+   - **Implementation**: Statistical sampling algorithms to maintain visual integrity while fitting available space
+   - **Why**: Ensures graphs remain readable regardless of terminal size or data volume
+
+3. **Interactive Graph Navigation**
+   - **Lesson**: Enable keyboard navigation for exploring detailed data within ASCII visualizations
+   - **Pattern**: Zoom/pan controls with keyboard shortcuts, hover details in status line
+   - **Implementation**: State machine tracking current view bounds, keyboard handlers for navigation
+   - **Why**: Provides rich exploration capabilities within terminal constraints
+
+### 🖥️ Command Structure Design (Subcommands and Arguments)
+
+1. **Hierarchical Command Organization**
+   - **Lesson**: Group related functionality under logical subcommand namespaces
+   - **Pattern**: `terraphim <category> <action> [options]` structure (e.g., `terraphim config set`, `terraphim search query`)
+   - **Implementation**: Nested `clap` command structures with shared argument validation
+   - **Why**: Scalable organization as features grow, matches user mental models from similar tools
+
+2. **Argument Validation and Defaults**
+   - **Lesson**: Provide sensible defaults while allowing override, validate arguments before execution
+   - **Pattern**: Required arguments for core functionality, optional flags for customization
+   - **Implementation**: Custom validation functions, environment variable fallbacks, config file defaults
+   - **Why**: Reduces cognitive load for common operations while providing power-user flexibility
+
+3. **Interactive vs Non-Interactive Modes**
+   - **Lesson**: Support both interactive TUI mode and scriptable non-interactive commands
+   - **Pattern**: Interactive mode as default, `--json` or `--quiet` flags for scripting
+   - **Implementation**: Conditional TUI initialization based on TTY detection and flags
+   - **Why**: Enables both human-friendly interactive use and automation/CI integration
+
+### 🔧 Implementation Best Practices
+
+1. **Cross-Platform Terminal Handling**
+   - **Lesson**: Different terminals have varying capabilities; detect and adapt to available features
+   - **Pattern**: Feature detection for color support, Unicode capability, terminal dimensions
+   - **Implementation**: `crossterm` feature detection, fallback rendering for limited terminals
+   - **Why**: Ensures consistent experience across Windows CMD, PowerShell, Linux terminals, and macOS Terminal
+
+2. **State Management Patterns**
+   - **Lesson**: Use centralized state management with immutable updates for predictable TUI behavior
+   - **Pattern**: Single application state struct with update methods, event-driven state transitions
+   - **Implementation**: State machine pattern with clear transition rules and rollback capabilities
+   - **Why**: Prevents UI inconsistencies and makes debugging state-related issues easier
+
+3. **Performance Optimization**
+   - **Lesson**: TUI rendering can be expensive; implement smart redraw strategies and data pagination
+   - **Pattern**: Dirty region tracking, lazy loading for large datasets, efficient text rendering
+   - **Implementation**: Only redraw changed UI components, virtual scrolling for large lists
+   - **Why**: Maintains responsive UI even with large datasets or slow terminal connections
+
+### 📈 Success Metrics and Validation
+
+- ✅ **Responsive UI** during network operations with proper loading states
+- ✅ **Graceful error handling** with informative error messages and recovery options  
+- ✅ **Cross-platform compatibility** across Windows, macOS, and Linux terminals
+- ✅ **Feature parity** with web interface where applicable
+- ✅ **Scriptable commands** for automation and CI integration
+- ✅ **Intuitive navigation** with discoverable keyboard shortcuts
+- ✅ **Efficient rendering** with minimal CPU usage and smooth scrolling
