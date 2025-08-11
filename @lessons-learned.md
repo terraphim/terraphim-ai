@@ -327,3 +327,10 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 - Generated types ensure consistency across frontend and backend
 - Single source of truth prevents type drift
 - Proper integration requires updating all consuming components 
+
+## ClickUp Haystack Integration (2025-08-09)
+
+- Prefer list-based search (`/api/v2/list/{list_id}/task?search=...`) when `list_id` is provided; otherwise team-wide search via `/api/v2/team/{team_id}/task?query=...`.
+- Map `text_content` (preferred) or `description` into `Document.body`; construct URL as `https://app.clickup.com/t/<task_id>`.
+- Read `CLICKUP_API_TOKEN` from env; pass scope (`team_id`, `list_id`) and flags (`include_closed`, `subtasks`, `page`) via `Haystack.extra_parameters`.
+- Keep live API tests `#[ignore]` and provide a non-live test that verifies behavior without credentials.

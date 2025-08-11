@@ -187,3 +187,25 @@ Config fields
 - Status: ✅ Generated and integrated
 - Usage: Desktop and Tauri applications
 - Generation: `cargo run --bin generate-bindings`
+
+## ClickUp Haystack - Progress Notes (2025-08-09)
+
+- Service: Added `ClickUp` to `ServiceType`
+- Indexer: `crates/terraphim_middleware/src/haystack/clickup.rs`
+  - Team search: `GET /api/v2/team/{team_id}/task?query=...`
+  - List search: `GET /api/v2/list/{list_id}/task?search=...`
+  - Reads `CLICKUP_API_TOKEN`; resolves `team_id`/`list_id` via `Haystack.extra_parameters`
+  - Extra params: `include_closed` (bool), `subtasks` (bool), `page` (string)
+  - Maps tasks → `Document` with id `clickup-task-<id>`, url `https://app.clickup.com/t/<id>`, title, body from `text_content`/`description`
+- Wiring: `search_haystacks` handles `ServiceType::ClickUp`
+- Tests:
+  - Non-live: `clickup_mapping_handles_missing_token` (passes)
+  - Live (ignored): `clickup_live_search_returns_documents` (requires `CLICKUP_API_TOKEN`, `CLICKUP_TEAM_ID`)
+
+Run
+```bash
+cargo test -p terraphim_middleware --test clickup_haystack_test clickup_mapping_handles_missing_token -- --nocapture
+# Live
+export CLICKUP_API_TOKEN=... CLICKUP_TEAM_ID=...
+cargo test -p terraphim_middleware --test clickup_haystack_test -- --ignored --nocapture
+```

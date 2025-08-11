@@ -4,7 +4,7 @@ use crate::indexer::IndexMiddleware;
 
 #[tokio::test]
 async fn test_query_rs_haystack_indexer() {
-    let indexer = QueryRsHaystackIndexer::new();
+    let indexer = QueryRsHaystackIndexer::default();
     
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
@@ -36,7 +36,7 @@ async fn test_query_rs_haystack_indexer() {
 
 #[tokio::test]
 async fn test_query_rs_reddit_search() {
-    let indexer = QueryRsHaystackIndexer::new();
+    let indexer = QueryRsHaystackIndexer::default();
     
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
@@ -68,7 +68,7 @@ async fn test_query_rs_reddit_search() {
 
 #[tokio::test]
 async fn test_query_rs_crates_search() {
-    let indexer = QueryRsHaystackIndexer::new();
+    let indexer = QueryRsHaystackIndexer::default();
     
     let haystack = Haystack {
         location: "https://query.rs".to_string(),

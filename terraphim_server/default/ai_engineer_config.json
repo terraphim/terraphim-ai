@@ -96,6 +96,28 @@
         }
       ],
       "extra": {}
+    },
+    "ClickUp": {
+      "shortname": "ClickUp",
+      "name": "ClickUp",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "clickup",
+          "service": "ClickUp",
+          "read_only": true,
+          "extra_parameters": {
+            "team_id": "${CLICKUP_TEAM_ID}",
+            "include_closed": "true",
+            "subtasks": "true",
+            "page": "0"
+          }
+        }
+      ],
+      "extra": {}
     }
   },
   "default_role": "AI Engineer",

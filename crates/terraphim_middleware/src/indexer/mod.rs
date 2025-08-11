@@ -8,7 +8,7 @@ use crate::{Error, Result};
 mod ripgrep;
 
 pub use ripgrep::RipgrepIndexer;
-use crate::haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer};
+use crate::haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer, ClickUpHaystackIndexer};
 
 fn hash_as_string<T: Hash>(t: &T) -> String {
     let mut s = DefaultHasher::new();
@@ -47,6 +47,7 @@ pub async fn search_haystacks(
     let ripgrep = RipgrepIndexer::default();
     let atomic = AtomicHaystackIndexer::default();
     let query_rs = QueryRsHaystackIndexer::default();
+    let clickup = ClickUpHaystackIndexer::default();
     let mut full_index = Index::new();
 
     let role = config
@@ -70,6 +71,10 @@ pub async fn search_haystacks(
             ServiceType::QueryRs => {
                 // Search through documents using query.rs
                 query_rs.index(needle, haystack).await?
+            }
+            ServiceType::ClickUp => {
+                // Search through documents using ClickUp
+                clickup.index(needle, haystack).await?
             }
         };
 
