@@ -38,10 +38,7 @@ impl TerraphimResourceMapper {
     }
 
     /// Convert a Terraphim document to MCP content
-    pub fn document_to_resource_contents(
-        &self,
-        document: &Document,
-    ) -> Result<ResourceContents> {
+    pub fn document_to_resource_contents(&self, document: &Document) -> Result<ResourceContents> {
         let mut text = format!("# {}\n\n", document.title);
         text.push_str(&document.body);
 
@@ -59,4 +56,4 @@ impl TerraphimResourceMapper {
     pub fn create_document_uri(&self, document_id: &str) -> String {
         format!("{}://{}", TERRAPHIM_URI_SCHEME, document_id)
     }
-} 
+}

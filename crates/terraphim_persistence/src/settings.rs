@@ -166,13 +166,12 @@ pub async fn parse_profiles(
     Ok(ops)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::{Deserialize, Serialize};
-    use async_trait::async_trait;
     use crate::Persistable;
+    use async_trait::async_trait;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct TestStruct {
@@ -209,7 +208,6 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load() -> Result<()> {
-
         // Create a test object
         let test_obj = TestStruct {
             name: "Test Object".to_string(),
@@ -224,7 +222,10 @@ mod tests {
         loaded_obj = loaded_obj.load().await?;
 
         // Compare the original and loaded objects
-        assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
+        assert_eq!(
+            test_obj, loaded_obj,
+            "Loaded object does not match the original"
+        );
 
         Ok(())
     }
@@ -246,7 +247,10 @@ mod tests {
         loaded_obj = loaded_obj.load().await?;
 
         // Compare the original and loaded objects
-        assert_eq!(test_obj, loaded_obj, "Loaded object does not match the original");
+        assert_eq!(
+            test_obj, loaded_obj,
+            "Loaded object does not match the original"
+        );
 
         Ok(())
     }
@@ -269,7 +273,10 @@ mod tests {
         loaded_obj = loaded_obj.load().await?;
 
         // Compare the original and loaded objects
-        assert_eq!(test_obj, loaded_obj, "Loaded RocksDB object does not match the original");
+        assert_eq!(
+            test_obj, loaded_obj,
+            "Loaded RocksDB object does not match the original"
+        );
 
         Ok(())
     }
@@ -292,7 +299,10 @@ mod tests {
         loaded_obj = loaded_obj.load().await?;
 
         // Compare the original and loaded objects
-        assert_eq!(test_obj, loaded_obj, "Loaded memory object does not match the original");
+        assert_eq!(
+            test_obj, loaded_obj,
+            "Loaded memory object does not match the original"
+        );
 
         Ok(())
     }
@@ -315,10 +325,16 @@ mod tests {
                 loaded_obj = loaded_obj.load().await?;
 
                 // Compare the original and loaded objects
-                assert_eq!(test_obj, loaded_obj, "Loaded ReDB object does not match the original");
-            },
+                assert_eq!(
+                    test_obj, loaded_obj,
+                    "Loaded ReDB object does not match the original"
+                );
+            }
             Err(e) => {
-                println!("ReDB profile not available (expected in some environments): {:?}", e);
+                println!(
+                    "ReDB profile not available (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have redb configured
             }
         }
@@ -344,10 +360,16 @@ mod tests {
                 loaded_obj = loaded_obj.load().await?;
 
                 // Compare the original and loaded objects
-                assert_eq!(test_obj, loaded_obj, "Loaded SQLite object does not match the original");
-            },
+                assert_eq!(
+                    test_obj, loaded_obj,
+                    "Loaded SQLite object does not match the original"
+                );
+            }
             Err(e) => {
-                println!("SQLite profile not available (expected in some environments): {:?}", e);
+                println!(
+                    "SQLite profile not available (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have sqlite configured
             }
         }

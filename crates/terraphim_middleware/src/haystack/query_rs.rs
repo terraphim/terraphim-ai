@@ -91,10 +91,16 @@ impl QueryRsHaystackIndexer {
     /// Fetch and scrape content from a document's URL
     async fn fetch_and_scrape_content(&self, doc: &Document) -> Result<Document> {
         let mut enhanced_doc = doc.clone();
-        
+
         log::info!("Fetching content from: {}", doc.url);
-        
-        match self.client.get(&doc.url).header("User-Agent", "Terraphim/1.0").send().await {
+
+        match self
+            .client
+            .get(&doc.url)
+            .header("User-Agent", "Terraphim/1.0")
+            .send()
+            .await
+        {
             Ok(response) => {
                 if response.status().is_success() {
                     match response.text().await {
@@ -102,27 +108,31 @@ impl QueryRsHaystackIndexer {
                             let scraped_content = self.scrape_content(&html_content, &doc.url);
                             enhanced_doc.body = scraped_content;
                             log::info!("Successfully scraped content from: {}", doc.url);
-                        },
+                        }
                         Err(e) => {
                             log::warn!("Failed to get text content from {}: {}", doc.url, e);
                         }
                     }
                 } else {
-                    log::warn!("Failed to fetch {} with status: {}", doc.url, response.status());
+                    log::warn!(
+                        "Failed to fetch {} with status: {}",
+                        doc.url,
+                        response.status()
+                    );
                 }
             }
             Err(e) => {
                 log::warn!("Failed to fetch {}: {}", doc.url, e);
             }
         }
-        
+
         Ok(enhanced_doc)
     }
 
     /// Scrape relevant content from HTML based on the URL type
     fn scrape_content(&self, html_content: &str, url: &str) -> String {
         let document = Html::parse_document(html_content);
-        
+
         if url.contains("crates.io") {
             self.scrape_crates_io_content(&document)
         } else if url.contains("docs.rs") {
@@ -139,47 +149,56 @@ impl QueryRsHaystackIndexer {
     /// Scrape content from crates.io pages
     fn scrape_crates_io_content(&self, document: &Html) -> String {
         let mut content = String::new();
-        
+
         // Try to get the crate description
         if let Ok(desc_selector) = Selector::parse(".crate-description") {
             if let Some(desc_elem) = document.select(&desc_selector).next() {
-                content.push_str(&format!("Description: {}\n\n", desc_elem.text().collect::<Vec<_>>().join(" ")));
+                content.push_str(&format!(
+                    "Description: {}\n\n",
+                    desc_elem.text().collect::<Vec<_>>().join(" ")
+                ));
             }
         }
-        
+
         // Try to get README content
         if let Ok(readme_selector) = Selector::parse("#readme") {
             if let Some(readme_elem) = document.select(&readme_selector).next() {
-                content.push_str(&format!("README: {}\n\n", readme_elem.text().collect::<Vec<_>>().join(" ")));
+                content.push_str(&format!(
+                    "README: {}\n\n",
+                    readme_elem.text().collect::<Vec<_>>().join(" ")
+                ));
             }
         }
-        
+
         // Try to get dependencies
         if let Ok(deps_selector) = Selector::parse(".dependencies") {
             if let Some(deps_elem) = document.select(&deps_selector).next() {
-                content.push_str(&format!("Dependencies: {}\n\n", deps_elem.text().collect::<Vec<_>>().join(" ")));
+                content.push_str(&format!(
+                    "Dependencies: {}\n\n",
+                    deps_elem.text().collect::<Vec<_>>().join(" ")
+                ));
             }
         }
-        
+
         if content.is_empty() {
             // Fallback: get all text content
             content = document.root_element().text().collect::<Vec<_>>().join(" ");
         }
-        
+
         content
     }
 
     /// Scrape content from docs.rs pages
     fn scrape_docs_rs_content(&self, document: &Html) -> String {
         let mut content = String::new();
-        
+
         // Try to get the main documentation content
         if let Ok(main_selector) = Selector::parse("main") {
             if let Some(main_elem) = document.select(&main_selector).next() {
                 content = main_elem.text().collect::<Vec<_>>().join(" ");
             }
         }
-        
+
         // If no main content, try to get documentation sections
         if content.is_empty() {
             if let Ok(doc_selector) = Selector::parse(".docblock") {
@@ -189,26 +208,26 @@ impl QueryRsHaystackIndexer {
                 }
             }
         }
-        
+
         if content.is_empty() {
             // Fallback: get all text content
             content = document.root_element().text().collect::<Vec<_>>().join(" ");
         }
-        
+
         content
     }
 
     /// Scrape content from Rust documentation pages
     fn scrape_rust_doc_content(&self, document: &Html) -> String {
         let mut content = String::new();
-        
+
         // Try to get the main documentation content
         if let Ok(main_selector) = Selector::parse("main") {
             if let Some(main_elem) = document.select(&main_selector).next() {
                 content = main_elem.text().collect::<Vec<_>>().join(" ");
             }
         }
-        
+
         // Try to get documentation sections
         if content.is_empty() {
             if let Ok(doc_selector) = Selector::parse(".docblock") {
@@ -218,26 +237,26 @@ impl QueryRsHaystackIndexer {
                 }
             }
         }
-        
+
         if content.is_empty() {
             // Fallback: get all text content
             content = document.root_element().text().collect::<Vec<_>>().join(" ");
         }
-        
+
         content
     }
 
     /// Scrape content from Reddit pages
     fn scrape_reddit_content(&self, document: &Html) -> String {
         let mut content = String::new();
-        
+
         // Try to get the post content
         if let Ok(post_selector) = Selector::parse("[data-testid='post-content']") {
             if let Some(post_elem) = document.select(&post_selector).next() {
                 content = post_elem.text().collect::<Vec<_>>().join(" ");
             }
         }
-        
+
         // Try alternative selectors for Reddit content
         if content.is_empty() {
             if let Ok(content_selector) = Selector::parse(".RichTextJSON-root") {
@@ -246,26 +265,26 @@ impl QueryRsHaystackIndexer {
                 }
             }
         }
-        
+
         if content.is_empty() {
             // Fallback: get all text content
             content = document.root_element().text().collect::<Vec<_>>().join(" ");
         }
-        
+
         content
     }
 
     /// Scrape generic content from any HTML page
     fn scrape_generic_content(&self, document: &Html) -> String {
         let mut content = String::new();
-        
+
         // Try to get main content
         if let Ok(main_selector) = Selector::parse("main") {
             if let Some(main_elem) = document.select(&main_selector).next() {
                 content = main_elem.text().collect::<Vec<_>>().join(" ");
             }
         }
-        
+
         // Try to get article content
         if content.is_empty() {
             if let Ok(article_selector) = Selector::parse("article") {
@@ -274,7 +293,7 @@ impl QueryRsHaystackIndexer {
                 }
             }
         }
-        
+
         // Try to get content from common content divs
         if content.is_empty() {
             for selector_str in [".content", ".main", ".post-content", ".entry-content"] {
@@ -286,19 +305,19 @@ impl QueryRsHaystackIndexer {
                 }
             }
         }
-        
+
         if content.is_empty() {
             // Fallback: get all text content
             content = document.root_element().text().collect::<Vec<_>>().join(" ");
         }
-        
+
         content
     }
 
     /// Search Reddit posts using the JSON API
     async fn search_reddit_posts(&self, query: &str) -> Result<Vec<Document>> {
         let url = format!("https://query.rs/posts/search?q={}", query);
-        
+
         match self.client.get(&url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
@@ -324,7 +343,7 @@ impl QueryRsHaystackIndexer {
     /// Search using the suggest API for std docs, attributes, etc.
     async fn search_suggest_api(&self, query: &str) -> Result<Vec<Document>> {
         let url = format!("https://query.rs/suggest/{}", query);
-        
+
         match self.client.get(&url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
@@ -351,18 +370,28 @@ impl QueryRsHaystackIndexer {
     async fn search_crates_io(&self, query: &str) -> Result<Vec<Document>> {
         // Try to search crates.io directly via their API
         let url = format!("https://crates.io/api/v1/crates?q={}&per_page=10", query);
-        
+
         log::info!("Searching crates.io for: {}", query);
-        
-        match self.client.get(&url).header("User-Agent", "Terraphim/1.0").send().await {
+
+        match self
+            .client
+            .get(&url)
+            .header("User-Agent", "Terraphim/1.0")
+            .send()
+            .await
+        {
             Ok(response) => {
                 if response.status().is_success() {
                     match response.json::<Value>().await {
                         Ok(crates_data) => {
                             let docs = self.parse_crates_io_json(crates_data, query);
-                            log::info!("Found {} crates.io results for: {}", docs.as_ref().map(|d| d.len()).unwrap_or(0), query);
+                            log::info!(
+                                "Found {} crates.io results for: {}",
+                                docs.as_ref().map(|d| d.len()).unwrap_or(0),
+                                query
+                            );
                             docs
-                        },
+                        }
                         Err(e) => {
                             log::warn!("Failed to parse crates.io JSON response: {}", e);
                             Ok(Vec::new())
@@ -384,19 +413,29 @@ impl QueryRsHaystackIndexer {
     async fn search_docs_rs(&self, query: &str) -> Result<Vec<Document>> {
         // Try to search docs.rs directly
         let url = format!("https://docs.rs/releases/search?query={}", query);
-        
+
         log::info!("Searching docs.rs for: {}", query);
-        
-        match self.client.get(&url).header("User-Agent", "Terraphim/1.0").send().await {
+
+        match self
+            .client
+            .get(&url)
+            .header("User-Agent", "Terraphim/1.0")
+            .send()
+            .await
+        {
             Ok(response) => {
                 if response.status().is_success() {
                     // Parse HTML response to extract crate information
                     match response.text().await {
                         Ok(html_content) => {
                             let docs = self.parse_docs_rs_html(&html_content, query);
-                            log::info!("Found {} docs.rs results for: {}", docs.as_ref().map(|d| d.len()).unwrap_or(0), query);
+                            log::info!(
+                                "Found {} docs.rs results for: {}",
+                                docs.as_ref().map(|d| d.len()).unwrap_or(0),
+                                query
+                            );
                             docs
-                        },
+                        }
                         Err(e) => {
                             log::warn!("Failed to get docs.rs HTML response: {}", e);
                             Ok(Vec::new())
@@ -420,7 +459,10 @@ impl QueryRsHaystackIndexer {
 
         for post in posts {
             if let Some(obj) = post.as_object() {
-                let title = obj.get("title").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                let title = obj
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
                 let url = obj.get("url").and_then(|v| v.as_str()).unwrap_or("");
                 let author = obj.get("author").and_then(|v| v.as_str()).unwrap_or("");
                 let score = obj.get("score").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -434,7 +476,11 @@ impl QueryRsHaystackIndexer {
                         description: Some(format!("by {} (score: {})", author, score)),
                         body: body.to_string(),
                         stub: None,
-                        tags: Some(vec!["rust".to_string(), "reddit".to_string(), "community".to_string()]),
+                        tags: Some(vec![
+                            "rust".to_string(),
+                            "reddit".to_string(),
+                            "community".to_string(),
+                        ]),
                         rank: Some(score),
                     });
                 }
@@ -458,17 +504,24 @@ impl QueryRsHaystackIndexer {
                             if let Some((title_part, url_part)) = completion_str.split_once(" - ") {
                                 let title = title_part.trim();
                                 let url = url_part.trim();
-                                
+
                                 if !title.is_empty() && !url.is_empty() {
                                     // Determine search type based on URL or title
                                     let search_type = self.determine_search_type(title, url);
                                     let tags = self.generate_tags_for_search_type(&search_type);
-                                    
+
                                     documents.push(Document {
                                         id: format!("{}-{}", search_type, url),
                                         url: url.to_string(),
-                                        title: format!("[{}] {}", search_type.to_uppercase(), title),
-                                        description: Some(format!("Rust {} documentation", search_type)),
+                                        title: format!(
+                                            "[{}] {}",
+                                            search_type.to_uppercase(),
+                                            title
+                                        ),
+                                        description: Some(format!(
+                                            "Rust {} documentation",
+                                            search_type
+                                        )),
                                         body: format!("Search result for '{}': {}", query, title),
                                         stub: None,
                                         tags: Some(tags),
@@ -493,8 +546,14 @@ impl QueryRsHaystackIndexer {
             for crate_info in crates {
                 if let Some(obj) = crate_info.as_object() {
                     let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                    let description = obj.get("description").and_then(|v| v.as_str()).unwrap_or("");
-                    let version = obj.get("max_version").and_then(|v| v.as_str()).unwrap_or("");
+                    let description = obj
+                        .get("description")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let version = obj
+                        .get("max_version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     let downloads = obj.get("downloads").and_then(|v| v.as_u64()).unwrap_or(0);
                     let url = format!("https://crates.io/crates/{}", name);
 
@@ -506,7 +565,11 @@ impl QueryRsHaystackIndexer {
                             description: Some(format!("{} ({} downloads)", description, downloads)),
                             body: format!("Crate: {} - {}", name, description),
                             stub: None,
-                            tags: Some(vec!["rust".to_string(), "crate".to_string(), "package".to_string()]),
+                            tags: Some(vec![
+                                "rust".to_string(),
+                                "crate".to_string(),
+                                "package".to_string(),
+                            ]),
                             rank: Some(downloads),
                         });
                     }
@@ -524,7 +587,7 @@ impl QueryRsHaystackIndexer {
         // Simple HTML parsing to extract crate information
         // This is a basic implementation - in production you might want to use a proper HTML parser
         let lines: Vec<&str> = html_content.lines().collect();
-        
+
         for line in lines {
             if line.contains("crate-name") && line.contains(query) {
                 // Extract crate name from the HTML
@@ -540,7 +603,11 @@ impl QueryRsHaystackIndexer {
                                 description: Some(format!("Documentation for {}", crate_name)),
                                 body: format!("Documentation for crate: {}", crate_name),
                                 stub: None,
-                                tags: Some(vec!["rust".to_string(), "docs".to_string(), "documentation".to_string()]),
+                                tags: Some(vec![
+                                    "rust".to_string(),
+                                    "docs".to_string(),
+                                    "documentation".to_string(),
+                                ]),
                                 rank: None,
                             });
                         }
@@ -591,7 +658,7 @@ impl QueryRsHaystackIndexer {
     /// Generate appropriate tags for search type
     fn generate_tags_for_search_type(&self, search_type: &str) -> Vec<String> {
         let mut tags = vec!["rust".to_string()];
-        
+
         match search_type {
             "std" | "trait" | "struct" | "enum" | "function" | "module" => {
                 tags.extend(vec!["std".to_string(), "documentation".to_string()]);
@@ -615,7 +682,7 @@ impl QueryRsHaystackIndexer {
                 tags.push("documentation".to_string());
             }
         }
-        
+
         tags
     }
-} 
+}

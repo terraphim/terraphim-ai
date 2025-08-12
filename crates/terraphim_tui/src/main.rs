@@ -19,10 +19,10 @@ use tokio::runtime::Runtime;
 
 mod client;
 use client::{ApiClient, SearchResponse};
-use terraphim_types::{SearchQuery, NormalizedTermValue, RoleName};
+use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
 #[derive(Parser, Debug)]
-#[command(name = "terraphim-tui", version, about = "Terraphim TUI interface")] 
+#[command(name = "terraphim-tui", version, about = "Terraphim TUI interface")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -30,16 +30,42 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    Search { query: String, #[arg(long, default_value = "Default")] role: String, #[arg(long, default_value_t = 10)] limit: usize },
-    Roles { #[command(subcommand)] sub: RolesSub },
-    Config { #[command(subcommand)] sub: ConfigSub },
-    Graph { #[arg(long, default_value = "Default")] role: String, #[arg(long, default_value_t = 50)] top_k: usize },
-    Chat { #[arg(long, default_value = "")] role: String, prompt: String, #[arg(long)] model: Option<String> },
+    Search {
+        query: String,
+        #[arg(long, default_value = "Default")]
+        role: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+    Roles {
+        #[command(subcommand)]
+        sub: RolesSub,
+    },
+    Config {
+        #[command(subcommand)]
+        sub: ConfigSub,
+    },
+    Graph {
+        #[arg(long, default_value = "Default")]
+        role: String,
+        #[arg(long, default_value_t = 50)]
+        top_k: usize,
+    },
+    Chat {
+        #[arg(long, default_value = "")]
+        role: String,
+        prompt: String,
+        #[arg(long)]
+        model: Option<String>,
+    },
     Interactive,
 }
 
 #[derive(Subcommand, Debug)]
-enum RolesSub { List, Select { name: String } }
+enum RolesSub {
+    List,
+    Select { name: String },
+}
 
 #[derive(Subcommand, Debug)]
 enum ConfigSub {
@@ -54,29 +80,34 @@ fn main() -> Result<()> {
 
     match cli.command {
         Some(Command::Interactive) | None => run_tui(),
-        Some(Command::Search { query, role, limit }) => {
-            rt.block_on(async move {
-                let api = ApiClient::new(std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()));
-                let q = SearchQuery {
-                    search_term: NormalizedTermValue::from(query.as_str()),
-                    skip: Some(0),
-                    limit: Some(limit),
-                    role: Some(RoleName::new(&role)),
-                };
-                let res: SearchResponse = api.search(&q).await?;
-                for doc in res.results.iter() {
-                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
-                }
-                Ok(())
-            })
-        }
+        Some(Command::Search { query, role, limit }) => rt.block_on(async move {
+            let api = ApiClient::new(
+                std::env::var("TERRAPHIM_SERVER")
+                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            );
+            let q = SearchQuery {
+                search_term: NormalizedTermValue::from(query.as_str()),
+                skip: Some(0),
+                limit: Some(limit),
+                role: Some(RoleName::new(&role)),
+            };
+            let res: SearchResponse = api.search(&q).await?;
+            for doc in res.results.iter() {
+                println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+            }
+            Ok(())
+        }),
         Some(Command::Roles { sub }) => {
-            let api = ApiClient::new(std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()));
+            let api = ApiClient::new(
+                std::env::var("TERRAPHIM_SERVER")
+                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            );
             rt.block_on(async move {
                 match sub {
                     RolesSub::List => {
                         let cfg = api.get_config().await?;
-                        let keys: Vec<String> = cfg.config.roles.keys().map(|r| r.to_string()).collect();
+                        let keys: Vec<String> =
+                            cfg.config.roles.keys().map(|r| r.to_string()).collect();
                         println!("{}", keys.join("\n"));
                     }
                     RolesSub::Select { name } => {
@@ -88,7 +119,10 @@ fn main() -> Result<()> {
             })
         }
         Some(Command::Config { sub }) => {
-            let api = ApiClient::new(std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()));
+            let api = ApiClient::new(
+                std::env::var("TERRAPHIM_SERVER")
+                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            );
             rt.block_on(async move {
                 match sub {
                     ConfigSub::Show => {
@@ -99,11 +133,18 @@ fn main() -> Result<()> {
                         // Minimal keys: selected_role, global_shortcut, role.<name>.theme
                         let mut cfg = api.get_config().await?.config;
                         match key.as_str() {
-                            "selected_role" => { cfg.selected_role = RoleName::new(&value); }
-                            "global_shortcut" => { cfg.global_shortcut = value.clone(); }
+                            "selected_role" => {
+                                cfg.selected_role = RoleName::new(&value);
+                            }
+                            "global_shortcut" => {
+                                cfg.global_shortcut = value.clone();
+                            }
                             _ if key.starts_with("role.") && key.ends_with(".theme") => {
                                 // role.<name>.theme
-                                if let Some(name) = key.strip_prefix("role.").and_then(|s| s.strip_suffix(".theme")) {
+                                if let Some(name) = key
+                                    .strip_prefix("role.")
+                                    .and_then(|s| s.strip_suffix(".theme"))
+                                {
                                     let rn = RoleName::new(name);
                                     if let Some(role) = cfg.roles.get_mut(&rn) {
                                         role.theme = value.clone();
@@ -124,37 +165,73 @@ fn main() -> Result<()> {
             })
         }
         Some(Command::Graph { role, top_k }) => {
-            let api = ApiClient::new(std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()));
+            let api = ApiClient::new(
+                std::env::var("TERRAPHIM_SERVER")
+                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            );
             rt.block_on(async move {
-                let rg = api.get_rolegraph_edges(if role.is_empty() { None } else { Some(&role) }).await?;
+                let rg = api
+                    .get_rolegraph_edges(if role.is_empty() { None } else { Some(&role) })
+                    .await?;
                 println!("Nodes: {}  Edges: {}", rg.nodes.len(), rg.edges.len());
                 // Build adjacency: for top_k nodes by rank, show connected nodes (by edges)
                 use std::collections::HashMap;
                 let mut label_by_id: HashMap<u64, &str> = HashMap::new();
-                for n in &rg.nodes { label_by_id.insert(n.id, &n.label); }
+                for n in &rg.nodes {
+                    label_by_id.insert(n.id, &n.label);
+                }
                 let mut nodes_sorted = rg.nodes.clone();
-                nodes_sorted.sort_by(|a,b| b.rank.cmp(&a.rank));
+                nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
                 for n in nodes_sorted.into_iter().take(top_k) {
                     // find neighbors via edges
                     let mut neighbors = Vec::new();
                     for e in &rg.edges {
-                        if e.source == n.id { if let Some(lbl) = label_by_id.get(&e.target) { neighbors.push((*lbl, e.rank)); } }
-                        if e.target == n.id { if let Some(lbl) = label_by_id.get(&e.source) { neighbors.push((*lbl, e.rank)); } }
+                        if e.source == n.id {
+                            if let Some(lbl) = label_by_id.get(&e.target) {
+                                neighbors.push((*lbl, e.rank));
+                            }
+                        }
+                        if e.target == n.id {
+                            if let Some(lbl) = label_by_id.get(&e.source) {
+                                neighbors.push((*lbl, e.rank));
+                            }
+                        }
                     }
-                    neighbors.sort_by(|a,b| b.1.cmp(&a.1));
-                    let list = neighbors.into_iter().take(5).map(|(l,_r)| l).collect::<Vec<&str>>().join(", ");
+                    neighbors.sort_by(|a, b| b.1.cmp(&a.1));
+                    let list = neighbors
+                        .into_iter()
+                        .take(5)
+                        .map(|(l, _r)| l)
+                        .collect::<Vec<&str>>()
+                        .join(", ");
                     println!("- [{}] {} -> {}", n.rank, n.label, list);
                 }
                 Ok(())
             })
         }
-        Some(Command::Chat { role, prompt, model }) => {
-            let api = ApiClient::new(std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()));
+        Some(Command::Chat {
+            role,
+            prompt,
+            model,
+        }) => {
+            let api = ApiClient::new(
+                std::env::var("TERRAPHIM_SERVER")
+                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            );
             rt.block_on(async move {
-                let res = api.chat(if role.is_empty() { "Default" } else { &role }, &prompt, model.as_deref()).await?;
+                let res = api
+                    .chat(
+                        if role.is_empty() { "Default" } else { &role },
+                        &prompt,
+                        model.as_deref(),
+                    )
+                    .await?;
                 match (res.status.as_str(), res.message) {
                     ("Success", Some(msg)) => println!("{}", msg),
-                    _ => println!("error: {}", res.error.unwrap_or_else(|| "unknown error".into())),
+                    _ => println!(
+                        "error: {}",
+                        res.error.unwrap_or_else(|| "unknown error".into())
+                    ),
                 }
                 Ok(())
             })
@@ -187,7 +264,9 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
     let mut results: Vec<String> = Vec::new();
     let mut terms: Vec<String> = Vec::new();
     let mut suggestions: Vec<String> = Vec::new();
-    let api = ApiClient::new(std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()));
+    let api = ApiClient::new(
+        std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
+    );
     let rt = Runtime::new()?;
 
     // Initialize terms from rolegraph (selected role)
@@ -210,8 +289,11 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                 ])
                 .split(f.size());
 
-            let input_widget = Paragraph::new(Line::from(input.as_str()))
-                .block(Block::default().title("Search • Type to query, Enter to run, q to quit").borders(Borders::ALL));
+            let input_widget = Paragraph::new(Line::from(input.as_str())).block(
+                Block::default()
+                    .title("Search • Type to query, Enter to run, q to quit")
+                    .borders(Borders::ALL),
+            );
             f.render_widget(input_widget, chunks[0]);
 
             // Suggestions (fixed height 5)
@@ -224,10 +306,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                 .block(Block::default().title("Suggestions").borders(Borders::ALL));
             f.render_widget(sug_list, chunks[1]);
 
-            let items: Vec<ListItem> = results
-                .iter()
-                .map(|r| ListItem::new(r.as_str()))
-                .collect();
+            let items: Vec<ListItem> = results.iter().map(|r| ListItem::new(r.as_str())).collect();
             let list = List::new(items)
                 .block(Block::default().title("Results").borders(Borders::ALL))
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -247,9 +326,18 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                         let api = api.clone();
                         if !query.is_empty() {
                             if let Ok(lines) = rt.block_on(async move {
-                                let q = SearchQuery { search_term: NormalizedTermValue::from(query.as_str()), skip: Some(0), limit: Some(10), role: None };
+                                let q = SearchQuery {
+                                    search_term: NormalizedTermValue::from(query.as_str()),
+                                    skip: Some(0),
+                                    limit: Some(10),
+                                    role: None,
+                                };
                                 let resp = api.search(&q).await?;
-                                let lines: Vec<String> = resp.results.into_iter().map(|d| format!("{} {}", d.rank.unwrap_or_default(), d.title)).collect();
+                                let lines: Vec<String> = resp
+                                    .results
+                                    .into_iter()
+                                    .map(|d| format!("{} {}", d.rank.unwrap_or_default(), d.title))
+                                    .collect();
                                 Ok::<Vec<String>, anyhow::Error>(lines)
                             }) {
                                 results = lines;
@@ -259,9 +347,20 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                     KeyCode::Backspace => {
                         input.pop();
                         // update suggestions
-                        let needle = input.rsplit_once(' ').map(|(_, w)| w).unwrap_or(input.as_str()).to_lowercase();
-                        suggestions = if needle.is_empty() { Vec::new() } else {
-                            let mut s: Vec<String> = terms.iter().filter(|t| t.to_lowercase().contains(&needle)).take(50).cloned().collect();
+                        let needle = input
+                            .rsplit_once(' ')
+                            .map(|(_, w)| w)
+                            .unwrap_or(input.as_str())
+                            .to_lowercase();
+                        suggestions = if needle.is_empty() {
+                            Vec::new()
+                        } else {
+                            let mut s: Vec<String> = terms
+                                .iter()
+                                .filter(|t| t.to_lowercase().contains(&needle))
+                                .take(50)
+                                .cloned()
+                                .collect();
                             s.truncate(5);
                             s
                         };
@@ -269,9 +368,20 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                     KeyCode::Char(c) => {
                         input.push(c);
                         // update suggestions
-                        let needle = input.rsplit_once(' ').map(|(_, w)| w).unwrap_or(input.as_str()).to_lowercase();
-                        suggestions = if needle.is_empty() { Vec::new() } else {
-                            let mut s: Vec<String> = terms.iter().filter(|t| t.to_lowercase().contains(&needle)).take(50).cloned().collect();
+                        let needle = input
+                            .rsplit_once(' ')
+                            .map(|(_, w)| w)
+                            .unwrap_or(input.as_str())
+                            .to_lowercase();
+                        suggestions = if needle.is_empty() {
+                            Vec::new()
+                        } else {
+                            let mut s: Vec<String> = terms
+                                .iter()
+                                .filter(|t| t.to_lowercase().contains(&needle))
+                                .take(50)
+                                .cloned()
+                                .collect();
                             s.truncate(5);
                             s
                         };
@@ -283,5 +393,3 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
     }
     Ok(())
 }
-
-

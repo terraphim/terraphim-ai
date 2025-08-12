@@ -1,20 +1,24 @@
 #[cfg(test)]
 mod tests {
-    use terraphim_atomic_client::{Config, Store};
     use dotenvy::dotenv;
-    use std::collections::HashMap;
     use serde_json::json;
+    use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use terraphim_atomic_client::{Config, Store};
 
     /// Tests the commit functionality for creating resources
     #[tokio::test]
     async fn test_commit_create() {
         // Load .env file if present
         dotenv().ok();
-        
+
         // Load configuration and ensure an Agent is present
-        let config = Config::from_env().expect("Environment variables ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET must be set");
-        assert!(config.agent.is_some(), "ATOMIC_SERVER_SECRET must decode into a valid Agent");
+        let config = Config::from_env()
+            .expect("Environment variables ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET must be set");
+        assert!(
+            config.agent.is_some(),
+            "ATOMIC_SERVER_SECRET must decode into a valid Agent"
+        );
 
         // Create a store with the config
         let store = Store::new(config).expect("Failed to create store");
@@ -51,56 +55,59 @@ mod tests {
             "https://atomicdata.dev/properties/isA".to_string(),
             json!(["https://atomicdata.dev/classes/Article"]),
         );
-        
+
         // Create the resource using a commit
         let _result = store
             .create_with_commit(&test_resource_id, properties)
             .await
             .expect("Failed to create resource via commit");
-        
+
         // Verify the resource was created
         let resource = store
             .get_resource(&test_resource_id)
             .await
             .expect("Failed to retrieve created resource");
-        
+
         println!("Retrieved resource: {:#?}", resource);
-        
+
         // Update the resource
         let mut update_properties = HashMap::new();
         update_properties.insert(
             "https://atomicdata.dev/properties/description".to_string(),
             json!("An updated test article"),
         );
-        
+
         // Update the resource using a commit
         let _update_result = store
             .update_with_commit(&test_resource_id, update_properties)
             .await
             .expect("Failed to update resource via commit");
-        
+
         // Verify the resource was updated
         let updated_resource = store
             .get_resource(&test_resource_id)
             .await
             .expect("Failed to fetch updated resource");
-        
+
         println!("Updated resource: {:#?}", updated_resource);
         assert_eq!(
-            updated_resource.properties.get("https://atomicdata.dev/properties/description").unwrap(),
+            updated_resource
+                .properties
+                .get("https://atomicdata.dev/properties/description")
+                .unwrap(),
             &json!("An updated test article")
         );
-        
+
         // Delete the resource using a commit
         store
             .delete_with_commit(&test_resource_id)
             .await
             .expect("Failed to delete resource via commit");
-        
+
         // Verify the resource was deleted
         match store.get_resource(&test_resource_id).await {
             Ok(_) => panic!("Resource was not deleted"),
             Err(_) => (),
         }
     }
-} 
+}

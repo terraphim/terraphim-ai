@@ -1,11 +1,11 @@
-use terraphim_config::{Haystack, ServiceType};
 use crate::haystack::QueryRsHaystackIndexer;
 use crate::indexer::IndexMiddleware;
+use terraphim_config::{Haystack, ServiceType};
 
 #[tokio::test]
 async fn test_query_rs_haystack_indexer() {
     let indexer = QueryRsHaystackIndexer::default();
-    
+
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
         service: ServiceType::QueryRs,
@@ -17,7 +17,7 @@ async fn test_query_rs_haystack_indexer() {
     // Test searching for Rust-related terms
     let needle = "async";
     let result = indexer.index(needle, &haystack).await;
-    
+
     match result {
         Ok(index) => {
             println!("Found {} documents", index.len());
@@ -29,7 +29,10 @@ async fn test_query_rs_haystack_indexer() {
         }
         Err(e) => {
             // It's okay if the test fails due to network issues
-            println!("QueryRs haystack test failed (expected for network issues): {}", e);
+            println!(
+                "QueryRs haystack test failed (expected for network issues): {}",
+                e
+            );
         }
     }
 }
@@ -37,7 +40,7 @@ async fn test_query_rs_haystack_indexer() {
 #[tokio::test]
 async fn test_query_rs_reddit_search() {
     let indexer = QueryRsHaystackIndexer::default();
-    
+
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
         service: ServiceType::QueryRs,
@@ -49,7 +52,7 @@ async fn test_query_rs_reddit_search() {
     // Test searching for Reddit posts
     let needle = "tokio";
     let result = indexer.index(needle, &haystack).await;
-    
+
     match result {
         Ok(index) => {
             println!("Found {} documents from Reddit search", index.len());
@@ -61,7 +64,10 @@ async fn test_query_rs_reddit_search() {
         }
         Err(e) => {
             // It's okay if the test fails due to network issues
-            println!("QueryRs Reddit search test failed (expected for network issues): {}", e);
+            println!(
+                "QueryRs Reddit search test failed (expected for network issues): {}",
+                e
+            );
         }
     }
 }
@@ -69,7 +75,7 @@ async fn test_query_rs_reddit_search() {
 #[tokio::test]
 async fn test_query_rs_crates_search() {
     let indexer = QueryRsHaystackIndexer::default();
-    
+
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
         service: ServiceType::QueryRs,
@@ -81,7 +87,7 @@ async fn test_query_rs_crates_search() {
     // Test searching for crates
     let needle = "serde";
     let result = indexer.index(needle, &haystack).await;
-    
+
     match result {
         Ok(index) => {
             println!("Found {} documents from crates search", index.len());
@@ -93,7 +99,10 @@ async fn test_query_rs_crates_search() {
         }
         Err(e) => {
             // It's okay if the test fails due to network issues
-            println!("QueryRs crates search test failed (expected for network issues): {}", e);
+            println!(
+                "QueryRs crates search test failed (expected for network issues): {}",
+                e
+            );
         }
     }
-} 
+}

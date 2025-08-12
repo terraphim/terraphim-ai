@@ -44,4 +44,4 @@ impl Persistable for Document {
     fn get_key(&self) -> String {
         format!("document_{}.json", self.normalize_key(&self.id))
     }
-} 
+}

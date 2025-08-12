@@ -27,5 +27,3 @@ fn role_with_clickup_haystack_is_valid() {
     let json = serde_json::to_string(&role).unwrap();
     assert!(json.contains("ClickUp"));
 }
-
-

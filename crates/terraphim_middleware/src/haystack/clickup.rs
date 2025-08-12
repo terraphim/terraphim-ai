@@ -13,7 +13,9 @@ pub struct ClickUpHaystackIndexer {
 
 impl Default for ClickUpHaystackIndexer {
     fn default() -> Self {
-        Self { client: Client::new() }
+        Self {
+            client: Client::new(),
+        }
     }
 }
 
@@ -44,21 +46,18 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
             // Optional flags
             let include_closed = parse_bool_param(extras.get("include_closed"), false);
             let subtasks = parse_bool_param(extras.get("subtasks"), true);
-            let page = extras.get("page").cloned().unwrap_or_else(|| "0".to_string());
+            let page = extras
+                .get("page")
+                .cloned()
+                .unwrap_or_else(|| "0".to_string());
 
             // Prefer universal search if available, otherwise fallback to list-based search via task endpoint
             let mut documents: Vec<Document> = Vec::new();
 
             if let Some(list) = list_id.clone() {
-                if let Ok(mut docs) = search_clickup_list(
-                    &client,
-                    &token,
-                    &list,
-                    &query,
-                    include_closed,
-                    subtasks,
-                )
-                .await
+                if let Ok(mut docs) =
+                    search_clickup_list(&client, &token, &list, &query, include_closed, subtasks)
+                        .await
                 {
                     documents.append(&mut docs);
                 }
@@ -202,7 +201,6 @@ fn map_task_value_to_document(t: &serde_json::Value) -> Option<Document> {
 }
 
 fn parse_bool_param(val: Option<&String>, default_value: bool) -> bool {
-    val.and_then(|s| s.parse::<bool>().ok()).unwrap_or(default_value)
+    val.and_then(|s| s.parse::<bool>().ok())
+        .unwrap_or(default_value)
 }
-
-

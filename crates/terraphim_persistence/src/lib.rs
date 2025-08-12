@@ -1,8 +1,8 @@
+pub mod document;
 pub mod error;
+pub mod memory;
 pub mod settings;
 pub mod thesaurus;
-pub mod memory;
-pub mod document;
 
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
@@ -32,9 +32,9 @@ impl DeviceStorage {
             .await?;
         Ok(storage)
     }
-    
+
     /// Initialize device storage with memory-only settings for tests
-    /// 
+    ///
     /// This is useful for tests that don't want to use filesystem or external services
     pub async fn init_memory_only() -> Result<&'static DeviceStorage> {
         let storage = DEVICE_STORAGE
@@ -155,15 +155,19 @@ pub trait Persistable: Serialize + DeserializeOwned {
 }
 
 /// Load multiple documents by their IDs
-/// 
+///
 /// This function efficiently loads multiple documents using their IDs.
 /// It attempts to load each document, but continues processing even if some documents fail to load.
 /// Returns a vector of successfully loaded documents.
 pub async fn load_documents_by_ids(document_ids: &[String]) -> Result<Vec<Document>> {
-    log::debug!("Loading {} documents by IDs: {:?}", document_ids.len(), document_ids);
-    
+    log::debug!(
+        "Loading {} documents by IDs: {:?}",
+        document_ids.len(),
+        document_ids
+    );
+
     let mut documents = Vec::new();
-    
+
     for doc_id in document_ids {
         let mut doc = Document::new(doc_id.clone());
         match doc.load().await {
@@ -177,7 +181,11 @@ pub async fn load_documents_by_ids(document_ids: &[String]) -> Result<Vec<Docume
             }
         }
     }
-    
-    log::debug!("Successfully loaded {} out of {} documents", documents.len(), document_ids.len());
+
+    log::debug!(
+        "Successfully loaded {} out of {} documents",
+        documents.len(),
+        document_ids.len()
+    );
     Ok(documents)
 }

@@ -1,4 +1,3 @@
-
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -7,9 +6,9 @@ use thiserror::Error;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
-use terraphim_types::{Concept, NormalizedTerm, NormalizedTermValue, Thesaurus};
 use cached::proc_macro::cached;
 use serde::Deserialize;
+use terraphim_types::{Concept, NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 #[derive(Error, Debug)]
 pub enum BuilderError {
@@ -163,13 +162,12 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
 }
 
 fn concept_from_path(path: PathBuf) -> Result<Concept> {
-    let stem = path
-        .file_stem()
-        .ok_or(BuilderError::Indexation(format!("No file stem in path {path:?}")))?;
+    let stem = path.file_stem().ok_or(BuilderError::Indexation(format!(
+        "No file stem in path {path:?}"
+    )))?;
     let concept_str = stem.to_string_lossy().to_string();
     Ok(Concept::from(concept_str))
 }
-
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data")]
@@ -284,4 +282,4 @@ pub fn json_decode(jsonlines: &str) -> Result<Vec<Message>> {
     Ok(serde_json::Deserializer::from_str(jsonlines)
         .into_iter()
         .collect::<std::result::Result<Vec<Message>, serde_json::Error>>()?)
-} 
+}

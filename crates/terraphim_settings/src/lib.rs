@@ -1,10 +1,10 @@
 use directories::ProjectDirs;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use twelf::{config, Layer};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use twelf::reexports::toml;
+use twelf::{config, Layer};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -94,7 +94,7 @@ impl DeviceSettings {
             Some(path) => path,
             None => DeviceSettings::default_config_path(),
         };
-        
+
         log::debug!("Settings path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
         log::debug!("Loading config_file: {:?}", config_file);
@@ -104,7 +104,11 @@ impl DeviceSettings {
             Layer::Env(Some(String::from("TERRAPHIM_"))),
         ])?)
     }
-    pub fn update_initialized_flag(&mut self, settings_path: Option<PathBuf>, initialized: bool) -> Result<(), Error> {
+    pub fn update_initialized_flag(
+        &mut self,
+        settings_path: Option<PathBuf>,
+        initialized: bool,
+    ) -> Result<(), Error> {
         let settings_path = settings_path.unwrap_or_else(Self::default_config_path);
         let settings_path = settings_path.join("settings.toml");
         self.initialized = initialized;
@@ -123,10 +127,9 @@ impl DeviceSettings {
     fn save_to_file(&self, path: &PathBuf) -> Result<(), Error> {
         let serialized_settings = toml::to_string_pretty(self)
             .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-        
-        std::fs::write(path, serialized_settings)
-            .map_err(Error::IoError)?;
-        
+
+        std::fs::write(path, serialized_settings).map_err(Error::IoError)?;
+
         Ok(())
     }
 }
@@ -146,14 +149,13 @@ fn init_config_file(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
     Ok(config_file)
 }
 
-
 /// To run test with logs and variables use:
 /// RUST_LOG="info,warn" TERRAPHIM_API_ENDPOINT="test_endpoint" TERRAPHIM_PROFILE_S3_REGION="us-west-1" cargo test -- --nocapture
 #[cfg(test)]
 mod tests {
     use super::*;
     use test_log::test;
-    
+
     use envtestkit::lock::lock_test;
     use envtestkit::set_env;
     use std::ffi::OsString;
@@ -162,15 +164,20 @@ mod tests {
     fn test_env_variable() {
         let _lock = lock_test();
         let _test = set_env(OsString::from("TERRAPHIM_PROFILE_S3_REGION"), "us-west-1");
-        let _test2 = set_env(OsString::from("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE"),"on");
-        
+        let _test2 = set_env(
+            OsString::from("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE"),
+            "on",
+        );
+
         log::debug!("Env: {:?}", std::env::var("TERRAPHIM_PROFILE_S3_REGION"));
-        let config = DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
-        
+        let config =
+            DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
+
         log::debug!("Config: {:?}", config);
         log::debug!(
             "Region: {:?}",
-            config.as_ref()
+            config
+                .as_ref()
                 .unwrap()
                 .profiles
                 .get("s3")
@@ -193,19 +200,22 @@ mod tests {
 
     #[test]
     fn test_update_initialized_flag() {
-
         let test_config_path = PathBuf::from("./test_settings/");
-        
+
         // Check if initialized is false
-        let mut config = DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
+        let mut config =
+            DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
         config.initialized = false;
         assert_eq!(config.initialized, false);
 
         // Update to true
-        config.update_initialized_flag(Some(test_config_path.clone()), true).unwrap();
+        config
+            .update_initialized_flag(Some(test_config_path.clone()), true)
+            .unwrap();
 
         // Check if initialized is now true
-        let config_copy = DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
+        let config_copy =
+            DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
         assert_eq!(config_copy.initialized, true);
     }
 }
