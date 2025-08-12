@@ -81,7 +81,7 @@ async fn test_ripgrep_extra_parameters() {
     let tag_args = ripgrep_command.parse_extra_parameters(&tag_params);
     println!("Tag filter args: {:?}", tag_args);
 
-    assert_eq!(tag_args, vec!["--glob".to_string(), "*#rust*".to_string()]);
+    assert_eq!(tag_args, vec!["--all-match".to_string(), "-e".to_string(), "#rust".to_string()]);
 
     // Test 2: Multiple parameters
     let mut multi_params = HashMap::new();
@@ -93,9 +93,10 @@ async fn test_ripgrep_extra_parameters() {
     let multi_args = ripgrep_command.parse_extra_parameters(&multi_params);
     println!("Multiple params args: {:?}", multi_args);
 
-    // Check that all expected arguments are present
-    assert!(multi_args.contains(&"--glob".to_string()));
-    assert!(multi_args.contains(&"*#testing*".to_string()));
+    // Check that tag patterns are enforced with --all-match and -e
+    assert!(multi_args.contains(&"--all-match".to_string()));
+    assert!(multi_args.contains(&"-e".to_string()));
+    assert!(multi_args.contains(&"#testing".to_string()));
     assert!(multi_args.contains(&"-t".to_string()));
     assert!(multi_args.contains(&"md".to_string()));
     assert!(multi_args.contains(&"--max-count".to_string()));
