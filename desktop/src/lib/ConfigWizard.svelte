@@ -131,6 +131,55 @@
     }
   });
 
+// Handle ESC to close wizard and return to previous screen
+onMount(() => {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      if (typeof window !== 'undefined') {
+        // Navigate back to main search screen
+        window.history.back();
+      }
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
+  return () => window.removeEventListener('keydown', onKeyDown);
+});
+
+// Cache of fetched LLM models per role index (UI-only)
+let roleModels: Record<number, string[]> = {};
+async function fetchLlmModels(roleIdx: number) {
+  const d = get(draft);
+  const role = d.roles[roleIdx];
+  const provider = role.llm_provider || (role.openrouter_enabled ? 'openrouter' : '');
+  const models: string[] = [];
+  try {
+    if (provider === 'ollama') {
+      const base = (role.llm_base_url || 'http://127.0.0.1:11434').replace(/\/$/, '');
+      const res = await fetch(`${base}/api/tags`);
+      const json = await res.json();
+      if (Array.isArray(json?.models)) {
+        for (const m of json.models) if (m?.name) models.push(m.name);
+      }
+    } else if (provider === 'openrouter') {
+      const apiKey = role.openrouter_api_key?.trim();
+      if (!apiKey) throw new Error('OpenRouter API key required');
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://terraphim.ai',
+          'X-Title': 'Terraphim Desktop'
+        }
+      });
+      const json = await res.json();
+      const data = Array.isArray(json?.data) ? json.data : [];
+      for (const m of data) if (m?.id) models.push(m.id);
+    }
+  } catch (e) {
+    console.error('Failed to fetch models', e);
+  }
+  roleModels = { ...roleModels, [roleIdx]: models };
+}
+
   let currentStep = 1;
   const totalSteps = 3;
   let saveStatus = ''; // 'success' or 'error'
@@ -306,10 +355,19 @@
       setTimeout(() => { saveStatus = ''; }, 3000); // Clear status after 3 seconds
     }
   }
+
+  function closeWizard() {
+    if (typeof window !== 'undefined') {
+      window.history.back();
+    }
+  }
 </script>
 
 <div class="box">
-  <h3 class="title is-4">Configuration Wizard</h3>
+  <div class="is-flex is-justify-content-space-between is-align-items-center" style="gap: .5rem;">
+    <h3 class="title is-4" style="margin-bottom: 0;">Configuration Wizard</h3>
+    <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
+  </div>
   
   {#if saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
@@ -557,6 +615,16 @@
             <div class="control">
               <input class="input" id={`llm-model-${idx}`} type="text" placeholder="llama3.1" bind:value={$draft.roles[idx].llm_model} />
             </div>
+            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            {#if roleModels[idx]?.length}
+              <div class="select is-fullwidth" style="margin-top:0.5rem;">
+                <select on:change={(e)=>{$draft.roles[idx].llm_model=(e.target as HTMLSelectElement).value}}>
+                  {#each roleModels[idx] as m}
+                    <option value={m}>{m}</option>
+                  {/each}
+                </select>
+              </div>
+            {/if}
           </div>
           <div class="field">
             <label class="label" for={`llm-base-url-${idx}`}>Base URL</label>
@@ -600,16 +668,18 @@
           <div class="field">
             <label class="label" for={`openrouter-model-${idx}`}>Model</label>
             <div class="control">
-              <div class="select is-fullwidth">
-                <select id={`openrouter-model-${idx}`} bind:value={$draft.roles[idx].openrouter_model}>
-                  <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo (Fast & Affordable)</option>
-                  <option value="openai/gpt-4">GPT-4 (High Quality)</option>
-                  <option value="anthropic/claude-3-sonnet">Claude 3 Sonnet (Balanced)</option>
-                  <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Fast)</option>
-                  <option value="mistralai/mixtral-8x7b-instruct">Mixtral 8x7B (Open Source)</option>
+              <input class="input" id={`openrouter-model-${idx}`} type="text" placeholder="openai/gpt-4-turbo" bind:value={$draft.roles[idx].openrouter_model} />
+            </div>
+            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            {#if roleModels[idx]?.length}
+              <div class="select is-fullwidth" style="margin-top:0.5rem;">
+                <select on:change={(e)=>{$draft.roles[idx].openrouter_model=(e.target as HTMLSelectElement).value}}>
+                  {#each roleModels[idx] as m}
+                    <option value={m}>{m}</option>
+                  {/each}
                 </select>
               </div>
-            </div>
+            {/if}
             <p class="help">Choose the language model for generating summaries. Different models offer different speed/quality tradeoffs.</p>
           </div>
 
