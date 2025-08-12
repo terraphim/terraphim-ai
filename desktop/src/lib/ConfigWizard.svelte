@@ -60,6 +60,11 @@
     openrouter_chat_enabled?: boolean;
     openrouter_chat_model?: string;
     openrouter_chat_system_prompt?: string;
+    // Generic LLM abstraction settings (stored in Role.extra)
+    llm_provider?: string; // openrouter | ollama
+    llm_model?: string;
+    llm_base_url?: string;
+    llm_auto_summarize?: boolean;
   };
   const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
     id: "Desktop",
@@ -111,7 +116,12 @@
             openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
             openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
             openrouter_chat_model: r.openrouter_chat_model ?? (r.openrouter_model ?? "openai/gpt-3.5-turbo"),
-            openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? ""
+            openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? "",
+            // Pull generic LLM settings from Role.extra if present
+            llm_provider: r.extra?.llm_provider ?? "",
+            llm_model: r.extra?.llm_model ?? "",
+            llm_base_url: r.extra?.llm_base_url ?? "",
+            llm_auto_summarize: r.extra?.llm_auto_summarize ?? false
             };
           })
         }));
@@ -145,7 +155,11 @@
       openrouter_auto_summarize: false,
       openrouter_chat_enabled: false,
       openrouter_chat_model: "openai/gpt-3.5-turbo",
-      openrouter_chat_system_prompt: ""
+      openrouter_chat_system_prompt: "",
+      llm_provider: "",
+      llm_model: "",
+      llm_base_url: "",
+      llm_auto_summarize: false
     }] }));
   }
   function removeRole(idx: number) {
@@ -253,6 +267,14 @@
           openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? ""
         })
       };
+
+      // Merge generic LLM settings into Role.extra
+      const extraUpdates: Record<string, any> = {};
+      if (r.llm_provider) extraUpdates.llm_provider = r.llm_provider;
+      if (r.llm_model) extraUpdates.llm_model = r.llm_model;
+      if (r.llm_base_url) extraUpdates.llm_base_url = r.llm_base_url;
+      if (typeof r.llm_auto_summarize === 'boolean') extraUpdates.llm_auto_summarize = r.llm_auto_summarize;
+      rolesMap[cleanKey].extra = { ...(rolesMap[cleanKey].extra || {}), ...extraUpdates };
     });
     updated.roles = rolesMap;
 
@@ -511,6 +533,44 @@
           </div>
         {/each}
         <button class="button is-small" data-testid="add-haystack-{idx}" on:click={() => addHaystack(idx)}>Add Haystack</button>
+
+        <!-- LLM Provider (Generic) -->
+        <h5 class="title is-6">AI-Enhanced Summaries (LLM Provider)</h5>
+        <div class="field">
+          <label class="label" for={`llm-provider-${idx}`}>Provider</label>
+          <div class="control">
+            <div class="select">
+              <select id={`llm-provider-${idx}`} bind:value={$draft.roles[idx].llm_provider}>
+                <option value="">(none)</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="ollama">Ollama (local)</option>
+              </select>
+            </div>
+          </div>
+          <p class="help">Choose a provider. OpenRouter uses API key; Ollama runs locally.</p>
+        </div>
+
+        <!-- Generic LLM fields -->
+        {#if $draft.roles[idx].llm_provider === 'ollama'}
+          <div class="field">
+            <label class="label" for={`llm-model-${idx}`}>Model</label>
+            <div class="control">
+              <input class="input" id={`llm-model-${idx}`} type="text" placeholder="llama3.1" bind:value={$draft.roles[idx].llm_model} />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for={`llm-base-url-${idx}`}>Base URL</label>
+            <div class="control">
+              <input class="input" id={`llm-base-url-${idx}`} type="text" placeholder="http://127.0.0.1:11434" bind:value={$draft.roles[idx].llm_base_url} />
+            </div>
+          </div>
+          <div class="field">
+            <label class="checkbox" for={`llm-auto-summarize-${idx}`}>
+              <input id={`llm-auto-summarize-${idx}`} type="checkbox" bind:checked={$draft.roles[idx].llm_auto_summarize} />
+              &nbsp;Automatically summarize search results
+            </label>
+          </div>
+        {/if}
 
         <!-- OpenRouter AI Configuration -->
         <h5 class="title is-6">AI-Enhanced Summaries (OpenRouter)</h5>
