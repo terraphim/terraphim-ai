@@ -162,6 +162,32 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 
 ### Future Work
 - Add streaming SSE for chat, caching for summaries, and model list fetch UI.
+
+## LLM Abstraction + Ollama Support (2025-08-12)
+
+### Key Insights
+- Introduce a provider-agnostic trait first, then migrate callsites. Keeps incremental risk low.
+- Use `Role.extra` for non-breaking config while existing OpenRouter fields continue to work.
+- Ollama’s chat API is OpenAI-like but returns `{ message: { content } }`; handle that shape.
+
+### Implementation Notes
+- New `terraphim_service::llm` module with `LlmClient` trait and `SummarizeOptions`.
+- Adapters:
+  - OpenRouter wraps existing client; preserves headers and token handling.
+  - Ollama uses `POST /api/chat` with `messages` array; non-stream for now.
+- Selection logic prefers `llm_provider` in `Role.extra`, else falls back to OpenRouter-if-configured, else Ollama if hints exist.
+
+### Testing
+- Compiles with default features and `--features openrouter`.
+- Added `ollama` feature flag; verify absence doesn’t impact default builds.
+ - Mocking Ollama with `wiremock` is straightforward using `/api/chat`; ensure response parsing targets `message.content`.
+ - End-to-end tests should skip gracefully if local Ollama is unreachable; probe `/api/tags` with a short timeout first.
+
+### Next
+- Add streaming methods to trait and wire SSE/websocket/line-delimited streaming.
+- Centralize retries/timeouts and redact model API logs.
+ - Extend UI to validate Ollama connectivity (simple GET to `/api/tags` or chat with minimal prompt) and list local models.
+ - Integrate `genai` as an alternative provider while keeping current adapters.
 1. **Advanced Query Syntax**
    - Support for `optionfn:findtrait:Iterator` syntax
    - Function signature search

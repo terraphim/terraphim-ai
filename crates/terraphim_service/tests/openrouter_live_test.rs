@@ -14,7 +14,9 @@ async fn live_chat_completion_smoke() {
         }
     };
 
-    let client = OpenRouterService::new(&api_key, "openai/gpt-3.5-turbo").expect("client init");
+    let model = std::env::var("OPENROUTER_MODEL")
+        .unwrap_or_else(|_| "openai/gpt-4-turbo".to_string());
+    let client = OpenRouterService::new(&api_key, &model).expect("client init");
 
     let reply = client
         .chat_completion(

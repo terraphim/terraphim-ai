@@ -7163,6 +7163,9 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "async-stream",
+ "async-trait",
+ "futures-util",
  "log",
  "opendal",
  "regex",
@@ -7171,6 +7174,7 @@ dependencies = [
  "serde_json",
  "serial_test 3.2.0",
  "strsim 0.11.1",
+ "tempfile",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",

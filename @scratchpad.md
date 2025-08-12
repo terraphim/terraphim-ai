@@ -278,6 +278,70 @@ Config fields
 
 ## Previous Work
 
+## LLM Provider Abstraction (2025-08-12)
+
+Status: Phase 1 COMPLETE (compiles)
+
+- Added `crates/terraphim_service/src/llm.rs` with `LlmClient` trait and provider selection.
+- Adapters:
+  - OpenRouter adapter wrapping existing `OpenRouterService` (behind `openrouter` feature)
+  - Ollama adapter via direct HTTP to `POST /api/chat` (behind `ollama` feature)
+- Config selection via `Role.extra` keys:
+  - `llm_provider` = `openrouter` | `ollama`
+  - `llm_model` or provider-specific `ollama_model`
+  - `llm_base_url` or `ollama_base_url` (default `http://127.0.0.1:11434`)
+  - `llm_auto_summarize` = true to enable generic summarization
+- Rewired summary enhancement in `terraphim_service::lib` to use LLM abstraction with OpenRouter back-compat.
+- Cargo features: added `ollama` feature in `terraphim_service` (uses `reqwest`).
+
+Build
+```bash
+cargo check -p terraphim_service
+cargo test -p terraphim_service --no-run
+cargo test -p terraphim_service --tests --features ollama --no-run
+```
+
+Next
+- Extend desktop wizard to surface `llm_provider`, `llm_model`, and Ollama base URL.
+- Add streaming API path and tests.
+
+UI
+- Desktop `ConfigWizard.svelte` updated to include generic LLM provider selector and Ollama fields (model, base URL, auto-summarize). Values are saved into `Role.extra`.
+
+Tests
+- Added `crates/terraphim_service/tests/ollama_adapter_smoke.rs` with a mock server to validate Ollama adapter summarize path behind `--features ollama`.
+
+Live E2E (Ollama)
+- Added `crates/terraphim_service/tests/ollama_live_test.rs` which configures a role with `llm_provider=ollama`, `llm_model=deepseek-coder:latest`, and hits local Ollama at `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`).
+- Run:
+  ```bash
+  ollama pull deepseek-coder:latest
+  export OLLAMA_BASE_URL="http://127.0.0.1:11434"
+  cargo test -p terraphim_service --test ollama_live_test --features ollama -- --nocapture
+  ```
+
+Resilience
+- Ollama client now uses a 30s timeout and up to 3 retry attempts on transient failures (5xx or network errors); 4xx fails fast.
+
+OpenRouter Live (using .env)
+- Ran `openrouter_live_test` with `OPENROUTER_API_KEY` from `.env` → 401 (User not found). Likely invalid/disabled key; test harness already skips when var missing or malformed.
+- To re-run:
+  ```bash
+  export OPENROUTER_API_KEY=sk-or-v1-...
+  cargo test -p terraphim_service --test openrouter_live_test --features openrouter -- --nocapture
+  ```
+
+Atomic Server E2E (using .env)
+- Reachable at `http://localhost:9883` (HTTP 200).
+- Non-ignored tests: passed.
+- Ignored full integration tests: mixed results — some passed, some failed with 500 from Atomic Server when creating a collection (error parsing JSON-AD URL). This appears environment-dependent; ensure `ATOMIC_SERVER_URL` and `ATOMIC_SERVER_SECRET` correspond to an agent with write access and correct base resource expectations.
+- Commands:
+  ```bash
+  export ATOMIC_SERVER_URL=http://localhost:9883
+  export ATOMIC_SERVER_SECRET=BASE64_AGENT_SECRET
+  cargo test -p terraphim_middleware --test atomic_haystack_config_integration -- --ignored --nocapture --test-threads=1
+  ```
+
 ### Atomic Server Integration
 - Status: ✅ Working (3/4 tests passing)
 - Endpoints: `/config`, `/documents/search`, `/health`
