@@ -16,6 +16,9 @@ use crate::score::Query;
 #[cfg(feature = "openrouter")]
 pub mod openrouter;
 
+// Generic LLM layer for multiple providers (OpenRouter, Ollama, etc.)
+pub mod llm;
+
 /// Normalize a filename to be used as a document ID
 ///
 /// This ensures consistent ID generation between server startup and edit API
@@ -625,49 +628,32 @@ impl<'a> TerraphimService {
     ///
     /// This method uses the OpenRouter service to generate intelligent summaries
     /// of document content, replacing basic text excerpts with AI-powered descriptions.
-    #[cfg(feature = "openrouter")]
     async fn enhance_descriptions_with_ai(
         &self,
         mut documents: Vec<Document>,
         role: &Role,
     ) -> Result<Vec<Document>> {
-        use crate::openrouter::OpenRouterService;
+        use crate::llm::{build_llm_from_role, SummarizeOptions};
 
-        // Create the OpenRouter service
-        let api_key = role.openrouter_api_key.as_ref().unwrap();
-        let model = role
-            .openrouter_model
-            .as_deref()
-            .unwrap_or("openai/gpt-3.5-turbo");
-
-        let openrouter_service = match OpenRouterService::new(api_key, model) {
-            Ok(service) => service,
-            Err(e) => {
-                log::error!(
-                    "Failed to create OpenRouter service for role '{}': {:?}",
-                    role.name,
-                    e
-                );
-                return Ok(documents); // Return original documents on service creation failure
-            }
+        let llm = match build_llm_from_role(role) {
+            Some(client) => client,
+            None => return Ok(documents),
         };
 
         log::info!(
-            "Enhancing {} document descriptions with OpenRouter model: {}",
+            "Enhancing {} document descriptions with LLM provider: {}",
             documents.len(),
-            model
+            llm.name()
         );
 
         let mut enhanced_count = 0;
         let mut error_count = 0;
 
         for document in &mut documents {
-            // Only enhance documents that have meaningful content and don't already have high-quality descriptions
             if self.should_generate_ai_summary(document) {
-                let summary_length = 250; // Target length for summaries
-
-                match openrouter_service
-                    .generate_summary(&document.body, summary_length)
+                let summary_length = 250;
+                match llm
+                    .summarize(&document.body, SummarizeOptions { max_length: summary_length })
                     .await
                 {
                     Ok(ai_summary) => {
@@ -681,24 +667,18 @@ impl<'a> TerraphimService {
                     }
                     Err(e) => {
                         log::warn!(
-                            "Failed to generate AI summary for '{}': {:?}",
+                            "Failed to generate AI summary for '{}': {}",
                             document.title,
                             e
                         );
                         error_count += 1;
-                        // Keep existing description as fallback
                     }
                 }
-            } else {
-                log::debug!(
-                    "Skipping AI summary for '{}' (not suitable for enhancement)",
-                    document.title
-                );
             }
         }
 
         log::info!(
-            "OpenRouter enhancement complete: {} enhanced, {} errors, {} skipped",
+            "LLM enhancement complete: {} enhanced, {} errors, {} skipped",
             enhanced_count,
             error_count,
             documents.len() - enhanced_count - error_count
@@ -711,7 +691,6 @@ impl<'a> TerraphimService {
     ///
     /// This helper method checks various criteria to decide whether a document
     /// would benefit from AI summarization.
-    #[cfg(feature = "openrouter")]
     fn should_generate_ai_summary(&self, document: &Document) -> bool {
         // Don't enhance if the document body is too short to summarize meaningfully
         if document.body.trim().len() < 200 {
@@ -889,10 +868,20 @@ impl<'a> TerraphimService {
                 }
 
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
+                // Apply AI summarization if enabled via OpenRouter or generic LLM config
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!(
                         "Applying OpenRouter AI summarization to {} search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
+                } else if crate::llm::role_wants_ai_summarize(&role) {
+                    log::debug!(
+                        "Applying LLM AI summarization to {} search results for role '{}'",
                         docs_ranked.len(),
                         role.name
                     );
@@ -944,6 +933,11 @@ impl<'a> TerraphimService {
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
+                } else if crate::llm::role_wants_ai_summarize(&role) {
+                    log::debug!("Applying LLM AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -986,6 +980,11 @@ impl<'a> TerraphimService {
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
+                } else if crate::llm::role_wants_ai_summarize(&role) {
+                    log::debug!("Applying LLM AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
@@ -1191,6 +1190,13 @@ impl<'a> TerraphimService {
                 if role.has_openrouter_config() {
                     log::debug!(
                         "Applying OpenRouter AI summarization to {} search results for role '{}'",
+                        documents.len(),
+                        role.name
+                    );
+                    documents = self.enhance_descriptions_with_ai(documents, &role).await?;
+                } else if crate::llm::role_wants_ai_summarize(&role) {
+                    log::debug!(
+                        "Applying LLM AI summarization to {} search results for role '{}'",
                         documents.len(),
                         role.name
                     );
