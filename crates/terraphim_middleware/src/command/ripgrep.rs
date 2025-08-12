@@ -244,11 +244,28 @@ impl RipgrepCommand {
         for (key, value) in extra_params {
             match key.as_str() {
                 "tag" => {
-                    // Filter files containing specific tags like #rust
-                    // Use ripgrep's --glob to match files containing the tag
-                    args.push("--glob".to_string());
-                    args.push(format!("*{}*", value));
-                    log::debug!("Added tag filter for: {}", value);
+                    // Require lines to match both the search needle and the tag(s)
+                    // Example: rg -tmarkdown --all-match -e needle -e "#rust"
+                    if !args.contains(&"--all-match".to_string()) {
+                        args.push("--all-match".to_string());
+                    }
+                    // Support comma or space separated tags
+                    let tags: Vec<&str> = value
+                        .split(|c: char| c == ',' || c.is_whitespace())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if tags.is_empty() {
+                        // Fallback: single value as provided
+                        args.push("-e".to_string());
+                        args.push(value.clone());
+                        log::debug!("Added tag pattern: {}", value);
+                    } else {
+                        for t in tags {
+                            args.push("-e".to_string());
+                            args.push(t.to_string());
+                            log::debug!("Added tag pattern: {}", t);
+                        }
+                    }
                 }
                 "glob" => {
                     // Direct glob pattern

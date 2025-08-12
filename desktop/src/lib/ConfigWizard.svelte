@@ -509,6 +509,38 @@ async function fetchLlmModels(roleIdx: number) {
             {#if $draft.roles[idx].haystacks[hIdx].service === "Ripgrep"}
               <div class="field">
                 <label class="label">Extra Parameters (for filtering)</label>
+                <!-- Dedicated Hashtag field mapped to extra_parameters.tag -->
+                <div class="field is-grouped">
+                  <div class="control">
+                    <label class="label" for={`ripgrep-hashtag-${idx}-${hIdx}`}>Hashtag</label>
+                    <input
+                      class="input"
+                      id={`ripgrep-hashtag-${idx}-${hIdx}`}
+                      type="text"
+                      placeholder="#rust"
+                      bind:value={$draft.roles[idx].haystacks[hIdx].extra_parameters["tag"]}
+                    />
+                  </div>
+                </div>
+                <div class="field is-grouped" style="margin-bottom:.5rem;">
+                  <div class="control">
+                    <label class="label" for={`ripgrep-hashtag-preset-${idx}-${hIdx}`}>Presets</label>
+                    <div class="select is-small">
+                      <select id={`ripgrep-hashtag-preset-${idx}-${hIdx}`}
+                        on:change={(e)=>{
+                          const val=(e.target as HTMLSelectElement).value;
+                          if (val) { $draft.roles[idx].haystacks[hIdx].extra_parameters["tag"]=val; }
+                        }}>
+                        <option value="">(choose)</option>
+                        <option value="#rust">#rust</option>
+                        <option value="#docs">#docs</option>
+                        <option value="#test">#test</option>
+                        <option value="#todo">#todo</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <p class="help">When set, searches will enforce the hashtag alongside your query (AND), e.g. <code>-e "search" -e "#rust"</code>.</p>
                 {#each Object.entries($draft.roles[idx].haystacks[hIdx].extra_parameters || {}) as [paramKey, paramValue], paramIdx}
                   <div class="field is-grouped">
                                                               <div class="control">
