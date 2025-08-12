@@ -1,4 +1,5 @@
 use anyhow::Result;
+use regex::Regex;
 use rmcp::{
     model::{CallToolRequestParam, ReadResourceRequestParam},
     service::ServiceExt,
@@ -7,7 +8,6 @@ use rmcp::{
 use std::process::Stdio;
 use terraphim_config::{ConfigBuilder, Haystack, ServiceType};
 use tokio::process::Command;
-use regex::Regex;
 
 async fn setup_server_command() -> Result<Command> {
     // Build the server first to ensure the binary is up-to-date
@@ -71,27 +71,35 @@ fn create_test_config() -> String {
         .build_default_server()
         .build()
         .expect("Failed to build test configuration");
-    
+
     // Update the haystack path to point to docs/src in the project root
     // Since we're running from the workspace root, docs/src should be directly accessible
     let docs_src_path = std::env::current_dir()
         .expect("Failed to get current directory")
         .join("docs/src");
-    
+
     println!("📁 Using docs/src as haystack: {:?}", docs_src_path);
-    
+
     // Verify the path exists
     if !docs_src_path.exists() {
-        println!("❌ Warning: docs/src path does not exist: {:?}", docs_src_path);
+        println!(
+            "❌ Warning: docs/src path does not exist: {:?}",
+            docs_src_path
+        );
         // List current directory contents to debug
-        if let Ok(entries) = std::fs::read_dir(std::env::current_dir().expect("Failed to get current directory")) {
+        if let Ok(entries) =
+            std::fs::read_dir(std::env::current_dir().expect("Failed to get current directory"))
+        {
             let dirs: Vec<_> = entries
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
                 .collect();
-            println!("📁 Current directory contents: {:?}", dirs.iter().map(|e| e.path()).collect::<Vec<_>>());
+            println!(
+                "📁 Current directory contents: {:?}",
+                dirs.iter().map(|e| e.path()).collect::<Vec<_>>()
+            );
         }
-        
+
         // Try to find docs directory
         let workspace_root = std::env::current_dir().expect("Failed to get current directory");
         let possible_paths = vec![
@@ -99,9 +107,14 @@ fn create_test_config() -> String {
             workspace_root.join("..").join("docs/src"),
             workspace_root.join("..").join("..").join("docs/src"),
         ];
-        
+
         for (i, path) in possible_paths.iter().enumerate() {
-            println!("🔍 Trying path {}: {:?} (exists: {})", i, path, path.exists());
+            println!(
+                "🔍 Trying path {}: {:?} (exists: {})",
+                i,
+                path,
+                path.exists()
+            );
             if path.exists() {
                 println!("✅ Found docs/src at: {:?}", path);
                 for role in config.roles.values_mut() {
@@ -129,7 +142,7 @@ fn create_test_config() -> String {
             }];
         }
     }
-    
+
     serde_json::to_string(&config).expect("Failed to serialize config")
 }
 
@@ -137,7 +150,9 @@ fn create_test_config() -> String {
 fn extract_found_count(message: &str) -> Option<usize> {
     // lazy static regex unnecessary in test context
     let re = Regex::new(r"Found (\d+) documents?").ok()?;
-    re.captures(message).and_then(|cap| cap.get(1)).and_then(|m| m.as_str().parse::<usize>().ok())
+    re.captures(message)
+        .and_then(|cap| cap.get(1))
+        .and_then(|m| m.as_str().parse::<usize>().ok())
 }
 
 #[tokio::test]
@@ -160,7 +175,9 @@ async fn test_mcp_server_integration() -> Result<()> {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
                 "config_str": test_config
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     println!("Update config result: {:#?}", config_result);
@@ -182,21 +199,28 @@ async fn test_mcp_server_integration() -> Result<()> {
                 arguments: serde_json::json!({
                     "query": query,
                     "limit": 5
-                }).as_object().cloned(),
+                })
+                .as_object()
+                .cloned(),
             })
             .await?;
         println!("Search result for '{}': {:#?}", query, search_result);
-        
+
         // Check if search was successful (even if no results found)
         assert!(!search_result.is_error.unwrap_or(false));
-        
+
         // Verify we got a response
         if let Some(content) = search_result.content.first() {
             if let Some(text_content) = content.as_text() {
                 println!("Search response: {}", text_content.text);
                 // Ensure the reported count matches number of resource objects returned (text node excluded)
                 if let Some(found) = extract_found_count(&text_content.text) {
-                    assert!(found >= search_result.content.len() - 1, "Reported document count {} is less than returned resources {}", found, search_result.content.len() - 1);
+                    assert!(
+                        found >= search_result.content.len() - 1,
+                        "Reported document count {} is less than returned resources {}",
+                        found,
+                        search_result.content.len() - 1
+                    );
                 } else {
                     panic!("Failed to parse found-count message: {}", text_content.text);
                 }
@@ -223,7 +247,9 @@ async fn test_search_with_different_roles() -> Result<()> {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
                 "config_str": test_config
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(!config_result.is_error.unwrap_or(false));
@@ -244,22 +270,32 @@ async fn test_search_with_different_roles() -> Result<()> {
                     "query": query,
                     "role": role,
                     "limit": 3
-                }).as_object().cloned(),
+                })
+                .as_object()
+                .cloned(),
             })
             .await?;
-        
+
         println!("Search result for role '{}': {:#?}", role, search_result);
         assert!(!search_result.is_error.unwrap_or(false));
-        
+
         // Verify we got a response
         if let Some(content) = search_result.content.first() {
             if let Some(text_content) = content.as_text() {
                 println!("Role '{}' response: {}", role, text_content.text);
                 if let Some(found) = extract_found_count(&text_content.text) {
-                    assert!(found >= search_result.content.len() - 1, "Reported document count {} is less than returned resources {}", found, search_result.content.len() - 1);
+                    assert!(
+                        found >= search_result.content.len() - 1,
+                        "Reported document count {} is less than returned resources {}",
+                        found,
+                        search_result.content.len() - 1
+                    );
                     // For Default role there should be at least one document
                     if role == "Default" {
-                        assert!(found > 0, "Default role should return at least one document");
+                        assert!(
+                            found > 0,
+                            "Default role should return at least one document"
+                        );
                     }
                 } else {
                     panic!("Failed to parse found-count message: {}", text_content.text);
@@ -287,7 +323,9 @@ async fn test_resource_uri_mapping() -> Result<()> {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
                 "config_str": test_config
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(!config_result.is_error.unwrap_or(false));
@@ -295,7 +333,7 @@ async fn test_resource_uri_mapping() -> Result<()> {
     // List available resources
     let resources = service.list_resources(Default::default()).await?;
     println!("Available resources: {:#?}", resources);
-    
+
     // Test reading a specific resource if available
     if let Some(resource) = resources.resources.first() {
         println!("Testing read resource: {}", resource.uri);
@@ -305,7 +343,7 @@ async fn test_resource_uri_mapping() -> Result<()> {
             })
             .await?;
         println!("Read resource result: {:#?}", read_result);
-        
+
         // Verify we got content
         if let Some(content) = read_result.contents.first() {
             match content {
@@ -327,7 +365,7 @@ async fn test_resource_uri_mapping() -> Result<()> {
             uri: "invalid://resource/uri".to_string(),
         })
         .await;
-    
+
     // Should return an error for invalid URI
     assert!(invalid_result.is_err());
 
@@ -350,14 +388,16 @@ async fn test_simple_search_with_debug() -> Result<()> {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
                 "config_str": test_config
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(!config_result.is_error.unwrap_or(false));
 
     // Test with a simple search term that should definitely match
     let search_terms = vec![
-        "Machine Learning",  // Should match machine_learning.md
+        "Machine Learning", // Should match machine_learning.md
         "Terraphim",        // Should match terraphim.md
         "neural",           // Should match neural_networks.md
         "system",           // Should match System Operator.md
@@ -371,29 +411,45 @@ async fn test_simple_search_with_debug() -> Result<()> {
                 arguments: serde_json::json!({
                     "query": search_term,
                     "limit": 10
-                }).as_object().cloned(),
+                })
+                .as_object()
+                .cloned(),
             })
             .await?;
-        
+
         println!("Search result for '{}': {:#?}", search_term, search_result);
         assert!(!search_result.is_error.unwrap_or(false));
-        
+
         // Verify we got a response
         if let Some(content) = search_result.content.first() {
             if let Some(text_content) = content.as_text() {
-                println!("Search response for '{}': {}", search_term, text_content.text);
+                println!(
+                    "Search response for '{}': {}",
+                    search_term, text_content.text
+                );
                 // Ensure the reported count matches number of resource objects returned (text node excluded)
                 if let Some(found) = extract_found_count(&text_content.text) {
-                    assert!(found >= search_result.content.len() - 1, "Reported document count {} is less than returned resources {}", found, search_result.content.len() - 1);
+                    assert!(
+                        found >= search_result.content.len() - 1,
+                        "Reported document count {} is less than returned resources {}",
+                        found,
+                        search_result.content.len() - 1
+                    );
                 } else {
                     panic!("Failed to parse found-count message: {}", text_content.text);
                 }
-                
+
                 // If we found documents, let's see what they are
                 if text_content.text.contains("Found") && !text_content.text.contains("Found 0") {
-                    println!("✅ Found documents for '{}': {}", search_term, text_content.text);
+                    println!(
+                        "✅ Found documents for '{}': {}",
+                        search_term, text_content.text
+                    );
                 } else {
-                    println!("❌ No documents found for '{}': {}", search_term, text_content.text);
+                    println!(
+                        "❌ No documents found for '{}': {}",
+                        search_term, text_content.text
+                    );
                 }
             }
         }
@@ -415,7 +471,9 @@ async fn test_search_pagination() -> Result<()> {
     service
         .call_tool(CallToolRequestParam {
             name: "update_config_tool".into(),
-            arguments: serde_json::json!({"config_str": test_config}).as_object().cloned(),
+            arguments: serde_json::json!({"config_str": test_config})
+                .as_object()
+                .cloned(),
         })
         .await?;
 
@@ -426,7 +484,9 @@ async fn test_search_pagination() -> Result<()> {
             arguments: serde_json::json!({
                 "query": "terraphim",
                 "limit": 2
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(!first_page.is_error.unwrap_or(false));
@@ -447,7 +507,9 @@ async fn test_search_pagination() -> Result<()> {
                 "query": "terraphim",
                 "skip": 2,
                 "limit": 2
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(!second_page.is_error.unwrap_or(false));
@@ -475,7 +537,9 @@ async fn test_search_invalid_pagination_params() -> Result<()> {
             arguments: serde_json::json!({
                 "query": "terraphim",
                 "limit": -5
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(res.is_error.unwrap_or(false) || res.content.first().is_some());
@@ -487,7 +551,9 @@ async fn test_search_invalid_pagination_params() -> Result<()> {
             arguments: serde_json::json!({
                 "query": "terraphim",
                 "limit": 10_000
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(res2.is_error.unwrap_or(false) || res2.content.first().is_some());
@@ -505,7 +571,9 @@ async fn test_search_read_resource_round_trip() -> Result<()> {
     service
         .call_tool(CallToolRequestParam {
             name: "update_config_tool".into(),
-            arguments: serde_json::json!({"config_str": create_test_config()}).as_object().cloned(),
+            arguments: serde_json::json!({"config_str": create_test_config()})
+                .as_object()
+                .cloned(),
         })
         .await?;
 
@@ -516,7 +584,9 @@ async fn test_search_read_resource_round_trip() -> Result<()> {
             arguments: serde_json::json!({
                 "query": "terraphim",
                 "limit": 1
-            }).as_object().cloned(),
+            })
+            .as_object()
+            .cloned(),
         })
         .await?;
     assert!(!search_res.is_error.unwrap_or(false));
@@ -525,7 +595,10 @@ async fn test_search_read_resource_round_trip() -> Result<()> {
         .iter()
         .find_map(|c| c.as_resource())
         .expect("Expected at least one resource");
-    let _embedded_text = if let rmcp::model::ResourceContents::TextResourceContents { text, .. } = &resource.resource {
+    let _embedded_text = if let rmcp::model::ResourceContents::TextResourceContents {
+        text, ..
+    } = &resource.resource
+    {
         text.clone()
     } else {
         panic!("Unexpected resource content type");
@@ -543,11 +616,15 @@ async fn test_search_read_resource_round_trip() -> Result<()> {
     let read_res = service
         .read_resource(ReadResourceRequestParam { uri: first_uri })
         .await?;
-    let read_text = match read_res.contents.first().expect("read_resource returned empty content") {
+    let read_text = match read_res
+        .contents
+        .first()
+        .expect("read_resource returned empty content")
+    {
         rmcp::model::ResourceContents::TextResourceContents { text, .. } => text.clone(),
         _ => "".into(),
     };
     assert!(!read_text.is_empty());
 
     Ok(())
-} 
+}

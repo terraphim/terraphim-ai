@@ -6,16 +6,16 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
+use regex::Regex;
 use rust_embed::RustEmbed;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
+use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::IndexedDocument;
+use terraphim_types::{Document, RelevanceFunction};
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
-use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
-use terraphim_types::{RelevanceFunction, Document};
-use regex::Regex;
 use walkdir::WalkDir;
 
 /// Create a proper description from document content
@@ -25,17 +25,15 @@ fn create_document_description(content: &str) -> Option<String> {
     let mut description_parts = Vec::new();
     let mut found_header = false;
     let mut content_lines = 0;
-    
+
     for line in lines {
         let trimmed = line.trim();
-        
+
         // Skip empty lines, frontmatter, and comments
-        if trimmed.is_empty() || 
-           trimmed.starts_with("---") ||
-           trimmed.starts_with("<!--") {
+        if trimmed.is_empty() || trimmed.starts_with("---") || trimmed.starts_with("<!--") {
             continue;
         }
-        
+
         // Check if this is a markdown header
         if trimmed.starts_with('#') {
             if !found_header {
@@ -48,7 +46,7 @@ fn create_document_description(content: &str) -> Option<String> {
             }
             continue;
         }
-        
+
         // Handle synonyms specially for KG files
         if trimmed.starts_with("synonyms::") {
             let synonym_text = trimmed.trim_start_matches("synonyms::").trim();
@@ -57,28 +55,31 @@ fn create_document_description(content: &str) -> Option<String> {
             }
             continue;
         }
-        
+
         // Found a meaningful paragraph - collect multiple lines for better context
-        if trimmed.len() > 20 && content_lines < 3 { // Get up to 3 meaningful content lines
+        if trimmed.len() > 20 && content_lines < 3 {
+            // Get up to 3 meaningful content lines
             // Skip lines that are just metadata or formatting
             if !trimmed.starts_with("tags::") &&
                !trimmed.starts_with("![") && // Skip image references
-               !trimmed.starts_with("```") { // Skip code blocks
+               !trimmed.starts_with("```")
+            {
+                // Skip code blocks
                 description_parts.push(trimmed.to_string());
                 content_lines += 1;
             }
         }
-        
+
         // Stop if we have enough content
         if description_parts.len() >= 4 || content_lines >= 3 {
             break;
         }
     }
-    
+
     if description_parts.is_empty() {
         return None;
     }
-    
+
     // Combine all parts intelligently
     let combined = if description_parts.len() == 1 {
         description_parts[0].clone()
@@ -95,21 +96,24 @@ fn create_document_description(content: &str) -> Option<String> {
         }
         result
     };
-    
+
     // Limit total length to 400 characters for more informative descriptions
     let description = if combined.len() > 400 {
         format!("{}...", &combined[..397])
     } else {
         combined
     };
-    
+
     Some(description)
 }
 
 mod api;
 mod error;
 
-use api::{create_document, health, search_documents, search_documents_post, get_rolegraph, find_documents_by_kg_term};
+use api::{
+    create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
+    search_documents_post,
+};
 pub use api::{ConfigResponse, CreateDocumentResponse, SearchResponse};
 pub use error::{Result, Status};
 
@@ -122,25 +126,31 @@ struct Assets;
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
-    
+
     let mut config = config_state.config.lock().await.clone();
     let mut local_rolegraphs = ahash::AHashMap::new();
-    
+
     for (role_name, role) in &mut config.roles {
         if role.relevance_function == RelevanceFunction::TerraphimGraph {
             if let Some(kg) = &role.kg {
                 if kg.automata_path.is_none() && kg.knowledge_graph_local.is_some() {
-                    log::info!("Building rolegraph for role '{}' from local files", role_name);
-                    
+                    log::info!(
+                        "Building rolegraph for role '{}' from local files",
+                        role_name
+                    );
+
                     let kg_local = kg.knowledge_graph_local.as_ref().unwrap();
                     log::info!("Knowledge graph path: {:?}", kg_local.path);
-                    
+
                     // Check if the directory exists
                     if !kg_local.path.exists() {
-                        log::warn!("Knowledge graph directory does not exist: {:?}", kg_local.path);
+                        log::warn!(
+                            "Knowledge graph directory does not exist: {:?}",
+                            kg_local.path
+                        );
                         continue;
                     }
-                    
+
                     // List files in the directory
                     let files: Vec<_> = if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
                         entries
@@ -156,76 +166,95 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                     } else {
                         Vec::new()
                     };
-                    
-                    log::info!("Found {} markdown files in {:?}", files.len(), kg_local.path);
+
+                    log::info!(
+                        "Found {} markdown files in {:?}",
+                        files.len(),
+                        kg_local.path
+                    );
                     for file in &files {
                         log::info!("  - {:?}", file.path());
                     }
-                    
+
                     // Build thesaurus using Logseq builder
                     let builder = Logseq::default();
                     log::info!("Created Logseq builder for path: {:?}", kg_local.path);
-                    
-                    match builder.build(role_name.to_string(), kg_local.path.clone()).await {
+
+                    match builder
+                        .build(role_name.to_string(), kg_local.path.clone())
+                        .await
+                    {
                         Ok(thesaurus) => {
                             log::info!("Successfully built and indexed rolegraph for role '{}' with {} terms and {} documents", role_name, thesaurus.len(), files.len());
                             // Create rolegraph
                             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
                             log::info!("Successfully created rolegraph for role '{}'", role_name);
-                            
+
                             // Index documents from knowledge graph files into the rolegraph
                             let mut rolegraph_with_docs = rolegraph;
-                            
+
                             // Index the knowledge graph markdown files as documents
                             if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
                                 for entry in entries.filter_map(|e| e.ok()) {
                                     if let Some(ext) = entry.path().extension() {
                                         if ext == "md" || ext == "markdown" {
-                                            if let Ok(content) = tokio::fs::read_to_string(&entry.path()).await {
-                                                                                // Create a proper description from the document content
-                                let description = create_document_description(&content);
-                                
-                                // Use normalized ID to match what persistence layer uses
-                                let filename = entry.file_name().to_string_lossy().to_string();
-                                let normalized_id = {
-                                    let re = Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
-                                    re.replace_all(&filename, "").to_lowercase()
-                                };
-                                
-                                let document = Document {
-                                    id: normalized_id.clone(),
-                                    url: entry.path().to_string_lossy().to_string(),
-                                    title: filename.clone(), // Keep original filename as title for display
-                                    body: content,
-                                    description,
-                                    stub: None,
-                                    tags: None,
-                                    rank: None,
-                                };
-                                                
+                                            if let Ok(content) =
+                                                tokio::fs::read_to_string(&entry.path()).await
+                                            {
+                                                // Create a proper description from the document content
+                                                let description =
+                                                    create_document_description(&content);
+
+                                                // Use normalized ID to match what persistence layer uses
+                                                let filename =
+                                                    entry.file_name().to_string_lossy().to_string();
+                                                let normalized_id = {
+                                                    let re = Regex::new(r"[^a-zA-Z0-9]+")
+                                                        .expect("Failed to create regex");
+                                                    re.replace_all(&filename, "").to_lowercase()
+                                                };
+
+                                                let document = Document {
+                                                    id: normalized_id.clone(),
+                                                    url: entry.path().to_string_lossy().to_string(),
+                                                    title: filename.clone(), // Keep original filename as title for display
+                                                    body: content,
+                                                    description,
+                                                    stub: None,
+                                                    tags: None,
+                                                    rank: None,
+                                                };
+
                                                 // Save document to persistence layer first
                                                 if let Err(e) = document.save().await {
                                                     log::error!("Failed to save document '{}' to persistence: {}", document.id, e);
                                                 } else {
                                                     log::info!("✅ Saved document '{}' to persistence layer", document.id);
                                                 }
-                                                
+
                                                 // Then add to rolegraph for KG indexing using the same normalized ID
-                                                rolegraph_with_docs.insert_document(&normalized_id, document);
-                                                log::info!("✅ Indexed document '{}' into rolegraph", filename);
+                                                rolegraph_with_docs
+                                                    .insert_document(&normalized_id, document);
+                                                log::info!(
+                                                    "✅ Indexed document '{}' into rolegraph",
+                                                    filename
+                                                );
                                             }
                                         }
                                     }
                                 }
                             }
-                            
+
                             // Also process and save all documents from haystack directories (recursively)
                             for haystack in &role.haystacks {
                                 if haystack.service == terraphim_config::ServiceType::Ripgrep {
-                                    log::info!("Processing haystack documents from: {} (recursive)", haystack.location);
-                                    
+                                    log::info!(
+                                        "Processing haystack documents from: {} (recursive)",
+                                        haystack.location
+                                    );
+
                                     let mut processed_count = 0;
-                                    
+
                                     // Use walkdir for recursive directory traversal
                                     for entry in WalkDir::new(&haystack.location)
                                         .into_iter()
@@ -234,27 +263,40 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                     {
                                         if let Some(ext) = entry.path().extension() {
                                             if ext == "md" || ext == "markdown" {
-                                                if let Ok(content) = tokio::fs::read_to_string(&entry.path()).await {
+                                                if let Ok(content) =
+                                                    tokio::fs::read_to_string(&entry.path()).await
+                                                {
                                                     // Create a proper description from the document content
-                                                    let description = create_document_description(&content);
-                                                    
+                                                    let description =
+                                                        create_document_description(&content);
+
                                                     // Use normalized ID to match what persistence layer uses
-                                                    let filename = entry.file_name().to_string_lossy().to_string();
+                                                    let filename = entry
+                                                        .file_name()
+                                                        .to_string_lossy()
+                                                        .to_string();
                                                     let normalized_id = {
-                                                        let re = Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
+                                                        let re = Regex::new(r"[^a-zA-Z0-9]+")
+                                                            .expect("Failed to create regex");
                                                         re.replace_all(&filename, "").to_lowercase()
                                                     };
-                                                    
+
                                                     // Skip if this is already a KG document (avoid duplicates)
-                                                    if let Some(kg_local) = &kg.knowledge_graph_local {
-                                                        if entry.path().starts_with(&kg_local.path) {
+                                                    if let Some(kg_local) =
+                                                        &kg.knowledge_graph_local
+                                                    {
+                                                        if entry.path().starts_with(&kg_local.path)
+                                                        {
                                                             continue; // Skip KG files, already processed above
                                                         }
                                                     }
-                                                    
+
                                                     let document = Document {
                                                         id: normalized_id.clone(),
-                                                        url: entry.path().to_string_lossy().to_string(),
+                                                        url: entry
+                                                            .path()
+                                                            .to_string_lossy()
+                                                            .to_string(),
                                                         title: filename.clone(), // Keep original filename as title for display
                                                         body: content,
                                                         description,
@@ -262,7 +304,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         tags: None,
                                                         rank: None,
                                                     };
-                                                    
+
                                                     // Save document to persistence layer
                                                     if let Err(e) = document.save().await {
                                                         log::debug!("Failed to save haystack document '{}' to persistence: {}", document.id, e);
@@ -274,28 +316,39 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                             }
                                         }
                                     }
-                                    log::info!("✅ Processed {} documents from haystack: {} (recursive)", processed_count, haystack.location);
+                                    log::info!(
+                                        "✅ Processed {} documents from haystack: {} (recursive)",
+                                        processed_count,
+                                        haystack.location
+                                    );
                                 }
                             }
 
                             // Store in local rolegraphs map
-                            local_rolegraphs.insert(role_name.clone(), RoleGraphSync::from(rolegraph_with_docs));
+                            local_rolegraphs.insert(
+                                role_name.clone(),
+                                RoleGraphSync::from(rolegraph_with_docs),
+                            );
                             log::info!("Stored rolegraph in local map for role '{}'", role_name);
                         }
                         Err(e) => {
-                            log::error!("Failed to build thesaurus for role '{}': {}", role_name, e);
+                            log::error!(
+                                "Failed to build thesaurus for role '{}': {}",
+                                role_name,
+                                e
+                            );
                         }
                     }
                 }
             }
         }
     }
-    
+
     // Merge local rolegraphs with existing ones
     for (role_name, rolegraph) in local_rolegraphs {
         config_state.roles.insert(role_name, rolegraph);
     }
-    
+
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
@@ -322,7 +375,10 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/config/selected_role/", post(api::update_selected_role))
         .route("/rolegraph", get(get_rolegraph))
         .route("/rolegraph/", get(get_rolegraph))
-        .route("/roles/:role_name/kg_search", get(find_documents_by_kg_term))
+        .route(
+            "/roles/:role_name/kg_search",
+            get(find_documents_by_kg_term),
+        )
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))

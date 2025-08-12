@@ -5,4 +5,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     generate_typescript_bindings()?;
     println!("✅ Done! Check desktop/src/lib/generated/types.ts");
     Ok(())
-} 
+}

@@ -1,7 +1,7 @@
-use terraphim_atomic_client::{Config, Store};
 use serde_json::json;
 use std::collections::HashMap;
 use std::env;
+use terraphim_atomic_client::{Config, Store};
 use urlencoding;
 
 #[cfg(feature = "native")]
@@ -9,10 +9,10 @@ use urlencoding;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments
     let args: Vec<String> = env::args().collect();
-    
+
     // Check operation type
     let operation = if args.len() > 1 { &args[1] } else { "help" };
-    
+
     match operation {
         "create" => create_resource(&args).await?,
         "update" => update_resource(&args).await?,
@@ -35,10 +35,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("  terraphim_atomic_client export-ontology <ontology_subject> [output_file] [format] [--validate]");
             println!("  terraphim_atomic_client collection <class_url> <sort_property_url> [--desc] [--limit N]");
             println!("  terraphim_atomic_client export-to-local <root_subject> [output_file] [format] [--validate]");
-            println!("  terraphim_atomic_client import-ontology <json_file> [parent_url] [--validate]");
+            println!(
+                "  terraphim_atomic_client import-ontology <json_file> [parent_url] [--validate]"
+            );
         }
     }
-    
+
     Ok(())
 }
 
@@ -55,17 +57,17 @@ async fn get_resource(args: &[String]) -> Result<(), Box<dyn std::error::Error>>
         println!("Usage: terraphim_atomic_client get <resource_url>");
         return Ok(());
     }
-    
+
     let resource_url = &args[2];
-    
+
     // Load configuration from environment
     let config = Config::from_env()?;
     let store = Store::new(config)?;
-    
+
     // Get the resource
     let resource = store.get_resource(resource_url).await?;
     println!("Resource: {:#?}", resource);
-    
+
     Ok(())
 }
 
@@ -76,21 +78,21 @@ async fn create_resource(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         println!("Usage: terraphim_atomic_client create <shortname> <name> <description> <class>");
         return Ok(());
     }
-    
+
     let shortname = &args[2];
     let name = &args[3];
     let description = &args[4];
     let class = &args[5];
-    
+
     // Load configuration from environment
     let config = Config::from_env()?;
     let store = Store::new(config)?;
-    
+
     // Create a unique resource ID with proper URL formatting
     let server_url = store.config.server_url.trim_end_matches('/');
     let subject = format!("{}/{}", server_url, shortname);
     println!("Creating resource with ID: {}", subject);
-    
+
     // Create properties for the resource
     let mut properties = HashMap::new();
     properties.insert(
@@ -113,11 +115,11 @@ async fn create_resource(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         "https://atomicdata.dev/properties/isA".to_string(),
         json!([format!("https://atomicdata.dev/classes/{}", class)]),
     );
-    
+
     // Create the resource using a commit
     let result = store.create_with_commit(&subject, properties).await?;
     println!("Resource created successfully: {:#?}", result);
-    
+
     Ok(())
 }
 
@@ -128,23 +130,23 @@ async fn update_resource(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         println!("Usage: terraphim_atomic_client update <resource_url> <property> <value>");
         return Ok(());
     }
-    
+
     let resource_url = &args[2];
     let property = &args[3];
     let value = &args[4];
-    
+
     // Load configuration from environment
     let config = Config::from_env()?;
     let store = Store::new(config)?;
-    
+
     // Create properties for the update
     let mut properties = HashMap::new();
     properties.insert(property.to_string(), json!(value));
-    
+
     // Update the resource using a commit
     let result = store.update_with_commit(resource_url, properties).await?;
     println!("Resource updated successfully: {:#?}", result);
-    
+
     Ok(())
 }
 
@@ -155,17 +157,17 @@ async fn delete_resource(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         println!("Usage: terraphim_atomic_client delete <resource_url>");
         return Ok(());
     }
-    
+
     let resource_url = &args[2];
-    
+
     // Load configuration from environment
     let config = Config::from_env()?;
     let store = Store::new(config)?;
-    
+
     // Delete the resource using a commit
     let result = store.delete_with_commit(resource_url).await?;
     println!("Resource deleted successfully: {:#?}", result);
-    
+
     Ok(())
 }
 
@@ -176,17 +178,17 @@ async fn search_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         println!("Usage: terraphim_atomic_client search <query>");
         return Ok(());
     }
-    
+
     let query = &args[2];
-    
+
     // Load configuration from environment
     let config = Config::from_env()?;
     let store = Store::new(config)?;
-    
+
     // Search for resources
     let results = store.search(query).await?;
     println!("Search results: {:#?}", results);
-    
+
     Ok(())
 }
 
@@ -199,8 +201,16 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
     }
 
     let subject = &args[2];
-    let output_file = if args.len() > 3 { &args[3] } else { "export.json" };
-    let format = if args.len() > 4 { args[4].to_lowercase() } else { "json-ad".to_string() };
+    let output_file = if args.len() > 3 {
+        &args[3]
+    } else {
+        "export.json"
+    };
+    let format = if args.len() > 4 {
+        args[4].to_lowercase()
+    } else {
+        "json-ad".to_string()
+    };
 
     // optional validation flag
     let validate = args.iter().any(|a| a == "--validate");
@@ -221,7 +231,7 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         "json" | "json-ad" => {
             let serialized = serde_json::to_vec_pretty(&resources)?;
             file.write_all(&serialized)?;
-        },
+        }
         "turtle" => {
             // Serialize each resource individually using Turtle representation from server
             let client = reqwest::Client::new();
@@ -233,24 +243,40 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
                     .send()
                     .await?;
                 if !resp.status().is_success() {
-                    return Err(format!("Failed to fetch Turtle serialization for {}: {}", res.subject, resp.status()).into());
+                    return Err(format!(
+                        "Failed to fetch Turtle serialization for {}: {}",
+                        res.subject,
+                        resp.status()
+                    )
+                    .into());
                 }
                 let body = resp.text().await?;
                 writeln!(file, "{}", body)?;
             }
-        },
+        }
         other => {
-            println!("Unsupported format '{}'. Supported: json, json-ad, turtle", other);
+            println!(
+                "Unsupported format '{}'. Supported: json, json-ad, turtle",
+                other
+            );
             return Ok(());
         }
     }
 
-    println!("Saved {} resources to {} in {} format", resources.len(), output_file, format);
+    println!(
+        "Saved {} resources to {} in {} format",
+        resources.len(),
+        output_file,
+        format
+    );
 
     if validate && format == "json-ad" {
         let server_prefix = store.config.server_url.trim_end_matches('/');
         let encoded_parent = urlencoding::encode(subject);
-        let mut import_url = format!("{}/import?parent={}&overwrite_outside=true", server_prefix, encoded_parent);
+        let mut import_url = format!(
+            "{}/import?parent={}&overwrite_outside=true",
+            server_prefix, encoded_parent
+        );
         if let Some(agent) = &store.config.agent {
             let encoded_agent = urlencoding::encode(&agent.subject);
             import_url.push_str("&agent=");
@@ -260,13 +286,22 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         // Always send JSON-AD regardless of chosen output format.
         let body = serde_json::to_vec(&resources)?;
 
-        use reqwest::header::{HeaderValue, CONTENT_TYPE, ACCEPT};
+        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::new();
         let resp = if let Some(agent) = &store.config.agent {
-            let mut headers = terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/ad+json"));
+            let mut headers =
+                terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
+            headers.insert(
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/ad+json"),
+            );
             headers.insert(ACCEPT, HeaderValue::from_static("application/ad+json"));
-            client.post(&import_url).headers(headers).body(body).send().await?
+            client
+                .post(&import_url)
+                .headers(headers)
+                .body(body)
+                .send()
+                .await?
         } else {
             client
                 .post(&import_url)
@@ -278,7 +313,10 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         };
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        println!("Warning: server responded with status {} during import validation. Body: {}", status, text);
+        println!(
+            "Warning: server responded with status {} during import validation. Body: {}",
+            status, text
+        );
     } else if validate {
         println!("Validation requires json-ad format – skipped.");
     } else {
@@ -289,7 +327,10 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
 }
 
 #[cfg(feature = "native")]
-async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_client::Result<Vec<terraphim_atomic_client::Resource>> {
+async fn fetch_all_subresources(
+    store: &Store,
+    root: &str,
+) -> terraphim_atomic_client::Result<Vec<terraphim_atomic_client::Resource>> {
     use std::collections::{HashSet, VecDeque};
 
     let mut visited: HashSet<String> = HashSet::new();
@@ -298,7 +339,7 @@ async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_c
 
     println!("Starting fetch_all_subresources with root: {}", root);
     println!("Server URL: {}", store.config.server_url);
-    
+
     // First, process the root resource to get its subresources
     println!("Processing root resource first: {}", root);
     match store.get_resource(root).await {
@@ -306,9 +347,12 @@ async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_c
             println!("Successfully fetched root resource: {}", res.subject);
             collected.push(res.clone());
             visited.insert(root.to_string());
-            
+
             // Add subresources from root to queue
-            if let Some(subresources) = res.properties.get("https://atomicdata.dev/properties/subresources") {
+            if let Some(subresources) = res
+                .properties
+                .get("https://atomicdata.dev/properties/subresources")
+            {
                 println!("Found subresources property: {:?}", subresources);
                 if let Some(subresources_array) = subresources.as_array() {
                     for subresource in subresources_array {
@@ -321,7 +365,7 @@ async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_c
             } else {
                 println!("No subresources property found in root resource");
             }
-            
+
             // Also collect links from root resource properties
             let server_prefix = store.config.server_url.trim_end_matches('/');
             for (_prop, value) in &res.properties {
@@ -337,15 +381,15 @@ async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_c
     // Now process the queue
     while let Some(subject) = queue.pop_front() {
         println!("Processing subject: {}", subject);
-        
+
         // Basic guards: only follow HTTP/HTTPS URLs belonging to same server.
         // Normalize URLs by removing trailing slashes for comparison
         let normalized_subject = subject.trim_end_matches('/');
         let normalized_server_url = store.config.server_url.trim_end_matches('/');
-        
+
         println!("Normalized subject: {}", normalized_subject);
         println!("Normalized server URL: {}", normalized_server_url);
-        
+
         if !normalized_subject.starts_with(normalized_server_url) {
             println!("Skipping {} - not on same server", subject);
             continue;
@@ -362,7 +406,7 @@ async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_c
                 println!("Successfully fetched resource: {}", res.subject);
                 collected.push(res.clone());
                 let server_prefix = store.config.server_url.trim_end_matches('/');
-                
+
                 // Collect links from all properties (for nested resources)
                 for (_prop, value) in &res.properties {
                     collect_links(&mut queue, value, server_prefix);
@@ -379,7 +423,11 @@ async fn fetch_all_subresources(store: &Store, root: &str) -> terraphim_atomic_c
 }
 
 #[cfg(feature = "native")]
-fn collect_links(queue: &mut std::collections::VecDeque<String>, value: &serde_json::Value, server_prefix: &str) {
+fn collect_links(
+    queue: &mut std::collections::VecDeque<String>,
+    value: &serde_json::Value,
+    server_prefix: &str,
+) {
     if let Some(arr) = value.as_array() {
         for val in arr {
             collect_links(queue, val, server_prefix);
@@ -417,8 +465,16 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     }
 
     let ontology_subject = &args[2];
-    let output_file = if args.len() > 3 { &args[3] } else { "ontology.json" };
-    let format = if args.len() > 4 { args[4].to_lowercase() } else { "json-ad".to_string() };
+    let output_file = if args.len() > 3 {
+        &args[3]
+    } else {
+        "ontology.json"
+    };
+    let format = if args.len() > 4 {
+        args[4].to_lowercase()
+    } else {
+        "json-ad".to_string()
+    };
     let validate = args.iter().any(|a| a == "--validate");
 
     // Load configuration from environment
@@ -432,7 +488,11 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     let ontology_path = {
         let url = ontology_subject.trim_end_matches('/');
         let after = url.split('/').last().unwrap_or("");
-        if after.is_empty() { url } else { after }
+        if after.is_empty() {
+            url
+        } else {
+            after
+        }
     };
 
     let mut mapping: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -448,7 +508,11 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     }
 
     // Helper to convert values using mapping (similar to export_ontology)
-    fn map_value(val: &serde_json::Value, mapping: &std::collections::HashMap<String,String>, root_subject: &str) -> serde_json::Value {
+    fn map_value(
+        val: &serde_json::Value,
+        mapping: &std::collections::HashMap<String, String>,
+        root_subject: &str,
+    ) -> serde_json::Value {
         match val {
             serde_json::Value::String(s) => {
                 if let Some(m) = mapping.get(s) {
@@ -468,12 +532,14 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                     serde_json::Value::String(s.clone())
                 }
             }
-            serde_json::Value::Array(arr) => {
-                serde_json::Value::Array(arr.iter().map(|v| map_value(v, mapping, root_subject)).collect())
-            }
+            serde_json::Value::Array(arr) => serde_json::Value::Array(
+                arr.iter()
+                    .map(|v| map_value(v, mapping, root_subject))
+                    .collect(),
+            ),
             serde_json::Value::Object(obj) => {
                 let mut new_obj = serde_json::Map::new();
-                for (k,v) in obj {
+                for (k, v) in obj {
                     if k == "@id" {
                         if let Some(id_str) = v.as_str() {
                             if id_str.starts_with("http://") || id_str.starts_with("https://") {
@@ -483,12 +549,16 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                                     continue;
                                 } else {
                                     // Keep other full URLs as-is for @id properties
-                                    new_obj.insert(k.clone(), serde_json::Value::String(id_str.to_string()));
+                                    new_obj.insert(
+                                        k.clone(),
+                                        serde_json::Value::String(id_str.to_string()),
+                                    );
                                     continue;
                                 }
                             } else if let Some(mapped) = mapping.get(id_str) {
                                 // If it's in the mapping, use the mapped value
-                                new_obj.insert(k.clone(), serde_json::Value::String(mapped.clone()));
+                                new_obj
+                                    .insert(k.clone(), serde_json::Value::String(mapped.clone()));
                                 continue;
                             } else {
                                 // If @id is not a full URL and not in mapping, skip it
@@ -508,22 +578,31 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     fn filter_invalid_objects(val: &serde_json::Value) -> serde_json::Value {
         match val {
             serde_json::Value::Array(arr) => {
-                let filtered: Vec<serde_json::Value> = arr.iter()
+                let filtered: Vec<serde_json::Value> = arr
+                    .iter()
                     .filter_map(|v| {
                         if let serde_json::Value::Object(obj) = v {
                             // Check if object has an @id that's not a valid URL
                             if let Some(id_val) = obj.get("@id") {
                                 if let Some(id_str) = id_val.as_str() {
-                                    if !id_str.starts_with("http://") && !id_str.starts_with("https://") {
+                                    if !id_str.starts_with("http://")
+                                        && !id_str.starts_with("https://")
+                                    {
                                         // Skip this object entirely
                                         return None;
                                     }
                                     // Also filter out any objects with @id properties that are inside collection members
                                     // These are metadata objects or existing resources that shouldn't be imported
-                                    if obj.contains_key("https://atomicdata.dev/properties/collection/currentPage") ||
-                                       obj.contains_key("https://atomicdata.dev/properties/collection/pageSize") ||
-                                       obj.contains_key("https://atomicdata.dev/properties/createdAt") ||
-                                       obj.contains_key("https://atomicdata.dev/properties/publicKey") {
+                                    if obj.contains_key(
+                                        "https://atomicdata.dev/properties/collection/currentPage",
+                                    ) || obj.contains_key(
+                                        "https://atomicdata.dev/properties/collection/pageSize",
+                                    ) || obj
+                                        .contains_key("https://atomicdata.dev/properties/createdAt")
+                                        || obj.contains_key(
+                                            "https://atomicdata.dev/properties/publicKey",
+                                        )
+                                    {
                                         return None;
                                     }
                                 }
@@ -548,49 +627,67 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     let ontology_subject_owned: String = ontology_subject.clone();
 
     // Transform each resource into object with localId-mapped properties
-    let transformed: Vec<serde_json::Value> = resources.iter().map(|res| {
-        let mut obj = serde_json::Map::new();
-        // Constant for lastCommit prop
-        const LAST_COMMIT_PROP: &str = "https://atomicdata.dev/properties/lastCommit";
+    let transformed: Vec<serde_json::Value> = resources
+        .iter()
+        .map(|res| {
+            let mut obj = serde_json::Map::new();
+            // Constant for lastCommit prop
+            const LAST_COMMIT_PROP: &str = "https://atomicdata.dev/properties/lastCommit";
 
-        for (prop, val) in &res.properties {
-            if prop == LAST_COMMIT_PROP {
-                continue;
-            }
-            // Skip parent on root resource (if any)
-            if res.subject == ontology_subject_owned && prop == "https://atomicdata.dev/properties/parent" {
-                continue;
-            }
-            // Skip read/write properties that contain agent references
-            if prop == "https://atomicdata.dev/properties/read" || prop == "https://atomicdata.dev/properties/write" {
-                if let serde_json::Value::Array(arr) = val {
-                    let filtered: Vec<serde_json::Value> = arr.iter()
-                        .filter(|v| {
-                            if let serde_json::Value::String(s) = v {
-                                !s.contains("/agents/")
-                            } else {
-                                true
-                            }
-                        })
-                        .cloned()
-                        .collect();
-                    if !filtered.is_empty() {
-                        let prop_key = mapping.get(prop).unwrap_or(prop).clone();
-                        let filtered_val = filter_invalid_objects(&serde_json::Value::Array(filtered));
-                        obj.insert(prop_key, map_value(&filtered_val, &mapping, &ontology_subject_owned));
-                    }
+            for (prop, val) in &res.properties {
+                if prop == LAST_COMMIT_PROP {
+                    continue;
                 }
-                continue;
+                // Skip parent on root resource (if any)
+                if res.subject == ontology_subject_owned
+                    && prop == "https://atomicdata.dev/properties/parent"
+                {
+                    continue;
+                }
+                // Skip read/write properties that contain agent references
+                if prop == "https://atomicdata.dev/properties/read"
+                    || prop == "https://atomicdata.dev/properties/write"
+                {
+                    if let serde_json::Value::Array(arr) = val {
+                        let filtered: Vec<serde_json::Value> = arr
+                            .iter()
+                            .filter(|v| {
+                                if let serde_json::Value::String(s) = v {
+                                    !s.contains("/agents/")
+                                } else {
+                                    true
+                                }
+                            })
+                            .cloned()
+                            .collect();
+                        if !filtered.is_empty() {
+                            let prop_key = mapping.get(prop).unwrap_or(prop).clone();
+                            let filtered_val =
+                                filter_invalid_objects(&serde_json::Value::Array(filtered));
+                            obj.insert(
+                                prop_key,
+                                map_value(&filtered_val, &mapping, &ontology_subject_owned),
+                            );
+                        }
+                    }
+                    continue;
+                }
+                let prop_key = mapping.get(prop).unwrap_or(prop).clone();
+                // First filter out invalid objects, then map values
+                let filtered_val = filter_invalid_objects(&val);
+                obj.insert(
+                    prop_key,
+                    map_value(&filtered_val, &mapping, &ontology_subject_owned),
+                );
             }
-            let prop_key = mapping.get(prop).unwrap_or(prop).clone();
-            // First filter out invalid objects, then map values
-            let filtered_val = filter_invalid_objects(&val);
-            obj.insert(prop_key, map_value(&filtered_val, &mapping, &ontology_subject_owned));
-        }
-        // Add localId property
-        obj.insert("https://atomicdata.dev/properties/localId".to_string(), serde_json::Value::String(mapping.get(&res.subject).unwrap().clone()));
-        serde_json::Value::Object(obj)
-    }).collect();
+            // Add localId property
+            obj.insert(
+                "https://atomicdata.dev/properties/localId".to_string(),
+                serde_json::Value::String(mapping.get(&res.subject).unwrap().clone()),
+            );
+            serde_json::Value::Object(obj)
+        })
+        .collect();
 
     // Write to disk
     use std::fs::File;
@@ -623,7 +720,10 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
             }
         }
         other => {
-            println!("Unsupported format '{}'. Supported: json, json-ad, turtle", other);
+            println!(
+                "Unsupported format '{}'. Supported: json, json-ad, turtle",
+                other
+            );
             return Ok(());
         }
     }
@@ -638,7 +738,10 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     if validate && format == "json-ad" {
         let server_prefix = store.config.server_url.trim_end_matches('/');
         let encoded_parent = urlencoding::encode(ontology_subject);
-        let mut import_url = format!("{}/import?parent={}&overwrite_outside=true", server_prefix, encoded_parent);
+        let mut import_url = format!(
+            "{}/import?parent={}&overwrite_outside=true",
+            server_prefix, encoded_parent
+        );
         if let Some(agent) = &store.config.agent {
             let encoded_agent = urlencoding::encode(&agent.subject);
             import_url.push_str("&agent=");
@@ -648,13 +751,22 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         // Always send JSON-AD transformed payload for validation
         let body = serde_json::to_vec(&transformed)?;
 
-        use reqwest::header::{HeaderValue, CONTENT_TYPE, ACCEPT};
+        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::new();
         let resp = if let Some(agent) = &store.config.agent {
-            let mut headers = terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/ad+json"));
+            let mut headers =
+                terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
+            headers.insert(
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/ad+json"),
+            );
             headers.insert(ACCEPT, HeaderValue::from_static("application/ad+json"));
-            client.post(&import_url).headers(headers).body(body).send().await?
+            client
+                .post(&import_url)
+                .headers(headers)
+                .body(body)
+                .send()
+                .await?
         } else {
             client
                 .post(&import_url)
@@ -666,7 +778,10 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         };
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        println!("Warning: server responded with status {} during ontology import validation. Body: {}", status, text);
+        println!(
+            "Warning: server responded with status {} during ontology import validation. Body: {}",
+            status, text
+        );
     } else if validate {
         println!("Validation requires json-ad format – skipped.");
     } else {
@@ -687,7 +802,11 @@ async fn collection_query(args: &[String]) -> Result<(), Box<dyn std::error::Err
     let class_url = &args[2];
     let sort_property_url = &args[3];
     let desc = args.iter().any(|a| a == "--desc");
-    let limit_opt = args.iter().position(|a| a == "--limit").and_then(|idx| args.get(idx+1)).and_then(|s| s.parse::<u32>().ok());
+    let limit_opt = args
+        .iter()
+        .position(|a| a == "--limit")
+        .and_then(|idx| args.get(idx + 1))
+        .and_then(|s| s.parse::<u32>().ok());
 
     // Load configuration from environment
     let config = Config::from_env()?;
@@ -729,8 +848,16 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         }
     }
 
-    let output_file = if args.len() > 3 { &args[3] } else { "export.json" };
-    let format = if args.len() > 4 { args[4].to_lowercase() } else { "json-ad".to_string() };
+    let output_file = if args.len() > 3 {
+        &args[3]
+    } else {
+        "export.json"
+    };
+    let format = if args.len() > 4 {
+        args[4].to_lowercase()
+    } else {
+        "json-ad".to_string()
+    };
     let validate = args.iter().any(|a| a == "--validate");
 
     // Fetch all in-server resources recursively, starting at resolved root_subject.
@@ -758,7 +885,11 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     }
 
     // Helper to convert values using mapping (similar to export_ontology)
-    fn map_value(val: &serde_json::Value, mapping: &HashMap<String, String>, root_subject: &str) -> serde_json::Value {
+    fn map_value(
+        val: &serde_json::Value,
+        mapping: &HashMap<String, String>,
+        root_subject: &str,
+    ) -> serde_json::Value {
         match val {
             serde_json::Value::String(s) => {
                 if let Some(m) = mapping.get(s) {
@@ -778,9 +909,11 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                     serde_json::Value::String(s.clone())
                 }
             }
-            serde_json::Value::Array(arr) => {
-                serde_json::Value::Array(arr.iter().map(|v| map_value(v, mapping, root_subject)).collect())
-            }
+            serde_json::Value::Array(arr) => serde_json::Value::Array(
+                arr.iter()
+                    .map(|v| map_value(v, mapping, root_subject))
+                    .collect(),
+            ),
             serde_json::Value::Object(obj) => {
                 let mut new_obj = serde_json::Map::new();
                 for (k, v) in obj {
@@ -793,12 +926,16 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                                     continue;
                                 } else {
                                     // Keep other full URLs as-is for @id properties
-                                    new_obj.insert(k.clone(), serde_json::Value::String(id_str.to_string()));
+                                    new_obj.insert(
+                                        k.clone(),
+                                        serde_json::Value::String(id_str.to_string()),
+                                    );
                                     continue;
                                 }
                             } else if let Some(mapped) = mapping.get(id_str) {
                                 // If it's in the mapping, use the mapped value
-                                new_obj.insert(k.clone(), serde_json::Value::String(mapped.clone()));
+                                new_obj
+                                    .insert(k.clone(), serde_json::Value::String(mapped.clone()));
                                 continue;
                             } else {
                                 // If @id is not a full URL and not in mapping, skip it
@@ -818,22 +955,31 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     fn filter_invalid_objects(val: &serde_json::Value) -> serde_json::Value {
         match val {
             serde_json::Value::Array(arr) => {
-                let filtered: Vec<serde_json::Value> = arr.iter()
+                let filtered: Vec<serde_json::Value> = arr
+                    .iter()
                     .filter_map(|v| {
                         if let serde_json::Value::Object(obj) = v {
                             // Check if object has an @id that's not a valid URL
                             if let Some(id_val) = obj.get("@id") {
                                 if let Some(id_str) = id_val.as_str() {
-                                    if !id_str.starts_with("http://") && !id_str.starts_with("https://") {
+                                    if !id_str.starts_with("http://")
+                                        && !id_str.starts_with("https://")
+                                    {
                                         // Skip this object entirely
                                         return None;
                                     }
                                     // Also filter out any objects with @id properties that are inside collection members
                                     // These are metadata objects or existing resources that shouldn't be imported
-                                    if obj.contains_key("https://atomicdata.dev/properties/collection/currentPage") ||
-                                       obj.contains_key("https://atomicdata.dev/properties/collection/pageSize") ||
-                                       obj.contains_key("https://atomicdata.dev/properties/createdAt") ||
-                                       obj.contains_key("https://atomicdata.dev/properties/publicKey") {
+                                    if obj.contains_key(
+                                        "https://atomicdata.dev/properties/collection/currentPage",
+                                    ) || obj.contains_key(
+                                        "https://atomicdata.dev/properties/collection/pageSize",
+                                    ) || obj
+                                        .contains_key("https://atomicdata.dev/properties/createdAt")
+                                        || obj.contains_key(
+                                            "https://atomicdata.dev/properties/publicKey",
+                                        )
+                                    {
                                         return None;
                                     }
                                 }
@@ -857,54 +1003,69 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 
     // Transform resources
     const LAST_COMMIT_PROP: &str = "https://atomicdata.dev/properties/lastCommit";
-    let transformed: Vec<serde_json::Value> = filtered_resources.iter().filter_map(|res| {
-        // Skip the root resource itself since it already exists
-        if res.subject == root_subject_owned {
-            return None;
-        }
-        
-        let mut obj = serde_json::Map::new();
-        for (prop, val) in &res.properties {
-            if prop == LAST_COMMIT_PROP {
-                continue;
+    let transformed: Vec<serde_json::Value> = filtered_resources
+        .iter()
+        .filter_map(|res| {
+            // Skip the root resource itself since it already exists
+            if res.subject == root_subject_owned {
+                return None;
             }
-            // Skip parent on root resource (if any)
-            if res.subject == root_subject_owned && prop == "https://atomicdata.dev/properties/parent" {
-                continue;
-            }
-            // Skip read/write properties that contain agent references
-            if prop == "https://atomicdata.dev/properties/read" || prop == "https://atomicdata.dev/properties/write" {
-                if let serde_json::Value::Array(arr) = val {
-                    let filtered: Vec<serde_json::Value> = arr.iter()
-                        .filter(|v| {
-                            if let serde_json::Value::String(s) = v {
-                                !s.contains("/agents/")
-                            } else {
-                                true
-                            }
-                        })
-                        .cloned()
-                        .collect();
-                    if !filtered.is_empty() {
-                        let prop_key = mapping.get(prop).unwrap_or(prop).clone();
-                        let filtered_val = filter_invalid_objects(&serde_json::Value::Array(filtered));
-                        obj.insert(prop_key, map_value(&filtered_val, &mapping, &root_subject_owned));
-                    }
+
+            let mut obj = serde_json::Map::new();
+            for (prop, val) in &res.properties {
+                if prop == LAST_COMMIT_PROP {
+                    continue;
                 }
-                continue;
+                // Skip parent on root resource (if any)
+                if res.subject == root_subject_owned
+                    && prop == "https://atomicdata.dev/properties/parent"
+                {
+                    continue;
+                }
+                // Skip read/write properties that contain agent references
+                if prop == "https://atomicdata.dev/properties/read"
+                    || prop == "https://atomicdata.dev/properties/write"
+                {
+                    if let serde_json::Value::Array(arr) = val {
+                        let filtered: Vec<serde_json::Value> = arr
+                            .iter()
+                            .filter(|v| {
+                                if let serde_json::Value::String(s) = v {
+                                    !s.contains("/agents/")
+                                } else {
+                                    true
+                                }
+                            })
+                            .cloned()
+                            .collect();
+                        if !filtered.is_empty() {
+                            let prop_key = mapping.get(prop).unwrap_or(prop).clone();
+                            let filtered_val =
+                                filter_invalid_objects(&serde_json::Value::Array(filtered));
+                            obj.insert(
+                                prop_key,
+                                map_value(&filtered_val, &mapping, &root_subject_owned),
+                            );
+                        }
+                    }
+                    continue;
+                }
+                let prop_key = mapping.get(prop).unwrap_or(prop).clone();
+                // First filter out invalid objects, then map values
+                let filtered_val = filter_invalid_objects(&val);
+                obj.insert(
+                    prop_key,
+                    map_value(&filtered_val, &mapping, &root_subject_owned),
+                );
             }
-            let prop_key = mapping.get(prop).unwrap_or(prop).clone();
-            // First filter out invalid objects, then map values
-            let filtered_val = filter_invalid_objects(&val);
-            obj.insert(prop_key, map_value(&filtered_val, &mapping, &root_subject_owned));
-        }
-        // localId
-        obj.insert(
-            "https://atomicdata.dev/properties/localId".to_string(),
-            serde_json::Value::String(mapping.get(&res.subject).unwrap().clone()),
-        );
-        Some(serde_json::Value::Object(obj))
-    }).collect();
+            // localId
+            obj.insert(
+                "https://atomicdata.dev/properties/localId".to_string(),
+                serde_json::Value::String(mapping.get(&res.subject).unwrap().clone()),
+            );
+            Some(serde_json::Value::Object(obj))
+        })
+        .collect();
 
     // Write to disk
     use std::fs::File;
@@ -927,38 +1088,59 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                 if resp.status().is_success() {
                     writeln!(file, "{}", resp.text().await?)?;
                 } else {
-                    eprintln!("Failed Turtle serialization for {}: {}", res.subject, resp.status());
+                    eprintln!(
+                        "Failed Turtle serialization for {}: {}",
+                        res.subject,
+                        resp.status()
+                    );
                 }
             }
         }
         other => {
-            println!("Unsupported format '{}'. Supported: json, json-ad, turtle", other);
+            println!(
+                "Unsupported format '{}'. Supported: json, json-ad, turtle",
+                other
+            );
             return Ok(());
         }
     }
 
     println!(
         "Exported {} resources to {} in {} format",
-        transformed.len(), output_file, format
+        transformed.len(),
+        output_file,
+        format
     );
 
     if validate && format == "json-ad" {
         let server_prefix = store.config.server_url.trim_end_matches('/');
         let encoded_parent = urlencoding::encode(&root_subject);
-        let mut import_url = format!("{}/import?parent={}&overwrite_outside=true", server_prefix, encoded_parent);
+        let mut import_url = format!(
+            "{}/import?parent={}&overwrite_outside=true",
+            server_prefix, encoded_parent
+        );
         if let Some(agent) = &store.config.agent {
             let encoded_agent = urlencoding::encode(&agent.subject);
             import_url.push_str("&agent=");
             import_url.push_str(&encoded_agent);
         }
         let body = serde_json::to_vec(&transformed)?;
-        use reqwest::header::{HeaderValue, CONTENT_TYPE, ACCEPT};
+        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::new();
         let resp = if let Some(agent) = &store.config.agent {
-            let mut headers = terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/ad+json"));
+            let mut headers =
+                terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
+            headers.insert(
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/ad+json"),
+            );
             headers.insert(ACCEPT, HeaderValue::from_static("application/ad+json"));
-            client.post(&import_url).headers(headers).body(body).send().await?
+            client
+                .post(&import_url)
+                .headers(headers)
+                .body(body)
+                .send()
+                .await?
         } else {
             client
                 .post(&import_url)
@@ -970,7 +1152,10 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         };
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        println!("Warning: server responded with status {} during import validation. Body: {}", status, text);
+        println!(
+            "Warning: server responded with status {} during import validation. Body: {}",
+            status, text
+        );
     } else if validate {
         println!("Validation requires json-ad format – skipped.");
     } else {
@@ -984,18 +1169,23 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Skip program name and command name, start from actual arguments
     let import_args = &args[2..];
-    
+
     if import_args.len() < 1 {
-        println!("Usage: terraphim_atomic_client import-ontology <json_file> [parent_url] [--validate]");
+        println!(
+            "Usage: terraphim_atomic_client import-ontology <json_file> [parent_url] [--validate]"
+        );
         println!("  json_file: Path to JSON-AD file to import");
-        println!("  parent_url: Optional parent URL (defaults to https://atomicdata.dev/classes/Drive)");
+        println!(
+            "  parent_url: Optional parent URL (defaults to https://atomicdata.dev/classes/Drive)"
+        );
         println!("  --validate: Enable validation of resources");
         return Ok(());
     }
 
     let json_file = &import_args[0];
     let default_parent = "https://atomicdata.dev/classes/Drive".to_string();
-    let parent_url = import_args.get(1)
+    let parent_url = import_args
+        .get(1)
         .filter(|&url| !url.starts_with("--"))
         .unwrap_or(&default_parent);
     let validate = import_args.iter().any(|arg| arg == "--validate");
@@ -1006,8 +1196,9 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 
     // Read and parse JSON file
     let json_content = std::fs::read_to_string(json_file)?;
-    let resources: Vec<serde_json::Map<String, serde_json::Value>> = serde_json::from_str(&json_content)?;
-    
+    let resources: Vec<serde_json::Map<String, serde_json::Value>> =
+        serde_json::from_str(&json_content)?;
+
     println!("Found {} resources to import", resources.len());
 
     // Sort resources by dependencies (ontology first, then classes, then properties)
@@ -1023,11 +1214,21 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     for (index, resource_obj) in sorted_resources.iter().enumerate() {
         match import_single_resource(&store, resource_obj, parent_url, validate).await {
             Ok(subject) => {
-                println!("✓ Successfully imported resource {}/{}: {}", index + 1, sorted_resources.len(), subject);
+                println!(
+                    "✓ Successfully imported resource {}/{}: {}",
+                    index + 1,
+                    sorted_resources.len(),
+                    subject
+                );
                 success_count += 1;
             }
             Err(e) => {
-                println!("✗ Failed to import resource {}/{}: {}", index + 1, sorted_resources.len(), e);
+                println!(
+                    "✗ Failed to import resource {}/{}: {}",
+                    index + 1,
+                    sorted_resources.len(),
+                    e
+                );
                 failed_resources.push((index + 1, e.to_string()));
             }
         }
@@ -1041,7 +1242,12 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     if !failed_resources.is_empty() {
         println!("\nErrors:");
         for (index, error) in failed_resources {
-            println!("  ✗ Failed to import resource {}/{}: {}", index, sorted_resources.len(), error);
+            println!(
+                "  ✗ Failed to import resource {}/{}: {}",
+                index,
+                sorted_resources.len(),
+                error
+            );
         }
         println!("\n✗ No resources were imported");
     } else {
@@ -1054,7 +1260,7 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 #[cfg(feature = "native")]
 fn sort_resources_by_dependencies(
     resources: Vec<serde_json::Map<String, serde_json::Value>>,
-    parent_url: &str
+    parent_url: &str,
 ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>, Box<dyn std::error::Error>> {
     // Define dependency order: ontology -> classes -> properties
     let mut sorted = Vec::new();
@@ -1064,7 +1270,10 @@ fn sort_resources_by_dependencies(
     let ontology_index = remaining.iter().position(|r| {
         r.get("https://atomicdata.dev/properties/isA")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().any(|item| item.as_str() == Some("https://atomicdata.dev/class/ontology")))
+            .map(|arr| {
+                arr.iter()
+                    .any(|item| item.as_str() == Some("https://atomicdata.dev/class/ontology"))
+            })
             .unwrap_or(false)
     });
 
@@ -1073,12 +1282,16 @@ fn sort_resources_by_dependencies(
     }
 
     // Then add all class resources
-    let class_indices: Vec<usize> = remaining.iter()
+    let class_indices: Vec<usize> = remaining
+        .iter()
         .enumerate()
         .filter(|(_, r)| {
             r.get("https://atomicdata.dev/properties/isA")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().any(|item| item.as_str() == Some("https://atomicdata.dev/classes/Class")))
+                .map(|arr| {
+                    arr.iter()
+                        .any(|item| item.as_str() == Some("https://atomicdata.dev/classes/Class"))
+                })
                 .unwrap_or(false)
         })
         .map(|(i, _)| i)
@@ -1090,12 +1303,17 @@ fn sort_resources_by_dependencies(
     }
 
     // Finally add all property resources
-    let property_indices: Vec<usize> = remaining.iter()
+    let property_indices: Vec<usize> = remaining
+        .iter()
         .enumerate()
         .filter(|(_, r)| {
             r.get("https://atomicdata.dev/properties/isA")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().any(|item| item.as_str() == Some("https://atomicdata.dev/classes/Property")))
+                .map(|arr| {
+                    arr.iter().any(|item| {
+                        item.as_str() == Some("https://atomicdata.dev/classes/Property")
+                    })
+                })
                 .unwrap_or(false)
         })
         .map(|(i, _)| i)
@@ -1121,20 +1339,21 @@ async fn import_single_resource(
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Extract or generate subject
     let subject = if let Some(id_value) = resource_obj.get("@id") {
-        id_value.as_str()
+        id_value
+            .as_str()
             .ok_or("@id field must be a string")?
             .to_string()
     } else if let Some(local_id) = resource_obj.get("https://atomicdata.dev/properties/localId") {
         // Convert localId to full URL using parent context
-        let local_id_str = local_id.as_str()
-            .ok_or("localId field must be a string")?;
+        let local_id_str = local_id.as_str().ok_or("localId field must be a string")?;
         format!("{}/{}", parent_url.trim_end_matches('/'), local_id_str)
     } else {
         // Generate a new subject URL based on parent and shortname
-        let shortname = resource_obj.get("https://atomicdata.dev/properties/shortname")
+        let shortname = resource_obj
+            .get("https://atomicdata.dev/properties/shortname")
             .and_then(|v| v.as_str())
             .ok_or("Resource must have either @id, localId, or shortname property")?;
-        
+
         format!("{}/{}", parent_url.trim_end_matches('/'), shortname)
     };
 
@@ -1155,7 +1374,7 @@ async fn import_single_resource(
             // Skip @id as it's handled separately
             continue;
         }
-        
+
         // Handle localId conversion
         if key == "https://atomicdata.dev/properties/localId" {
             // Convert localId to full URL and add as @id
@@ -1165,10 +1384,11 @@ async fn import_single_resource(
             }
             continue;
         }
-        
+
         // Convert relative URLs in arrays to absolute URLs
-        let processed_value = if key == "https://atomicdata.dev/properties/classes" || 
-                                  key == "https://atomicdata.dev/properties/properties" {
+        let processed_value = if key == "https://atomicdata.dev/properties/classes"
+            || key == "https://atomicdata.dev/properties/properties"
+        {
             convert_relative_urls_in_array(value, parent_url)?
         } else if key == "https://atomicdata.dev/properties/parent" {
             // Parent should be a localId reference, not a URL
@@ -1177,12 +1397,12 @@ async fn import_single_resource(
         } else {
             value.clone()
         };
-        
+
         // Validate property URLs if validation is enabled
         if validate && !key.starts_with("https://") && !key.starts_with("http://") {
             return Err(format!("Invalid property key '{}': must be a valid URL", key).into());
         }
-        
+
         properties.insert(key.clone(), processed_value);
     }
 
@@ -1202,14 +1422,14 @@ async fn import_single_resource(
 
     // Create the resource using commit
     let _result = store.create_with_commit(&subject, properties).await?;
-    
+
     Ok(subject)
 }
 
 #[cfg(feature = "native")]
 fn convert_relative_urls_in_array(
-    value: &serde_json::Value, 
-    parent_url: &str
+    value: &serde_json::Value,
+    parent_url: &str,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     match value {
         serde_json::Value::Array(arr) => {
@@ -1221,7 +1441,8 @@ fn convert_relative_urls_in_array(
                         converted.push(item.clone());
                     } else {
                         // Convert relative URL to absolute
-                        let absolute_url = format!("{}/{}", parent_url.trim_end_matches('/'), url_str);
+                        let absolute_url =
+                            format!("{}/{}", parent_url.trim_end_matches('/'), url_str);
                         converted.push(serde_json::json!(absolute_url));
                     }
                 } else {
@@ -1230,19 +1451,21 @@ fn convert_relative_urls_in_array(
             }
             Ok(serde_json::Value::Array(converted))
         }
-        _ => Ok(value.clone())
+        _ => Ok(value.clone()),
     }
 }
 
 #[cfg(feature = "native")]
-fn validate_resource(properties: &std::collections::HashMap<String, serde_json::Value>) -> Result<(), Box<dyn std::error::Error>> {
+fn validate_resource(
+    properties: &std::collections::HashMap<String, serde_json::Value>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Basic validation of atomic data properties
-    
+
     // Check for required name, shortname, or localId
     let has_name = properties.contains_key("https://atomicdata.dev/properties/name");
     let has_shortname = properties.contains_key("https://atomicdata.dev/properties/shortname");
     let has_local_id = properties.contains_key("https://atomicdata.dev/properties/localId");
-    
+
     if !has_name && !has_shortname && !has_local_id {
         return Err("Resource must have either 'name', 'shortname', or 'localId' property".into());
     }
@@ -1273,19 +1496,29 @@ fn validate_resource(properties: &std::collections::HashMap<String, serde_json::
     }
 
     // Validate classes and properties arrays if present
-    for array_key in &["https://atomicdata.dev/properties/classes", "https://atomicdata.dev/properties/properties"] {
+    for array_key in &[
+        "https://atomicdata.dev/properties/classes",
+        "https://atomicdata.dev/properties/properties",
+    ] {
         if let Some(array_value) = properties.get(*array_key) {
             if let serde_json::Value::Array(arr) = array_value {
                 for item in arr {
                     if let Some(item_str) = item.as_str() {
                         // Allow both absolute URLs and relative paths (will be converted later)
-                        if !item_str.starts_with("https://") && 
-                           !item_str.starts_with("http://") && 
-                           !item_str.contains("/") {
-                            return Err(format!("Invalid URL in {} array: {}", array_key, item_str).into());
+                        if !item_str.starts_with("https://")
+                            && !item_str.starts_with("http://")
+                            && !item_str.contains("/")
+                        {
+                            return Err(format!(
+                                "Invalid URL in {} array: {}",
+                                array_key, item_str
+                            )
+                            .into());
                         }
                     } else {
-                        return Err(format!("All items in {} array must be strings", array_key).into());
+                        return Err(
+                            format!("All items in {} array must be strings", array_key).into()
+                        );
                     }
                 }
             } else {
@@ -1303,4 +1536,4 @@ async fn initialize_store() -> Result<Store, Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let store = Store::new(config)?;
     Ok(store)
-} 
+}

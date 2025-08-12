@@ -1,8 +1,21 @@
 {
+  "package": {
+    "version": "0.1.0",
+    "productName": "Terraphim Desktop"
+  },
   "tauri": {
+    "allowlist": {
+      "all": false,
+      "dialog": { "all": true },
+      "path": { "all": true },
+      "fs": { "all": true },
+      "globalShortcut": { "all": true }
+    },
     "bundle": {
-      "identifier": "com.terraphim.ai.desktop",
-      "version": "0.1.0"
+      "identifier": "com.terraphim.ai.desktop"
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png"
     },
     "windows": [
       {

@@ -8,25 +8,28 @@ use terraphim_config::{ConfigBuilder, ConfigId};
 use terraphim_persistence::Persistable;
 
 use std::error::Error;
-use std::sync::Arc;
 use std::path::Path;
-use tokio::sync::Mutex;
+use std::sync::Arc;
 use tauri::{
     CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
     SystemTrayMenu, SystemTrayMenuItem, WindowBuilder,
 };
+use tokio::sync::Mutex;
 
-use terraphim_config::ConfigState;
-use terraphim_settings::DeviceSettings;
-use terraphim_mcp_server::McpService;
 use rmcp::service::ServiceExt;
+use terraphim_config::ConfigState;
+use terraphim_mcp_server::McpService;
+use terraphim_settings::DeviceSettings;
 use tokio::io::{stdin, stdout};
 use tracing_subscriber::prelude::*;
 
 /// Initialize user data folder with bundled docs/src content if empty
-async fn initialize_user_data_folder(app_handle: &tauri::AppHandle, device_settings: &DeviceSettings) -> Result<(), Box<dyn Error>> {
+async fn initialize_user_data_folder(
+    app_handle: &tauri::AppHandle,
+    device_settings: &DeviceSettings,
+) -> Result<(), Box<dyn Error>> {
     let data_path = Path::new(&device_settings.default_data_path);
-    
+
     // Check if data folder exists and has content
     let should_initialize = if !data_path.exists() {
         log::info!("User data folder does not exist, creating: {:?}", data_path);
@@ -44,31 +47,41 @@ async fn initialize_user_data_folder(app_handle: &tauri::AppHandle, device_setti
                 false
             }
         });
-        
+
         if !has_kg || !has_docs {
-            log::info!("User data folder missing content, will initialize: kg={}, docs={}", has_kg, has_docs);
+            log::info!(
+                "User data folder missing content, will initialize: kg={}, docs={}",
+                has_kg,
+                has_docs
+            );
             true
         } else {
             log::info!("User data folder already initialized");
             false
         }
     };
-    
+
     if should_initialize {
         // Get the bundled docs/src content
-        let resource_dir = app_handle.path_resolver().resource_dir()
+        let resource_dir = app_handle
+            .path_resolver()
+            .resource_dir()
             .ok_or("Failed to get resource directory")?;
         let bundled_docs_src = resource_dir.join("docs").join("src");
-        
+
         if bundled_docs_src.exists() {
-            log::info!("Copying bundled content from {:?} to {:?}", bundled_docs_src, data_path);
+            log::info!(
+                "Copying bundled content from {:?} to {:?}",
+                bundled_docs_src,
+                data_path
+            );
             copy_dir_all(&bundled_docs_src, data_path)?;
             log::info!("Successfully initialized user data folder");
         } else {
             log::warn!("Bundled docs/src not found at {:?}", bundled_docs_src);
         }
     }
-    
+
     Ok(())
 }
 
@@ -77,19 +90,19 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {
         std::fs::create_dir_all(dst)?;
     }
-    
+
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
-        
+
         if src_path.is_dir() {
             copy_dir_all(&src_path, &dst_path)?;
         } else {
             std::fs::copy(&src_path, &dst_path)?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -132,7 +145,10 @@ async fn run_mcp_server() -> anyhow::Result<()> {
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
-        .with(tracing_subscriber::EnvFilter::from_default_env().add_directive(tracing::Level::WARN.into()));
+        .with(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::WARN.into()),
+        );
     let _ = subscriber.try_init();
 
     tracing::info!("Starting Terraphim MCP server (embedded in desktop binary)");
@@ -172,12 +188,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             panic!("Failed to load device settings: {:?}", e);
         }
     };
-    let device_settings_read=device_settings.clone();
-    
+    let device_settings_read = device_settings.clone();
 
-    
     let device_settings = Arc::new(Mutex::new(device_settings));
-    
+
     log::info!("Device settings: {:?}", device_settings.lock().await);
 
     let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
@@ -185,9 +199,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(config) => config,
             Err(e) => {
                 log::info!("Failed to load config: {:?}", e);
-                let config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+                let config = ConfigBuilder::new()
+                    .build_default_desktop()
+                    .build()
+                    .unwrap();
                 config
-            },
+            }
         },
         Err(e) => panic!("Failed to build config: {:?}", e),
     };
@@ -215,7 +232,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         log::info!("User requested to change role from tray to {}", role_name);
                         let config_state: tauri::State<ConfigState> = app_handle.state();
 
-                        match cmd::select_role(app_handle.clone(), config_state, role_name.clone()).await {
+                        match cmd::select_role(app_handle.clone(), config_state, role_name.clone())
+                            .await
+                        {
                             Ok(config_response) => {
                                 let new_tray_menu = build_tray_menu(&config_response.config);
                                 if let Err(e) = app_handle.tray_handle().set_menu(new_tray_menu) {
@@ -249,7 +268,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             "Hide"
                                         }
                                         Err(e) => {
-                                            log::error!("Error checking window visibility: {:?}", e);
+                                            log::error!(
+                                                "Error checking window visibility: {:?}",
+                                                e
+                                            );
                                             "Show/Hide"
                                         }
                                     };
@@ -272,7 +294,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                             "Hide"
                                         }
                                         Err(e) => {
-                                            log::error!("Error checking window visibility: {:?}", e);
+                                            log::error!(
+                                                "Error checking window visibility: {:?}",
+                                                e
+                                            );
                                             "Show/Hide"
                                         }
                                     };
@@ -303,11 +328,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::get_rolegraph,
             cmd::find_documents_for_kg_term,
             cmd::save_article_to_atomic
-       ])
+        ])
         .setup(move |app| {
             let settings = device_settings_read.clone();
             let handle = app.handle();
-            
+
             // Initialize user data folder with bundled content if needed
             let handle_clone = handle.clone();
             let settings_clone = settings.clone();
@@ -316,9 +341,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     log::error!("Failed to initialize user data folder: {:?}", e);
                 }
             });
-            
+
             // Try to get the main window with different possible labels
-            let main_window = ["main", ""].iter()
+            let main_window = ["main", ""]
+                .iter()
                 .filter_map(|label| app.get_window(label))
                 .next()
                 .or_else(|| {
@@ -327,14 +353,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 });
 
             if let Some(main_window) = main_window {
-                if !settings.initialized {           
+                if !settings.initialized {
                     tauri::async_runtime::spawn(async move {
-                        let splashscreen_window = WindowBuilder::new(&handle, "splashscreen", tauri::WindowUrl::App("../dist/splashscreen.html".into()))
+                        let splashscreen_window = WindowBuilder::new(
+                            &handle,
+                            "splashscreen",
+                            tauri::WindowUrl::App("../dist/splashscreen.html".into()),
+                        )
                         .title("Splashscreen")
                         .resizable(true)
                         .decorations(true)
                         .always_on_top(false)
-                        .inner_size(800.0, 600.0).build().unwrap();
+                        .inner_size(800.0, 600.0)
+                        .build()
+                        .unwrap();
                         splashscreen_window.show().unwrap();
 
                         // Hide the main window initially
@@ -347,7 +379,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 log::error!("No main window found during setup");
             }
-       
+
             Ok(())
         })
         .build(context)
@@ -356,28 +388,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
     app.run(move |app_handle, e| match e {
         RunEvent::Ready => {
             let app_handle = app_handle.clone();
-            
+
             // Try to get the window with different possible labels
             let window_labels = ["main", ""];
             let mut window_found = false;
-            
+
             for label in &window_labels {
                 if let Some(window) = app_handle.get_window(label) {
                     let _ = window.hide();
                     let window_clone = window.clone();
                     app_handle
                         .global_shortcut_manager()
-                        .register(&global_shortcut, move || {
-                            match window_clone.is_visible() {
-                                Ok(true) => {
-                                    let _ = window_clone.hide();
-                                }
-                                Ok(false) => {
-                                    let _ = window_clone.show();
-                                }
-                                Err(e) => {
-                                    log::error!("Error checking window visibility in global shortcut: {:?}", e);
-                                }
+                        .register(&global_shortcut, move || match window_clone.is_visible() {
+                            Ok(true) => {
+                                let _ = window_clone.hide();
+                            }
+                            Ok(false) => {
+                                let _ = window_clone.show();
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Error checking window visibility in global shortcut: {:?}",
+                                    e
+                                );
                             }
                         })
                         .unwrap();
@@ -385,9 +418,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     break;
                 }
             }
-            
+
             if !window_found {
-                log::error!("No window found for global shortcut with labels: {:?}", window_labels);
+                log::error!(
+                    "No window found for global shortcut with labels: {:?}",
+                    window_labels
+                );
                 // Try to get any available window
                 let windows = app_handle.windows();
                 if let Some((_, window)) = windows.iter().next() {
@@ -395,17 +431,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     let window_clone = window.clone();
                     app_handle
                         .global_shortcut_manager()
-                        .register(&global_shortcut, move || {
-                            match window_clone.is_visible() {
-                                Ok(true) => {
-                                    let _ = window_clone.hide();
-                                }
-                                Ok(false) => {
-                                    let _ = window_clone.show();
-                                }
-                                Err(e) => {
-                                    log::error!("Error checking window visibility in global shortcut: {:?}", e);
-                                }
+                        .register(&global_shortcut, move || match window_clone.is_visible() {
+                            Ok(true) => {
+                                let _ = window_clone.hide();
+                            }
+                            Ok(false) => {
+                                let _ = window_clone.show();
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Error checking window visibility in global shortcut: {:?}",
+                                    e
+                                );
                             }
                         })
                         .unwrap();

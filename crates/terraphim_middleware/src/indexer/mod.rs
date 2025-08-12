@@ -7,8 +7,8 @@ use crate::{Error, Result};
 
 mod ripgrep;
 
+use crate::haystack::{AtomicHaystackIndexer, ClickUpHaystackIndexer, QueryRsHaystackIndexer};
 pub use ripgrep::RipgrepIndexer;
-use crate::haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer, ClickUpHaystackIndexer};
 
 fn hash_as_string<T: Hash>(t: &T) -> String {
     let mut s = DefaultHasher::new();

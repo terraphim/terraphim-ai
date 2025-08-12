@@ -1,24 +1,24 @@
 use axum::{
-    extract::{Query, State, Path},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Extension, Json,
 };
+use schemars::schema_for;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
-use schemars::schema_for;
-use serde_json::Value;
 
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
+use terraphim_rolegraph::magic_unpair;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, IndexedDocument, SearchQuery};
-use terraphim_rolegraph::magic_unpair;
 use terraphim_types::RoleName;
+use terraphim_types::{Document, IndexedDocument, SearchQuery};
 
 use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
@@ -138,7 +138,7 @@ pub(crate) async fn get_config(State(config): State<ConfigState>) -> Result<Json
 }
 
 /// API handler for Terraphim Config update
-/// 
+///
 /// This function updates the configuration both in-memory and persists it to disk
 /// so that the changes survive server restarts.
 pub(crate) async fn update_config(
@@ -146,12 +146,12 @@ pub(crate) async fn update_config(
     Json(config_new): Json<Config>,
 ) -> Result<Json<ConfigResponse>> {
     log::info!("Updating configuration and persisting to disk");
-    
+
     // Update in-memory configuration
     let mut config = config_state.config.lock().await;
     *config = config_new.clone();
     drop(config); // Release the lock before async save operation
-    
+
     // Persist the configuration to disk
     match config_new.save().await {
         Ok(()) => {
@@ -298,7 +298,7 @@ pub struct KgSearchQuery {
 }
 
 /// Find documents that contain a given knowledge graph term
-/// 
+///
 /// This endpoint searches for documents that were the source of a knowledge graph term.
 /// For example, given "haystack", it will find documents like "haystack.md" that contain
 /// this term or its synonyms ("datasource", "service", "agent").
@@ -307,16 +307,22 @@ pub(crate) async fn find_documents_by_kg_term(
     axum::extract::Path(role_name): axum::extract::Path<String>,
     Query(query): Query<KgSearchQuery>,
 ) -> Result<Json<SearchResponse>> {
-    log::debug!("Finding documents for KG term '{}' in role '{}'", query.term, role_name);
-    
+    log::debug!(
+        "Finding documents for KG term '{}' in role '{}'",
+        query.term,
+        role_name
+    );
+
     let role_name = RoleName::new(&role_name);
     let mut terraphim_service = TerraphimService::new(config_state);
-    
-    let results = terraphim_service.find_documents_for_kg_term(&role_name, &query.term).await?;
+
+    let results = terraphim_service
+        .find_documents_for_kg_term(&role_name, &query.term)
+        .await?;
     let total = results.len();
-    
+
     log::debug!("Found {} documents for KG term '{}'", total, query.term);
-    
+
     Ok(Json(SearchResponse {
         status: Status::Success,
         results,
@@ -379,7 +385,7 @@ pub struct SummarizationStatusResponse {
 /// Chat message exchanged with the assistant
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
-    pub role: String,   // "system" | "user" | "assistant"
+    pub role: String, // "system" | "user" | "assistant"
     pub content: String,
 }
 
@@ -427,7 +433,9 @@ pub(crate) async fn chat_completion(
                 status: Status::Error,
                 message: None,
                 model_used: None,
-                error: Some("OpenRouter chat not enabled or not configured for this role".to_string()),
+                error: Some(
+                    "OpenRouter chat not enabled or not configured for this role".to_string(),
+                ),
             }));
         }
 
@@ -471,7 +479,10 @@ pub(crate) async fn chat_completion(
             use terraphim_service::openrouter::OpenRouterService;
             match OpenRouterService::new(&api_key, &model) {
                 Ok(client) => {
-                    match client.chat_completion(messages_json, Some(1024), Some(0.2)).await {
+                    match client
+                        .chat_completion(messages_json, Some(1024), Some(0.2))
+                        .await
+                    {
                         Ok(reply) => {
                             return Ok(Json(ChatResponse {
                                 status: Status::Success,
@@ -603,7 +614,7 @@ pub(crate) async fn list_openrouter_models(
 }
 
 /// Generate or retrieve a summary for a document using OpenRouter
-/// 
+///
 /// This endpoint generates AI-powered summaries for documents using the OpenRouter service.
 /// It requires the role to have OpenRouter properly configured (enabled, API key, model).
 /// Summaries are cached in the persistence layer to avoid redundant API calls.
@@ -611,11 +622,15 @@ pub(crate) async fn summarize_document(
     State(config_state): State<ConfigState>,
     Json(request): Json<SummarizeDocumentRequest>,
 ) -> Result<Json<SummarizeDocumentResponse>> {
-    log::debug!("Summarizing document '{}' with role '{}'", request.document_id, request.role);
-    
+    log::debug!(
+        "Summarizing document '{}' with role '{}'",
+        request.document_id,
+        request.role
+    );
+
     let role_name = RoleName::new(&request.role);
     let config = config_state.config.lock().await;
-    
+
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(SummarizeDocumentResponse {
@@ -627,7 +642,7 @@ pub(crate) async fn summarize_document(
             error: Some(format!("Role '{}' not found", request.role)),
         }));
     };
-    
+
     // Check if OpenRouter is enabled and configured for this role
     #[cfg(feature = "openrouter")]
     {
@@ -641,10 +656,10 @@ pub(crate) async fn summarize_document(
                 error: Some("OpenRouter not properly configured for this role".to_string()),
             }));
         }
-        
+
         // Clone role to use after dropping lock
         let role = role_ref.clone();
-        
+
         // Get the API key from environment variable if not set in role
         let api_key = if let Some(key) = &role.openrouter_api_key {
             key.clone()
@@ -656,17 +671,23 @@ pub(crate) async fn summarize_document(
                 )
             })?
         };
-        
-        let model = role.openrouter_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
+
+        let model = role
+            .openrouter_model
+            .as_deref()
+            .unwrap_or("openai/gpt-3.5-turbo");
         let max_length = request.max_length.unwrap_or(250);
         let force_regenerate = request.force_regenerate.unwrap_or(false);
-        
+
         drop(config); // Release the lock before async operations
-        
+
         let mut terraphim_service = TerraphimService::new(config_state);
-        
+
         // Try to load existing document first
-        let document_opt = match terraphim_service.get_document_by_id(&request.document_id).await {
+        let document_opt = match terraphim_service
+            .get_document_by_id(&request.document_id)
+            .await
+        {
             Ok(doc_opt) => doc_opt,
             Err(e) => {
                 log::error!("Failed to load document '{}': {:?}", request.document_id, e);
@@ -690,12 +711,15 @@ pub(crate) async fn summarize_document(
                 error: Some("Document not found".to_string()),
             }));
         };
-        
+
         // Check if we already have a summary and don't need to regenerate
         if !force_regenerate {
             if let Some(existing_summary) = &document.description {
                 if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
-                    log::debug!("Using cached summary for document '{}'", request.document_id);
+                    log::debug!(
+                        "Using cached summary for document '{}'",
+                        request.document_id
+                    );
                     return Ok(Json(SummarizeDocumentResponse {
                         status: Status::Success,
                         document_id: request.document_id,
@@ -707,20 +731,31 @@ pub(crate) async fn summarize_document(
                 }
             }
         }
-        
+
         // Generate new summary using OpenRouter
-        match terraphim_service.generate_document_summary(&document, &api_key, model, max_length).await {
+        match terraphim_service
+            .generate_document_summary(&document, &api_key, model, max_length)
+            .await
+        {
             Ok(summary) => {
-                log::info!("Generated summary for document '{}' using model '{}'", request.document_id, model);
-                
+                log::info!(
+                    "Generated summary for document '{}' using model '{}'",
+                    request.document_id,
+                    model
+                );
+
                 // Save the updated document with the new summary
                 let mut updated_doc = document.clone();
                 updated_doc.description = Some(summary.clone());
-                
+
                 if let Err(e) = updated_doc.save().await {
-                    log::error!("Failed to save summary for document '{}': {:?}", request.document_id, e);
+                    log::error!(
+                        "Failed to save summary for document '{}': {:?}",
+                        request.document_id,
+                        e
+                    );
                 }
-                
+
                 Ok(Json(SummarizeDocumentResponse {
                     status: Status::Success,
                     document_id: request.document_id,
@@ -731,7 +766,11 @@ pub(crate) async fn summarize_document(
                 }))
             }
             Err(e) => {
-                log::error!("Failed to generate summary for document '{}': {:?}", request.document_id, e);
+                log::error!(
+                    "Failed to generate summary for document '{}': {:?}",
+                    request.document_id,
+                    e
+                );
                 Ok(Json(SummarizeDocumentResponse {
                     status: Status::Error,
                     document_id: request.document_id,
@@ -743,7 +782,7 @@ pub(crate) async fn summarize_document(
             }
         }
     }
-    
+
     #[cfg(not(feature = "openrouter"))]
     {
         Ok(Json(SummarizeDocumentResponse {
@@ -764,24 +803,25 @@ pub(crate) async fn get_summarization_status(
 ) -> Result<Json<SummarizationStatusResponse>> {
     let role_name = RoleName::new(&query.role);
     let config = config_state.config.lock().await;
-    
+
     let Some(role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Role '{}' not found", query.role)),
         ));
     };
-    
+
     #[cfg(feature = "openrouter")]
     {
         let openrouter_enabled = role.openrouter_enabled;
-        let openrouter_configured = role.has_openrouter_config() || std::env::var("OPENROUTER_KEY").is_ok();
+        let openrouter_configured =
+            role.has_openrouter_config() || std::env::var("OPENROUTER_KEY").is_ok();
         let model = role.get_openrouter_model().map(|s| s.to_string());
-        
+
         // Note: For now, we'll set cached_summaries_count to 0
         // In the future, this could query the persistence layer for documents with summaries
         let cached_summaries_count = 0;
-        
+
         Ok(Json(SummarizationStatusResponse {
             status: Status::Success,
             openrouter_enabled,
@@ -790,7 +830,7 @@ pub(crate) async fn get_summarization_status(
             cached_summaries_count,
         }))
     }
-    
+
     #[cfg(not(feature = "openrouter"))]
     {
         Ok(Json(SummarizationStatusResponse {

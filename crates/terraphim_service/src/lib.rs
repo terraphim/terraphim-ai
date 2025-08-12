@@ -7,7 +7,8 @@ use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::{
-    Document, Index, IndexedDocument, NormalizedTermValue,RelevanceFunction, RoleName, SearchQuery, Thesaurus,
+    Document, Index, IndexedDocument, NormalizedTermValue, RelevanceFunction, RoleName,
+    SearchQuery, Thesaurus,
 };
 mod score;
 use crate::score::Query;
@@ -16,7 +17,7 @@ use crate::score::Query;
 pub mod openrouter;
 
 /// Normalize a filename to be used as a document ID
-/// 
+///
 /// This ensures consistent ID generation between server startup and edit API
 fn normalize_filename_to_id(filename: &str) -> String {
     let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
@@ -70,18 +71,21 @@ impl<'a> TerraphimService {
             if let Some(kg) = &role.kg {
                 if let Some(automata_path) = &kg.automata_path {
                     log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_path);
-                    
+
                     // Try to load from automata path first
                     match load_thesaurus(automata_path).await {
                         Ok(thesaurus) => {
                             log::info!("Successfully loaded thesaurus from automata path");
-                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                            let rolegraph =
+                                RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
                             match rolegraph {
                                 Ok(rolegraph) => {
                                     let rolegraph_value = RoleGraphSync::from(rolegraph);
                                     rolegraphs.insert(role_name.clone(), rolegraph_value);
                                 }
-                                Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                                Err(e) => {
+                                    log::error!("Failed to update role and thesaurus: {:?}", e)
+                                }
                             }
                             Ok(thesaurus)
                         }
@@ -102,15 +106,22 @@ impl<'a> TerraphimService {
                                     .await
                                 {
                                     Ok(thesaurus) => {
-                                        let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                                        let rolegraph =
+                                            RoleGraph::new(role_name.clone(), thesaurus.clone())
+                                                .await;
                                         match rolegraph {
                                             Ok(rolegraph) => {
-                                                let rolegraph_value = RoleGraphSync::from(rolegraph);
-                                                rolegraphs.insert(role_name.clone(), rolegraph_value);
+                                                let rolegraph_value =
+                                                    RoleGraphSync::from(rolegraph);
+                                                rolegraphs
+                                                    .insert(role_name.clone(), rolegraph_value);
                                             }
-                                            Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                                            Err(e) => log::error!(
+                                                "Failed to update role and thesaurus: {:?}",
+                                                e
+                                            ),
                                         }
-                                        
+
                                         Ok(thesaurus)
                                     }
                                     Err(e) => {
@@ -119,7 +130,9 @@ impl<'a> TerraphimService {
                                             role_name,
                                             e
                                         );
-                                        Err(ServiceError::Config("Failed to load or build thesaurus".into()))
+                                        Err(ServiceError::Config(
+                                            "Failed to load or build thesaurus".into(),
+                                        ))
                                     }
                                 }
                             } else {
@@ -127,7 +140,9 @@ impl<'a> TerraphimService {
                                     "No fallback available for role {}: no local KG path configured",
                                     role_name
                                 );
-                                Err(ServiceError::Config("No automata path and no local KG available".into()))
+                                Err(ServiceError::Config(
+                                    "No automata path and no local KG available".into(),
+                                ))
                             }
                         }
                     }
@@ -140,10 +155,7 @@ impl<'a> TerraphimService {
                     );
                     let logseq_builder = Logseq::default();
                     match logseq_builder
-                        .build(
-                            role_name.as_lowercase().to_string(),
-                            kg_local.path.clone(),
-                        )
+                        .build(role_name.as_lowercase().to_string(), kg_local.path.clone())
                         .await
                     {
                         Ok(thesaurus) => {
@@ -151,15 +163,18 @@ impl<'a> TerraphimService {
                                 "Successfully built thesaurus from local KG for role {}",
                                 role_name
                             );
-                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                            let rolegraph =
+                                RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
                             match rolegraph {
                                 Ok(rolegraph) => {
                                     let rolegraph_value = RoleGraphSync::from(rolegraph);
                                     rolegraphs.insert(role_name.clone(), rolegraph_value);
                                 }
-                                Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                                Err(e) => {
+                                    log::error!("Failed to update role and thesaurus: {:?}", e)
+                                }
                             }
-                            
+
                             Ok(thesaurus)
                         }
                         Err(e) => {
@@ -168,7 +183,9 @@ impl<'a> TerraphimService {
                                 role_name,
                                 e
                             );
-                            Err(ServiceError::Config("Failed to build thesaurus from local KG".into()))
+                            Err(ServiceError::Config(
+                                "Failed to build thesaurus from local KG".into(),
+                            ))
                         }
                     }
                 } else {
@@ -182,10 +199,7 @@ impl<'a> TerraphimService {
                         );
                         let logseq_builder = Logseq::default();
                         match logseq_builder
-                            .build(
-                                role_name.as_lowercase().to_string(),
-                                kg_local.path.clone(),
-                            )
+                            .build(role_name.as_lowercase().to_string(), kg_local.path.clone())
                             .await
                         {
                             Ok(thesaurus) => {
@@ -200,9 +214,11 @@ impl<'a> TerraphimService {
                                         let rolegraph_value = RoleGraphSync::from(rolegraph);
                                         rolegraphs.insert(role_name.clone(), rolegraph_value);
                                     }
-                                    Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
+                                    Err(e) => {
+                                        log::error!("Failed to update role and thesaurus: {:?}", e)
+                                    }
                                 }
-                                
+
                                 Ok(thesaurus)
                             }
                             Err(e) => {
@@ -211,18 +227,24 @@ impl<'a> TerraphimService {
                                     role_name,
                                     e
                                 );
-                                Err(ServiceError::Config("Failed to build thesaurus from local KG".into()))
+                                Err(ServiceError::Config(
+                                    "Failed to build thesaurus from local KG".into(),
+                                ))
                             }
                         }
                     } else {
-                        Err(ServiceError::Config("No local knowledge graph path available".into()))
+                        Err(ServiceError::Config(
+                            "No local knowledge graph path available".into(),
+                        ))
                     }
                 }
             } else {
-                Err(ServiceError::Config("Knowledge graph not configured".into()))
+                Err(ServiceError::Config(
+                    "Knowledge graph not configured".into(),
+                ))
             }
         }
-        
+
         log::debug!("Loading thesaurus for role: {}", role_name);
         log::debug!("Role keys {:?}", self.config_state.roles.keys());
         let mut rolegraphs = self.config_state.roles.clone();
@@ -245,33 +267,42 @@ impl<'a> TerraphimService {
                 }
             }
         } else {
-            load_thesaurus_from_automata_path(
-                &self.config_state,
-                role_name,
-                &mut rolegraphs,
-            )
-            .await
+            load_thesaurus_from_automata_path(&self.config_state, role_name, &mut rolegraphs).await
         }
     }
 
     /// Preprocess document content to create clickable KG links when terraphim_it is enabled
-    /// 
+    ///
     /// This function replaces KG terms in the document body with markdown links
     /// in the format [term](kg:term) which can be intercepted by the frontend
     /// to display KG documents when clicked.
-    pub async fn preprocess_document_content(&mut self, mut document: Document, role: &Role) -> Result<Document> {
+    pub async fn preprocess_document_content(
+        &mut self,
+        mut document: Document,
+        role: &Role,
+    ) -> Result<Document> {
         // Only preprocess if terraphim_it is enabled and role has KG configured
         if !role.terraphim_it {
-            log::debug!("terraphim_it disabled for role {}, skipping KG preprocessing", role.name);
+            log::debug!(
+                "terraphim_it disabled for role {}, skipping KG preprocessing",
+                role.name
+            );
             return Ok(document);
         }
 
         let Some(_kg) = &role.kg else {
-            log::debug!("No KG configured for role {}, skipping KG preprocessing", role.name);
+            log::debug!(
+                "No KG configured for role {}, skipping KG preprocessing",
+                role.name
+            );
             return Ok(document);
         };
 
-        log::debug!("Preprocessing document '{}' for KG term linking in role '{}'", document.title, role.name);
+        log::debug!(
+            "Preprocessing document '{}' for KG term linking in role '{}'",
+            document.title,
+            role.name
+        );
 
         // Load thesaurus for the role
         let thesaurus = match self.ensure_thesaurus_loaded(&role.name).await {
@@ -284,34 +315,127 @@ impl<'a> TerraphimService {
 
         // Filter thesaurus to only include meaningful terms and avoid over-linking
         let mut kg_thesaurus = Thesaurus::new(format!("kg_links_{}", role.name));
-        
+
         // Very selective KG term filtering to avoid clutter:
-        // Only include highly specific, domain-relevant terms 
-        let excluded_common_terms = ["service", "haystack", "system", "config", "configuration", "type", "method", "function", "class", "component", "module", "library", "framework", "interface", "api", "data", "file", "path", "url", "string", "number", "value", "option", "parameter", "field", "property", "attribute", "element", "item", "object", "array", "list", "map", "set", "collection", "server", "client", "request", "response", "error", "result", "success", "failure", "true", "false", "null", "undefined", "empty", "full", "start", "end", "begin", "finish", "create", "delete", "update", "read", "write", "load", "save", "process", "handle", "manage", "control", "execute", "run", "call", "invoke", "trigger", "event", "action", "command", "query", "search", "filter", "sort", "order", "group", "match", "find", "replace", "insert", "remove", "add", "set", "get", "put", "post", "head", "patch", "delete"];
-        
-        let mut sorted_terms: Vec<_> = (&thesaurus).into_iter()
+        // Only include highly specific, domain-relevant terms
+        let excluded_common_terms = [
+            "service",
+            "haystack",
+            "system",
+            "config",
+            "configuration",
+            "type",
+            "method",
+            "function",
+            "class",
+            "component",
+            "module",
+            "library",
+            "framework",
+            "interface",
+            "api",
+            "data",
+            "file",
+            "path",
+            "url",
+            "string",
+            "number",
+            "value",
+            "option",
+            "parameter",
+            "field",
+            "property",
+            "attribute",
+            "element",
+            "item",
+            "object",
+            "array",
+            "list",
+            "map",
+            "set",
+            "collection",
+            "server",
+            "client",
+            "request",
+            "response",
+            "error",
+            "result",
+            "success",
+            "failure",
+            "true",
+            "false",
+            "null",
+            "undefined",
+            "empty",
+            "full",
+            "start",
+            "end",
+            "begin",
+            "finish",
+            "create",
+            "delete",
+            "update",
+            "read",
+            "write",
+            "load",
+            "save",
+            "process",
+            "handle",
+            "manage",
+            "control",
+            "execute",
+            "run",
+            "call",
+            "invoke",
+            "trigger",
+            "event",
+            "action",
+            "command",
+            "query",
+            "search",
+            "filter",
+            "sort",
+            "order",
+            "group",
+            "match",
+            "find",
+            "replace",
+            "insert",
+            "remove",
+            "add",
+            "set",
+            "get",
+            "put",
+            "post",
+            "head",
+            "patch",
+            "delete",
+        ];
+
+        let mut sorted_terms: Vec<_> = (&thesaurus)
+            .into_iter()
             .filter(|(key, _)| {
                 let term = key.as_str();
-                
+
                 // Exclude empty terms, very short terms, and common technical terms
                 if term.is_empty() || term.len() < 5 || excluded_common_terms.contains(&term) {
                     return false;
                 }
-                
+
                 // Only include highly specific terms:
                 // 1. Very long compound terms (>12 chars) OR
-                // 2. Hyphenated compound terms OR  
+                // 2. Hyphenated compound terms OR
                 // 3. Terms with unique patterns (contains "graph", "terraphim", etc.)
-                term.len() > 12 || 
-                term.contains('-') || 
-                term.contains("graph") ||
-                term.contains("terraphim") ||
-                term.contains("knowledge") ||
-                term.contains("embedding")
+                term.len() > 12
+                    || term.contains('-')
+                    || term.contains("graph")
+                    || term.contains("terraphim")
+                    || term.contains("knowledge")
+                    || term.contains("embedding")
             })
             .collect();
-        sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id));  // Sort by relevance (ID)
-        
+        sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id)); // Sort by relevance (ID)
+
         // Take only the top 3 most specific terms to minimize clutter
         let max_kg_terms = 3;
         for (key, value) in sorted_terms.into_iter().take(max_kg_terms) {
@@ -323,10 +447,13 @@ impl<'a> TerraphimService {
             kg_value.url = Some(format!("kg:{}", value.value)); // Link to the root concept
             kg_thesaurus.insert(key.clone(), kg_value);
         }
-        
+
         let kg_terms_count = kg_thesaurus.len();
-        log::debug!("Filtered KG thesaurus from {} to {} terms for preprocessing", 
-                   thesaurus.len(), kg_terms_count);
+        log::debug!(
+            "Filtered KG thesaurus from {} to {} terms for preprocessing",
+            thesaurus.len(),
+            kg_terms_count
+        );
 
         // Apply KG term replacement to document body (only if we have terms to replace)
         if !kg_thesaurus.is_empty() {
@@ -334,8 +461,11 @@ impl<'a> TerraphimService {
                 Ok(processed_bytes) => {
                     match String::from_utf8(processed_bytes) {
                         Ok(processed_content) => {
-                            log::debug!("Successfully preprocessed document '{}' with {} KG terms", 
-                                       document.title, kg_terms_count);
+                            log::debug!(
+                                "Successfully preprocessed document '{}' with {} KG terms",
+                                document.title,
+                                kg_terms_count
+                            );
                             document.body = processed_content;
                         }
                         Err(e) => {
@@ -345,7 +475,11 @@ impl<'a> TerraphimService {
                     }
                 }
                 Err(e) => {
-                    log::warn!("Failed to replace KG terms in document '{}': {:?}", document.title, e);
+                    log::warn!(
+                        "Failed to replace KG terms in document '{}': {:?}",
+                        document.title,
+                        e
+                    );
                 }
             }
         } else {
@@ -380,7 +514,9 @@ impl<'a> TerraphimService {
                     if let Err(e) = ripgrep.update_document(&document).await {
                         log::warn!(
                             "Failed to write document {} to haystack {:?}: {:?}",
-                            document.id, haystack.location, e
+                            document.id,
+                            haystack.location,
+                            e
                         );
                     }
                 }
@@ -391,13 +527,13 @@ impl<'a> TerraphimService {
     }
 
     /// Get document by ID
-    /// 
+    ///
     /// This method supports both normalized IDs (e.g., "haystackmd") and original filenames (e.g., "haystack.md").
     /// It tries to find the document using the provided ID first, then tries with a normalized version,
     /// and finally falls back to searching by title.
     pub async fn get_document_by_id(&mut self, document_id: &str) -> Result<Option<Document>> {
         log::debug!("Getting document by ID: '{}'", document_id);
-        
+
         // 1️⃣ Try to load the document directly using the provided ID
         let mut placeholder = Document::default();
         placeholder.id = document_id.to_string();
@@ -407,24 +543,41 @@ impl<'a> TerraphimService {
                 return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
             }
             Err(e) => {
-                log::debug!("Document '{}' not found with direct lookup: {:?}", document_id, e);
+                log::debug!(
+                    "Document '{}' not found with direct lookup: {:?}",
+                    document_id,
+                    e
+                );
             }
         }
 
         // 2️⃣ If the provided ID looks like a filename, try with normalized ID
         if document_id.contains('.') || document_id.contains('-') || document_id.contains('_') {
             let normalized_id = normalize_filename_to_id(document_id);
-            log::debug!("Trying normalized ID '{}' for filename '{}'", normalized_id, document_id);
-            
+            log::debug!(
+                "Trying normalized ID '{}' for filename '{}'",
+                normalized_id,
+                document_id
+            );
+
             let mut normalized_placeholder = Document::default();
             normalized_placeholder.id = normalized_id.clone();
             match normalized_placeholder.load().await {
                 Ok(doc) => {
-                    log::debug!("Found document '{}' with normalized ID '{}'", document_id, normalized_id);
+                    log::debug!(
+                        "Found document '{}' with normalized ID '{}'",
+                        document_id,
+                        normalized_id
+                    );
                     return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
                 }
                 Err(e) => {
-                    log::debug!("Document '{}' not found with normalized ID '{}': {:?}", document_id, normalized_id, e);
+                    log::debug!(
+                        "Document '{}' not found with normalized ID '{}': {:?}",
+                        document_id,
+                        normalized_id,
+                        e
+                    );
                 }
             }
         }
@@ -439,7 +592,7 @@ impl<'a> TerraphimService {
         };
 
         let documents = self.search(&search_query).await?;
-        
+
         // Look for a document whose title matches the requested ID
         for doc in documents {
             if doc.title == document_id || doc.id == document_id {
@@ -453,74 +606,109 @@ impl<'a> TerraphimService {
     }
 
     /// Apply KG preprocessing to a document if needed based on the current selected role
-    /// 
+    ///
     /// This helper method checks if the selected role has terraphim_it enabled
     /// and applies KG term preprocessing accordingly.
-    /// 
+    ///
     /// NOTE: Disabled to prevent double processing - KG preprocessing is now only applied
     /// during search results to avoid processing documents multiple times.
     async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
         // DISABLED: KG preprocessing is already applied in search results
         // to prevent double processing that creates "links to links"
-        log::debug!("Skipping KG preprocessing for individual document load to prevent double processing");
+        log::debug!(
+            "Skipping KG preprocessing for individual document load to prevent double processing"
+        );
         Ok(document)
     }
 
     /// Enhance document descriptions with AI-generated summaries using OpenRouter
-    /// 
+    ///
     /// This method uses the OpenRouter service to generate intelligent summaries
     /// of document content, replacing basic text excerpts with AI-powered descriptions.
     #[cfg(feature = "openrouter")]
-    async fn enhance_descriptions_with_ai(&self, mut documents: Vec<Document>, role: &Role) -> Result<Vec<Document>> {
+    async fn enhance_descriptions_with_ai(
+        &self,
+        mut documents: Vec<Document>,
+        role: &Role,
+    ) -> Result<Vec<Document>> {
         use crate::openrouter::OpenRouterService;
-        
+
         // Create the OpenRouter service
         let api_key = role.openrouter_api_key.as_ref().unwrap();
-        let model = role.openrouter_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
-        
+        let model = role
+            .openrouter_model
+            .as_deref()
+            .unwrap_or("openai/gpt-3.5-turbo");
+
         let openrouter_service = match OpenRouterService::new(api_key, model) {
             Ok(service) => service,
             Err(e) => {
-                log::error!("Failed to create OpenRouter service for role '{}': {:?}", role.name, e);
+                log::error!(
+                    "Failed to create OpenRouter service for role '{}': {:?}",
+                    role.name,
+                    e
+                );
                 return Ok(documents); // Return original documents on service creation failure
             }
         };
-        
-        log::info!("Enhancing {} document descriptions with OpenRouter model: {}", documents.len(), model);
-        
+
+        log::info!(
+            "Enhancing {} document descriptions with OpenRouter model: {}",
+            documents.len(),
+            model
+        );
+
         let mut enhanced_count = 0;
         let mut error_count = 0;
-        
+
         for document in &mut documents {
             // Only enhance documents that have meaningful content and don't already have high-quality descriptions
             if self.should_generate_ai_summary(document) {
                 let summary_length = 250; // Target length for summaries
-                
-                match openrouter_service.generate_summary(&document.body, summary_length).await {
+
+                match openrouter_service
+                    .generate_summary(&document.body, summary_length)
+                    .await
+                {
                     Ok(ai_summary) => {
-                        log::debug!("Generated AI summary for '{}': {} characters", document.title, ai_summary.len());
+                        log::debug!(
+                            "Generated AI summary for '{}': {} characters",
+                            document.title,
+                            ai_summary.len()
+                        );
                         document.description = Some(ai_summary);
                         enhanced_count += 1;
                     }
                     Err(e) => {
-                        log::warn!("Failed to generate AI summary for '{}': {:?}", document.title, e);
+                        log::warn!(
+                            "Failed to generate AI summary for '{}': {:?}",
+                            document.title,
+                            e
+                        );
                         error_count += 1;
                         // Keep existing description as fallback
                     }
                 }
             } else {
-                log::debug!("Skipping AI summary for '{}' (not suitable for enhancement)", document.title);
+                log::debug!(
+                    "Skipping AI summary for '{}' (not suitable for enhancement)",
+                    document.title
+                );
             }
         }
-        
-        log::info!("OpenRouter enhancement complete: {} enhanced, {} errors, {} skipped", 
-                  enhanced_count, error_count, documents.len() - enhanced_count - error_count);
-        
+
+        log::info!(
+            "OpenRouter enhancement complete: {} enhanced, {} errors, {} skipped",
+            enhanced_count,
+            error_count,
+            documents.len() - enhanced_count - error_count
+        );
+
         Ok(documents)
     }
 
     /// Determine if a document should receive an AI-generated summary
-    /// 
+    ///
     /// This helper method checks various criteria to decide whether a document
     /// would benefit from AI summarization.
     #[cfg(feature = "openrouter")]
@@ -529,7 +717,7 @@ impl<'a> TerraphimService {
         if document.body.trim().len() < 200 {
             return false;
         }
-        
+
         // Don't enhance if we already have a high-quality description
         if let Some(ref description) = document.description {
             // If the description is substantial and doesn't look like a simple excerpt, keep it
@@ -537,12 +725,12 @@ impl<'a> TerraphimService {
                 return false;
             }
         }
-        
+
         // Don't enhance very large documents (cost control)
         if document.body.len() > 8000 {
             return false;
         }
-        
+
         // Good candidates for AI summarization
         true
     }
@@ -563,7 +751,7 @@ impl<'a> TerraphimService {
         };
         Ok(role)
     }
-    
+
     /// search for documents in the haystacks with selected role from the config
     /// and return the documents sorted by relevance
     pub async fn search_documents_selected_role(
@@ -571,7 +759,14 @@ impl<'a> TerraphimService {
         search_term: &NormalizedTermValue,
     ) -> Result<Vec<Document>> {
         let role = self.config_state.get_selected_role().await;
-        let documents = self.search(&SearchQuery { search_term: search_term.clone(), role: Some(role), skip: None, limit: None }).await?;
+        let documents = self
+            .search(&SearchQuery {
+                search_term: search_term.clone(),
+                role: Some(role),
+                skip: None,
+                limit: None,
+            })
+            .await?;
         Ok(documents)
     }
 
@@ -602,19 +797,26 @@ impl<'a> TerraphimService {
                     let mut document: terraphim_types::Document = doc.clone();
                     let rank = (total_length - idx).try_into().unwrap();
                     document.rank = Some(rank);
-                    
+
                     // 🔄 Enhanced persistence layer integration for both local and Atomic Data documents
                     if document.id.starts_with("http://") || document.id.starts_with("https://") {
                         // Atomic Data document: Check persistence first, then save for future queries
-                        log::debug!("Processing Atomic Data document '{}' (URL: {})", document.title, document.id);
-                        
+                        log::debug!(
+                            "Processing Atomic Data document '{}' (URL: {})",
+                            document.title,
+                            document.id
+                        );
+
                         // Try to load from persistence first (for cached Atomic Data documents)
                         let mut placeholder = Document::default();
                         placeholder.id = document.id.clone();
                         match placeholder.load().await {
                             Ok(persisted_doc) => {
                                 // Found in persistence - use cached version
-                                log::debug!("Found cached Atomic Data document '{}' in persistence", document.title);
+                                log::debug!(
+                                    "Found cached Atomic Data document '{}' in persistence",
+                                    document.title
+                                );
                                 if let Some(better_description) = persisted_doc.description {
                                     document.description = Some(better_description);
                                 }
@@ -626,14 +828,21 @@ impl<'a> TerraphimService {
                             Err(_) => {
                                 // Not in persistence - save this Atomic Data document for future queries
                                 log::debug!("Caching Atomic Data document '{}' to persistence for future queries", document.title);
-                                
+
                                 // Save in background to avoid blocking the response
                                 let doc_to_save = document.clone();
                                 tokio::spawn(async move {
                                     if let Err(e) = doc_to_save.save().await {
-                                        log::warn!("Failed to cache Atomic Data document '{}': {}", doc_to_save.title, e);
+                                        log::warn!(
+                                            "Failed to cache Atomic Data document '{}': {}",
+                                            doc_to_save.title,
+                                            e
+                                        );
                                     } else {
-                                        log::debug!("Successfully cached Atomic Data document '{}'", doc_to_save.title);
+                                        log::debug!(
+                                            "Successfully cached Atomic Data document '{}'",
+                                            doc_to_save.title
+                                        );
                                     }
                                 });
                             }
@@ -651,7 +860,7 @@ impl<'a> TerraphimService {
                             // Try normalized ID based on document title (filename)
                             // For KG files, the title might be "haystack" but persistence ID is "haystackmd"
                             let normalized_id = normalize_filename_to_id(&document.title);
-                            
+
                             let mut normalized_placeholder = Document::default();
                             normalized_placeholder.id = normalized_id.clone();
                             if let Ok(persisted_doc) = normalized_placeholder.load().await {
@@ -675,23 +884,34 @@ impl<'a> TerraphimService {
                             }
                         }
                     }
-                    
+
                     docs_ranked.push(document);
                 }
-                
+
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() && role.openrouter_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
-                
+
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
                 if role.terraphim_it {
-                    log::debug!("Applying KG preprocessing to {} search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying KG preprocessing to {} search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     let mut processed_docs = Vec::new();
                     for document in docs_ranked {
-                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
@@ -701,11 +921,12 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::BM25 => {
                 log::debug!("Searching haystack with BM25 scorer");
-                
+
                 let documents = index.get_all_documents();
-                
+
                 log::debug!("Sorting documents by BM25 relevance");
-                let query = Query::new(&search_query.search_term.to_string()).name_scorer(score::QueryScorer::BM25);
+                let query = Query::new(&search_query.search_term.to_string())
+                    .name_scorer(score::QueryScorer::BM25);
                 let documents = score::sort_documents(&query, documents);
                 let total_length = documents.len();
                 let mut docs_ranked = Vec::new();
@@ -715,20 +936,27 @@ impl<'a> TerraphimService {
                     document.rank = Some(rank);
                     docs_ranked.push(document);
                 }
-                
+
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
-                
+
                 // Apply KG preprocessing if enabled for this role
                 if role.terraphim_it {
-                    log::debug!("Applying KG preprocessing to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying KG preprocessing to {} BM25 search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     let mut processed_docs = Vec::new();
                     for document in docs_ranked {
-                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
@@ -738,11 +966,12 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::BM25F => {
                 log::debug!("Searching haystack with BM25F scorer");
-                
+
                 let documents = index.get_all_documents();
-                
+
                 log::debug!("Sorting documents by BM25F relevance");
-                let query = Query::new(&search_query.search_term.to_string()).name_scorer(score::QueryScorer::BM25F);
+                let query = Query::new(&search_query.search_term.to_string())
+                    .name_scorer(score::QueryScorer::BM25F);
                 let documents = score::sort_documents(&query, documents);
                 let total_length = documents.len();
                 let mut docs_ranked = Vec::new();
@@ -752,20 +981,27 @@ impl<'a> TerraphimService {
                     document.rank = Some(rank);
                     docs_ranked.push(document);
                 }
-                
+
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
-                
+
                 // Apply KG preprocessing if enabled for this role
                 if role.terraphim_it {
-                    log::debug!("Applying KG preprocessing to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying KG preprocessing to {} BM25F search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     let mut processed_docs = Vec::new();
                     for document in docs_ranked {
-                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
@@ -775,11 +1011,12 @@ impl<'a> TerraphimService {
             }
             RelevanceFunction::BM25Plus => {
                 log::debug!("Searching haystack with BM25Plus scorer");
-                
+
                 let documents = index.get_all_documents();
-                
+
                 log::debug!("Sorting documents by BM25Plus relevance");
-                let query = Query::new(&search_query.search_term.to_string()).name_scorer(score::QueryScorer::BM25Plus);
+                let query = Query::new(&search_query.search_term.to_string())
+                    .name_scorer(score::QueryScorer::BM25Plus);
                 let documents = score::sort_documents(&query, documents);
                 let total_length = documents.len();
                 let mut docs_ranked = Vec::new();
@@ -789,20 +1026,27 @@ impl<'a> TerraphimService {
                     document.rank = Some(rank);
                     docs_ranked.push(document);
                 }
-                
+
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() && role.openrouter_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self.enhance_descriptions_with_ai(docs_ranked, &role).await?;
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
-                
+
                 // Apply KG preprocessing if enabled for this role
                 if role.terraphim_it {
-                    log::debug!("Applying KG preprocessing to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying KG preprocessing to {} BM25Plus search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     let mut processed_docs = Vec::new();
                     for document in docs_ranked {
-                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
@@ -822,48 +1066,57 @@ impl<'a> TerraphimService {
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
                 let mut documents = index.get_documents(scored_index_docs);
-                
+
                 // Apply TF-IDF scoring to enhance Terraphim Graph ranking
                 if !documents.is_empty() {
-                    log::debug!("Applying TF-IDF scoring to {} documents for enhanced ranking", documents.len());
-                    
+                    log::debug!(
+                        "Applying TF-IDF scoring to {} documents for enhanced ranking",
+                        documents.len()
+                    );
+
                     use crate::score::bm25_additional::TFIDFScorer;
                     let mut tfidf_scorer = TFIDFScorer::new();
                     tfidf_scorer.initialize(&documents);
-                    
+
                     // Re-score documents using TF-IDF
                     let query_text = &search_query.search_term.to_string();
                     for document in &mut documents {
                         let tfidf_score = tfidf_scorer.score(query_text, document);
                         // Combine TF-IDF score with existing rank using a weighted approach
                         if let Some(rank) = document.rank {
-                            document.rank = Some(rank + (tfidf_score * 0.3) as u64); // 30% weight for TF-IDF
+                            document.rank = Some(rank + (tfidf_score * 0.3) as u64);
+                        // 30% weight for TF-IDF
                         } else {
                             document.rank = Some((tfidf_score * 10.0) as u64); // Scale TF-IDF for ranking
                         }
                     }
-                    
+
                     // Re-sort documents by the new combined rank
-                    documents.sort_by(|a, b| {
-                        b.rank.unwrap_or(0).cmp(&a.rank.unwrap_or(0))
-                    });
-                    
+                    documents.sort_by(|a, b| b.rank.unwrap_or(0).cmp(&a.rank.unwrap_or(0)));
+
                     log::debug!("TF-IDF scoring applied successfully");
                 }
-                
+
                 // 🔄 Enhanced persistence layer integration for both local and Atomic Data documents
                 for document in &mut documents {
                     if document.id.starts_with("http://") || document.id.starts_with("https://") {
                         // Atomic Data document: Check persistence first, then save for future queries
-                        log::debug!("Processing Atomic Data document '{}' (URL: {})", document.title, document.id);
-                        
+                        log::debug!(
+                            "Processing Atomic Data document '{}' (URL: {})",
+                            document.title,
+                            document.id
+                        );
+
                         // Try to load from persistence first (for cached Atomic Data documents)
                         let mut placeholder = Document::default();
                         placeholder.id = document.id.clone();
                         match placeholder.load().await {
                             Ok(persisted_doc) => {
                                 // Found in persistence - use cached version
-                                log::debug!("Found cached Atomic Data document '{}' in persistence", document.title);
+                                log::debug!(
+                                    "Found cached Atomic Data document '{}' in persistence",
+                                    document.title
+                                );
                                 if let Some(better_description) = persisted_doc.description {
                                     document.description = Some(better_description);
                                 }
@@ -875,14 +1128,21 @@ impl<'a> TerraphimService {
                             Err(_) => {
                                 // Not in persistence - save this Atomic Data document for future queries
                                 log::debug!("Caching Atomic Data document '{}' to persistence for future queries", document.title);
-                                
+
                                 // Save in background to avoid blocking the response
                                 let doc_to_save = document.clone();
                                 tokio::spawn(async move {
                                     if let Err(e) = doc_to_save.save().await {
-                                        log::warn!("Failed to cache Atomic Data document '{}': {}", doc_to_save.title, e);
+                                        log::warn!(
+                                            "Failed to cache Atomic Data document '{}': {}",
+                                            doc_to_save.title,
+                                            e
+                                        );
                                     } else {
-                                        log::debug!("Successfully cached Atomic Data document '{}'", doc_to_save.title);
+                                        log::debug!(
+                                            "Successfully cached Atomic Data document '{}'",
+                                            doc_to_save.title
+                                        );
                                     }
                                 });
                             }
@@ -900,7 +1160,7 @@ impl<'a> TerraphimService {
                             // Try normalized ID based on document title (filename)
                             // For KG files, the title might be "haystack" but persistence ID is "haystackmd"
                             let normalized_id = normalize_filename_to_id(&document.title);
-                            
+
                             let mut normalized_placeholder = Document::default();
                             normalized_placeholder.id = normalized_id.clone();
                             if let Ok(persisted_doc) = normalized_placeholder.load().await {
@@ -929,16 +1189,25 @@ impl<'a> TerraphimService {
                 // Apply OpenRouter AI summarization if enabled for this role
                 #[cfg(feature = "openrouter")]
                 if role.has_openrouter_config() {
-                    log::debug!("Applying OpenRouter AI summarization to {} search results for role '{}'", documents.len(), role.name);
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} search results for role '{}'",
+                        documents.len(),
+                        role.name
+                    );
                     documents = self.enhance_descriptions_with_ai(documents, &role).await?;
                 }
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
                 if role.terraphim_it {
-                    log::debug!("Applying KG preprocessing to {} search results for role '{}'", documents.len(), role.name);
+                    log::debug!(
+                        "Applying KG preprocessing to {} search results for role '{}'",
+                        documents.len(),
+                        role.name
+                    );
                     let mut processed_docs = Vec::new();
                     for document in documents {
-                        let processed_doc = self.preprocess_document_content(document, &role).await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
@@ -950,43 +1219,60 @@ impl<'a> TerraphimService {
     }
 
     /// Find documents that contain a given knowledge graph term
-    /// 
+    ///
     /// This method searches for documents that were the source of a knowledge graph term.
     /// For example, given "haystack", it will find documents like "haystack.md" that contain
     /// this term or its synonyms ("datasource", "service", "agent").
-    /// 
+    ///
     /// Returns a vector of Documents that contain the term, with KG preprocessing applied if enabled for the role.
-    pub async fn find_documents_for_kg_term(&mut self, role_name: &RoleName, term: &str) -> Result<Vec<Document>> {
-        log::debug!("Finding documents for KG term '{}' in role '{}'", term, role_name);
-        
+    pub async fn find_documents_for_kg_term(
+        &mut self,
+        role_name: &RoleName,
+        term: &str,
+    ) -> Result<Vec<Document>> {
+        log::debug!(
+            "Finding documents for KG term '{}' in role '{}'",
+            term,
+            role_name
+        );
+
         // Ensure the thesaurus is loaded for this role
         let _thesaurus = self.ensure_thesaurus_loaded(role_name).await?;
-        
+
         // Get the role configuration to check if KG preprocessing should be applied
-        let role = self.config_state.get_role(role_name).await
-            .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found in config", role_name)))?;
-        
+        let role = self.config_state.get_role(role_name).await.ok_or_else(|| {
+            ServiceError::Config(format!("Role '{}' not found in config", role_name))
+        })?;
+
         // Get the role's rolegraph
-        let rolegraph_sync = self.config_state.roles.get(role_name)
+        let rolegraph_sync = self
+            .config_state
+            .roles
+            .get(role_name)
             .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found", role_name)))?;
-        
+
         let rolegraph = rolegraph_sync.lock().await;
-        
+
         // Find document IDs that contain this term
         let document_ids = rolegraph.find_document_ids_for_term(term);
         drop(rolegraph); // Release the lock early
-        
+
         if document_ids.is_empty() {
             log::debug!("No documents found for term '{}'", term);
             return Ok(Vec::new());
         }
-        
-        log::debug!("Found {} document IDs for term '{}': {:?}", document_ids.len(), term, document_ids);
-        
+
+        log::debug!(
+            "Found {} document IDs for term '{}': {:?}",
+            document_ids.len(),
+            term,
+            document_ids
+        );
+
         // Load the actual documents using the persistence layer
         // Handle both local and Atomic Data documents properly
         let mut documents = Vec::new();
-        
+
         for doc_id in &document_ids {
             if doc_id.starts_with("http://") || doc_id.starts_with("https://") {
                 // Atomic Data document: Try to load from persistence first
@@ -995,7 +1281,10 @@ impl<'a> TerraphimService {
                 placeholder.id = doc_id.clone();
                 match placeholder.load().await {
                     Ok(loaded_doc) => {
-                        log::debug!("Found cached Atomic Data document '{}' in persistence", doc_id);
+                        log::debug!(
+                            "Found cached Atomic Data document '{}' in persistence",
+                            doc_id
+                        );
                         documents.push(loaded_doc);
                     }
                     Err(_) => {
@@ -1019,10 +1308,13 @@ impl<'a> TerraphimService {
                 }
             }
         }
-        
+
         // Apply KG preprocessing if enabled for this role
         if role.terraphim_it {
-            log::debug!("Applying KG preprocessing for role '{}' with terraphim_it enabled", role_name);
+            log::debug!(
+                "Applying KG preprocessing for role '{}' with terraphim_it enabled",
+                role_name
+            );
             let mut processed_documents = Vec::new();
             for document in documents {
                 let processed_doc = self.preprocess_document_content(document, &role).await?;
@@ -1030,28 +1322,35 @@ impl<'a> TerraphimService {
             }
             documents = processed_documents;
         } else {
-            log::debug!("terraphim_it disabled for role '{}', skipping KG preprocessing", role_name);
+            log::debug!(
+                "terraphim_it disabled for role '{}', skipping KG preprocessing",
+                role_name
+            );
         }
-        
-        log::debug!("Successfully loaded and processed {} documents for term '{}'", documents.len(), term);
+
+        log::debug!(
+            "Successfully loaded and processed {} documents for term '{}'",
+            documents.len(),
+            term
+        );
         Ok(documents)
     }
 
     /// Generate a summary for a document using OpenRouter
-    /// 
+    ///
     /// This method takes a document and generates an AI-powered summary using the OpenRouter service.
     /// The summary is generated based on the document's content and can be customized with different
     /// models and length constraints.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `document` - The document to summarize
     /// * `api_key` - The OpenRouter API key
     /// * `model` - The model to use for summarization (e.g., "openai/gpt-3.5-turbo")
     /// * `max_length` - Maximum length of the summary in characters
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a `Result<String>` containing the generated summary or an error if summarization fails.
     #[cfg(feature = "openrouter")]
     pub async fn generate_document_summary(
@@ -1062,27 +1361,39 @@ impl<'a> TerraphimService {
         max_length: usize,
     ) -> Result<String> {
         use crate::openrouter::OpenRouterService;
-        
-        log::debug!("Generating summary for document '{}' using model '{}'", document.id, model);
-        
+
+        log::debug!(
+            "Generating summary for document '{}' using model '{}'",
+            document.id,
+            model
+        );
+
         // Create the OpenRouter service
-        let openrouter_service = OpenRouterService::new(api_key, model)
-            .map_err(|e| ServiceError::OpenRouter(e))?;
-        
+        let openrouter_service =
+            OpenRouterService::new(api_key, model).map_err(|e| ServiceError::OpenRouter(e))?;
+
         // Use the document body for summarization
         let content = &document.body;
-        
+
         if content.trim().is_empty() {
-            return Err(ServiceError::Config("Document body is empty, cannot generate summary".to_string()));
+            return Err(ServiceError::Config(
+                "Document body is empty, cannot generate summary".to_string(),
+            ));
         }
-        
+
         // Generate the summary
-        let summary = openrouter_service.generate_summary(content, max_length).await
+        let summary = openrouter_service
+            .generate_summary(content, max_length)
+            .await
             .map_err(|e| ServiceError::OpenRouter(e))?;
-        
-        log::info!("Generated {}-character summary for document '{}' using model '{}'", 
-                  summary.len(), document.id, model);
-        
+
+        log::info!(
+            "Generated {}-character summary for document '{}' using model '{}'",
+            summary.len(),
+            document.id,
+            model
+        );
+
         Ok(summary)
     }
 
@@ -1095,7 +1406,9 @@ impl<'a> TerraphimService {
         _model: &str,
         _max_length: usize,
     ) -> Result<String> {
-        Err(ServiceError::Config("OpenRouter feature not enabled during compilation".to_string()))
+        Err(ServiceError::Config(
+            "OpenRouter feature not enabled during compilation".to_string(),
+        ))
     }
 
     /// Fetch the current config
@@ -1143,7 +1456,6 @@ impl<'a> TerraphimService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1152,7 +1464,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_config() {
-        let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+        let mut config = ConfigBuilder::new()
+            .build_default_desktop()
+            .build()
+            .unwrap();
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let service = TerraphimService::new(config_state);
         let fetched_config = service.fetch_config().await;
@@ -1161,43 +1476,58 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_documents_selected_role() {
-        let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+        let mut config = ConfigBuilder::new()
+            .build_default_desktop()
+            .build()
+            .unwrap();
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let mut service = TerraphimService::new(config_state);
         let search_term = NormalizedTermValue::new("terraphim".to_string());
-        let documents = service.search_documents_selected_role(&search_term).await.unwrap();
+        let documents = service
+            .search_documents_selected_role(&search_term)
+            .await
+            .unwrap();
         assert!(documents.is_empty() || !documents.is_empty()); // Either empty or has results
     }
 
     #[tokio::test]
     async fn test_ensure_thesaurus_loaded_terraphim_engineer() {
         // Create a fresh config instead of trying to load from persistence
-        let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+        let mut config = ConfigBuilder::new()
+            .build_default_desktop()
+            .build()
+            .unwrap();
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let mut service = TerraphimService::new(config_state);
-        
+
         let role_name = RoleName::new("Terraphim Engineer");
         let thesaurus_result = service.ensure_thesaurus_loaded(&role_name).await;
-        
+
         match thesaurus_result {
             Ok(thesaurus) => {
-                println!("✅ Successfully loaded thesaurus with {} entries", thesaurus.len());
+                println!(
+                    "✅ Successfully loaded thesaurus with {} entries",
+                    thesaurus.len()
+                );
                 // Verify thesaurus contains expected terms
                 assert!(!thesaurus.is_empty(), "Thesaurus should not be empty");
-                
+
                 // Check for expected terms from docs/src/kg using &thesaurus for iteration
-                let has_terraphim = (&thesaurus).into_iter().any(|(term, _)| {
-                    term.as_str().to_lowercase().contains("terraphim")
-                });
-                let has_graph = (&thesaurus).into_iter().any(|(term, _)| {
-                    term.as_str().to_lowercase().contains("graph")
-                });
-                
+                let has_terraphim = (&thesaurus)
+                    .into_iter()
+                    .any(|(term, _)| term.as_str().to_lowercase().contains("terraphim"));
+                let has_graph = (&thesaurus)
+                    .into_iter()
+                    .any(|(term, _)| term.as_str().to_lowercase().contains("graph"));
+
                 println!("   Contains 'terraphim': {}", has_terraphim);
                 println!("   Contains 'graph': {}", has_graph);
-                
+
                 // At least one of these should be present
-                assert!(has_terraphim || has_graph, "Thesaurus should contain expected terms");
+                assert!(
+                    has_terraphim || has_graph,
+                    "Thesaurus should contain expected terms"
+                );
             }
             Err(e) => {
                 println!("❌ Failed to load thesaurus: {:?}", e);
@@ -1210,22 +1540,32 @@ mod tests {
     #[tokio::test]
     async fn test_config_building_with_local_kg() {
         // Test that config building works correctly with local KG files
-        let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+        let mut config = ConfigBuilder::new()
+            .build_default_desktop()
+            .build()
+            .unwrap();
         let config_state_result = ConfigState::new(&mut config).await;
-        
+
         match config_state_result {
             Ok(config_state) => {
                 println!("✅ Successfully built config state");
                 // Verify that roles were created
-                assert!(!config_state.roles.is_empty(), "Config state should have roles");
-                
+                assert!(
+                    !config_state.roles.is_empty(),
+                    "Config state should have roles"
+                );
+
                 // Check if Terraphim Engineer role was created
                 let terraphim_engineer_role = RoleName::new("Terraphim Engineer");
-                let has_terraphim_engineer = config_state.roles.contains_key(&terraphim_engineer_role);
+                let has_terraphim_engineer =
+                    config_state.roles.contains_key(&terraphim_engineer_role);
                 println!("   Has Terraphim Engineer role: {}", has_terraphim_engineer);
-                
+
                 // The role should exist even if thesaurus building failed
-                assert!(has_terraphim_engineer, "Terraphim Engineer role should exist");
+                assert!(
+                    has_terraphim_engineer,
+                    "Terraphim Engineer role should exist"
+                );
             }
             Err(e) => {
                 println!("❌ Failed to build config state: {:?}", e);
@@ -1237,14 +1577,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_atomic_data_persistence_skip() {
-        use terraphim_types::{Document, SearchQuery, NormalizedTermValue, RoleName};
-        use terraphim_config::{Config, Role, Haystack, ServiceType};
-        use terraphim_persistence::DeviceStorage;
         use ahash::AHashMap;
-        
+        use terraphim_config::{Config, Haystack, Role, ServiceType};
+        use terraphim_persistence::DeviceStorage;
+        use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+
         // Initialize memory-only persistence for testing
         DeviceStorage::init_memory_only().await.unwrap();
-        
+
         // Create a test config with a role
         let mut config = Config::default();
         let role_name = RoleName::new("test_role");
@@ -1279,10 +1619,10 @@ mod tests {
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
-        
+
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let mut service = TerraphimService::new(config_state);
-        
+
         // Create a test search query
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::new("test".to_string()),
@@ -1290,11 +1630,11 @@ mod tests {
             skip: None,
             role: Some(role_name),
         };
-        
+
         // Test that Atomic Data URLs are skipped during persistence lookup
         // This test verifies that the debug message is logged instead of trying to load from persistence
         let result = service.search(&search_query).await;
-        
+
         // The search should complete without errors, even though no documents are found
         // The important thing is that Atomic Data URLs don't cause persistence lookup errors
         assert!(result.is_ok(), "Search should complete without errors");
@@ -1302,14 +1642,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_atomic_data_caching() {
-        use terraphim_types::{Document, SearchQuery, NormalizedTermValue, RoleName};
-        use terraphim_config::{Config, Role, Haystack, ServiceType};
-        use terraphim_persistence::DeviceStorage;
         use ahash::AHashMap;
-        
+        use terraphim_config::{Config, Haystack, Role, ServiceType};
+        use terraphim_persistence::DeviceStorage;
+        use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+
         // Initialize memory-only persistence for testing
         DeviceStorage::init_memory_only().await.unwrap();
-        
+
         // Create a test config with a role
         let mut config = Config::default();
         let role_name = RoleName::new("test_role");
@@ -1344,10 +1684,10 @@ mod tests {
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
-        
+
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let mut service = TerraphimService::new(config_state);
-        
+
         // Create a mock Atomic Data document
         let atomic_doc = Document {
             id: "http://localhost:9883/borrower-portal/form-field/requestedLoanAmount".to_string(),
@@ -1359,7 +1699,7 @@ mod tests {
             tags: None,
             rank: None,
         };
-        
+
         // Test 1: Save Atomic Data document to persistence
         log::info!("Testing Atomic Data document caching...");
         match atomic_doc.save().await {
@@ -1369,7 +1709,7 @@ mod tests {
                 panic!("Atomic Data document save failed");
             }
         }
-        
+
         // Test 2: Verify the document can be loaded from persistence
         let mut placeholder = Document::default();
         placeholder.id = atomic_doc.id.clone();
@@ -1381,11 +1721,14 @@ mod tests {
                 assert_eq!(loaded_doc.description, atomic_doc.description);
             }
             Err(e) => {
-                log::error!("❌ Failed to load Atomic Data document from persistence: {}", e);
+                log::error!(
+                    "❌ Failed to load Atomic Data document from persistence: {}",
+                    e
+                );
                 panic!("Atomic Data document load failed");
             }
         }
-        
+
         // Test 3: Verify the search logic would find the cached document
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::new("test".to_string()),
@@ -1393,24 +1736,26 @@ mod tests {
             skip: None,
             role: Some(role_name),
         };
-        
+
         let result = service.search(&search_query).await;
         assert!(result.is_ok(), "Search should complete without errors");
-        
+
         log::info!("✅ All Atomic Data caching tests passed!");
     }
 
     #[tokio::test]
     async fn test_kg_term_search_with_atomic_data() {
-        use terraphim_types::{Document, RoleName, KnowledgeGraphInputType};
-        use terraphim_config::{Config, Role, Haystack, ServiceType, KnowledgeGraph, KnowledgeGraphLocal};
-        use terraphim_persistence::DeviceStorage;
         use ahash::AHashMap;
         use std::path::PathBuf;
-        
+        use terraphim_config::{
+            Config, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
+        };
+        use terraphim_persistence::DeviceStorage;
+        use terraphim_types::{Document, KnowledgeGraphInputType, RoleName};
+
         // Initialize memory-only persistence for testing
         DeviceStorage::init_memory_only().await.unwrap();
-        
+
         // Create a test config with a role that has KG enabled
         let mut config = Config::default();
         let role_name = RoleName::new("test_kg_role");
@@ -1453,10 +1798,10 @@ mod tests {
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
-        
+
         let config_state = ConfigState::new(&mut config).await.unwrap();
         let mut service = TerraphimService::new(config_state);
-        
+
         // Create and cache an Atomic Data document
         let atomic_doc = Document {
             id: "http://localhost:9883/borrower-portal/form-field/requestedLoanAmount".to_string(),
@@ -1468,7 +1813,7 @@ mod tests {
             tags: None,
             rank: None,
         };
-        
+
         // Save the Atomic Data document to persistence
         log::info!("Testing KG term search with Atomic Data documents...");
         match atomic_doc.save().await {
@@ -1478,25 +1823,31 @@ mod tests {
                 panic!("Atomic Data document save failed");
             }
         }
-        
+
         // Test that find_documents_for_kg_term can handle Atomic Data document IDs
         // Note: In a real scenario, the rolegraph would contain the Atomic Data document ID
         // For this test, we're verifying that the function can handle Atomic Data URLs properly
         let result = service.find_documents_for_kg_term(&role_name, "test").await;
-        
+
         // The function should complete without errors, even if no documents are found
         // The important thing is that it doesn't crash when encountering Atomic Data URLs
-        assert!(result.is_ok(), "find_documents_for_kg_term should complete without errors");
-        
+        assert!(
+            result.is_ok(),
+            "find_documents_for_kg_term should complete without errors"
+        );
+
         let documents = result.unwrap();
-        log::info!("✅ KG term search completed successfully, found {} documents", documents.len());
-        
+        log::info!(
+            "✅ KG term search completed successfully, found {} documents",
+            documents.len()
+        );
+
         // Verify that the function can handle Atomic Data document loading
         // by manually testing the document loading logic
         let atomic_doc_id = "http://localhost:9883/borrower-portal/form-field/requestedLoanAmount";
         let mut placeholder = Document::default();
         placeholder.id = atomic_doc_id.to_string();
-        
+
         match placeholder.load().await {
             Ok(loaded_doc) => {
                 log::info!("✅ Successfully loaded Atomic Data document from persistence in KG term search context");
@@ -1504,11 +1855,14 @@ mod tests {
                 assert_eq!(loaded_doc.body, atomic_doc.body);
             }
             Err(e) => {
-                log::error!("❌ Failed to load Atomic Data document in KG term search context: {}", e);
+                log::error!(
+                    "❌ Failed to load Atomic Data document in KG term search context: {}",
+                    e
+                );
                 panic!("Atomic Data document load failed in KG term search context");
             }
         }
-        
+
         log::info!("✅ All KG term search with Atomic Data tests passed!");
     }
-}  
+}

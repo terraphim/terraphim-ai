@@ -6,7 +6,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use axum::http::StatusCode;
 use axum::routing::post;
-use axum::{Router};
+use axum::Router;
 
 #[tokio::test]
 async fn chat_endpoint_returns_reply_from_openrouter() {
@@ -44,5 +44,3 @@ async fn chat_endpoint_returns_reply_from_openrouter() {
     assert_eq!(json["status"], "Success");
     assert!(json["message"].as_str().unwrap().contains("Hello"));
 }
-
-

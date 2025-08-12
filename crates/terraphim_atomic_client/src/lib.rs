@@ -1,22 +1,22 @@
 /*!
  * # Atomic Server Client
- * 
+ *
  * A Rust client library for interacting with Atomic Server, with support for both native and WASM environments.
- * 
+ *
  * ## Features
- * 
+ *
  * - Fetch resources from Atomic Server
  * - Create, update, and delete resources
  * - Authenticate requests using Ed25519 signatures
  * - WASM compatibility for browser environments
- * 
+ *
  * ## Usage
- * 
+ *
  * ```rust,no_run
  * use atomic_server_client::{types::{Config, Resource}, store::Store};
  * use std::collections::HashMap;
  * use serde_json::json;
- * 
+ *
  * #[tokio::main]
  * async fn main() {
  *     // Load configuration from environment variables
@@ -47,24 +47,24 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-mod error;
-pub mod types;
 mod auth;
-pub mod store;
+mod error;
 pub mod http;
+pub mod store;
 pub mod time_utils;
+pub mod types;
 
-pub use error::AtomicError;
-pub use auth::Agent;
 #[cfg(feature = "native")]
 pub use auth::get_authentication_headers;
+pub use auth::Agent;
+pub use error::AtomicError;
 
 /// Result type used throughout the library
 pub type Result<T> = std::result::Result<T, AtomicError>;
 
 // Re-export commonly used types for convenience
-pub use types::{Commit, CommitBuilder, Config, Resource};
 pub use store::Store;
+pub use types::{Commit, CommitBuilder, Config, Resource};
 
 #[cfg(all(target_arch = "wasm32", feature = "export_store"))]
 #[wasm_bindgen]
@@ -94,4 +94,3 @@ mod tests {
         assert!(config.agent.is_none());
     }
 }
-

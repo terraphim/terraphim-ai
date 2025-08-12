@@ -1,8 +1,8 @@
 #![cfg(feature = "openrouter")]
 
+use serial_test::serial;
 use std::env;
 use wiremock::matchers::{method, path, path_regex};
-use serial_test::serial;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use terraphim_service::openrouter::OpenRouterService;
@@ -60,7 +60,11 @@ async fn test_chat_completion_success() {
     let client = OpenRouterService::new("sk-or-v1-test", "openai/gpt-3.5-turbo").unwrap();
 
     let reply = client
-        .chat_completion(vec![serde_json::json!({"role":"user","content":"hi"})], Some(128), Some(0.2))
+        .chat_completion(
+            vec![serde_json::json!({"role":"user","content":"hi"})],
+            Some(128),
+            Some(0.2),
+        )
         .await
         .expect("chat should succeed");
 
@@ -77,13 +81,17 @@ async fn test_list_models_handles_both_formats() {
     let body1 = serde_json::json!({
         "data": [{"id":"openai/gpt-3.5-turbo"},{"id":"anthropic/claude-3-haiku"}]
     });
-    Mock::given(method("GET")).and(path_regex(r"/models$"))
+    Mock::given(method("GET"))
+        .and(path_regex(r"/models$"))
         .respond_with(ResponseTemplate::new(200).set_body_json(body1))
         .mount(&server)
         .await;
 
     let client = OpenRouterService::new("sk-or-v1-test", "openai/gpt-3.5-turbo").unwrap();
-    let models = client.list_models().await.expect("list models should succeed");
+    let models = client
+        .list_models()
+        .await
+        .expect("list models should succeed");
     assert!(!models.is_empty(), "models list should not be empty");
 
     // Second response style: { models: ["model-a","model-b"] }
@@ -91,11 +99,15 @@ async fn test_list_models_handles_both_formats() {
     let body2 = serde_json::json!({
         "models": ["openai/gpt-4","mistralai/mixtral-8x7b-instruct"]
     });
-    Mock::given(method("GET")).and(path_regex(r"/models$"))
+    Mock::given(method("GET"))
+        .and(path_regex(r"/models$"))
         .respond_with(ResponseTemplate::new(200).set_body_json(body2))
         .mount(&server)
         .await;
-    let models2 = client.list_models().await.expect("list models format 2 should succeed");
+    let models2 = client
+        .list_models()
+        .await
+        .expect("list models format 2 should succeed");
     assert!(models2.iter().any(|m| m.contains("gpt-4")));
 }
 
@@ -117,5 +129,3 @@ async fn test_rate_limit_and_error_paths() {
     let res2 = client.chat_completion(vec![], None, None).await;
     assert!(res2.is_err(), "server error must error");
 }
-
-

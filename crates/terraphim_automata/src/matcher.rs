@@ -45,7 +45,7 @@ pub fn find_matches(
 pub enum LinkType {
     WikiLinks,
     HTMLLinks,
-    MarkdownLinks
+    MarkdownLinks,
 }
 
 // // This function replacing instead of matching patterns
@@ -60,14 +60,21 @@ pub fn replace_matches(text: &str, thesaurus: Thesaurus, link_type: LinkType) ->
             }
             LinkType::HTMLLinks => {
                 patterns.push(key.to_string());
-                replace_with.push(format!("<a href=\"{}\">{}</a>", value.clone().url.unwrap_or_default(), value.clone().value));
+                replace_with.push(format!(
+                    "<a href=\"{}\">{}</a>",
+                    value.clone().url.unwrap_or_default(),
+                    value.clone().value
+                ));
             }
             LinkType::MarkdownLinks => {
                 patterns.push(key.to_string());
-                replace_with.push(format!("[{}]({})", value.clone().value, value.clone().url.unwrap_or_default()));
+                replace_with.push(format!(
+                    "[{}]({})",
+                    value.clone().value,
+                    value.clone().url.unwrap_or_default()
+                ));
             }
         }
-        
     }
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)

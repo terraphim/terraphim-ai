@@ -2,7 +2,7 @@ use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
 
 /// Example demonstrating how to configure Terraphim with atomic server haystacks
-/// 
+///
 /// This example shows how to create a complete Terraphim configuration that includes
 /// both traditional ripgrep haystacks and atomic server haystacks for hybrid search.
 #[tokio::main]
@@ -12,15 +12,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 1: Basic atomic server haystack configuration
     println!("📋 Example 1: Basic Atomic Server Haystack Configuration");
-    
+
     let basic_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
         .add_role(
             "AtomicUser",
             Role {
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
+                terraphim_it: true,
                 shortname: Some("AtomicUser".to_string()),
                 name: "AtomicUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -30,7 +28,8 @@ terraphim_it: "example.ai",
                     "http://localhost:9883".to_string(), // Atomic server URL
                     ServiceType::Atomic,
                     true,
-                ).with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+                )
+                .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
                 extra: ahash::AHashMap::new(),
             },
         )
@@ -44,15 +43,13 @@ terraphim_it: "example.ai",
 
     // Example 2: Hybrid configuration with both ripgrep and atomic server
     println!("\n📋 Example 2: Hybrid Ripgrep + Atomic Server Configuration");
-    
+
     let hybrid_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+Shift+T")
         .add_role(
             "LocalResearcher",
             Role {
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
+                terraphim_it: true,
                 shortname: Some("LocalResearcher".to_string()),
                 name: "LocalResearcher".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -70,17 +67,16 @@ terraphim_it: "example.ai",
                         "http://localhost:9883".to_string(), // Atomic server URL
                         ServiceType::Atomic,
                         true,
-                    ).with_atomic_secret(Some("your-base64-secret-here".to_string())),
+                    )
+                    .with_atomic_secret(Some("your-base64-secret-here".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
             },
         )
         .add_role(
-            "RemoteResearcher", 
+            "RemoteResearcher",
             Role {
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
+                terraphim_it: true,
                 shortname: Some("RemoteResearcher".to_string()),
                 name: "RemoteResearcher".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -92,12 +88,14 @@ terraphim_it: "example.ai",
                         "http://localhost:9883".to_string(),
                         ServiceType::Atomic,
                         true,
-                    ).with_atomic_secret(Some("secret-for-server-1".to_string())),
+                    )
+                    .with_atomic_secret(Some("secret-for-server-1".to_string())),
                     Haystack::new(
                         "https://example.com/atomic".to_string(),
                         ServiceType::Atomic,
                         true,
-                    ).with_atomic_secret(Some("secret-for-server-2".to_string())),
+                    )
+                    .with_atomic_secret(Some("secret-for-server-2".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
             },
@@ -114,15 +112,13 @@ terraphim_it: "example.ai",
 
     // Example 3: Anonymous access to atomic server
     println!("\n📋 Example 3: Anonymous Access to Atomic Server");
-    
+
     let anonymous_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+Alt+T")
         .add_role(
             "AnonymousUser",
             Role {
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
+                terraphim_it: false,
                 shortname: Some("AnonymousUser".to_string()),
                 name: "AnonymousUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -146,15 +142,13 @@ terraphim_it: "example.ai",
 
     // Example 4: Public document server configuration
     println!("\n📋 Example 4: Public Document Server Configuration");
-    
+
     let public_docs_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+P")
         .add_role(
             "PublicReader",
             Role {
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
+                terraphim_it: false,
                 shortname: Some("PublicReader".to_string()),
                 name: "PublicReader".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
@@ -189,7 +183,7 @@ terraphim_it: "example.ai",
 
     // Example 5: Configuration serialization
     println!("\n📋 Example 5: Configuration Serialization");
-    
+
     let json_output = serde_json::to_string_pretty(&basic_config)?;
     println!("JSON configuration:");
     println!("{}", json_output);
@@ -205,7 +199,7 @@ terraphim_it: "example.ai",
     println!("   - service: ServiceType::Ripgrep");
     println!("   - atomic_server_secret: None (not used)");
     println!("   - Searches local markdown files");
-    
+
     println!("\n🌐 Atomic Server Haystacks:");
     println!("   - location: URL (e.g., 'http://localhost:9883', 'https://my-server.com/atomic')");
     println!("   - service: ServiceType::Atomic");
@@ -221,14 +215,14 @@ terraphim_it: "example.ai",
     println!("   - Store secrets securely (environment variables, secure vaults)");
     println!("   - Use atomic_server_secret: None for public document servers");
     println!("   - Use atomic_server_secret: Some(secret) for private/authenticated servers");
-    
+
     println!("\n🔒 Access Level Examples:");
     println!("   Public Access (atomic_server_secret: None):");
     println!("     ✓ Public documentation sites");
     println!("     ✓ Open knowledge bases");
     println!("     ✓ Community wikis");
     println!("     ✓ Educational content");
-    
+
     println!("\n   Authenticated Access (atomic_server_secret: Some(secret)):");
     println!("     ✓ Private company documents");
     println!("     ✓ Personal notes and archives");
@@ -240,11 +234,11 @@ terraphim_it: "example.ai",
 
 /// Create configuration from environment variables
 fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>> {
-    let server_url = std::env::var("ATOMIC_SERVER_URL")
-        .unwrap_or_else(|_| "http://localhost:9883".to_string());
-    
+    let server_url =
+        std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
+
     let secret = std::env::var("ATOMIC_SERVER_SECRET").ok();
-    
+
     let read_only = std::env::var("ATOMIC_READ_ONLY")
         .unwrap_or_else(|_| "true".to_string())
         .parse::<bool>()
@@ -255,23 +249,18 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
         .add_role(
             "EnvironmentUser",
             Role {
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
-terraphim_it: "example.ai",
+                terraphim_it: false,
                 shortname: Some("EnvironmentUser".to_string()),
                 name: "EnvironmentUser".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "default".to_string(),
                 kg: None,
-                haystacks: vec![Haystack::new(
-                    server_url,
-                    ServiceType::Atomic,
-                    read_only,
-                ).with_atomic_secret(secret)],
+                haystacks: vec![Haystack::new(server_url, ServiceType::Atomic, read_only)
+                    .with_atomic_secret(secret)],
                 extra: ahash::AHashMap::new(),
             },
         )
         .build()?;
 
     Ok(config)
-} 
+}

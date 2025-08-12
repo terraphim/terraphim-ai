@@ -2,8 +2,7 @@ use ahash::AHashMap;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType,
-    TerraphimConfigError,
+    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
 use terraphim_types::RelevanceFunction;

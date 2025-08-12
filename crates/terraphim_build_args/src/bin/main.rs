@@ -2,15 +2,14 @@
 ///
 /// This CLI tool provides centralized management of build arguments for the
 /// Terraphim AI project, supporting configuration of features, targets, and environments.
-
 use clap::{Arg, Command};
-use terraphim_build_args::*;
 use std::process;
 use std::str::FromStr;
+use terraphim_build_args::*;
 
 fn main() {
     env_logger::init();
-    
+
     let matches = Command::new("terraphim-build-args")
         .version("0.1.0")
         .author("Terraphim Contributors")
@@ -62,7 +61,7 @@ fn main() {
                 .action(clap::ArgAction::SetTrue),
         )
         .get_matches();
-    
+
     // Load configuration from file if provided
     let mut config = if let Some(config_file) = matches.get_one::<String>("config") {
         match BuildConfig::from_file(config_file) {
@@ -78,7 +77,7 @@ fn main() {
             process::exit(1);
         })
     };
-    
+
     // Override with command line arguments
     if let Some(target) = matches.get_one::<String>("target") {
         match BuildTarget::from_str(target) {
@@ -89,7 +88,7 @@ fn main() {
             }
         }
     }
-    
+
     if let Some(features) = matches.get_one::<String>("features") {
         match FeatureSet::from_str(features) {
             Ok(f) => config.features = f,
@@ -99,7 +98,7 @@ fn main() {
             }
         }
     }
-    
+
     if let Some(environment) = matches.get_one::<String>("environment") {
         match Environment::from_str(environment) {
             Ok(e) => config.environment = e,
@@ -109,19 +108,19 @@ fn main() {
             }
         }
     }
-    
+
     // Validate configuration
     if let Err(e) = config.validate() {
         eprintln!("Configuration validation failed: {}", e);
         process::exit(1);
     }
-    
+
     // If validation only, exit successfully
     if matches.get_flag("validate") {
         println!("Configuration validation successful");
         return;
     }
-    
+
     // Generate output based on format
     let output_format = matches.get_one::<String>("output").unwrap();
     match output_format.as_str() {
@@ -137,15 +136,13 @@ fn main() {
             let args = config.earthly_args();
             println!("earthly {}", args.join(" "));
         }
-        "json" => {
-            match serde_json::to_string_pretty(&config) {
-                Ok(json) => println!("{}", json),
-                Err(e) => {
-                    eprintln!("Error serializing config to JSON: {}", e);
-                    process::exit(1);
-                }
+        "json" => match serde_json::to_string_pretty(&config) {
+            Ok(json) => println!("{}", json),
+            Err(e) => {
+                eprintln!("Error serializing config to JSON: {}", e);
+                process::exit(1);
             }
-        }
+        },
         _ => {
             eprintln!("Unknown output format: {}", output_format);
             process::exit(1);

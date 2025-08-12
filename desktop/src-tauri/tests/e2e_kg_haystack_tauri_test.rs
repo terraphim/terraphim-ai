@@ -1,5 +1,5 @@
 //! End-to-end test for KG term to document lookup functionality
-//! 
+//!
 //! This test validates that the find_documents_for_kg_term functionality works correctly
 //! by testing the underlying service logic directly.
 
@@ -36,30 +36,36 @@ async fn test_find_documents_for_kg_term_haystack() {
     println!("🔍 Step 3: Testing service logic with haystack terms");
     let test_terms = vec!["haystack", "datasource", "service", "agent"];
     let role_name = RoleName::new("Terraphim Engineer");
-    
+
     let mut terraphim_service = TerraphimService::new(config_state.clone());
-    
+
     for term in test_terms {
         println!("  🔎 Testing service with term: '{}'", term);
-        
-        let result = terraphim_service.find_documents_for_kg_term(&role_name, term).await;
-        
+
+        let result = terraphim_service
+            .find_documents_for_kg_term(&role_name, term)
+            .await;
+
         match result {
             Ok(results) => {
                 println!("    ✅ Service succeeded for term '{}'", term);
                 println!("    📄 Found {} documents", results.len());
-                
+
                 // Log document details
                 for (i, doc) in results.iter().enumerate() {
-                    println!("      {}. Document: '{}' (ID: '{}')", 
-                        i + 1, doc.title, doc.id);
+                    println!(
+                        "      {}. Document: '{}' (ID: '{}')",
+                        i + 1,
+                        doc.title,
+                        doc.id
+                    );
                     println!("         URL: '{}'", doc.url);
-                    
+
                     // Validate document structure
                     assert!(!doc.id.is_empty(), "Document ID should not be empty");
                     assert!(!doc.title.is_empty(), "Document title should not be empty");
                 }
-                
+
                 // For haystack specifically, we expect to find documents
                 if term == "haystack" {
                     // Note: We don't assert !results.is_empty() because the KG building
@@ -77,7 +83,7 @@ async fn test_find_documents_for_kg_term_haystack() {
             }
         }
     }
-    
+
     println!("✅ Service integration test completed");
 }
 
@@ -85,7 +91,7 @@ async fn test_find_documents_for_kg_term_haystack() {
 #[serial]
 async fn test_service_error_handling() {
     println!("🧪 Testing service error handling");
-    
+
     let _ = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::WARN)
         .try_init();
@@ -99,14 +105,16 @@ async fn test_service_error_handling() {
     let config_state = ConfigState::new(&mut config)
         .await
         .expect("Failed to initialize ConfigState");
-    
+
     let mut terraphim_service = TerraphimService::new(config_state.clone());
-    
+
     // Test with invalid role name
     println!("  🔍 Testing with invalid role name");
     let invalid_role = RoleName::new("NonExistent Role");
-    let result = terraphim_service.find_documents_for_kg_term(&invalid_role, "test").await;
-    
+    let result = terraphim_service
+        .find_documents_for_kg_term(&invalid_role, "test")
+        .await;
+
     match result {
         Ok(_) => {
             println!("    ⚠️  Expected error for invalid role, but got success");
@@ -115,29 +123,34 @@ async fn test_service_error_handling() {
             println!("    ✅ Correctly handled invalid role: {:?}", e);
         }
     }
-    
+
     // Test with valid role but potentially problematic term
     println!("  🔍 Testing with valid role and empty term");
     let valid_role = RoleName::new("Engineer"); // This role should exist
-    let result = terraphim_service.find_documents_for_kg_term(&valid_role, "").await;
-    
+    let result = terraphim_service
+        .find_documents_for_kg_term(&valid_role, "")
+        .await;
+
     match result {
         Ok(results) => {
-            println!("    ✅ Handled empty term gracefully: {} results", results.len());
+            println!(
+                "    ✅ Handled empty term gracefully: {} results",
+                results.len()
+            );
         }
         Err(e) => {
             println!("    ✅ Correctly rejected empty term: {:?}", e);
         }
     }
-    
+
     println!("✅ Error handling test completed");
 }
 
-#[tokio::test] 
+#[tokio::test]
 #[serial]
 async fn test_service_response_format_validation() {
     println!("📋 Testing service response format validation");
-    
+
     // Create test configuration
     let mut config = ConfigBuilder::new_with_id(ConfigId::Desktop)
         .build_default_desktop()
@@ -147,20 +160,22 @@ async fn test_service_response_format_validation() {
     let config_state = ConfigState::new(&mut config)
         .await
         .expect("Failed to initialize ConfigState");
-    
+
     let mut terraphim_service = TerraphimService::new(config_state.clone());
-    
+
     // Test the service and validate response format
     let role_name = RoleName::new("Terraphim Engineer");
-    let result = terraphim_service.find_documents_for_kg_term(&role_name, "test").await;
-    
+    let result = terraphim_service
+        .find_documents_for_kg_term(&role_name, "test")
+        .await;
+
     match result {
         Ok(results) => {
             println!("✅ Service executed successfully");
-            
+
             println!("  📊 Response validation:");
             println!("    - Results count: {}", results.len());
-            
+
             // Validate each document in results
             for doc in &results {
                 assert!(!doc.id.is_empty(), "Document ID should not be empty");
@@ -168,7 +183,7 @@ async fn test_service_response_format_validation() {
                 // URL can be empty in some cases, so we don't assert on it
                 // Body can be empty in some cases, so we don't assert on it
             }
-            
+
             println!("✅ Response format validation completed");
         }
         Err(e) => {
@@ -177,6 +192,6 @@ async fn test_service_response_format_validation() {
             println!("ℹ️  This may be expected in test environment");
         }
     }
-    
+
     println!("✅ Response format validation test completed");
-} 
+}

@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use rmcp::ServiceExt;
 use rmcp::transport::sse_server::{SseServer, SseServerConfig};
+use rmcp::ServiceExt;
 use std::net::SocketAddr;
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_mcp_server::McpService;
 use tokio::io;
-use tracing_subscriber::{self, EnvFilter, fmt, prelude::*};
 use tracing_log;
+use tracing_subscriber::{self, fmt, prelude::*, EnvFilter};
 
 #[derive(Parser)]
 #[command(name = "terraphim_mcp_server")]
@@ -19,7 +19,7 @@ struct Args {
     /// Configuration profile to use
     #[arg(short, long, value_enum, default_value_t = ConfigProfile::Desktop)]
     profile: ConfigProfile,
-    
+
     /// Enable verbose logging (INFO level instead of WARN)
     #[arg(short, long)]
     verbose: bool,
@@ -44,11 +44,10 @@ enum ConfigProfile {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    
+
     // Log to a file
-    let log_dir = std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| {
-        "/tmp/terraphim-logs".to_string()
-    });
+    let log_dir =
+        std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| "/tmp/terraphim-logs".to_string());
     std::fs::create_dir_all(&log_dir)?;
     let file_appender = tracing_appender::rolling::daily(log_dir, "terraphim-mcp-server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -70,7 +69,10 @@ async fn main() -> Result<()> {
     // If a subscriber is already set (e.g. in test harness), ignore the error.
     let _ = subscriber.try_init();
 
-    tracing::info!("Starting Terraphim MCP server with {:?} profile", args.profile);
+    tracing::info!(
+        "Starting Terraphim MCP server with {:?} profile",
+        args.profile
+    );
 
     // Build configuration based on selected profile
     let config = match args.profile {
@@ -80,14 +82,14 @@ async fn main() -> Result<()> {
                 .build_default_desktop()
                 .build()
                 .expect("Failed to build default desktop configuration")
-        },
+        }
         ConfigProfile::Server => {
             tracing::info!("Using server configuration (Default role without KG)");
             ConfigBuilder::new()
                 .build_default_server()
                 .build()
                 .expect("Failed to build default server configuration")
-        },
+        }
     };
 
     // Initialize ConfigState from the config
@@ -141,4 +143,4 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-} 
+}

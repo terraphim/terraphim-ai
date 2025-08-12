@@ -3,19 +3,19 @@ use tauri::State;
 
 use serde::{Deserialize, Serialize};
 
+use terraphim_atomic_client::{Agent, Config as AtomicConfig, Store};
 use terraphim_config::{Config, ConfigState};
+use terraphim_rolegraph::magic_unpair;
 use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
-use terraphim_rolegraph::magic_unpair;
 use terraphim_types::Thesaurus;
 use terraphim_types::{Document, SearchQuery};
-use terraphim_atomic_client::{Store, Config as AtomicConfig, Agent};
 
-use serde::Serializer;
 use schemars::schema_for;
+use serde::Serializer;
 use serde_json::Value;
-use tsify::Tsify;
 use std::collections::HashMap;
+use tsify::Tsify;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -164,8 +164,8 @@ pub struct InitialSettings {
     data_folder: PathBuf,
     global_shortcut: String,
 }
-use tauri::async_runtime::Mutex;
 use std::sync::Arc;
+use tauri::async_runtime::Mutex;
 
 #[tauri::command]
 pub async fn save_initial_settings(
@@ -210,33 +210,33 @@ use tauri::{Manager, Window};
 
 #[tauri::command]
 pub async fn close_splashscreen(window: Window) {
-  // Close splashscreen
-  if let Some(splashscreen) = window.get_window("splashscreen") {
-    let _ = splashscreen.close();
-  } else {
-    log::warn!("Splashscreen window not found");
-  }
-  
-  // Show main window - try different possible labels
-  let window_labels = ["main", ""];
-  let mut main_window_found = false;
-  
-  for label in &window_labels {
-    if let Some(main_window) = window.get_window(label) {
-      let _ = main_window.show();
-      main_window_found = true;
-      break;
+    // Close splashscreen
+    if let Some(splashscreen) = window.get_window("splashscreen") {
+        let _ = splashscreen.close();
+    } else {
+        log::warn!("Splashscreen window not found");
     }
-  }
-  
-  if !main_window_found {
-    log::error!("Main window not found with any expected label");
-    // Try to get any available window
-    let windows = window.windows();
-    if let Some((_, any_window)) = windows.iter().next() {
-      let _ = any_window.show();
+
+    // Show main window - try different possible labels
+    let window_labels = ["main", ""];
+    let mut main_window_found = false;
+
+    for label in &window_labels {
+        if let Some(main_window) = window.get_window(label) {
+            let _ = main_window.show();
+            main_window_found = true;
+            break;
+        }
     }
-  }
+
+    if !main_window_found {
+        log::error!("Main window not found with any expected label");
+        // Try to get any available window
+        let windows = window.windows();
+        if let Some((_, any_window)) = windows.iter().next() {
+            let _ = any_window.show();
+        }
+    }
 }
 
 /// Response type for a single document
@@ -313,28 +313,28 @@ pub async fn get_rolegraph(
     role_name: Option<String>,
 ) -> Result<RoleGraphResponse> {
     log::info!("Get rolegraph called for role: {:?}", role_name);
-    
+
     let config = {
         let config_guard = config_state.config.lock().await;
         config_guard.clone()
     };
-    
+
     // Use provided role or fall back to selected role
     let role = match role_name {
         Some(name) => terraphim_types::RoleName::new(&name),
         None => config.selected_role.clone(),
     };
-    
+
     // Check if role exists and has a rolegraph
     let Some(rolegraph_sync) = config_state.roles.get(&role) else {
         return Err(TerraphimTauriError::Generic(format!(
-            "Role '{}' not found or has no knowledge graph configured", 
+            "Role '{}' not found or has no knowledge graph configured",
             role.original
         )));
     };
-    
+
     let rolegraph = rolegraph_sync.lock().await;
-    
+
     // Convert rolegraph nodes to DTOs
     let nodes: Vec<GraphNodeDto> = rolegraph
         .nodes_map()
@@ -345,7 +345,7 @@ pub async fn get_rolegraph(
                 .get(id)
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| format!("Node {}", id));
-            
+
             GraphNodeDto {
                 id: *id,
                 label,
@@ -353,7 +353,7 @@ pub async fn get_rolegraph(
             }
         })
         .collect();
-    
+
     // Convert rolegraph edges to DTOs using magic_unpair to get source and target
     let edges: Vec<GraphEdgeDto> = rolegraph
         .edges_map()
@@ -367,7 +367,7 @@ pub async fn get_rolegraph(
             }
         })
         .collect();
-    
+
     Ok(RoleGraphResponse {
         status: Status::Success,
         nodes,
@@ -401,7 +401,7 @@ pub async fn select_role(
 }
 
 /// Find documents that contain a given knowledge graph term
-/// 
+///
 /// This command searches for documents that were the source of a knowledge graph term.
 /// For example, given "haystack", it will find documents like "haystack.md" that contain
 /// this term or its synonyms ("datasource", "service", "agent").
@@ -411,16 +411,22 @@ pub async fn find_documents_for_kg_term(
     role_name: String,
     term: String,
 ) -> Result<DocumentListResponse> {
-    log::debug!("Finding documents for KG term '{}' in role '{}'", term, role_name);
-    
+    log::debug!(
+        "Finding documents for KG term '{}' in role '{}'",
+        term,
+        role_name
+    );
+
     let role_name = role_name.into();
     let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
-    
-    let results = terraphim_service.find_documents_for_kg_term(&role_name, &term).await?;
+
+    let results = terraphim_service
+        .find_documents_for_kg_term(&role_name, &term)
+        .await?;
     let total = results.len();
-    
+
     log::debug!("Found {} documents for KG term '{}'", total, term);
-    
+
     Ok(DocumentListResponse {
         status: Status::Success,
         results,
@@ -455,7 +461,7 @@ pub struct AtomicSaveResponse {
 }
 
 /// Save an article to atomic server
-/// 
+///
 /// This command saves a document as an article to the specified atomic server.
 /// It uses the atomic client to create the resource with proper authentication.
 #[command]
@@ -464,18 +470,21 @@ pub async fn save_article_to_atomic(
     server_url: String,
     atomic_secret: Option<String>,
 ) -> Result<AtomicSaveResponse> {
-    log::info!("Saving article '{}' to atomic server: {}", article.title, server_url);
-    
+    log::info!(
+        "Saving article '{}' to atomic server: {}",
+        article.title,
+        server_url
+    );
+
     // Create atomic client configuration
     let agent = match atomic_secret {
-        Some(secret) => {
-            Agent::from_base64(&secret)
-                .map_err(|e| TerraphimTauriError::Generic(format!("Invalid atomic server secret: {}", e)))?
-        },
+        Some(secret) => Agent::from_base64(&secret).map_err(|e| {
+            TerraphimTauriError::Generic(format!("Invalid atomic server secret: {}", e))
+        })?,
         None => {
             log::warn!("No atomic server secret provided - using anonymous access");
             return Err(TerraphimTauriError::Generic(
-                "Atomic server secret is required for saving articles".to_string()
+                "Atomic server secret is required for saving articles".to_string(),
             ));
         }
     };
@@ -485,12 +494,13 @@ pub async fn save_article_to_atomic(
         agent: Some(agent),
     };
 
-    let store = Store::new(atomic_config)
-        .map_err(|e| TerraphimTauriError::Generic(format!("Failed to create atomic store: {}", e)))?;
+    let store = Store::new(atomic_config).map_err(|e| {
+        TerraphimTauriError::Generic(format!("Failed to create atomic store: {}", e))
+    })?;
 
     // Build article properties for atomic server
     let mut properties = HashMap::new();
-    
+
     // Standard atomic data properties
     properties.insert(
         "https://atomicdata.dev/properties/shortname".to_string(),
@@ -510,9 +520,9 @@ pub async fn save_article_to_atomic(
     );
     properties.insert(
         "https://atomicdata.dev/properties/isA".to_string(),
-        serde_json::Value::Array(vec![
-            serde_json::Value::String("https://atomicdata.dev/classes/Article".to_string())
-        ]),
+        serde_json::Value::Array(vec![serde_json::Value::String(
+            "https://atomicdata.dev/classes/Article".to_string(),
+        )]),
     );
 
     // Article body as content - using markdown datatype for rich text support
@@ -548,9 +558,11 @@ pub async fn save_article_to_atomic(
         properties.insert(
             "https://atomicdata.dev/properties/tags".to_string(),
             serde_json::Value::Array(
-                article.tags.iter()
+                article
+                    .tags
+                    .iter()
                     .map(|tag| serde_json::Value::String(tag.clone()))
-                    .collect()
+                    .collect(),
             ),
         );
     }
@@ -564,17 +576,24 @@ pub async fn save_article_to_atomic(
     // Save to atomic server using commit
     match store.create_with_commit(&article.subject, properties).await {
         Ok(_) => {
-            log::info!("✅ Successfully saved article '{}' to atomic server", article.title);
+            log::info!(
+                "✅ Successfully saved article '{}' to atomic server",
+                article.title
+            );
             Ok(AtomicSaveResponse {
                 status: Status::Success,
                 subject: Some(article.subject),
-                message: format!("Article '{}' saved successfully to atomic server", article.title),
+                message: format!(
+                    "Article '{}' saved successfully to atomic server",
+                    article.title
+                ),
             })
-        },
+        }
         Err(e) => {
             log::error!("❌ Failed to save article to atomic server: {}", e);
             Err(TerraphimTauriError::Generic(format!(
-                "Failed to save article to atomic server: {}", e
+                "Failed to save article to atomic server: {}",
+                e
             )))
         }
     }

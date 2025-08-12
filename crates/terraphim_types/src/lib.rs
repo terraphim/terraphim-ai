@@ -6,8 +6,8 @@ use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 
-use std::str::FromStr;
 use schemars::JsonSchema;
+use std::str::FromStr;
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
@@ -142,12 +142,16 @@ pub struct NormalizedTerm {
     #[serde(rename = "nterm")]
     pub value: NormalizedTermValue,
     /// The URL of the normalized term
-    pub url: Option<String>
+    pub url: Option<String>,
 }
 
 impl NormalizedTerm {
     pub fn new(id: u64, value: NormalizedTermValue) -> Self {
-        Self { id, value, url: None }
+        Self {
+            id,
+            value,
+            url: None,
+        }
     }
 }
 

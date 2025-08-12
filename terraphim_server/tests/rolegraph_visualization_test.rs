@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     use ahash::AHashMap;
-    
+
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
@@ -197,37 +197,54 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
-        
+
         // Validate response structure
         assert_eq!(rolegraph_data.status, Status::Success);
-        
+
         // Validate that we have nodes and edges
-        assert!(!rolegraph_data.nodes.is_empty(), "Engineer role should have nodes");
-        assert!(!rolegraph_data.edges.is_empty(), "Engineer role should have edges");
-        
+        assert!(
+            !rolegraph_data.nodes.is_empty(),
+            "Engineer role should have nodes"
+        );
+        assert!(
+            !rolegraph_data.edges.is_empty(),
+            "Engineer role should have edges"
+        );
+
         // Validate node structure
         for node in &rolegraph_data.nodes {
             assert!(node.id > 0, "Node ID should be positive");
             assert!(!node.label.is_empty(), "Node label should not be empty");
             assert!(node.rank > 0, "Node rank should be positive");
         }
-        
+
         // Validate edge structure
         for edge in &rolegraph_data.edges {
             assert!(edge.source > 0, "Edge source should be positive");
             assert!(edge.target > 0, "Edge target should be positive");
             assert!(edge.rank > 0, "Edge rank should be positive");
-            
+
             // Validate that source and target nodes exist
             let source_exists = rolegraph_data.nodes.iter().any(|n| n.id == edge.source);
             let target_exists = rolegraph_data.nodes.iter().any(|n| n.id == edge.target);
-            
-            assert!(source_exists, "Edge source node {} should exist", edge.source);
-            assert!(target_exists, "Edge target node {} should exist", edge.target);
+
+            assert!(
+                source_exists,
+                "Edge source node {} should exist",
+                edge.source
+            );
+            assert!(
+                target_exists,
+                "Edge target node {} should exist",
+                edge.target
+            );
         }
-        
-        println!("Engineer role visualization: {} nodes, {} edges", 
-                 rolegraph_data.nodes.len(), rolegraph_data.edges.len());
+
+        println!(
+            "Engineer role visualization: {} nodes, {} edges",
+            rolegraph_data.nodes.len(),
+            rolegraph_data.edges.len()
+        );
     }
 
     /// Test that the rolegraph visualization endpoint returns correct structure for System Operator role
@@ -247,16 +264,25 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
-        
+
         // Validate response structure
         assert_eq!(rolegraph_data.status, Status::Success);
-        
+
         // Validate that we have nodes and edges
-        assert!(!rolegraph_data.nodes.is_empty(), "System Operator role should have nodes");
-        assert!(!rolegraph_data.edges.is_empty(), "System Operator role should have edges");
-        
-        println!("System Operator role visualization: {} nodes, {} edges", 
-                 rolegraph_data.nodes.len(), rolegraph_data.edges.len());
+        assert!(
+            !rolegraph_data.nodes.is_empty(),
+            "System Operator role should have nodes"
+        );
+        assert!(
+            !rolegraph_data.edges.is_empty(),
+            "System Operator role should have edges"
+        );
+
+        println!(
+            "System Operator role visualization: {} nodes, {} edges",
+            rolegraph_data.nodes.len(),
+            rolegraph_data.edges.len()
+        );
     }
 
     /// Test that the rolegraph visualization endpoint returns 404 for roles without knowledge graphs
@@ -324,17 +350,23 @@ mod tests {
         // Validate that the structure is consistent
         assert_eq!(rolegraph_data1.nodes.len(), rolegraph_data2.nodes.len());
         assert_eq!(rolegraph_data1.edges.len(), rolegraph_data2.edges.len());
-        
+
         // Validate that node IDs are consistent
-        let node_ids1: std::collections::HashSet<u64> = rolegraph_data1.nodes.iter().map(|n| n.id).collect();
-        let node_ids2: std::collections::HashSet<u64> = rolegraph_data2.nodes.iter().map(|n| n.id).collect();
+        let node_ids1: std::collections::HashSet<u64> =
+            rolegraph_data1.nodes.iter().map(|n| n.id).collect();
+        let node_ids2: std::collections::HashSet<u64> =
+            rolegraph_data2.nodes.iter().map(|n| n.id).collect();
         assert_eq!(node_ids1, node_ids2);
-        
+
         // Validate that edge IDs are consistent
-        let edge_ids1: std::collections::HashSet<(u64, u64)> = rolegraph_data1.edges.iter()
+        let edge_ids1: std::collections::HashSet<(u64, u64)> = rolegraph_data1
+            .edges
+            .iter()
             .map(|e| (e.source, e.target))
             .collect();
-        let edge_ids2: std::collections::HashSet<(u64, u64)> = rolegraph_data2.edges.iter()
+        let edge_ids2: std::collections::HashSet<(u64, u64)> = rolegraph_data2
+            .edges
+            .iter()
             .map(|e| (e.source, e.target))
             .collect();
         assert_eq!(edge_ids1, edge_ids2);
@@ -374,19 +406,24 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
-        
+
         // Validate that node labels are meaningful (not just IDs)
         for node in &rolegraph_data.nodes {
             assert!(!node.label.is_empty(), "Node label should not be empty");
-            assert!(!node.label.chars().all(|c| c.is_numeric()), 
-                   "Node label should not be just numeric: {}", node.label);
+            assert!(
+                !node.label.chars().all(|c| c.is_numeric()),
+                "Node label should not be just numeric: {}",
+                node.label
+            );
         }
-        
+
         // Check for some expected labels from the thesaurus
-        let labels: std::collections::HashSet<&str> = rolegraph_data.nodes.iter()
+        let labels: std::collections::HashSet<&str> = rolegraph_data
+            .nodes
+            .iter()
             .map(|n| n.label.as_str())
             .collect();
-        
+
         println!("Available node labels: {:?}", labels);
     }
 
@@ -406,24 +443,31 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
-        
+
         // Validate that edges connect valid nodes
-        let node_ids: std::collections::HashSet<u64> = rolegraph_data.nodes.iter()
-            .map(|n| n.id)
-            .collect();
-        
+        let node_ids: std::collections::HashSet<u64> =
+            rolegraph_data.nodes.iter().map(|n| n.id).collect();
+
         for edge in &rolegraph_data.edges {
-            assert!(node_ids.contains(&edge.source), 
-                   "Edge source {} should exist in nodes", edge.source);
-            assert!(node_ids.contains(&edge.target), 
-                   "Edge target {} should exist in nodes", edge.target);
-            assert_ne!(edge.source, edge.target, 
-                      "Edge should not connect node to itself");
+            assert!(
+                node_ids.contains(&edge.source),
+                "Edge source {} should exist in nodes",
+                edge.source
+            );
+            assert!(
+                node_ids.contains(&edge.target),
+                "Edge target {} should exist in nodes",
+                edge.target
+            );
+            assert_ne!(
+                edge.source, edge.target,
+                "Edge should not connect node to itself"
+            );
         }
-        
+
         // Validate that edges have proper ranks
         for edge in &rolegraph_data.edges {
             assert!(edge.rank > 0, "Edge rank should be positive");
         }
     }
-} 
+}

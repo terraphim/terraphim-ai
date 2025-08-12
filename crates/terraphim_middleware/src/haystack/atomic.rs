@@ -1,11 +1,7 @@
+use terraphim_atomic_client::{store::Store, types::Config, Agent};
 use terraphim_types::{Document, Index};
-use terraphim_atomic_client::{
-    store::Store,
-    types::Config,
-    Agent,
-};
 
-use crate::{Result, indexer::IndexMiddleware};
+use crate::{indexer::IndexMiddleware, Result};
 use terraphim_config::Haystack;
 
 /// Middleware that uses an Atomic Server as a haystack.
@@ -22,7 +18,11 @@ impl IndexMiddleware for AtomicHaystackIndexer {
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Haystack) -> Result<Index> {
         let haystack_url = &haystack.location;
-        log::debug!("AtomicHaystackIndexer::index called with needle: '{}' haystack: {:?}", needle, haystack_url);
+        log::debug!(
+            "AtomicHaystackIndexer::index called with needle: '{}' haystack: {:?}",
+            needle,
+            haystack_url
+        );
         log::info!("🔍 AtomicHaystackIndexer searching for: '{}'", needle);
 
         if haystack_url.is_empty() {
@@ -32,7 +32,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
 
         // Validate URL format before proceeding
         if !is_valid_url(haystack_url) {
-            log::warn!("Invalid URL format: '{}', returning empty index", haystack_url);
+            log::warn!(
+                "Invalid URL format: '{}', returning empty index",
+                haystack_url
+            );
             return Ok(Index::default());
         }
 
@@ -45,7 +48,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                 }
                 Err(e) => {
                     log::error!("Failed to create agent from secret: {}", e);
-                    return Err(crate::Error::Indexation(format!("Invalid atomic server secret: {}", e)));
+                    return Err(crate::Error::Indexation(format!(
+                        "Invalid atomic server secret: {}",
+                        e
+                    )));
                 }
             }
         } else {
@@ -61,7 +67,11 @@ impl IndexMiddleware for AtomicHaystackIndexer {
         let store = match Store::new(config) {
             Ok(store) => store,
             Err(e) => {
-                log::warn!("Failed to create atomic store for URL '{}': {}, returning empty index", haystack_url, e);
+                log::warn!(
+                    "Failed to create atomic store for URL '{}': {}, returning empty index",
+                    haystack_url,
+                    e
+                );
                 return Ok(Index::default());
             }
         };
@@ -71,26 +81,40 @@ impl IndexMiddleware for AtomicHaystackIndexer {
         let search_result = match store.search(needle).await {
             Ok(result) => result,
             Err(e) => {
-                log::warn!("Search failed for URL '{}': {}, returning empty index", haystack_url, e);
+                log::warn!(
+                    "Search failed for URL '{}': {}, returning empty index",
+                    haystack_url,
+                    e
+                );
                 return Ok(Index::default());
             }
         };
-        
-        log::debug!("📊 Search result structure: {}", serde_json::to_string_pretty(&search_result).unwrap_or_else(|_| format!("{:?}", search_result)));
+
+        log::debug!(
+            "📊 Search result structure: {}",
+            serde_json::to_string_pretty(&search_result)
+                .unwrap_or_else(|_| format!("{:?}", search_result))
+        );
 
         // Convert search results to documents
         let mut index = Index::new();
-        
+
         // Handle Atomic Server search response format
         // The response is an object with "https://atomicdata.dev/properties/endpoint/results" array
         if let Some(obj) = search_result.as_object() {
             log::debug!("📋 Search result is object format");
-            
+
             // Check for the endpoint/results property (standard Atomic Server search response)
-            if let Some(results) = obj.get("https://atomicdata.dev/properties/endpoint/results").and_then(|v| v.as_array()) {
-                log::info!("📋 Found {} results in endpoint/results format", results.len());
+            if let Some(results) = obj
+                .get("https://atomicdata.dev/properties/endpoint/results")
+                .and_then(|v| v.as_array())
+            {
+                log::info!(
+                    "📋 Found {} results in endpoint/results format",
+                    results.len()
+                );
                 let server_prefix = store.config.server_url.trim_end_matches('/');
-                
+
                 for result_val in results {
                     if let Some(subject) = result_val.as_str() {
                         // Skip external URLs that don't belong to our server
@@ -98,28 +122,36 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                             log::debug!("  ⏭️ Skipping external URL: {}", subject);
                             continue;
                         }
-                        
+
                         log::debug!("  📄 Processing result: {}", subject);
                         match store.get_resource(subject).await {
                             Ok(resource) => {
                                 // Try to extract meaningful body content from various properties
                                 let body = extract_document_body(&resource.properties);
-                                
+
                                 let document = Document {
                                     id: resource.subject.clone(),
                                     url: resource.subject.clone(),
-                                    title: resource.properties.get("https://atomicdata.dev/properties/name")
+                                    title: resource
+                                        .properties
+                                        .get("https://atomicdata.dev/properties/name")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or(&resource.subject)
                                         .to_string(),
-                                    description: resource.properties.get("https://atomicdata.dev/properties/description")
+                                    description: resource
+                                        .properties
+                                        .get("https://atomicdata.dev/properties/description")
                                         .and_then(|v| v.as_str())
                                         .map(|s| s.to_string()),
                                     body,
                                     ..Default::default()
                                 };
-                                
-                                log::debug!("  ✅ Created document: {} ({})", document.title, document.id);
+
+                                log::debug!(
+                                    "  ✅ Created document: {} ({})",
+                                    document.title,
+                                    document.id
+                                );
                                 index.insert(document.id.clone(), document);
                             }
                             Err(e) => {
@@ -142,22 +174,30 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                             match store.get_resource(subject).await {
                                 Ok(resource) => {
                                     let body = extract_document_body(&resource.properties);
-                                    
+
                                     let document = Document {
                                         id: resource.subject.clone(),
                                         url: resource.subject.clone(),
-                                        title: resource.properties.get("https://atomicdata.dev/properties/name")
+                                        title: resource
+                                            .properties
+                                            .get("https://atomicdata.dev/properties/name")
                                             .and_then(|v| v.as_str())
                                             .unwrap_or(&resource.subject)
                                             .to_string(),
-                                        description: resource.properties.get("https://atomicdata.dev/properties/description")
+                                        description: resource
+                                            .properties
+                                            .get("https://atomicdata.dev/properties/description")
                                             .and_then(|v| v.as_str())
                                             .map(|s| s.to_string()),
                                         body,
                                         ..Default::default()
                                     };
-                                    
-                                    log::debug!("  ✅ Created document: {} ({})", document.title, document.id);
+
+                                    log::debug!(
+                                        "  ✅ Created document: {} ({})",
+                                        document.title,
+                                        document.id
+                                    );
                                     index.insert(document.id.clone(), document);
                                 }
                                 Err(e) => {
@@ -180,22 +220,30 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                     match store.get_resource(subject).await {
                         Ok(resource) => {
                             let body = extract_document_body(&resource.properties);
-                            
+
                             let document = Document {
                                 id: resource.subject.clone(),
                                 url: resource.subject.clone(),
-                                title: resource.properties.get("https://atomicdata.dev/properties/name")
+                                title: resource
+                                    .properties
+                                    .get("https://atomicdata.dev/properties/name")
                                     .and_then(|v| v.as_str())
                                     .unwrap_or(&resource.subject)
                                     .to_string(),
-                                description: resource.properties.get("https://atomicdata.dev/properties/description")
+                                description: resource
+                                    .properties
+                                    .get("https://atomicdata.dev/properties/description")
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string()),
                                 body,
                                 ..Default::default()
                             };
-                            
-                            log::debug!("  ✅ Created document: {} ({})", document.title, document.id);
+
+                            log::debug!(
+                                "  ✅ Created document: {} ({})",
+                                document.title,
+                                document.id
+                            );
                             index.insert(document.id.clone(), document);
                         }
                         Err(e) => {
@@ -208,9 +256,12 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                 }
             }
         } else {
-            log::warn!("❌ Search result is neither array nor object: {:?}", search_result);
+            log::warn!(
+                "❌ Search result is neither array nor object: {:?}",
+                search_result
+            );
         }
-        
+
         log::info!("🎯 Final index contains {} documents", index.len());
         Ok(index)
     }
@@ -223,25 +274,33 @@ fn is_valid_url(url: &str) -> bool {
 
 /// Extract meaningful document body from resource properties.
 /// Tries multiple sources in order of preference.
-fn extract_document_body(properties: &std::collections::HashMap<String, serde_json::Value>) -> String {
+fn extract_document_body(
+    properties: &std::collections::HashMap<String, serde_json::Value>,
+) -> String {
     // First try Terraphim-specific body property
-    if let Some(body) = properties.get("http://localhost:9883/terraphim-drive/terraphim/property/body")
-        .and_then(|v| v.as_str()) {
+    if let Some(body) = properties
+        .get("http://localhost:9883/terraphim-drive/terraphim/property/body")
+        .and_then(|v| v.as_str())
+    {
         return body.to_string();
     }
-    
+
     // Then try standard atomic data description
-    if let Some(description) = properties.get("https://atomicdata.dev/properties/description")
-        .and_then(|v| v.as_str()) {
+    if let Some(description) = properties
+        .get("https://atomicdata.dev/properties/description")
+        .and_then(|v| v.as_str())
+    {
         return description.to_string();
     }
-    
+
     // Try name as fallback
-    if let Some(name) = properties.get("https://atomicdata.dev/properties/name")
-        .and_then(|v| v.as_str()) {
+    if let Some(name) = properties
+        .get("https://atomicdata.dev/properties/name")
+        .and_then(|v| v.as_str())
+    {
         return name.to_string();
     }
-    
+
     // Fallback to serialized properties
     serde_json::to_string(properties).unwrap_or_default()
-} 
+}

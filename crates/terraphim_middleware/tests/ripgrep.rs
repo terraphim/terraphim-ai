@@ -1,13 +1,14 @@
 use serial_test::serial;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
-use terraphim_types::{RelevanceFunction, RoleName};
 use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
+use terraphim_types::{RelevanceFunction, RoleName};
 
 fn create_test_role() -> Role {
     Role {
         shortname: Some("Test".to_string()),
         name: "Test".into(),
         relevance_function: RelevanceFunction::TitleScorer,
+        terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
         haystacks: vec![Haystack {
@@ -80,7 +81,7 @@ async fn test_search_machine_learning() {
 #[serial]
 async fn test_role_configuration() {
     let config = create_test_config();
-    
+
     // Test that roles are configured correctly
     assert!(config.roles.contains_key(&RoleName::new("Test")));
 
@@ -100,10 +101,10 @@ mod nested_tests {
     async fn test_nested_search() -> Result<()> {
         let config = create_test_config();
         let _role = config.roles.get(&RoleName::new("Test")).unwrap();
-        
+
         // Test basic role existence
         assert!(config.roles.len() > 0);
-        
+
         Ok(())
     }
 }

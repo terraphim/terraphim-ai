@@ -1,5 +1,5 @@
-use thiserror::Error;
 use std::string::FromUtf8Error;
+use thiserror::Error;
 use url::ParseError;
 
 #[cfg(feature = "native")]
@@ -128,4 +128,4 @@ impl From<reqwest::header::ToStrError> for AtomicError {
     fn from(err: reqwest::header::ToStrError) -> Self {
         AtomicError::HeaderToStr(err)
     }
-} 
+}

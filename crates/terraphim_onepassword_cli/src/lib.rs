@@ -4,16 +4,16 @@
 //! managing secrets in the Terraphim AI project. It enables fetching secrets from 1Password
 //! vaults, presenting a consistent API for accessing or caching secrets in application environments.
 
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 use thiserror::Error;
-use serde::{Deserialize, Serialize};
 
 /// Errors that may occur during 1Password CLI operations
 #[derive(Error, Debug)]
 pub enum OnePasswordError {
     #[error("1Password CLI command failed with status: {0}")]
     CommandFailed(i32),
-    
+
     #[error("Failed to parse CLI output: {0}")]
     ParseError(String),
 
@@ -49,7 +49,9 @@ pub fn fetch_secret(vault: &str, item: &str) -> OnePasswordResult<OnePasswordSec
         .expect("Failed to execute op command");
 
     if !output.status.success() {
-        return Err(OnePasswordError::CommandFailed(output.status.code().unwrap_or(-1)));
+        return Err(OnePasswordError::CommandFailed(
+            output.status.code().unwrap_or(-1),
+        ));
     }
 
     let secret: OnePasswordSecret = serde_json::from_slice(&output.stdout)

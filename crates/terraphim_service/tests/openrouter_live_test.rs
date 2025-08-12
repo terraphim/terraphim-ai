@@ -14,15 +14,16 @@ async fn live_chat_completion_smoke() {
         }
     };
 
-    let client = OpenRouterService::new(&api_key, "openai/gpt-3.5-turbo")
-        .expect("client init");
+    let client = OpenRouterService::new(&api_key, "openai/gpt-3.5-turbo").expect("client init");
 
     let reply = client
-        .chat_completion(vec![serde_json::json!({"role":"user","content":"Say 'pong'"})], Some(64), Some(0.2))
+        .chat_completion(
+            vec![serde_json::json!({"role":"user","content":"Say 'pong'"})],
+            Some(64),
+            Some(0.2),
+        )
         .await
         .expect("live chat call should succeed");
 
     assert!(!reply.trim().is_empty());
 }
-
-

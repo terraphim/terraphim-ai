@@ -3,12 +3,12 @@ use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;
 
 pub mod command;
+pub mod haystack;
 pub mod indexer;
 pub mod thesaurus;
-pub mod haystack;
 
-pub use indexer::{search_haystacks, RipgrepIndexer};
 pub use haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer};
+pub use indexer::{search_haystacks, RipgrepIndexer};
 
 #[cfg(test)]
 mod tests;

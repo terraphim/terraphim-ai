@@ -1,8 +1,8 @@
+use crate::auth::Agent;
 use crate::{error::AtomicError, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use crate::auth::Agent;
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// Configuration for connecting to an Atomic Server.
 #[derive(Debug, Clone)]
@@ -27,18 +27,26 @@ impl Config {
     pub fn from_env() -> Result<Self> {
         // Load .env file if present
         dotenvy::dotenv().ok();
-        
+
         // Print all environment variables for debugging
         println!("Reading environment variables...");
         for (key, value) in std::env::vars() {
             if key.starts_with("ATOMIC_") {
-                println!("Found env var: {} = {}", key, if key.contains("SECRET") { "[REDACTED]" } else { &value });
+                println!(
+                    "Found env var: {} = {}",
+                    key,
+                    if key.contains("SECRET") {
+                        "[REDACTED]"
+                    } else {
+                        &value
+                    }
+                );
             }
         }
 
         let server_url = std::env::var("ATOMIC_SERVER_URL")
             .map_err(|_| AtomicError::Parse("ATOMIC_SERVER_URL not set".to_string()))?;
-        
+
         let agent = match std::env::var("ATOMIC_SERVER_SECRET") {
             Ok(secret) => {
                 println!("Found ATOMIC_SERVER_SECRET, length: {}", secret.len());
@@ -47,19 +55,19 @@ impl Config {
                     Ok(agent) => {
                         println!("Agent created successfully with subject: {}", agent.subject);
                         Some(agent)
-                    },
+                    }
                     Err(e) => {
                         eprintln!("Failed to create agent from secret: {}", e);
                         None
                     }
                 }
-            },
+            }
             Err(e) => {
                 eprintln!("ATOMIC_SERVER_SECRET not set: {}", e);
                 None
             }
         };
-        
+
         Ok(Self { server_url, agent })
     }
 }
@@ -83,43 +91,61 @@ pub struct Commit {
     /// The subject URL of the resource being modified
     #[serde(rename = "https://atomicdata.dev/properties/subject")]
     pub subject: String,
-    
+
     /// The resource's properties as key-value pairs
-    #[serde(rename = "https://atomicdata.dev/properties/set", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "https://atomicdata.dev/properties/set",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub set: Option<HashMap<String, Value>>,
-    
+
     /// The set of property URLs that need to be removed
-    #[serde(rename = "https://atomicdata.dev/properties/remove", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "https://atomicdata.dev/properties/remove",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub remove: Option<Vec<String>>,
-    
+
     /// List of Properties and Arrays to be appended to them
-    #[serde(rename = "https://atomicdata.dev/properties/push", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "https://atomicdata.dev/properties/push",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub push: Option<HashMap<String, Value>>,
-    
+
     /// Whether to delete the resource
-    #[serde(rename = "https://atomicdata.dev/properties/destroy", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "https://atomicdata.dev/properties/destroy",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub destroy: Option<bool>,
-    
+
     /// The signature of the commit
-    #[serde(rename = "https://atomicdata.dev/properties/signature", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "https://atomicdata.dev/properties/signature",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub signature: Option<String>,
-    
+
     /// The signer of the commit
     #[serde(rename = "https://atomicdata.dev/properties/signer")]
     pub signer: String,
-    
+
     /// The timestamp of the commit
     #[serde(rename = "https://atomicdata.dev/properties/createdAt")]
     pub created_at: i64,
-    
+
     /// The previously applied commit to this Resource
-    #[serde(rename = "https://atomicdata.dev/properties/previousCommit", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "https://atomicdata.dev/properties/previousCommit",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub previous_commit: Option<String>,
-    
+
     /// The classes of the commit
     #[serde(rename = "https://atomicdata.dev/properties/isA")]
     pub is_a: Vec<String>,
-    
+
     /// The URL of the Commit
     pub url: Option<String>,
 }
@@ -137,12 +163,12 @@ impl Commit {
     ///
     /// A Result containing the new Commit instance or an error
     pub fn new_create_or_update(
-        subject: String, 
-        properties: HashMap<String, Value>, 
-        agent: &Agent
+        subject: String,
+        properties: HashMap<String, Value>,
+        agent: &Agent,
     ) -> Result<Self> {
         let now = crate::time_utils::unix_timestamp_secs();
-        
+
         let commit = Self {
             subject,
             set: Some(properties),
@@ -156,10 +182,10 @@ impl Commit {
             is_a: vec!["https://atomicdata.dev/classes/Commit".to_string()],
             url: None,
         };
-        
+
         Ok(commit)
     }
-    
+
     /// Creates a new commit to delete a resource.
     ///
     /// # Arguments
@@ -172,7 +198,7 @@ impl Commit {
     /// A Result containing the new Commit instance or an error
     pub fn new_delete(subject: String, agent: &Agent) -> Result<Self> {
         let now = crate::time_utils::unix_timestamp_secs();
-        
+
         let commit = Self {
             subject,
             set: None,
@@ -186,7 +212,7 @@ impl Commit {
             is_a: vec!["https://atomicdata.dev/classes/Commit".to_string()],
             url: None,
         };
-        
+
         Ok(commit)
     }
 
@@ -275,12 +301,16 @@ impl Commit {
         // Check timestamp is not in the future (with some tolerance)
         let now = crate::time_utils::unix_timestamp_secs();
         if self.created_at > now + 60 {
-            return Err(AtomicError::Parse("Commit timestamp is in the future".to_string()));
+            return Err(AtomicError::Parse(
+                "Commit timestamp is in the future".to_string(),
+            ));
         }
 
         // Check timestamp is not too old (24 hours)
         if self.created_at < now - 86400 {
-            return Err(AtomicError::Parse("Commit timestamp is too old".to_string()));
+            return Err(AtomicError::Parse(
+                "Commit timestamp is too old".to_string(),
+            ));
         }
 
         Ok(())
@@ -300,24 +330,22 @@ impl Commit {
         self.validate()?;
 
         // Serialize to canonical JSON
-        let commit_json = serde_jcs::to_string(&self)
-            .map_err(|e| AtomicError::Json(e))?;
-        
+        let commit_json = serde_jcs::to_string(&self).map_err(|e| AtomicError::Json(e))?;
+
         // Sign the commit
         let signature = agent.sign(commit_json.as_bytes())?;
         self.signature = Some(signature);
-        
+
         Ok(self)
     }
-    
+
     /// Converts the commit to a JSON value.
     ///
     /// # Returns
     ///
     /// A Result containing the JSON value or an error
     pub fn to_json(&self) -> Result<Value> {
-        let json = serde_json::to_value(self)
-            .map_err(|e| AtomicError::Json(e))?;
+        let json = serde_json::to_value(self).map_err(|e| AtomicError::Json(e))?;
         Ok(json)
     }
 }

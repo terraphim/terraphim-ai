@@ -1,7 +1,7 @@
 use anyhow::Result;
-use rmcp::{ServiceExt, model::CallToolRequestParam, transport::TokioChildProcess};
-use tokio::process::Command;
+use rmcp::{model::CallToolRequestParam, transport::TokioChildProcess, ServiceExt};
 use std::process::Stdio;
+use tokio::process::Command;
 
 /// Build and launch the desktop binary in MCP server mode and return a transport for the client.
 async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
@@ -20,21 +20,35 @@ async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
     // Locate the compiled binary: same logic as other integration tests
     let crate_dir = std::env::current_dir()?;
     let binary_name = if cfg!(target_os = "windows") {
-        if cfg!(debug_assertions) { "terraphim-ai-desktop.exe" } else { "terraphim-ai-desktop.exe" }
+        if cfg!(debug_assertions) {
+            "terraphim-ai-desktop.exe"
+        } else {
+            "terraphim-ai-desktop.exe"
+        }
     } else {
         "terraphim-ai-desktop"
     };
 
     let candidate_paths = [
-        crate_dir.parent().and_then(|p| p.parent()).map(|workspace| workspace.join("target").join("debug").join(binary_name)),
+        crate_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|workspace| workspace.join("target").join("debug").join(binary_name)),
         Some(crate_dir.join("target").join("debug").join(binary_name)),
     ];
 
-    let binary_path = candidate_paths.into_iter().flatten().find(|p| p.exists()).ok_or_else(|| anyhow::anyhow!("Desktop binary not found in expected locations"))?;
+    let binary_path = candidate_paths
+        .into_iter()
+        .flatten()
+        .find(|p| p.exists())
+        .ok_or_else(|| anyhow::anyhow!("Desktop binary not found in expected locations"))?;
 
     // Spawn the desktop binary with the `mcp-server` subcommand
     let mut cmd = Command::new(binary_path);
-    cmd.arg("mcp-server").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit());
+    cmd.arg("mcp-server")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
 
     Ok(TokioChildProcess::new(cmd)?)
 }
@@ -62,9 +76,12 @@ async fn test_desktop_mcp_server_basic_search() -> Result<()> {
         })
         .await?;
 
-    assert!(!search_result.is_error.unwrap_or(false), "Search reported error");
+    assert!(
+        !search_result.is_error.unwrap_or(false),
+        "Search reported error"
+    );
 
     // Terminate server
     service.cancel().await?;
     Ok(())
-} 
+}

@@ -22,47 +22,59 @@ impl IndexMiddleware for RipgrepIndexer {
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Haystack) -> Result<Index> {
         let haystack_path = Path::new(&haystack.location);
-        log::debug!("RipgrepIndexer::index called with needle: '{}' haystack: {:?}", needle, haystack_path);
-        
+        log::debug!(
+            "RipgrepIndexer::index called with needle: '{}' haystack: {:?}",
+            needle,
+            haystack_path
+        );
+
         // Check if haystack path exists
         if !haystack_path.exists() {
             log::warn!("Haystack path does not exist: {:?}", haystack_path);
             return Ok(Index::default());
         }
-        
+
         // List files in haystack directory
         if let Ok(entries) = fs::read_dir(haystack_path) {
             let files: Vec<_> = entries
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
                 .collect();
-            log::debug!("Found {} markdown files in haystack: {:?}", files.len(), files.iter().map(|e| e.path()).collect::<Vec<_>>());
+            log::debug!(
+                "Found {} markdown files in haystack: {:?}",
+                files.len(),
+                files.iter().map(|e| e.path()).collect::<Vec<_>>()
+            );
         }
-        
+
         // Parse extra parameters from haystack configuration
-        let extra_args = self.command.parse_extra_parameters(haystack.get_extra_parameters());
+        let extra_args = self
+            .command
+            .parse_extra_parameters(haystack.get_extra_parameters());
         if !extra_args.is_empty() {
             log::info!("Using extra ripgrep parameters: {:?}", extra_args);
         }
-        
+
         // Run ripgrep with extra arguments if any
         let messages = if extra_args.is_empty() {
             self.command.run(needle, haystack_path).await?
         } else {
-            self.command.run_with_extra_args(needle, haystack_path, &extra_args).await?
+            self.command
+                .run_with_extra_args(needle, haystack_path, &extra_args)
+                .await?
         };
-        
+
         log::debug!("Ripgrep returned {} messages", messages.len());
-        
+
         // Debug: Log the first few messages to understand the JSON structure
         log::debug!("RipgrepIndexer got {} messages", messages.len());
         for (i, message) in messages.iter().take(3).enumerate() {
             log::debug!("Message {}: {:?}", i, message);
         }
-        
+
         let documents = index_inner(messages);
         log::debug!("Index_inner created {} documents", documents.len());
-        
+
         Ok(documents)
     }
 }
@@ -74,8 +86,8 @@ impl RipgrepIndexer {
     /// path to the original file. When haystacks are marked as read-only this
     /// method SHOULD NOT be called.
     pub async fn update_document(&self, document: &Document) -> Result<()> {
-        use tokio::fs;
         use std::path::Path;
+        use tokio::fs;
 
         let path = Path::new(&document.url);
         // Ensure the parent directory exists (it should, given the document was
@@ -104,7 +116,7 @@ impl RipgrepIndexer {
 /// which allows us to cache requests to the index service
 fn index_inner(messages: Vec<Message>) -> Index {
     log::debug!("index_inner called with {} messages", messages.len());
-    
+
     // Cache of already processed documents
     let mut index: Index = Index::default();
     let mut existing_paths: HashSet<String> = HashSet::new();
@@ -112,7 +124,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
     let mut document = Document::default();
     let mut document_count = 0;
     let mut match_count = 0;
-    
+
     for message in messages {
         match message {
             Message::Begin(message) => {
@@ -123,7 +135,7 @@ fn index_inner(messages: Vec<Message>) -> Index {
                     log::warn!("Begin message without path");
                     continue;
                 };
-                
+
                 if existing_paths.contains(&path) {
                     log::warn!("Skipping duplicate document: {}", path);
                     continue;
@@ -139,8 +151,13 @@ fn index_inner(messages: Vec<Message>) -> Index {
                     .to_string();
                 document.title = title;
                 document.url = path.clone();
-                
-                log::debug!("Creating document {}: {} ({})", document_count, document.title, document.id);
+
+                log::debug!(
+                    "Creating document {}: {} ({})",
+                    document_count,
+                    document.title,
+                    document.id
+                );
             }
             Message::Match(message) => {
                 match_count += 1;
@@ -148,14 +165,14 @@ fn index_inner(messages: Vec<Message>) -> Index {
                     log::warn!("Match message without path");
                     continue;
                 };
-                
+
                 log::trace!("Processing match {} for document: {}", match_count, path);
-                
+
                 let body = match fs::read_to_string(&path) {
                     Ok(body) => {
                         log::trace!("Successfully read file: {} ({} bytes)", path, body.len());
                         body
-                    },
+                    }
                     Err(e) => {
                         log::warn!("Failed to read file: {} - {:?}", path, e);
                         continue;
@@ -167,13 +184,13 @@ fn index_inner(messages: Vec<Message>) -> Index {
                     Data::Text { text } => {
                         log::trace!("Match text: {}", text);
                         text
-                    },
+                    }
                     _ => {
                         log::warn!("Match lines is not text: {:?}", message.lines);
                         continue;
                     }
                 };
-                
+
                 // Only use the first match for description to avoid long concatenations
                 // Limit description to 200 characters for readability
                 if document.description.is_none() {
@@ -208,9 +225,9 @@ fn index_inner(messages: Vec<Message>) -> Index {
                         continue;
                     }
                 };
-                
+
                 // Only use the first context for description to avoid long concatenations
-                // Limit description to 200 characters for readability  
+                // Limit description to 200 characters for readability
                 if document.description.is_none() {
                     let cleaned_lines = lines.trim();
                     if !cleaned_lines.is_empty() {
@@ -227,7 +244,11 @@ fn index_inner(messages: Vec<Message>) -> Index {
                 // The `End` message could be received before the `Begin`
                 // message causing the document to be empty
                 if !document.title.is_empty() {
-                    log::debug!("Inserting document into index: {} ({})", document.title, document.id);
+                    log::debug!(
+                        "Inserting document into index: {} ({})",
+                        document.title,
+                        document.id
+                    );
                     index.insert(document.id.to_string(), document.clone());
                 } else {
                     log::debug!("Skipping empty document");
