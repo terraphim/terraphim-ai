@@ -2,22 +2,22 @@ use std::f64;
 use std::fmt;
 use std::result;
 
-mod names;
-mod scored;
 mod bm25;
 pub mod bm25_additional;
 #[cfg(test)]
 mod bm25_test;
+mod names;
+mod scored;
 
+use bm25::{BM25FScorer, BM25PlusScorer};
+use bm25_additional::{JaccardScorer, OkapiBM25Scorer, QueryRatioScorer, TFIDFScorer};
 pub use names::QueryScorer;
 use scored::{Scored, SearchResults};
-use bm25::{BM25FScorer, BM25PlusScorer};
-use bm25_additional::{OkapiBM25Scorer, TFIDFScorer, JaccardScorer, QueryRatioScorer};
 use serde::{Serialize, Serializer};
 
+use crate::ServiceError;
 use terraphim_types::Document;
 use terraphim_types::SearchQuery;
-use crate::ServiceError;
 
 /// Score module local Result type using TerraphimService's error enum.
 type Result<T> = std::result::Result<T, ServiceError>;
@@ -28,7 +28,7 @@ type Result<T> = std::result::Result<T, ServiceError>;
 /// should be sorted.
 pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> {
     let mut scorer = Scorer::new().with_similarity(query.similarity);
-    
+
     // Initialize the appropriate scorer based on the query's name_scorer
     match query.name_scorer {
         QueryScorer::BM25 => {
@@ -59,9 +59,12 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
             // For OkapiBM25 and other cases, use similarity scoring
         }
     }
-    
+
     match scorer.score_documents(query, documents.clone()) {
-        Ok(results) => results.into_iter().map(|scored| scored.into_value()).collect(),
+        Ok(results) => results
+            .into_iter()
+            .map(|scored| scored.into_value())
+            .collect(),
         Err(_) => documents,
     }
 }
@@ -137,7 +140,7 @@ impl Scorer {
         for document in documents {
             results.push(Scored::new(document));
         }
-        
+
         match query.name_scorer {
             QueryScorer::BM25 => {
                 if let Some(scorer) = &self.scorer {
@@ -188,7 +191,7 @@ impl Scorer {
                 results.rescore(|document| self.similarity(query, &document.title));
             }
         }
-        
+
         log::debug!("results after rescoring: {:#?}", results);
         Ok(results)
     }

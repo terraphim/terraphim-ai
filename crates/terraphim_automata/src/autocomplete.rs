@@ -1,11 +1,11 @@
-use fst::{Map, MapBuilder, Streamer, Automaton, IntoStreamer, automaton::Str};
+use crate::{Result, TerraphimAutomataError};
 use ahash::AHashMap;
+use fst::{automaton::Str, Automaton, IntoStreamer, Map, MapBuilder, Streamer};
 use serde::{Deserialize, Serialize};
 use terraphim_types::{NormalizedTermValue, Thesaurus};
-use crate::{Result, TerraphimAutomataError};
 
 #[cfg(feature = "remote-loading")]
-use crate::{AutomataPath, load_thesaurus};
+use crate::{load_thesaurus, AutomataPath};
 
 /// Autocomplete index built from thesaurus data using FST
 #[derive(Debug, Clone)]
@@ -34,7 +34,7 @@ pub struct AutocompleteResult {
     pub normalized_term: NormalizedTermValue,
     pub id: u64,
     pub url: Option<String>,
-    pub score: f64,  // FST value as relevance score
+    pub score: f64, // FST value as relevance score
 }
 
 /// Configuration for autocomplete behavior
@@ -91,7 +91,10 @@ pub fn build_autocomplete_index(
     let mut terms_with_scores: Vec<(String, u64)> = Vec::new();
     let mut metadata: AHashMap<String, AutocompleteMetadata> = AHashMap::new();
 
-    log::debug!("Building autocomplete index from thesaurus with {} entries", thesaurus.len());
+    log::debug!(
+        "Building autocomplete index from thesaurus with {} entries",
+        thesaurus.len()
+    );
 
     // Extract all terms from thesaurus and assign scores based on term frequency/importance
     for (key, normalized_term) in &thesaurus {
@@ -104,15 +107,18 @@ pub fn build_autocomplete_index(
         // Use the ID as a score (higher ID = higher relevance)
         // In a real implementation, this could be based on term frequency, importance, etc.
         let score = normalized_term.id;
-        
+
         terms_with_scores.push((term.clone(), score));
-        
-        metadata.insert(term.clone(), AutocompleteMetadata {
-            id: normalized_term.id,
-            normalized_term: normalized_term.value.clone(),
-            url: normalized_term.url.clone(),
-            original_term: key.to_string(),
-        });
+
+        metadata.insert(
+            term.clone(),
+            AutocompleteMetadata {
+                id: normalized_term.id,
+                normalized_term: normalized_term.value.clone(),
+                url: normalized_term.url.clone(),
+                original_term: key.to_string(),
+            },
+        );
     }
 
     // Sort terms lexicographically for FST building
@@ -125,11 +131,14 @@ pub fn build_autocomplete_index(
     for (term, score) in terms_with_scores {
         builder.insert(&term, score)?;
     }
-    
+
     let fst_bytes = builder.into_inner()?;
     let fst = Map::new(fst_bytes)?;
 
-    log::debug!("Successfully built autocomplete index with {} terms", metadata.len());
+    log::debug!(
+        "Successfully built autocomplete index with {} terms",
+        metadata.len()
+    );
 
     Ok(AutocompleteIndex {
         fst,
@@ -139,7 +148,7 @@ pub fn build_autocomplete_index(
 }
 
 /// Load thesaurus and build autocomplete index in one step
-/// 
+///
 /// Note: This function requires the "remote-loading" feature to be enabled
 /// for async loading of remote thesaurus files.
 #[cfg(feature = "remote-loading")]
@@ -172,19 +181,22 @@ pub fn autocomplete_search(
     let max_results = limit.unwrap_or(config.max_results);
     let mut results = Vec::new();
 
-    log::trace!("Searching autocomplete index for prefix: '{}'", search_prefix);
+    log::trace!(
+        "Searching autocomplete index for prefix: '{}'",
+        search_prefix
+    );
 
     // Use FST to find all terms with the given prefix using the Str automaton
     let automaton = Str::new(&search_prefix).starts_with();
     let mut stream = index.fst.search(automaton).into_stream();
-    
+
     while let Some((term_bytes, score)) = stream.next() {
         if results.len() >= max_results {
             break;
         }
 
         let term = String::from_utf8_lossy(term_bytes).to_string();
-        
+
         if let Some(metadata) = index.metadata.get(&term) {
             results.push(AutocompleteResult {
                 term: metadata.original_term.clone(),
@@ -198,18 +210,23 @@ pub fn autocomplete_search(
 
     // Sort results by score (descending) then by term length (ascending) for better UX
     results.sort_by(|a, b| {
-        b.score.partial_cmp(&a.score)
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.term.len().cmp(&b.term.len()))
     });
 
-    log::trace!("Found {} autocomplete results for prefix: '{}'", results.len(), search_prefix);
+    log::trace!(
+        "Found {} autocomplete results for prefix: '{}'",
+        results.len(),
+        search_prefix
+    );
 
     Ok(results)
 }
 
 /// Fuzzy autocomplete search using Levenshtein edit distance (baseline comparison)
-/// 
+///
 /// Uses Levenshtein distance calculation for baseline comparison with the default
 /// Jaro-Winkler fuzzy search. Levenshtein is useful when you need exact edit distance control.
 pub fn fuzzy_autocomplete_search_levenshtein(
@@ -220,50 +237,50 @@ pub fn fuzzy_autocomplete_search_levenshtein(
 ) -> Result<Vec<AutocompleteResult>> {
     let max_results = limit.unwrap_or(10);
     let mut all_results = Vec::new();
-    
+
     // Try exact prefix first
     let exact_results = autocomplete_search(index, prefix, Some(max_results))?;
     all_results.extend(exact_results);
-    
+
     if all_results.len() >= max_results {
         all_results.truncate(max_results);
         return Ok(all_results);
     }
-    
+
     // For fuzzy matching, scan all terms and calculate Levenshtein similarity
     if max_edit_distance > 0 {
         let mut fuzzy_candidates = Vec::new();
-        
+
         // Iterate through all terms in the metadata to find fuzzy matches
         for (term, metadata) in &index.metadata {
             // Skip if we already have this result from exact search
             if all_results.iter().any(|r| r.id == metadata.id) {
                 continue;
             }
-            
+
             // Calculate Levenshtein distance - check both full term and individual words
             let distances = {
                 let mut dists = vec![strsim::levenshtein(prefix, term)];
-                
+
                 // Also check against individual words in the term for better fuzzy matching
                 for word in term.split_whitespace() {
                     dists.push(strsim::levenshtein(prefix, word));
                 }
-                
+
                 dists
             };
-            
+
             let min_distance = distances.into_iter().min().unwrap_or(usize::MAX);
-            
+
             // Only include if within edit distance threshold
             if min_distance <= max_edit_distance {
                 // Convert distance to similarity score (same as terraphim_service scorer)
                 let similarity = 1.0 / (1.0 + min_distance as f64);
-                
+
                 // Weight by original FST score
                 let original_score = metadata.id as f64;
                 let combined_score = similarity * original_score * 0.8; // Penalize fuzzy matches
-                
+
                 fuzzy_candidates.push(AutocompleteResult {
                     term: metadata.original_term.clone(),
                     normalized_term: metadata.normalized_term.clone(),
@@ -273,33 +290,35 @@ pub fn fuzzy_autocomplete_search_levenshtein(
                 });
             }
         }
-        
+
         // Sort by combined score (similarity * original_score)
         fuzzy_candidates.sort_by(|a, b| {
-            b.score.partial_cmp(&a.score)
+            b.score
+                .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.term.len().cmp(&b.term.len()))
         });
-        
+
         // Add the best fuzzy matches
         let remaining_slots = max_results - all_results.len();
         all_results.extend(fuzzy_candidates.into_iter().take(remaining_slots));
     }
-    
+
     // Final sort by score
     all_results.sort_by(|a, b| {
-        b.score.partial_cmp(&a.score)
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.term.len().cmp(&b.term.len()))
     });
-    
+
     all_results.truncate(max_results);
     Ok(all_results)
 }
 
 /// Fuzzy autocomplete search using Jaro-Winkler similarity (DEFAULT)
-/// 
-/// Jaro-Winkler is the recommended algorithm for autocomplete because it gives extra weight 
+///
+/// Jaro-Winkler is the recommended algorithm for autocomplete because it gives extra weight
 /// to common prefixes and handles character transpositions better. It's 2.3x faster than
 /// Levenshtein and produces higher quality results for autocomplete scenarios.
 pub fn fuzzy_autocomplete_search(
@@ -310,48 +329,49 @@ pub fn fuzzy_autocomplete_search(
 ) -> Result<Vec<AutocompleteResult>> {
     let max_results = limit.unwrap_or(10);
     let mut all_results = Vec::new();
-    
+
     // Try exact prefix first
     let exact_results = autocomplete_search(index, prefix, Some(max_results))?;
     all_results.extend(exact_results);
-    
+
     if all_results.len() >= max_results {
         all_results.truncate(max_results);
         return Ok(all_results);
     }
-    
+
     // For fuzzy matching, scan all terms and calculate Jaro-Winkler similarity
     if min_similarity > 0.0 && min_similarity < 1.0 {
         let mut fuzzy_candidates = Vec::new();
-        
+
         // Iterate through all terms in the metadata to find fuzzy matches
         for (term, metadata) in &index.metadata {
             // Skip if we already have this result from exact search
             if all_results.iter().any(|r| r.id == metadata.id) {
                 continue;
             }
-            
+
             // Calculate Jaro-Winkler similarity - check both full term and individual words
             let similarities = {
                 let mut sims = vec![strsim::jaro_winkler(prefix, term)];
-                
+
                 // Also check against individual words in the term for better fuzzy matching
                 for word in term.split_whitespace() {
                     sims.push(strsim::jaro_winkler(prefix, word));
                 }
-                
+
                 sims
             };
-            
-            let max_similarity = similarities.into_iter()
+
+            let max_similarity = similarities
+                .into_iter()
                 .fold(0.0f64, |acc, sim| acc.max(sim));
-            
+
             // Only include if above similarity threshold
             if max_similarity >= min_similarity {
                 // Weight by original FST score
                 let original_score = metadata.id as f64;
                 let combined_score = max_similarity * original_score * 0.8; // Penalize fuzzy matches
-                
+
                 fuzzy_candidates.push(AutocompleteResult {
                     term: metadata.original_term.clone(),
                     normalized_term: metadata.normalized_term.clone(),
@@ -361,32 +381,34 @@ pub fn fuzzy_autocomplete_search(
                 });
             }
         }
-        
+
         // Sort by combined score (similarity * original_score)
         fuzzy_candidates.sort_by(|a, b| {
-            b.score.partial_cmp(&a.score)
+            b.score
+                .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.term.len().cmp(&b.term.len()))
         });
-        
+
         // Add the best fuzzy matches
         let remaining_slots = max_results - all_results.len();
         all_results.extend(fuzzy_candidates.into_iter().take(remaining_slots));
     }
-    
+
     // Final sort by score
     all_results.sort_by(|a, b| {
-        b.score.partial_cmp(&a.score)
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.term.len().cmp(&b.term.len()))
     });
-    
+
     all_results.truncate(max_results);
     Ok(all_results)
 }
 
 /// Enhanced fuzzy autocomplete search using Jaro-Winkler similarity (DEPRECATED - use fuzzy_autocomplete_search)
-/// 
+///
 /// This function is deprecated. Use `fuzzy_autocomplete_search` instead, which now uses
 /// Jaro-Winkler as the default algorithm for better autocomplete performance.
 #[deprecated(since = "0.1.0", note = "Use fuzzy_autocomplete_search instead")]
@@ -407,7 +429,7 @@ pub fn serialize_autocomplete_index(index: &AutocompleteIndex) -> Result<Vec<u8>
         metadata: index.metadata.clone(),
         name: index.name.clone(),
     };
-    
+
     bincode::serialize(&serializable)
         .map_err(|e| TerraphimAutomataError::Dict(format!("Serialization error: {}", e)))
 }
@@ -416,9 +438,9 @@ pub fn serialize_autocomplete_index(index: &AutocompleteIndex) -> Result<Vec<u8>
 pub fn deserialize_autocomplete_index(data: &[u8]) -> Result<AutocompleteIndex> {
     let serializable: SerializableIndex = bincode::deserialize(data)
         .map_err(|e| TerraphimAutomataError::Dict(format!("Deserialization error: {}", e)))?;
-    
+
     let fst = Map::new(serializable.fst_bytes)?;
-    
+
     Ok(AutocompleteIndex {
         fst,
         metadata: serializable.metadata,
@@ -441,7 +463,7 @@ mod tests {
 
     fn create_test_thesaurus() -> Thesaurus {
         let mut thesaurus = Thesaurus::new("Test".to_string());
-        
+
         // Add test terms with different IDs (scores)
         let terms = vec![
             ("machine learning", "machine learning", 10),
@@ -455,16 +477,19 @@ mod tests {
             ("programming", "programming", 5),
             ("python", "python", 7),
         ];
-        
+
         for (key, normalized, id) in terms {
             let normalized_term = NormalizedTerm {
                 id,
                 value: NormalizedTermValue::from(normalized),
-                url: Some(format!("https://example.com/{}", normalized.replace(' ', "-"))),
+                url: Some(format!(
+                    "https://example.com/{}",
+                    normalized.replace(' ', "-")
+                )),
             };
             thesaurus.insert(NormalizedTermValue::from(key), normalized_term);
         }
-        
+
         thesaurus
     }
 
@@ -472,7 +497,7 @@ mod tests {
     fn test_build_autocomplete_index() {
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         assert_eq!(index.name(), "Test");
         assert_eq!(index.len(), 10);
         assert!(!index.is_empty());
@@ -482,15 +507,15 @@ mod tests {
     fn test_autocomplete_search_basic() {
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         // Test prefix search
         let results = autocomplete_search(&index, "ma", None).unwrap();
         assert!(!results.is_empty());
-        
+
         // Check that results contain "machine learning"
         let has_ml = results.iter().any(|r| r.term == "machine learning");
         assert!(has_ml, "Should find 'machine learning' for prefix 'ma'");
-        
+
         // Test exact match
         let results = autocomplete_search(&index, "python", None).unwrap();
         assert!(!results.is_empty());
@@ -501,14 +526,16 @@ mod tests {
     fn test_autocomplete_search_ordering() {
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         // Search for terms that should be ordered by score
         let results = autocomplete_search(&index, "a", Some(5)).unwrap();
-        
+
         // Results should be sorted by score (descending)
         for i in 1..results.len() {
-            assert!(results[i-1].score >= results[i].score,
-                   "Results should be sorted by score (descending)");
+            assert!(
+                results[i - 1].score >= results[i].score,
+                "Results should be sorted by score (descending)"
+            );
         }
     }
 
@@ -516,11 +543,11 @@ mod tests {
     fn test_autocomplete_search_limits() {
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         // Test limit parameter
         let results = autocomplete_search(&index, "", Some(3)).unwrap();
         assert!(results.len() <= 3, "Should respect limit parameter");
-        
+
         // Test default limit
         let results = autocomplete_search(&index, "", None).unwrap();
         assert!(results.len() <= 10, "Should respect default limit");
@@ -530,44 +557,56 @@ mod tests {
     fn test_fuzzy_autocomplete_search() {
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         // Test fuzzy search with Jaro-Winkler similarity (now the default)
         let results = fuzzy_autocomplete_search(&index, "machne", 0.6, Some(5)).unwrap();
-        
+
         // Should find results even with typo - "machine" should match "machne" with good similarity
-        assert!(!results.is_empty(), "Fuzzy search should find results for 'machne'");
-        
+        assert!(
+            !results.is_empty(),
+            "Fuzzy search should find results for 'machne'"
+        );
+
         // Verify we get machine learning with good similarity score
         let has_ml = results.iter().any(|r| r.term == "machine learning");
-        assert!(has_ml, "Should find 'machine learning' for fuzzy search 'machne'");
+        assert!(
+            has_ml,
+            "Should find 'machine learning' for fuzzy search 'machne'"
+        );
     }
 
     #[test]
     fn test_fuzzy_search_levenshtein_scoring() {
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         // Test different edit distances using Levenshtein baseline function
-        let results_distance_1 = fuzzy_autocomplete_search_levenshtein(&index, "pythno", 1, Some(10)).unwrap();
-        let results_distance_2 = fuzzy_autocomplete_search_levenshtein(&index, "pythno", 2, Some(10)).unwrap();
-        
+        let results_distance_1 =
+            fuzzy_autocomplete_search_levenshtein(&index, "pythno", 1, Some(10)).unwrap();
+        let results_distance_2 =
+            fuzzy_autocomplete_search_levenshtein(&index, "pythno", 2, Some(10)).unwrap();
+
         // Should find more results with higher edit distance
-        assert!(results_distance_2.len() >= results_distance_1.len(),
-               "Higher edit distance should yield more or equal results");
-        
+        assert!(
+            results_distance_2.len() >= results_distance_1.len(),
+            "Higher edit distance should yield more or equal results"
+        );
+
         // Test exact match should score higher than fuzzy match
         let exact_results = autocomplete_search(&index, "python", None).unwrap();
         let fuzzy_results = fuzzy_autocomplete_search(&index, "pythno", 0.6, None).unwrap();
-        
+
         if !exact_results.is_empty() && !fuzzy_results.is_empty() {
             let exact_python = exact_results.iter().find(|r| r.term == "python");
             let fuzzy_python = fuzzy_results.iter().find(|r| r.term == "python");
-            
+
             if let (Some(exact), Some(fuzzy)) = (exact_python, fuzzy_python) {
                 // Exact match should have higher score than fuzzy match
                 // (though fuzzy search applies penalty factor)
-                assert!(exact.score > fuzzy.score,
-                       "Exact match should score higher than fuzzy match");
+                assert!(
+                    exact.score > fuzzy.score,
+                    "Exact match should score higher than fuzzy match"
+                );
             }
         }
     }
@@ -576,22 +615,25 @@ mod tests {
     fn test_serialization_roundtrip() {
         let thesaurus = create_test_thesaurus();
         let original_index = build_autocomplete_index(thesaurus, None).unwrap();
-        
+
         // Serialize
         let serialized = serialize_autocomplete_index(&original_index).unwrap();
-        assert!(!serialized.is_empty(), "Serialized data should not be empty");
-        
+        assert!(
+            !serialized.is_empty(),
+            "Serialized data should not be empty"
+        );
+
         // Deserialize
         let deserialized_index = deserialize_autocomplete_index(&serialized).unwrap();
-        
+
         // Verify integrity
         assert_eq!(original_index.name(), deserialized_index.name());
         assert_eq!(original_index.len(), deserialized_index.len());
-        
+
         // Test that search works the same
         let original_results = autocomplete_search(&original_index, "ma", None).unwrap();
         let deserialized_results = autocomplete_search(&deserialized_index, "ma", None).unwrap();
-        
+
         assert_eq!(original_results.len(), deserialized_results.len());
         for (orig, deser) in original_results.iter().zip(deserialized_results.iter()) {
             assert_eq!(orig.term, deser.term);
@@ -605,15 +647,18 @@ mod tests {
     async fn test_load_autocomplete_index() {
         // Test loading from local example
         let result = load_autocomplete_index(&AutomataPath::local_example(), None).await;
-        
+
         match result {
             Ok(index) => {
                 assert!(!index.is_empty(), "Loaded index should not be empty");
                 assert_eq!(index.name(), "Engineering"); // From local example file
-                
+
                 // Test search functionality
                 let results = autocomplete_search(&index, "foo", None).unwrap();
-                assert!(!results.is_empty(), "Should find results for 'foo' in test data");
+                assert!(
+                    !results.is_empty(),
+                    "Should find results for 'foo' in test data"
+                );
             }
             Err(e) => {
                 // This is acceptable if the test data file doesn't exist
@@ -629,13 +674,13 @@ mod tests {
             min_prefix_length: 2,
             case_sensitive: false,
         };
-        
+
         let thesaurus = create_test_thesaurus();
         let index = build_autocomplete_index(thesaurus, Some(config)).unwrap();
-        
+
         // Test that short prefixes return no results
         let _results = autocomplete_search(&index, "a", None).unwrap();
         // Note: The config is only used during index building, not search
         // In a full implementation, we'd pass config to search function too
     }
-} 
+}

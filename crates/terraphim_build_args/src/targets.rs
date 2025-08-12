@@ -1,9 +1,8 @@
 /// Target management for build configurations
-/// 
+///
 /// This module provides functionality for managing build targets in the
 /// Terraphim AI project, enabling configuration for cross-compilation,
 /// platform-specific settings, and target validation.
-
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -41,7 +40,7 @@ impl BuildTarget {
     pub fn target_triple(&self) -> Option<String> {
         match self {
             BuildTarget::NativeRelease => None, // Default triple
-            BuildTarget::NativeDebug => None, // Default triple
+            BuildTarget::NativeDebug => None,   // Default triple
             BuildTarget::CrossCompile(triple) => Some(triple.clone()),
             BuildTarget::Docker => None, // Docker doesn't use triples
             BuildTarget::Earthly(target) => Some(target.clone()),
@@ -60,7 +59,11 @@ impl BuildTarget {
     /// Retrieves the build profile
     pub fn profile(&self) -> BuildProfile {
         match self {
-            BuildTarget::NativeRelease | BuildTarget::CrossCompile(_) | BuildTarget::Docker | BuildTarget::Earthly(_) | BuildTarget::Custom(_) => BuildProfile::Release,
+            BuildTarget::NativeRelease
+            | BuildTarget::CrossCompile(_)
+            | BuildTarget::Docker
+            | BuildTarget::Earthly(_)
+            | BuildTarget::Custom(_) => BuildProfile::Release,
             BuildTarget::NativeDebug => BuildProfile::Debug,
         }
     }
@@ -140,13 +143,34 @@ mod tests {
 
     #[test]
     fn test_build_target_parsing() {
-        assert_eq!(BuildTarget::from_str("native-release").unwrap(), BuildTarget::NativeRelease);
-        assert_eq!(BuildTarget::from_str("release").unwrap(), BuildTarget::NativeRelease);
-        assert_eq!(BuildTarget::from_str("native-debug").unwrap(), BuildTarget::NativeDebug);
-        assert_eq!(BuildTarget::from_str("debug").unwrap(), BuildTarget::NativeDebug);
-        assert_eq!(BuildTarget::from_str("docker").unwrap(), BuildTarget::Docker);
-        assert_eq!(BuildTarget::from_str("cross-x86_64-unknown-linux-musl").unwrap(), BuildTarget::CrossCompile("x86_64-unknown-linux-musl".to_string()));
-        assert_eq!(BuildTarget::from_str("earthly-build").unwrap(), BuildTarget::Earthly("build".to_string()));
+        assert_eq!(
+            BuildTarget::from_str("native-release").unwrap(),
+            BuildTarget::NativeRelease
+        );
+        assert_eq!(
+            BuildTarget::from_str("release").unwrap(),
+            BuildTarget::NativeRelease
+        );
+        assert_eq!(
+            BuildTarget::from_str("native-debug").unwrap(),
+            BuildTarget::NativeDebug
+        );
+        assert_eq!(
+            BuildTarget::from_str("debug").unwrap(),
+            BuildTarget::NativeDebug
+        );
+        assert_eq!(
+            BuildTarget::from_str("docker").unwrap(),
+            BuildTarget::Docker
+        );
+        assert_eq!(
+            BuildTarget::from_str("cross-x86_64-unknown-linux-musl").unwrap(),
+            BuildTarget::CrossCompile("x86_64-unknown-linux-musl".to_string())
+        );
+        assert_eq!(
+            BuildTarget::from_str("earthly-build").unwrap(),
+            BuildTarget::Earthly("build".to_string())
+        );
     }
 
     #[test]

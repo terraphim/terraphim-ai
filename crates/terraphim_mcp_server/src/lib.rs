@@ -3,18 +3,18 @@ use std::sync::Arc;
 use anyhow::Result;
 use rmcp::{
     model::{
-        CallToolResult, Content, ListResourcesResult, ReadResourceRequestParam, ReadResourceResult,
-        ServerInfo, ErrorData, ListToolsResult, Tool, CallToolRequestParam
+        CallToolRequestParam, CallToolResult, Content, ErrorData, ListResourcesResult,
+        ListToolsResult, ReadResourceRequestParam, ReadResourceResult, ServerInfo, Tool,
     },
     service::RequestContext,
     Error as McpError, RoleServer, ServerHandler,
 };
+use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
-use terraphim_automata::{AutocompleteIndex, AutocompleteConfig, AutocompleteResult};
-use tracing::{error, info};
 use thiserror::Error;
+use tracing::{error, info};
 
 pub mod resource_mapper;
 
@@ -73,17 +73,17 @@ impl McpService {
 
     /// Create a Terraphim service instance from the current configuration
     pub async fn terraphim_service(&self) -> Result<TerraphimService, anyhow::Error> {
-        // Instead of cloning the old ConfigState (which has stale roles), 
+        // Instead of cloning the old ConfigState (which has stale roles),
         // create a fresh ConfigState from the current config to ensure roles are up-to-date
         let config = self.config_state.config.clone();
         let current_config = config.lock().await;
         let mut fresh_config = current_config.clone();
         drop(current_config);
-        
+
         let fresh_config_state = terraphim_config::ConfigState::new(&mut fresh_config)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create fresh ConfigState: {}", e))?;
-            
+
         Ok(TerraphimService::new(fresh_config_state))
     }
 
@@ -103,16 +103,18 @@ impl McpService {
         limit: Option<i32>,
         skip: Option<i32>,
     ) -> Result<CallToolResult, McpError> {
-        let mut service = self.terraphim_service().await
+        let mut service = self
+            .terraphim_service()
+            .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        
+
         // Determine which role to use (provided role or selected role)
         let role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
         } else {
             self.config_state.get_selected_role().await
         };
-        
+
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::from(query),
             limit: limit.map(|l| l as usize),
@@ -150,10 +152,7 @@ impl McpService {
     }
 
     /// Update the Terraphim configuration
-    pub async fn update_config_tool(
-        &self,
-        config_str: String,
-    ) -> Result<CallToolResult, McpError> {
+    pub async fn update_config_tool(&self, config_str: String) -> Result<CallToolResult, McpError> {
         match serde_json::from_str::<Config>(&config_str) {
             Ok(new_config) => match self.update_config(new_config).await {
                 Ok(()) => {
@@ -180,16 +179,18 @@ impl McpService {
         &self,
         role: Option<String>,
     ) -> Result<CallToolResult, McpError> {
-        let mut service = self.terraphim_service().await
+        let mut service = self
+            .terraphim_service()
+            .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        
+
         // Determine which role to use (provided role or selected role)
         let role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
         } else {
             self.config_state.get_selected_role().await
         };
-        
+
         // Check if the role exists and has proper knowledge graph configuration
         let role_config = self.config_state.get_role(&role_name).await;
         if let Some(role_cfg) = role_config {
@@ -201,12 +202,14 @@ impl McpService {
                 ));
                 return Ok(CallToolResult::error(vec![error_content]));
             }
-            
+
             // Check if role has knowledge graph configuration
-            let kg_is_properly_configured = role_cfg.kg.as_ref()
+            let kg_is_properly_configured = role_cfg
+                .kg
+                .as_ref()
                 .map(|kg| kg.automata_path.is_some() || kg.knowledge_graph_local.is_some())
                 .unwrap_or(false);
-            
+
             if !kg_is_properly_configured {
                 let error_content = Content::text(format!(
                     "Role '{}' does not have a properly configured knowledge graph. Autocomplete requires a role with defined automata_path or local knowledge graph.",
@@ -222,7 +225,7 @@ impl McpService {
             ));
             return Ok(CallToolResult::error(vec![error_content]));
         }
-        
+
         // Load thesaurus for the role
         match service.ensure_thesaurus_loaded(&role_name).await {
             Ok(thesaurus_data) => {
@@ -233,17 +236,23 @@ impl McpService {
                     ));
                     return Ok(CallToolResult::error(vec![error_content]));
                 }
-                
-                info!("Building autocomplete index from {} thesaurus entries for role: {}", 
-                      thesaurus_data.len(), role_name);
-                
+
+                info!(
+                    "Building autocomplete index from {} thesaurus entries for role: {}",
+                    thesaurus_data.len(),
+                    role_name
+                );
+
                 let config = AutocompleteConfig::default();
-                match terraphim_automata::build_autocomplete_index(thesaurus_data.clone(), Some(config)) {
+                match terraphim_automata::build_autocomplete_index(
+                    thesaurus_data.clone(),
+                    Some(config),
+                ) {
                     Ok(index) => {
                         // Store the index with role context
                         let mut autocomplete_lock = self.autocomplete_index.write().await;
                         *autocomplete_lock = Some(index);
-                        
+
                         let content = Content::text(format!(
                             "Autocomplete index built successfully with {} terms for role '{}'",
                             thesaurus_data.len(),
@@ -253,7 +262,8 @@ impl McpService {
                     }
                     Err(e) => {
                         error!("Failed to build autocomplete index: {}", e);
-                        let error_content = Content::text(format!("Failed to build autocomplete index: {}", e));
+                        let error_content =
+                            Content::text(format!("Failed to build autocomplete index: {}", e));
                         Ok(CallToolResult::error(vec![error_content]))
                     }
                 }
@@ -280,20 +290,28 @@ impl McpService {
             let max_results = limit.unwrap_or(10);
             let mut combined: Vec<AutocompleteResult> = Vec::new();
             // Prefer exact/prefix first
-            if let Ok(mut exact) = terraphim_automata::autocomplete_search(index, &query, Some(max_results)) {
+            if let Ok(mut exact) =
+                terraphim_automata::autocomplete_search(index, &query, Some(max_results))
+            {
                 combined.append(&mut exact);
             }
             // Fill remaining with fuzzy
             if combined.len() < max_results {
                 let remaining = max_results - combined.len();
-                if let Ok(mut fuzzy) = terraphim_automata::fuzzy_autocomplete_search(index, &query, 0.6, Some(remaining)) {
+                if let Ok(mut fuzzy) = terraphim_automata::fuzzy_autocomplete_search(
+                    index,
+                    &query,
+                    0.6,
+                    Some(remaining),
+                ) {
                     combined.append(&mut fuzzy);
                 }
             }
             // Graph embeddings-style expansion: include additional synonyms sharing the same concept id
             if combined.len() < max_results {
                 use std::collections::HashSet;
-                let mut seen_terms: HashSet<String> = combined.iter().map(|r| r.term.clone()).collect();
+                let mut seen_terms: HashSet<String> =
+                    combined.iter().map(|r| r.term.clone()).collect();
                 let concept_ids: HashSet<u64> = combined.iter().map(|r| r.id).collect();
                 let mut candidates: Vec<AutocompleteResult> = Vec::new();
                 // Iterate over all metadata and pick terms with same concept id
@@ -309,23 +327,36 @@ impl McpService {
                     }
                 }
                 // Prefer shorter terms, stable order
-                candidates.sort_by(|a, b| a.term.len().cmp(&b.term.len()).then_with(|| a.term.cmp(&b.term)));
+                candidates.sort_by(|a, b| {
+                    a.term
+                        .len()
+                        .cmp(&b.term.len())
+                        .then_with(|| a.term.cmp(&b.term))
+                });
                 for cand in candidates {
-                    if combined.len() >= max_results { break; }
+                    if combined.len() >= max_results {
+                        break;
+                    }
                     if seen_terms.insert(cand.term.clone()) {
                         combined.push(cand);
                     }
                 }
             }
             let mut contents = Vec::new();
-            contents.push(Content::text(format!("Found {} suggestions", combined.len())));
+            contents.push(Content::text(format!(
+                "Found {} suggestions",
+                combined.len()
+            )));
             for r in combined.into_iter().take(max_results) {
                 let line = format!("{}", r.term);
                 contents.push(Content::text(line));
             }
             return Ok(CallToolResult::success(contents));
         }
-        let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+        let error_content = Content::text(
+            "Autocomplete index not built. Please run 'build_autocomplete_index' first."
+                .to_string(),
+        );
         Ok(CallToolResult::error(vec![error_content]))
     }
 
@@ -340,21 +371,33 @@ impl McpService {
         if let Some(ref index) = *autocomplete_lock {
             let max_results = limit.unwrap_or(10);
             let mut results: Vec<AutocompleteResult> = Vec::new();
-            if let Ok(mut prefix) = terraphim_automata::autocomplete_search(index, &query, Some(max_results)) {
+            if let Ok(mut prefix) =
+                terraphim_automata::autocomplete_search(index, &query, Some(max_results))
+            {
                 results.append(&mut prefix);
             }
             if results.len() < max_results {
                 let remaining = max_results - results.len();
-                if let Ok(mut fuzzy) = terraphim_automata::fuzzy_autocomplete_search(index, &query, 0.6, Some(remaining)) {
+                if let Ok(mut fuzzy) = terraphim_automata::fuzzy_autocomplete_search(
+                    index,
+                    &query,
+                    0.6,
+                    Some(remaining),
+                ) {
                     results.append(&mut fuzzy);
                 }
             }
 
             // Build snippets by searching for each term to fetch a related document and use its stub/description/body excerpt
-            let mut service = self.terraphim_service().await
+            let mut service = self
+                .terraphim_service()
+                .await
                 .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             let mut contents = Vec::new();
-            contents.push(Content::text(format!("Found {} suggestions", results.len())));
+            contents.push(Content::text(format!(
+                "Found {} suggestions",
+                results.len()
+            )));
             for r in results.into_iter().take(max_results) {
                 let sq = SearchQuery {
                     search_term: NormalizedTermValue::from(r.term.clone()),
@@ -365,9 +408,11 @@ impl McpService {
                 let snippet = match service.search(&sq).await {
                     Ok(docs) if !docs.is_empty() => {
                         let d = &docs[0];
-                        if let Some(stub) = &d.stub { stub.clone() }
-                        else if let Some(desc) = &d.description { desc.clone() }
-                        else {
+                        if let Some(stub) = &d.stub {
+                            stub.clone()
+                        } else if let Some(desc) = &d.description {
+                            desc.clone()
+                        } else {
                             let body = d.body.as_str();
                             let snip = body.chars().take(160).collect::<String>();
                             snip
@@ -375,12 +420,19 @@ impl McpService {
                     }
                     _ => String::new(),
                 };
-                let line = if snippet.is_empty() { r.term } else { format!("{} — {}", r.term, snippet) };
+                let line = if snippet.is_empty() {
+                    r.term
+                } else {
+                    format!("{} — {}", r.term, snippet)
+                };
                 contents.push(Content::text(line));
             }
             return Ok(CallToolResult::success(contents));
         }
-        let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+        let error_content = Content::text(
+            "Autocomplete index not built. Please run 'build_autocomplete_index' first."
+                .to_string(),
+        );
         Ok(CallToolResult::error(vec![error_content]))
     }
 
@@ -392,22 +444,31 @@ impl McpService {
         limit: Option<usize>,
     ) -> Result<CallToolResult, McpError> {
         let autocomplete_lock = self.autocomplete_index.read().await;
-        
+
         if let Some(ref index) = *autocomplete_lock {
             let min_similarity = similarity.unwrap_or(0.6);
             let max_results = limit.unwrap_or(10);
-            
-            match terraphim_automata::fuzzy_autocomplete_search(index, &query, min_similarity, Some(max_results)) {
+
+            match terraphim_automata::fuzzy_autocomplete_search(
+                index,
+                &query,
+                min_similarity,
+                Some(max_results),
+            ) {
                 Ok(results) => {
                     let mut contents = Vec::new();
-                    let summary = format!("Found {} autocomplete suggestions for '{}'", results.len(), query);
+                    let summary = format!(
+                        "Found {} autocomplete suggestions for '{}'",
+                        results.len(),
+                        query
+                    );
                     contents.push(Content::text(summary));
-                    
+
                     for result in results {
                         let suggestion = format!("• {} (score: {:.3})", result.term, result.score);
                         contents.push(Content::text(suggestion));
                     }
-                    
+
                     Ok(CallToolResult::success(contents))
                 }
                 Err(e) => {
@@ -417,7 +478,10 @@ impl McpService {
                 }
             }
         } else {
-            let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+            let error_content = Content::text(
+                "Autocomplete index not built. Please run 'build_autocomplete_index' first."
+                    .to_string(),
+            );
             Ok(CallToolResult::error(vec![error_content]))
         }
     }
@@ -430,32 +494,45 @@ impl McpService {
         limit: Option<usize>,
     ) -> Result<CallToolResult, McpError> {
         let autocomplete_lock = self.autocomplete_index.read().await;
-        
+
         if let Some(ref index) = *autocomplete_lock {
             let max_distance = max_edit_distance.unwrap_or(2);
             let max_results = limit.unwrap_or(10);
-            
-            match terraphim_automata::fuzzy_autocomplete_search_levenshtein(index, &query, max_distance, Some(max_results)) {
+
+            match terraphim_automata::fuzzy_autocomplete_search_levenshtein(
+                index,
+                &query,
+                max_distance,
+                Some(max_results),
+            ) {
                 Ok(results) => {
                     let mut contents = Vec::new();
-                    let summary = format!("Found {} Levenshtein autocomplete suggestions for '{}'", results.len(), query);
+                    let summary = format!(
+                        "Found {} Levenshtein autocomplete suggestions for '{}'",
+                        results.len(),
+                        query
+                    );
                     contents.push(Content::text(summary));
-                    
+
                     for result in results {
                         let suggestion = format!("• {} (score: {:.3})", result.term, result.score);
                         contents.push(Content::text(suggestion));
                     }
-                    
+
                     Ok(CallToolResult::success(contents))
                 }
                 Err(e) => {
                     error!("Levenshtein autocomplete search failed: {}", e);
-                    let error_content = Content::text(format!("Levenshtein autocomplete search failed: {}", e));
+                    let error_content =
+                        Content::text(format!("Levenshtein autocomplete search failed: {}", e));
                     Ok(CallToolResult::error(vec![error_content]))
                 }
             }
         } else {
-            let error_content = Content::text("Autocomplete index not built. Please run 'build_autocomplete_index' first.".to_string());
+            let error_content = Content::text(
+                "Autocomplete index not built. Please run 'build_autocomplete_index' first."
+                    .to_string(),
+            );
             Ok(CallToolResult::error(vec![error_content]))
         }
     }
@@ -492,7 +569,7 @@ impl ServerHandler for McpService {
                 "required": ["query"]
             });
             let search_map = search_schema.as_object().unwrap().clone();
-            
+
             let config_schema = serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -535,7 +612,8 @@ impl ServerHandler for McpService {
                 },
                 "required": ["query"]
             });
-            let autocomplete_snippets_map = autocomplete_snippets_schema.as_object().unwrap().clone();
+            let autocomplete_snippets_map =
+                autocomplete_snippets_schema.as_object().unwrap().clone();
 
             let fuzzy_autocomplete_schema = serde_json::json!({
                 "type": "object",
@@ -575,7 +653,8 @@ impl ServerHandler for McpService {
                 },
                 "required": ["query"]
             });
-            let levenshtein_autocomplete_map = levenshtein_autocomplete_schema.as_object().unwrap().clone();
+            let levenshtein_autocomplete_map =
+                levenshtein_autocomplete_schema.as_object().unwrap().clone();
 
             let tools = vec![
                 Tool {
@@ -621,7 +700,7 @@ impl ServerHandler for McpService {
                     annotations: None,
                 }
             ];
-            Ok(ListToolsResult { 
+            Ok(ListToolsResult {
                 tools,
                 next_cursor: None,
             })
@@ -637,108 +716,150 @@ impl ServerHandler for McpService {
             match request.name.as_ref() {
                 "search" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments.get("query")
+                    let query = arguments
+                        .get("query")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                        })?
                         .to_string();
-                    
-                    let role = arguments.get("role")
+
+                    let role = arguments
+                        .get("role")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    
-                    let limit = arguments.get("limit")
+
+                    let limit = arguments
+                        .get("limit")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as i32);
-                    
-                    let skip = arguments.get("skip")
+
+                    let skip = arguments
+                        .get("skip")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as i32);
-                    
-                    self.search(query, role, limit, skip).await
+
+                    self.search(query, role, limit, skip)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
                 "update_config_tool" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let config_str = arguments.get("config_str")
+                    let config_str = arguments
+                        .get("config_str")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| ErrorData::invalid_params("Missing 'config_str' parameter".to_string(), None))?
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params(
+                                "Missing 'config_str' parameter".to_string(),
+                                None,
+                            )
+                        })?
                         .to_string();
-                    
-                    self.update_config_tool(config_str).await
+
+                    self.update_config_tool(config_str)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
                 "build_autocomplete_index" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let role = arguments.get("role")
+                    let role = arguments
+                        .get("role")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    
-                    self.build_autocomplete_index(role).await
+
+                    self.build_autocomplete_index(role)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
                 "fuzzy_autocomplete_search" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments.get("query")
+                    let query = arguments
+                        .get("query")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                        })?
                         .to_string();
-                    
-                    let similarity = arguments.get("similarity")
-                        .and_then(|v| v.as_f64());
-                    
-                    let limit = arguments.get("limit")
+
+                    let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
+
+                    let limit = arguments
+                        .get("limit")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as usize);
-                    
-                    self.fuzzy_autocomplete_search(query, similarity, limit).await
+
+                    self.fuzzy_autocomplete_search(query, similarity, limit)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
                 "autocomplete_terms" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments.get("query")
+                    let query = arguments
+                        .get("query")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                        })?
                         .to_string();
-                    let limit = arguments.get("limit").and_then(|v| v.as_i64()).map(|i| i as usize);
-                    self.autocomplete_terms(query, limit).await
+                    let limit = arguments
+                        .get("limit")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as usize);
+                    self.autocomplete_terms(query, limit)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
                 "autocomplete_with_snippets" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments.get("query")
+                    let query = arguments
+                        .get("query")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                        })?
                         .to_string();
-                    let limit = arguments.get("limit").and_then(|v| v.as_i64()).map(|i| i as usize);
-                    self.autocomplete_with_snippets(query, limit).await
+                    let limit = arguments
+                        .get("limit")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as usize);
+                    self.autocomplete_with_snippets(query, limit)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
                 "fuzzy_autocomplete_search_levenshtein" => {
                     let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments.get("query")
+                    let query = arguments
+                        .get("query")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| ErrorData::invalid_params("Missing 'query' parameter".to_string(), None))?
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                        })?
                         .to_string();
-                    
-                    let max_edit_distance = arguments.get("max_edit_distance")
+
+                    let max_edit_distance = arguments
+                        .get("max_edit_distance")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as usize);
-                    
-                    let limit = arguments.get("limit")
+
+                    let limit = arguments
+                        .get("limit")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as usize);
-                    
-                    self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit).await
+
+                    self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit)
+                        .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
                 }
-                _ => Err(ErrorData::method_not_found::<rmcp::model::CallToolRequestMethod>())
+                _ => Err(ErrorData::method_not_found::<
+                    rmcp::model::CallToolRequestMethod,
+                >()),
             }
         }
     }
@@ -749,14 +870,16 @@ impl ServerHandler for McpService {
         _context: RequestContext<RoleServer>,
     ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> + Send + '_ {
         async move {
-            let mut service = self.terraphim_service().await
+            let mut service = self
+                .terraphim_service()
+                .await
                 .map_err(|e| TerraphimMcpError::Anyhow(e))?;
-            
+
             // Use a broad search term to find documents instead of empty search
             // We'll try common terms that should match documents in our KG
             let search_terms = vec!["terraphim", "graph", "service", "haystack"];
             let mut all_documents = std::collections::HashSet::new();
-            
+
             // Perform multiple searches to gather available documents
             for term in search_terms {
                 let search_query = terraphim_types::SearchQuery {
@@ -765,7 +888,7 @@ impl ServerHandler for McpService {
                     skip: None,
                     role: None,
                 };
-                
+
                 match service.search(&search_query).await {
                     Ok(documents) => {
                         for doc in documents {
@@ -778,7 +901,7 @@ impl ServerHandler for McpService {
                     }
                 }
             }
-            
+
             // If we still have no documents, try a final broad search
             if all_documents.is_empty() {
                 let fallback_query = terraphim_types::SearchQuery {
@@ -787,37 +910,38 @@ impl ServerHandler for McpService {
                     skip: None,
                     role: None,
                 };
-                
+
                 let documents = service
                     .search(&fallback_query)
                     .await
                     .map_err(TerraphimMcpError::Service)?;
-                    
+
                 let resources = self
                     .resource_mapper
                     .documents_to_resources(&documents)
                     .map_err(TerraphimMcpError::Anyhow)?;
-                    
+
                 return Ok(ListResourcesResult {
                     resources,
                     next_cursor: None,
                 });
             }
-            
+
             // Convert unique document IDs back to documents for resource mapping
             // For now, we'll do individual searches to get full document objects
             let mut final_documents = Vec::new();
-            for doc_id in all_documents.iter().take(50) { // Limit to 50 resources
+            for doc_id in all_documents.iter().take(50) {
+                // Limit to 50 resources
                 if let Ok(Some(doc)) = service.get_document_by_id(doc_id).await {
                     final_documents.push(doc);
                 }
             }
-            
+
             let resources = self
                 .resource_mapper
                 .documents_to_resources(&final_documents)
                 .map_err(TerraphimMcpError::Anyhow)?;
-                
+
             Ok(ListResourcesResult {
                 resources,
                 next_cursor: None,
@@ -835,7 +959,9 @@ impl ServerHandler for McpService {
                 .resource_mapper
                 .uri_to_id(&request.uri)
                 .map_err(TerraphimMcpError::Anyhow)?;
-            let mut service = self.terraphim_service().await
+            let mut service = self
+                .terraphim_service()
+                .await
                 .map_err(|e| TerraphimMcpError::Anyhow(e))?;
             let document = service
                 .get_document_by_id(&doc_id)

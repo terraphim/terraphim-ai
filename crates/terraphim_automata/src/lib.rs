@@ -3,21 +3,25 @@ pub mod autocomplete;
 pub mod builder;
 pub mod matcher;
 
-pub use matcher::{find_matches, Matched, replace_matches, LinkType};
 pub use autocomplete::{
-    build_autocomplete_index, autocomplete_search, 
-    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein,
-    serialize_autocomplete_index, deserialize_autocomplete_index,
-    AutocompleteIndex, AutocompleteResult, AutocompleteConfig, AutocompleteMetadata
+    autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
+    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
+    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
 };
+pub use matcher::{find_matches, replace_matches, LinkType, Matched};
 
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
 pub mod autocomplete_helpers {
     use super::autocomplete::{AutocompleteIndex, AutocompleteMetadata};
-    pub fn iter_metadata<'a>(index: &'a AutocompleteIndex) -> impl Iterator<Item = (&'a str, &'a AutocompleteMetadata)> {
+    pub fn iter_metadata<'a>(
+        index: &'a AutocompleteIndex,
+    ) -> impl Iterator<Item = (&'a str, &'a AutocompleteMetadata)> {
         index.metadata_iter()
     }
-    pub fn get_metadata<'a>(index: &'a AutocompleteIndex, term: &str) -> Option<&'a AutocompleteMetadata> {
+    pub fn get_metadata<'a>(
+        index: &'a AutocompleteIndex,
+        term: &str,
+    ) -> Option<&'a AutocompleteMetadata> {
         index.metadata_get(term)
     }
 }
@@ -118,10 +122,14 @@ pub fn load_thesaurus_from_json(json_str: &str) -> Result<Thesaurus> {
 }
 
 /// Load thesaurus from JSON string and replace terms using streaming matcher
-pub fn load_thesaurus_from_json_and_replace(json_str: &str, content: &str, link_type: LinkType) -> Result<Vec<u8>> {
+pub fn load_thesaurus_from_json_and_replace(
+    json_str: &str,
+    content: &str,
+    link_type: LinkType,
+) -> Result<Vec<u8>> {
     let thesaurus = load_thesaurus_from_json(json_str)?;
     let replaced = replace_matches(content, thesaurus, link_type)?;
-    Ok(replaced)    
+    Ok(replaced)
 }
 
 /// Load thesaurus from JSON string (async version for compatibility)
@@ -132,12 +140,16 @@ pub async fn load_thesaurus_from_json_async(json_str: &str) -> Result<Thesaurus>
 
 /// Load thesaurus from JSON string and replace terms using streaming matcher (async version)
 #[cfg(feature = "remote-loading")]
-pub async fn load_thesaurus_from_json_and_replace_async(json_str: &str, content: &str, link_type: LinkType) -> Result<Vec<u8>> {
+pub async fn load_thesaurus_from_json_and_replace_async(
+    json_str: &str,
+    content: &str,
+    link_type: LinkType,
+) -> Result<Vec<u8>> {
     load_thesaurus_from_json_and_replace(json_str, content, link_type)
 }
 
 /// Load a thesaurus from a file or URL
-/// 
+///
 /// Note: Remote loading requires the "remote-loading" feature to be enabled.
 #[cfg(feature = "remote-loading")]
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
@@ -179,7 +191,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
 }
 
 /// Load a thesaurus from a local file only (WASM-compatible version)
-/// 
+///
 /// This version only supports local file loading and doesn't require async runtime.
 #[cfg(not(feature = "remote-loading"))]
 pub fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
@@ -187,7 +199,7 @@ pub fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
         AutomataPath::Local(path) => fs::read_to_string(path)?,
         AutomataPath::Remote(_) => {
             return Err(TerraphimAutomataError::InvalidThesaurus(
-                "Remote loading is not supported. Enable the 'remote-loading' feature.".to_string()
+                "Remote loading is not supported. Enable the 'remote-loading' feature.".to_string(),
             ));
         }
     };
@@ -304,26 +316,44 @@ mod tests {
         let thesaurus = load_thesaurus_from_json(json_str).unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
-            thesaurus.get(&NormalizedTermValue::from("project management framework tailoring")).unwrap().id,
+            thesaurus
+                .get(&NormalizedTermValue::from(
+                    "project management framework tailoring"
+                ))
+                .unwrap()
+                .id,
             1_u64
         );
         assert_eq!(
-            thesaurus.get(&NormalizedTermValue::from("strategy documents")).unwrap().id,
+            thesaurus
+                .get(&NormalizedTermValue::from("strategy documents"))
+                .unwrap()
+                .id,
             2_u64
         );
         assert_eq!(
-            thesaurus.get(&NormalizedTermValue::from("project constraints")).unwrap().id,
+            thesaurus
+                .get(&NormalizedTermValue::from("project constraints"))
+                .unwrap()
+                .id,
             3_u64
         );
         assert_eq!(
-            thesaurus.get(&NormalizedTermValue::from("project management framework tailoring")).unwrap().url,
+            thesaurus
+                .get(&NormalizedTermValue::from(
+                    "project management framework tailoring"
+                ))
+                .unwrap()
+                .url,
             Some("https://example.com/project-tailoring-strategy".to_string())
         );
         assert_eq!(
-            thesaurus.get(&NormalizedTermValue::from("strategy documents")).unwrap().url,
+            thesaurus
+                .get(&NormalizedTermValue::from("strategy documents"))
+                .unwrap()
+                .url,
             Some("https://example.com/strategy-documents".to_string())
         );
-        
     }
 
     #[test]
@@ -351,19 +381,26 @@ mod tests {
 }"#;
 
         let content = "I like project constraints and strategy documents.";
-        let replaced = load_thesaurus_from_json_and_replace(json_str, content, LinkType::MarkdownLinks).unwrap();
+        let replaced =
+            load_thesaurus_from_json_and_replace(json_str, content, LinkType::MarkdownLinks)
+                .unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
         assert_eq!(replaced_str, "I like [project constraints](https://example.com/project-constraints) and [strategy documents](https://example.com/strategy-documents).");
 
         // Test HTMLLinks
-        let replaced = load_thesaurus_from_json_and_replace(json_str, content, LinkType::HTMLLinks).unwrap();
+        let replaced =
+            load_thesaurus_from_json_and_replace(json_str, content, LinkType::HTMLLinks).unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
         assert_eq!(replaced_str, "I like <a href=\"https://example.com/project-constraints\">project constraints</a> and <a href=\"https://example.com/strategy-documents\">strategy documents</a>.");
 
         // Test WikiLinks
-        let replaced = load_thesaurus_from_json_and_replace(json_str, content, LinkType::WikiLinks).unwrap();
+        let replaced =
+            load_thesaurus_from_json_and_replace(json_str, content, LinkType::WikiLinks).unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
-        assert_eq!(replaced_str, "I like [[project constraints]] and [[strategy documents]].");
+        assert_eq!(
+            replaced_str,
+            "I like [[project constraints]] and [[strategy documents]]."
+        );
     }
 
     #[test]

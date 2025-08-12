@@ -175,7 +175,7 @@ impl RipgrepCommand {
     pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         self.run_with_extra_args(needle, haystack, &[]).await
     }
-    
+
     /// Runs ripgrep to find `needle` in `haystack` with additional command-line arguments
     ///
     /// This method allows passing extra ripgrep arguments like filtering by tags.
@@ -183,12 +183,22 @@ impl RipgrepCommand {
     /// extra_args like ["--glob", "*#rust*"] or use ripgrep patterns.
     ///
     /// Returns a Vec of Messages, which correspond to ripgrep's internal JSON output.
-    pub async fn run_with_extra_args(&self, needle: &str, haystack: &Path, extra_args: &[String]) -> Result<Vec<Message>> {
+    pub async fn run_with_extra_args(
+        &self,
+        needle: &str,
+        haystack: &Path,
+        extra_args: &[String],
+    ) -> Result<Vec<Message>> {
         // Put options first, then extra args, then needle, then haystack (correct ripgrep argument order)
-        let args: Vec<String> = self.default_args.clone()
+        let args: Vec<String> = self
+            .default_args
+            .clone()
             .into_iter()
             .chain(extra_args.iter().cloned())
-            .chain(vec![needle.to_string(), haystack.to_string_lossy().to_string()])
+            .chain(vec![
+                needle.to_string(),
+                haystack.to_string_lossy().to_string(),
+            ])
             .collect();
 
         log::debug!("Running ripgrep with args: {:?}", args);
@@ -204,12 +214,16 @@ impl RipgrepCommand {
             stdout.read_to_string(&mut data).await.map(|_| data)
         };
         let output = read.await?;
-        log::debug!("Raw ripgrep output ({} bytes): {}", output.len(), &output[..std::cmp::min(500, output.len())]);
+        log::debug!(
+            "Raw ripgrep output ({} bytes): {}",
+            output.len(),
+            &output[..std::cmp::min(500, output.len())]
+        );
         let messages = json_decode(&output)?;
         log::debug!("JSON decode produced {} messages", messages.len());
         Ok(messages)
     }
-    
+
     /// Parse extra parameters from haystack configuration into ripgrep arguments
     ///
     /// This method converts key-value pairs from the haystack extra_parameters
@@ -221,9 +235,12 @@ impl RipgrepCommand {
     /// - `type`: File type filters (e.g., "md", "rs")
     /// - `max_count`: Maximum number of matches per file
     /// - `context`: Number of context lines around matches
-    pub fn parse_extra_parameters(&self, extra_params: &std::collections::HashMap<String, String>) -> Vec<String> {
+    pub fn parse_extra_parameters(
+        &self,
+        extra_params: &std::collections::HashMap<String, String>,
+    ) -> Vec<String> {
         let mut args = Vec::new();
-        
+
         for (key, value) in extra_params {
             match key.as_str() {
                 "tag" => {
@@ -269,7 +286,7 @@ impl RipgrepCommand {
                 }
             }
         }
-        
+
         args
     }
 }

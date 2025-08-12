@@ -11,4 +11,4 @@ pub fn unix_timestamp_secs() -> i64 {
             (js_sys::Date::now() / 1000.0) as i64
         }
     }
-} 
+}

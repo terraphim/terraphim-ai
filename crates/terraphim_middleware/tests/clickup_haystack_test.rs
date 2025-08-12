@@ -1,5 +1,8 @@
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
-use terraphim_middleware::{haystack::ClickUpHaystackIndexer, indexer::{IndexMiddleware, search_haystacks}};
+use terraphim_middleware::{
+    haystack::ClickUpHaystackIndexer,
+    indexer::{search_haystacks, IndexMiddleware},
+};
 use terraphim_types::{RelevanceFunction, SearchQuery};
 
 #[tokio::test]
@@ -9,7 +12,10 @@ async fn clickup_mapping_handles_missing_token() {
 
     let haystack = Haystack::new("clickup".to_string(), ServiceType::ClickUp, true);
     let indexer = ClickUpHaystackIndexer::default();
-    let index = indexer.index("test", &haystack).await.expect("indexing should not error");
+    let index = indexer
+        .index("test", &haystack)
+        .await
+        .expect("indexing should not error");
     assert!(index.is_empty());
 }
 
@@ -30,22 +36,31 @@ async fn clickup_live_search_returns_documents() {
         terraphim_it: false,
         theme: "lumen".to_string(),
         kg: None,
-        haystacks: vec![Haystack::new("clickup".to_string(), ServiceType::ClickUp, true)
-            .with_extra_parameter("team_id".into(), std::env::var("CLICKUP_TEAM_ID").unwrap())
-            .with_extra_parameter("include_closed".into(), "true".into())
-            .with_extra_parameter("subtasks".into(), "true".into())],
+        haystacks: vec![
+            Haystack::new("clickup".to_string(), ServiceType::ClickUp, true)
+                .with_extra_parameter("team_id".into(), std::env::var("CLICKUP_TEAM_ID").unwrap())
+                .with_extra_parameter("include_closed".into(), "true".into())
+                .with_extra_parameter("subtasks".into(), "true".into()),
+        ],
         extra: ahash::AHashMap::new(),
     };
 
     let mut config = ConfigBuilder::new()
         .add_role("ClickUp", role)
-        .default_role("ClickUp").unwrap()
-        .build().unwrap();
+        .default_role("ClickUp")
+        .unwrap()
+        .build()
+        .unwrap();
 
-    let config_state = terraphim_config::ConfigState::new(&mut config).await.unwrap();
-    let query = SearchQuery { search_term: "meeting".into(), skip: Some(0), limit: Some(10), role: Some("ClickUp".into()) };
+    let config_state = terraphim_config::ConfigState::new(&mut config)
+        .await
+        .unwrap();
+    let query = SearchQuery {
+        search_term: "meeting".into(),
+        skip: Some(0),
+        limit: Some(10),
+        role: Some("ClickUp".into()),
+    };
     let results = search_haystacks(config_state, query).await.unwrap();
     assert!(results.len() >= 0);
 }
-
-

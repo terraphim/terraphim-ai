@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use ahash::AHashMap;
-    
+
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
@@ -20,7 +20,8 @@ mod tests {
     // Sample config with knowledge graphs for testing visualization
     fn sample_config_with_kg() -> Config {
         // Use absolute path to docs/src/kg
-        let kg_path = std::path::PathBuf::from("/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg");
+        let kg_path =
+            std::path::PathBuf::from("/Users/alex/projects/terraphim/terraphim-ai/docs/src/kg");
         let haystack = kg_path.parent().unwrap().to_path_buf();
 
         ConfigBuilder::new()
@@ -149,25 +150,31 @@ mod tests {
             .unwrap();
 
         println!("Response status: {}", response.status());
-        
+
         if response.status() == StatusCode::OK {
             let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
-            
+
             println!("Response status: {:?}", rolegraph_data.status);
             println!("Number of nodes: {}", rolegraph_data.nodes.len());
             println!("Number of edges: {}", rolegraph_data.edges.len());
-            
+
             if !rolegraph_data.nodes.is_empty() {
                 println!("First few nodes:");
                 for (i, node) in rolegraph_data.nodes.iter().take(5).enumerate() {
-                    println!("  Node {}: id={}, label='{}', rank={}", i, node.id, node.label, node.rank);
+                    println!(
+                        "  Node {}: id={}, label='{}', rank={}",
+                        i, node.id, node.label, node.rank
+                    );
                 }
             }
-            
+
             if !rolegraph_data.edges.is_empty() {
                 println!("First few edges:");
                 for (i, edge) in rolegraph_data.edges.iter().take(5).enumerate() {
-                    println!("  Edge {}: source={}, target={}, rank={}", i, edge.source, edge.target, edge.rank);
+                    println!(
+                        "  Edge {}: source={}, target={}, rank={}",
+                        i, edge.source, edge.target, edge.rank
+                    );
                 }
             }
         } else {
@@ -190,10 +197,10 @@ mod tests {
             .unwrap();
 
         println!("Config response status: {}", response.status());
-        
+
         if response.status() == StatusCode::OK {
             let config_text = response.text().await.unwrap();
             println!("Config response: {}", config_text);
         }
     }
-} 
+}
