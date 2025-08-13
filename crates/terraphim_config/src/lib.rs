@@ -158,6 +158,8 @@ pub enum ServiceType {
     QueryRs,
     /// Use ClickUp API as the indexing service
     ClickUp,
+    /// Use an MCP client to query a Model Context Protocol server
+    Mcp,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched

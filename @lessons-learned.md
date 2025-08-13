@@ -137,6 +137,23 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 ### 🚀 Future Enhancements
 
 ## OpenRouter Summarization + Chat (2025-08-08)
+## MCP Client Integration (2025-08-13)
+
+### Key Insights
+- Feature-gate new protocol clients so default builds stay green; ship HTTP/SSE fallback first.
+- Align to crate API from crates.io (`mcp-client 0.1.0`): use `McpService` wrapper; `SseTransport`/`StdioTransport` provide handles, not Tower services.
+- SDK `Content` doesn’t expose direct `text` field; tool responses may be text blocks or structured JSON — parse defensively.
+
+### Implementation Notes
+- `terraphim_middleware` features: `mcp` (SSE/http), `mcp-rust-sdk` (SDK clients optional).
+- SSE/http path: probe `/{base}/sse`, POST to `/{base}/search` then fallback `/{base}/list`, support array or `{items: [...]}` responses.
+- OAuth: pass bearer when configured.
+- SDK path: create transport, wrap with `McpService`, build `McpClient`, initialize, `list_tools(None)`, pick `search` or `list`, `call_tool`.
+
+### Testing
+- Live: `npx -y @modelcontextprotocol/server-everything sse` on port 3001; set `MCP_SERVER_URL` and run ignored test.
+- Default, `mcp`, and `mcp-rust-sdk` builds compile after aligning content parsing to `mcp-spec` types.
+
 
 ### Key Insights
 - Feature-gated integration lets default builds stay lean; enable with `--features openrouter` on server/desktop.

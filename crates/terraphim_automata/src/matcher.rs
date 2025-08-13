@@ -86,3 +86,75 @@ pub fn replace_matches(text: &str, thesaurus: Thesaurus, link_type: LinkType) ->
 }
 
 // tests
+
+/// Extract the paragraph text starting at each automata term match.
+///
+/// For every matched term in `text`, returns the substring from the start of the term
+/// until the end of the containing paragraph (first blank line or end-of-text).
+pub fn extract_paragraphs_from_automata(
+    text: &str,
+    thesaurus: Thesaurus,
+    include_term: bool,
+) -> Result<Vec<(Matched, String)>> {
+    let matches = find_matches(text, thesaurus, true)?;
+    let mut results: Vec<(Matched, String)> = Vec::new();
+
+    for m in matches.into_iter() {
+        let (start, end) = m
+            .pos
+            .ok_or_else(|| TerraphimAutomataError::Dict("Positions were not returned".to_string()))?;
+
+        // Start at term start (or right after the term) depending on flag
+        let paragraph_start = if include_term { start } else { end };
+        let paragraph_end = find_paragraph_end(text, end);
+
+        if paragraph_start <= paragraph_end && paragraph_start < text.len() {
+            let slice = &text[paragraph_start..paragraph_end];
+            results.push((m, slice.to_string()));
+        }
+    }
+
+    Ok(results)
+}
+
+/// Find the end of the paragraph starting after `from_index`.
+/// Paragraphs are separated by a blank line, matched by the earliest of
+/// "\r\n\r\n", "\n\n", or "\r\r". If none found, returns end of text.
+fn find_paragraph_end(text: &str, from_index: usize) -> usize {
+    if from_index >= text.len() {
+        return text.len();
+    }
+    let tail = &text[from_index..];
+    let mut end_rel: Option<usize> = None;
+    for sep in ["\r\n\r\n", "\n\n", "\r\r"] {
+        if let Some(i) = tail.find(sep) {
+            end_rel = Some(match end_rel { Some(cur) => cur.min(i), None => i });
+        }
+    }
+    match end_rel {
+        Some(i) => from_index + i,
+        None => text.len(),
+    }
+}
+
+#[cfg(test)]
+mod paragraph_tests {
+    use super::*;
+    use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+    #[test]
+    fn extracts_paragraph_from_term() {
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        let norm = NormalizedTerm::new(1, NormalizedTermValue::from("lorem"));
+        thesaurus.insert(NormalizedTermValue::from("lorem"), norm);
+
+        let text = "Intro\n\nlorem ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nNext paragraph starts here.";
+
+        let results = extract_paragraphs_from_automata(text, thesaurus, true).unwrap();
+        assert_eq!(results.len(), 1);
+        let (_m, para) = &results[0];
+        assert!(para.starts_with("lorem ipsum"));
+        assert!(para.contains("consectetur"));
+        assert!(!para.contains("Next paragraph"));
+    }
+}
