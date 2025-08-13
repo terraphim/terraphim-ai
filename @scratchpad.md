@@ -1,6 +1,63 @@
+### Plan: Automata Paragraph Extraction
+- Add helper in `terraphim_automata::matcher` to extract paragraph(s) starting at matched terms.
+- API: `extract_paragraphs_from_automata(text, thesaurus, include_term) -> Vec<(Matched, String)>`.
+- Use existing `find_matches(..., return_positions=true)` to get indices.
+- Determine paragraph end by scanning for blank-line separators, else end-of-text.
+- Provide unit test and docs page.
+
 # Terraphim AI Project Scratchpad
 
-## Current Task: QueryRs Haystack and Scoring Functions Validation
+## 🚧 CURRENT TASK: ASYNC REFACTORING AND PERFORMANCE OPTIMIZATION (2025-08-13)
+### MCP Client Integration Plan (Active)
+- Add `mcp-client` and feature flags in `terraphim_middleware`.
+- Implement three transports following rust-sdk examples:
+  - stdio: spawn `npx -y @modelcontextprotocol/server-everything stdio`
+  - sse: connect to `http://127.0.0.1:3001/sse`
+  - oauth: same as sse with bearer token
+- Map tool outputs (`search` or `list`) to `terraphim_types::Document`.
+- Live test `mcp_haystack_test.rs` uses `MCP_SERVER_URL` and `transport=sse`.
+
+Status: SSE/http path implemented; rust-sdk wiring added behind `mcp-rust-sdk`. Content parsing updated to use `mcp-spec` (`Content::as_text`, `EmbeddedResource::get_text`); removed ad-hoc `reqwest::Error` creation in favor of `Error::Indexation`. Default, `mcp`, and `mcp-rust-sdk` builds compile green.
+
+
+### Phase 1: Analysis and Baseline Establishment ✅ IN PROGRESS
+
+**Current Focus**: Identifying performance bottlenecks and async patterns for optimization
+
+#### Identified Areas for Improvement:
+
+1. **Service Layer (`terraphim_service`)**:
+   - Complex nested async functions with deep call stacks
+   - Potential for structured concurrency improvements
+   - Memory-intensive document processing loops
+
+2. **Middleware (`terraphim_middleware`)**:
+   - Sequential haystack processing could be parallelized
+   - Index construction blocking on I/O operations
+   - Missing bounded channels for backpressure
+
+3. **Knowledge Graph (`terraphim_rolegraph`)**:
+   - Synchronous graph construction blocking async runtime
+   - Hash map contention in concurrent scenarios
+   - Missing async-aware data structures
+
+4. **Automata (`terraphim_automata`)**:
+   - Good benchmark coverage but could benefit from more realistic scenarios
+   - WASM compatibility checks needed
+   - FST construction performance opportunities
+
+#### Benchmarking Status:
+- ✅ Existing benchmarks identified in rolegraph and automata crates
+- 🚧 Need to establish baseline measurements
+- ❌ Missing benchmarks for service layer and middleware
+- ❌ No WASM-specific performance testing
+
+#### Time Library Migration Plan:
+- ✅ chrono usage audit completed (6 files identified)
+- ❌ Replacement strategy not yet implemented
+- ❌ WASM compatibility testing pending
+
+## Previous Task: QueryRs Haystack and Scoring Functions Validation
 ## ✅ TUI Interface Implementation - COMPLETE (2025-01-31)
 
 **Status**: ✅ COMPLETE

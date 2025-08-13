@@ -20,6 +20,7 @@ use terraphim_automata::autocomplete::{
     AutocompleteIndex,
 };
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+use terraphim_automata::matcher::extract_paragraphs_from_automata;
 
 #[cfg(feature = "tokio-runtime")]
 use tokio::runtime::Runtime;
@@ -342,6 +343,19 @@ fn bench_comparison_with_matcher(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark paragraph extraction using automata matcher
+fn bench_paragraph_extraction(c: &mut Criterion) {
+    let mut thesaurus = Thesaurus::new("bench".to_string());
+    let norm = NormalizedTerm::new(1, NormalizedTermValue::from("alpha"));
+    thesaurus.insert(NormalizedTermValue::from("alpha"), norm);
+    let text = "header\n\nalpha ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nfooter";
+    c.bench_function("extract_paragraphs_from_automata_small_text", |b| {
+        b.iter(|| {
+            let _ = extract_paragraphs_from_automata(text, thesaurus.clone(), true).unwrap();
+        })
+    });
+}
+
 criterion_group!(
     benches,
     bench_build_index_throughput,
@@ -353,6 +367,7 @@ criterion_group!(
     bench_memory_scaling,
     bench_concurrent_search,
     bench_realistic_usage,
-    bench_comparison_with_matcher
+    bench_comparison_with_matcher,
+    bench_paragraph_extraction
 );
 criterion_main!(benches);

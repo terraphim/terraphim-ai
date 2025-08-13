@@ -7,7 +7,7 @@ use crate::{Error, Result};
 
 mod ripgrep;
 
-use crate::haystack::{AtomicHaystackIndexer, ClickUpHaystackIndexer, QueryRsHaystackIndexer};
+use crate::haystack::{AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, QueryRsHaystackIndexer};
 pub use ripgrep::RipgrepIndexer;
 
 fn hash_as_string<T: Hash>(t: &T) -> String {
@@ -75,6 +75,11 @@ pub async fn search_haystacks(
             ServiceType::ClickUp => {
                 // Search through documents using ClickUp
                 clickup.index(needle, haystack).await?
+            }
+            ServiceType::Mcp => {
+                // Search via MCP client
+                let mcp = McpHaystackIndexer::default();
+                mcp.index(needle, haystack).await?
             }
         };
 

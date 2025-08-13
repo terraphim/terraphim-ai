@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time;
 use thiserror::Error;
+#[cfg(feature = "tokio-runtime")]
 use tokio::io::AsyncReadExt;
+#[cfg(feature = "tokio-runtime")]
 use tokio::process::Command;
 
 use cached::proc_macro::cached;
@@ -42,6 +44,7 @@ pub struct Logseq {
     service: LogseqService,
 }
 
+#[cfg(feature = "tokio-runtime")]
 impl ThesaurusBuilder for Logseq {
     async fn build<P: Into<PathBuf> + Send>(&self, name: String, haystack: P) -> Result<Thesaurus> {
         let haystack = haystack.into();
@@ -71,6 +74,7 @@ impl Default for LogseqService {
     }
 }
 
+#[cfg(feature = "tokio-runtime")]
 impl LogseqService {
     pub async fn get_raw_messages(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
         let haystack = haystack.to_string_lossy().to_string();

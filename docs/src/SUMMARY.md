@@ -22,6 +22,11 @@
 ## Integrations
 
 - [Atomic Server Integration](./atomic-server-integration.md)
+- [MCP Integration](./mcp-integration.md)
+
+## Automata
+
+- [Paragraph Extraction](./automata-paragraph-extraction.md)
 
 ## Scoring Algorithms
 
