@@ -43,12 +43,20 @@ cargo test --features ollama ollama_llama_performance_test
 Tests the complete Ollama LLM integration workflow:
 
 - **Connectivity Test**: Verifies Ollama instance is reachable
-- **Direct LLM Client Test**: Tests summarization with llama3.2:3b
+- **Direct LLM Client Test**: Tests summarization with llama3.2:3b (with improved length handling)
 - **Role Configuration Test**: Validates role-based LLM client building
 - **End-to-End Search Test**: Tests search with auto-summarization
 - **Model Listing Test**: Verifies model availability and listing
 
-### 2. Performance Test (`ollama_llama_performance_test`)
+### 2. Length Constraint Test (`ollama_llama_length_constraint_test`)
+
+Tests the length constraint handling and post-processing capabilities:
+
+- **Strict Length Testing**: Tests with very short content and strict length constraints
+- **Post-Processing Validation**: Verifies that the LLM client enforces length limits
+- **Smart Truncation**: Tests word-boundary aware truncation for better readability
+
+### 3. Performance Test (`ollama_llama_performance_test`)
 
 Tests reliability and performance under load:
 
@@ -110,6 +118,8 @@ The Ollama integration is implemented in `crates/terraphim_service/src/llm.rs`:
 - **HTTP Client**: Uses reqwest for API communication
 - **Retry Logic**: Built-in retry mechanism for reliability
 - **Timeout Handling**: Configurable timeouts for different operations
+- **Length Constraints**: Smart post-processing with word-boundary aware truncation
+- **Prompt Engineering**: Explicit length instructions for better LLM compliance
 
 ### API Endpoints
 
