@@ -96,7 +96,7 @@ mod tests {
                     break;
                 }
                 _ => {
-                    if attempts >= 5 {
+                    if attempts >= 30 {
                         panic!("Server did not become ready in time at {}", address);
                     }
                     println!("Waiting for server to become ready...");

@@ -147,6 +147,7 @@ pub struct Commit {
     pub is_a: Vec<String>,
 
     /// The URL of the Commit
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
