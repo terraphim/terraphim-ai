@@ -57,6 +57,11 @@ async fn test_get_config_command() {
 
 #[tokio::test]
 async fn test_update_config_command() {
+    // Initialize memory-only persistence to avoid filesystem/network dependencies
+    terraphim_persistence::DeviceStorage::init_memory_only()
+        .await
+        .unwrap();
+
     let config_state = create_test_config_state().await;
 
     // Test the underlying service logic directly

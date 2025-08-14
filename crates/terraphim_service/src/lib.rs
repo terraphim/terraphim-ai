@@ -70,7 +70,12 @@ impl<'a> TerraphimService {
             rolegraphs: &mut AHashMap<RoleName, RoleGraphSync>,
         ) -> Result<Thesaurus> {
             let config = config_state.config.lock().await;
-            let role = config.roles.get(role_name).cloned().unwrap();
+            let Some(role) = config.roles.get(role_name).cloned() else {
+                return Err(ServiceError::Config(format!(
+                    "Role '{}' not found in config",
+                    role_name
+                )));
+            };
             if let Some(kg) = &role.kg {
                 if let Some(automata_path) = &kg.automata_path {
                     log::info!("Loading Role `{}` - URL: {:?}", role_name, automata_path);
