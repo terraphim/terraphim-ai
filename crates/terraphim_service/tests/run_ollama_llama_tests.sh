@@ -46,6 +46,10 @@ echo "📋 Running comprehensive integration test..."
 cargo test --features ollama ollama_llama_integration_comprehensive -- --nocapture
 
 echo ""
+echo "📏 Running length constraint test..."
+cargo test --features ollama ollama_llama_length_constraint_test -- --nocapture
+
+echo ""
 echo "📊 Running performance test..."
 cargo test --features ollama ollama_llama_performance_test -- --nocapture
 

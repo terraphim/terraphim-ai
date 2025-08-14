@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use base64::Engine;
 use rmcp::{
     model::{
         CallToolRequestParam, CallToolResult, Content, ErrorData, ListResourcesResult,
@@ -10,6 +11,8 @@ use rmcp::{
     Error as McpError, RoleServer, ServerHandler,
 };
 use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
+use terraphim_automata::builder::json_decode;
+use terraphim_automata::matcher::{find_matches, replace_matches, extract_paragraphs_from_automata};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
@@ -536,6 +539,573 @@ impl McpService {
             Ok(CallToolResult::error(vec![error_content]))
         }
     }
+
+    /// Fuzzy autocomplete search using Jaro-Winkler similarity (explicit)
+    pub async fn fuzzy_autocomplete_search_jaro_winkler(
+        &self,
+        query: String,
+        similarity: Option<f64>,
+        limit: Option<usize>,
+    ) -> Result<CallToolResult, McpError> {
+        let autocomplete_lock = self.autocomplete_index.read().await;
+
+        if let Some(ref index) = *autocomplete_lock {
+            let min_similarity = similarity.unwrap_or(0.6);
+            let max_results = limit.unwrap_or(10);
+
+                            match terraphim_automata::fuzzy_autocomplete_search(
+                index,
+                &query,
+                min_similarity,
+                Some(max_results),
+            ) {
+                Ok(results) => {
+                    let mut contents = Vec::new();
+                    let summary = format!(
+                        "Found {} Jaro-Winkler autocomplete suggestions for '{}'",
+                        results.len(),
+                        query
+                    );
+                    contents.push(Content::text(summary));
+
+                    for result in results {
+                        let suggestion = format!("• {} (score: {:.3})", result.term, result.score);
+                        contents.push(Content::text(suggestion));
+                    }
+
+                    Ok(CallToolResult::success(contents))
+                }
+                Err(e) => {
+                    error!("Jaro-Winkler autocomplete search failed: {}", e);
+                    let error_content =
+                        Content::text(format!("Jaro-Winkler autocomplete search failed: {}", e));
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+        } else {
+            let error_content = Content::text(
+                "Autocomplete index not built. Please run 'build_autocomplete_index' first."
+                    .to_string(),
+            );
+            Ok(CallToolResult::error(vec![error_content]))
+        }
+    }
+
+    /// Serialize autocomplete index to bytes for storage/transmission
+    pub async fn serialize_autocomplete_index(&self) -> Result<CallToolResult, McpError> {
+        let autocomplete_lock = self.autocomplete_index.read().await;
+
+        if let Some(ref index) = *autocomplete_lock {
+            match terraphim_automata::serialize_autocomplete_index(index) {
+                Ok(bytes) => {
+                    let mut contents = Vec::new();
+                    contents.push(Content::text(format!(
+                        "Successfully serialized autocomplete index to {} bytes",
+                        bytes.len()
+                    )));
+                    
+                    // Convert bytes to base64 for text representation
+                    let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                    contents.push(Content::text("Base64 encoded data:".to_string()));
+                    contents.push(Content::text(base64_data));
+
+                    Ok(CallToolResult::success(contents))
+                }
+                Err(e) => {
+                    error!("Serialize autocomplete index failed: {}", e);
+                    let error_content = Content::text(format!("Serialize autocomplete index failed: {}", e));
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+        } else {
+            let error_content = Content::text(
+                "Autocomplete index not built. Please run 'build_autocomplete_index' first."
+                    .to_string(),
+            );
+            Ok(CallToolResult::error(vec![error_content]))
+        }
+    }
+
+    /// Deserialize autocomplete index from bytes
+    pub async fn deserialize_autocomplete_index(
+        &self,
+        base64_data: String,
+    ) -> Result<CallToolResult, McpError> {
+        // Decode base64 data
+        let bytes = match base64::engine::general_purpose::STANDARD.decode(&base64_data) {
+            Ok(data) => data,
+            Err(e) => {
+                let error_content = Content::text(format!("Invalid base64 data: {}", e));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+        };
+
+        match terraphim_automata::deserialize_autocomplete_index(&bytes) {
+            Ok(index) => {
+                // Store the deserialized index
+                let mut autocomplete_lock = self.autocomplete_index.write().await;
+                *autocomplete_lock = Some(index);
+
+                let mut contents = Vec::new();
+                contents.push(Content::text(format!(
+                    "Successfully deserialized autocomplete index with {} terms",
+                    autocomplete_lock.as_ref().unwrap().len()
+                )));
+
+                Ok(CallToolResult::success(contents))
+            }
+            Err(e) => {
+                error!("Deserialize autocomplete index failed: {}", e);
+                let error_content = Content::text(format!("Deserialize autocomplete index failed: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Find all term matches in text using Aho-Corasick algorithm
+    pub async fn find_matches(
+        &self,
+        text: String,
+        role: Option<String>,
+        return_positions: Option<bool>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut service = self
+            .terraphim_service()
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+
+        // Load thesaurus for the role
+        match service.ensure_thesaurus_loaded(&role_name).await {
+            Ok(thesaurus_data) => {
+                if thesaurus_data.is_empty() {
+                    let error_content = Content::text(format!(
+                        "No thesaurus data available for role '{}'. Please ensure the role has a properly configured and loaded knowledge graph.",
+                        role_name
+                    ));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                let return_pos = return_positions.unwrap_or(false);
+                
+                match find_matches(&text, thesaurus_data, return_pos) {
+                    Ok(matches) => {
+                        let mut contents = Vec::new();
+                        let summary = format!(
+                            "Found {} term matches in text for role '{}'",
+                            matches.len(),
+                            role_name
+                        );
+                        contents.push(Content::text(summary));
+
+                        for (_idx, matched) in matches.iter().enumerate() {
+                            let match_info = if return_pos {
+                                if let Some((start, end)) = matched.pos {
+                                    format!("• {} (pos: {}-{})", matched.term, start, end)
+                                } else {
+                                    format!("• {} (no position)", matched.term)
+                                }
+                            } else {
+                                format!("• {}", matched.term)
+                            };
+                            contents.push(Content::text(match_info));
+                        }
+
+                        Ok(CallToolResult::success(contents))
+                    }
+                    Err(e) => {
+                        error!("Find matches failed: {}", e);
+                        let error_content = Content::text(format!("Find matches failed: {}", e));
+                        Ok(CallToolResult::error(vec![error_content]))
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to load thesaurus for role '{}': {}", role_name, e);
+                let error_content = Content::text(format!(
+                    "Failed to load thesaurus for role '{}': {}. Please ensure the role has a valid knowledge graph configuration.",
+                    role_name, e
+                ));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Replace matched terms in text with links using specified format
+    pub async fn replace_matches(
+        &self,
+        text: String,
+        role: Option<String>,
+        link_type: String,
+    ) -> Result<CallToolResult, McpError> {
+        let mut service = self
+            .terraphim_service()
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+
+        // Parse link type
+        let link_type_enum = match link_type.to_lowercase().as_str() {
+            "wiki" | "wikilinks" => terraphim_automata::LinkType::WikiLinks,
+            "html" | "htmllinks" => terraphim_automata::LinkType::HTMLLinks,
+            "markdown" | "md" => terraphim_automata::LinkType::MarkdownLinks,
+            _ => {
+                let error_content = Content::text(format!(
+                    "Invalid link type '{}'. Supported types: wiki, html, markdown",
+                    link_type
+                ));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+        };
+
+        // Load thesaurus for the role
+        match service.ensure_thesaurus_loaded(&role_name).await {
+            Ok(thesaurus_data) => {
+                if thesaurus_data.is_empty() {
+                    let error_content = Content::text(format!(
+                        "No thesaurus data available for role '{}'. Please ensure the role has a properly configured and loaded knowledge graph.",
+                        role_name
+                    ));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                match replace_matches(&text, thesaurus_data, link_type_enum) {
+                    Ok(replaced_bytes) => {
+                        let replaced_text = String::from_utf8(replaced_bytes)
+                            .unwrap_or_else(|_| "Binary output (non-UTF8)".to_string());
+                        
+                        let mut contents = Vec::new();
+                        contents.push(Content::text(format!(
+                            "Successfully replaced terms in text for role '{}' using {} format",
+                            role_name, link_type
+                        )));
+                        contents.push(Content::text("Replaced text:".to_string()));
+                        contents.push(Content::text(replaced_text));
+
+                        Ok(CallToolResult::success(contents))
+                    }
+                    Err(e) => {
+                        error!("Replace matches failed: {}", e);
+                        let error_content = Content::text(format!("Replace matches failed: {}", e));
+                        Ok(CallToolResult::error(vec![error_content]))
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to load thesaurus for role '{}': {}", role_name, e);
+                let error_content = Content::text(format!(
+                    "Failed to load thesaurus for role '{}': {}. Please ensure the role has a valid knowledge graph configuration.",
+                    role_name, e
+                ));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Extract paragraphs containing matched terms from text
+    pub async fn extract_paragraphs_from_automata(
+        &self,
+        text: String,
+        role: Option<String>,
+        include_term: Option<bool>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut service = self
+            .terraphim_service()
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+
+        // Load thesaurus for the role
+        match service.ensure_thesaurus_loaded(&role_name).await {
+            Ok(thesaurus_data) => {
+                if thesaurus_data.is_empty() {
+                    let error_content = Content::text(format!(
+                        "No thesaurus data available for role '{}'. Please ensure the role has a properly configured and loaded knowledge graph.",
+                        role_name
+                    ));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                let include_term_bool = include_term.unwrap_or(true);
+                
+                match extract_paragraphs_from_automata(&text, thesaurus_data, include_term_bool) {
+                    Ok(paragraphs) => {
+                        let mut contents = Vec::new();
+                        let summary = format!(
+                            "Extracted {} paragraphs containing matched terms for role '{}'",
+                            paragraphs.len(),
+                            role_name
+                        );
+                        contents.push(Content::text(summary));
+
+                        for (idx, (matched, paragraph)) in paragraphs.iter().enumerate() {
+                            let match_info = format!("Match {}: {}", idx + 1, matched.term);
+                            contents.push(Content::text(match_info));
+                            contents.push(Content::text(format!("Paragraph: {}", paragraph)));
+                            contents.push(Content::text("---".to_string()));
+                        }
+
+                        Ok(CallToolResult::success(contents))
+                    }
+                    Err(e) => {
+                        error!("Extract paragraphs failed: {}", e);
+                        let error_content = Content::text(format!("Extract paragraphs failed: {}", e));
+                        Ok(CallToolResult::error(vec![error_content]))
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to load thesaurus for role '{}': {}", role_name, e);
+                let error_content = Content::text(format!(
+                    "Failed to load thesaurus for role '{}': {}. Please ensure the role has a valid knowledge graph configuration.",
+                    role_name, e
+                ));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Parse Logseq JSON output using terraphim_automata
+    pub async fn json_decode(
+        &self,
+        jsonlines: String,
+    ) -> Result<CallToolResult, McpError> {
+        match json_decode(&jsonlines) {
+            Ok(messages) => {
+                let mut contents = Vec::new();
+                let summary = format!("Successfully parsed {} Logseq messages", messages.len());
+                contents.push(Content::text(summary));
+
+                for (idx, message) in messages.iter().enumerate() {
+                    let message_info = format!("Message {}: {:?}", idx + 1, message);
+                    contents.push(Content::text(message_info));
+                }
+
+                Ok(CallToolResult::success(contents))
+            }
+            Err(e) => {
+                error!("JSON decode failed: {}", e);
+                let error_content = Content::text(format!("JSON decode failed: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Load thesaurus from automata path (local file or remote URL)
+    pub async fn load_thesaurus(
+        &self,
+        automata_path: String,
+    ) -> Result<CallToolResult, McpError> {
+        // Parse the automata path
+        let path = if automata_path.starts_with("http://") || automata_path.starts_with("https://") {
+            terraphim_automata::AutomataPath::from_remote(&automata_path)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+        } else {
+            terraphim_automata::AutomataPath::from_local(&automata_path)
+        };
+
+        match terraphim_automata::load_thesaurus(&path).await {
+            Ok(thesaurus) => {
+                let mut contents = Vec::new();
+                let summary = format!(
+                    "Successfully loaded thesaurus from '{}' with {} terms",
+                    automata_path,
+                    thesaurus.len()
+                );
+                contents.push(Content::text(summary));
+
+                // Show first few terms as preview
+                let preview_terms: Vec<_> = thesaurus.keys().take(10).collect();
+                if !preview_terms.is_empty() {
+                    contents.push(Content::text("Preview of terms:".to_string()));
+                    for term in preview_terms {
+                        let normalized = thesaurus.get(term).unwrap();
+                        let term_info = format!("• {} -> {}", term, normalized.value);
+                        contents.push(Content::text(term_info));
+                    }
+                    if thesaurus.len() > 10 {
+                        contents.push(Content::text(format!("... and {} more terms", thesaurus.len() - 10)));
+                    }
+                }
+
+                Ok(CallToolResult::success(contents))
+            }
+            Err(e) => {
+                error!("Load thesaurus failed: {}", e);
+                let error_content = Content::text(format!("Load thesaurus failed: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Load thesaurus from JSON string
+    pub async fn load_thesaurus_from_json(
+        &self,
+        json_str: String,
+    ) -> Result<CallToolResult, McpError> {
+        match terraphim_automata::load_thesaurus_from_json(&json_str) {
+            Ok(thesaurus) => {
+                let mut contents = Vec::new();
+                let summary = format!(
+                    "Successfully loaded thesaurus from JSON with {} terms",
+                    thesaurus.len()
+                );
+                contents.push(Content::text(summary));
+
+                // Show first few terms as preview
+                let preview_terms: Vec<_> = thesaurus.keys().take(10).collect();
+                if !preview_terms.is_empty() {
+                    contents.push(Content::text("Preview of terms:".to_string()));
+                    for term in preview_terms {
+                        let normalized = thesaurus.get(term).unwrap();
+                        let term_info = format!("• {} -> {}", term, normalized.value);
+                        contents.push(Content::text(term_info));
+                    }
+                    if thesaurus.len() > 10 {
+                        contents.push(Content::text(format!("... and {} more terms", thesaurus.len() - 10)));
+                    }
+                }
+
+                Ok(CallToolResult::success(contents))
+            }
+            Err(e) => {
+                error!("Load thesaurus from JSON failed: {}", e);
+                let error_content = Content::text(format!("Load thesaurus from JSON failed: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Check if all matched terms in text can be connected by a single path in the knowledge graph
+    pub async fn is_all_terms_connected_by_path(
+        &self,
+        text: String,
+        role: Option<String>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut service = self
+            .terraphim_service()
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+
+        // Check if the role exists and has proper knowledge graph configuration
+        let role_config = self.config_state.get_role(&role_name).await;
+        if let Some(role_cfg) = role_config {
+            // Check if role uses TerraphimGraph relevance function (required for knowledge graph)
+            if role_cfg.relevance_function != terraphim_types::RelevanceFunction::TerraphimGraph {
+                let error_content = Content::text(format!(
+                    "Role '{}' does not use knowledge graph ranking (TerraphimGraph). Graph connectivity check is only available for roles with knowledge graph-based ranking. Current relevance function: {:?}",
+                    role_name, role_cfg.relevance_function
+                ));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+
+            // Check if role has knowledge graph configuration
+            let kg_is_properly_configured = role_cfg
+                .kg
+                .as_ref()
+                .map(|kg| kg.automata_path.is_some() || kg.knowledge_graph_local.is_some())
+                .unwrap_or(false);
+
+            if !kg_is_properly_configured {
+                let error_content = Content::text(format!(
+                    "Role '{}' does not have a properly configured knowledge graph. Graph connectivity check requires a role with defined automata_path or local knowledge graph.",
+                    role_name
+                ));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+        } else {
+            let error_content = Content::text(format!(
+                "Role '{}' not found in configuration. Available roles: {:?}",
+                role_name,
+                self.config_state.roles.keys().collect::<Vec<_>>()
+            ));
+            return Ok(CallToolResult::error(vec![error_content]));
+        }
+
+        // Load thesaurus for the role to find matches
+        match service.ensure_thesaurus_loaded(&role_name).await {
+            Ok(thesaurus_data) => {
+                if thesaurus_data.is_empty() {
+                    let error_content = Content::text(format!(
+                        "No thesaurus data available for role '{}'. Please ensure the role has a properly configured and loaded knowledge graph.",
+                        role_name
+                    ));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                // Find all term matches in the text
+                match terraphim_automata::find_matches(&text, thesaurus_data, false) {
+                    Ok(matches) => {
+                        if matches.is_empty() {
+                            let content = Content::text(format!(
+                                "No terms from role '{}' found in the provided text. Cannot check graph connectivity.",
+                                role_name
+                            ));
+                            return Ok(CallToolResult::success(vec![content]));
+                        }
+
+                        // Extract matched terms
+                        let matched_terms: Vec<String> = matches.iter().map(|m| m.term.clone()).collect();
+                        
+                        // Create a RoleGraph instance to check connectivity
+                        // For now, we'll use a simple approach by checking if we can build a graph
+                        // In a full implementation, you might want to load the actual graph structure
+                        let mut contents = Vec::new();
+                        contents.push(Content::text(format!(
+                            "Found {} matched terms in text for role '{}': {:?}",
+                            matched_terms.len(),
+                            role_name,
+                            matched_terms
+                        )));
+                        
+                        // Note: This is a placeholder implementation
+                        // The actual RoleGraph::is_all_terms_connected_by_path would need the graph structure
+                        contents.push(Content::text("Note: Graph connectivity check requires full graph structure loading. This is a preview of matched terms."));
+                        
+                        Ok(CallToolResult::success(contents))
+                    }
+                    Err(e) => {
+                        error!("Find matches failed: {}", e);
+                        let error_content = Content::text(format!("Find matches failed: {}", e));
+                        Ok(CallToolResult::error(vec![error_content]))
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to load thesaurus for role '{}': {}", role_name, e);
+                let error_content = Content::text(format!(
+                    "Failed to load thesaurus for role '{}': {}. Please ensure the role has a valid knowledge graph configuration.",
+                    role_name, e
+                ));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
 }
 
 impl ServerHandler for McpService {
@@ -656,6 +1226,76 @@ impl ServerHandler for McpService {
             let levenshtein_autocomplete_map =
                 levenshtein_autocomplete_schema.as_object().unwrap().clone();
 
+            let find_matches_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "The text to search in" },
+                    "role": { "type": "string", "description": "Optional role to filter by" },
+                    "return_positions": { "type": "boolean", "description": "Whether to return positions (default: false)" }
+                },
+                "required": ["text"]
+            });
+            let find_matches_map = find_matches_schema.as_object().unwrap().clone();
+
+            let replace_matches_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "The text to replace terms in" },
+                    "role": { "type": "string", "description": "Optional role to filter by" },
+                    "link_type": { "type": "string", "description": "The type of link to use (wiki, html, markdown)" }
+                },
+                "required": ["text", "link_type"]
+            });
+            let replace_matches_map = replace_matches_schema.as_object().unwrap().clone();
+
+            let extract_paragraphs_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "The text to extract paragraphs from" },
+                    "role": { "type": "string", "description": "Optional role to filter by" },
+                    "include_term": { "type": "boolean", "description": "Whether to include the matched term in the paragraph (default: true)" }
+                },
+                "required": ["text"]
+            });
+            let extract_paragraphs_map = extract_paragraphs_schema.as_object().unwrap().clone();
+
+            let json_decode_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "jsonlines": { "type": "string", "description": "The JSON lines string to decode" }
+                },
+                "required": ["jsonlines"]
+            });
+            let json_decode_map = json_decode_schema.as_object().unwrap().clone();
+
+            let load_thesaurus_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "automata_path": { "type": "string", "description": "The path to the automata file (local or remote URL)" }
+                },
+                "required": ["automata_path"]
+            });
+            let load_thesaurus_map = load_thesaurus_schema.as_object().unwrap().clone();
+
+            let load_thesaurus_json_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "json_str": { "type": "string", "description": "The JSON string to load thesaurus from" }
+                },
+                "required": ["json_str"]
+            });
+            let load_thesaurus_json_map = load_thesaurus_json_schema.as_object().unwrap().clone();
+
+            let is_all_terms_connected_schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "The text to check for term connectivity" },
+                    "role": { "type": "string", "description": "Optional role to use for thesaurus and graph" }
+                },
+                "required": ["text"]
+            });
+            let is_all_terms_connected_map = is_all_terms_connected_schema.as_object().unwrap().clone();
+
             let tools = vec![
                 Tool {
                     name: "search".into(),
@@ -697,6 +1337,76 @@ impl ServerHandler for McpService {
                     name: "fuzzy_autocomplete_search_levenshtein".into(),
                     description: Some("Perform fuzzy autocomplete search using Levenshtein distance (baseline comparison algorithm)".into()),
                     input_schema: Arc::new(levenshtein_autocomplete_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "fuzzy_autocomplete_search_jaro_winkler".into(),
+                    description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (explicit)".into()),
+                    input_schema: Arc::new(fuzzy_autocomplete_schema.as_object().unwrap().clone()),
+                    annotations: None,
+                },
+                Tool {
+                    name: "serialize_autocomplete_index".into(),
+                    description: Some("Serialize the current autocomplete index to a base64-encoded string for storage/transmission".into()),
+                    input_schema: Arc::new(serde_json::json!({
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }).as_object().unwrap().clone()),
+                    annotations: None,
+                },
+                Tool {
+                    name: "deserialize_autocomplete_index".into(),
+                    description: Some("Deserialize an autocomplete index from a base64-encoded string".into()),
+                    input_schema: Arc::new(serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "base64_data": { "type": "string", "description": "The base64-encoded string of the serialized index" }
+                        },
+                        "required": ["base64_data"]
+                    }).as_object().unwrap().clone()),
+                    annotations: None,
+                },
+                Tool {
+                    name: "find_matches".into(),
+                    description: Some("Find all term matches in text using Aho-Corasick algorithm".into()),
+                    input_schema: Arc::new(find_matches_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "replace_matches".into(),
+                    description: Some("Replace matched terms in text with links using specified format".into()),
+                    input_schema: Arc::new(replace_matches_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "extract_paragraphs_from_automata".into(),
+                    description: Some("Extract paragraphs containing matched terms from text".into()),
+                    input_schema: Arc::new(extract_paragraphs_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "json_decode".into(),
+                    description: Some("Parse Logseq JSON output using terraphim_automata".into()),
+                    input_schema: Arc::new(json_decode_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "load_thesaurus".into(),
+                    description: Some("Load thesaurus from a local file or remote URL".into()),
+                    input_schema: Arc::new(load_thesaurus_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "load_thesaurus_from_json".into(),
+                    description: Some("Load thesaurus from a JSON string".into()),
+                    input_schema: Arc::new(load_thesaurus_json_map),
+                    annotations: None,
+                },
+                Tool {
+                    name: "is_all_terms_connected_by_path".into(),
+                    description: Some("Check if all matched terms in text can be connected by a single path in the knowledge graph".into()),
+                    input_schema: Arc::new(is_all_terms_connected_map),
                     annotations: None,
                 }
             ];
@@ -853,6 +1563,185 @@ impl ServerHandler for McpService {
                         .map(|i| i as usize);
 
                     self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "fuzzy_autocomplete_search_jaro_winkler" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let query = arguments
+                        .get("query")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                        })?
+                        .to_string();
+
+                    let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
+
+                    let limit = arguments
+                        .get("limit")
+                        .and_then(|v| v.as_i64())
+                        .map(|i| i as usize);
+
+                    self.fuzzy_autocomplete_search_jaro_winkler(query, similarity, limit)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "serialize_autocomplete_index" => {
+                    self.serialize_autocomplete_index()
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "deserialize_autocomplete_index" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let base64_data = arguments
+                        .get("base64_data")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'base64_data' parameter".to_string(), None)
+                        })?
+                        .to_string();
+
+                    self.deserialize_autocomplete_index(base64_data)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "find_matches" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let text = arguments
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                        })?
+                        .to_string();
+                    let role = arguments
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let return_positions = arguments
+                        .get("return_positions")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    self.find_matches(text, role, Some(return_positions))
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "replace_matches" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let text = arguments
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                        })?
+                        .to_string();
+                    let role = arguments
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let link_type = arguments
+                        .get("link_type")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'link_type' parameter".to_string(), None)
+                        })?
+                        .to_string();
+
+                    self.replace_matches(text, role, link_type)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "extract_paragraphs_from_automata" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let text = arguments
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                        })?
+                        .to_string();
+                    let role = arguments
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let include_term = arguments
+                        .get("include_term")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true);
+
+                    self.extract_paragraphs_from_automata(text, role, Some(include_term))
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "json_decode" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let jsonlines = arguments
+                        .get("jsonlines")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'jsonlines' parameter".to_string(), None)
+                        })?
+                        .to_string();
+
+                    self.json_decode(jsonlines)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "load_thesaurus" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let automata_path = arguments
+                        .get("automata_path")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'automata_path' parameter".to_string(), None)
+                        })?
+                        .to_string();
+
+                    self.load_thesaurus(automata_path)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "load_thesaurus_from_json" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let json_str = arguments
+                        .get("json_str")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'json_str' parameter".to_string(), None)
+                        })?
+                        .to_string();
+
+                    self.load_thesaurus_from_json(json_str)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                }
+                "is_all_terms_connected_by_path" => {
+                    let arguments = request.arguments.unwrap_or_default();
+                    let text = arguments
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                        })?
+                        .to_string();
+                    let role = arguments
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+
+                    self.is_all_terms_connected_by_path(text, role)
                         .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)

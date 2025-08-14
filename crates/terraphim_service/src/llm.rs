@@ -163,9 +163,9 @@ impl LlmClient for OllamaClient {
     }
 
     async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String> {
-        // Craft a compact summarization instruction similar to OpenRouter path
+        // Craft a compact summarization instruction with strict length constraints
         let prompt = format!(
-            "Please provide a concise and informative summary (≈{} chars).\n\nContent:\n{}",
+            "Please provide a concise and informative summary in EXACTLY {} characters or less. Be brief and focused.\n\nContent:\n{}",
             opts.max_length, content
         );
 
@@ -207,13 +207,29 @@ impl LlmClient for OllamaClient {
 
                     match resp.json::<serde_json::Value>().await {
                         Ok(json) => {
-                            let content = json
+                            let mut content = json
                                 .get("message")
                                 .and_then(|m| m.get("content"))
                                 .and_then(|c| c.as_str())
                                 .unwrap_or("")
                                 .trim()
                                 .to_string();
+                            
+                            // Post-process to respect max_length constraint
+                            if content.len() > opts.max_length {
+                                // Try to truncate at a word boundary
+                                let truncated = if let Some(last_space) = content[..opts.max_length].rfind(' ') {
+                                    if last_space > opts.max_length * 3 / 4 { // Only truncate if we can keep most of the content
+                                        format!("{}...", &content[..last_space])
+                                    } else {
+                                        format!("{}...", &content[..opts.max_length])
+                                    }
+                                } else {
+                                    format!("{}...", &content[..opts.max_length])
+                                };
+                                content = truncated;
+                            }
+                            
                             return Ok(content);
                         }
                         Err(e) => {
