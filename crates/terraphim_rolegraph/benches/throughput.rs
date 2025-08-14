@@ -185,6 +185,14 @@ fn bench_query(c: &mut Criterion) {
     });
 }
 
+fn bench_is_all_terms_connected_by_path(c: &mut Criterion) {
+    let rolegraph = block_on(get_rolegraph());
+    let text = "Life cycle concepts ... Paradigm Map ... project planning";
+    c.bench_function("is_all_terms_connected_by_path", |b| {
+        b.iter(|| rolegraph.is_all_terms_connected_by_path(text))
+    });
+}
+
 criterion_group!(
     benches,
     bench_find_matching_node_idss,
@@ -194,6 +202,7 @@ criterion_group!(
     bench_throughput,
     bench_throughput_corpus,
     bench_query_throughput,
-    bench_query
+    bench_query,
+    bench_is_all_terms_connected_by_path
 );
 criterion_main!(benches);

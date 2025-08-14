@@ -28,6 +28,10 @@
 
 - [Paragraph Extraction](./automata-paragraph-extraction.md)
 
+## Role Graph
+
+- [Connectivity Check](./graph-connectivity.md)
+
 ## Scoring Algorithms
 
 - [Title Scorer](./scorers/Title-Scorer.md)

@@ -44,14 +44,16 @@ pub struct Logseq {
     service: LogseqService,
 }
 
-#[cfg(feature = "tokio-runtime")]
 impl ThesaurusBuilder for Logseq {
     async fn build<P: Into<PathBuf> + Send>(&self, name: String, haystack: P) -> Result<Thesaurus> {
         let haystack = haystack.into();
+        #[cfg(feature = "tokio-runtime")]
         let messages = self
             .service
             .get_raw_messages(LOGSEQ_KEY_VALUE_DELIMITER, &haystack)
             .await?;
+        #[cfg(not(feature = "tokio-runtime"))]
+        let messages: Vec<Message> = Vec::new();
         let thesaurus = index_inner(name, messages);
         Ok(thesaurus)
     }
