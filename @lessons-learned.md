@@ -1,5 +1,166 @@
 # Terraphim AI Lessons Learned
 
+## MCP Server Development and Protocol Integration (2025-01-31)
+
+### 🎯 Key Challenges and Solutions
+
+1. **MCP Protocol Implementation Complexity**
+   - **Lesson**: The `rmcp` crate requires precise trait implementation for proper method routing
+   - **Challenge**: `tools/list` method not reaching `list_tools` function despite successful protocol handshake
+   - **Evidence**: Debug prints in `list_tools` not appearing, empty tools list responses
+   - **Investigation**: Multiple approaches attempted (manual trait, macro-based, signature fixes)
+
+2. **Trait Implementation Patterns**
+   - **Lesson**: `ServerHandler` trait requires exact method signatures with proper async patterns
+   - **Correct Pattern**: `async fn list_tools(...) -> Result<ListToolsResult, ErrorData>`
+   - **Incorrect Pattern**: `fn list_tools(...) -> impl Future<Output = Result<...>>`
+   - **Solution**: Use `async fn` syntax instead of manual `impl Future` returns
+
+3. **Error Type Consistency**
+   - **Lesson**: `ErrorData` from `rmcp::model` must be used consistently across trait implementation
+   - **Challenge**: Type mismatches between `McpError` trait requirement and `ErrorData` implementation
+   - **Solution**: Import `ErrorData` from `rmcp::model` and use consistently
+
+4. **Protocol Handshake vs. Method Routing**
+   - **Lesson**: Successful protocol handshake doesn't guarantee proper method routing
+   - **Evidence**: `initialize` method works, but `tools/list` returns empty responses
+   - **Implication**: Protocol setup correct, but tool listing mechanism broken
+
+### 🔧 Technical Implementation Insights
+
+1. **MCP Tool Registration**
+```rust
+// Correct tool registration pattern
+let tools = vec![
+    Tool {
+        name: "autocomplete_terms".to_string(),
+        description: "Autocomplete terms from thesaurus".to_string(),
+        input_schema: Arc::new(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "role": {"type": "string"}
+            }
+        }).as_object().unwrap().clone()),
+    },
+    // ... more tools
+];
+```
+
+2. **Async Method Implementation**
+```rust
+// Correct async method signature
+async fn list_tools(
+    &self,
+    _params: Option<ListToolsRequestParam>,
+    _context: &Context,
+) -> Result<ListToolsResult, ErrorData> {
+    println!("DEBUG: list_tools called!"); // Debug logging
+    // ... implementation
+}
+```
+
+3. **Error Handling Strategy**
+   - Return `ErrorData` consistently across all trait methods
+   - Use proper error construction for different failure modes
+   - Maintain error context for debugging
+
+### 🚀 Performance and Reliability
+
+1. **Transport Layer Stability**
+   - **Stdio Transport**: More reliable for testing, but connection closure issues
+   - **SSE Transport**: HTTP-based, but POST endpoint routing problems
+   - **Recommendation**: Use stdio for development, SSE for production
+
+2. **Database Backend Selection**
+   - **RocksDB**: Caused locking issues in local development
+   - **OpenDAL Alternatives**: memory, dashmap, sqlite, redb provide non-locking options
+   - **Solution**: Created `settings_local_dev.toml` with OpenDAL priorities
+
+3. **Testing Strategy**
+   - **Integration Tests**: Essential for MCP protocol validation
+   - **Debug Logging**: Critical for troubleshooting routing issues
+   - **Multiple Approaches**: Test both stdio and SSE transports
+
+### 📊 Testing Best Practices
+
+1. **MCP Protocol Testing**
+```rust
+#[tokio::test]
+async fn test_tools_list_only() {
+    let mut child = Command::new("cargo")
+        .args(["run", "--bin", "terraphim_mcp_server"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn server");
+    
+    // Test protocol handshake and tools/list
+    // Verify debug output appears
+}
+```
+
+2. **Debug Output Validation**
+   - Add `println!` statements in `list_tools` function
+   - Verify output appears in test results
+   - Use `--nocapture` flag for test output
+
+3. **Transport Testing**
+   - Test both stdio and SSE transports
+   - Verify protocol handshake success
+   - Check method routing for each transport
+
+### 🎯 User Experience Considerations
+
+1. **Autocomplete Integration**
+   - **Novel Editor**: Leverage built-in autocomplete functionality
+   - **MCP Service**: Provide autocomplete suggestions via MCP tools
+   - **UI Controls**: Show autocomplete status and enable/disable controls
+
+2. **Error Reporting**
+   - Clear error messages for MCP protocol failures
+   - Graceful degradation when tools unavailable
+   - User-friendly status indicators
+
+3. **Configuration Management**
+   - Environment-specific settings (local dev vs. production)
+   - Non-locking database backends for development
+   - Easy startup scripts for local development
+
+### 🔍 Debugging Strategies
+
+1. **Protocol Level Debugging**
+   - Add debug logging to all trait methods
+   - Verify method signatures match trait requirements
+   - Check transport layer communication
+
+2. **Transport Level Debugging**
+   - Test with minimal MCP client implementations
+   - Verify protocol handshake sequence
+   - Check for connection closure issues
+
+3. **Integration Level Debugging**
+   - Test individual components in isolation
+   - Verify tool registration and routing
+   - Check error handling and response formatting
+
+### 📚 Documentation and Examples
+
+1. **MCP Implementation Guide**
+   - Document correct trait implementation patterns
+   - Provide working examples for common tools
+   - Include troubleshooting section for common issues
+
+2. **Testing Documentation**
+   - Document test setup and execution
+   - Include expected output examples
+   - Provide debugging tips and common pitfalls
+
+3. **Integration Examples**
+   - Show how to integrate with different editors
+   - Provide configuration examples
+   - Include performance optimization tips
+
 ## Enhanced QueryRs Haystack Implementation (2025-01-31)
 
 ### 🎯 Key Success Factors

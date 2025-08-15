@@ -2,16 +2,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use rmcp::transport::sse_server::{SseServer, SseServerConfig};
-use rmcp::ServiceExt;
-use std::net::SocketAddr;
+use rmcp::{ServiceExt, transport::{stdio, sse_server::{SseServer, SseServerConfig}}};
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_mcp_server::McpService;
-use tokio::io;
-use tracing_log;
-use tracing_subscriber::{self, fmt, prelude::*, EnvFilter};
+use tokio_util;
+use tracing::{info, Level};
+use tracing_subscriber;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(name = "terraphim_mcp_server")]
 #[command(about = "Terraphim MCP server with configurable profile")]
 #[command(version)]
@@ -41,50 +39,41 @@ enum ConfigProfile {
     Server,
 }
 
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to listen for ctrl+c");
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize logging
     let args = Args::parse();
-
-    // Log to a file
-    let log_dir =
-        std::env::var("TERRAPHIM_LOG_DIR").unwrap_or_else(|_| "/tmp/terraphim-logs".to_string());
-    std::fs::create_dir_all(&log_dir)?;
-    let file_appender = tracing_appender::rolling::daily(log_dir, "terraphim-mcp-server.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-    // Forward `log` crate events (used throughout library code) to `tracing`
-    let _ = tracing_log::LogTracer::init();
-
-    // Set log level based on verbose flag
-    let log_level = if args.verbose {
-        tracing::Level::INFO
+    
+    if args.verbose {
+        tracing_subscriber::fmt()
+            .with_max_level(Level::DEBUG)
+            .init();
     } else {
-        tracing::Level::WARN
-    };
-
-    let subscriber = tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(non_blocking))
-        .with(EnvFilter::from_default_env().add_directive(log_level.into()));
-
-    // If a subscriber is already set (e.g. in test harness), ignore the error.
-    let _ = subscriber.try_init();
-
-    tracing::info!(
-        "Starting Terraphim MCP server with {:?} profile",
-        args.profile
-    );
-
+        tracing_subscriber::fmt()
+            .with_max_level(Level::INFO)
+            .init();
+    }
+    
+    info!("Starting Terraphim MCP Server...");
+    info!("Args: {:?}", args);
+    
     // Build configuration based on selected profile
     let config = match args.profile {
         ConfigProfile::Desktop => {
-            tracing::info!("Using desktop configuration (Terraphim Engineer role with local KG)");
+            info!("Using desktop configuration (Terraphim Engineer role with local KG)");
             ConfigBuilder::new()
                 .build_default_desktop()
                 .build()
                 .expect("Failed to build default desktop configuration")
         }
         ConfigProfile::Server => {
-            tracing::info!("Using server configuration (Default role without KG)");
+            info!("Using server configuration (Default role without KG)");
             ConfigBuilder::new()
                 .build_default_server()
                 .build()
@@ -98,49 +87,51 @@ async fn main() -> Result<()> {
         .await
         .expect("Failed to create config state from config");
 
-    // Create the router
+    // Create the MCP service
     let service = McpService::new(Arc::new(config_state));
-    // Build autocomplete index by default in background
-    let service_clone = service.clone();
-    tokio::spawn(async move {
-        service_clone.init_autocomplete_default().await;
-    });
-    tracing::info!("Initialized Terraphim MCP service");
-
+    
     if args.sse {
-        let bind_addr: SocketAddr = args.bind.parse().expect("invalid bind address");
-        let sse_config = SseServerConfig {
-            bind: bind_addr,
+        info!("Starting SSE server on {}", args.bind);
+        
+        // Start SSE server
+        let config = SseServerConfig {
+            bind: args.bind.parse().expect("Invalid bind address"),
             sse_path: "/sse".to_string(),
             post_path: "/message".to_string(),
             ct: tokio_util::sync::CancellationToken::new(),
             sse_keep_alive: None,
         };
-        let (sse_server, router) = SseServer::new(sse_config);
 
+        let (sse_server, router) = SseServer::new(config);
         let listener = tokio::net::TcpListener::bind(sse_server.config.bind).await?;
         let ct = sse_server.config.ct.child_token();
+
         let server = axum::serve(listener, router).with_graceful_shutdown(async move {
             ct.cancelled().await;
-            tracing::info!("sse server cancelled");
+            info!("SSE server cancelled");
         });
+
         tokio::spawn(async move {
             if let Err(e) = server.await {
-                tracing::error!(error = %e, "sse server shutdown with error");
+                tracing::error!(error = %e, "SSE server shutdown with error");
             }
         });
 
-        let cancel = sse_server.with_service(move || service.clone());
-        tracing::info!("SSE MCP server started on {}", args.bind);
-        tokio::signal::ctrl_c().await?;
-        cancel.cancel();
+        let _ct = sse_server.with_service(move || service.clone());
+        
+        // Wait for shutdown signal
+        shutdown_signal().await;
     } else {
-        // Create and run MCP server using stdout/stdin transport
-        let server = service.serve((io::stdin(), io::stdout())).await?;
-        tracing::info!("MCP server initialized and ready to handle requests");
-        let reason = server.waiting().await?;
-        tracing::info!("MCP server shut down with reason: {:?}", reason);
+        info!("Starting stdio server");
+        
+        // Initialize autocomplete index by default
+        service.init_autocomplete_default().await;
+        info!("Initialized Terraphim MCP service");
+        
+        // Start stdio server
+        let mcp_service = service.serve(stdio()).await?;
+        mcp_service.waiting().await?;
     }
-
+    
     Ok(())
 }

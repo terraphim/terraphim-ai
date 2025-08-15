@@ -49,7 +49,15 @@ impl DeviceStorage {
 }
 
 async fn init_device_storage() -> Result<DeviceStorage> {
-    let settings = DeviceSettings::load_from_env_and_file(None)?;
+    // Use local dev settings by default to avoid RocksDB lock issues
+    let settings_path = std::env::var("TERRAPHIM_SETTINGS_PATH")
+        .map(|p| std::path::PathBuf::from(p))
+        .unwrap_or_else(|_| {
+            // Default to local dev settings in the same directory
+            std::path::PathBuf::from("crates/terraphim_settings/default/settings_local_dev.toml")
+        });
+    
+    let settings = DeviceSettings::load_from_env_and_file(Some(settings_path))?;
     init_device_storage_with_settings(settings).await
 }
 
