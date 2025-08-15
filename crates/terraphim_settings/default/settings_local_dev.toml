@@ -1,0 +1,20 @@
+server_hostname = "127.0.0.1:8000"
+api_endpoint="http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+default_data_path = "${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}"
+
+# Non-locking backends for local development
+[profiles.memory]
+type = "memory"
+
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/terraphim_dashmap"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"
+
+[profiles.redb]
+type = "redb"
+datadir = "/tmp/terraphim_redb"

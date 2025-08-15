@@ -120,9 +120,9 @@ impl McpService {
 
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::from(query),
+            role: Some(role_name),
             limit: limit.map(|l| l as usize),
             skip: skip.map(|s| s as usize),
-            role: Some(role_name),
         };
 
         match service.search(&search_query).await {
@@ -287,7 +287,18 @@ impl McpService {
         &self,
         query: String,
         limit: Option<usize>,
+        role: Option<String>,
     ) -> Result<CallToolResult, McpError> {
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+
+        // Check if we need to rebuild the autocomplete index for this role
+        // For now, we'll use the existing index, but in the future we could implement
+        // role-specific indices or rebuild when the role changes
         let autocomplete_lock = self.autocomplete_index.read().await;
         if let Some(ref index) = *autocomplete_lock {
             let max_results = limit.unwrap_or(10);
@@ -368,8 +379,18 @@ impl McpService {
         &self,
         query: String,
         limit: Option<usize>,
+        role: Option<String>,
     ) -> Result<CallToolResult, McpError> {
+        // Determine which role to use (provided role or selected role)
+        let role_name = if let Some(role_str) = role {
+            RoleName::from(role_str)
+        } else {
+            self.config_state.get_selected_role().await
+        };
+
         // We only need the terms from automata index, snippets will be pulled from documents when possible
+        // For now, we'll use the existing index, but in the future we could implement
+        // role-specific indices or rebuild when the role changes
         let autocomplete_lock = self.autocomplete_index.read().await;
         if let Some(ref index) = *autocomplete_lock {
             let max_results = limit.unwrap_or(10);
@@ -404,9 +425,9 @@ impl McpService {
             for r in results.into_iter().take(max_results) {
                 let sq = SearchQuery {
                     search_term: NormalizedTermValue::from(r.term.clone()),
-                    skip: Some(0),
-                    limit: Some(1),
                     role: None,
+                    limit: Some(1),
+                    skip: Some(0),
                 };
                 let snippet = match service.search(&sq).await {
                     Ok(docs) if !docs.is_empty() => {
@@ -1109,312 +1130,333 @@ impl McpService {
 }
 
 impl ServerHandler for McpService {
-    fn list_tools(
+    async fn initialize(
+        &self,
+        request: rmcp::model::InitializeRequestParam,
+        context: RequestContext<RoleServer>,
+    ) -> Result<rmcp::model::InitializeResult, ErrorData> {
+        if context.peer.peer_info().is_none() {
+            context.peer.set_peer_info(request);
+        }
+        Ok(self.get_info())
+    }
+
+    async fn list_tools(
         &self,
         _request: Option<rmcp::model::PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
-        async move {
-            // Convert JSON values to Arc<Map<String, Value>> for input_schema
-            let search_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query"
-                    },
-                    "role": {
-                        "type": "string",
-                        "description": "Optional role to filter by"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of results to return"
-                    },
-                    "skip": {
-                        "type": "integer",
-                        "description": "Number of results to skip"
-                    }
+    ) -> Result<ListToolsResult, ErrorData> {
+        tracing::debug!("list_tools function called!");
+        
+        // Convert JSON values to Arc<Map<String, Value>> for input_schema
+        let search_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query"
                 },
-                "required": ["query"]
-            });
-            let search_map = search_schema.as_object().unwrap().clone();
-
-            let config_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "config_str": {
-                        "type": "string",
-                        "description": "JSON configuration string"
-                    }
+                "role": {
+                    "type": "string",
+                    "description": "Optional role to filter by"
                 },
-                "required": ["config_str"]
-            });
-            let config_map = config_schema.as_object().unwrap().clone();
-
-            let build_autocomplete_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "role": {
-                        "type": "string",
-                        "description": "Optional role name to build autocomplete index for. If not provided, uses the currently selected role."
-                    }
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return"
                 },
-                "required": []
-            });
-            let build_autocomplete_map = build_autocomplete_schema.as_object().unwrap().clone();
-
-            let autocomplete_terms_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string", "description": "Prefix or term for suggestions" },
-                    "limit": { "type": "integer", "description": "Max suggestions (default 10)" }
-                },
-                "required": ["query"]
-            });
-            let autocomplete_terms_map = autocomplete_terms_schema.as_object().unwrap().clone();
-
-            let autocomplete_snippets_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string", "description": "Prefix or term for suggestions with snippets" },
-                    "limit": { "type": "integer", "description": "Max suggestions (default 10)" }
-                },
-                "required": ["query"]
-            });
-            let autocomplete_snippets_map =
-                autocomplete_snippets_schema.as_object().unwrap().clone();
-
-            let fuzzy_autocomplete_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The text to get autocomplete suggestions for"
-                    },
-                    "similarity": {
-                        "type": "number",
-                        "description": "Minimum Jaro-Winkler similarity threshold (0.0-1.0, default: 0.6)"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of suggestions to return (default: 10)"
-                    }
-                },
-                "required": ["query"]
-            });
-            let fuzzy_autocomplete_map = fuzzy_autocomplete_schema.as_object().unwrap().clone();
-
-            let levenshtein_autocomplete_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The text to get autocomplete suggestions for"
-                    },
-                    "max_edit_distance": {
-                        "type": "integer",
-                        "description": "Maximum Levenshtein edit distance allowed (default: 2)"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of suggestions to return (default: 10)"
-                    }
-                },
-                "required": ["query"]
-            });
-            let levenshtein_autocomplete_map =
-                levenshtein_autocomplete_schema.as_object().unwrap().clone();
-
-            let find_matches_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "text": { "type": "string", "description": "The text to search in" },
-                    "role": { "type": "string", "description": "Optional role to filter by" },
-                    "return_positions": { "type": "boolean", "description": "Whether to return positions (default: false)" }
-                },
-                "required": ["text"]
-            });
-            let find_matches_map = find_matches_schema.as_object().unwrap().clone();
-
-            let replace_matches_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "text": { "type": "string", "description": "The text to replace terms in" },
-                    "role": { "type": "string", "description": "Optional role to filter by" },
-                    "link_type": { "type": "string", "description": "The type of link to use (wiki, html, markdown)" }
-                },
-                "required": ["text", "link_type"]
-            });
-            let replace_matches_map = replace_matches_schema.as_object().unwrap().clone();
-
-            let extract_paragraphs_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "text": { "type": "string", "description": "The text to extract paragraphs from" },
-                    "role": { "type": "string", "description": "Optional role to filter by" },
-                    "include_term": { "type": "boolean", "description": "Whether to include the matched term in the paragraph (default: true)" }
-                },
-                "required": ["text"]
-            });
-            let extract_paragraphs_map = extract_paragraphs_schema.as_object().unwrap().clone();
-
-            let json_decode_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "jsonlines": { "type": "string", "description": "The JSON lines string to decode" }
-                },
-                "required": ["jsonlines"]
-            });
-            let json_decode_map = json_decode_schema.as_object().unwrap().clone();
-
-            let load_thesaurus_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "automata_path": { "type": "string", "description": "The path to the automata file (local or remote URL)" }
-                },
-                "required": ["automata_path"]
-            });
-            let load_thesaurus_map = load_thesaurus_schema.as_object().unwrap().clone();
-
-            let load_thesaurus_json_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "json_str": { "type": "string", "description": "The JSON string to load thesaurus from" }
-                },
-                "required": ["json_str"]
-            });
-            let load_thesaurus_json_map = load_thesaurus_json_schema.as_object().unwrap().clone();
-
-            let is_all_terms_connected_schema = serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "text": { "type": "string", "description": "The text to check for term connectivity" },
-                    "role": { "type": "string", "description": "Optional role to use for thesaurus and graph" }
-                },
-                "required": ["text"]
-            });
-            let is_all_terms_connected_map = is_all_terms_connected_schema.as_object().unwrap().clone();
-
-            let tools = vec![
-                Tool {
-                    name: "search".into(),
-                    description: Some("Search for documents in the Terraphim knowledge graph".into()),
-                    input_schema: Arc::new(search_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "update_config_tool".into(),
-                    description: Some("Update the Terraphim configuration".into()),
-                    input_schema: Arc::new(config_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "build_autocomplete_index".into(),
-                    description: Some("Build FST-based autocomplete index from role's knowledge graph. Only available for roles with TerraphimGraph relevance function and configured knowledge graph.".into()),
-                    input_schema: Arc::new(build_autocomplete_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "fuzzy_autocomplete_search".into(),
-                    description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (default, faster and higher quality)".into()),
-                    input_schema: Arc::new(fuzzy_autocomplete_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "autocomplete_terms".into(),
-                    description: Some("Autocomplete terms using FST prefix + fuzzy fallback".into()),
-                    input_schema: Arc::new(autocomplete_terms_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "autocomplete_with_snippets".into(),
-                    description: Some("Autocomplete and return short snippets from matching documents".into()),
-                    input_schema: Arc::new(autocomplete_snippets_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "fuzzy_autocomplete_search_levenshtein".into(),
-                    description: Some("Perform fuzzy autocomplete search using Levenshtein distance (baseline comparison algorithm)".into()),
-                    input_schema: Arc::new(levenshtein_autocomplete_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "fuzzy_autocomplete_search_jaro_winkler".into(),
-                    description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (explicit)".into()),
-                    input_schema: Arc::new(fuzzy_autocomplete_schema.as_object().unwrap().clone()),
-                    annotations: None,
-                },
-                Tool {
-                    name: "serialize_autocomplete_index".into(),
-                    description: Some("Serialize the current autocomplete index to a base64-encoded string for storage/transmission".into()),
-                    input_schema: Arc::new(serde_json::json!({
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }).as_object().unwrap().clone()),
-                    annotations: None,
-                },
-                Tool {
-                    name: "deserialize_autocomplete_index".into(),
-                    description: Some("Deserialize an autocomplete index from a base64-encoded string".into()),
-                    input_schema: Arc::new(serde_json::json!({
-                        "type": "object",
-                        "properties": {
-                            "base64_data": { "type": "string", "description": "The base64-encoded string of the serialized index" }
-                        },
-                        "required": ["base64_data"]
-                    }).as_object().unwrap().clone()),
-                    annotations: None,
-                },
-                Tool {
-                    name: "find_matches".into(),
-                    description: Some("Find all term matches in text using Aho-Corasick algorithm".into()),
-                    input_schema: Arc::new(find_matches_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "replace_matches".into(),
-                    description: Some("Replace matched terms in text with links using specified format".into()),
-                    input_schema: Arc::new(replace_matches_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "extract_paragraphs_from_automata".into(),
-                    description: Some("Extract paragraphs containing matched terms from text".into()),
-                    input_schema: Arc::new(extract_paragraphs_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "json_decode".into(),
-                    description: Some("Parse Logseq JSON output using terraphim_automata".into()),
-                    input_schema: Arc::new(json_decode_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "load_thesaurus".into(),
-                    description: Some("Load thesaurus from a local file or remote URL".into()),
-                    input_schema: Arc::new(load_thesaurus_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "load_thesaurus_from_json".into(),
-                    description: Some("Load thesaurus from a JSON string".into()),
-                    input_schema: Arc::new(load_thesaurus_json_map),
-                    annotations: None,
-                },
-                Tool {
-                    name: "is_all_terms_connected_by_path".into(),
-                    description: Some("Check if all matched terms in text can be connected by a single path in the knowledge graph".into()),
-                    input_schema: Arc::new(is_all_terms_connected_map),
-                    annotations: None,
+                "skip": {
+                    "type": "integer",
+                    "description": "Number of results to skip"
                 }
-            ];
-            Ok(ListToolsResult {
-                tools,
-                next_cursor: None,
-            })
-        }
+            },
+            "required": ["query"]
+        });
+        let search_map = search_schema.as_object().unwrap().clone();
+
+        let config_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "config_str": {
+                    "type": "string",
+                    "description": "JSON configuration string"
+                }
+            },
+            "required": ["config_str"]
+        });
+        let config_map = config_schema.as_object().unwrap().clone();
+
+        let build_autocomplete_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string",
+                    "description": "Optional role name to build autocomplete index for. If not provided, uses the currently selected role."
+                }
+            },
+            "required": []
+        });
+        let build_autocomplete_map = build_autocomplete_schema.as_object().unwrap().clone();
+
+        let autocomplete_terms_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": { "type": "string", "description": "Prefix or term for suggestions" },
+                "limit": { "type": "integer", "description": "Max suggestions (default 10)" },
+                "role": { "type": "string", "description": "Optional role name to use for autocomplete. If not provided, uses the currently selected role." }
+            },
+            "required": ["query"]
+        });
+        let autocomplete_terms_map = autocomplete_terms_schema.as_object().unwrap().clone();
+
+        let autocomplete_snippets_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": { "type": "string", "description": "Prefix or term for suggestions with snippets" },
+                "limit": { "type": "integer", "description": "Max suggestions (default 10)" },
+                "role": { "type": "string", "description": "Optional role name to use for autocomplete. If not provided, uses the currently selected role." }
+            },
+            "required": ["query"]
+        });
+        let autocomplete_snippets_map =
+            autocomplete_snippets_schema.as_object().unwrap().clone();
+
+        let fuzzy_autocomplete_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The text to get autocomplete suggestions for"
+                },
+                "similarity": {
+                    "type": "number",
+                    "description": "Minimum Jaro-Winkler similarity threshold (0.0-1.0, default: 0.6)"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of suggestions to return (default: 10)"
+                }
+            },
+            "required": ["query"]
+        });
+        let fuzzy_autocomplete_map = fuzzy_autocomplete_schema.as_object().unwrap().clone();
+
+        let levenshtein_autocomplete_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The text to get autocomplete suggestions for"
+                },
+                "max_edit_distance": {
+                    "type": "integer",
+                    "description": "Maximum Levenshtein edit distance allowed (default: 2)"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of suggestions to return (default: 10)"
+                }
+            },
+            "required": ["query"]
+        });
+        let levenshtein_autocomplete_map =
+            levenshtein_autocomplete_schema.as_object().unwrap().clone();
+
+        let find_matches_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "text": { "type": "string", "description": "The text to search in" },
+                "role": { "type": "string", "description": "Optional role to filter by" },
+                "return_positions": { "type": "boolean", "description": "Whether to return positions (default: false)" }
+            },
+            "required": ["text"]
+        });
+        let find_matches_map = find_matches_schema.as_object().unwrap().clone();
+
+        let replace_matches_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "text": { "type": "string", "description": "The text to replace terms in" },
+                "role": { "type": "string", "description": "Optional role to filter by" },
+                "link_type": { "type": "string", "description": "The type of link to use (wiki, html, markdown)" }
+            },
+            "required": ["text", "link_type"]
+        });
+        let replace_matches_map = replace_matches_schema.as_object().unwrap().clone();
+
+        let extract_paragraphs_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "text": { "type": "string", "description": "The text to extract paragraphs from" },
+                "role": { "type": "string", "description": "Optional role to filter by" },
+                "include_term": { "type": "boolean", "description": "Whether to include the matched term in the paragraph (default: true)" }
+            },
+            "required": ["text"]
+        });
+        let extract_paragraphs_map = extract_paragraphs_schema.as_object().unwrap().clone();
+
+        let json_decode_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "jsonlines": { "type": "string", "description": "The JSON lines string to decode" }
+            },
+            "required": ["jsonlines"]
+        });
+        let json_decode_map = json_decode_schema.as_object().unwrap().clone();
+
+        let load_thesaurus_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "automata_path": { "type": "string", "description": "The path to the automata file (local or remote URL)" }
+            },
+            "required": ["automata_path"]
+        });
+        let load_thesaurus_map = load_thesaurus_schema.as_object().unwrap().clone();
+
+        let load_thesaurus_json_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "json_str": { "type": "string", "description": "The JSON string to load thesaurus from" }
+            },
+            "required": ["json_str"]
+        });
+        let load_thesaurus_json_map = load_thesaurus_json_schema.as_object().unwrap().clone();
+
+        let is_all_terms_connected_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "text": { "type": "string", "description": "The text to check for term connectivity" },
+                "role": { "type": "string", "description": "Optional role to use for thesaurus and graph" }
+            },
+            "required": ["text"]
+        });
+        let is_all_terms_connected_map = is_all_terms_connected_schema.as_object().unwrap().clone();
+
+        let tools = vec![
+            Tool {
+                name: "search".into(),
+                description: Some("Search for documents in the Terraphim knowledge graph".into()),
+                input_schema: Arc::new(search_map),
+                annotations: None,
+            },
+            Tool {
+                name: "update_config_tool".into(),
+                description: Some("Update the Terraphim configuration".into()),
+                input_schema: Arc::new(config_map),
+                annotations: None,
+            },
+            Tool {
+                name: "build_autocomplete_index".into(),
+                description: Some("Build FST-based autocomplete index from role's knowledge graph. Only available for roles with TerraphimGraph relevance function and configured knowledge graph.".into()),
+                input_schema: Arc::new(build_autocomplete_map),
+                annotations: None,
+            },
+            Tool {
+                name: "fuzzy_autocomplete_search".into(),
+                description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (default, faster and higher quality)".into()),
+                input_schema: Arc::new(fuzzy_autocomplete_map),
+                annotations: None,
+            },
+            Tool {
+                name: "autocomplete_terms".into(),
+                description: Some("Autocomplete terms using FST prefix + fuzzy fallback".into()),
+                input_schema: Arc::new(autocomplete_terms_map),
+                annotations: None,
+            },
+            Tool {
+                name: "autocomplete_with_snippets".into(),
+                description: Some("Autocomplete and return short snippets from matching documents".into()),
+                input_schema: Arc::new(autocomplete_snippets_map),
+                annotations: None,
+            },
+            Tool {
+                name: "fuzzy_autocomplete_search_levenshtein".into(),
+                description: Some("Perform fuzzy autocomplete search using Levenshtein distance (baseline comparison algorithm)".into()),
+                input_schema: Arc::new(levenshtein_autocomplete_map),
+                annotations: None,
+            },
+            Tool {
+                name: "fuzzy_autocomplete_search_jaro_winkler".into(),
+                description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (explicit)".into()),
+                input_schema: Arc::new(fuzzy_autocomplete_schema.as_object().unwrap().clone()),
+                annotations: None,
+            },
+            Tool {
+                name: "serialize_autocomplete_index".into(),
+                description: Some("Serialize the current autocomplete index to a base64-encoded string for storage/transmission".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }).as_object().unwrap().clone()),
+                annotations: None,
+            },
+            Tool {
+                name: "deserialize_autocomplete_index".into(),
+                description: Some("Deserialize an autocomplete index from a base64-encoded string".into()),
+                input_schema: Arc::new(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "base64_data": { "type": "string", "description": "The base64-encoded string of the serialized index" }
+                    },
+                    "required": ["base64_data"]
+                }).as_object().unwrap().clone()),
+                annotations: None,
+            },
+            Tool {
+                name: "find_matches".into(),
+                description: Some("Find all term matches in text using Aho-Corasick algorithm".into()),
+                input_schema: Arc::new(find_matches_map),
+                annotations: None,
+            },
+            Tool {
+                name: "replace_matches".into(),
+                description: Some("Replace matched terms in text with links using specified format".into()),
+                input_schema: Arc::new(replace_matches_map),
+                annotations: None,
+            },
+            Tool {
+                name: "extract_paragraphs_from_automata".into(),
+                description: Some("Extract paragraphs containing matched terms from text".into()),
+                input_schema: Arc::new(extract_paragraphs_map),
+                annotations: None,
+            },
+            Tool {
+                name: "json_decode".into(),
+                description: Some("Parse Logseq JSON output using terraphim_automata".into()),
+                input_schema: Arc::new(json_decode_map),
+                annotations: None,
+            },
+            Tool {
+                name: "load_thesaurus".into(),
+                description: Some("Load thesaurus from a local file or remote URL".into()),
+                input_schema: Arc::new(load_thesaurus_map.clone()),
+                annotations: None,
+            },
+            Tool {
+                name: "load_thesaurus_from_json".into(),
+                description: Some("Load thesaurus from a JSON string".into()),
+                input_schema: Arc::new(load_thesaurus_json_map),
+                annotations: None,
+            },
+            Tool {
+                name: "is_all_terms_connected_by_path".into(),
+                description: Some("Check if all matched terms in text can be connected by a single path in the knowledge graph".into()),
+                input_schema: Arc::new(is_all_terms_connected_map),
+                annotations: None,
+            }
+        ];
+        
+        tracing::debug!("Created {} tools", tools.len());
+        tracing::debug!("First tool name: {:?}", tools.first().map(|t| &t.name));
+        
+        let result = ListToolsResult {
+            tools,
+            next_cursor: None,
+        };
+        
+        tracing::debug!("Returning ListToolsResult with {} tools", result.tools.len());
+        
+        Ok(result)
     }
 
     fn call_tool(
@@ -1519,7 +1561,11 @@ impl ServerHandler for McpService {
                         .get("limit")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as usize);
-                    self.autocomplete_terms(query, limit)
+                    let role = arguments
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    self.autocomplete_terms(query, limit, role)
                         .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
@@ -1537,7 +1583,11 @@ impl ServerHandler for McpService {
                         .get("limit")
                         .and_then(|v| v.as_i64())
                         .map(|i| i as usize);
-                    self.autocomplete_with_snippets(query, limit)
+                    let role = arguments
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    self.autocomplete_with_snippets(query, limit, role)
                         .await
                         .map_err(TerraphimMcpError::Mcp)
                         .map_err(ErrorData::from)
@@ -1838,38 +1888,36 @@ impl ServerHandler for McpService {
         }
     }
 
-    fn read_resource(
+    async fn read_resource(
         &self,
         request: ReadResourceRequestParam,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ReadResourceResult, ErrorData>> + Send + '_ {
-        async move {
-            let doc_id = self
+    ) -> Result<ReadResourceResult, ErrorData> {
+        let doc_id = self
+            .resource_mapper
+            .uri_to_id(&request.uri)
+            .map_err(TerraphimMcpError::Anyhow)?;
+        let mut service = self
+            .terraphim_service()
+            .await
+            .map_err(|e| TerraphimMcpError::Anyhow(e))?;
+        let document = service
+            .get_document_by_id(&doc_id)
+            .await
+            .map_err(TerraphimMcpError::Service)?;
+        if let Some(doc) = document {
+            let contents = self
                 .resource_mapper
-                .uri_to_id(&request.uri)
+                .document_to_resource_contents(&doc)
                 .map_err(TerraphimMcpError::Anyhow)?;
-            let mut service = self
-                .terraphim_service()
-                .await
-                .map_err(|e| TerraphimMcpError::Anyhow(e))?;
-            let document = service
-                .get_document_by_id(&doc_id)
-                .await
-                .map_err(TerraphimMcpError::Service)?;
-            if let Some(doc) = document {
-                let contents = self
-                    .resource_mapper
-                    .document_to_resource_contents(&doc)
-                    .map_err(TerraphimMcpError::Anyhow)?;
-                Ok(ReadResourceResult {
-                    contents: vec![contents],
-                })
-            } else {
-                Err(ErrorData::resource_not_found(
-                    format!("Document not found: {}", doc_id),
-                    None,
-                ))
-            }
+            Ok(ReadResourceResult {
+                contents: vec![contents],
+            })
+        } else {
+            Err(ErrorData::resource_not_found(
+                format!("Document not found: {}", doc_id),
+                None,
+            ))
         }
     }
 
