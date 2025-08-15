@@ -528,8 +528,8 @@ async function fetchLlmModels(roleIdx: number) {
                     <div class="select is-small">
                       <select id={`ripgrep-hashtag-preset-${idx}-${hIdx}`}
                         on:change={(e)=>{
-                          const val=(e.target as HTMLSelectElement).value;
-                          if (val) { $draft.roles[idx].haystacks[hIdx].extra_parameters["tag"]=val; }
+                          const val = (e.target as HTMLSelectElement).value;
+                          if (val) { $draft.roles[idx].haystacks[hIdx].extra_parameters["tag"] = val; }
                         }}>
                         <option value="">(choose)</option>
                         <option value="#rust">#rust</option>
@@ -543,15 +543,15 @@ async function fetchLlmModels(roleIdx: number) {
                 <p class="help">When set, searches will enforce the hashtag alongside your query (AND), e.g. <code>-e "search" -e "#rust"</code>.</p>
                 {#each Object.entries($draft.roles[idx].haystacks[hIdx].extra_parameters || {}) as [paramKey, paramValue], paramIdx}
                   <div class="field is-grouped">
-                                                              <div class="control">
-                       <input 
-                         class="input" 
-                         type="text" 
-                         placeholder="Parameter name"
-                         value={paramKey}
-                         on:blur={(e) => handleParameterKeyChange(idx, hIdx, paramKey, e)}
-                       />
-                     </div>
+                    <div class="control">
+                      <input 
+                        class="input" 
+                        type="text" 
+                        placeholder="Parameter name"
+                        value={paramKey}
+                        on:blur={(e) => handleParameterKeyChange(idx, hIdx, paramKey, e)}
+                      />
+                    </div>
                     <div class="control is-expanded">
                       <input 
                         class="input" 
