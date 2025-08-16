@@ -62,7 +62,38 @@ Async Ecosystem
 - Utilize `tonic` for gRPC with async support.
 - use [salvo](https://salvo.rs/book/) for async web server and axum
 
-This document serves as your comprehensive guide for project interaction and development. Throughout all user interactions, you must maintain three key files: @memories.md for interaction history, @lessons-learned.md for knowledge retention, and @scratchpad.md for active task management.
+## Memory and Task Management
+
+Throughout all user interactions, maintain three key files:
+- **@memories.md**: Interaction history and project status
+- **@lessons-learned.md**: Knowledge retention and technical insights
+- **@scratchpad.md**: Active task management and current work
+
+## Best Practices and Development Workflow
+
+### Async Programming Patterns
+- Separate UI rendering from network operations using bounded channels
+- Use `tokio::select!` for managing multiple async tasks
+- Implement async/sync boundaries with proper channel communication
+- Prefer structured concurrency with scoped tasks
+
+### Error Handling Strategy
+- Return empty results instead of errors for network failures
+- Log warnings for debugging but maintain graceful degradation
+- Implement progressive timeout strategies (quick for health checks, longer for searches)
+- Use `Result<T, E>` propagation with fallback UI states
+
+### Testing Philosophy
+- Unit tests for individual components with `tokio::test`
+- Integration tests for cross-crate functionality
+- Live tests gated by environment variables
+- End-to-end validation with actual service calls
+
+### Configuration Management
+- Role-based configuration with sensible defaults
+- Feature flags for optional functionality
+- Environment variable overrides for deployment flexibility
+- JSON for role configs, TOML for system settings
 
 
 ## Project Overview
@@ -188,10 +219,12 @@ The system uses role-based configuration with multiple backends:
 5. Query processing with semantic expansion
 
 ### Haystack Types
-- **Ripgrep**: Local filesystem search
-- **AtomicServer**: Integration with Atomic Data
-- **ClickUp**: Task management integration
-- **Logseq**: Personal knowledge management
+- **Ripgrep**: Local filesystem search using `ripgrep` command
+- **AtomicServer**: Integration with Atomic Data protocol
+- **ClickUp**: Task management with API token authentication
+- **Logseq**: Personal knowledge management with markdown parsing
+- **QueryRs**: Rust documentation and Reddit community search
+- **MCP**: Model Context Protocol for AI tool integration
 
 ## AI Integration
 
@@ -229,9 +262,56 @@ The system uses role-based configuration with multiple backends:
 - E2E tests for full user workflows
 - Atomic server tests for external integrations
 
+## Project Structure
+
+```
+terraphim-ai/
+├── crates/                          # Core library crates
+│   ├── terraphim_automata/         # Text matching, autocomplete, thesaurus
+│   ├── terraphim_config/           # Configuration management
+│   ├── terraphim_middleware/       # Haystack indexing and search orchestration
+│   ├── terraphim_persistence/      # Storage abstraction layer
+│   ├── terraphim_rolegraph/        # Knowledge graph implementation
+│   ├── terraphim_service/          # Main service layer with AI integration
+│   ├── terraphim_settings/         # Device and server settings
+│   ├── terraphim_types/            # Shared type definitions
+│   ├── terraphim_mcp_server/       # MCP server for AI tool integration
+│   ├── terraphim_tui/              # Terminal UI implementation
+│   ├── terraphim_atomic_client/    # Atomic Data integration
+│   ├── terraphim_onepassword_cli/  # 1Password CLI integration
+│   └── terraphim-markdown-parser/  # Markdown parsing utilities
+├── terraphim_server/                # Main HTTP server binary
+│   ├── default/                    # Default configurations
+│   └── fixtures/                   # Test data and examples
+├── desktop/                         # Svelte frontend application
+│   ├── src/                        # Frontend source code
+│   ├── src-tauri/                  # Tauri desktop integration
+│   └── public/                     # Static assets
+├── lab/                            # Experimental code and prototypes
+└── docs/                           # Documentation
+
+Key Configuration Files:
+- Cargo.toml                        # Workspace configuration
+- terraphim_server/default/*.json   # Role configurations
+- desktop/package.json              # Frontend dependencies
+- crates/terraphim_settings/default/*.toml  # System settings
+```
+
 ## MCP (Model Context Protocol) Integration
 
-The system includes MCP server functionality in `crates/terraphim_mcp_server/` for integration with AI development tools.
+The system includes comprehensive MCP server functionality in `crates/terraphim_mcp_server/` for integration with AI development tools. The MCP server exposes all `terraphim_automata` and `terraphim_rolegraph` functions as MCP tools:
+
+### MCP Tools Available
+- **Autocomplete**: `autocomplete_terms`, `autocomplete_with_snippets`
+- **Text Processing**: `find_matches`, `replace_matches`, `extract_paragraphs_from_automata`
+- **Thesaurus Management**: `load_thesaurus`, `load_thesaurus_from_json`
+- **Graph Connectivity**: `is_all_terms_connected_by_path`
+- **Fuzzy Search**: `fuzzy_autocomplete_search_jaro_winkler`
+
+### MCP Transport Support
+- **stdio**: For local development and testing
+- **SSE/HTTP**: For production deployments
+- **OAuth**: Optional bearer token authentication
 
 ## Desktop Application
 
@@ -267,3 +347,155 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 - Large thesaurus files may require memory tuning
 - Search performance varies significantly by relevance function chosen
 - Consider haystack size limits for responsive search
+- Use concurrent API calls with `tokio::join!` for parallel operations
+- Implement bounded channels for backpressure in async operations
+- Virtual scrolling for large datasets in UI components
+
+## Recent Implementations and Features
+
+### Haystack Integrations
+- **QueryRs**: Reddit API + Rust std documentation search with smart type detection
+- **MCP**: Model Context Protocol with SSE/HTTP transports
+- **ClickUp**: Task management with list/team search
+- **Atomic Server**: Integration with Atomic Data protocol
+
+### LLM Support
+- **OpenRouter**: Feature-gated integration with `--features openrouter`
+- **Ollama**: Local model support with `llm_provider=ollama` in role config
+- **Generic LLM Interface**: Provider-agnostic `LlmClient` trait
+
+### Advanced Features
+- **Paragraph Extraction**: Extract paragraphs starting at matched terms
+- **Graph Path Connectivity**: Verify if matched terms connect via single path
+- **TUI Interface**: Terminal UI with hierarchical commands and ASCII graphs
+- **Autocomplete Service**: MCP-based autocomplete for Novel editor
+
+## Testing and Validation
+
+### Test Commands
+```bash
+# Run specific integration tests
+cargo test -p terraphim_service --test ollama_llama_integration_test
+cargo test -p terraphim_middleware --test query_rs_haystack_test
+cargo test -p terraphim_mcp_server --test test_tools_list
+
+# Run with features
+cargo test --features openrouter
+cargo test --features mcp-rust-sdk
+
+# Live tests (require services running)
+MCP_SERVER_URL=http://localhost:3001 cargo test mcp_haystack_test -- --ignored
+OLLAMA_BASE_URL=http://127.0.0.1:11434 cargo test ollama_live_test -- --ignored
+```
+
+### Configuration Examples
+```json
+// Role with Ollama configuration
+{
+  "name": "Llama Engineer",
+  "extra": {
+    "llm_provider": "ollama",
+    "ollama_base_url": "http://127.0.0.1:11434",
+    "ollama_model": "llama3.2:3b"
+  }
+}
+```
+
+## Known Issues and Workarounds
+
+### MCP Protocol
+- `tools/list` routing issue - debug with `--nocapture` flag
+- Use stdio transport for development, SSE for production
+
+### Database Backends
+- RocksDB can cause locking issues - use OpenDAL alternatives
+- Preferred backends: memory, dashmap, sqlite, redb
+
+### API Integration
+- QueryRs `/suggest/{query}` returns OpenSearch format
+- Reddit API ~500ms, Suggest API ~300ms response times
+- Implement graceful degradation for network failures
+
+## Critical Implementation Details
+
+### Thesaurus Format
+```json
+{
+  "id": "unique_id",
+  "nterm": "normalized_term",
+  "url": "https://example.com/resource"
+}
+```
+
+### Document Structure
+- **id**: Unique identifier
+- **url**: Resource location
+- **body**: Full text content
+- **description**: Summary or excerpt
+- **tags**: Classification labels
+- **rank**: Optional relevance score
+
+### Role Configuration Structure
+```json
+{
+  "name": "Role Name",
+  "relevance_function": "BM25|TitleScorer|TerraphimGraph",
+  "theme": "UI theme name",
+  "extra": {
+    "llm_provider": "ollama|openrouter",
+    "custom_settings": {}
+  },
+  "haystacks": [
+    {
+      "name": "Haystack Name",
+      "service": "Ripgrep|AtomicServer|QueryRs|MCP",
+      "extra_parameters": {}
+    }
+  ]
+}
+```
+
+### API Endpoints
+- `GET /health` - Server health check
+- `POST /config` - Update configuration
+- `POST /documents/search` - Search documents
+- `POST /documents/summarize` - AI summarization
+- `POST /chat` - Chat completion
+- `GET /config` - Get current configuration
+- `GET /roles` - List available roles
+
+## Quick Start Guide
+
+1. **Clone and Build**
+   ```bash
+   git clone https://github.com/terraphim/terraphim-ai
+   cd terraphim-ai
+   cargo build --release
+   ```
+
+2. **Run Backend Server**
+   ```bash
+   cargo run --release -- --config terraphim_engineer_config.json
+   ```
+
+3. **Run Frontend (separate terminal)**
+   ```bash
+   cd desktop
+   yarn install
+   yarn dev
+   ```
+
+4. **Run with Ollama Support**
+   ```bash
+   # Start Ollama first
+   ollama serve
+   
+   # Run with Ollama config
+   cargo run --release -- --config ollama_llama_config.json
+   ```
+
+5. **Run MCP Server**
+   ```bash
+   cd crates/terraphim_mcp_server
+   ./start_local_dev.sh
+   ```
