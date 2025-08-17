@@ -335,3 +335,31 @@
 - Ready for production use
 
 **Next Steps**: Ready for production deployment
+
+## ✅ Tauri Dev Server Configuration Fix - COMPLETED (2025-01-31)
+
+### Fixed Tauri Dev Server Port Configuration
+
+**Problem**: Tauri dev command was waiting for localhost:8080 instead of standard Vite dev server port 5173.
+
+**Solution**: Added missing `build` section to `desktop/src-tauri/tauri.conf.json`:
+
+```json
+{
+  "build": {
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  }
+}
+```
+
+**Result**: 
+- Before: `devPath: http://localhost:8080/` (incorrect)
+- After: `devPath: http://localhost:5173/` (correct)
+- Tauri now correctly waits for Vite dev server on port 5173
+
+**Files Modified**:
+- `desktop/src-tauri/tauri.conf.json` - Added build configuration
+- `desktop/package.json` - Added tauri scripts
+
+**Status**: ✅ **FIXED** - Tauri dev server now correctly connects to Vite dev server.

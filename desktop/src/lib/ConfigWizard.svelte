@@ -528,7 +528,7 @@ async function fetchLlmModels(roleIdx: number) {
                     <div class="select is-small">
                       <select id={`ripgrep-hashtag-preset-${idx}-${hIdx}`}
                         on:change={(e)=>{
-                          const val = (e.target as HTMLSelectElement).value;
+                          const val = e.currentTarget.value;
                           if (val) { $draft.roles[idx].haystacks[hIdx].extra_parameters["tag"] = val; }
                         }}>
                         <option value="">(choose)</option>
@@ -650,7 +650,7 @@ async function fetchLlmModels(roleIdx: number) {
             <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
-                <select on:change={(e)=>{$draft.roles[idx].llm_model=(e.target as HTMLSelectElement).value}}>
+                                        <select on:change={(e)=>{$draft.roles[idx].llm_model=e.currentTarget.value}}>
                   {#each roleModels[idx] as m}
                     <option value={m}>{m}</option>
                   {/each}
@@ -705,7 +705,7 @@ async function fetchLlmModels(roleIdx: number) {
             <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
-                <select on:change={(e)=>{$draft.roles[idx].openrouter_model=(e.target as HTMLSelectElement).value}}>
+                                        <select on:change={(e)=>{$draft.roles[idx].openrouter_model=e.currentTarget.value}}>
                   {#each roleModels[idx] as m}
                     <option value={m}>{m}</option>
                   {/each}
