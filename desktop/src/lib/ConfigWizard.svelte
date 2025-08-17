@@ -74,6 +74,32 @@
     roles: []
   });
 
+  // Available Bootstrap themes
+  const availableThemes = [
+    'default',
+    'darkly',
+    'cerulean',
+    'cosmo',
+    'cyborg',
+    'flatly',
+    'journal',
+    'litera',
+    'lumen',
+    'lux',
+    'materia',
+    'minty',
+    'nuclear',
+    'pulse',
+    'sandstone',
+    'simplex',
+    'slate',
+    'solar',
+    'spacelab',
+    'superhero',
+    'united',
+    'yeti'
+  ];
+
   onMount(async () => {
     try {
       let schemaJson;
@@ -407,7 +433,13 @@ async function fetchLlmModels(roleIdx: number) {
     <div class="field">
       <label class="label" for="default-theme">Default theme</label>
       <div class="control">
-        <input class="input" id="default-theme" type="text" bind:value={$draft.default_theme} />
+        <div class="select is-fullwidth">
+          <select id="default-theme" bind:value={$draft.default_theme}>
+            {#each availableThemes as theme}
+              <option value={theme}>{theme}</option>
+            {/each}
+          </select>
+        </div>
       </div>
     </div>
 
@@ -442,7 +474,13 @@ async function fetchLlmModels(roleIdx: number) {
         <div class="field">
           <label class="label" for={`role-theme-${idx}`}>Theme</label>
           <div class="control">
-            <input class="input" id={`role-theme-${idx}`} type="text" bind:value={$draft.roles[idx].theme} />
+            <div class="select is-fullwidth">
+              <select id={`role-theme-${idx}`} bind:value={$draft.roles[idx].theme}>
+                {#each availableThemes as theme}
+                  <option value={theme}>{theme}</option>
+                {/each}
+              </select>
+            </div>
           </div>
         </div>
         <div class="field">
