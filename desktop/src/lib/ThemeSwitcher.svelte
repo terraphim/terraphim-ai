@@ -112,8 +112,8 @@
   console.log("Using Terraphim Server URL:", CONFIG.ServerURL);
 
   function updateRole(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    const newRoleName = target.value;
+    const target = event.currentTarget as HTMLSelectElement;
+const newRoleName = target.value;
     console.log("Role change requested:", newRoleName);
 
     // Persist the newly selected role in the dedicated store **first** so that
