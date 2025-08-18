@@ -3,6 +3,7 @@
   import { get } from 'svelte/store';
   import { role } from '../stores';
   import { CONFIG } from '../../config';
+  import BackButton from '../BackButton.svelte';
 
   type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
   type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
@@ -63,6 +64,8 @@
     ];
   });
 </script>
+
+<BackButton fallbackPath="/" />
 
 <section class="section">
   <div class="container">
