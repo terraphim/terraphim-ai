@@ -31,7 +31,7 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
     // Step 1: Build configuration with Terraphim Engineer role that has local KG
     println!("📝 Step 1: Building configuration with Terraphim Engineer role");
     let mut config = ConfigBuilder::new_with_id(ConfigId::Server)
-        .build_default_server()
+        .build_default_desktop()
         .build()
         .expect("Failed to build config");
 
@@ -43,7 +43,7 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
 
     // Step 3: Verify Engineer role exists and has rolegraph
     println!("✅ Step 3: Verifying Engineer role configuration");
-    let engineer_role = RoleName::new("Engineer");
+    let engineer_role = RoleName::new("Terraphim Engineer");
     assert!(
         config_state.roles.contains_key(&engineer_role),
         "Engineer role should exist in config state"
@@ -231,7 +231,7 @@ async fn test_kg_haystack_specific_document_validation() {
 
     // Build config and state
     let mut config = ConfigBuilder::new_with_id(ConfigId::Server)
-        .build_default_server()
+        .build_default_desktop()
         .build()
         .expect("Failed to build config");
 
