@@ -1,0 +1,42 @@
+server_hostname = "127.0.0.1:8000"
+api_endpoint="http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+default_data_path = "${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}"
+
+[profiles.s3]
+type = "s3"
+bucket = "test"
+region = "${TERRAPHIM_PROFILE_S3_REGION:-us-east-1}"
+endpoint = "${TERRAPHIM_PROFILE_S3_ENDPOINT:-http://rpi4node3:8333/}"
+access_key_id = "${AWS_ACCESS_KEY_ID}"
+secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
+
+[profiles.sled]
+type = "sled"
+datadir= "/tmp/terraphim/sled"
+
+[profiles.memory]
+type = "memory"
+
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/dashmaptest"
+
+[profiles.rock]
+type = "rocksdb"
+datadir = "/tmp/opendal/rocksdb" 
+
+[profiles.redb]
+type = "redb"
+datadir = "/tmp/terraphim_redb"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"
+
+[profiles.atomicserver]
+endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"
+type = "atomicserver"
+private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
+public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
+parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}"

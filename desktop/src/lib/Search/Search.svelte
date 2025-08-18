@@ -6,6 +6,7 @@
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
   import { thesaurus,typeahead } from "../stores";
+  import BackButton from "../BackButton.svelte";
 
   let results: Document[] = [];
   let error: string | null = null;
@@ -125,6 +126,8 @@
     }
   }
 </script>
+
+<BackButton fallbackPath="/" />
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
   <Field>

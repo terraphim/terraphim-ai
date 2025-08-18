@@ -6,6 +6,7 @@
   import ArticleModal from './Search/ArticleModal.svelte';
   import type { Document } from './Search/SearchResult';
   import type { RoleGraphResponse } from './generated/types';
+  import BackButton from './BackButton.svelte';
 
   export let apiUrl: string = '/rolegraph';
   export let fullscreen: boolean = true;
@@ -296,6 +297,8 @@
     };
   });
 </script>
+
+<BackButton fallbackPath="/" />
 
 <svelte:window bind:innerWidth={width} bind:innerHeight={height} />
 
