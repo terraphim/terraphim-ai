@@ -1,4 +1,6 @@
+pub mod document;
 pub mod error;
+pub mod memory;
 pub mod settings;
 pub mod thesaurus;
 
@@ -9,6 +11,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use terraphim_settings::DeviceSettings;
 
 use std::collections::HashMap;
+use terraphim_types::Document;
 
 pub use error::{Error, Result};
 
@@ -29,10 +32,36 @@ impl DeviceStorage {
             .await?;
         Ok(storage)
     }
+
+    /// Initialize device storage with memory-only settings for tests
+    ///
+    /// This is useful for tests that don't want to use filesystem or external services
+    pub async fn init_memory_only() -> Result<&'static DeviceStorage> {
+        let storage = DEVICE_STORAGE
+            .get_or_try_init(async {
+                let settings = memory::create_memory_only_device_settings()?;
+                let initialized_storage = init_device_storage_with_settings(settings).await?;
+                Ok::<DeviceStorage, Error>(initialized_storage)
+            })
+            .await?;
+        Ok(storage)
+    }
 }
 
 async fn init_device_storage() -> Result<DeviceStorage> {
-    let settings = DeviceSettings::load_from_env_and_file(None)?;
+    // Use local dev settings by default to avoid RocksDB lock issues
+    let settings_path = std::env::var("TERRAPHIM_SETTINGS_PATH")
+        .map(|p| std::path::PathBuf::from(p))
+        .unwrap_or_else(|_| {
+            // Default to local dev settings in the same directory
+            std::path::PathBuf::from("crates/terraphim_settings/default/settings_local_dev.toml")
+        });
+    
+    let settings = DeviceSettings::load_from_env_and_file(Some(settings_path))?;
+    init_device_storage_with_settings(settings).await
+}
+
+async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<DeviceStorage> {
     log::info!("Loaded settings: {:?}", settings);
 
     let operators = settings::parse_profiles(&settings).await?;
@@ -131,4 +160,40 @@ pub trait Persistable: Serialize + DeserializeOwned {
         let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
         re.replace_all(key, "").to_lowercase()
     }
+}
+
+/// Load multiple documents by their IDs
+///
+/// This function efficiently loads multiple documents using their IDs.
+/// It attempts to load each document, but continues processing even if some documents fail to load.
+/// Returns a vector of successfully loaded documents.
+pub async fn load_documents_by_ids(document_ids: &[String]) -> Result<Vec<Document>> {
+    log::debug!(
+        "Loading {} documents by IDs: {:?}",
+        document_ids.len(),
+        document_ids
+    );
+
+    let mut documents = Vec::new();
+
+    for doc_id in document_ids {
+        let mut doc = Document::new(doc_id.clone());
+        match doc.load().await {
+            Ok(loaded_doc) => {
+                documents.push(loaded_doc);
+                log::trace!("Successfully loaded document: {}", doc_id);
+            }
+            Err(e) => {
+                log::warn!("Failed to load document '{}': {}", doc_id, e);
+                // Continue processing other documents even if this one fails
+            }
+        }
+    }
+
+    log::debug!(
+        "Successfully loaded {} out of {} documents",
+        documents.len(),
+        document_ids.len()
+    );
+    Ok(documents)
 }

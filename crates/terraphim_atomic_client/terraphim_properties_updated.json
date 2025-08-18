@@ -1,0 +1,418 @@
+[
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/id",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Unique identifier for a resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "id"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/url",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "URL to the document or resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "url"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/title",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Title of the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/body",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "The main content body of the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "body"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/rank",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Rank or relevance score of the document in search results.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "rank"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/role-name",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Name of the user role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "role-name"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/theme",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "UI theme name for the role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "theme"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/tags",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Tags associated with the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "tags"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/search-term",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The search term for querying documents.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "search-term"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/path",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "File system path to the haystack or knowledge graph data.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "path"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/description",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "A short description of the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "description"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/stub",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "A short excerpt of the document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "stub"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/connected-with",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "List of connected edge IDs for a node.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "connected-with"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/doc-hash",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "A hashmap of document IDs to ranks for an edge.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "doc-hash"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/matched-edges",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Edges matched for an indexed document.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "matched-edges"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/nodes",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "List of node IDs for validation of matching.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "nodes"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/skip",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Number of results to skip in pagination.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "skip"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/limit",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Maximum number of results to return.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "limit"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/role",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/classtype": "http://localhost:9883/terraphim-drive/terraphim/class/role-name",
+    "https://atomicdata.dev/properties/description": "The role to use for the search query.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "role"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/config-id",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Identifier for the config (Server, Desktop, or Embedded).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "config-id"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/global-shortcut",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Global shortcut for activating terraphim desktop.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "global-shortcut"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/roles",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "User roles with their respective settings.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "roles"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/default-role",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/classtype": "http://localhost:9883/terraphim-drive/terraphim/class/role-name",
+    "https://atomicdata.dev/properties/description": "The default role to use if no role is specified.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "default-role"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/selected-role",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/classtype": "http://localhost:9883/terraphim-drive/terraphim/class/role-name",
+    "https://atomicdata.dev/properties/description": "The currently selected role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "selected-role"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/relevance-function",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The relevance function used to rank search results (terraphim-graph or title-scorer).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "relevance-function"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/haystacks",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "List of haystacks for the role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "haystacks"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/knowledge-graph",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/classtype": "http://localhost:9883/terraphim-drive/terraphim/class/knowledge-graph",
+    "https://atomicdata.dev/properties/description": "Knowledge graph configuration for the role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "knowledge-graph"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/shortname",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Short name identifier.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "shortname"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/service-type",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The service used for indexing documents (Ripgrep or Atomic).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "service-type"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/read-only",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "When true, the haystack is treated as read-only.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "read-only"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/atomic-server-secret",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The secret for connecting to an Atomic Server.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "atomic-server-secret"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/automata-path",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Path to the published automata (can be online URL or local file).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "automata-path"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/knowledge-graph-local",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/classtype": "http://localhost:9883/terraphim-drive/terraphim/class/knowledge-graph-local",
+    "https://atomicdata.dev/properties/description": "Local knowledge graph configuration.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "knowledge-graph-local"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/public",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether the knowledge graph is public.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "public"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/publish",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether the knowledge graph should be published.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "publish"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/input-type",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Input type for the knowledge graph (markdown or json).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "input-type"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/original",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Original case-sensitive version of a role name.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "original"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/lowercase",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Lowercase version of a role name for case-insensitive comparisons.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "lowercase"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/nterm",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The normalized term value.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "nterm"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/value",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The normalized value of a concept.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "value"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/property/config",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/classtype": "http://localhost:9883/terraphim-drive/terraphim/class/config",
+    "https://atomicdata.dev/properties/description": "The terraphim configuration.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/shortname": "config"
+  }
+] 

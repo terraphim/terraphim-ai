@@ -28,3 +28,22 @@ type = "atomicserver"
 private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
 public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
 parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}"
+
+# Example ClickUp role (requires env CLICKUP_API_TOKEN and CLICKUP_TEAM_ID). This is consumed by the app UI.
+[roles.ClickUp]
+shortname = "ClickUp"
+name = "ClickUp"
+relevance_function = "title-scorer"
+terraphim_it = false
+theme = "lumen"
+
+[[roles.ClickUp.haystacks]]
+location = "clickup"
+service = "ClickUp"
+read_only = true
+
+[roles.ClickUp.haystacks.extra_parameters]
+team_id = "${CLICKUP_TEAM_ID}"
+include_closed = "true"
+subtasks = "true"
+page = "0"

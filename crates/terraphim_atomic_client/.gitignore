@@ -1,0 +1,6 @@
+/target
+.env
+test_signature/target/
+target
+extract-ontology
+export.json

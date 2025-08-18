@@ -6,9 +6,14 @@ use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 
+use schemars::JsonSchema;
 use std::str::FromStr;
+#[cfg(feature = "typescript")]
+use tsify::Tsify;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RoleName {
     pub original: String,
     pub lowercase: String,
@@ -24,6 +29,10 @@ impl RoleName {
 
     pub fn as_lowercase(&self) -> &str {
         &self.lowercase
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.original
     }
 }
 
@@ -75,6 +84,8 @@ impl<'de> Deserialize<'de> for RoleName {
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
 #[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
@@ -131,12 +142,16 @@ pub struct NormalizedTerm {
     #[serde(rename = "nterm")]
     pub value: NormalizedTermValue,
     /// The URL of the normalized term
-    pub url: Option<String>
+    pub url: Option<String>,
 }
 
 impl NormalizedTerm {
     pub fn new(id: u64, value: NormalizedTermValue) -> Self {
-        Self { id, value, url: None }
+        Self {
+            id,
+            value,
+            url: None,
+        }
     }
 }
 
@@ -181,6 +196,8 @@ impl Display for Concept {
 /// It holds the title, body, description, tags, and rank.
 /// The `id` is a unique identifier for the document.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Document {
     /// Unique identifier for the document
     pub id: String,
@@ -441,11 +458,23 @@ impl IndexedDocument {
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+    pub fn from_document(document: Document) -> Self {
+        let indexed_document = IndexedDocument {
+            id: document.id,
+            matched_edges: Vec::new(),
+            rank: 0,
+            tags: document.tags.unwrap_or_default(),
+            nodes: Vec::new(),
+        };
+        indexed_document
+    }
 }
 
 /// Query type for searching documents in the `RoleGraph`.
 /// It contains the search term, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SearchQuery {
     pub search_term: NormalizedTermValue,
     pub skip: Option<usize>,
@@ -455,7 +484,9 @@ pub struct SearchQuery {
 
 /// Defines the relevance function (scorer) to be used for ranking search
 /// results for the `Role`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the Terraphim graph
     ///
@@ -467,13 +498,24 @@ pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the title of a document
     #[serde(rename = "title-scorer")]
     TitleScorer,
+    /// BM25 (Okapi BM25) relevance function for probabilistic ranking
+    #[serde(rename = "bm25")]
+    BM25,
+    /// BM25F relevance function with field-specific weights (title, body, description, tags)
+    #[serde(rename = "bm25f")]
+    BM25F,
+    /// BM25Plus relevance function with enhanced parameters for fine-tuning
+    #[serde(rename = "bm25plus")]
+    BM25Plus,
 }
 
 /// Defines all supported inputs for the knowledge graph.
 ///
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]

@@ -24,7 +24,7 @@ mod tests {
     // Sample config for testing
     fn sample_config() -> Config {
         let automata_path = AutomataPath::from_local("fixtures/term_to_id.json");
-        let haystack = PathBuf::from("fixtures/haystack");
+        let haystack = "fixtures/haystack".to_string();
 
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
@@ -37,10 +37,14 @@ mod tests {
                     theme: "spacelab".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
-                        path: haystack.clone(),
+                        location: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    terraphim_it: false,
                 },
             )
             .add_role(
@@ -60,10 +64,14 @@ mod tests {
                         publish: true,
                     }),
                     haystacks: vec![Haystack {
-                        path: haystack.clone(),
+                        location: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    terraphim_it: false,
                 },
             )
             .add_role(
@@ -83,10 +91,14 @@ mod tests {
                         publish: true,
                     }),
                     haystacks: vec![Haystack {
-                        path: haystack.clone(),
+                        location: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    terraphim_it: false,
                 },
             )
             .build()

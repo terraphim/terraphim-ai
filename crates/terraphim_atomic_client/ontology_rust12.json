@@ -1,0 +1,196 @@
+[
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "defaultOntology/class/card"
+    ],
+    "https://atomicdata.dev/properties/description": "Default ontology for this drive",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology",
+    "https://atomicdata.dev/properties/properties": [
+      "defaultOntology/property/content",
+      "defaultOntology/property/section",
+      "defaultOntology/property/title"
+    ],
+    "https://atomicdata.dev/properties/shortname": "ontology"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/class/card",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/tags"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "defaultOntology/defaultOntology/property/title",
+      "defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/property/section"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/property/content",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "content"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/property/section",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "section"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/property/title",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "defaultOntology/defaultOntology/class/card"
+    ],
+    "https://atomicdata.dev/properties/description": "Default ontology for this drive",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/properties": [
+      "defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/property/section",
+      "defaultOntology/defaultOntology/property/title"
+    ],
+    "https://atomicdata.dev/properties/shortname": "ontology"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/property/title",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/property/content",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "content"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/property/section",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "section"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/class/card",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/tags"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "defaultOntology/defaultOntology/defaultOntology/property/title",
+      "defaultOntology/defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/defaultOntology/property/section"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/defaultOntology/property/title",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/defaultOntology/property/content",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "content"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/defaultOntology/property/section",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "section"
+  },
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "defaultOntology/defaultOntology/defaultOntology/class/card"
+    ],
+    "https://atomicdata.dev/properties/description": "Default ontology for this drive",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/properties": [
+      "defaultOntology/defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/defaultOntology/property/section",
+      "defaultOntology/defaultOntology/defaultOntology/property/title"
+    ],
+    "https://atomicdata.dev/properties/shortname": "ontology"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/defaultOntology/class/card",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/tags"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "defaultOntology/defaultOntology/defaultOntology/property/title",
+      "defaultOntology/defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/defaultOntology/property/section"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  }
+]

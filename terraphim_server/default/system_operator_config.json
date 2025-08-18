@@ -1,0 +1,72 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+S",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "/tmp/system_operator/pages",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "System Operator": {
+      "shortname": "SysOps",
+      "name": "System Operator",
+      "relevance_function": "terraphim-graph",
+      "theme": "superhero",
+      "kg": {
+        "automata_path": "https://staging-storage.terraphim.io/thesaurus_Default.json",
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "/tmp/system_operator/pages"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "/tmp/system_operator/pages",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": "https://staging-storage.terraphim.io/thesaurus_Default.json",
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "/tmp/system_operator/pages"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "/tmp/system_operator/pages",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "System Operator",
+  "selected_role": "System Operator"
+} 

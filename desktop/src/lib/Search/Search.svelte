@@ -6,6 +6,7 @@
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
   import { thesaurus,typeahead } from "../stores";
+  import BackButton from "../BackButton.svelte";
 
   let results: Document[] = [];
   let error: string | null = null;
@@ -27,7 +28,10 @@
   }
 
   function updateSuggestions(event: Event) {
-    const inputElement = event.target as HTMLInputElement;
+    const inputElement = event.target as HTMLInputElement | null;
+    if (!inputElement || inputElement.selectionStart == null) {
+      return;
+    }
     const cursorPosition = inputElement.selectionStart;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
@@ -54,14 +58,14 @@
 
   function applySuggestion(suggestion: string) {
     const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
-    const cursorPosition = inputElement.selectionStart;
+    const cursorPosition = inputElement?.selectionStart ?? 0;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const textAfterCursor = $input.slice(cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
     words[words.length - 1] = suggestion;
     
     $input = [...words, textAfterCursor].join(" ");
-    inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
+    inputElement?.setSelectionRange?.(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
     suggestions = [];
     suggestionIndex = -1;
   }
@@ -115,13 +119,15 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        this.error = `Error fetching data: ${error}`;
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        error = `Error fetching data: ${err}`;
       }
     }
   }
 </script>
+
+<BackButton fallbackPath="/" />
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
   <Field>
@@ -144,6 +150,16 @@
             <li
               class:active={index === suggestionIndex}
               on:click={() => applySuggestion(suggestion)}
+              on:keydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  applySuggestion(suggestion);
+                }
+              }}
+              tabindex="0"
+              role="option"
+              aria-selected={index === suggestionIndex}
+              aria-label={`Apply suggestion: ${suggestion}`}
             >
               {suggestion}
             </li>
@@ -165,6 +181,12 @@
     <div class="content has-text-grey has-text-centered">
       <img src={logo} alt="Terraphim Logo" />
       <p>I am Terraphim, your personal assistant.</p>
+      <button class="button is-primary" data-testid="wizard-start" on:click={() => window.location.href = '/config/wizard'}>
+        <span class="icon">
+          <i class="fas fa-magic"></i>
+        </span>
+        <span>Configuration Wizard</span>
+      </button>
     </div>
   </section>
 {/if}
@@ -201,5 +223,13 @@
   .suggestions li:hover,
   .suggestions li.active {
     background-color: #f5f5f5;
+  }
+  /* Center logo and text on empty state */
+  .has-text-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
   }
 </style>

@@ -1,0 +1,128 @@
+{
+  "id": "Desktop",
+  "global_shortcut": "Ctrl+Shift+D",
+  "roles": {
+    "Dual Haystack Title Scorer": {
+      "shortname": "dual-title",
+      "name": "Dual Haystack Title Scorer",
+      "relevance_function": "title-scorer",
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        },
+        {
+          "location": "../../docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Dual Haystack Graph Embeddings": {
+      "shortname": "dual-graph",
+      "name": "Dual Haystack Graph Embeddings",
+      "relevance_function": "terraphim-graph",
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "../../docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        },
+        {
+          "location": "../../docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Dual Haystack Hybrid Researcher": {
+      "shortname": "dual-hybrid",
+      "name": "Dual Haystack Hybrid Researcher",
+      "relevance_function": "terraphim-graph",
+      "theme": "pulse",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "../../docs/src"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        },
+        {
+          "location": "../../docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        },
+        {
+          "location": "../../terraphim_server/fixtures/haystack",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Single Atomic Reference": {
+      "shortname": "atomic-ref",
+      "name": "Single Atomic Reference",
+      "relevance_function": "title-scorer",
+      "theme": "cerulean",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Single Ripgrep Reference": {
+      "shortname": "ripgrep-ref",
+      "name": "Single Ripgrep Reference",
+      "relevance_function": "title-scorer",
+      "theme": "journal",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "../../docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Dual Haystack Title Scorer",
+  "selected_role": "Dual Haystack Title Scorer"
+} 

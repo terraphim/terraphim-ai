@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use terraphim_types::Document;
 
 use crate::error::{Error, Result};
-use crate::score::{NameQuery, NameScorer};
+use crate::score::{NameQuery, QueryScorer};
 use crate::scored::{Scored, SearchResults};
 
 /// A handle that permits searching documents with relevance ranking.
@@ -182,7 +182,7 @@ impl Searcher {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
     name: Option<String>,
-    name_scorer: Option<NameScorer>,
+    name_scorer: Option<QueryScorer>,
     similarity: Similarity,
     size: usize,
     year: Range<u32>,
@@ -203,7 +203,7 @@ impl Query {
     pub fn new() -> Query {
         Query {
             name: None,
-            name_scorer: Some(NameScorer::default()),
+            name_scorer: Some(QueryScorer::default()),
             similarity: Similarity::default(),
             size: 30,
             kinds: vec![],
@@ -254,7 +254,7 @@ impl Query {
     /// in IMDb. Normally, when the name index is used, only the (small number)
     /// of results returned by searching the name are ranked. Typically, these
     /// sorts of queries are useful for evaluation purposes, but not much else.
-    pub fn name_scorer(mut self, scorer: Option<NameScorer>) -> Query {
+    pub fn name_scorer(mut self, scorer: Option<QueryScorer>) -> Query {
         self.name_scorer = scorer;
         self
     }
