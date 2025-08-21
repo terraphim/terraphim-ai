@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
+  import { open } from "@tauri-apps/api/dialog";
   // @ts-ignore
   import { is_tauri } from "$lib/stores";
   import { writable, get } from "svelte/store";
@@ -50,6 +51,7 @@
     name: string; 
     shortname: string; 
     relevance_function: RelevanceFunction; 
+    terraphim_it: boolean;
     theme: string; 
     haystacks: HaystackForm[]; 
     kg: KnowledgeGraphForm;
@@ -67,6 +69,48 @@
     llm_base_url?: string;
     llm_auto_summarize?: boolean;
   };
+
+  // File selection functions for Tauri
+  async function selectHaystackPath(roleIdx: number, hsIdx: number) {
+    if (!get(is_tauri)) return;
+    
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false
+      });
+      
+      if (selected && typeof selected === "string") {
+        draft.update(d => {
+          d.roles[roleIdx].haystacks[hsIdx].path = selected;
+          return d;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to open folder selector:", err);
+    }
+  }
+
+  async function selectKnowledgeGraphPath(roleIdx: number) {
+    if (!get(is_tauri)) return;
+    
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false
+      });
+      
+      if (selected && typeof selected === "string") {
+        draft.update(d => {
+          d.roles[roleIdx].kg.local_path = selected;
+          return d;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to open folder selector:", err);
+    }
+  }
+
   const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
     id: "Desktop",
     global_shortcut: "Ctrl+X",
@@ -128,6 +172,7 @@
               name: r.name,
               shortname: r.shortname,
               relevance_function: r.relevance_function,
+              terraphim_it: r.terraphim_it ?? false,
               theme: r.theme,
               haystacks: (r.haystacks ?? []).map((h:any)=>({
                 path: h.location || h.path || "", // Handle both old and new field names
@@ -222,6 +267,7 @@ async function fetchLlmModels(roleIdx: number) {
       name: "New Role", 
       shortname:"new", 
       relevance_function: "title-scorer", 
+      terraphim_it: false,
       theme: "spacelab", 
       haystacks: [], 
       kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false},
@@ -319,6 +365,7 @@ async function fetchLlmModels(roleIdx: number) {
         shortname: r.shortname,
         theme: r.theme,
         relevance_function: r.relevance_function,
+        terraphim_it: r.terraphim_it ?? false,
         haystacks: r.haystacks.map((h)=>({
           location: h.path, // Use location field as expected by backend
           service: h.service,
@@ -493,6 +540,18 @@ async function fetchLlmModels(roleIdx: number) {
           </div>
         </div>
         
+        <div class="field">
+          <label class="label" for={`role-terraphim-it-${idx}`}>
+            <input 
+              class="checkbox" 
+              id={`role-terraphim-it-${idx}`} 
+              type="checkbox" 
+              bind:checked={$draft.roles[idx].terraphim_it} 
+            />
+            Enable Terraphim IT features (KG preprocessing, auto-linking)
+          </label>
+        </div>
+        
         <h5 class="title is-6">Haystacks</h5>
         {#each roleItem.haystacks as hs, hIdx}
           <div class="box is-light">
@@ -525,7 +584,12 @@ async function fetchLlmModels(roleIdx: number) {
                   type="text" 
                   placeholder={$draft.roles[idx].haystacks[hIdx].service === "Atomic" ? "https://localhost:9883" : "/path/to/documents"} 
                   bind:value={$draft.roles[idx].haystacks[hIdx].path} 
+                  readonly={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic"}
+                  on:click={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic" ? () => selectHaystackPath(idx, hIdx) : undefined}
                 />
+                {#if $is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic"}
+                  <p class="help">Click to select directory</p>
+                {/if}
               </div>
             </div>
 
@@ -806,7 +870,18 @@ async function fetchLlmModels(roleIdx: number) {
         <div class="field">
           <label class="label" for={`kg-local-path-${idx}`}>Local KG path</label>
           <div class="control">
-            <input class="input" id={`kg-local-path-${idx}`} type="text" placeholder="/path/to/markdown" bind:value={$draft.roles[idx].kg.local_path} />
+            <input 
+              class="input" 
+              id={`kg-local-path-${idx}`} 
+              type="text" 
+              placeholder="/path/to/markdown" 
+              bind:value={$draft.roles[idx].kg.local_path} 
+              readonly={$is_tauri}
+              on:click={$is_tauri ? () => selectKnowledgeGraphPath(idx) : undefined}
+            />
+            {#if $is_tauri}
+              <p class="help">Click to select directory</p>
+            {/if}
           </div>
         </div>
         <div class="field is-grouped">
