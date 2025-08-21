@@ -48,11 +48,17 @@ impl IndexMiddleware for RipgrepIndexer {
         }
 
         // Parse extra parameters from haystack configuration
+        let extra_params = haystack.get_extra_parameters();
+        log::debug!("Haystack extra_parameters: {:?}", extra_params);
+        
         let extra_args = self
             .command
-            .parse_extra_parameters(haystack.get_extra_parameters());
+            .parse_extra_parameters(extra_params);
         if !extra_args.is_empty() {
-            log::info!("Using extra ripgrep parameters: {:?}", extra_args);
+            log::info!("🏷️ Using extra ripgrep parameters: {:?}", extra_args);
+            log::info!("🔍 This will modify the ripgrep command to include tag filtering");
+        } else {
+            log::debug!("No extra parameters provided for ripgrep command");
         }
 
         // Run ripgrep with extra arguments if any
