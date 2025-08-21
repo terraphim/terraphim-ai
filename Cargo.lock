@@ -6941,6 +6941,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "env_logger 0.11.8",
  "log",
  "mockall 0.13.1",
  "portpicker",

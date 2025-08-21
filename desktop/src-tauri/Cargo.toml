@@ -34,6 +34,7 @@ rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features 
 serde_json_any_key = "2.0.0" 
 anyhow = "1.0.81"
 log = "0.4.21"
+env_logger = "0.11.0"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
 tauri = { version = "1.7.1", features = [

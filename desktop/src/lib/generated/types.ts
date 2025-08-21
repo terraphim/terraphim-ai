@@ -23,12 +23,12 @@ export interface SearchQuery {
     limit: number | undefined;
     role: RoleName | undefined;
 }
-export type RelevanceFunction = "terraphim-graph" | "title-scorer";
+export type RelevanceFunction = "terraphim-graph" | "title-scorer" | "bm25" | "bm25f" | "bm25plus";
 export type KnowledgeGraphInputType = "markdown" | "json";
 // === Automata Types ===
 export type AutomataPath = { Local: string } | { Remote: string };
 // === Configuration Types ===
-export type ServiceType = "Ripgrep" | "Atomic";
+export type ServiceType = "Ripgrep" | "Atomic" | "QueryRs" | "ClickUp" | "Mcp";
 export interface Haystack {
     location: string;
     service: ServiceType;
@@ -50,6 +50,7 @@ export interface Role extends AHashMap<string, Value> {
     shortname: string | undefined;
     name: RoleName;
     relevance_function: RelevanceFunction;
+    terraphim_it: boolean;
     theme: string;
     kg: KnowledgeGraph | undefined;
     haystacks: Haystack[];

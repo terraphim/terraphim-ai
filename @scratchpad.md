@@ -14,6 +14,53 @@
 
 # Terraphim AI Project Scratchpad
 
+## Current Task Status (2025-01-31)
+
+### ✅ COMPLETED: terraphim_it Field Fix
+
+**Task**: Fix invalid args `configNew` for command `update_config`: missing field `terraphim_it`
+
+**Status**: ✅ **COMPLETED SUCCESSFULLY**
+
+**Implementation Details**:
+- **Root Cause**: TypeScript bindings were missing `terraphim_it` field from Rust Role struct
+- **Solution**: Regenerated TypeScript bindings with `cargo run --bin generate-bindings`
+- **ConfigWizard Updates**: Added `terraphim_it` field to RoleForm type, addRole function, role mapping, and save function
+- **UI Enhancement**: Added checkbox control for "Enable Terraphim IT features (KG preprocessing, auto-linking)"
+- **Default Value**: New roles default to `terraphim_it: false`
+- **Build Verification**: Both frontend (`yarn run build`) and Tauri (`cargo build`) compile successfully
+
+**Key Changes Made**:
+1. **TypeScript Bindings**: Regenerated to include missing `terraphim_it` field
+2. **RoleForm Type**: Added `terraphim_it: boolean` field
+3. **addRole Function**: Set default `terraphim_it: false`
+4. **Role Initialization**: Added `terraphim_it: r.terraphim_it ?? false` in onMount
+5. **Save Function**: Included `terraphim_it` field in role construction
+6. **UI Field**: Added checkbox with descriptive label
+
+**Result**: Configuration Wizard now properly handles `terraphim_it` field, eliminating the validation error. Users can enable/disable Terraphim IT features through the UI.
+
+---
+
+### ✅ COMPLETED: ConfigWizard File Selector Integration
+
+**Task**: Update ConfigWizard.svelte to use the same file selector for file and directory paths as StartupScreen.svelte - when is_tauri allows selecting local files.
+
+**Status**: ✅ **COMPLETED SUCCESSFULLY**
+
+**Implementation Details**:
+- Added `import { open } from "@tauri-apps/api/dialog"` to ConfigWizard.svelte
+- Implemented `selectHaystackPath()` function for Ripgrep haystack directory selection
+- Implemented `selectKnowledgeGraphPath()` function for local KG directory selection
+- Updated UI inputs to be readonly and clickable in Tauri environments
+- Added help text "Click to select directory" for better user guidance
+- Maintained Atomic service URLs as regular text inputs (not readonly)
+- Both frontend and Tauri backend compile successfully
+
+**Current Status**: All tasks completed successfully. Project is building and ready for production use.
+
+---
+
 ## ✅ COMPLETED: CONFIGURATION WIZARD THEME SELECTION UPDATE (2025-01-31)
 
 ### Configuration Wizard Theme Selection Enhancement - COMPLETED ✅

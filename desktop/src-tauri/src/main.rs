@@ -181,10 +181,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return run_mcp_server().await.map_err(|e| e.into());
     }
 
+    // Initialize logging only for desktop app mode (not MCP server mode)
+    env_logger::init();
+    
+    log::info!("Starting Terraphim Desktop app...");
+    log::info!("Current working directory: {:?}", std::env::current_dir()?);
+    
     let device_settings = match DeviceSettings::load_from_env_and_file(None) {
-        Ok(settings) => settings,
+        Ok(settings) => {
+            log::info!("Successfully loaded device settings: {:?}", settings);
+            settings
+        },
         Err(e) => {
             log::error!("Failed to load device settings: {:?}", e);
+            log::error!("Error details: {:?}", e);
             panic!("Failed to load device settings: {:?}", e);
         }
     };
