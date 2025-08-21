@@ -202,6 +202,7 @@ impl RipgrepCommand {
             .collect();
 
         log::debug!("Running ripgrep with args: {:?}", args);
+        log::info!("🚀 Executing: {} {}", &self.command, args.join(" "));
 
         let mut child = Command::new(&self.command)
             .args(args)
@@ -240,14 +241,23 @@ impl RipgrepCommand {
         extra_params: &std::collections::HashMap<String, String>,
     ) -> Vec<String> {
         let mut args = Vec::new();
+        
+        if extra_params.is_empty() {
+            log::debug!("No extra parameters to process");
+            return args;
+        }
+        
+        log::debug!("Processing {} extra parameters: {:?}", extra_params.len(), extra_params);
 
         for (key, value) in extra_params {
             match key.as_str() {
                 "tag" => {
+                    log::info!("🏷️ Processing tag filter: '{}'", value);
                     // Require lines to match both the search needle and the tag(s)
                     // Example: rg -tmarkdown --all-match -e needle -e "#rust"
                     if !args.contains(&"--all-match".to_string()) {
                         args.push("--all-match".to_string());
+                        log::debug!("Added --all-match flag for tag filtering");
                     }
                     // Support comma or space separated tags
                     let tags: Vec<&str> = value
@@ -258,14 +268,15 @@ impl RipgrepCommand {
                         // Fallback: single value as provided
                         args.push("-e".to_string());
                         args.push(value.clone());
-                        log::debug!("Added tag pattern: {}", value);
+                        log::info!("Added tag pattern: {}", value);
                     } else {
                         for t in tags {
                             args.push("-e".to_string());
                             args.push(t.to_string());
-                            log::debug!("Added tag pattern: {}", t);
+                            log::info!("Added tag pattern: {}", t);
                         }
                     }
+                    log::info!("🔍 Tag filtering will require search results to contain ALL specified patterns");
                 }
                 "glob" => {
                     // Direct glob pattern

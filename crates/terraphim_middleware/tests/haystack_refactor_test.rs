@@ -99,9 +99,10 @@ async fn test_ripgrep_extra_parameters_tag_filtering() {
     let command = RipgrepCommand::default();
     let parsed_args = command.parse_extra_parameters(haystack.get_extra_parameters());
 
-    // Should contain the tag filter as a glob pattern
-    assert!(parsed_args.contains(&"--glob".to_string()));
-    assert!(parsed_args.contains(&"*#rust*".to_string()));
+    // Should contain the tag filter with --all-match and -e pattern
+    assert!(parsed_args.contains(&"--all-match".to_string()));
+    assert!(parsed_args.contains(&"-e".to_string()));
+    assert!(parsed_args.contains(&"#rust".to_string()));
 
     // Should contain max count
     assert!(parsed_args.contains(&"--max-count".to_string()));
