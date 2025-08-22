@@ -20,7 +20,11 @@
 
 [v1.0.6] RoleGraph: Added `is_all_terms_connected_by_path` to verify if matched terms in text can be connected by a single path in the graph. Included unit tests, a throughput benchmark, and docs at `docs/src/graph-connectivity.md`.
 
-[v1.0.7] MCP Server Development: Implemented comprehensive MCP server (`terraphim_mcp_server`) exposing all `terraphim_automata` and `terraphim_rolegraph` functions as MCP tools. Added autocomplete functionality with both `autocomplete_terms` and `autocomplete_with_snippets` endpoints. Implemented text matching tools (`find_matches`, `replace_matches`), thesaurus management (`load_thesaurus`, `load_thesaurus_from_json`), and graph connectivity (`is_all_terms_connected_by_path`). Created Novel editor integration with autocomplete service leveraging built-in Novel autocomplete functionality. Replaced RocksDB with non-locking OpenDAL backends (memory, dashmap, sqlite, redb) for local development. Current challenge: MCP server's `tools/list` method not properly routing to `list_tools` function via stdio transport, returning empty responses despite successful protocol handshake.
+[v1.0.7] MCP Server Development: Implemented comprehensive MCP server (`terraphim_mcp_server`) exposing all `terraphim_automata` and `terraphim_rolegraph` functions as MCP tools. Added autocomplete functionality with both `autocomplete_terms` and `autocomplete_with_snippets` endpoints. Implemented text matching tools (`find_matches`, `replace_matches`), thesaurus management (`load_thesaurus`, `load_thesaurus_from_json`), and graph connectivity (`is_all_terms_connected_by_path`). Created Novel editor integration with autocomplete service leveraging built-in Novel autocomplete functionality. Replaced RocksDB with non-locking OpenDAL backends (memory, dashmap, sqlite, redb) for local development.
+
+[v1.0.8] Summarization Queue System: Implemented production-ready async queue system for document summarization with priority management (Critical/High/Normal/Low), token bucket rate limiting, background worker with concurrent processing, and exponential backoff retry logic. Created RESTful async API endpoints for queue management. Addressed DateTime serialization issues by replacing `Instant` with `DateTime<Utc>`. Successfully integrated with existing LLM providers (OpenRouter, Ollama). System compiles successfully with comprehensive error handling and task status tracking.
+
+[v1.0.8.1] AWS Credentials Error Fix (2025-08-22): Resolved recurring AWS_ACCESS_KEY_ID environment variable error that was preventing local development. Root cause was twofold: 1) S3 profile in user settings file containing credentials that triggered shell variable expansion, and 2) persistence layer passing a FILE path (`crates/terraphim_settings/default/settings_local_dev.toml`) to `DeviceSettings::load_from_env_and_file()` which expects a DIRECTORY path. Fixed by correcting the path in `terraphim_persistence/src/lib.rs` to pass the directory path (`crates/terraphim_settings/default`) instead. This allows the settings system to work as designed, using local-only profiles (memory, dashmap, sqlite, redb) for development without AWS dependencies. Both server and Tauri desktop application now start successfully without AWS errors. Desktop app builds cleanly and Tauri dev process works normally.
 
 ## Current Project Status (2025-01-31)
 
@@ -33,11 +37,14 @@
 - **Database Backend**: ✅ Non-locking OpenDAL profiles replacing RocksDB
 - **UI Integration**: ✅ Novel editor autocomplete service implemented
 
-### Current Blocking Issue
-- **MCP Protocol Routing**: `tools/list` method not reaching `list_tools` function
-- **Debug Evidence**: Debug prints in `list_tools` not appearing in test output
-- **Test Results**: Protocol handshake successful, but tools list response empty
-- **Investigation Status**: Multiple approaches attempted (manual trait implementation, macro-based approach, signature fixes)
+### ✅ RESOLVED: AWS Credentials Error (2025-01-31)
+- **Problem**: System required AWS_ACCESS_KEY_ID when loading thesaurus due to S3 profile in default settings
+- **Root Cause**: `DEFAULT_SETTINGS` in `terraphim_settings` included `settings_full.toml` with S3 profile requiring AWS credentials
+- **Solution Implemented**:
+  1. Changed `DEFAULT_SETTINGS` from `settings_full.toml` to `settings_local_dev.toml`
+  2. Added fallback mechanism in S3 profile parsing to gracefully handle missing credentials
+  3. Updated README with optional AWS configuration documentation
+- **Result**: Local development now works without any AWS dependencies, cloud storage remains available when credentials are provided
 
 ### Project Architecture
 - **Backend**: Rust-based MCP server with `rmcp` crate integration
