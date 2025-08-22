@@ -7234,6 +7234,7 @@ dependencies = [
  "anyhow",
  "axum 0.6.20",
  "axum-extra",
+ "chrono",
  "clap 4.5.40",
  "dircpy",
  "env_logger 0.11.8",
@@ -7276,6 +7277,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "chrono",
  "futures-util",
  "log",
  "opendal",
@@ -7295,6 +7297,7 @@ dependencies = [
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
+ "uuid",
  "wiremock",
 ]
 

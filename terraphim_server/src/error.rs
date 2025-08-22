@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 pub enum Status {
     #[serde(rename = "success")]
     Success,
+    #[serde(rename = "partial_success")]
+    PartialSuccess,
     #[serde(rename = "error")]
     Error,
 }

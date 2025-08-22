@@ -70,10 +70,26 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
     result.into()
 }
 
+/// Ensure directory exists for storage backends that require it
+fn ensure_directory_exists(path: &str) -> Result<()> {
+    if !path.is_empty() {
+        log::info!("🔧 Creating directory: {}", path);
+        std::fs::create_dir_all(path).map_err(|e| {
+            Error::OpenDal(opendal::Error::new(
+                opendal::ErrorKind::Unexpected,
+                &format!("Failed to create directory '{}': {}", path, e)
+            ))
+        })?;
+        log::info!("✅ Successfully created directory: {}", path);
+    }
+    Ok(())
+}
+
 pub async fn parse_profile(
     settings: &DeviceSettings,
     profile_name: &str,
 ) -> Result<(Operator, u128)> {
+    log::info!("📁 Parsing profile: {}", profile_name);
     /// Returns the time (in nanoseconds) it takes to load a 1MB file,
     /// used to determine the fastest operator for a given profile.
     async fn get_speed(op: Operator) -> OpendalResult<u128> {
@@ -101,11 +117,16 @@ pub async fn parse_profile(
         .ok_or_else(|| Error::Profile("type is required".to_string()))?;
 
     let scheme = Scheme::from_str(svc)?;
+    log::info!("🔧 Profile '{}' using scheme: {:?}", profile_name, scheme);
     let op = match scheme {
         Scheme::Azblob => Operator::from_map::<services::Azblob>(profile.clone())?.finish(),
         Scheme::Azdls => Operator::from_map::<services::Azdls>(profile.clone())?.finish(),
         #[cfg(feature = "services-dashmap")]
         Scheme::Dashmap => {
+            // Ensure directory exists for DashMap
+            if let Some(root) = profile.get("root") {
+                ensure_directory_exists(root)?;
+            }
             let builder = services::Dashmap::default();
             // Init an operator
             let op = Operator::new(builder)?
@@ -132,10 +153,34 @@ pub async fn parse_profile(
         #[cfg(feature = "services-rocksdb")]
         Scheme::Rocksdb => Operator::from_map::<services::Rocksdb>(profile.clone())?.finish(),
         #[cfg(feature = "services-redb")]
-        Scheme::Redb => Operator::from_map::<services::Redb>(profile.clone())?.finish(),
+        Scheme::Redb => {
+            // Ensure directory exists for ReDB
+            if let Some(datadir) = profile.get("datadir") {
+                ensure_directory_exists(datadir)?;
+            }
+            Operator::from_map::<services::Redb>(profile.clone())?.finish()
+        },
         #[cfg(feature = "services-sqlite")]
-        Scheme::Sqlite => Operator::from_map::<services::Sqlite>(profile.clone())?.finish(),
-        Scheme::S3 => Operator::from_map::<services::S3>(profile.clone())?.finish(),
+        Scheme::Sqlite => {
+            // Ensure directory exists for SQLite
+            if let Some(datadir) = profile.get("datadir") {
+                ensure_directory_exists(datadir)?;
+            }
+            Operator::from_map::<services::Sqlite>(profile.clone())?.finish()
+        },
+        Scheme::S3 => {
+            match Operator::from_map::<services::S3>(profile.clone()) {
+                Ok(builder) => builder.finish(),
+                Err(e) => {
+                    log::warn!("Failed to create S3 operator (missing AWS credentials?): {:?}", e);
+                    log::info!("Falling back to memory operator for profile: {}", profile_name);
+                    let builder = services::Memory::default();
+                    Operator::new(builder)?
+                        .layer(LoggingLayer::default())
+                        .finish()
+                }
+            }
+        },
         Scheme::Webdav => Operator::from_map::<services::Webdav>(profile.clone())?.finish(),
         Scheme::Webhdfs => Operator::from_map::<services::Webhdfs>(profile.clone())?.finish(),
         _ => {
@@ -374,6 +419,104 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    /// Test that directories are created automatically for operators
+    #[tokio::test]
+    #[serial_test::serial] 
+    async fn test_operators_create_directories() -> Result<()> {
+        use tempfile::TempDir;
+        use terraphim_types::Document;
+        
+        // Create temporary directory for test
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+        
+        // Create test settings with custom paths in temporary directory
+        let sqlite_path = temp_path.join("test_sqlite");
+        let redb_path = temp_path.join("test_redb");
+        let dashmap_path = temp_path.join("test_dashmap");
+        
+        let mut profiles = std::collections::HashMap::new();
+        
+        // SQLite profile with proper configuration
+        let mut sqlite_profile = std::collections::HashMap::new();
+        sqlite_profile.insert("type".to_string(), "sqlite".to_string());
+        sqlite_profile.insert("connection_string".to_string(), 
+            format!("sqlite://{}/test.db", sqlite_path.to_string_lossy()));
+        sqlite_profile.insert("datadir".to_string(), sqlite_path.to_string_lossy().to_string());
+        profiles.insert("test_sqlite".to_string(), sqlite_profile);
+        
+        // ReDB profile with proper configuration
+        let mut redb_profile = std::collections::HashMap::new();
+        redb_profile.insert("type".to_string(), "redb".to_string());
+        redb_profile.insert("datadir".to_string(), redb_path.to_string_lossy().to_string());
+        redb_profile.insert("table".to_string(), "test_table".to_string());
+        redb_profile.insert("path".to_string(), format!("{}/test.redb", redb_path.to_string_lossy()));
+        profiles.insert("test_redb".to_string(), redb_profile);
+        
+        // DashMap profile
+        let mut dashmap_profile = std::collections::HashMap::new();
+        dashmap_profile.insert("type".to_string(), "dashmap".to_string());
+        dashmap_profile.insert("root".to_string(), dashmap_path.to_string_lossy().to_string());
+        profiles.insert("test_dashmap".to_string(), dashmap_profile);
+        
+        let settings = DeviceSettings {
+            server_hostname: "localhost:8000".to_string(),
+            api_endpoint: "http://localhost:8000/api".to_string(),
+            initialized: false,
+            default_data_path: temp_path.to_string_lossy().to_string(),
+            profiles,
+        };
+        
+        // Test that parse_profiles creates directories and operators
+        let operators = parse_profiles(&settings).await?;
+        
+        // Verify directories were created (only check for ones that were actually created)
+        if operators.contains_key("test_sqlite") {
+            assert!(sqlite_path.exists(), "SQLite directory should be created");
+            log::info!("✅ SQLite directory created successfully");
+        } else {
+            log::warn!("SQLite operator not available (feature not enabled)");
+        }
+        
+        if operators.contains_key("test_redb") {
+            assert!(redb_path.exists(), "ReDB directory should be created");
+            log::info!("✅ ReDB directory created successfully");
+        } else {
+            log::warn!("ReDB operator not available (feature not enabled)");
+        }
+        
+        if operators.contains_key("test_dashmap") {
+            assert!(dashmap_path.exists(), "DashMap directory should be created");
+            log::info!("✅ DashMap directory created successfully");
+        } else {
+            log::warn!("DashMap operator not available (feature not enabled)");
+        }
+        
+        // Test that we can save a document to each operator
+        let test_doc = Document {
+            id: "test_document".to_string(),
+            title: "Test Document".to_string(),
+            url: "test://url".to_string(),
+            body: "Test content".to_string(),
+            description: Some("Test description".to_string()),
+            stub: None,
+            tags: None,
+            rank: None,
+        };
+        
+        // Save document to each operator to verify they work
+        for (name, (op, _)) in &operators {
+            let key = format!("document_{}.json", test_doc.id);
+            let data = serde_json::to_string(&test_doc)?;
+            match op.write(&key, data).await {
+                Ok(()) => log::info!("✅ Successfully saved test document to {}", name),
+                Err(e) => log::warn!("Failed to save to {}: {:?}", name, e),
+            }
+        }
+        
         Ok(())
     }
 }

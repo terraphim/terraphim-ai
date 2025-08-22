@@ -16,6 +16,54 @@
 
 ## Current Task Status (2025-01-31)
 
+### 🔄 IN PROGRESS: AWS_ACCESS_KEY_ID Environment Variable Error
+
+**Task**: Investigate and fix AWS_ACCESS_KEY_ID environment variable lookup error preventing local development
+
+**Status**: 🔄 **INVESTIGATING ROOT CAUSE**
+
+**Investigation Details**:
+- **Error Location**: Occurs when loading thesaurus data in `terraphim_service`
+- **Root Cause**: Default settings include S3 profile requiring AWS credentials
+- **Settings Chain**: 
+  1. `terraphim_persistence/src/lib.rs` tries to use `settings_local_dev.toml`
+  2. `terraphim_settings/src/lib.rs` has `DEFAULT_SETTINGS` pointing to `settings_full.toml`
+  3. When no config exists, it creates one using `settings_full.toml` content
+  4. S3 profile in `settings_full.toml` requires `AWS_ACCESS_KEY_ID` environment variable
+
+**Next Steps**:
+- Update DEFAULT_SETTINGS to use local-only profiles
+- Ensure S3 profile is optional and doesn't block local development
+- Add fallback mechanism when AWS credentials are not available
+
+---
+
+### ✅ COMPLETED: Summarization Queue System
+
+**Task**: Implement production-ready async queue system for document summarization
+
+**Status**: ✅ **COMPLETED AND COMPILED SUCCESSFULLY**
+
+**Implementation Details**:
+- **Queue Management**: Priority-based queue with TaskId tracking
+- **Rate Limiting**: Token bucket algorithm for LLM providers
+- **Background Worker**: Async processing with concurrent task execution
+- **Retry Logic**: Exponential backoff for transient failures
+- **API Endpoints**: RESTful async endpoints for queue management
+- **Serialization**: Fixed DateTime<Utc> for serializable timestamps
+
+**Key Files Created/Modified**:
+1. `crates/terraphim_service/src/summarization_queue.rs` - Core queue structures
+2. `crates/terraphim_service/src/rate_limiter.rs` - Token bucket implementation
+3. `crates/terraphim_service/src/summarization_worker.rs` - Background worker
+4. `crates/terraphim_service/src/summarization_manager.rs` - High-level manager
+5. `terraphim_server/src/api.rs` - New async API endpoints
+6. Updated Cargo.toml files with uuid and chrono dependencies
+
+**Result**: System compiles successfully with comprehensive error handling and monitoring
+
+---
+
 ### ✅ COMPLETED: terraphim_it Field Fix
 
 **Task**: Fix invalid args `configNew` for command `update_config`: missing field `terraphim_it`

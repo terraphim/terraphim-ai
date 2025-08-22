@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::{
     http::{header, Method, StatusCode, Uri},
@@ -15,6 +16,8 @@ use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
 use tokio::sync::broadcast::channel;
+use terraphim_service::summarization_queue::QueueConfig;
+use terraphim_service::summarization_manager::SummarizationManager;
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
@@ -352,6 +355,10 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
+    // Initialize summarization manager
+    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
+    log::info!("Initialized summarization manager with default configuration");
+
     let app = Router::new()
         .route("/health", get(health))
         // .route("/documents", get(list_documents))
@@ -363,6 +370,17 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/documents/summarize/", post(api::summarize_document))
         .route("/summarization/status", get(api::get_summarization_status))
         .route("/summarization/status/", get(api::get_summarization_status))
+        // New async summarization endpoints
+        .route("/documents/async_summarize", post(api::async_summarize_document))
+        .route("/documents/async_summarize/", post(api::async_summarize_document))
+        .route("/summarization/batch", post(api::batch_summarize_documents))
+        .route("/summarization/batch/", post(api::batch_summarize_documents))
+        .route("/summarization/task/:task_id/status", get(api::get_task_status))
+        .route("/summarization/task/:task_id/status/", get(api::get_task_status))
+        .route("/summarization/task/:task_id/cancel", post(api::cancel_task))
+        .route("/summarization/task/:task_id/cancel/", post(api::cancel_task))
+        .route("/summarization/queue/stats", get(api::get_queue_stats))
+        .route("/summarization/queue/stats/", get(api::get_queue_stats))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))
@@ -382,6 +400,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
+        .layer(Extension(summarization_manager))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)

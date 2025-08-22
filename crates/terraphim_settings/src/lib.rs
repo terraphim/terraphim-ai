@@ -24,7 +24,7 @@ pub type DeviceSettingsResult<T> = std::result::Result<T, Error>;
 pub const DEFAULT_CONFIG_PATH: &str = ".config";
 
 /// Default settings file
-pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_full.toml");
+pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_local_dev.toml");
 
 fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where

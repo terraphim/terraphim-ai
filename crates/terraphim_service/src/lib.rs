@@ -19,6 +19,12 @@ pub mod openrouter;
 // Generic LLM layer for multiple providers (OpenRouter, Ollama, etc.)
 pub mod llm;
 
+// Summarization queue system for production-ready async processing
+pub mod rate_limiter;
+pub mod summarization_queue;
+pub mod summarization_worker;
+pub mod summarization_manager;
+
 /// Normalize a filename to be used as a document ID
 ///
 /// This ensures consistent ID generation between server startup and edit API

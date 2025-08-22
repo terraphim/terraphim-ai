@@ -45,6 +45,72 @@ async fn run_server() -> Result<()> {
         server_settings.server_hostname
     );
 
+    // Pre-create directories for storage backends early in startup to prevent persistence errors
+    log::info!("🔧 Pre-creating storage directories...");
+    log::info!("Found {} profiles: {:?}", server_settings.profiles.len(), server_settings.profiles.keys().collect::<Vec<_>>());
+    for (profile_name, profile) in &server_settings.profiles {
+        let unknown = "unknown".to_string();
+        let profile_type = profile.get("type").unwrap_or(&unknown);
+        log::info!("Processing profile '{}' of type '{}'", profile_name, profile_type);
+        match profile_type.as_str() {
+            "sqlite" => {
+                // Handle both datadir and connection_string formats
+                if let Some(datadir) = profile.get("datadir") {
+                    if !datadir.is_empty() {
+                        log::info!("🔧 Creating SQLite directory: {}", datadir);
+                        if let Err(e) = std::fs::create_dir_all(datadir) {
+                            log::warn!("Failed to create SQLite directory '{}': {}", datadir, e);
+                        } else {
+                            log::info!("✅ Created SQLite directory: {}", datadir);
+                        }
+                    }
+                } else if let Some(connection_string) = profile.get("connection_string") {
+                    // Extract directory from connection_string path
+                    if let Some(parent_dir) = std::path::Path::new(connection_string).parent() {
+                        let dir_str = parent_dir.to_string_lossy();
+                        if !dir_str.is_empty() {
+                            log::info!("🔧 Creating SQLite directory: {}", dir_str);
+                            if let Err(e) = std::fs::create_dir_all(parent_dir) {
+                                log::warn!("Failed to create SQLite directory '{}': {}", dir_str, e);
+                            } else {
+                                log::info!("✅ Created SQLite directory: {}", dir_str);
+                            }
+                        }
+                    }
+                }
+            }
+            "redb" => {
+                // Handle both datadir and path formats
+                let dir_path = profile.get("datadir").or_else(|| profile.get("path"));
+                
+                if let Some(datadir) = dir_path {
+                    if !datadir.is_empty() {
+                        log::info!("🔧 Creating ReDB directory: {}", datadir);
+                        if let Err(e) = std::fs::create_dir_all(datadir) {
+                            log::warn!("Failed to create ReDB directory '{}': {}", datadir, e);
+                        } else {
+                            log::info!("✅ Created ReDB directory: {}", datadir);
+                        }
+                    }
+                }
+            }
+            "dashmap" => {
+                if let Some(root) = profile.get("root") {
+                    if !root.is_empty() {
+                        log::info!("🔧 Creating DashMap directory: {}", root);
+                        if let Err(e) = std::fs::create_dir_all(root) {
+                            log::warn!("Failed to create DashMap directory '{}': {}", root, e);
+                        } else {
+                            log::info!("✅ Created DashMap directory: {}", root);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    log::info!("✅ Storage directory pre-creation completed");
+
     let server_hostname = server_settings
         .server_hostname
         .parse::<SocketAddr>()
