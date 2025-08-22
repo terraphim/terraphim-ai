@@ -4,12 +4,13 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
-use tokio::sync::Mutex;
+use chrono::Utc;
 
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
@@ -358,6 +359,140 @@ pub struct SummarizeDocumentResponse {
     pub from_cache: bool,
     /// Error message if summarization failed
     pub error: Option<String>,
+}
+
+// New async queue API types
+
+/// Request for async document summarization
+#[derive(Debug, Deserialize)]
+pub struct AsyncSummarizeRequest {
+    /// Document ID to summarize
+    pub document_id: String,
+    /// Role to use for summarization
+    pub role: String,
+    /// Optional: Priority level (low, normal, high, critical)
+    pub priority: Option<String>,
+    /// Optional: Override max summary length (default: 250 characters)
+    pub max_length: Option<usize>,
+    /// Optional: Force regeneration even if summary exists
+    pub force_regenerate: Option<bool>,
+    /// Optional: Callback URL for completion notification
+    pub callback_url: Option<String>,
+}
+
+/// Response for async summarization request
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AsyncSummarizeResponse {
+    /// Status of the request submission
+    pub status: Status,
+    /// Task ID for tracking progress
+    pub task_id: Option<String>,
+    /// Position in queue if successfully queued
+    pub position_in_queue: Option<usize>,
+    /// Estimated wait time in seconds
+    pub estimated_wait_seconds: Option<u64>,
+    /// Error message if submission failed
+    pub error: Option<String>,
+}
+
+/// Request for task status
+#[derive(Debug, Deserialize)]
+pub struct TaskStatusRequest {
+    /// Task ID to check
+    pub task_id: String,
+}
+
+/// Response for task status
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TaskStatusResponse {
+    /// Status of the request
+    pub status: Status,
+    /// Task ID
+    pub task_id: String,
+    /// Current task status
+    pub task_status: Option<String>,
+    /// Progress percentage (0-100) if processing
+    pub progress: Option<f32>,
+    /// Result summary if completed
+    pub summary: Option<String>,
+    /// Error message if failed
+    pub error: Option<String>,
+    /// Processing duration if completed
+    pub processing_duration_ms: Option<u64>,
+    /// Next retry time if failed and retryable
+    pub next_retry_seconds: Option<u64>,
+    /// Retry count
+    pub retry_count: Option<u32>,
+}
+
+/// Request to cancel a task
+#[derive(Debug, Deserialize)]
+pub struct CancelTaskRequest {
+    /// Task ID to cancel
+    pub task_id: String,
+    /// Reason for cancellation
+    pub reason: Option<String>,
+}
+
+/// Response for task cancellation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CancelTaskResponse {
+    /// Status of the cancellation request
+    pub status: Status,
+    /// Whether the task was successfully cancelled
+    pub cancelled: bool,
+    /// Error message if cancellation failed
+    pub error: Option<String>,
+}
+
+/// Response for queue statistics
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct QueueStatsResponse {
+    /// Status of the request
+    pub status: Status,
+    /// Queue statistics
+    pub stats: Option<terraphim_service::summarization_queue::QueueStats>,
+    /// Error message if retrieval failed
+    pub error: Option<String>,
+}
+
+/// Request for batch summarization
+#[derive(Debug, Deserialize)]
+pub struct BatchSummarizeRequest {
+    /// List of documents to summarize
+    pub documents: Vec<BatchSummarizeItem>,
+    /// Role to use for summarization
+    pub role: String,
+    /// Priority for all tasks (low, normal, high, critical)
+    pub priority: Option<String>,
+    /// Optional: Callback URL for batch completion notification
+    pub callback_url: Option<String>,
+}
+
+/// Single item in batch summarization request
+#[derive(Debug, Deserialize)]
+pub struct BatchSummarizeItem {
+    /// Document ID to summarize
+    pub document_id: String,
+    /// Optional: Override max summary length
+    pub max_length: Option<usize>,
+    /// Optional: Force regeneration even if summary exists
+    pub force_regenerate: Option<bool>,
+}
+
+/// Response for batch summarization
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BatchSummarizeResponse {
+    /// Status of the batch request
+    pub status: Status,
+    /// List of submitted task IDs
+    pub task_ids: Vec<String>,
+    /// Number of successfully queued tasks
+    pub queued_count: usize,
+    /// Number of failed submissions
+    pub failed_count: usize,
+    /// Errors for failed submissions
+    pub errors: Vec<String>,
 }
 
 /// Query parameters for summarization status
@@ -841,4 +976,413 @@ pub(crate) async fn get_summarization_status(
             cached_summaries_count: 0,
         }))
     }
+}
+
+// New Async Queue API Endpoints
+
+/// Submit a document for async summarization
+pub(crate) async fn async_summarize_document(
+    State(config_state): State<ConfigState>,
+    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Json(request): Json<AsyncSummarizeRequest>,
+) -> Result<Json<AsyncSummarizeResponse>> {
+    log::debug!(
+        "Async summarizing document '{}' with role '{}'",
+        request.document_id,
+        request.role
+    );
+
+    let role_name = RoleName::new(&request.role);
+    let config = config_state.config.lock().await;
+
+    // Get the role configuration
+    let Some(role_ref) = config.roles.get(&role_name) else {
+        return Ok(Json(AsyncSummarizeResponse {
+            status: Status::Error,
+            task_id: None,
+            position_in_queue: None,
+            estimated_wait_seconds: None,
+            error: Some(format!("Role '{}' not found", request.role)),
+        }));
+    };
+
+    let role = role_ref.clone();
+    drop(config); // Release the lock
+
+    // Load the document
+    let mut terraphim_service = TerraphimService::new(config_state);
+    let document = match terraphim_service.get_document_by_id(&request.document_id).await {
+        Ok(Some(doc)) => doc,
+        Ok(None) => {
+            return Ok(Json(AsyncSummarizeResponse {
+                status: Status::Error,
+                task_id: None,
+                position_in_queue: None,
+                estimated_wait_seconds: None,
+                error: Some("Document not found".to_string()),
+            }));
+        }
+        Err(e) => {
+            log::error!("Failed to load document '{}': {:?}", request.document_id, e);
+            return Ok(Json(AsyncSummarizeResponse {
+                status: Status::Error,
+                task_id: None,
+                position_in_queue: None,
+                estimated_wait_seconds: None,
+                error: Some(format!("Failed to load document: {}", e)),
+            }));
+        }
+    };
+
+    // Parse priority
+    let priority = match request.priority.as_deref() {
+        Some("low") => Some(terraphim_service::summarization_queue::Priority::Low),
+        Some("normal") => Some(terraphim_service::summarization_queue::Priority::Normal),
+        Some("high") => Some(terraphim_service::summarization_queue::Priority::High),
+        Some("critical") => Some(terraphim_service::summarization_queue::Priority::Critical),
+        None => None,
+        Some(invalid) => {
+            return Ok(Json(AsyncSummarizeResponse {
+                status: Status::Error,
+                task_id: None,
+                position_in_queue: None,
+                estimated_wait_seconds: None,
+                error: Some(format!("Invalid priority '{}'. Use: low, normal, high, or critical", invalid)),
+            }));
+        }
+    };
+
+    // Submit to queue
+    let manager = summarization_manager.lock().await;
+    match manager.summarize_document(
+        document,
+        role,
+        priority,
+        request.max_length,
+        request.force_regenerate,
+        request.callback_url,
+    ).await {
+        Ok(result) => {
+            match result {
+                terraphim_service::summarization_queue::SubmitResult::Queued { 
+                    task_id, 
+                    position_in_queue,
+                    estimated_wait_time_seconds 
+                } => {
+                    Ok(Json(AsyncSummarizeResponse {
+                        status: Status::Success,
+                        task_id: Some(task_id.to_string()),
+                        position_in_queue: Some(position_in_queue),
+                        estimated_wait_seconds: estimated_wait_time_seconds,
+                        error: None,
+                    }))
+                }
+                terraphim_service::summarization_queue::SubmitResult::QueueFull => {
+                    Ok(Json(AsyncSummarizeResponse {
+                        status: Status::Error,
+                        task_id: None,
+                        position_in_queue: None,
+                        estimated_wait_seconds: None,
+                        error: Some("Queue is full, please try again later".to_string()),
+                    }))
+                }
+                terraphim_service::summarization_queue::SubmitResult::Duplicate(existing_id) => {
+                    Ok(Json(AsyncSummarizeResponse {
+                        status: Status::Success,
+                        task_id: Some(existing_id.to_string()),
+                        position_in_queue: None,
+                        estimated_wait_seconds: None,
+                        error: Some("Task already exists for this document".to_string()),
+                    }))
+                }
+                terraphim_service::summarization_queue::SubmitResult::ValidationError(err) => {
+                    Ok(Json(AsyncSummarizeResponse {
+                        status: Status::Error,
+                        task_id: None,
+                        position_in_queue: None,
+                        estimated_wait_seconds: None,
+                        error: Some(err),
+                    }))
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to submit summarization task: {:?}", e);
+            Ok(Json(AsyncSummarizeResponse {
+                status: Status::Error,
+                task_id: None,
+                position_in_queue: None,
+                estimated_wait_seconds: None,
+                error: Some(format!("Failed to submit task: {}", e)),
+            }))
+        }
+    }
+}
+
+/// Get the status of a summarization task
+pub(crate) async fn get_task_status(
+    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Path(task_id): Path<String>,
+) -> Result<Json<TaskStatusResponse>> {
+    let task_id = match task_id.parse() {
+        Ok(uuid) => terraphim_service::summarization_queue::TaskId(uuid),
+        Err(_) => {
+            return Ok(Json(TaskStatusResponse {
+                status: Status::Error,
+                task_id: task_id.clone(),
+                task_status: None,
+                progress: None,
+                summary: None,
+                error: Some("Invalid task ID format".to_string()),
+                processing_duration_ms: None,
+                next_retry_seconds: None,
+                retry_count: None,
+            }));
+        }
+    };
+
+    let manager = summarization_manager.lock().await;
+    match manager.get_task_status(&task_id).await {
+        Some(status) => {
+            let (task_status_str, progress, summary, error, duration_ms, next_retry, retry_count) = match status {
+                terraphim_service::summarization_queue::TaskStatus::Pending { .. } => {
+                    ("pending".to_string(), None, None, None, None, None, None)
+                }
+                terraphim_service::summarization_queue::TaskStatus::Processing { progress, .. } => {
+                    ("processing".to_string(), progress, None, None, None, None, None)
+                }
+                terraphim_service::summarization_queue::TaskStatus::Completed { 
+                    summary, 
+                    processing_duration_seconds, 
+                    .. 
+                } => {
+                    ("completed".to_string(), Some(100.0), Some(summary), None, 
+                     Some(processing_duration_seconds * 1000), None, None)
+                }
+                terraphim_service::summarization_queue::TaskStatus::Failed { 
+                    error, 
+                    retry_count,
+                    next_retry_at,
+                    .. 
+                } => {
+                    let next_retry_seconds = next_retry_at.map(|t| {
+                        let duration = t.signed_duration_since(chrono::Utc::now());
+                        duration.num_seconds().max(0) as u64
+                    });
+                    ("failed".to_string(), None, None, Some(error), None, 
+                     next_retry_seconds, Some(retry_count))
+                }
+                terraphim_service::summarization_queue::TaskStatus::Cancelled { reason, .. } => {
+                    ("cancelled".to_string(), None, None, Some(reason), None, None, None)
+                }
+            };
+
+            Ok(Json(TaskStatusResponse {
+                status: Status::Success,
+                task_id: task_id.to_string(),
+                task_status: Some(task_status_str),
+                progress,
+                summary,
+                error,
+                processing_duration_ms: duration_ms,
+                next_retry_seconds: next_retry,
+                retry_count,
+            }))
+        }
+        None => {
+            Ok(Json(TaskStatusResponse {
+                status: Status::Error,
+                task_id: task_id.to_string(),
+                task_status: None,
+                progress: None,
+                summary: None,
+                error: Some("Task not found".to_string()),
+                processing_duration_ms: None,
+                next_retry_seconds: None,
+                retry_count: None,
+            }))
+        }
+    }
+}
+
+/// Cancel a summarization task
+pub(crate) async fn cancel_task(
+    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Path(task_id): Path<String>,
+    Json(request): Json<CancelTaskRequest>,
+) -> Result<Json<CancelTaskResponse>> {
+    let task_id = match task_id.parse() {
+        Ok(uuid) => terraphim_service::summarization_queue::TaskId(uuid),
+        Err(_) => {
+            return Ok(Json(CancelTaskResponse {
+                status: Status::Error,
+                cancelled: false,
+                error: Some("Invalid task ID format".to_string()),
+            }));
+        }
+    };
+
+    let manager = summarization_manager.lock().await;
+    match manager.cancel_task(
+        task_id.clone(),
+        request.reason.unwrap_or_else(|| "Cancelled by user".to_string()),
+    ).await {
+        Ok(cancelled) => {
+            Ok(Json(CancelTaskResponse {
+                status: Status::Success,
+                cancelled,
+                error: None,
+            }))
+        }
+        Err(e) => {
+            log::error!("Failed to cancel task {}: {:?}", task_id, e);
+            Ok(Json(CancelTaskResponse {
+                status: Status::Error,
+                cancelled: false,
+                error: Some(format!("Failed to cancel task: {}", e)),
+            }))
+        }
+    }
+}
+
+/// Get queue statistics
+pub(crate) async fn get_queue_stats(
+    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+) -> Result<Json<QueueStatsResponse>> {
+    let manager = summarization_manager.lock().await;
+    match manager.get_stats().await {
+        Ok(stats) => {
+            Ok(Json(QueueStatsResponse {
+                status: Status::Success,
+                stats: Some(stats),
+                error: None,
+            }))
+        }
+        Err(e) => {
+            log::error!("Failed to get queue stats: {:?}", e);
+            Ok(Json(QueueStatsResponse {
+                status: Status::Error,
+                stats: None,
+                error: Some(format!("Failed to get stats: {}", e)),
+            }))
+        }
+    }
+}
+
+/// Submit multiple documents for batch summarization
+pub(crate) async fn batch_summarize_documents(
+    State(config_state): State<ConfigState>,
+    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Json(request): Json<BatchSummarizeRequest>,
+) -> Result<Json<BatchSummarizeResponse>> {
+    log::debug!(
+        "Batch summarizing {} documents with role '{}'",
+        request.documents.len(),
+        request.role
+    );
+
+    let role_name = RoleName::new(&request.role);
+    let config = config_state.config.lock().await;
+
+    // Get the role configuration
+    let Some(role_ref) = config.roles.get(&role_name) else {
+        return Ok(Json(BatchSummarizeResponse {
+            status: Status::Error,
+            task_ids: vec![],
+            queued_count: 0,
+            failed_count: request.documents.len(),
+            errors: vec![format!("Role '{}' not found", request.role)],
+        }));
+    };
+
+    let role = role_ref.clone();
+    drop(config); // Release the lock
+
+    // Parse priority
+    let priority = match request.priority.as_deref() {
+        Some("low") => Some(terraphim_service::summarization_queue::Priority::Low),
+        Some("normal") => Some(terraphim_service::summarization_queue::Priority::Normal),
+        Some("high") => Some(terraphim_service::summarization_queue::Priority::High),
+        Some("critical") => Some(terraphim_service::summarization_queue::Priority::Critical),
+        None => None,
+        Some(invalid) => {
+            return Ok(Json(BatchSummarizeResponse {
+                status: Status::Error,
+                task_ids: vec![],
+                queued_count: 0,
+                failed_count: request.documents.len(),
+                errors: vec![format!("Invalid priority '{}'. Use: low, normal, high, or critical", invalid)],
+            }));
+        }
+    };
+
+    let mut terraphim_service = TerraphimService::new(config_state);
+    let manager = summarization_manager.lock().await;
+
+    let mut task_ids = Vec::new();
+    let mut errors = Vec::new();
+    let mut queued_count = 0;
+    let mut failed_count = 0;
+
+    for (index, item) in request.documents.iter().enumerate() {
+        // Load the document
+        let document = match terraphim_service.get_document_by_id(&item.document_id).await {
+            Ok(Some(doc)) => doc,
+            Ok(None) => {
+                errors.push(format!("Document {} not found", item.document_id));
+                failed_count += 1;
+                continue;
+            }
+            Err(e) => {
+                log::error!("Failed to load document '{}': {:?}", item.document_id, e);
+                errors.push(format!("Failed to load document {}: {}", item.document_id, e));
+                failed_count += 1;
+                continue;
+            }
+        };
+
+        // Submit to queue
+        match manager.summarize_document(
+            document,
+            role.clone(),
+            priority.clone(),
+            item.max_length,
+            item.force_regenerate,
+            request.callback_url.clone(),
+        ).await {
+            Ok(result) => {
+                match result {
+                    terraphim_service::summarization_queue::SubmitResult::Queued { task_id, .. } => {
+                        task_ids.push(task_id.to_string());
+                        queued_count += 1;
+                    }
+                    terraphim_service::summarization_queue::SubmitResult::Duplicate(existing_id) => {
+                        task_ids.push(existing_id.to_string());
+                        queued_count += 1; // Count as success for batch
+                    }
+                    terraphim_service::summarization_queue::SubmitResult::QueueFull => {
+                        errors.push(format!("Queue full for document {}", item.document_id));
+                        failed_count += 1;
+                    }
+                    terraphim_service::summarization_queue::SubmitResult::ValidationError(err) => {
+                        errors.push(format!("Validation error for document {}: {}", item.document_id, err));
+                        failed_count += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to submit task for document '{}': {:?}", item.document_id, e);
+                errors.push(format!("Failed to submit task for document {}: {}", item.document_id, e));
+                failed_count += 1;
+            }
+        }
+    }
+
+    Ok(Json(BatchSummarizeResponse {
+        status: if failed_count == 0 { Status::Success } else { Status::PartialSuccess },
+        task_ids,
+        queued_count,
+        failed_count,
+        errors,
+    }))
 }

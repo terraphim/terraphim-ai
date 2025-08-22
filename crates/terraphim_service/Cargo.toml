@@ -31,6 +31,8 @@ tokio = { workspace = true }
 async-trait = "0.1"
 futures-util = "0.3"
 async-stream = "0.3"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 # OpenRouter integration dependencies (optional)
 reqwest = { workspace = true, optional = true }

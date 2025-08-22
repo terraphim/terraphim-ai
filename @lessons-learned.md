@@ -1,5 +1,85 @@
 # Terraphim AI Lessons Learned
 
+## Async Queue System and Production-Ready Summarization (2025-01-31)
+
+### 🎯 Key Architecture Patterns
+
+1. **Priority Queue with Binary Heap**
+   - **Lesson**: Use `BinaryHeap` for efficient priority queue implementation
+   - **Pattern**: Wrap tasks in `Reverse()` for min-heap behavior (highest priority first)
+   - **Benefits**: O(log n) insertion/extraction, automatic ordering
+
+2. **Token Bucket Rate Limiting**
+   - **Lesson**: Token bucket algorithm provides smooth rate limiting with burst capacity
+   - **Implementation**: Track tokens, refill rate, and request count per window
+   - **Pattern**: Use `Arc<Mutex<>>` for thread-safe token management
+
+3. **DateTime Serialization for Async Systems**
+   - **Problem**: `std::time::Instant` doesn't implement `Serialize/Deserialize`
+   - **Solution**: Use `chrono::DateTime<Utc>` for serializable timestamps
+   - **Pattern**: Convert durations to seconds (u64) for API responses
+
+4. **Background Worker Pattern**
+   - **Lesson**: Separate queue management from processing with channels
+   - **Pattern**: Use `mpsc::channel` for command communication
+   - **Benefits**: Clean shutdown, pause/resume capabilities, status tracking
+
+### 🔧 Implementation Best Practices
+
+1. **Task Status Management**
+```rust
+// Use Arc<RwLock<HashMap>> for concurrent status tracking
+pub(crate) task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>
+// Make field pub(crate) for internal access
+```
+
+2. **Retry Logic with Exponential Backoff**
+```rust
+let delay = Duration::from_secs(2u64.pow(task.retry_count));
+tokio::time::sleep(delay).await;
+```
+
+3. **RESTful API Design**
+   - POST `/api/summarize/async` - Submit task, return TaskId
+   - GET `/api/summarize/status/{id}` - Check task status
+   - DELETE `/api/summarize/cancel/{id}` - Cancel task
+   - GET `/api/summarize/queue/stats` - Queue statistics
+
+### 🚨 Common Pitfalls and Solutions
+
+1. **Missing Dependencies**
+   - Always add `uuid` with `["v4", "serde"]` features
+   - Include `chrono` with `["serde"]` feature for DateTime
+
+2. **Visibility Issues**
+   - Use `pub(crate)` for internal module access
+   - Avoid private fields in structs accessed across modules
+
+3. **Enum Variant Consistency**
+   - Add new variants (e.g., `PartialSuccess`) to all match statements
+   - Update error enums when adding new states
+
+## AWS Credentials and Settings Configuration (2025-01-31)
+
+### 🎯 Settings Loading Chain Issue
+
+1. **Problem**: AWS_ACCESS_KEY_ID required even for local development
+   - **Root Cause**: `DEFAULT_SETTINGS` includes S3 profile from `settings_full.toml`
+   - **Impact**: Blocks local development without AWS credentials
+
+2. **Settings Resolution Chain**:
+   ```
+   1. terraphim_persistence tries settings_local_dev.toml
+   2. terraphim_settings DEFAULT_SETTINGS = settings_full.toml
+   3. If no config exists, creates using settings_full.toml
+   4. S3 profile requires AWS environment variables
+   ```
+
+3. **Solution Approaches**:
+   - Change DEFAULT_SETTINGS to local-only profiles
+   - Make S3 profile optional with fallback
+   - Use feature flags for cloud storage profiles
+
 ## MCP Server Development and Protocol Integration (2025-01-31)
 
 ### 🎯 Key Challenges and Solutions

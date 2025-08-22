@@ -100,6 +100,38 @@ The compactness and mobility of such AI assistant drives the [[Design Decisions]
 
 Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
 
+## Configuration
+
+### Storage Backends
+
+Terraphim supports multiple storage backends for different deployment scenarios:
+
+#### Local Development (Default)
+The system uses local storage backends by default, requiring no additional configuration:
+- **Memory**: In-memory storage for testing
+- **DashMap**: High-performance concurrent storage
+- **SQLite**: Local database storage
+- **ReDB**: Embedded key-value database
+
+#### Cloud Storage (Optional)
+For production deployments, you can optionally enable cloud storage:
+
+##### AWS S3 Configuration
+To use AWS S3 storage, set the following environment variables:
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export TERRAPHIM_PROFILE_S3_REGION="us-east-1"
+export TERRAPHIM_PROFILE_S3_ENDPOINT="https://s3.amazonaws.com/"
+```
+
+**Note**: AWS credentials are completely optional. The system will automatically fall back to local storage if AWS credentials are not available, ensuring local development works without any cloud dependencies.
+
+### Environment Variables
+- `TERRAPHIM_SETTINGS_PATH`: Override the settings file path
+- `TERRAPHIM_DATA_PATH`: Set the data directory location
+- `LOG_LEVEL`: Set logging verbosity (debug, info, warn, error)
+
 ## Contributing
 
 If you'd like to contribute to the project, please read our
