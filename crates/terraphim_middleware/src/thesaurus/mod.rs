@@ -86,12 +86,13 @@ async fn update_thesaurus(
     thesaurus: Thesaurus,
 ) -> Result<()> {
     log::debug!("Updating thesaurus for role: {}", role_name);
-    let mut rolegraphs = config_state.roles.clone();
     let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
     match rolegraph {
         Ok(rolegraph) => {
             let rolegraph_value = RoleGraphSync::from(rolegraph);
-            rolegraphs.insert(role_name.clone(), rolegraph_value);
+            // Actually update the config_state.roles, not just a local copy
+            config_state.roles.insert(role_name.clone(), rolegraph_value);
+            log::info!("Successfully updated rolegraph for role: {}", role_name);
         }
         Err(e) => log::error!("Failed to update role and thesaurus: {:?}", e),
     }
