@@ -234,7 +234,11 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         }
         "turtle" => {
             // Serialize each resource individually using Turtle representation from server
-            let client = reqwest::Client::new();
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
             use reqwest::header::ACCEPT;
             for res in &resources {
                 let resp = client
@@ -287,7 +291,11 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         let body = serde_json::to_vec(&resources)?;
 
         use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers =
                 terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -700,7 +708,11 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
             file.write_all(&serialized)?;
         }
         "turtle" => {
-            let client = reqwest::Client::new();
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
             use reqwest::header::ACCEPT;
             for res in &resources {
                 let resp = client
@@ -752,7 +764,11 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         let body = serde_json::to_vec(&transformed)?;
 
         use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers =
                 terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -1077,7 +1093,11 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
             file.write_all(&serialized)?;
         }
         "turtle" => {
-            let client = reqwest::Client::new();
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
             use reqwest::header::ACCEPT;
             for res in &filtered_resources {
                 let resp = client
@@ -1126,7 +1146,11 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         }
         let body = serde_json::to_vec(&transformed)?;
         use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers =
                 terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;

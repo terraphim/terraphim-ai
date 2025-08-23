@@ -380,7 +380,7 @@
     
     // Add metadata
     markdownContent += `**Source:** Terraphim Search\n`;
-    markdownContent += `**Rank:** ${document.rank}\n`;
+    markdownContent += `**Rank:** ${document.rank || 'N/A'}\n`;
     if (document.url) {
       markdownContent += `**URL:** ${document.url}\n`;
     }
@@ -451,7 +451,7 @@
         </div>
           <div class="level-right">
           <Taglist>
-            <Tag rounded>Rank {document.rank}</Tag>
+            <Tag rounded>Rank {document.rank || 0}</Tag>
           </Taglist>
         </div>
         <div transition:fade>

@@ -502,9 +502,8 @@ mod tests {
     use tokio::test;
     use ulid::Ulid;
 
-    async fn load_sample_thesaurus() -> Thesaurus {
+    fn load_sample_thesaurus() -> Thesaurus {
         load_thesaurus(&AutomataPath::local_example_full())
-            .await
             .unwrap()
     }
 
@@ -576,7 +575,7 @@ mod tests {
             return;
         }
         let automata_path = AutomataPath::from_local(engineer_thesaurus_path);
-        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
+        let thesaurus = load_thesaurus(&automata_path).unwrap();
         let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone())
             .await
             .unwrap();

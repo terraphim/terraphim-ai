@@ -71,3 +71,9 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 # OpenRouter AI integration feature
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+# Optional database backends
+sqlite = ["terraphim_persistence/services-sqlite"]
+rocksdb = ["terraphim_persistence/services-rocksdb"]
+redis = ["terraphim_persistence/services-redis"]
+# Enable all database backends
+full-db = ["sqlite", "rocksdb", "redis"]

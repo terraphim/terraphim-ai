@@ -164,7 +164,8 @@ async fn test_terraphim_engineer_local_kg_integration() {
     log::info!("⏳ Waiting for server startup and KG build...");
     sleep(Duration::from_secs(15)).await; // Local KG build may take longer
 
-    let client = Client::new();
+    let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let base_url = "http://127.0.0.1:8081";
 
     // Test 1: Health check

@@ -17,7 +17,8 @@ async fn e2e_search_auto_summarize_with_ollama() {
         .ok()
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
-    let http = reqwest::Client::new();
+    let http = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let ok = http
         .get(format!("{}/api/tags", base_url.trim_end_matches('/')))
         .timeout(Duration::from_secs(2))

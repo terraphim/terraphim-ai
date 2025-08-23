@@ -50,14 +50,21 @@ async fn main() -> Result<()> {
     // Initialize logging
     let args = Args::parse();
     
-    if args.verbose {
-        tracing_subscriber::fmt()
-            .with_max_level(Level::DEBUG)
-            .init();
+    // Standardized tracing setup
+    let level = if args.verbose { Level::DEBUG } else { Level::INFO };
+    let subscriber = tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(level.into())
+        );
+        
+    if args.sse {
+        // SSE mode needs timestamps for server logs
+        subscriber.init();
     } else {
-        tracing_subscriber::fmt()
-            .with_max_level(Level::INFO)
-            .init();
+        // Stdio mode can skip timestamps for cleaner output
+        subscriber.without_time().init();
     }
     
     info!("Starting Terraphim MCP Server...");

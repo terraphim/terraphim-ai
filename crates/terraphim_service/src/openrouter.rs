@@ -78,7 +78,8 @@ impl OpenRouterService {
             ));
         }
 
-        let client = reqwest::Client::new();
+        let client = crate::http_client::create_api_client()
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         // Allow overriding base URL for testing via env var
         let base_url = std::env::var("OPENROUTER_BASE_URL")

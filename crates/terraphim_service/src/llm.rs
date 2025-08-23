@@ -305,7 +305,8 @@ fn build_ollama_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmCl
         .or_else(|| get_string_extra(&role.extra, "ollama_base_url"))
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
-    let http = reqwest::Client::new();
+    let http = crate::http_client::create_api_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     Some(Arc::new(OllamaClient {
         http,
         base_url,

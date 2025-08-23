@@ -48,6 +48,12 @@ chrono = { version = "0.4", features = ["serde"] }
 [features]
 default = []
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+# Optional database backends
+sqlite = ["terraphim_persistence/services-sqlite"]
+rocksdb = ["terraphim_persistence/services-rocksdb"]
+redis = ["terraphim_persistence/services-redis"]
+# Enable all database backends
+full-db = ["sqlite", "rocksdb", "redis"]
 
 [dev-dependencies]
 serial_test = "3.0.0"

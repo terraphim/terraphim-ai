@@ -182,7 +182,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Initialize logging only for desktop app mode (not MCP server mode)
-    env_logger::init();
+    terraphim_service::logging::init_logging(
+        terraphim_service::logging::detect_logging_config()
+    );
     
     log::info!("Starting Terraphim Desktop app...");
     log::info!("Current working directory: {:?}", std::env::current_dir()?);
