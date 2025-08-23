@@ -20,3 +20,4 @@ datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
 [profiles.redb]
 type = "redb"
 datadir = "/tmp/terraphim_redb"  # Directory auto-created
+table = "terraphim"  # Required table name for redb

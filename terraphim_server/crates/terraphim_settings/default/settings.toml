@@ -13,9 +13,10 @@ type = "memory"
 type = "dashmap"
 root = "/tmp/terraphim_dashmap"  # Directory auto-created
 
-[profiles.sqlite]
-type = "sqlite"
-datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
+# Optional database backends - uncomment if SQLite feature is enabled
+# [profiles.sqlite]
+# type = "sqlite"
+# datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
 
 [profiles.redb]
 type = "redb"
