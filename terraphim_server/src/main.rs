@@ -36,7 +36,9 @@ async fn main() -> Result<()> {
 
 async fn run_server() -> Result<()> {
     // Set up logger for the server
-    env_logger::init();
+    terraphim_service::logging::init_logging(
+        terraphim_service::logging::detect_logging_config()
+    );
 
     let server_settings =
         DeviceSettings::load_from_env_and_file(None).context("Failed to load settings")?;

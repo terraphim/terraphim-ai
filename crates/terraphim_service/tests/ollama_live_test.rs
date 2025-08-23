@@ -14,7 +14,8 @@ async fn live_ollama_summarize_deepseek_coder() {
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
     // Quick connectivity check; if not running, exit early (treat as skipped)
-    let http = reqwest::Client::new();
+    let http = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let health = http
         .get(format!("{}/api/tags", base_url.trim_end_matches('/')))
         .send()

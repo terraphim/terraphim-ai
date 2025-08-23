@@ -25,10 +25,6 @@ async-trait = "0.1.74"
 log = "0.4"
 opendal = { version = "0.44.2", features = [
     "services-dashmap",
-    "services-redis",
-    "services-rocksdb",
-    "services-redb", 
-    "services-sqlite",
 ] }
 serde = { version = "1.0.182", features = ["derive"] }
 serde_json = "1.0.104"
@@ -46,18 +42,18 @@ tokio = { version = "1", features = ["full"] }
 test-env-log = "0.2"
 
 [features]
-default = ["services-dashmap", "services-rocksdb", "services-atomicserver"]
+default = ["services-dashmap", "services-redb", "services-atomicserver"]
 # Enable services dashmap support
 services-dashmap = ["opendal/services-dashmap"]
 # Enable services ipfs support
 services-ipfs = ["opendal/services-ipfs"]
-# Enable services redis support
+# Enable services redis support (optional)
 services-redis = ["opendal/services-redis"]
-# Enable services rocksdb support
+# Enable services rocksdb support (optional)
 services-rocksdb = ["opendal/services-rocksdb"]
-# Enable services redb support
+# Enable services redb support (lightweight alternative to rocksdb)
 services-redb = ["opendal/services-redb"]
-# Enable services sqlite support
+# Enable services sqlite support (optional)
 services-sqlite = ["opendal/services-sqlite"]
 # Enable services atomic server
 services-atomicserver = ["opendal/services-atomicserver"]

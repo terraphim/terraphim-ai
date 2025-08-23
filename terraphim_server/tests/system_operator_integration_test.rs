@@ -19,9 +19,9 @@ use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
 #[serial]
 async fn test_system_operator_remote_kg_integration() {
     // Set up logging
-    let _ = env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .try_init();
+    terraphim_service::logging::init_logging(
+        terraphim_service::logging::LoggingConfig::IntegrationTest
+    );
 
     // Check if system operator data exists
     let system_operator_path = PathBuf::from("/tmp/system_operator/pages");
@@ -93,7 +93,8 @@ async fn test_system_operator_remote_kg_integration() {
     // Wait for server to start
     sleep(Duration::from_secs(3)).await;
 
-    let client = Client::new();
+    let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let base_url = "http://127.0.0.1:8080";
 
     // Test 1: Health check

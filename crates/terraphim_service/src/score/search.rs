@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use terraphim_types::Document;
 
 use crate::error::{Error, Result};
-use crate::score::{NameQuery, QueryScorer};
+use crate::score::{NameQuery, QueryScorer, Similarity};
 use crate::scored::{Scored, SearchResults};
 
 /// A handle that permits searching documents with relevance ranking.
@@ -898,5 +898,78 @@ mod tests {
         }
         let got: Test = serde_json::from_str(json).unwrap();
         assert_eq!(got.query, expected);
+    }
+}
+
+/// A simplified query structure for Terraphim document search.
+///
+/// This is a streamlined version of Query focused on document search functionality
+/// without the complexity of media-specific fields from the original implementation.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct TerraphimQuery {
+    pub name: String,
+    pub name_scorer: QueryScorer,
+    pub similarity: Similarity,
+    pub size: usize,
+}
+
+impl TerraphimQuery {
+    /// Create a new query with the given search term.
+    pub fn new(name: &str) -> TerraphimQuery {
+        TerraphimQuery {
+            name: name.to_string(),
+            name_scorer: QueryScorer::default(),
+            similarity: Similarity::default(),
+            size: 30,
+        }
+    }
+
+    /// Return true if and only if this query is empty.
+    ///
+    /// Searching with an empty query always yields no results.
+    pub fn is_empty(&self) -> bool {
+        self.name.is_empty()
+    }
+
+    /// Set the name scorer to use for ranking.
+    ///
+    /// The name scorer determines which algorithm is used to rank documents.
+    pub fn name_scorer(mut self, scorer: QueryScorer) -> TerraphimQuery {
+        self.name_scorer = scorer;
+        self
+    }
+
+    /// Set the similarity function.
+    ///
+    /// The similarity function can be selected from a predefined set of
+    /// choices defined by the [`Similarity`](enum.Similarity.html) type.
+    ///
+    /// When a similarity function is used, then any results from searching
+    /// the name index are re-ranked according to their similarity with the
+    /// query.
+    ///
+    /// By default, no similarity function is used.
+    pub fn similarity(mut self, sim: Similarity) -> TerraphimQuery {
+        self.similarity = sim;
+        self
+    }
+}
+
+impl Serialize for TerraphimQuery {
+    fn serialize<S>(&self, s: S) -> result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_str(&self.to_string())
+    }
+}
+
+impl fmt::Display for TerraphimQuery {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{scorer:{}}}", self.name_scorer)?;
+        write!(f, " {{sim:{}}}", self.similarity)?;
+        write!(f, " {{size:{}}}", self.size)?;
+        write!(f, " {}", self.name)?;
+        Ok(())
     }
 }

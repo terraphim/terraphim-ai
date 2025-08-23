@@ -15,7 +15,10 @@ use uuid::Uuid;
 #[tokio::test]
 async fn test_atomic_haystack_title_scorer_role() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     // Load atomic server configuration from environment
     dotenvy::dotenv().ok();
@@ -351,7 +354,10 @@ async fn test_atomic_haystack_title_scorer_role() {
 #[tokio::test]
 async fn test_atomic_haystack_graph_embeddings_role() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     // Load atomic server configuration from environment
     dotenvy::dotenv().ok();
@@ -639,7 +645,10 @@ async fn test_atomic_haystack_graph_embeddings_role() {
 #[tokio::test]
 async fn test_atomic_haystack_role_comparison() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     // Load atomic server configuration from environment
     dotenvy::dotenv().ok();
@@ -1047,7 +1056,10 @@ async fn test_atomic_roles_config_validation() {
 #[tokio::test]
 async fn test_comprehensive_atomic_haystack_roles() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     // Load atomic server configuration from environment
     dotenvy::dotenv().ok();
@@ -1483,7 +1495,10 @@ async fn test_comprehensive_atomic_haystack_roles() {
 #[tokio::test]
 async fn test_atomic_haystack_error_handling() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     // Test with invalid atomic server URL
     let invalid_config = ConfigBuilder::new()

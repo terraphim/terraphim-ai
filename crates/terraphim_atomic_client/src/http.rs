@@ -24,7 +24,11 @@ pub mod native {
     ///
     /// A Result containing the resource as a JSON value or an error if retrieval fails
     pub async fn get_resource(subject: &str, config: &Config) -> Result<Value> {
-        let client = Client::new();
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent("Terraphim-Atomic-Client/1.0")
+            .build()
+            .unwrap_or_else(|_| Client::new());
         let mut request = client.get(subject).header("Accept", "application/json");
 
         // Add authentication headers if an agent is available
@@ -63,7 +67,11 @@ pub mod native {
     ///
     /// A Result containing () or an error if the commit fails
     pub async fn send_commit(commit: &Commit, config: &Config) -> Result<()> {
-        let client = Client::new();
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent("Terraphim-Atomic-Client/1.0")
+            .build()
+            .unwrap_or_else(|_| Client::new());
         let url = format!("{}/commit", config.server_url);
         let request = client
             .post(&url)

@@ -155,7 +155,11 @@ pub async fn load_thesaurus_from_json_and_replace_async(
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
     async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
-        let response = reqwest::Client::new()
+        let response = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent("Terraphim-Automata/1.0")
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new())
             .get(url.clone())
             .header("Accept", "application/json")
             .send()

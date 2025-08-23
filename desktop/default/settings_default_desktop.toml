@@ -18,9 +18,10 @@ datadir= "/tmp/opendal/sled"
 type = "dashmap"
 root = "/tmp/dashmaptest"
 
-[profiles.rock]
-type = "rocksdb"
-datadir = "/tmp/opendal/rocksdb" 
+# Optional database backends - uncomment if RocksDB feature is enabled
+# [profiles.rock]
+# type = "rocksdb"
+# datadir = "/tmp/opendal/rocksdb" 
 
 [profiles.atomicserver]
 endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"

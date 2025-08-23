@@ -130,7 +130,8 @@ mod tests {
     }
 
     async fn wait_for_server_ready(address: SocketAddr) {
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
@@ -185,7 +186,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_structure() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Trigger search to ensure KG indexing is warmed up
         let _ = client
@@ -259,7 +261,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_system_operator() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Trigger search warmup
         let _ = client
@@ -302,7 +305,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_no_kg() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Test Default role (no knowledge graph)
         let response = client
@@ -320,7 +324,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_default_role() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Test without specifying role (should use selected role)
         let response = client
@@ -338,7 +343,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_consistency() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Test Engineer role multiple times to ensure consistency
         let response1 = client
@@ -389,7 +395,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_invalid_role() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Test with invalid role name
         let response = client
@@ -407,7 +414,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_node_labels() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         let response = client
             .get(format!("http://{server}/rolegraph?role=Engineer"))
@@ -444,7 +452,8 @@ mod tests {
     #[serial]
     async fn test_rolegraph_visualization_edge_relationships() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         let response = client
             .get(format!("http://{server}/rolegraph?role=Engineer"))

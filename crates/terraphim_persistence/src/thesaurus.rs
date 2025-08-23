@@ -33,7 +33,13 @@ impl Persistable for Thesaurus {
 
     /// returns key + .json
     fn get_key(&self) -> String {
-        format!("thesaurus_{}.json", self.normalize_key(&self.name()))
+        let name = self.name();
+        let normalized = self.normalize_key(name);
+        let key = format!("thesaurus_{}.json", normalized);
+        
+        log::debug!("Thesaurus key generation: name='{}' → key='{}'", name, key);
+        
+        key
     }
 }
 
@@ -86,6 +92,7 @@ mod tests {
     }
 
     /// Test saving and loading a thesaurus to rocksdb profile
+    #[cfg(feature = "services-rocksdb")]
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load_thesaurus_rocksdb() -> Result<()> {
@@ -161,6 +168,7 @@ mod tests {
     }
 
     /// Test saving and loading a thesaurus to sqlite profile (if available)
+    #[cfg(feature = "services-sqlite")]
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load_thesaurus_sqlite() -> Result<()> {

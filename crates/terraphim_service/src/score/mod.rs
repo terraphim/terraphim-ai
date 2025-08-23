@@ -6,6 +6,7 @@ mod bm25;
 pub mod bm25_additional;
 #[cfg(test)]
 mod bm25_test;
+pub mod common;
 mod names;
 mod scored;
 
@@ -206,27 +207,19 @@ impl Scorer {
     }
 }
 
-/// A query that can be used to search records.
+/// A simplified query structure for Terraphim document search.
 ///
-/// A query typically consists of a fuzzy name query along with zero or more
-/// filters.
-///
-/// A search result must satisfy every filter on a query to match.
-///
-/// Empty queries always return no results.
-///
-/// The `Serialize` and `Deserialize` implementations for this type use the
-/// free-form query syntax.
+/// This is a streamlined version focused on document search functionality.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
-    name: String,
-    name_scorer: QueryScorer,
-    similarity: Similarity,
-    size: usize,
+    pub name: String,
+    pub name_scorer: QueryScorer,
+    pub similarity: Similarity,
+    pub size: usize,
 }
 
 impl Query {
-    /// Create a new empty query.
+    /// Create a new query with the given search term.
     pub fn new(name: &str) -> Query {
         Query {
             name: name.to_string(),
@@ -254,8 +247,7 @@ impl Query {
     /// Set the similarity function.
     ///
     /// The similarity function can be selected from a predefined set of
-    /// choices defined by the
-    /// [`Similarity`](enum.Similarity.html) type.
+    /// choices defined by the [`Similarity`](enum.Similarity.html) type.
     ///
     /// When a similarity function is used, then any results from searching
     /// the name index are re-ranked according to their similarity with the
@@ -277,18 +269,6 @@ impl Serialize for Query {
     }
 }
 
-// impl<'a> Deserialize<'a> for Query {
-//     fn deserialize<D>(d: D) -> result::Result<Query, D::Error>
-//     where
-//         D: Deserializer<'a>,
-//     {
-//         use serde::de::Error;
-
-//         let querystr = String::deserialize(d)?;
-//         Ok(querystr)
-//     }
-// }
-
 impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{scorer:{}}}", self.name_scorer)?;
@@ -298,6 +278,7 @@ impl fmt::Display for Query {
         Ok(())
     }
 }
+
 
 /// A ranking function to use when searching IMDb records.
 ///

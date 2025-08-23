@@ -36,7 +36,8 @@ async fn ollama_llama_integration_comprehensive() {
 async fn test_ollama_connectivity(base_url: &str) {
     println!("🧪 Testing Ollama connectivity to {}", base_url);
     
-    let http = reqwest::Client::new();
+    let http = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let health_url = format!("{}/api/tags", base_url.trim_end_matches('/'));
     
     let response = http

@@ -1,4 +1,5 @@
-use crate::score::bm25::{BM25FScorer, BM25Params, BM25PlusScorer, FieldWeights};
+use crate::score::bm25::{BM25FScorer, BM25PlusScorer};
+use crate::score::common::{BM25Params, FieldWeights};
 use crate::score::bm25_additional::{
     JaccardScorer, OkapiBM25Scorer, QueryRatioScorer, TFIDFScorer,
 };

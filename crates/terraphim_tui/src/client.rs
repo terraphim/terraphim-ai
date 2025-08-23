@@ -11,8 +11,14 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new(base_url: impl Into<String>) -> Self {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .user_agent("Terraphim-TUI/1.0")
+            .build()
+            .unwrap_or_else(|_| Client::new());
+            
         Self {
-            http: Client::new(),
+            http: client,
             base: base_url.into(),
         }
     }

@@ -85,7 +85,8 @@ mod tests {
     }
 
     async fn wait_for_server_ready(address: SocketAddr) {
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
@@ -140,7 +141,8 @@ mod tests {
     #[serial]
     async fn debug_rolegraph_visualization() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         // Test Engineer role
         let response = client
@@ -188,7 +190,8 @@ mod tests {
     #[serial]
     async fn debug_config() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
         let response = client
             .get(format!("http://{server}/config"))

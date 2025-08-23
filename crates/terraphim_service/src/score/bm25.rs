@@ -2,49 +2,7 @@ use std::collections::HashMap;
 use std::f64;
 
 use terraphim_types::Document;
-
-/// BM25 parameters
-pub struct BM25Params {
-    /// k1 parameter controls term frequency saturation
-    pub k1: f64,
-    /// b parameter controls document length normalization
-    pub b: f64,
-    /// delta parameter for BM25+ to address the lower-bounding problem
-    pub delta: f64,
-}
-
-impl Default for BM25Params {
-    fn default() -> Self {
-        Self {
-            k1: 1.2,
-            b: 0.75,
-            delta: 1.0,
-        }
-    }
-}
-
-/// Field weights for BM25F
-pub struct FieldWeights {
-    /// Weight for document title
-    pub title: f64,
-    /// Weight for document body
-    pub body: f64,
-    /// Weight for document description (if available)
-    pub description: f64,
-    /// Weight for document tags (if available)
-    pub tags: f64,
-}
-
-impl Default for FieldWeights {
-    fn default() -> Self {
-        Self {
-            title: 3.0,
-            body: 1.0,
-            description: 2.0,
-            tags: 2.5,
-        }
-    }
-}
+use super::common::{BM25Params, FieldWeights};
 
 /// BM25F scorer implementation
 pub struct BM25FScorer {

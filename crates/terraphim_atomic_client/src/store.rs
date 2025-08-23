@@ -37,7 +37,11 @@ impl Store {
     pub fn new(config: Config) -> Result<Self> {
         #[cfg(feature = "native")]
         {
-            let client = reqwest::Client::new();
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .user_agent("Terraphim-Atomic-Client/1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
             Ok(Self { config, client })
         }
 

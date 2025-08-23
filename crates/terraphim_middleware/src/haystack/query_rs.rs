@@ -22,9 +22,14 @@ pub struct QueryRsHaystackIndexer {
 
 impl Default for QueryRsHaystackIndexer {
     fn default() -> Self {
-        Self {
-            client: Client::new(),
-        }
+        // Create optimized client for API calls with shorter timeout
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .user_agent("Terraphim/1.0 (https://terraphim.ai)")
+            .build()
+            .unwrap_or_else(|_| Client::new());
+            
+        Self { client }
     }
 }
 

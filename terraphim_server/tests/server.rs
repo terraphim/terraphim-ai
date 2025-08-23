@@ -131,7 +131,8 @@ mod tests {
     }
 
     async fn wait_for_server_ready(address: SocketAddr) {
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
@@ -165,7 +166,8 @@ mod tests {
     #[serial]
     async fn test_post_search_document() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
         let response = client
             .post(format!("http://{server}/documents/search"))
             .header("Content-Type", "application/json")
@@ -306,7 +308,8 @@ mod tests {
         let mut new_config = orig_config.config.clone();
         new_config.default_role = "Engineer".to_string().into();
         new_config.global_shortcut = "Ctrl+P".to_string();
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
         let response = client
             .post(&config_url)
             .header("Content-Type", "application/json")
@@ -327,7 +330,8 @@ mod tests {
     #[serial]
     async fn test_create_document() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
         let response = client.post(format!("http://{server}/documents"))
             .header("Content-Type", "application/json")
             // TODO: Do we want to set the ID here or want the server to
