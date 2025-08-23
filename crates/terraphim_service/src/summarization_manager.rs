@@ -198,15 +198,16 @@ mod tests {
             body: "This is a test document for summarization with enough content to make it interesting.".to_string(),
             url: "http://example.com".to_string(),
             description: None,
-            tags: vec![],
+            stub: None,
+            tags: Some(vec![]),
             rank: None,
         }
     }
 
     fn create_test_role() -> Role {
         Role {
-            shortname: "test-role".to_string(),
-            name: "Test Role".to_string(),
+            shortname: Some("test-role".to_string()),
+            name: "Test Role".to_string().into(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             haystacks: vec![],
             terraphim_it: false,

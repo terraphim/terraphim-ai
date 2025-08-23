@@ -21,10 +21,9 @@ use terraphim_types::RoleName;
 #[tokio::test]
 async fn test_e2e_kg_haystack_lookup_comprehensive() {
     // Initialize logging for test debugging
-    let _ = env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
-        .is_test(true)
-        .try_init();
+    terraphim_service::logging::init_logging(
+        terraphim_service::logging::LoggingConfig::Test
+    );
 
     println!("🚀 Starting comprehensive E2E test for KG term to document lookup");
 
@@ -129,7 +128,8 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
     let server_addr = "127.0.0.1:18080".parse().unwrap();
 
     // Create a client for testing
-    let client = reqwest::Client::new();
+    let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
     // Clone config_state for the spawned task
     let config_state_clone = config_state.clone();

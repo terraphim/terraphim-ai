@@ -91,7 +91,8 @@ async fn test_kg_term_to_document_lookup() {
     // Give the server time to start
     sleep(Duration::from_secs(5)).await;
 
-    let client = Client::new();
+    let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let base_url = "http://127.0.0.1:8001";
 
     // Test 1: Health check
@@ -299,7 +300,8 @@ async fn test_kg_term_lookup_invalid_role() {
     // Give the server time to start
     sleep(Duration::from_secs(3)).await;
 
-    let client = Client::new();
+    let client = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let base_url = "http://127.0.0.1:8002";
 
     // Test with invalid role name

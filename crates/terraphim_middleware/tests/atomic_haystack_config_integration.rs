@@ -16,7 +16,10 @@ use uuid::Uuid;
 #[ignore] // Requires running Atomic Server at localhost:9883
 async fn test_atomic_haystack_with_terraphim_config() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     // Load atomic server configuration from environment
     dotenvy::dotenv().ok();
@@ -346,7 +349,10 @@ async fn test_atomic_haystack_anonymous_access() {
 #[ignore] // Requires running Atomic Server
 async fn test_atomic_haystack_public_vs_authenticated_access() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     let server_url = "http://localhost:9883".to_string();
     let atomic_secret = std::env::var("ATOMIC_SERVER_SECRET").ok();
@@ -503,7 +509,10 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
 #[ignore] // Requires running Atomic Server with specific test data
 async fn test_atomic_haystack_public_document_creation_and_access() {
     // Initialize logging for test debugging
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .is_test(true)
+        .try_init();
 
     let server_url = "http://localhost:9883".to_string();
     let atomic_secret = std::env::var("ATOMIC_SERVER_SECRET").ok();

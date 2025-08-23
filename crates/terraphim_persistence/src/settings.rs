@@ -301,6 +301,7 @@ mod tests {
     }
 
     /// Test saving and loading a struct to rocksdb profile
+    #[cfg(feature = "services-rocksdb")]
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load_rocksdb() -> Result<()> {
@@ -388,6 +389,7 @@ mod tests {
     }
 
     /// Test saving and loading a struct to sqlite profile (if available)
+    #[cfg(feature = "services-sqlite")]
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load_sqlite() -> Result<()> {

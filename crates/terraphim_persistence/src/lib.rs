@@ -203,7 +203,22 @@ pub trait Persistable: Serialize + DeserializeOwned {
     fn get_key(&self) -> String;
     fn normalize_key(&self, key: &str) -> String {
         let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
-        re.replace_all(key, "").to_lowercase()
+        let normalized = re.replace_all(key, "").to_lowercase();
+        
+        log::debug!("Key normalization: '{}' → '{}'", key, normalized);
+        
+        // Validate that the normalized key is filesystem-safe and reasonable
+        if normalized.is_empty() {
+            log::warn!("Key normalization resulted in empty string for input: '{}'", key);
+        } else if normalized.len() > 200 {
+            log::warn!("Normalized key is very long ({} chars) for input: '{}' → '{}'", 
+                      normalized.len(), key, normalized);
+        } else if normalized.len() < key.len() / 2 && key.len() > 10 {
+            log::debug!("Key normalization removed significant content: '{}' ({} chars) → '{}' ({} chars)", 
+                       key, key.len(), normalized, normalized.len());
+        }
+        
+        normalized.to_string()
     }
 }
 

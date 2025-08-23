@@ -32,7 +32,8 @@ async fn chat_endpoint_returns_reply_from_openrouter() {
         "messages": [ {"role":"user","content":"hi"} ]
     });
 
-    let response = reqwest::Client::new()
+    let response = terraphim_service::http_client::create_default_client()
+        .unwrap_or_else(|_| reqwest::Client::new())
         .post(format!("{}/chat", app.base_url))
         .json(&payload)
         .send()

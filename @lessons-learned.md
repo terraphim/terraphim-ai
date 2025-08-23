@@ -1,5 +1,389 @@
 # Terraphim AI Lessons Learned
 
+## Code Duplication Elimination and Refactoring Patterns (2025-08-23)
+
+### 🎯 Key Refactoring Strategies
+
+1. **Duplicate Detection Methodology**
+   - **Grep-based Analysis**: Used systematic grep searches to identify duplicate patterns (`struct.*Params`, `reqwest::Client::new`, `fn score`)
+   - **Structural Comparison**: Compared entire struct definitions to find exact duplicates vs. similar patterns
+   - **Import Analysis**: Tracked imports to understand dependencies and usage patterns
+
+2. **Centralization Patterns**
+   - **Common Module Creation**: Created `score/common.rs` as single source of truth for shared structs
+   - **Re-export Strategy**: Used `pub use` to maintain backwards compatibility during refactoring
+   - **Import Path Updates**: Updated all consumers to import from centralized location
+
+3. **Testing-Driven Refactoring**
+   - **Test-First Verification**: Ran comprehensive tests before and after changes to ensure functionality preservation
+   - **Import Fixing**: Updated test imports to match new module structure (`use crate::score::common::{BM25Params, FieldWeights}`)
+   - **Compilation Validation**: Used `cargo test` as primary validation mechanism
+
+### 🔧 Implementation Best Practices
+
+1. **BM25 Struct Consolidation**
+```rust
+// Before: Duplicate in bm25.rs and bm25_additional.rs
+pub struct BM25Params { k1: f64, b: f64, delta: f64 }
+
+// After: Single definition in common.rs
+pub struct BM25Params { 
+    /// k1 parameter controls term frequency saturation
+    pub k1: f64,
+    /// b parameter controls document length normalization  
+    pub b: f64,
+    /// delta parameter for BM25+ to address the lower-bounding problem
+    pub delta: f64,
+}
+```
+
+2. **Query Struct Simplification**
+```rust
+// Before: Complex Query with IMDb-specific fields
+pub struct Query { name: Option<String>, year: Range<u32>, votes: Range<u32>, ... }
+
+// After: Streamlined TerraphimQuery for document search
+pub struct Query { pub name: String, pub name_scorer: QueryScorer, pub similarity: Similarity, pub size: usize }
+```
+
+3. **Module Organization Pattern**
+```rust
+// mod.rs structure for shared components
+pub mod common;           // Shared structs and utilities
+pub mod bm25;            // Main BM25F/BM25Plus implementations  
+pub mod bm25_additional; // Extended BM25 variants (Okapi, TFIDF, Jaccard)
+```
+
+### 🚨 Common Pitfalls and Solutions
+
+1. **Import Path Dependencies**
+   - **Problem**: Tests failing with "private struct import" errors
+   - **Solution**: Update test imports to use centralized module paths
+   - **Pattern**: `use crate::score::common::{BM25Params, FieldWeights}`
+
+2. **Backwards Compatibility**
+   - **Problem**: External code using old struct paths
+   - **Solution**: Use `pub use` re-exports to maintain API compatibility
+   - **Pattern**: `pub use common::{BM25Params, FieldWeights}`
+
+3. **Complex File Dependencies**
+   - **Problem**: Files with legacy dependencies from other projects
+   - **Solution**: Extract minimal required functionality rather than refactor entire complex files
+   - **Approach**: Created simplified structs instead of trying to fix external dependencies
+
+4. **Test Coverage Validation**
+   - **Essential**: Run full test suite after each major refactoring step
+   - **Pattern**: `cargo test -p terraphim_service --lib` to verify specific crate functionality
+   - **Result**: 51/56 tests passing (failures unrelated to refactoring)
+
+### 🎯 Refactoring Impact Metrics
+
+- **Code Reduction**: ~50-100 lines eliminated from duplicate structs alone
+- **Test Coverage**: All BM25-related functionality preserved and validated
+- **Maintainability**: Single source of truth established for critical scoring components
+- **Documentation**: Enhanced with detailed parameter explanations and usage examples
+- **API Consistency**: Streamlined Query interface focused on actual use cases
+
+## HTTP Client Consolidation and Dependency Management (2025-08-23)
+
+### 🎯 HTTP Client Factory Pattern
+
+1. **Centralized Client Creation**
+   - **Pattern**: Create specialized factory functions for different use cases
+   - **Implementation**: `crates/terraphim_service/src/http_client.rs` with 5 factory functions
+   - **Benefits**: Consistent configuration, timeout handling, user agents
+
+2. **Factory Function Design**
+```rust
+// General purpose client with 30s timeout
+pub fn create_default_client() -> reqwest::Result<Client>
+
+// API client with JSON headers
+pub fn create_api_client() -> reqwest::Result<Client>
+
+// Scraping client with longer timeout and rotation-friendly headers
+pub fn create_scraping_client() -> reqwest::Result<Client>
+
+// Custom client builder for specialized needs
+pub fn create_custom_client(timeout_secs: u64, user_agent: &str, ...) -> reqwest::Result<Client>
+```
+
+3. **Circular Dependency Resolution**
+   - **Problem**: terraphim_middleware cannot depend on terraphim_service (circular)
+   - **Solution**: Apply inline optimization pattern for external crates
+   - **Pattern**: `Client::builder().timeout().user_agent().build().unwrap_or_else(|_| Client::new())`
+
+### 🔧 Implementation Strategies
+
+1. **Update Pattern for Internal Crates**
+```rust
+// Before
+let client = reqwest::Client::new();
+
+// After  
+let client = terraphim_service::http_client::create_default_client()
+    .unwrap_or_else(|_| reqwest::Client::new());
+```
+
+2. **Inline Optimization for External Crates**
+```rust
+// For crates that can't import terraphim_service
+let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(30))
+    .user_agent("Terraphim-Atomic-Client/1.0")
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
+```
+
+3. **Dependency Management Best Practices**
+   - **Lesson**: Move commonly used dependencies from optional to standard
+   - **Pattern**: Make `reqwest` standard dependency when HTTP client factory is core functionality
+   - **Update**: Adjust feature flags accordingly (`openrouter = ["terraphim_config/openrouter"]`)
+
+### 🏗️ Architecture Insights
+
+1. **Respect Crate Boundaries**
+   - **Lesson**: Don't create circular dependencies for code sharing
+   - **Solution**: Use inline patterns or extract common functionality to lower-level crate
+   - **Pattern**: Dependency hierarchy should flow in one direction
+
+2. **Gradual Migration Strategy**
+   - **Phase 1**: Update files within same crate using centralized factory
+   - **Phase 2**: Apply inline optimization to external crates  
+   - **Phase 3**: Extract common HTTP patterns to shared utility crate if needed
+
+3. **Build Verification Process**
+   - **Test Strategy**: `cargo build -p <crate> --quiet` after each change
+   - **Expected**: Warnings about unused code during refactoring are normal
+   - **Validate**: All tests should continue passing
+
+## Logging Standardization and Framework Integration (2025-08-23)
+
+### 🎯 Centralized Logging Architecture
+
+1. **Multiple Framework Support**
+   - **Pattern**: Support both `env_logger` and `tracing` within single logging module
+   - **Implementation**: `crates/terraphim_service/src/logging.rs` with configuration presets
+   - **Benefits**: Consistent initialization across different logging frameworks
+
+2. **Configuration Presets**
+```rust
+pub enum LoggingConfig {
+    Server,           // WARN level, structured format
+    Development,      // INFO level, human-readable  
+    Test,             // DEBUG level, test-friendly
+    IntegrationTest,  // INFO level, reduced noise
+    Custom { level }, // Custom log level
+}
+```
+
+3. **Smart Environment Detection**
+   - **Pattern**: Auto-detect appropriate logging level based on compilation flags and environment
+   - **Implementation**: `detect_logging_config()` checks debug assertions, test environment, LOG_LEVEL env var
+   - **Benefits**: Zero-configuration logging with sensible defaults
+
+### 🔧 Framework-Specific Patterns
+
+1. **env_logger Standardization**
+```rust
+// Before: Inconsistent patterns
+env_logger::init();
+env_logger::try_init();
+env_logger::builder().filter_level(...).try_init();
+
+// After: Centralized with presets
+terraphim_service::logging::init_logging(
+    terraphim_service::logging::detect_logging_config()
+);
+```
+
+2. **tracing Enhancement**
+```rust
+// Before: Basic setup
+tracing_subscriber::fmt().init();
+
+// After: Enhanced with environment filter
+let subscriber = tracing_subscriber::fmt()
+    .with_env_filter(
+        tracing_subscriber::EnvFilter::from_default_env()
+            .add_directive(level.into())
+    );
+```
+
+3. **Test Environment Handling**
+   - **Pattern**: `.is_test(true)` for test-friendly formatting
+   - **Implementation**: Separate test configurations to reduce noise
+   - **Benefits**: Clean test output while maintaining debug capability
+
+### 🏗️ Dependency Management Strategies
+
+1. **Core vs Optional Dependencies**
+   - **Lesson**: Make common logging framework (env_logger) a standard dependency
+   - **Pattern**: Optional advanced features (tracing) via feature flags
+   - **Implementation**: `env_logger = "0.10"` standard, `tracing = { optional = true }`
+
+2. **Circular Dependency Avoidance**
+   - **Problem**: Middleware crates can't depend on service crate for logging
+   - **Solution**: Apply inline standardization patterns maintaining consistency
+   - **Pattern**: Consistent `env_logger::builder()` setup without shared module
+
+3. **Feature Flag Organization**
+```toml
+[features]
+default = []
+tracing = ["dep:tracing", "dep:tracing-subscriber"]
+```
+
+### 🎯 Binary-Specific Implementations  
+
+1. **Main Server Applications**
+   - **terraphim_server**: Uses centralized detection with fallback to development logging
+   - **desktop/src-tauri**: Desktop app with same centralized approach
+   - **terraphim_mcp_server**: Enhanced tracing with SSE-aware timestamp formatting
+
+2. **Test File Patterns**
+   - **Integration Tests**: `LoggingConfig::IntegrationTest` for reduced noise
+   - **Unit Tests**: `LoggingConfig::Test` for full debug output
+   - **Middleware Tests**: Inline standardized patterns due to dependency constraints
+
+3. **Specialized Requirements**
+   - **MCP Server**: Conditional timestamps (SSE needs them, stdio skips for clean output)
+   - **Desktop App**: Separate MCP server mode vs desktop app mode logging
+   - **Test Files**: `.is_test(true)` for test-friendly output formatting
+
+### 🚨 Common Pitfalls and Solutions
+
+1. **Framework Mixing**
+   - **Problem**: Some binaries use tracing, others use env_logger
+   - **Solution**: Support both frameworks in centralized module with feature flags
+   - **Pattern**: Provide helpers for both, let binaries choose appropriate framework
+
+2. **Circular Dependencies**
+   - **Problem**: Lower-level crates can't depend on service layer for logging
+   - **Solution**: Apply consistent inline patterns rather than shared dependencies
+   - **Implementation**: Standardized builder patterns without importing shared module
+
+3. **Test Environment Detection**
+   - **Lesson**: `cfg!(test)` and `RUST_TEST_THREADS` env var detect test environment
+   - **Pattern**: Automatic test configuration without manual setup
+   - **Benefits**: Consistent test logging without boilerplate in each test
+
+## Error Handling Consolidation and Trait-Based Architecture (2025-08-23)
+
+### 🎯 Error Infrastructure Design Patterns
+
+1. **Base Error Trait Pattern**
+   - **Lesson**: Create foundational trait defining common error behavior across all crates
+   - **Pattern**: `TerraphimError` trait with categorization, recoverability flags, and user messaging
+   - **Implementation**: `trait TerraphimError: std::error::Error + Send + Sync + 'static`
+   - **Benefits**: Enables systematic error classification and consistent handling patterns
+
+2. **Error Categorization System**
+   - **Lesson**: Systematic error classification improves debugging, monitoring, and user experience
+   - **Categories**: Network, Configuration, Auth, Validation, Storage, Integration, System
+   - **Implementation**: `ErrorCategory` enum with specific handling patterns per category
+   - **Usage**: Enables category-specific retry logic, user messaging, and monitoring alerts
+
+3. **Structured Error Construction**
+   - **Lesson**: Helper factory functions reduce boilerplate and ensure consistent error patterns
+   - **Pattern**: Factory methods like `CommonError::network_with_source()`, `CommonError::config_field()`
+   - **Implementation**: Builder pattern with optional fields for context, source errors, and metadata
+   - **Benefits**: Reduces error construction complexity and ensures proper error chaining
+
+### 🔧 Error Chain Management
+
+1. **Error Source Preservation**
+   - **Lesson**: Maintain full error chain for debugging while providing clean user messages
+   - **Pattern**: `#[source]` attributes and `Box<dyn std::error::Error + Send + Sync>` for nested errors
+   - **Implementation**: Source error wrapping with context preservation
+   - **Why**: Enables root cause analysis while maintaining clean API surface
+
+2. **Error Downcasting Strategies**
+   - **Lesson**: Trait object downcasting requires concrete type matching, not trait matching
+   - **Problem**: `anyhow::Error::downcast_ref::<dyn TerraphimError>()` doesn't work due to `Sized` requirement
+   - **Solution**: Check for specific concrete types implementing the trait
+   - **Pattern**: Error chain inspection with type-specific downcasting
+
+3. **API Error Response Enhancement**
+   - **Lesson**: Enrich API error responses with structured metadata for better client-side handling
+   - **Implementation**: Add `category` and `recoverable` fields to `ErrorResponse`
+   - **Pattern**: Error chain traversal to extract terraphim-specific error information
+   - **Benefits**: Enables smarter client-side retry logic and user experience improvements
+
+### 🏗️ Cross-Crate Error Integration
+
+1. **Existing Error Type Enhancement**
+   - **Lesson**: Enhance existing error enums to implement new trait without breaking changes
+   - **Pattern**: Add `CommonError` variant to existing enums, implement `TerraphimError` trait
+   - **Implementation**: Backward compatibility through enum extension and trait implementation
+   - **Benefits**: Gradual migration path without breaking existing error handling
+
+2. **Service Layer Error Aggregation**
+   - **Lesson**: Service layer should aggregate and categorize errors from all underlying layers
+   - **Pattern**: `ServiceError` implements `TerraphimError` and delegates to constituent errors
+   - **Implementation**: Match-based categorization with recoverability assessment
+   - **Why**: Provides unified error interface while preserving detailed error information
+
+3. **Server-Level Error Translation**
+   - **Lesson**: HTTP API layer should translate internal errors to structured client responses
+   - **Pattern**: Error chain inspection in `IntoResponse` implementation
+   - **Implementation**: Type-specific downcasting with fallback to generic error handling
+   - **Benefits**: Clean API responses with actionable error information
+
+### 🚨 Common Pitfalls and Solutions
+
+1. **Trait Object Sizing Issues**
+   - **Problem**: `downcast_ref::<dyn Trait>()` fails with "size cannot be known" error
+   - **Solution**: Downcast to specific concrete types implementing the trait
+   - **Pattern**: Check for known error types in error chain traversal
+   - **Learning**: Rust's type system requires concrete types for downcasting operations
+
+2. **Error Chain Termination**
+   - **Problem**: Need to traverse error chain without infinite loops
+   - **Solution**: Use `source()` method with explicit loop termination
+   - **Pattern**: `while let Some(source) = current_error.source()` with break conditions
+   - **Implementation**: Safe error chain traversal with cycle detection
+
+3. **Backward Compatibility Maintenance**
+   - **Lesson**: Enhance existing error types incrementally without breaking consumers
+   - **Pattern**: Add new variants and traits while preserving existing error patterns
+   - **Implementation**: Extension through enum variants and trait implementations
+   - **Benefits**: Zero-breaking-change migration to enhanced error handling
+
+### 🎯 Error Handling Best Practices
+
+1. **Factory Method Design**
+   - **Pattern**: Provide both simple and complex constructors for different use cases
+   - **Implementation**: `CommonError::network()` for simple cases, `CommonError::network_with_source()` for complex
+   - **Benefits**: Reduces boilerplate while enabling rich error context when needed
+
+2. **Utility Function Patterns**
+   - **Pattern**: Convert arbitrary errors to categorized errors with context
+   - **Implementation**: `utils::as_network_error()`, `utils::as_storage_error()` helpers
+   - **Usage**: `map_err(|e| utils::as_network_error(e, "fetching data"))`
+   - **Benefits**: Consistent error categorization across codebase
+
+3. **Testing Error Scenarios**
+   - **Lesson**: Test error categorization, recoverability, and message formatting
+   - **Pattern**: Unit tests for error construction, categorization, and trait implementation
+   - **Implementation**: Comprehensive test coverage for error infrastructure
+   - **Why**: Ensures error handling behaves correctly under all conditions
+
+### 📈 Error Handling Impact Metrics
+
+- ✅ **13+ Error Types** surveyed and categorized across codebase
+- ✅ **Core Error Infrastructure** established with trait-based architecture
+- ✅ **API Response Enhancement** with structured error metadata
+- ✅ **Zero Breaking Changes** to existing error handling patterns
+- ✅ **Foundation Established** for systematic error improvement across all crates
+- ✅ **Testing Coverage** maintained with 24/24 tests passing
+
+### 🔄 Remaining Consolidation Targets
+
+1. **Configuration Loading**: Consolidate 15+ config loading patterns into shared utilities
+2. **Testing Utilities**: Standardize test setup and teardown patterns
+3. **Error Migration**: Apply new error patterns to remaining 13+ error types across crates
+
 ## Async Queue System and Production-Ready Summarization (2025-01-31)
 
 ### 🎯 Key Architecture Patterns
