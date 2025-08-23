@@ -31,6 +31,7 @@ serde_json = "1.0.104"
 thiserror = "1.0.56"
 tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
 regex = "1.11.0"
+rusqlite = { version = "0.29", optional = true }
 
 
 [dev-dependencies]
@@ -42,7 +43,7 @@ tokio = { version = "1", features = ["full"] }
 test-env-log = "0.2"
 
 [features]
-default = ["services-dashmap", "services-redb", "services-atomicserver"]
+default = ["services-dashmap", "services-sqlite", "services-atomicserver"]
 # Enable services dashmap support
 services-dashmap = ["opendal/services-dashmap"]
 # Enable services ipfs support
@@ -54,7 +55,7 @@ services-rocksdb = ["opendal/services-rocksdb"]
 # Enable services redb support (lightweight alternative to rocksdb)
 services-redb = ["opendal/services-redb"]
 # Enable services sqlite support (optional)
-services-sqlite = ["opendal/services-sqlite"]
+services-sqlite = ["opendal/services-sqlite", "rusqlite"]
 # Enable services atomic server
 services-atomicserver = ["opendal/services-atomicserver"]
 memory = []

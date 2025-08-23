@@ -82,19 +82,8 @@ async fn run_server() -> Result<()> {
                 }
             }
             "redb" => {
-                // Handle both datadir and path formats
-                let dir_path = profile.get("datadir").or_else(|| profile.get("path"));
-                
-                if let Some(datadir) = dir_path {
-                    if !datadir.is_empty() {
-                        log::info!("🔧 Creating ReDB directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create ReDB directory '{}': {}", datadir, e);
-                        } else {
-                            log::info!("✅ Created ReDB directory: {}", datadir);
-                        }
-                    }
-                }
+                // ReDB datadir is the database file path - parent directory creation is handled by OpenDAL
+                log::info!("ReDB database will be created by OpenDAL");
             }
             "dashmap" => {
                 if let Some(root) = profile.get("root") {

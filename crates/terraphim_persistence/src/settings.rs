@@ -85,6 +85,60 @@ fn ensure_directory_exists(path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Ensure SQLite table exists for OpenDAL
+#[cfg(feature = "services-sqlite")]
+fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Result<()> {
+    // Extract database path from connection string (remove query parameters)
+    let db_path = if let Some(path_part) = connection_string.split('?').next() {
+        path_part
+    } else {
+        connection_string
+    };
+    
+    log::info!("🔧 Ensuring SQLite table '{}' exists in database: {}", table_name, db_path);
+    
+    // Create the database file and table if they don't exist
+    let connection = rusqlite::Connection::open(db_path).map_err(|e| {
+        Error::OpenDal(opendal::Error::new(
+            opendal::ErrorKind::Unexpected,
+            &format!("Failed to open SQLite database '{}': {}", db_path, e)
+        ))
+    })?;
+    
+    // Enable WAL mode for concurrent access
+    connection.pragma_update(None, "journal_mode", "WAL").map_err(|e| {
+        Error::OpenDal(opendal::Error::new(
+            opendal::ErrorKind::Unexpected,
+            &format!("Failed to enable WAL mode: {}", e)
+        ))
+    })?;
+    
+    // Set synchronous mode to NORMAL for better performance
+    connection.pragma_update(None, "synchronous", "NORMAL").map_err(|e| {
+        Error::OpenDal(opendal::Error::new(
+            opendal::ErrorKind::Unexpected,
+            &format!("Failed to set synchronous mode: {}", e)
+        ))
+    })?;
+    
+    // Create table with key-value schema expected by OpenDAL
+    let create_table_sql = format!(
+        "CREATE TABLE IF NOT EXISTS {} (key TEXT PRIMARY KEY, value BLOB)",
+        table_name
+    );
+    
+    connection.execute(&create_table_sql, []).map_err(|e| {
+        Error::OpenDal(opendal::Error::new(
+            opendal::ErrorKind::Unexpected,
+            &format!("Failed to create SQLite table '{}': {}", table_name, e)
+        ))
+    })?;
+    
+    log::info!("✅ SQLite table '{}' ready", table_name);
+    Ok(())
+}
+
+
 pub async fn parse_profile(
     settings: &DeviceSettings,
     profile_name: &str,
@@ -154,9 +208,14 @@ pub async fn parse_profile(
         Scheme::Rocksdb => Operator::from_map::<services::Rocksdb>(profile.clone())?.finish(),
         #[cfg(feature = "services-redb")]
         Scheme::Redb => {
-            // Ensure directory exists for ReDB
+            // Ensure parent directory exists for ReDB database file
             if let Some(datadir) = profile.get("datadir") {
-                ensure_directory_exists(datadir)?;
+                if let Some(parent) = std::path::Path::new(datadir).parent() {
+                    let parent_str = parent.to_string_lossy();
+                    if !parent_str.is_empty() {
+                        ensure_directory_exists(&parent_str)?;
+                    }
+                }
             }
             Operator::from_map::<services::Redb>(profile.clone())?.finish()
         },
@@ -166,7 +225,28 @@ pub async fn parse_profile(
             if let Some(datadir) = profile.get("datadir") {
                 ensure_directory_exists(datadir)?;
             }
-            Operator::from_map::<services::Sqlite>(profile.clone())?.finish()
+            
+            // Ensure SQLite table exists before OpenDAL tries to use it
+            if let (Some(connection_string), Some(table_name)) = 
+                (profile.get("connection_string"), profile.get("table")) {
+                ensure_sqlite_table_exists(connection_string, table_name)?;
+            }
+            
+            // SQLite configuration with proper field names
+            let mut sqlite_profile = profile.clone();
+            
+            // Ensure required fields are set with proper defaults
+            if !sqlite_profile.contains_key("root") {
+                sqlite_profile.insert("root".to_string(), "/".to_string());
+            }
+            if !sqlite_profile.contains_key("key_field") {
+                sqlite_profile.insert("key_field".to_string(), "key".to_string());
+            }
+            if !sqlite_profile.contains_key("value_field") {
+                sqlite_profile.insert("value_field".to_string(), "value".to_string());
+            }
+            
+            Operator::from_map::<services::Sqlite>(sqlite_profile)?.finish()
         },
         Scheme::S3 => {
             match Operator::from_map::<services::S3>(profile.clone()) {

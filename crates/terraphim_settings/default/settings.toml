@@ -15,14 +15,18 @@ root = "/tmp/dashmaptest"
 type = "rocksdb"
 datadir = "/tmp/opendal/rocksdb"
 
-[profiles.redb]
-type = "redb"
-datadir = "/tmp/terraphim_redb"
-table = "terraphim"
-
+# SQLite with WAL mode for concurrent access without locks
 [profiles.sqlite]
 type = "sqlite"
 datadir = "/tmp/terraphim_sqlite"
+connection_string = "/tmp/terraphim_sqlite/terraphim.db"
+table = "terraphim_kv"
+
+# ReDB disabled to avoid database locking issues with concurrent access
+# [profiles.redb]
+# type = "redb"
+# datadir = "/tmp/terraphim_redb/terraphim.redb"
+# table = "terraphim"
 
 [profiles.memory]
 type = "memory"

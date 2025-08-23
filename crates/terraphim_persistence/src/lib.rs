@@ -82,16 +82,8 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
                 }
             }
             "redb" => {
-                if let Some(datadir) = profile.get("datadir") {
-                    if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating ReDB directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create ReDB directory '{}': {}", datadir, e);
-                        } else {
-                            log::info!("✅ Created ReDB directory: {}", datadir);
-                        }
-                    }
-                }
+                // ReDB datadir is the database file path - parent directory creation handled by our settings layer
+                log::info!("ReDB database file will be created by OpenDAL");
             }
             "dashmap" => {
                 if let Some(root) = profile.get("root") {
