@@ -20,5 +20,5 @@ root = "/tmp/terraphim_dashmap"  # Directory auto-created
 
 [profiles.redb]
 type = "redb"
-datadir = "/tmp/terraphim_redb"  # Directory auto-created
+path = "/tmp/terraphim_redb/terraphim.redb"  # File path for redb database
 table = "terraphim"  # Required table name for redb
