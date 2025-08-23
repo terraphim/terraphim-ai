@@ -7189,6 +7189,7 @@ dependencies = [
  "log",
  "opendal",
  "regex",
+ "rusqlite",
  "serde",
  "serde_json",
  "serial_test 3.2.0",

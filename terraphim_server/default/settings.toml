@@ -7,7 +7,7 @@ datadir = "/tmp/terraphim_rocksdb"
 
 [profiles.redb]
 type = "redb"
-datadir = "/tmp/terraphim_redb"
+datadir = "/tmp/terraphim_redb/terraphim.redb"
 table = "terraphim"
 
 [profiles.sqlite]
