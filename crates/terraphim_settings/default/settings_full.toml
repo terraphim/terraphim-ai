@@ -28,7 +28,7 @@ datadir = "/tmp/opendal/rocksdb"
 
 [profiles.redb]
 type = "redb"
-datadir = "/tmp/terraphim_redb"
+path = "/tmp/terraphim_redb/terraphim.redb"
 table = "terraphim"
 
 [profiles.sqlite]
