@@ -530,7 +530,7 @@ mod tests {
     async fn test_find_matching_node_idss() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
             .await
             .unwrap();
         let matches = rolegraph.find_matching_node_ids(query);
@@ -541,7 +541,7 @@ mod tests {
     async fn test_find_matching_node_idss_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
             .await
             .unwrap();
         println!("rolegraph: {:?}", rolegraph);
@@ -653,7 +653,7 @@ mod tests {
     #[test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
-        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
             .await
             .unwrap();
         let document_id = Ulid::new().to_string();
@@ -705,7 +705,7 @@ mod tests {
     #[test]
     async fn test_is_all_terms_connected_by_path_true() {
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
             .await
             .unwrap();
         let text = "Life cycle concepts ... Paradigm Map ... project planning";
@@ -715,7 +715,7 @@ mod tests {
     #[test]
     async fn test_is_all_terms_connected_by_path_false() {
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
             .await
             .unwrap();
         // Intentionally pick terms unlikely to be connected together
