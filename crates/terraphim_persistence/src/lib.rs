@@ -248,23 +248,35 @@ pub trait Persistable: Serialize + DeserializeOwned {
 
     fn get_key(&self) -> String;
     fn normalize_key(&self, key: &str) -> String {
+        // Replace non-alphanumeric characters with underscores to preserve semantic meaning
         let re = regex::Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create regex");
-        let normalized = re.replace_all(key, "").to_lowercase();
+        let normalized = re.replace_all(key, "_").to_lowercase();
         
-        log::debug!("Key normalization: '{}' → '{}'", key, normalized);
+        // Remove leading/trailing underscores and collapse multiple underscores
+        let cleaned = normalized.trim_matches('_').to_string();
+        let re_multi = regex::Regex::new(r"_+").expect("Failed to create regex");
+        let final_key = re_multi.replace_all(&cleaned, "_").to_string();
+        
+        log::debug!("Key normalization: '{}' → '{}'", key, final_key);
         
         // Validate that the normalized key is filesystem-safe and reasonable
-        if normalized.is_empty() {
+        if final_key.is_empty() {
             log::warn!("Key normalization resulted in empty string for input: '{}'", key);
-        } else if normalized.len() > 200 {
+            // Fallback to hash if normalization fails completely
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            key.hash(&mut hasher);
+            return format!("fallback_{:x}", hasher.finish());
+        } else if final_key.len() > 200 {
             log::warn!("Normalized key is very long ({} chars) for input: '{}' → '{}'", 
-                      normalized.len(), key, normalized);
-        } else if normalized.len() < key.len() / 2 && key.len() > 10 {
-            log::debug!("Key normalization removed significant content: '{}' ({} chars) → '{}' ({} chars)", 
-                       key, key.len(), normalized, normalized.len());
+                      final_key.len(), key, final_key);
+        } else if final_key.len() < key.len() / 3 && key.len() > 15 {
+            log::debug!("Key normalization significantly shortened: '{}' ({} chars) → '{}' ({} chars)", 
+                       key, key.len(), final_key, final_key.len());
         }
         
-        normalized.to_string()
+        final_key
     }
 }
 
