@@ -60,11 +60,14 @@ async fn main() -> Result<()> {
         );
         
     if args.sse {
-        // SSE mode needs timestamps for server logs
+        // SSE mode needs timestamps for server logs - write to stdout
         subscriber.init();
     } else {
-        // Stdio mode can skip timestamps for cleaner output
-        subscriber.without_time().init();
+        // Stdio mode: write logs to stderr to avoid mixing with JSON-RPC responses on stdout
+        subscriber
+            .without_time()
+            .with_writer(std::io::stderr)
+            .init();
     }
     
     info!("Starting Terraphim MCP Server...");

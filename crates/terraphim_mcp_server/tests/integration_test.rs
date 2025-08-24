@@ -59,8 +59,8 @@ async fn setup_server_command() -> Result<Command> {
         .env("RUST_BACKTRACE", "1")
         .env("RUST_LOG", "debug")
         .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     Ok(command)
 }

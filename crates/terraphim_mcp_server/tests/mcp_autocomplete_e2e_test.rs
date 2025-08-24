@@ -109,7 +109,7 @@ async fn start_mcp_server() -> Result<TokioChildProcess> {
     cmd.args(&["run", "--bin", "terraphim_mcp_server"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit());
+        .stderr(std::process::Stdio::piped());
 
     // Allow server to start up
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
