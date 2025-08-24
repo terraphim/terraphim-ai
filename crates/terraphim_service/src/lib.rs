@@ -1240,6 +1240,18 @@ impl<'a> TerraphimService {
                         if !rolegraph.has_document(&doc.id) && !doc.body.is_empty() {
                             log::debug!("Indexing new document '{}' into rolegraph for TerraphimGraph search", doc.id);
                             rolegraph.insert_document(&doc.id, doc.clone());
+                            
+                            // Save document to persistence to ensure it's available for kg_search
+                            // Drop the rolegraph lock temporarily to avoid deadlocks during async save
+                            drop(rolegraph);
+                            if let Err(e) = doc.save().await {
+                                log::warn!("Failed to save document '{}' to persistence: {}", doc.id, e);
+                            } else {
+                                log::debug!("Successfully saved document '{}' to persistence", doc.id);
+                            }
+                            // Re-acquire the lock
+                            rolegraph = rolegraph_sync.lock().await;
+                            
                             newly_indexed += 1;
                         }
                     }
@@ -1509,6 +1521,11 @@ impl<'a> TerraphimService {
         }
     }
 
+    /// Check if a document ID appears to be hash-based (16 hex characters)
+    fn is_hash_based_id(id: &str) -> bool {
+        id.len() == 16 && id.chars().all(|c| c.is_ascii_hexdigit())
+    }
+
     /// Find documents that contain a given knowledge graph term
     ///
     /// This method searches for documents that were the source of a knowledge graph term.
@@ -1594,6 +1611,15 @@ impl<'a> TerraphimService {
                     }
                     Err(e) => {
                         log::warn!("Failed to load local document '{}': {}", doc_id, e);
+                        
+                        // Check if this might be a hash-based ID from old ripgrep documents
+                        if Self::is_hash_based_id(doc_id) {
+                            log::debug!("Document ID '{}' appears to be hash-based (legacy document), skipping for now", doc_id);
+                            log::info!("💡 Hash-based document IDs are deprecated. This document will be re-indexed with normalized IDs on next haystack search.");
+                            // Skip legacy hash-based documents - they will be re-indexed with proper normalized IDs
+                            // when the haystack is searched again
+                        }
+                        
                         // Continue processing other documents even if this one fails
                     }
                 }
