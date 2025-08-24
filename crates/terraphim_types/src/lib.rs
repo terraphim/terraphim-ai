@@ -208,8 +208,10 @@ pub struct Document {
     /// The document body
     pub body: String,
 
-    /// A short description of the document
+    /// A short description of the document (extracted from content)
     pub description: Option<String>,
+    /// AI-generated summarization of the document content
+    pub summarization: Option<String>,
     /// A short excerpt of the document
     pub stub: Option<String>,
     /// Tags for the document
@@ -226,6 +228,13 @@ impl fmt::Display for Document {
         // Append description if it exists
         if let Some(ref description) = self.description {
             write!(f, " {}", description)?;
+        }
+
+        // Append summarization if it exists and is different from description
+        if let Some(ref summarization) = self.summarization {
+            if Some(summarization) != self.description.as_ref() {
+                write!(f, " {}", summarization)?;
+            }
         }
 
         Ok(())

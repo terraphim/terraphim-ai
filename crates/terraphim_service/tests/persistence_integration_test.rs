@@ -51,6 +51,7 @@ async fn test_service_document_persistence_integration() {
         body: "This document tests service-level persistence integration with comprehensive content that should be preserved across service restarts.".to_string(),
         url: "https://example.com/service-test".to_string(),
         description: Some("A test document for service persistence validation".to_string()),
+        summarization: None,
         stub: None,
         tags: Some(vec!["service".to_string(), "persistence".to_string(), "integration".to_string()]),
         rank: Some(95),
@@ -101,6 +102,7 @@ async fn test_service_document_persistence_integration() {
         body: "Testing document persistence with special characters in ID.".to_string(),
         url: "https://example.com/special-chars".to_string(),
         description: Some("Document with special character ID".to_string()),
+        summarization: None,
         stub: None,
         tags: None,
         rank: None,
@@ -315,9 +317,9 @@ async fn test_key_generation_consistency_in_service() {
     // Test thesaurus key generation for various role names
     let test_roles = vec![
         ("Simple", "thesaurus_simple.json"),
-        ("Terraphim Engineer", "thesaurus_terraphimengineer.json"),
-        ("AI/ML Engineer", "thesaurus_aillengineer.json"),
-        ("Data & Analytics Expert", "thesaurus_dataanalyticsexpert.json"),
+        ("Terraphim Engineer", "thesaurus_terraphim_engineer.json"),
+        ("AI/ML Engineer", "thesaurus_ai_ml_engineer.json"),
+        ("Data & Analytics Expert", "thesaurus_data_analytics_expert.json"),
     ];
 
     for (role_name_str, expected_key) in test_roles {
@@ -391,6 +393,7 @@ async fn test_unicode_persistence_in_service() {
         body: "This document contains various unicode characters: 中文, العربية, русский, 🎉, mathematical symbols: ∑∫∂".to_string(),
         url: "https://example.com/unicode-test".to_string(),
         description: Some("Testing unicode persistence: ñoño café".to_string()),
+        summarization: None,
         stub: None,
         tags: Some(vec!["unicode".to_string(), "测试".to_string(), "тест".to_string()]),
         rank: Some(100),
@@ -455,6 +458,7 @@ async fn test_large_content_persistence_in_service() {
         body: large_content.clone(),
         url: "https://example.com/large-content".to_string(),
         description: Some("Testing persistence of large document content".to_string()),
+        summarization: None,
         stub: None,
         tags: Some(vec!["large".to_string(), "performance".to_string()]),
         rank: Some(50),

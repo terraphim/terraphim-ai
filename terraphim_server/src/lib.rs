@@ -223,6 +223,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     title: filename.clone(), // Keep original filename as title for display
                                                     body: content,
                                                     description,
+                                                    summarization: None,
                                                     stub: None,
                                                     tags: None,
                                                     rank: None,
@@ -317,6 +318,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         title: filename.clone(), // Keep original filename as title for display
                                                         body: content,
                                                         description,
+                                                        summarization: None,
                                                         stub: None,
                                                         tags: None,
                                                         rank: None,

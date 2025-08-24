@@ -98,6 +98,165 @@ impl SummarizationManager {
         self.queue.resume().await
     }
 
+    /// Process document to generate description and optionally summarization
+    ///
+    /// This method provides immediate processing for documents that need:
+    /// 1. Description extraction from content if missing
+    /// 2. Optionally queue AI summarization if available
+    ///
+    /// # Arguments
+    /// * `doc` - Mutable reference to document to process
+    /// * `role` - Role configuration for summarization
+    /// * `extract_description` - Whether to extract description from content if missing
+    /// * `queue_summarization` - Whether to queue AI summarization task
+    /// 
+    /// # Returns
+    /// * `Result<Option<TaskId>, ServiceError>` - Task ID if summarization was queued, None if only description was processed
+    pub async fn process_document_fields(
+        &self,
+        doc: &mut Document,
+        role: &Role,
+        extract_description: bool,
+        queue_summarization: bool,
+    ) -> Result<Option<TaskId>, ServiceError> {
+        let mut task_id = None;
+
+        // Extract description from content if requested and missing
+        if extract_description && doc.description.is_none() && !doc.body.is_empty() {
+            match Self::extract_description_from_body(&doc.body, 200) {
+                Ok(description) => {
+                    log::debug!("Generated description for document '{}': {} chars", doc.id, description.len());
+                    doc.description = Some(description);
+                }
+                Err(e) => {
+                    log::warn!("Failed to extract description for document '{}': {}", doc.id, e);
+                }
+            }
+        }
+
+        // Queue AI summarization if requested and content is substantial
+        if queue_summarization && doc.body.len() >= 500 {
+            let submit_result = self.summarize_document(
+                doc.clone(),
+                role.clone(),
+                Some(Priority::Normal),
+                Some(300), // max summary length
+                Some(false), // don't force regenerate
+                None, // no callback URL
+            ).await?;
+            
+            match submit_result {
+                SubmitResult::Queued { task_id: queued_task_id, .. } => {
+                    task_id = Some(queued_task_id.clone());
+                    log::debug!("Queued AI summarization for document '{}' with task ID: {:?}", doc.id, queued_task_id);
+                }
+                SubmitResult::Duplicate(existing_task_id) => {
+                    task_id = Some(existing_task_id.clone());
+                    log::debug!("Document '{}' already has summarization task: {:?}", doc.id, existing_task_id);
+                }
+                SubmitResult::ValidationError(error) => {
+                    log::warn!("Validation error for document '{}': {}", doc.id, error);
+                }
+                SubmitResult::QueueFull => {
+                    log::warn!("Summarization queue is full, cannot queue document '{}'", doc.id);
+                }
+            }
+        }
+
+        Ok(task_id)
+    }
+
+    /// Extract description from document body content
+    ///
+    /// Takes the first substantial paragraph or line, up to max_length characters.
+    /// Attempts to break at sentence boundaries when possible.
+    ///
+    /// # Arguments
+    /// * `body` - Document body content
+    /// * `max_length` - Maximum character count for description
+    ///
+    /// # Returns
+    /// * `Result<String, ServiceError>` - Extracted description or error
+    pub fn extract_description_from_body(body: &str, max_length: usize) -> Result<String, ServiceError> {
+        if body.is_empty() {
+            return Err(ServiceError::Config("Document body is empty".to_string()));
+        }
+
+        // Find the first substantial paragraph or line
+        let first_paragraph = body
+            .split('\n')
+            .map(|line| line.trim())
+            .find(|line| !line.is_empty() && line.len() > 10)
+            .unwrap_or_else(|| body.trim());
+
+        // If the paragraph is short enough, use it as-is
+        if first_paragraph.len() <= max_length {
+            return Ok(first_paragraph.to_string());
+        }
+
+        // Try to break at sentence boundary
+        let truncated = &first_paragraph[..max_length];
+        if let Some(last_period) = truncated.rfind(". ") {
+            if last_period > max_length / 2 {
+                return Ok(truncated[..=last_period].to_string());
+            }
+        }
+
+        // Try to break at word boundary
+        if let Some(last_space) = truncated.rfind(' ') {
+            if last_space > max_length / 2 {
+                return Ok(format!("{}...", &truncated[..last_space]));
+            }
+        }
+
+        // Fallback to character truncation
+        Ok(format!("{}...", &first_paragraph[..max_length - 3]))
+    }
+
+    /// Process multiple documents for description and summarization
+    ///
+    /// Efficiently processes a batch of documents, extracting descriptions
+    /// and optionally queuing summarization tasks.
+    ///
+    /// # Arguments
+    /// * `documents` - Mutable slice of documents to process
+    /// * `role` - Role configuration for summarization
+    /// * `extract_description` - Whether to extract descriptions
+    /// * `queue_summarization` - Whether to queue AI summarization
+    ///
+    /// # Returns
+    /// * `Result<Vec<Option<TaskId>>, ServiceError>` - Task IDs for queued summarizations
+    pub async fn process_documents_batch(
+        &self,
+        documents: &mut [Document],
+        role: &Role,
+        extract_description: bool,
+        queue_summarization: bool,
+    ) -> Result<Vec<Option<TaskId>>, ServiceError> {
+        log::info!("Processing {} documents for description and summarization", documents.len());
+        
+        let mut task_ids = Vec::with_capacity(documents.len());
+        let mut successful_count = 0;
+        let mut error_count = 0;
+
+        for doc in documents.iter_mut() {
+            match self.process_document_fields(doc, role, extract_description, queue_summarization).await {
+                Ok(task_id) => {
+                    task_ids.push(task_id);
+                    successful_count += 1;
+                }
+                Err(e) => {
+                    log::error!("Failed to process document '{}': {}", doc.id, e);
+                    task_ids.push(None);
+                    error_count += 1;
+                }
+            }
+        }
+
+        log::info!("Completed batch processing: {} successful, {} errors", successful_count, error_count);
+        Ok(task_ids)
+    }
+
     /// Shutdown the manager and all workers
     pub async fn shutdown(&mut self) -> Result<(), ServiceError> {
         // Send shutdown command
@@ -198,6 +357,7 @@ mod tests {
             body: "This is a test document for summarization with enough content to make it interesting.".to_string(),
             url: "http://example.com".to_string(),
             description: None,
+        summarization: None,
             stub: None,
             tags: Some(vec![]),
             rank: None,

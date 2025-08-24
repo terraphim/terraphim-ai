@@ -1225,10 +1225,36 @@ impl<'a> TerraphimService {
                 log::debug!("Ranking documents with thesaurus");
                 let mut documents = index.get_documents(scored_index_docs.clone());
                 
+                // CRITICAL FIX: Index all haystack documents into rolegraph if not already present
+                // This ensures TerraphimGraph search can find documents discovered by haystacks
+                let all_haystack_docs = index.get_all_documents();
+                log::debug!("Found {} total documents from haystacks, checking which need indexing", all_haystack_docs.len());
+                let mut need_reindexing = false;
+                
+                if let Some(rolegraph_sync) = self.config_state.roles.get(&role.name) {
+                    let mut rolegraph = rolegraph_sync.lock().await;
+                    let mut newly_indexed = 0;
+                    
+                    for doc in &all_haystack_docs {
+                        // Only index documents that aren't already in the rolegraph
+                        if !rolegraph.has_document(&doc.id) && !doc.body.is_empty() {
+                            log::debug!("Indexing new document '{}' into rolegraph for TerraphimGraph search", doc.id);
+                            rolegraph.insert_document(&doc.id, doc.clone());
+                            newly_indexed += 1;
+                        }
+                    }
+                    
+                    if newly_indexed > 0 {
+                        log::info!("✅ Indexed {} new documents into rolegraph for role '{}'", newly_indexed, role.name);
+                        log::debug!("RoleGraph now has {} nodes, {} edges, {} documents", 
+                                   rolegraph.get_node_count(), rolegraph.get_edge_count(), rolegraph.get_document_count());
+                        need_reindexing = true; // We'll use the existing re-search logic below
+                    }
+                }
+                
                 // CRITICAL FIX: Ensure documents have body content loaded from persistence
                 // If documents don't have body content, they won't contribute to graph nodes properly
                 let mut documents_with_content = Vec::new();
-                let mut need_reindexing = false;
                 
                 for mut document in documents {
                     // Check if document body is empty or missing
@@ -1274,6 +1300,7 @@ impl<'a> TerraphimService {
                                                 body: content,
                                                 url: document.url.clone(),
                                                 description: document.description.clone(),
+                                                summarization: document.summarization.clone(),
                                                 stub: None,
                                                 tags: document.tags.clone(),
                                                 rank: document.rank,
@@ -1306,7 +1333,7 @@ impl<'a> TerraphimService {
                 documents = documents_with_content;
                 
                 if need_reindexing {
-                    log::info!("🔄 Re-indexed documents into rolegraph, re-running search to get updated rankings");
+                    log::info!("🔄 Re-running TerraphimGraph search after indexing new documents");
                     
                     // Re-run the rolegraph search to get updated rankings
                     let updated_scored_docs: Vec<IndexedDocument> = self
@@ -1969,6 +1996,7 @@ mod tests {
             title: "Requested Loan Amount ($)".to_string(),
             body: "Form field for Requested Loan Amount ($)".to_string(),
             description: Some("Form field for Requested Loan Amount ($)".to_string()),
+            summarization: None,
             stub: None,
             tags: None,
             rank: None,
@@ -2083,6 +2111,7 @@ mod tests {
             title: "Requested Loan Amount ($)".to_string(),
             body: "Form field for Requested Loan Amount ($)".to_string(),
             description: Some("Form field for Requested Loan Amount ($)".to_string()),
+            summarization: None,
             stub: None,
             tags: None,
             rank: None,
@@ -2201,6 +2230,7 @@ mod tests {
                 body: "This is the first test document body".to_string(),
                 url: "test://doc1".to_string(),
                 description: Some("First document description".to_string()),
+                summarization: None,
                 stub: None,
                 tags: Some(vec!["test".to_string(), "first".to_string()]),
                 rank: None, // Should be assigned by the function
@@ -2211,6 +2241,7 @@ mod tests {
                 body: "This is the second test document body".to_string(),
                 url: "test://doc2".to_string(),
                 description: Some("Second document description".to_string()),
+                summarization: None,
                 stub: None,
                 tags: Some(vec!["test".to_string(), "second".to_string()]),
                 rank: None, // Should be assigned by the function
@@ -2221,6 +2252,7 @@ mod tests {
                 body: "This is the third test document body".to_string(),
                 url: "test://doc3".to_string(),
                 description: Some("Third document description".to_string()),
+                summarization: None,
                 stub: None,
                 tags: Some(vec!["test".to_string(), "third".to_string()]),
                 rank: None, // Should be assigned by the function

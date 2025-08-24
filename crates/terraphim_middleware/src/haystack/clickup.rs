@@ -194,6 +194,7 @@ fn map_task_value_to_document(t: &serde_json::Value) -> Option<Document> {
         title,
         body: description.clone().unwrap_or_default(),
         description,
+        summarization: None,
         stub: None,
         tags: Some(vec!["clickup".to_string(), "task".to_string()]),
         rank: None,
