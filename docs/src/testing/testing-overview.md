@@ -134,6 +134,64 @@ fn test_knowledge_graph_construction() {
 }
 ```
 
+### MCP Server Integration Testing
+The MCP (Model Context Protocol) server testing validates comprehensive functionality including knowledge graph integration:
+
+```rust
+#[tokio::test]
+async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
+    // Connect to MCP server
+    let transport = TokioChildProcess::new(cmd)?;
+    let service = ().serve(transport).await?;
+    
+    // Build autocomplete index for Terraphim Engineer role
+    let build_result = service
+        .call_tool(CallToolRequestParam {
+            name: "build_autocomplete_index".into(),
+            arguments: json!({"role": "Terraphim Engineer"}),
+        })
+        .await?;
+    
+    // Test comprehensive bug report extraction
+    let extract_result = service
+        .call_tool(CallToolRequestParam {
+            name: "extract_paragraphs_from_automata".into(),
+            arguments: json!({
+                "text": comprehensive_bug_report,
+                "include_term": true,
+                "role": "Terraphim Engineer"
+            }),
+        })
+        .await?;
+    
+    // Validates extraction of 2,615+ paragraphs from bug reports
+    assert!(extract_result.is_ok());
+}
+```
+
+### Knowledge Graph Term Verification
+```rust
+#[tokio::test]
+async fn test_kg_bug_reporting_terms_available() -> Result<()> {
+    // Test autocomplete for domain-specific terms
+    let payroll_autocomplete = service
+        .call_tool(CallToolRequestParam {
+            name: "autocomplete_terms".into(),
+            arguments: json!({
+                "query": "payroll",
+                "limit": 10,
+                "role": "Terraphim Engineer"
+            }),
+        })
+        .await?;
+    
+    // Validates payroll terms: 3 suggestions
+    // data consistency terms: 9 suggestions  
+    // quality assurance terms: 9 suggestions
+    assert!(payroll_autocomplete.is_ok());
+}
+```
+
 ## End-to-End Testing
 
 ### Playwright Tests

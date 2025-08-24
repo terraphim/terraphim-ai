@@ -2,7 +2,7 @@
 
 This folder is a source for Terraphim documentation as well as demonstration for Terraphim Engineer role:
 
-[kg](./kg) folder is an example of personal knowledge graph used for testing and fixtures
+[kg](./kg) folder is an example of personal knowledge graph used for testing, fixtures, and domain-specific terminology including bug reporting and issue tracking
 
 Example configuration for this KG:
 
