@@ -48,13 +48,12 @@ async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
     cmd.arg("mcp-server")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
+        .stderr(Stdio::piped());
 
     Ok(TokioChildProcess::new(cmd)?)
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_desktop_mcp_server_basic_search() -> Result<()> {
     let transport = launch_desktop_mcp_server().await?;
     let service = ().serve(transport).await?;
