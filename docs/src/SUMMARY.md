@@ -42,7 +42,12 @@
 ## Testing
 
 - [Testing Overview](./testing/testing-overview.md)
+- [MCP Integration Testing](./testing/mcp-integration-testing.md)
 
 ## Knowledge Graph
 
 - [Knowledge Graph](./kg/knowledge-graph.md)
+- [Knowledge Graph System](./kg/knowledge-graph-system.md)
+- [Bug Reporting Enhancement](./knowledge-graph-bug-reporting-enhancement.md)
+- [Bug Reporting Terminology](./kg/bug-reporting.md)
+- [Issue Tracking Terminology](./kg/issue-tracking.md)
