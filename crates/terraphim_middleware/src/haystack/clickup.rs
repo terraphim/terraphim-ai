@@ -5,6 +5,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use terraphim_config::Haystack;
 use terraphim_types::{Document, Index};
+use terraphim_persistence::Persistable;
 
 #[derive(Debug, Clone)]
 pub struct ClickUpHaystackIndexer {
@@ -16,6 +17,49 @@ impl Default for ClickUpHaystackIndexer {
         Self {
             client: Client::new(),
         }
+    }
+}
+
+impl ClickUpHaystackIndexer {
+    /// Normalize document ID to match persistence layer expectations
+    fn normalize_document_id(&self, original_id: &str) -> String {
+        // Create a dummy document to access the normalize_key method
+        let dummy_doc = Document {
+            id: "dummy".to_string(),
+            title: "dummy".to_string(),
+            body: "dummy".to_string(),
+            url: "dummy".to_string(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+        };
+        dummy_doc.normalize_key(original_id)
+    }
+
+    fn map_task_value_to_document(&self, t: &serde_json::Value) -> Option<Document> {
+        let id = t.get("id").and_then(|v| v.as_str())?.to_string();
+        let title = t.get("name").and_then(|v| v.as_str())?.to_string();
+        let description = t
+            .get("text_content")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let url = format!("https://app.clickup.com/t/{}", id);
+        let original_id = format!("clickup-task-{}", id);
+        let normalized_id = self.normalize_document_id(&original_id);
+        Some(Document {
+            id: normalized_id,
+            url,
+            title,
+            body: description.clone().unwrap_or_default(),
+            description,
+            summarization: None,
+            stub: None,
+            tags: Some(vec!["clickup".to_string(), "task".to_string()]),
+            rank: None,
+        })
     }
 }
 
@@ -56,7 +100,7 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
 
             if let Some(list) = list_id.clone() {
                 if let Ok(mut docs) =
-                    search_clickup_list(&client, &token, &list, &query, include_closed, subtasks)
+                    search_clickup_list(&client, &token, &list, &query, include_closed, subtasks, &self)
                         .await
                 {
                     documents.append(&mut docs);
@@ -70,6 +114,7 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
                     &page,
                     include_closed,
                     subtasks,
+                    &self,
                 )
                 .await
                 {
@@ -100,6 +145,7 @@ async fn search_clickup_universal(
     page: &str,
     include_closed: bool,
     subtasks: bool,
+    indexer: &ClickUpHaystackIndexer,
 ) -> Result<Vec<Document>> {
     // GET /api/v2/team/{team_id}/task
     let url = format!("https://api.clickup.com/api/v2/team/{}/task", team_id);
@@ -128,7 +174,7 @@ async fn search_clickup_universal(
     let mut results: Vec<Document> = Vec::new();
     if let Some(tasks) = json_value.get("tasks").and_then(|v| v.as_array()) {
         for t in tasks {
-            if let Some(doc) = map_task_value_to_document(t) {
+            if let Some(doc) = indexer.map_task_value_to_document(t) {
                 results.push(doc);
             }
         }
@@ -144,6 +190,7 @@ async fn search_clickup_list(
     query: &str,
     include_closed: bool,
     subtasks: bool,
+    indexer: &ClickUpHaystackIndexer,
 ) -> Result<Vec<Document>> {
     // GET /api/v2/list/{list_id}/task
     let url = format!("https://api.clickup.com/api/v2/list/{}/task", list_id);
@@ -170,7 +217,7 @@ async fn search_clickup_list(
     let mut results: Vec<Document> = Vec::new();
     if let Some(tasks) = json_value.get("tasks").and_then(|v| v.as_array()) {
         for t in tasks {
-            if let Some(doc) = map_task_value_to_document(t) {
+            if let Some(doc) = indexer.map_task_value_to_document(t) {
                 results.push(doc);
             }
         }
@@ -179,27 +226,6 @@ async fn search_clickup_list(
     Ok(results)
 }
 
-fn map_task_value_to_document(t: &serde_json::Value) -> Option<Document> {
-    let id = t.get("id").and_then(|v| v.as_str())?.to_string();
-    let title = t.get("name").and_then(|v| v.as_str())?.to_string();
-    let description = t
-        .get("text_content")
-        .or_else(|| t.get("description"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let url = format!("https://app.clickup.com/t/{}", id);
-    Some(Document {
-        id: format!("clickup-task-{}", id),
-        url,
-        title,
-        body: description.clone().unwrap_or_default(),
-        description,
-        summarization: None,
-        stub: None,
-        tags: Some(vec!["clickup".to_string(), "task".to_string()]),
-        rank: None,
-    })
-}
 
 fn parse_bool_param(val: Option<&String>, default_value: bool) -> bool {
     val.and_then(|s| s.parse::<bool>().ok())

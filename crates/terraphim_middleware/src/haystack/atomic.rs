@@ -1,5 +1,6 @@
 use terraphim_atomic_client::{store::Store, types::Config, Agent};
 use terraphim_types::{Document, Index};
+use terraphim_persistence::Persistable;
 
 use crate::{indexer::IndexMiddleware, Result};
 use terraphim_config::Haystack;
@@ -8,6 +9,25 @@ use terraphim_config::Haystack;
 #[derive(Default, Clone)]
 pub struct AtomicHaystackIndexer {
     // We can add configuration here, like the server URL
+}
+
+impl AtomicHaystackIndexer {
+    /// Normalize document ID to match persistence layer expectations
+    fn normalize_document_id(&self, original_id: &str) -> String {
+        // Create a dummy document to access the normalize_key method
+        let dummy_doc = Document {
+            id: "dummy".to_string(),
+            title: "dummy".to_string(),
+            body: "dummy".to_string(),
+            url: "dummy".to_string(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+        };
+        dummy_doc.normalize_key(original_id)
+    }
 }
 
 impl IndexMiddleware for AtomicHaystackIndexer {
@@ -129,8 +149,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                 // Try to extract meaningful body content from various properties
                                 let body = extract_document_body(&resource.properties);
 
+                                let original_id = resource.subject.clone();
+                                let normalized_id = self.normalize_document_id(&original_id);
                                 let document = Document {
-                                    id: resource.subject.clone(),
+                                    id: normalized_id,
                                     url: resource.subject.clone(),
                                     title: resource
                                         .properties
@@ -144,7 +166,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                         .and_then(|v| v.as_str())
                                         .map(|s| s.to_string()),
                                     body,
-                                    ..Default::default()
+                                    summarization: None,
+                                    stub: None,
+                                    tags: None,
+                                    rank: None,
                                 };
 
                                 log::debug!(
@@ -175,8 +200,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                 Ok(resource) => {
                                     let body = extract_document_body(&resource.properties);
 
+                                    let original_id = resource.subject.clone();
+                                    let normalized_id = self.normalize_document_id(&original_id);
                                     let document = Document {
-                                        id: resource.subject.clone(),
+                                        id: normalized_id,
                                         url: resource.subject.clone(),
                                         title: resource
                                             .properties
@@ -190,7 +217,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                             .and_then(|v| v.as_str())
                                             .map(|s| s.to_string()),
                                         body,
-                                        ..Default::default()
+                                        summarization: None,
+                                        stub: None,
+                                        tags: None,
+                                        rank: None,
                                     };
 
                                     log::debug!(
@@ -221,8 +251,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                         Ok(resource) => {
                             let body = extract_document_body(&resource.properties);
 
+                            let original_id = resource.subject.clone();
+                            let normalized_id = self.normalize_document_id(&original_id);
                             let document = Document {
-                                id: resource.subject.clone(),
+                                id: normalized_id,
                                 url: resource.subject.clone(),
                                 title: resource
                                     .properties
@@ -236,7 +268,10 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string()),
                                 body,
-                                ..Default::default()
+                                summarization: None,
+                                stub: None,
+                                tags: None,
+                                rank: None,
                             };
 
                             log::debug!(

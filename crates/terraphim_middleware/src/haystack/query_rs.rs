@@ -6,6 +6,7 @@ use scraper::{Html, Selector};
 use serde_json::Value;
 use terraphim_config::Haystack;
 use terraphim_types::{Document, Index};
+use terraphim_persistence::Persistable;
 
 /// Middleware that uses query.rs as a haystack.
 /// Supports comprehensive Rust documentation search including:
@@ -93,6 +94,23 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
 }
 
 impl QueryRsHaystackIndexer {
+    /// Normalize document ID to match persistence layer expectations
+    fn normalize_document_id(&self, original_id: &str) -> String {
+        // Create a dummy document to access the normalize_key method
+        let dummy_doc = Document {
+            id: "dummy".to_string(),
+            title: "dummy".to_string(),
+            body: "dummy".to_string(),
+            url: "dummy".to_string(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+        };
+        dummy_doc.normalize_key(original_id)
+    }
+
     /// Fetch and scrape content from a document's URL
     async fn fetch_and_scrape_content(&self, doc: &Document) -> Result<Document> {
         let mut enhanced_doc = doc.clone();
@@ -474,8 +492,10 @@ impl QueryRsHaystackIndexer {
                 let body = obj.get("selftext").and_then(|v| v.as_str()).unwrap_or("");
 
                 if !title.is_empty() && !url.is_empty() {
+                    let original_id = format!("reddit-{}", url);
+                    let normalized_id = self.normalize_document_id(&original_id);
                     documents.push(Document {
-                        id: format!("reddit-{}", url),
+                        id: normalized_id,
                         url: url.to_string(),
                         title: format!("[Reddit] {}", title),
                         description: Some(format!("by {} (score: {})", author, score)),
@@ -516,8 +536,10 @@ impl QueryRsHaystackIndexer {
                                     let search_type = self.determine_search_type(title, url);
                                     let tags = self.generate_tags_for_search_type(&search_type);
 
+                                    let original_id = format!("{}-{}", search_type, url);
+                                    let normalized_id = self.normalize_document_id(&original_id);
                                     documents.push(Document {
-                                        id: format!("{}-{}", search_type, url),
+                                        id: normalized_id,
                                         url: url.to_string(),
                                         title: format!(
                                             "[{}] {}",
@@ -565,8 +587,10 @@ impl QueryRsHaystackIndexer {
                     let url = format!("https://crates.io/crates/{}", name);
 
                     if !name.is_empty() {
+                        let original_id = format!("crate-{}", name);
+                        let normalized_id = self.normalize_document_id(&original_id);
                         documents.push(Document {
-                            id: format!("crate-{}", name),
+                            id: normalized_id,
                             url: url.clone(),
                             title: format!("[CRATE] {} {}", name, version),
                             description: Some(format!("{} ({} downloads)", description, downloads)),
@@ -604,8 +628,10 @@ impl QueryRsHaystackIndexer {
                         let crate_name = &line[start + 11..start + end];
                         if !crate_name.is_empty() {
                             let url = format!("https://docs.rs/{}", crate_name);
+                            let original_id = format!("docs-{}", crate_name);
+                            let normalized_id = self.normalize_document_id(&original_id);
                             documents.push(Document {
-                                id: format!("docs-{}", crate_name),
+                                id: normalized_id,
                                 url: url.clone(),
                                 title: format!("[DOCS] {}", crate_name),
                                 description: Some(format!("Documentation for {}", crate_name)),

@@ -98,6 +98,7 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         title: "Terraphim-graph".to_string(),
         body: content.clone(),
         description: Some("Terraphim Graph scorer using unique graph embeddings".to_string()),
+        summarization: None,
         stub: None,
         tags: None,
         rank: None,
