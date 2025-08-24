@@ -235,12 +235,26 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     log::info!("✅ Saved document '{}' to persistence layer", document.id);
                                                 }
 
+                                                // Validate document has content before indexing into rolegraph
+                                                if document.body.is_empty() {
+                                                    log::warn!("Document '{}' has empty body, cannot properly index into rolegraph", filename);
+                                                } else {
+                                                    log::debug!("Document '{}' has {} chars of body content", filename, document.body.len());
+                                                }
+                                                
                                                 // Then add to rolegraph for KG indexing using the same normalized ID
+                                                let document_clone = document.clone();
                                                 rolegraph_with_docs
                                                     .insert_document(&normalized_id, document);
+                                                    
+                                                // Log rolegraph statistics after insertion
+                                                let node_count = rolegraph_with_docs.get_node_count();
+                                                let edge_count = rolegraph_with_docs.get_edge_count();
+                                                let doc_count = rolegraph_with_docs.get_document_count();
+                                                
                                                 log::info!(
-                                                    "✅ Indexed document '{}' into rolegraph",
-                                                    filename
+                                                    "✅ Indexed document '{}' into rolegraph (body: {} chars, nodes: {}, edges: {}, docs: {})",
+                                                    filename, document_clone.body.len(), node_count, edge_count, doc_count
                                                 );
                                             }
                                         }
