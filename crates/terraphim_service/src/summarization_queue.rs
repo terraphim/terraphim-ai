@@ -442,6 +442,7 @@ mod tests {
             body: "This is a test document for summarization.".to_string(),
             url: "http://example.com".to_string(),
             description: None,
+        summarization: None,
             stub: None,
             tags: Some(vec![]),
             rank: None,

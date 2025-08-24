@@ -334,6 +334,11 @@ impl RoleGraph {
         }
     }
 
+    /// Check if a document is already indexed in the rolegraph
+    pub fn has_document(&self, document_id: &str) -> bool {
+        self.documents.contains_key(document_id)
+    }
+
     pub fn add_or_update_document(&mut self, document_id: &str, x: u64, y: u64) {
         let edge = magic_pair(x, y);
         let edge = self.init_or_update_edge(edge, document_id);
@@ -650,6 +655,7 @@ mod tests {
             title: "README".to_string(),
             body: test_document.to_string(),
             description: None,
+            summarization: None,
         };
         rolegraph.insert_document(&document_id, document);
         println!("query with {}", "terraphim-graph and service".to_string());
@@ -685,6 +691,7 @@ mod tests {
             title: "terraphim-graph".to_string(),
             body: test_document2.to_string(),
             description: None,
+            summarization: None,
         };
         rolegraph.insert_document(&document_id2, document2);
         log::debug!("Query graph");
@@ -735,6 +742,7 @@ mod tests {
             title: "Life cycle concepts and project direction".to_string(),
             body: query4.to_string(),
             description: None,
+            summarization: None,
         };
         rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
@@ -817,6 +825,7 @@ mod tests {
             rank: Some(1),
             stub: None,
             description: Some("Test document with thesaurus terms".to_string()),
+            summarization: None,
         };
 
         // Insert document into rolegraph (this should create nodes and edges)

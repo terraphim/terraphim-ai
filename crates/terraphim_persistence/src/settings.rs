@@ -584,6 +584,7 @@ mod tests {
             url: "test://url".to_string(),
             body: "Test content".to_string(),
             description: Some("Test description".to_string()),
+            summarization: Some("Test summarization".to_string()),
             stub: None,
             tags: None,
             rank: None,

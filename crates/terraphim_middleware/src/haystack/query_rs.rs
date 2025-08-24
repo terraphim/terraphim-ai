@@ -479,6 +479,7 @@ impl QueryRsHaystackIndexer {
                         url: url.to_string(),
                         title: format!("[Reddit] {}", title),
                         description: Some(format!("by {} (score: {})", author, score)),
+                        summarization: None,
                         body: body.to_string(),
                         stub: None,
                         tags: Some(vec![
@@ -527,6 +528,7 @@ impl QueryRsHaystackIndexer {
                                             "Rust {} documentation",
                                             search_type
                                         )),
+                                        summarization: None,
                                         body: format!("Search result for '{}': {}", query, title),
                                         stub: None,
                                         tags: Some(tags),
@@ -568,6 +570,7 @@ impl QueryRsHaystackIndexer {
                             url: url.clone(),
                             title: format!("[CRATE] {} {}", name, version),
                             description: Some(format!("{} ({} downloads)", description, downloads)),
+                            summarization: None,
                             body: format!("Crate: {} - {}", name, description),
                             stub: None,
                             tags: Some(vec![
@@ -606,6 +609,7 @@ impl QueryRsHaystackIndexer {
                                 url: url.clone(),
                                 title: format!("[DOCS] {}", crate_name),
                                 description: Some(format!("Documentation for {}", crate_name)),
+                                summarization: None,
                                 body: format!("Documentation for crate: {}", crate_name),
                                 stub: None,
                                 tags: Some(vec![

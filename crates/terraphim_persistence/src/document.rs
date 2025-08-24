@@ -73,6 +73,7 @@ mod tests {
         test_doc.body = "This is a test document for persistence validation.".to_string();
         test_doc.url = "https://example.com/test-document".to_string();
         test_doc.description = Some("Test document description".to_string());
+        test_doc.summarization = Some("Test document AI-generated summary".to_string());
         test_doc.tags = Some(vec!["test".to_string(), "persistence".to_string()]);
         test_doc.rank = Some(100);
 
@@ -89,6 +90,7 @@ mod tests {
         assert_eq!(loaded_doc.body, test_doc.body, "Document bodies should match");
         assert_eq!(loaded_doc.url, test_doc.url, "Document URLs should match");
         assert_eq!(loaded_doc.description, test_doc.description, "Document descriptions should match");
+        assert_eq!(loaded_doc.summarization, test_doc.summarization, "Document summarizations should match");
         assert_eq!(loaded_doc.tags, test_doc.tags, "Document tags should match");
         assert_eq!(loaded_doc.rank, test_doc.rank, "Document ranks should match");
 
@@ -107,6 +109,7 @@ mod tests {
         test_doc.body = "This document tests saving to all backends.".to_string();
         test_doc.url = "https://example.com/all-backends".to_string();
         test_doc.description = Some("Testing all backends".to_string());
+        test_doc.summarization = Some("Summary for all backends test".to_string());
 
         // Save the document to all backends
         test_doc.save().await?;
@@ -121,6 +124,7 @@ mod tests {
         assert_eq!(loaded_doc.body, test_doc.body, "Document bodies should match");
         assert_eq!(loaded_doc.url, test_doc.url, "Document URLs should match");
         assert_eq!(loaded_doc.description, test_doc.description, "Document descriptions should match");
+        assert_eq!(loaded_doc.summarization, test_doc.summarization, "Document summarizations should match");
 
         Ok(())
     }
