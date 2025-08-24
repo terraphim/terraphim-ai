@@ -9,7 +9,7 @@ mod tests {
     use terraphim_server::{axum_server, CreateDocumentResponse, SearchResponse, Status};
     use terraphim_settings::DeviceSettings;
 
-    use reqwest::{Client, StatusCode};
+    use axum::http::StatusCode;
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
@@ -132,13 +132,13 @@ mod tests {
 
     async fn wait_for_server_ready(address: SocketAddr) {
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
         loop {
             match client.get(&health_url).send().await {
-                Ok(response) if response.status() == StatusCode::OK => {
+                Ok(response) if response.status() == 200 => {
                     println!("Server is ready at {}", address);
                     break;
                 }
@@ -167,7 +167,7 @@ mod tests {
     async fn test_post_search_document() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
         let response = client
             .post(format!("http://{server}/documents/search"))
             .header("Content-Type", "application/json")
@@ -184,7 +184,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -192,7 +192,7 @@ mod tests {
     async fn test_search_documents() {
         let server = ensure_server_started().await;
         let response = reqwest::get(format!("http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=System%20Operator")).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -202,7 +202,7 @@ mod tests {
 
         let url = format!("http://{server}/documents/search?search_term=system&skip=0&limit=10");
         let response = reqwest::get(url).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         // The response body should be of this form:
         // {
@@ -253,7 +253,7 @@ mod tests {
         ))
         .await
         .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let response: SearchResponse = response.json().await.unwrap();
         println!("{:#?}", response);
@@ -277,7 +277,7 @@ mod tests {
         let response = reqwest::get(format!("http://{server}/config"))
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         // Check that the config is valid JSON and contains the expected roles
         let response: ConfigResponse = response.json().await.unwrap();
@@ -309,7 +309,7 @@ mod tests {
         new_config.default_role = "Engineer".to_string().into();
         new_config.global_shortcut = "Ctrl+P".to_string();
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
         let response = client
             .post(&config_url)
             .header("Content-Type", "application/json")
@@ -318,7 +318,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let new_config: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(orig_config.status, Status::Success));
@@ -331,7 +331,7 @@ mod tests {
     async fn test_create_document() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
         let response = client.post(format!("http://{server}/documents"))
             .header("Content-Type", "application/json")
             // TODO: Do we want to set the ID here or want the server to
@@ -347,7 +347,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
         let response: CreateDocumentResponse = response.json().await.unwrap();
         assert!(matches!(response.status, Status::Success));
         assert_eq!(response.id, "Title of the document");

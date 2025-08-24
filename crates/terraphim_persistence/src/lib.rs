@@ -181,12 +181,66 @@ pub trait Persistable: Serialize + DeserializeOwned {
         Ok(())
     }
 
-    /// Load from the fastest operator
+    /// Load from operators with fallback mechanism
+    /// 
+    /// This function tries to load the object from storage backends in speed order.
+    /// If the fastest operator fails, it will try the next fastest, and so on.
+    /// This provides resilience when different storage backends have different content.
     async fn load_from_operator(&self, key: &str, _op: &Operator) -> Result<Self>
     where
         Self: Sized,
     {
-        let (_ops, fastest_op) = &self.load_config().await?;
+        let (ops, fastest_op) = &self.load_config().await?;
+        
+        // First try the fastest operator as before
+        match fastest_op.read(key).await {
+            Ok(bs) => {
+                match serde_json::from_slice(&bs) {
+                    Ok(obj) => {
+                        log::debug!("✅ Loaded '{}' from fastest operator", key);
+                        return Ok(obj);
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to deserialize '{}' from fastest operator: {}", key, e);
+                    }
+                }
+            }
+            Err(e) => {
+                log::debug!("Failed to read '{}' from fastest operator: {}, trying fallback", key, e);
+            }
+        }
+        
+        // If fastest operator failed, try all operators in speed order
+        let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
+        ops_vec.sort_by_key(|&(_, (_, speed))| speed);
+        
+        for (profile_name, (op, _speed)) in ops_vec {
+            // Skip if this is the same as the fastest operator we already tried
+            if std::ptr::eq(op as *const Operator, fastest_op as *const Operator) {
+                continue;
+            }
+            
+            log::debug!("🔄 Trying to load '{}' from profile '{}'", key, profile_name);
+            
+            match op.read(key).await {
+                Ok(bs) => {
+                    match serde_json::from_slice(&bs) {
+                        Ok(obj) => {
+                            log::info!("✅ Successfully loaded '{}' from fallback profile '{}'", key, profile_name);
+                            return Ok(obj);
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to deserialize '{}' from profile '{}': {}", key, profile_name, e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::debug!("Failed to read '{}' from profile '{}': {}", key, profile_name, e);
+                }
+            }
+        }
+        
+        // If all operators failed, return the original error from the fastest operator
         let bs = fastest_op.read(key).await?;
         let obj = serde_json::from_slice(&bs)?;
         Ok(obj)

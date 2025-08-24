@@ -28,6 +28,16 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Statistics about the graph structure for debugging
+#[derive(Debug, Clone)]
+pub struct GraphStats {
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub document_count: usize,
+    pub thesaurus_size: usize,
+    pub is_populated: bool,
+}
+
 /// A `RoleGraph` is a graph of concepts and their relationships.
 ///
 /// It is used to index documents and search for them.
@@ -344,6 +354,79 @@ impl RoleGraph {
             }
         };
     }
+    
+    /// Get the number of nodes in the graph
+    pub fn get_node_count(&self) -> usize {
+        self.nodes.len()
+    }
+    
+    /// Get the number of edges in the graph  
+    pub fn get_edge_count(&self) -> usize {
+        self.edges.len()
+    }
+    
+    /// Get the number of documents in the graph
+    pub fn get_document_count(&self) -> usize {
+        self.documents.len()
+    }
+    
+    /// Check if the graph has been properly populated
+    pub fn is_graph_populated(&self) -> bool {
+        !self.nodes.is_empty() && !self.edges.is_empty() && !self.documents.is_empty()
+    }
+    
+    /// Get graph statistics for debugging
+    pub fn get_graph_stats(&self) -> GraphStats {
+        GraphStats {
+            node_count: self.nodes.len(),
+            edge_count: self.edges.len(),
+            document_count: self.documents.len(),
+            thesaurus_size: self.thesaurus.len(),
+            is_populated: self.is_graph_populated(),
+        }
+    }
+    
+    /// Validate that documents have content and are indexed properly
+    pub fn validate_documents(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        
+        for (doc_id, _indexed_doc) in &self.documents {
+            // Check if this document contributed to graph structure
+            let has_nodes = self.nodes.values().any(|node| 
+                node.connected_with.iter().any(|edge_id|
+                    self.edges.get(edge_id).map_or(false, |edge|
+                        edge.doc_hash.contains_key(doc_id)
+                    )
+                )
+            );
+            
+            if !has_nodes {
+                warnings.push(format!("Document '{}' did not create any nodes (may have empty body or no thesaurus matches)", doc_id));
+            }
+        }
+        
+        warnings
+    }
+    
+    /// Find all document IDs that contain a specific term
+    pub fn find_document_ids_for_term(&self, term: &str) -> Vec<String> {
+        let node_ids = self.find_matching_node_ids(term);
+        let mut document_ids = std::collections::HashSet::new();
+        
+        for node_id in node_ids {
+            if let Some(node) = self.nodes.get(&node_id) {
+                for edge_id in &node.connected_with {
+                    if let Some(edge) = self.edges.get(edge_id) {
+                        for doc_id in edge.doc_hash.keys() {
+                            document_ids.insert(doc_id.clone());
+                        }
+                    }
+                }
+            }
+        }
+        
+        document_ids.into_iter().collect()
+    }
 
     fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
         let edge = match self.edges.entry(edge_key) {
@@ -387,61 +470,6 @@ impl RoleGraph {
         &self.edges
     }
 
-    /// Find document IDs that contain a given term in their content
-    ///
-    /// This method searches for documents that were the source of a knowledge graph term.
-    /// For example, given "haystack", it will find documents like "haystack.md" that contain
-    /// this term or its synonyms ("datasource", "service", "agent").
-    ///
-    /// Returns a vector of document IDs that contain the term.
-    pub fn find_document_ids_for_term(&self, term: &str) -> Vec<String> {
-        log::debug!("Finding document IDs for term: '{}'", term);
-
-        // First, find all node IDs that match this term
-        let matching_node_ids = self.find_matching_node_ids(term);
-        log::trace!(
-            "Found {} matching node IDs: {:?}",
-            matching_node_ids.len(),
-            matching_node_ids
-        );
-
-        let mut document_ids = std::collections::HashSet::new();
-
-        // For each matching node, find all edges connected to it
-        for node_id in matching_node_ids {
-            if let Some(node) = self.nodes.get(&node_id) {
-                log::trace!(
-                    "Processing node {} with {} connected edges",
-                    node_id,
-                    node.connected_with.len()
-                );
-
-                // For each edge connected to this node, get the documents
-                for edge_id in &node.connected_with {
-                    if let Some(edge) = self.edges.get(edge_id) {
-                        // Add all document IDs from this edge
-                        for doc_id in edge.doc_hash.keys() {
-                            document_ids.insert(doc_id.clone());
-                            log::trace!(
-                                "Found document '{}' connected to node {}",
-                                doc_id,
-                                node_id
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        let result: Vec<String> = document_ids.into_iter().collect();
-        log::debug!(
-            "Found {} unique document IDs for term '{}': {:?}",
-            result.len(),
-            term,
-            result
-        );
-        result
-    }
 }
 
 /// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`
@@ -523,8 +551,9 @@ mod tests {
     use tokio::test;
     use ulid::Ulid;
 
-    fn load_sample_thesaurus() -> Thesaurus {
+    async fn load_sample_thesaurus() -> Thesaurus {
         load_thesaurus(&AutomataPath::local_example_full())
+            .await
             .unwrap()
     }
 
@@ -551,7 +580,7 @@ mod tests {
     async fn test_find_matching_node_idss() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         let matches = rolegraph.find_matching_node_ids(query);
@@ -562,7 +591,7 @@ mod tests {
     async fn test_find_matching_node_idss_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         println!("rolegraph: {:?}", rolegraph);
@@ -596,7 +625,7 @@ mod tests {
             return;
         }
         let automata_path = AutomataPath::from_local(engineer_thesaurus_path);
-        let thesaurus = load_thesaurus(&automata_path).unwrap();
+        let thesaurus = load_thesaurus(&automata_path).await.unwrap();
         let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone())
             .await
             .unwrap();
@@ -674,7 +703,7 @@ mod tests {
     #[test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
-        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         let document_id = Ulid::new().to_string();
@@ -726,7 +755,7 @@ mod tests {
     #[test]
     async fn test_is_all_terms_connected_by_path_true() {
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         let text = "Life cycle concepts ... Paradigm Map ... project planning";
@@ -736,7 +765,7 @@ mod tests {
     #[test]
     async fn test_is_all_terms_connected_by_path_false() {
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus())
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
             .await
             .unwrap();
         // Intentionally pick terms unlikely to be connected together
@@ -752,7 +781,7 @@ mod tests {
 
         // Create a role graph with sample thesaurus
         let role_name = "Test Role".to_string();
-        let thesaurus = load_sample_thesaurus();
+        let thesaurus = load_sample_thesaurus().await;
         let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone())
             .await
             .expect("Failed to create rolegraph");

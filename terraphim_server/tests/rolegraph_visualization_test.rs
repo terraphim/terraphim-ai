@@ -10,7 +10,7 @@ mod tests {
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
-    use reqwest::{Client, StatusCode};
+    use axum::http::StatusCode;
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
@@ -131,13 +131,13 @@ mod tests {
 
     async fn wait_for_server_ready(address: SocketAddr) {
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
         loop {
             match client.get(&health_url).send().await {
-                Ok(response) if response.status() == StatusCode::OK => {
+                Ok(response) if response.status() == 200 => {
                     println!("Server is ready at {}", address);
                     break;
                 }
@@ -187,7 +187,7 @@ mod tests {
     async fn test_rolegraph_visualization_structure() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Trigger search to ensure KG indexing is warmed up
         let _ = client
@@ -203,7 +203,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
 
@@ -262,7 +262,7 @@ mod tests {
     async fn test_rolegraph_visualization_system_operator() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Trigger search warmup
         let _ = client
@@ -277,7 +277,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
 
@@ -306,7 +306,7 @@ mod tests {
     async fn test_rolegraph_visualization_no_kg() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Test Default role (no knowledge graph)
         let response = client
@@ -325,7 +325,7 @@ mod tests {
     async fn test_rolegraph_visualization_default_role() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Test without specifying role (should use selected role)
         let response = client
@@ -344,7 +344,7 @@ mod tests {
     async fn test_rolegraph_visualization_consistency() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Test Engineer role multiple times to ensure consistency
         let response1 = client
@@ -396,7 +396,7 @@ mod tests {
     async fn test_rolegraph_visualization_invalid_role() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Test with invalid role name
         let response = client
@@ -415,7 +415,7 @@ mod tests {
     async fn test_rolegraph_visualization_node_labels() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         let response = client
             .get(format!("http://{server}/rolegraph?role=Engineer"))
@@ -423,7 +423,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
 
@@ -453,7 +453,7 @@ mod tests {
     async fn test_rolegraph_visualization_edge_relationships() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         let response = client
             .get(format!("http://{server}/rolegraph?role=Engineer"))
@@ -461,7 +461,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
 

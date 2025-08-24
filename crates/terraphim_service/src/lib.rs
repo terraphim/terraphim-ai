@@ -1218,10 +1218,111 @@ impl<'a> TerraphimService {
                     .search_indexed_documents(search_query, &role)
                     .await;
 
+                log::debug!("TerraphimGraph search found {} indexed documents", scored_index_docs.len());
+
                 // Apply to ripgrep vector of document output
                 // I.e. use the ranking of thesaurus to rank the documents here
                 log::debug!("Ranking documents with thesaurus");
-                let mut documents = index.get_documents(scored_index_docs);
+                let mut documents = index.get_documents(scored_index_docs.clone());
+                
+                // CRITICAL FIX: Ensure documents have body content loaded from persistence
+                // If documents don't have body content, they won't contribute to graph nodes properly
+                let mut documents_with_content = Vec::new();
+                let mut need_reindexing = false;
+                
+                for mut document in documents {
+                    // Check if document body is empty or missing
+                    if document.body.is_empty() {
+                        log::debug!("Document '{}' has empty body, attempting to load from persistence", document.id);
+                        
+                        // Try to load full document from persistence with fallback
+                        let mut full_doc = Document::new(document.id.clone());
+                        match full_doc.load().await {
+                            Ok(loaded_doc) => {
+                                if !loaded_doc.body.is_empty() {
+                                    log::info!("✅ Loaded body content for document '{}' from persistence", document.id);
+                                    document.body = loaded_doc.body.clone();
+                                    if loaded_doc.description.is_some() {
+                                        document.description = loaded_doc.description.clone();
+                                    }
+                                    
+                                    // Re-index document into rolegraph with proper content
+                                    if let Some(rolegraph_sync) = self.config_state.roles.get(&role.name) {
+                                        let mut rolegraph = rolegraph_sync.lock().await;
+                                        rolegraph.insert_document(&document.id, loaded_doc);
+                                        need_reindexing = true;
+                                        log::debug!("Re-indexed document '{}' into rolegraph with content", document.id);
+                                    }
+                                } else {
+                                    log::warn!("Document '{}' still has empty body after loading from persistence", document.id);
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to load document '{}' from persistence: {}", document.id, e);
+                                
+                                // Try to read from original file path if it's a local file
+                                if document.url.starts_with('/') || document.url.starts_with("docs/") {
+                                    match tokio::fs::read_to_string(&document.url).await {
+                                        Ok(content) => {
+                                            log::info!("✅ Loaded content for '{}' from file: {}", document.id, document.url);
+                                            document.body = content.clone();
+                                            
+                                            // Create and save full document
+                                            let full_doc = Document {
+                                                id: document.id.clone(),
+                                                title: document.title.clone(),
+                                                body: content,
+                                                url: document.url.clone(),
+                                                description: document.description.clone(),
+                                                stub: None,
+                                                tags: document.tags.clone(),
+                                                rank: document.rank,
+                                            };
+                                            
+                                            // Save to persistence for future use
+                                            if let Err(e) = full_doc.save().await {
+                                                log::warn!("Failed to save document '{}' to persistence: {}", document.id, e);
+                                            }
+                                            
+                                            // Re-index into rolegraph
+                                            if let Some(rolegraph_sync) = self.config_state.roles.get(&role.name) {
+                                                let mut rolegraph = rolegraph_sync.lock().await;
+                                                rolegraph.insert_document(&document.id, full_doc);
+                                                need_reindexing = true;
+                                                log::debug!("Re-indexed document '{}' into rolegraph from file", document.id);
+                                            }
+                                        }
+                                        Err(file_e) => {
+                                            log::warn!("Failed to read file '{}' for document '{}': {}", document.url, document.id, file_e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    documents_with_content.push(document);
+                }
+                
+                documents = documents_with_content;
+                
+                if need_reindexing {
+                    log::info!("🔄 Re-indexed documents into rolegraph, re-running search to get updated rankings");
+                    
+                    // Re-run the rolegraph search to get updated rankings
+                    let updated_scored_docs: Vec<IndexedDocument> = self
+                        .config_state
+                        .search_indexed_documents(search_query, &role)
+                        .await;
+                        
+                    if !updated_scored_docs.is_empty() {
+                        log::debug!("✅ Updated rolegraph search found {} documents", updated_scored_docs.len());
+                        // Update documents with new ranking from rolegraph
+                        let updated_documents = index.get_documents(updated_scored_docs);
+                        if !updated_documents.is_empty() {
+                            documents = updated_documents;
+                        }
+                    }
+                }
 
                 // Apply TF-IDF scoring to enhance Terraphim Graph ranking
                 if !documents.is_empty() {
