@@ -7,7 +7,7 @@ mod tests {
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
-    use reqwest::{Client, StatusCode};
+    use axum::http::StatusCode;
     use std::{net::SocketAddr, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
@@ -86,13 +86,13 @@ mod tests {
 
     async fn wait_for_server_ready(address: SocketAddr) {
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
         loop {
             match client.get(&health_url).send().await {
-                Ok(response) if response.status() == StatusCode::OK => {
+                Ok(response) if response.status() == 200 => {
                     println!("Server is ready at {}", address);
                     break;
                 }
@@ -142,7 +142,7 @@ mod tests {
     async fn debug_rolegraph_visualization() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         // Test Engineer role
         let response = client
@@ -153,7 +153,7 @@ mod tests {
 
         println!("Response status: {}", response.status());
 
-        if response.status() == StatusCode::OK {
+        if response.status() == 200 {
             let rolegraph_data: RoleGraphResponseDto = response.json().await.unwrap();
 
             println!("Response status: {:?}", rolegraph_data.status);
@@ -191,7 +191,7 @@ mod tests {
     async fn debug_config() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
         let response = client
             .get(format!("http://{server}/config"))
@@ -201,7 +201,7 @@ mod tests {
 
         println!("Config response status: {}", response.status());
 
-        if response.status() == StatusCode::OK {
+        if response.status() == 200 {
             let config_text = response.text().await.unwrap();
             println!("Config response: {}", config_text);
         }
