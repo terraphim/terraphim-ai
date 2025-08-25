@@ -443,26 +443,29 @@ impl<'a> TerraphimService {
     ) -> Result<Document> {
         // Only preprocess if terraphim_it is enabled and role has KG configured
         if !role.terraphim_it {
-            log::debug!(
-                "terraphim_it disabled for role {}, skipping KG preprocessing",
+            log::info!(
+                "🔍 terraphim_it disabled for role '{}', skipping KG preprocessing",
                 role.name
             );
             return Ok(document);
         }
 
         let Some(_kg) = &role.kg else {
-            log::debug!(
-                "No KG configured for role {}, skipping KG preprocessing",
+            log::info!(
+                "⚠️ No KG configured for role '{}', skipping KG preprocessing",
                 role.name
             );
             return Ok(document);
         };
 
-        log::debug!(
-            "Preprocessing document '{}' for KG term linking in role '{}'",
+        log::info!(
+            "🧠 Starting KG preprocessing for document '{}' in role '{}' (terraphim_it enabled)",
             document.title,
             role.name
         );
+        log::debug!("📄 Document preview: {} characters starting with: {}", 
+                   document.body.len(), 
+                   &document.body.chars().take(100).collect::<String>());
 
         // Load thesaurus for the role
         let thesaurus = match self.ensure_thesaurus_loaded(&role.name).await {
@@ -609,11 +612,19 @@ impl<'a> TerraphimService {
         }
 
         let kg_terms_count = kg_thesaurus.len();
-        log::debug!(
-            "Filtered KG thesaurus from {} to {} terms for preprocessing",
+        log::info!(
+            "📋 KG thesaurus filtering: {} → {} terms (filters: len>12, hyphenated, or contains graph/terraphim/knowledge/embedding)",
             thesaurus.len(),
             kg_terms_count
         );
+        
+        // Log the actual terms that passed filtering for debugging
+        if kg_terms_count > 0 {
+            let terms: Vec<String> = (&kg_thesaurus).into_iter().map(|(k, v)| format!("'{}' → kg:{}", k, v.value)).collect();
+            log::info!("🔍 KG terms selected for linking: {}", terms.join(", "));
+        } else {
+            log::info!("⚠️ No KG terms passed filtering criteria - document '{}' will have no KG links", document.title);
+        }
 
         // Apply KG term replacement to document body (only if we have terms to replace)
         if !kg_thesaurus.is_empty() {
@@ -621,8 +632,8 @@ impl<'a> TerraphimService {
                 Ok(processed_bytes) => {
                     match String::from_utf8(processed_bytes) {
                         Ok(processed_content) => {
-                            log::debug!(
-                                "Successfully preprocessed document '{}' with {} KG terms",
+                            log::info!(
+                                "✅ Successfully preprocessed document '{}' with {} KG terms → created [term](kg:concept) links",
                                 document.title,
                                 kg_terms_count
                             );
@@ -643,7 +654,7 @@ impl<'a> TerraphimService {
                 }
             }
         } else {
-            log::debug!("No KG terms to process for document '{}'", document.title);
+            log::info!("💭 No specific KG terms found for document '{}' (filters excluded generic terms)", document.title);
         }
 
         Ok(document)
@@ -1049,17 +1060,38 @@ impl<'a> TerraphimService {
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
                 if role.terraphim_it {
-                    log::debug!(
-                        "Applying KG preprocessing to {} search results for role '{}'",
+                    log::info!(
+                        "🧠 Applying KG preprocessing to {} TerraphimGraph search results for role '{}'",
                         docs_ranked.len(),
                         role.name
                     );
                     let mut processed_docs = Vec::new();
+                    let mut total_kg_terms = 0;
+                    let mut docs_with_kg_links = 0;
+                    
                     for document in docs_ranked {
+                        let original_body_len = document.body.len();
                         let processed_doc =
                             self.preprocess_document_content(document, &role).await?;
+                        
+                        // Count KG links added (rough estimate by body size increase)
+                        let new_body_len = processed_doc.body.len();
+                        if new_body_len > original_body_len {
+                            docs_with_kg_links += 1;
+                            // Rough estimate: each KG link adds ~15-20 chars on average
+                            let estimated_links = (new_body_len - original_body_len) / 17;
+                            total_kg_terms += estimated_links;
+                        }
+                        
                         processed_docs.push(processed_doc);
                     }
+                    
+                    log::info!(
+                        "✅ KG preprocessing complete: {} documents processed, {} received KG links (~{} total links)",
+                        processed_docs.len(),
+                        docs_with_kg_links,
+                        total_kg_terms
+                    );
                     Ok(processed_docs)
                 } else {
                     Ok(docs_ranked)
@@ -1099,17 +1131,37 @@ impl<'a> TerraphimService {
 
                 // Apply KG preprocessing if enabled for this role
                 if role.terraphim_it {
-                    log::debug!(
-                        "Applying KG preprocessing to {} BM25 search results for role '{}'",
+                    log::info!(
+                        "🧠 Applying KG preprocessing to {} BM25 search results for role '{}'",
                         docs_ranked.len(),
                         role.name
                     );
                     let mut processed_docs = Vec::new();
+                    let mut total_kg_terms = 0;
+                    let mut docs_with_kg_links = 0;
+                    
                     for document in docs_ranked {
+                        let original_body_len = document.body.len();
                         let processed_doc =
                             self.preprocess_document_content(document, &role).await?;
+                        
+                        // Count KG links added (rough estimate by body size increase)
+                        let new_body_len = processed_doc.body.len();
+                        if new_body_len > original_body_len {
+                            docs_with_kg_links += 1;
+                            let estimated_links = (new_body_len - original_body_len) / 17;
+                            total_kg_terms += estimated_links;
+                        }
+                        
                         processed_docs.push(processed_doc);
                     }
+                    
+                    log::info!(
+                        "✅ KG preprocessing complete: {} documents processed, {} received KG links (~{} total links)",
+                        processed_docs.len(),
+                        docs_with_kg_links,
+                        total_kg_terms
+                    );
                     Ok(processed_docs)
                 } else {
                     Ok(docs_ranked)
@@ -1149,17 +1201,37 @@ impl<'a> TerraphimService {
 
                 // Apply KG preprocessing if enabled for this role
                 if role.terraphim_it {
-                    log::debug!(
-                        "Applying KG preprocessing to {} BM25F search results for role '{}'",
+                    log::info!(
+                        "🧠 Applying KG preprocessing to {} BM25F search results for role '{}'",
                         docs_ranked.len(),
                         role.name
                     );
                     let mut processed_docs = Vec::new();
+                    let mut total_kg_terms = 0;
+                    let mut docs_with_kg_links = 0;
+                    
                     for document in docs_ranked {
+                        let original_body_len = document.body.len();
                         let processed_doc =
                             self.preprocess_document_content(document, &role).await?;
+                        
+                        // Count KG links added (rough estimate by body size increase)
+                        let new_body_len = processed_doc.body.len();
+                        if new_body_len > original_body_len {
+                            docs_with_kg_links += 1;
+                            let estimated_links = (new_body_len - original_body_len) / 17;
+                            total_kg_terms += estimated_links;
+                        }
+                        
                         processed_docs.push(processed_doc);
                     }
+                    
+                    log::info!(
+                        "✅ KG preprocessing complete: {} documents processed, {} received KG links (~{} total links)",
+                        processed_docs.len(),
+                        docs_with_kg_links,
+                        total_kg_terms
+                    );
                     Ok(processed_docs)
                 } else {
                     Ok(docs_ranked)
@@ -1194,17 +1266,37 @@ impl<'a> TerraphimService {
 
                 // Apply KG preprocessing if enabled for this role
                 if role.terraphim_it {
-                    log::debug!(
-                        "Applying KG preprocessing to {} BM25Plus search results for role '{}'",
+                    log::info!(
+                        "🧠 Applying KG preprocessing to {} BM25Plus search results for role '{}'",
                         docs_ranked.len(),
                         role.name
                     );
                     let mut processed_docs = Vec::new();
+                    let mut total_kg_terms = 0;
+                    let mut docs_with_kg_links = 0;
+                    
                     for document in docs_ranked {
+                        let original_body_len = document.body.len();
                         let processed_doc =
                             self.preprocess_document_content(document, &role).await?;
+                        
+                        // Count KG links added (rough estimate by body size increase)
+                        let new_body_len = processed_doc.body.len();
+                        if new_body_len > original_body_len {
+                            docs_with_kg_links += 1;
+                            let estimated_links = (new_body_len - original_body_len) / 17;
+                            total_kg_terms += estimated_links;
+                        }
+                        
                         processed_docs.push(processed_doc);
                     }
+                    
+                    log::info!(
+                        "✅ KG preprocessing complete: {} documents processed, {} received KG links (~{} total links)",
+                        processed_docs.len(),
+                        docs_with_kg_links,
+                        total_kg_terms
+                    );
                     Ok(processed_docs)
                 } else {
                     Ok(docs_ranked)
@@ -1628,20 +1720,42 @@ impl<'a> TerraphimService {
 
         // Apply KG preprocessing if enabled for this role
         if role.terraphim_it {
-            log::debug!(
-                "Applying KG preprocessing for role '{}' with terraphim_it enabled",
+            log::info!(
+                "🧠 Applying KG preprocessing to {} KG term documents for role '{}' (terraphim_it enabled)",
+                documents.len(),
                 role_name
             );
             let mut processed_documents = Vec::new();
+            let mut total_kg_terms = 0;
+            let mut docs_with_kg_links = 0;
+            
             for document in documents {
+                let original_body_len = document.body.len();
                 let processed_doc = self.preprocess_document_content(document, &role).await?;
+                
+                // Count KG links added (rough estimate by body size increase)
+                let new_body_len = processed_doc.body.len();
+                if new_body_len > original_body_len {
+                    docs_with_kg_links += 1;
+                    let estimated_links = (new_body_len - original_body_len) / 17;
+                    total_kg_terms += estimated_links;
+                }
+                
                 processed_documents.push(processed_doc);
             }
+            
+            log::info!(
+                "✅ KG preprocessing complete: {} documents processed, {} received KG links (~{} total links)",
+                processed_documents.len(),
+                docs_with_kg_links,
+                total_kg_terms
+            );
             documents = processed_documents;
         } else {
-            log::debug!(
-                "terraphim_it disabled for role '{}', skipping KG preprocessing",
-                role_name
+            log::info!(
+                "🔍 terraphim_it disabled for role '{}', skipping KG preprocessing for {} documents",
+                role_name,
+                documents.len()
             );
         }
 
@@ -1775,9 +1889,24 @@ impl<'a> TerraphimService {
             )));
         }
 
-        current_config.selected_role = role_name;
+        current_config.selected_role = role_name.clone();
         current_config.save().await?;
-        log::info!("Selected role updated to {}", current_config.selected_role);
+        
+        // Log role selection with terraphim_it status
+        if let Some(role) = current_config.roles.get(&role_name) {
+            if role.terraphim_it {
+                log::info!("🎯 Selected role '{}' → terraphim_it: ✅ ENABLED (KG preprocessing will be applied)", role_name);
+                if role.kg.is_some() {
+                    log::info!("📚 KG configuration: Available for role '{}'", role_name);
+                } else {
+                    log::warn!("⚠️ KG configuration: Missing for role '{}' (terraphim_it enabled but no KG)", role_name);
+                }
+            } else {
+                log::info!("🎯 Selected role '{}' → terraphim_it: ❌ DISABLED (KG preprocessing skipped)", role_name);
+            }
+        } else {
+            log::info!("🎯 Selected role updated to '{}'", role_name);
+        }
 
         Ok(current_config.clone())
     }
