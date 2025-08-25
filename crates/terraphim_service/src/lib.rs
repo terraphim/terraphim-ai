@@ -635,8 +635,12 @@ impl<'a> TerraphimService {
                 .collect();
             log::info!("🔧 Passing to replace_matches: {} (total terms: {})", 
                       debug_thesaurus.join(", "), kg_thesaurus.len());
-            log::info!("📝 Document body preview (first 200 chars): {}...", 
-                       if document.body.len() > 200 { &document.body[..200] } else { &document.body });
+            let preview = if document.body.chars().count() > 200 {
+                document.body.chars().take(200).collect::<String>() + "..."
+            } else {
+                document.body.clone()
+            };
+            log::info!("📝 Document body preview (first 200 chars): {}", preview);
             
             match replace_matches(&document.body, kg_thesaurus, LinkType::MarkdownLinks) {
                 Ok(processed_bytes) => {
