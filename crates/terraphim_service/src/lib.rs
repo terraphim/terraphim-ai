@@ -628,6 +628,16 @@ impl<'a> TerraphimService {
 
         // Apply KG term replacement to document body (only if we have terms to replace)
         if !kg_thesaurus.is_empty() {
+            // Debug: log what we're about to pass to replace_matches
+            let debug_thesaurus: Vec<String> = (&kg_thesaurus).into_iter()
+                .map(|(k, v)| format!("'{}' -> '{}' (url: {:?})", k, v.value, v.url))
+                .take(3) // Limit to first 3 entries to avoid spam
+                .collect();
+            log::info!("🔧 Passing to replace_matches: {} (total terms: {})", 
+                      debug_thesaurus.join(", "), kg_thesaurus.len());
+            log::info!("📝 Document body preview (first 200 chars): {}...", 
+                       if document.body.len() > 200 { &document.body[..200] } else { &document.body });
+            
             match replace_matches(&document.body, kg_thesaurus, LinkType::MarkdownLinks) {
                 Ok(processed_bytes) => {
                     match String::from_utf8(processed_bytes) {
@@ -637,6 +647,37 @@ impl<'a> TerraphimService {
                                 document.title,
                                 kg_terms_count
                             );
+                            
+                            // Debug: Check if content actually changed
+                            let content_changed = processed_content != document.body;
+                            log::info!("🔄 Content changed: {} (original: {} chars, processed: {} chars)", 
+                                       content_changed, document.body.len(), processed_content.len());
+                            
+                            // Debug: Show actual KG links in the processed content
+                            let kg_links: Vec<&str> = processed_content
+                                .split("[")
+                                .filter_map(|s| {
+                                    if let Some(closing) = s.find("](kg:") {
+                                        Some(&s[..closing])
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            
+                            if !kg_links.is_empty() {
+                                log::info!("🔗 Found KG links in processed content: [{}](kg:...)", kg_links.join("], ["));
+                                
+                                // Show a snippet of the processed content with context
+                                if let Some(first_link_pos) = processed_content.find("](kg:") {
+                                    let start = first_link_pos.saturating_sub(50);
+                                    let end = (first_link_pos + 100).min(processed_content.len());
+                                    log::info!("📄 Content snippet with KG link: ...{}...", &processed_content[start..end]);
+                                }
+                            } else {
+                                log::warn!("⚠️ No KG links found in processed content despite successful replacement");
+                            }
+                            
                             document.body = processed_content;
                         }
                         Err(e) => {
@@ -968,8 +1009,19 @@ impl<'a> TerraphimService {
                                     document.description = Some(better_description);
                                 }
                                 // Update body if the persisted version has better content
-                                if !persisted_doc.body.is_empty() {
+                                // But DO NOT overwrite if this role uses KG preprocessing (terraphim_it)
+                                // because we need to preserve the processed content with KG links
+                                if !persisted_doc.body.is_empty() && !role.terraphim_it {
+                                    log::debug!(
+                                        "Updated body from persistence for Atomic document '{}' (role: '{}', terraphim_it: {})",
+                                        document.title, role.name, role.terraphim_it
+                                    );
                                     document.body = persisted_doc.body;
+                                } else if role.terraphim_it {
+                                    log::debug!(
+                                        "Keeping search result body for Atomic document '{}' because role '{}' uses KG preprocessing (terraphim_it=true)",
+                                        document.title, role.name
+                                    );
                                 }
                             }
                             Err(_) => {
@@ -1509,8 +1561,19 @@ impl<'a> TerraphimService {
                                     document.description = Some(better_description);
                                 }
                                 // Update body if the persisted version has better content
-                                if !persisted_doc.body.is_empty() {
+                                // But DO NOT overwrite if this role uses KG preprocessing (terraphim_it)
+                                // because we need to preserve the processed content with KG links
+                                if !persisted_doc.body.is_empty() && !role.terraphim_it {
+                                    log::debug!(
+                                        "Updated body from persistence for Atomic document '{}' (role: '{}', terraphim_it: {})",
+                                        document.title, role.name, role.terraphim_it
+                                    );
                                     document.body = persisted_doc.body;
+                                } else if role.terraphim_it {
+                                    log::debug!(
+                                        "Keeping search result body for Atomic document '{}' because role '{}' uses KG preprocessing (terraphim_it=true)",
+                                        document.title, role.name
+                                    );
                                 }
                             }
                             Err(_) => {
