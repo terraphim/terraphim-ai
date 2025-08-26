@@ -331,7 +331,7 @@ impl Commit {
         self.validate()?;
 
         // Serialize to canonical JSON
-        let commit_json = serde_jcs::to_string(&self).map_err(|e| AtomicError::Json(e))?;
+        let commit_json = serde_jcs::to_string(&self).map_err(AtomicError::Json)?;
 
         // Sign the commit
         let signature = agent.sign(commit_json.as_bytes())?;
@@ -346,7 +346,7 @@ impl Commit {
     ///
     /// A Result containing the JSON value or an error
     pub fn to_json(&self) -> Result<Value> {
-        let json = serde_json::to_value(self).map_err(|e| AtomicError::Json(e))?;
+        let json = serde_json::to_value(self).map_err(AtomicError::Json)?;
         Ok(json)
     }
 }

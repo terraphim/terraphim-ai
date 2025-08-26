@@ -54,6 +54,7 @@ fn dummy_document(id: String, body: String) -> Document {
         title: "Title".to_string(),
         url: "URL".to_string(),
         description: None,
+        summarization: None,
         stub: None,
         rank: None,
         tags: None,

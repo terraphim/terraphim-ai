@@ -54,7 +54,7 @@ mod tests {
         let test_obj = Thesaurus::new("Test Thesaurus".to_string());
 
         // Save the object
-        test_obj.save_to_one("dashmap").await?;
+        test_obj.save_to_one("memory").await?;
 
         // Load the object
         let mut loaded_obj = Thesaurus::new("Test Thesaurus".to_string());

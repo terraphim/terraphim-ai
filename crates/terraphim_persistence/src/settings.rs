@@ -340,7 +340,7 @@ mod tests {
         };
 
         // Save the object
-        test_obj.save_to_one("dashmap").await?;
+        test_obj.save_to_one("memory").await?;
 
         // Load the object
         let mut loaded_obj = TestStruct::new("Test Object".to_string());
@@ -526,8 +526,9 @@ mod tests {
         let mut sqlite_profile = std::collections::HashMap::new();
         sqlite_profile.insert("type".to_string(), "sqlite".to_string());
         sqlite_profile.insert("connection_string".to_string(), 
-            format!("sqlite://{}/test.db", sqlite_path.to_string_lossy()));
+            format!("{}/test.db", sqlite_path.to_string_lossy()));
         sqlite_profile.insert("datadir".to_string(), sqlite_path.to_string_lossy().to_string());
+        sqlite_profile.insert("table".to_string(), "test_table".to_string());
         profiles.insert("test_sqlite".to_string(), sqlite_profile);
         
         // ReDB profile with proper configuration
@@ -552,8 +553,10 @@ mod tests {
             profiles,
         };
         
-        // Test that parse_profiles creates directories and operators
-        let operators = parse_profiles(&settings).await?;
+        // Test that init_device_storage_with_settings creates directories and operators
+        use crate::init_device_storage_with_settings;
+        let storage = init_device_storage_with_settings(settings).await?;
+        let operators = storage.ops;
         
         // Verify directories were created (only check for ones that were actually created)
         if operators.contains_key("test_sqlite") {

@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use reqwest::Client;
 use serial_test::serial;
 use tokio::time::sleep;
 
@@ -94,7 +93,7 @@ async fn test_system_operator_remote_kg_integration() {
     sleep(Duration::from_secs(3)).await;
 
     let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
     let base_url = "http://127.0.0.1:8080";
 
     // Test 1: Health check

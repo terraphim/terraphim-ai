@@ -8,7 +8,6 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use ed25519_dalek::{Keypair, PublicKey, Signer};
 #[cfg(feature = "native")]
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use serde_json;
 #[cfg(not(feature = "native"))]
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -93,6 +92,12 @@ pub struct Agent {
     pub name: Option<String>,
 }
 
+impl Default for Agent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Agent {
     /// Creates a new agent with a randomly generated keypair.
     ///
@@ -156,13 +161,14 @@ impl Agent {
         // Get the public key from the secret or derive it from the private key
         let public_key_bytes = match secret["publicKey"].as_str() {
             Some(public_key_str) => {
-                match {
+                let res = {
                     let mut padded_key = public_key_str.to_string();
                     while padded_key.len() % 4 != 0 {
                         padded_key.push('=');
                     }
                     STANDARD.decode(&padded_key)
-                } {
+                };
+                match res {
                     Ok(bytes) => bytes,
                     Err(_) => {
                         // If we can't decode the public key, derive it from the private key

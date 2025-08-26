@@ -9,7 +9,6 @@ mod tests {
     use terraphim_server::{axum_server, CreateDocumentResponse, SearchResponse, Status};
     use terraphim_settings::DeviceSettings;
 
-    use axum::http::StatusCode;
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,

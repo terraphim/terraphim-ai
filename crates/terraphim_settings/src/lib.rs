@@ -69,6 +69,12 @@ pub struct DeviceSettings {
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
 
+impl Default for DeviceSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeviceSettings {
     /// Create a new DeviceSettings
     pub fn new() -> Self {
@@ -126,7 +132,7 @@ impl DeviceSettings {
     /// Save settings to a specified file
     fn save_to_file(&self, path: &PathBuf) -> Result<(), Error> {
         let serialized_settings = toml::to_string_pretty(self)
-            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         std::fs::write(path, serialized_settings).map_err(Error::IoError)?;
 

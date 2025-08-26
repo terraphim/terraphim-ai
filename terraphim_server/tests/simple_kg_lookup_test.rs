@@ -50,6 +50,7 @@ async fn test_kg_lookup_functionality_basic() {
         title: "Haystack".to_string(),
         body: content.clone(),
         description: Some("Test haystack document".to_string()),
+        summarization: None,
         stub: None,
         tags: Some(vec![
             "datasource".to_string(),

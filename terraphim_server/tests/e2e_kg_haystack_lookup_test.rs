@@ -12,7 +12,6 @@
 
 use tokio;
 
-use axum::http::StatusCode;
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_server::{axum_server, SearchResponse};
 use terraphim_service::TerraphimService;
@@ -129,7 +128,7 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
 
     // Create a client for testing
     let client = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .expect("Failed to create HTTP client");
 
     // Clone config_state for the spawned task
     let config_state_clone = config_state.clone();
@@ -155,7 +154,7 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
             Ok(response) => {
                 println!("    📡 API Response status: {}", response.status());
 
-                if response.status() == StatusCode::OK {
+                if response.status().as_u16() == 200 {
                     match response.json::<SearchResponse>().await {
                         Ok(search_response) => {
                             println!(

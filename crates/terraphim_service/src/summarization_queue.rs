@@ -14,6 +14,12 @@ use terraphim_types::Document;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TaskId(pub Uuid);
 
+impl Default for TaskId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
@@ -28,10 +34,12 @@ impl std::fmt::Display for TaskId {
 
 /// Priority levels for summarization tasks
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Priority {
     /// Low priority - batch processing
     Low = 0,
     /// Normal priority - standard requests
+    #[default]
     Normal = 1,
     /// High priority - user-initiated requests
     High = 2,
@@ -39,11 +47,6 @@ pub enum Priority {
     Critical = 3,
 }
 
-impl Default for Priority {
-    fn default() -> Self {
-        Priority::Normal
-    }
-}
 
 /// Status of a summarization task
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -310,9 +313,8 @@ pub struct SummarizationQueue {
 }
 
 impl SummarizationQueue {
-    /// Create a new summarization queue
-    pub fn new(config: QueueConfig) -> Self {
-        let (command_sender, _command_receiver) = mpsc::channel(100);
+    /// Create a new summarization queue with the provided command sender
+    pub fn new(config: QueueConfig, command_sender: mpsc::Sender<QueueCommand>) -> Self {
         let task_status = Arc::new(RwLock::new(HashMap::new()));
 
         Self {
@@ -434,6 +436,7 @@ impl SummarizationQueue {
 mod tests {
     use super::*;
     use terraphim_config::Role;
+    use tokio::sync::mpsc;
 
     fn create_test_document() -> Document {
         Document {
@@ -543,7 +546,8 @@ mod tests {
     #[tokio::test]
     async fn test_queue_creation() {
         let config = QueueConfig::default();
-        let queue = SummarizationQueue::new(config);
+        let (command_sender, _receiver) = mpsc::channel(10);
+        let queue = SummarizationQueue::new(config, command_sender);
         
         // Queue should be created successfully
         assert!(queue.task_status.read().await.is_empty());

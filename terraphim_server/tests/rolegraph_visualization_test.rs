@@ -10,7 +10,6 @@ mod tests {
     use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
-    use axum::http::StatusCode;
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
@@ -316,7 +315,7 @@ mod tests {
             .unwrap();
 
         // Should return 404 since Default role has no knowledge graph
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.status().as_u16(), 404);
     }
 
     /// Test that the rolegraph visualization endpoint uses selected role when no role specified
@@ -335,7 +334,7 @@ mod tests {
             .unwrap();
 
         // Since the default selected role is "Default" which has no KG, this should return 404
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.status().as_u16(), 404);
     }
 
     /// Test that the rolegraph visualization endpoint returns consistent data structure
@@ -359,8 +358,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response1.status(), StatusCode::OK);
-        assert_eq!(response2.status(), StatusCode::OK);
+        assert_eq!(response1.status().as_u16(), 200);
+        assert_eq!(response2.status().as_u16(), 200);
 
         let rolegraph_data1: RoleGraphResponseDto = response1.json().await.unwrap();
         let rolegraph_data2: RoleGraphResponseDto = response2.json().await.unwrap();
@@ -406,7 +405,7 @@ mod tests {
             .unwrap();
 
         // Should return 404 for invalid role
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.status().as_u16(), 404);
     }
 
     /// Test that the rolegraph visualization endpoint returns proper node labels

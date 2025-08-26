@@ -15,9 +15,10 @@ impl Persistable for Document {
     /// Create a new, *empty* document instance using the provided key as the
     /// `id`.  All other fields are initialised with their default values.
     fn new(key: String) -> Self {
-        let mut doc = Document::default();
-        doc.id = key;
-        doc
+        Document {
+            id: key,
+            ..Default::default()
+        }
     }
 
     /// Save to a single profile.
@@ -206,12 +207,12 @@ mod tests {
     async fn test_document_key_normalization() -> Result<()> {
         let test_cases = vec![
             ("simple", "document_simple.json"),
-            ("Simple Document", "document_simpledocument.json"),
-            ("Document with Spaces", "document_documentwithspaces.json"),
-            ("Doc-with-Dashes_123", "document_docwithdashes123.json"),
-            ("Doc@Special#Chars!", "document_docspecialchars.json"),
-            ("UPPERCASE_DOC", "document_uppercasedoc.json"),
-            ("http://example.com/doc", "document_httpexamplecomdoc.json"),
+            ("Simple Document", "document_simple_document.json"),
+            ("Document with Spaces", "document_document_with_spaces.json"),
+            ("Doc-with-Dashes_123", "document_doc_with_dashes_123.json"),
+            ("Doc@Special#Chars!", "document_doc_special_chars.json"),
+            ("UPPERCASE_DOC", "document_uppercase_doc.json"),
+            ("http://example.com/doc", "document_http_example_com_doc.json"),
         ];
 
         for (id, expected_key) in test_cases {

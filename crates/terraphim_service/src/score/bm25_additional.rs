@@ -1,9 +1,7 @@
-use std::cmp;
-use std::collections::{BinaryHeap, HashMap};
-use std::fmt;
+use std::collections::HashMap;
 
 use terraphim_types::Document;
-use super::common::{BM25Params, FieldWeights};
+use super::common::BM25Params;
 
 /// Okapi BM25 scorer implementation
 pub struct OkapiBM25Scorer {
@@ -284,7 +282,7 @@ impl QueryRatioScorer {
         let intersection_size = query_set.intersection(&doc_set).count();
 
         // QueryRatio formula
-        if query_set.len() > 0 {
+        if !query_set.is_empty() {
             intersection_size as f64 / query_set.len() as f64
         } else {
             0.0

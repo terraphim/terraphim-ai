@@ -4,7 +4,6 @@ use std::env;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use axum::http::StatusCode;
 use axum::routing::post;
 use axum::Router;
 
@@ -33,14 +32,14 @@ async fn chat_endpoint_returns_reply_from_openrouter() {
     });
 
     let response = terraphim_service::http_client::create_default_client()
-        .unwrap_or_else(|_| reqwest::Client::new())
+        .expect("Failed to create HTTP client")
         .post(format!("{}/chat", app.base_url))
         .json(&payload)
         .send()
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status().as_u16(), 200);
     let json: serde_json::Value = response.json().await.unwrap();
     assert_eq!(json["status"], "Success");
     assert!(json["message"].as_str().unwrap().contains("Hello"));

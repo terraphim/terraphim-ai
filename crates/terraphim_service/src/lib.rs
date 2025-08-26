@@ -661,11 +661,7 @@ impl<'a> TerraphimService {
                             let kg_links: Vec<&str> = processed_content
                                 .split("[")
                                 .filter_map(|s| {
-                                    if let Some(closing) = s.find("](kg:") {
-                                        Some(&s[..closing])
-                                    } else {
-                                        None
-                                    }
+                                    s.find("](kg:").map(|closing| &s[..closing])
                                 })
                                 .collect();
                             
@@ -1740,7 +1736,7 @@ impl<'a> TerraphimService {
                     // If we have a URL, extract concept name from it, otherwise use the concept value
                     let concept_name = if let Some(url) = &root_concept.url {
                         url.split('/')
-                            .last()
+                            .next_back()
                             .and_then(|s| s.strip_suffix(".md"))
                             .unwrap_or(root_concept_name)
                     } else {

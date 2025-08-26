@@ -51,7 +51,7 @@ impl DeviceStorage {
 async fn init_device_storage() -> Result<DeviceStorage> {
     // Use local dev settings by default to avoid RocksDB lock issues
     let settings_path = std::env::var("TERRAPHIM_SETTINGS_PATH")
-        .map(|p| std::path::PathBuf::from(p))
+        .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| {
             // Default to local dev settings directory (not file)
             std::path::PathBuf::from("crates/terraphim_settings/default")
@@ -65,7 +65,7 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
     log::info!("Loaded settings: {:?}", settings);
     
     // Pre-create directories for storage backends that need them
-    for (_profile_name, profile) in &settings.profiles {
+    for profile in settings.profiles.values() {
         let unknown = "unknown".to_string();
         let profile_type = profile.get("type").unwrap_or(&unknown);
         match profile_type.as_str() {
@@ -82,8 +82,16 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
                 }
             }
             "redb" => {
-                // ReDB datadir is the database file path - parent directory creation handled by our settings layer
-                log::info!("ReDB database file will be created by OpenDAL");
+                if let Some(datadir) = profile.get("datadir") {
+                    if !datadir.is_empty() {
+                        log::info!("🔧 Pre-creating ReDB directory: {}", datadir);
+                        if let Err(e) = std::fs::create_dir_all(datadir) {
+                            log::warn!("Failed to create ReDB directory '{}': {}", datadir, e);
+                        } else {
+                            log::info!("✅ Created ReDB directory: {}", datadir);
+                        }
+                    }
+                }
             }
             "dashmap" => {
                 if let Some(root) = profile.get("root") {
