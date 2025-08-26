@@ -1398,6 +1398,28 @@ pub struct ThesaurusResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct AutocompleteResponse {
+    /// Status of the request
+    pub status: Status,
+    /// Autocomplete suggestions from FST search
+    pub suggestions: Vec<AutocompleteSuggestion>,
+    /// Error message if search failed
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AutocompleteSuggestion {
+    /// The suggested term
+    pub term: String,
+    /// Normalized term value
+    pub normalized_term: String,
+    /// URL if available
+    pub url: Option<String>,
+    /// Relevance score from FST
+    pub score: f64,
+}
+
 /// Get thesaurus for a specific role
 ///
 /// This endpoint returns the thesaurus (concept mappings) for a given role,
@@ -1434,6 +1456,99 @@ pub(crate) async fn get_thesaurus(
     Ok(Json(ThesaurusResponse {
         status: Status::Success,
         thesaurus: Some(thesaurus_map),
+        error: None,
+    }))
+}
+
+/// FST-based autocomplete for a specific role and query
+///
+/// This endpoint uses the Finite State Transducer (FST) from terraphim_automata
+/// to provide fast, intelligent autocomplete suggestions with fuzzy matching.
+pub(crate) async fn get_autocomplete(
+    State(config_state): State<ConfigState>,
+    Path((role_name, query)): Path<(String, String)>,
+) -> Result<Json<AutocompleteResponse>> {
+    use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search, AutocompleteConfig};
+    
+    log::debug!("Getting autocomplete for role '{}', query '{}'", role_name, query);
+    
+    let role_name = RoleName::new(&role_name);
+    
+    // Get the role graph for the specified role
+    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
+        return Ok(Json(AutocompleteResponse {
+            status: Status::Error,
+            suggestions: vec![],
+            error: Some(format!("Role '{}' not found", role_name)),
+        }));
+    };
+    
+    let rolegraph = rolegraph_sync.lock().await;
+    
+    // Build FST autocomplete index from the thesaurus
+    let autocomplete_index = match build_autocomplete_index(rolegraph.thesaurus.clone(), None) {
+        Ok(index) => index,
+        Err(e) => {
+            log::error!("Failed to build autocomplete index: {}", e);
+            return Ok(Json(AutocompleteResponse {
+                status: Status::Error,
+                suggestions: vec![],
+                error: Some(format!("Failed to build autocomplete index: {}", e)),
+            }));
+        }
+    };
+    
+    // Try exact prefix search first
+    let results = if query.len() >= 3 {
+        // For longer queries, try fuzzy search for better UX (0.7 = 70% similarity threshold)
+        match fuzzy_autocomplete_search(&autocomplete_index, &query, 0.7, Some(8)) {
+            Ok(results) => results,
+            Err(e) => {
+                log::warn!("Fuzzy search failed, trying exact search: {}", e);
+                // Fall back to exact search
+                match autocomplete_search(&autocomplete_index, &query, Some(8)) {
+                    Ok(results) => results,
+                    Err(e) => {
+                        log::error!("Autocomplete search failed: {}", e);
+                        return Ok(Json(AutocompleteResponse {
+                            status: Status::Error,
+                            suggestions: vec![],
+                            error: Some(format!("Autocomplete search failed: {}", e)),
+                        }));
+                    }
+                }
+            }
+        }
+    } else {
+        // For short queries, use exact prefix search only
+        match autocomplete_search(&autocomplete_index, &query, Some(8)) {
+            Ok(results) => results,
+            Err(e) => {
+                log::error!("Autocomplete search failed: {}", e);
+                return Ok(Json(AutocompleteResponse {
+                    status: Status::Error,
+                    suggestions: vec![],
+                    error: Some(format!("Autocomplete search failed: {}", e)),
+                }));
+            }
+        }
+    };
+    
+    // Convert FST results to API response format
+    let suggestions: Vec<AutocompleteSuggestion> = results.into_iter().map(|result| {
+        AutocompleteSuggestion {
+            term: result.term,
+            normalized_term: result.normalized_term.as_str().to_string(),
+            url: result.url,
+            score: result.score,
+        }
+    }).collect();
+    
+    log::debug!("Found {} autocomplete suggestions for query '{}'", suggestions.len(), query);
+    
+    Ok(Json(AutocompleteResponse {
+        status: Status::Success,
+        suggestions,
         error: None,
     }))
 }
