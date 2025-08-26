@@ -16,6 +16,7 @@
 #![deny(missing_docs)]
 
 use anyhow::Context;
+use clap::Parser;
 use std::net::SocketAddr;
 use terraphim_config::ConfigState;
 use terraphim_config::{ConfigBuilder, ConfigId};
@@ -23,9 +24,23 @@ use terraphim_persistence::Persistable;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::DeviceSettings;
 
+/// Terraphim AI server with role-based deployment support
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Role configuration to use (Default, RustEngineer, TerraphimEngineer, Combined)
+    #[arg(long, default_value = "TerraphimEngineer")]
+    role: String,
+    
+    /// Custom config file path (overrides role selection)
+    #[arg(long)]
+    config: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    match run_server().await {
+    let args = Args::parse();
+    match run_server(args).await {
         Ok(()) => Ok(()),
         Err(e) => {
             log::error!("Error: {e:#?}");
@@ -34,7 +49,7 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn run_server() -> Result<()> {
+async fn run_server(args: Args) -> Result<()> {
     // Set up logger for the server
     terraphim_service::logging::init_logging(
         terraphim_service::logging::detect_logging_config()
@@ -111,21 +126,39 @@ async fn run_server() -> Result<()> {
         });
 
     let mut config = {
-        // Try to load terraphim_engineer_config.json first
-        let engineer_config_path =
-            std::path::Path::new("terraphim_server/default/terraphim_engineer_config.json");
-        if engineer_config_path.exists() {
+        // Use custom config file if provided, otherwise determine from role
+        let config_path = if let Some(custom_config) = args.config {
+            std::path::PathBuf::from(custom_config)
+        } else {
+            // Determine config file based on role
+            let config_filename = match args.role.to_lowercase().as_str() {
+                "default" => "default_role_config.json",
+                "rustengineer" => "rust_engineer_config.json", 
+                "terraphimengineer" => "terraphim_engineer_config.json",
+                "combined" => "combined_roles_config.json",
+                _ => {
+                    log::warn!("Unknown role '{}', using terraphim_engineer_config.json", args.role);
+                    "terraphim_engineer_config.json"
+                }
+            };
+            std::path::Path::new("terraphim_server/default").join(config_filename)
+        };
+        
+        log::info!("Loading configuration from {:?} (role: {})", config_path, args.role);
+        
+        if config_path.exists() {
             log::info!(
-                "Loading Terraphim Engineer configuration from {:?}",
-                engineer_config_path
+                "Loading {} role configuration from {:?}",
+                args.role,
+                config_path
             );
-            match std::fs::read_to_string(engineer_config_path) {
+            match std::fs::read_to_string(&config_path) {
                 Ok(config_content) => {
                     match serde_json::from_str::<terraphim_config::Config>(&config_content) {
-                        Ok(mut engineer_config) => {
-                            log::info!("✅ Successfully loaded Terraphim Engineer configuration");
-                            // Try to load saved config, but if it fails, use the engineer config as fallback
-                            match engineer_config.load().await {
+                        Ok(mut role_config) => {
+                            log::info!("✅ Successfully loaded {} role configuration", args.role);
+                            // Try to load saved config, but if it fails, use the role config as fallback
+                            match role_config.load().await {
                                 Ok(saved_config) => {
                                     log::info!(
                                         "✅ Successfully loaded saved configuration from disk"
@@ -133,13 +166,13 @@ async fn run_server() -> Result<()> {
                                     saved_config
                                 }
                                 Err(e) => {
-                                    log::info!("No saved config found, using Terraphim Engineer config: {:?}", e);
-                                    engineer_config
+                                    log::info!("No saved config found, using {} role config: {:?}", args.role, e);
+                                    role_config
                                 }
                             }
                         }
                         Err(e) => {
-                            log::warn!("Failed to parse Terraphim Engineer config: {:?}", e);
+                            log::warn!("Failed to parse {} role config: {:?}", args.role, e);
                             log::info!("Falling back to default server configuration");
                             match ConfigBuilder::new_with_id(ConfigId::Server)
                                 .build_default_server()
@@ -169,7 +202,7 @@ async fn run_server() -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    log::warn!("Failed to read Terraphim Engineer config file: {:?}", e);
+                    log::warn!("Failed to read {} role config file: {:?}", args.role, e);
                     log::info!("Falling back to default server configuration");
                     match ConfigBuilder::new_with_id(ConfigId::Server)
                         .build_default_server()
@@ -194,8 +227,9 @@ async fn run_server() -> Result<()> {
             }
         } else {
             log::info!(
-                "Terraphim Engineer config not found at {:?}",
-                engineer_config_path
+                "{} role config not found at {:?}",
+                args.role,
+                config_path
             );
             log::info!("Using default server configuration");
             match ConfigBuilder::new_with_id(ConfigId::Server)
