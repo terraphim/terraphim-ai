@@ -33,36 +33,25 @@ private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
 public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
 parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}"
 
-# Default role configuration - basic settings for simple usage
-[roles.Default]
-shortname = "Default"
-name = "Default"
+# Rust Engineer role configuration - specialized for Rust development with external API
+[roles.RustEngineer]
+shortname = "rust-engineer"
+name = "Rust Engineer"
 relevance_function = "title-scorer"
 terraphim_it = false
-theme = "spacelab"
+theme = "cosmo"
 
-[[roles.Default.haystacks]]
+[[roles.RustEngineer.haystacks]]
+location = "https://query.rs"
+service = "QueryRs"
+read_only = true
+
+[roles.RustEngineer.haystacks.extra_parameters]
+
+# Fallback local haystack for Rust Engineer
+[[roles.RustEngineer.haystacks]]
 location = "docs/src"
 service = "Ripgrep"
 read_only = true
 
-[roles.Default.haystacks.extra_parameters]
-
-# Example role for ClickUp (requires env CLICKUP_API_TOKEN and CLICKUP_TEAM_ID)
-[roles.ClickUp]
-shortname = "ClickUp"
-name = "ClickUp"
-relevance_function = "title-scorer"
-terraphim_it = false
-theme = "lumen"
-
-[[roles.ClickUp.haystacks]]
-location = "clickup"
-service = "ClickUp"
-read_only = true
-
-[roles.ClickUp.haystacks.extra_parameters]
-team_id = "${CLICKUP_TEAM_ID}"
-include_closed = "true"
-subtasks = "true"
-page = "0"
+[roles.RustEngineer.haystacks.extra_parameters]
