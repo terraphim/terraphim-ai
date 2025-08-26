@@ -413,6 +413,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/roles/:role_name/kg_search",
             get(find_documents_by_kg_term),
         )
+        .route("/thesaurus/:role_name", get(api::get_thesaurus))
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
