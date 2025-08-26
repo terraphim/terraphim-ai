@@ -1691,6 +1691,9 @@ impl<'a> TerraphimService {
     /// For example, given "haystack", it will find documents like "haystack.md" that contain
     /// this term or its synonyms ("datasource", "service", "agent").
     ///
+    /// For KG protocol resolution, this method also directly looks for KG definition documents
+    /// when the term appears to be a KG concept (like "terraphim-graph" -> "./docs/src/kg/terraphim-graph.md").
+    ///
     /// Returns a vector of Documents that contain the term, with KG preprocessing applied if enabled for the role.
     pub async fn find_documents_for_kg_term(
         &mut self,
@@ -1704,14 +1707,109 @@ impl<'a> TerraphimService {
         );
 
         // Ensure the thesaurus is loaded for this role
-        let _thesaurus = self.ensure_thesaurus_loaded(role_name).await?;
+        let thesaurus = self.ensure_thesaurus_loaded(role_name).await?;
 
         // Get the role configuration to check if KG preprocessing should be applied
         let role = self.config_state.get_role(role_name).await.ok_or_else(|| {
             ServiceError::Config(format!("Role '{}' not found in config", role_name))
         })?;
 
-        // Get the role's rolegraph
+        let mut documents = Vec::new();
+
+        // ENHANCEMENT: First, check if this is a direct KG definition document request
+        // This handles KG protocol resolution like kg:terraphim-graph -> ./docs/src/kg/terraphim-graph.md
+        // Also handles synonyms like kg:graph -> terraphim-graph -> ./docs/src/kg/terraphim-graph.md
+        if let Some(kg_config) = &role.kg {
+            log::debug!("Found KG config for role");
+            if let Some(kg_local) = &kg_config.knowledge_graph_local {
+                let mut potential_concepts = vec![term.to_string()];
+                
+                // Use the loaded thesaurus to resolve synonyms to root concepts
+                log::debug!("Checking thesaurus for term '{}'", term);
+                
+                // Create normalized term to look up in thesaurus
+                let normalized_search_term = terraphim_types::NormalizedTermValue::new(term.to_string());
+                
+                // Look up the term in the thesaurus - this will find the root concept if term is a synonym
+                if let Some(root_concept) = thesaurus.get(&normalized_search_term) {
+                    log::debug!("Found root concept for '{}': {:?}", term, root_concept);
+                    
+                    // The root concept's value contains the canonical concept name
+                    let root_concept_name = root_concept.value.as_str();
+                    
+                    // If we have a URL, extract concept name from it, otherwise use the concept value
+                    let concept_name = if let Some(url) = &root_concept.url {
+                        url.split('/')
+                            .last()
+                            .and_then(|s| s.strip_suffix(".md"))
+                            .unwrap_or(root_concept_name)
+                    } else {
+                        root_concept_name
+                    };
+                    
+                    if !potential_concepts.contains(&concept_name.to_string()) {
+                        potential_concepts.push(concept_name.to_string());
+                        log::debug!("Added concept from thesaurus: {} (root: {})", concept_name, root_concept_name);
+                    }
+                } else {
+                    log::debug!("No direct mapping found for '{}' in thesaurus", term);
+                }
+                
+                log::debug!("Trying {} potential concepts: {:?}", potential_concepts.len(), potential_concepts);
+                
+                // Try to find KG definition documents for all potential concepts
+                for concept in potential_concepts {
+                    let potential_kg_file = kg_local.path.join(format!("{}.md", concept));
+                    log::debug!("Looking for KG definition file: {:?}", potential_kg_file);
+                    
+                    if potential_kg_file.exists() {
+                        log::info!("Found KG definition file: {:?}", potential_kg_file);
+                        
+                        // Check if we already have this document to avoid duplicates
+                        let file_path = potential_kg_file.to_string_lossy().to_string();
+                        if documents.iter().any(|d: &Document| d.url == file_path) {
+                            log::debug!("Skipping duplicate KG document: {}", file_path);
+                            continue;
+                        }
+                        
+                        // Load the KG definition document directly from filesystem
+                        // Don't use Document::load() as it relies on persistence layer
+                        match std::fs::read_to_string(&potential_kg_file) {
+                            Ok(content) => {
+                                let mut kg_doc = Document::new(potential_kg_file.to_string_lossy().to_string());
+                                kg_doc.url = potential_kg_file.to_string_lossy().to_string();
+                                kg_doc.body = content.clone();
+                                
+                                // Extract title from markdown content (first # line)
+                                let title = content.lines()
+                                    .find(|line| line.starts_with("# "))
+                                    .map(|line| line.trim_start_matches("# ").trim())
+                                    .unwrap_or(&concept)
+                                    .to_string();
+                                kg_doc.title = title;
+                                
+                                log::debug!("Successfully loaded KG definition document: {}", kg_doc.title);
+                                documents.push(kg_doc);
+                                
+                                // Found the definition document, no need to check other concepts
+                                break;
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to read KG definition file '{}': {}", potential_kg_file.display(), e);
+                            }
+                        }
+                    } else {
+                        log::debug!("KG definition file not found: {:?}", potential_kg_file);
+                    }
+                }
+            } else {
+                log::debug!("No KG local config found");
+            }
+        } else {
+            log::debug!("No KG config found for role");
+        }
+
+        // Also search through the rolegraph for any documents that contain this term
         let rolegraph_sync = self
             .config_state
             .roles
@@ -1719,28 +1817,25 @@ impl<'a> TerraphimService {
             .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found", role_name)))?;
 
         let rolegraph = rolegraph_sync.lock().await;
-
-        // Find document IDs that contain this term
         let document_ids = rolegraph.find_document_ids_for_term(term);
         drop(rolegraph); // Release the lock early
 
-        if document_ids.is_empty() {
-            log::debug!("No documents found for term '{}'", term);
-            return Ok(Vec::new());
-        }
-
         log::debug!(
-            "Found {} document IDs for term '{}': {:?}",
+            "Found {} document IDs from rolegraph for term '{}'",
             document_ids.len(),
-            term,
-            document_ids
+            term
         );
 
-        // Load the actual documents using the persistence layer
-        // Handle both local and Atomic Data documents properly
-        let mut documents = Vec::new();
-
+        // Load documents found in the rolegraph (if any)
         for doc_id in &document_ids {
+            // Skip if we already have this document from the KG definition lookup
+            if documents.iter().any(|d| d.id == *doc_id || d.url == *doc_id) {
+                log::debug!("Skipping duplicate document from rolegraph: {}", doc_id);
+                continue;
+            }
+
+            // Load the actual documents using the persistence layer
+            // Handle both local and Atomic Data documents properly
             if doc_id.starts_with("http://") || doc_id.starts_with("https://") {
                 // Atomic Data document: Try to load from persistence first
                 log::debug!("Loading Atomic Data document '{}' from persistence", doc_id);
