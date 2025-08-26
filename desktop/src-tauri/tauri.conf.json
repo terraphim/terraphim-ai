@@ -30,7 +30,6 @@
       ],
       "resources": [
         "../default/**/*",
-        "../../../docs/src/kg/**/*.md",
         "../public/assets/bulmaswatch/**/*.css"
       ]
     },
