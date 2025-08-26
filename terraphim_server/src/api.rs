@@ -1386,3 +1386,54 @@ pub(crate) async fn batch_summarize_documents(
         errors,
     }))
 }
+
+/// Response for thesaurus endpoint
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ThesaurusResponse {
+    /// Status of the request
+    pub status: Status,
+    /// The thesaurus data as a hash map of normalized terms
+    pub thesaurus: Option<std::collections::HashMap<String, String>>,
+    /// Error message if retrieval failed
+    pub error: Option<String>,
+}
+
+/// Get thesaurus for a specific role
+///
+/// This endpoint returns the thesaurus (concept mappings) for a given role,
+/// which is used for search bar autocomplete functionality in the UI.
+pub(crate) async fn get_thesaurus(
+    State(config_state): State<ConfigState>,
+    Path(role_name): Path<String>,
+) -> Result<Json<ThesaurusResponse>> {
+    log::debug!("Getting thesaurus for role '{}'", role_name);
+    
+    let role_name = RoleName::new(&role_name);
+    
+    // Get the role graph for the specified role
+    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
+        return Ok(Json(ThesaurusResponse {
+            status: Status::Error,
+            thesaurus: None,
+            error: Some(format!("Role '{}' not found", role_name)),
+        }));
+    };
+    
+    let rolegraph = rolegraph_sync.lock().await;
+    
+    // Convert the thesaurus to a simple HashMap<String, String> format
+    // that matches what the UI expects
+    let mut thesaurus_map = std::collections::HashMap::new();
+    
+    for (key, value) in &rolegraph.thesaurus {
+        thesaurus_map.insert(key.as_str().to_string(), value.value.as_str().to_string());
+    }
+    
+    log::debug!("Found {} thesaurus entries for role '{}'", thesaurus_map.len(), role_name);
+    
+    Ok(Json(ThesaurusResponse {
+        status: Status::Success,
+        thesaurus: Some(thesaurus_map),
+        error: None,
+    }))
+}

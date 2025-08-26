@@ -86,6 +86,25 @@
             thesaurus.set(res as any);
             typeahead.set(true);
           });
+        } else {
+          // Web mode: fetch thesaurus from HTTP endpoint
+          console.log("Fetching thesaurus from HTTP endpoint for role", config.selected_role);
+          fetch(`${CONFIG.ServerURL}/thesaurus/${encodeURIComponent(config.selected_role)}`)
+            .then((response) => response.json())
+            .then((res) => {
+              console.log("thesaurus HTTP response", res);
+              if (res && res.status === "success" && res.thesaurus) {
+                thesaurus.set(res.thesaurus);
+                typeahead.set(true);
+              } else {
+                console.error("Failed to fetch thesaurus:", res);
+                typeahead.set(false);
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching thesaurus:", error);
+              typeahead.set(false);
+            });
         }
       } else {
         typeahead.set(false);
@@ -158,6 +177,29 @@ const newRoleName = target.value;
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify($configStore),
         }).catch(error => console.error("Error updating config on server:", error));
+
+        // Handle thesaurus publishing in web mode
+        if (roleSettings.kg?.publish) {
+          console.log("Fetching thesaurus from HTTP endpoint for role", newRoleName);
+          fetch(`${CONFIG.ServerURL}/thesaurus/${encodeURIComponent(newRoleName)}`)
+            .then((response) => response.json())
+            .then((res) => {
+              console.log("thesaurus HTTP response", res);
+              if (res && res.status === "success" && res.thesaurus) {
+                thesaurus.set(res.thesaurus);
+                typeahead.set(true);
+              } else {
+                console.error("Failed to fetch thesaurus:", res);
+                typeahead.set(false);
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching thesaurus:", error);
+              typeahead.set(false);
+            });
+        } else {
+          typeahead.set(false);
+        }
     }
   }
 </script>
