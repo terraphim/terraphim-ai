@@ -414,6 +414,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             get(find_documents_by_kg_term),
         )
         .route("/thesaurus/:role_name", get(api::get_thesaurus))
+        .route("/autocomplete/:role_name/:query", get(api::get_autocomplete))
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
