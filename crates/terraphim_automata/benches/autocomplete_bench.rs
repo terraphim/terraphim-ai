@@ -14,6 +14,7 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
+use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_automata::autocomplete::{
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,

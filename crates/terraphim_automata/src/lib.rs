@@ -13,9 +13,9 @@ pub use matcher::{find_matches, replace_matches, LinkType, Matched};
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
 pub mod autocomplete_helpers {
     use super::autocomplete::{AutocompleteIndex, AutocompleteMetadata};
-    pub fn iter_metadata<'a>(
-        index: &'a AutocompleteIndex,
-    ) -> impl Iterator<Item = (&'a str, &'a AutocompleteMetadata)> {
+    pub fn iter_metadata(
+        index: &AutocompleteIndex,
+    ) -> impl Iterator<Item = (&str, &AutocompleteMetadata)> {
         index.metadata_iter()
     }
     pub fn get_metadata<'a>(

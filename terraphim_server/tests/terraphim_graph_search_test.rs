@@ -1,7 +1,6 @@
 use serial_test::serial;
-use std::collections::HashMap;
 use ahash::AHashMap;
-use serde_json::Value;
+use std::path::PathBuf;
 use terraphim_config::{Config, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
 use terraphim_persistence::{DeviceStorage, Persistable};
 use terraphim_service::TerraphimService;
@@ -32,6 +31,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             body: "This is a haystack document that provides service functionality. It contains information about terraphim-graph and knowledge graph systems.".to_string(),
             url: "docs/src/kg/haystack.md".to_string(),
             description: Some("A haystack is a service that provides data indexing".to_string()),
+            summarization: None,
             stub: None,
             tags: Some(vec!["haystack".to_string(), "service".to_string()]),
             rank: None,
@@ -42,6 +42,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             body: "Service architecture documentation. This service provides haystack functionality and integrates with the knowledge graph system.".to_string(),
             url: "docs/src/kg/service.md".to_string(),
             description: Some("Service layer documentation".to_string()),
+            summarization: None,
             stub: None,
             tags: Some(vec!["service".to_string()]),
             rank: None,
@@ -52,6 +53,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             body: "Terraphim-graph is the knowledge graph system that provides semantic search. It uses haystacks as data sources and services for processing.".to_string(),
             url: "docs/src/kg/terraphim-graph.md".to_string(),
             description: Some("Terraphim graph documentation".to_string()),
+            summarization: None,
             stub: None,
             tags: Some(vec!["terraphim-graph".to_string(), "knowledge-graph".to_string()]),
             rank: None,
@@ -90,8 +92,8 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         kg: Some(KnowledgeGraph {
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
-                input_type: "markdown".to_string(),
-                path: "docs/src/kg".to_string(),
+                input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/src/kg"),
             }),
             public: true,
             publish: true,
@@ -122,7 +124,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
 
     // Step 3: Initialize service and build rolegraph
     log::info!("🔧 Creating TerraphimService and building rolegraph");
-    let config_state = terraphim_config::ConfigState::new(&mut config).await?;
+    let mut config_state = terraphim_config::ConfigState::new(&mut config).await?;
     let mut terraphim_service = TerraphimService::new(config_state.clone());
 
     // Ensure thesaurus is loaded for the role
@@ -237,6 +239,7 @@ async fn test_persistence_fallback_behavior() -> Result<(), Box<dyn std::error::
         body: "This document tests persistence fallback functionality.".to_string(),
         url: "test://fallback".to_string(),
         description: Some("Fallback test document".to_string()),
+        summarization: None,
         stub: None,
         tags: Some(vec!["fallback".to_string(), "test".to_string()]),
         rank: None,
@@ -279,8 +282,8 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
         kg: Some(KnowledgeGraph {
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
-                input_type: "markdown".to_string(),
-                path: "docs/src/kg".to_string(),
+                input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/src/kg"),
             }),
             public: true,
             publish: true,

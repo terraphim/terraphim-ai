@@ -1,14 +1,6 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-use terraphim_ai_desktop::{get_config, search, update_config, Status};
-use terraphim_config::{ConfigBuilder, ConfigState, Haystack, Role, ServiceType};
-use terraphim_persistence::memory::create_test_device_settings as create_memory_settings;
+use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_service::TerraphimService;
-use terraphim_settings::DeviceSettings;
-use terraphim_types::RelevanceFunction;
-use terraphim_types::{RoleName, SearchQuery};
+use terraphim_types::SearchQuery;
 
 async fn create_test_config_state() -> ConfigState {
     let mut config = ConfigBuilder::new()
@@ -18,10 +10,6 @@ async fn create_test_config_state() -> ConfigState {
     ConfigState::new(&mut config).await.unwrap()
 }
 
-fn create_test_device_settings_wrapped() -> Arc<Mutex<DeviceSettings>> {
-    let settings = create_memory_settings().unwrap();
-    Arc::new(Mutex::new(settings))
-}
 
 #[tokio::test]
 async fn test_search_command() {

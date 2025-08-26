@@ -468,14 +468,13 @@ impl IndexedDocument {
         serde_json::to_string(&self)
     }
     pub fn from_document(document: Document) -> Self {
-        let indexed_document = IndexedDocument {
+        IndexedDocument {
             id: document.id,
             matched_edges: Vec::new(),
             rank: 0,
             tags: document.tags.unwrap_or_default(),
             nodes: Vec::new(),
-        };
-        indexed_document
+        }
     }
 }
 

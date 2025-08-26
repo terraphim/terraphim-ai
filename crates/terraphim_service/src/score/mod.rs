@@ -9,6 +9,8 @@ mod bm25_test;
 pub mod common;
 mod names;
 mod scored;
+#[cfg(test)]
+mod scorer_integration_test;
 
 use bm25::{BM25FScorer, BM25PlusScorer};
 use bm25_additional::{JaccardScorer, OkapiBM25Scorer, QueryRatioScorer, TFIDFScorer};
@@ -18,7 +20,6 @@ use serde::{Serialize, Serializer};
 
 use crate::ServiceError;
 use terraphim_types::Document;
-use terraphim_types::SearchQuery;
 
 /// Score module local Result type using TerraphimService's error enum.
 type Result<T> = std::result::Result<T, ServiceError>;
@@ -33,27 +34,33 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
     // Initialize the appropriate scorer based on the query's name_scorer
     match query.name_scorer {
         QueryScorer::BM25 => {
-            let bm25_scorer = OkapiBM25Scorer::new();
+            let mut bm25_scorer = OkapiBM25Scorer::new();
+            bm25_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(bm25_scorer));
         }
         QueryScorer::BM25F => {
-            let bm25f_scorer = BM25FScorer::new();
+            let mut bm25f_scorer = BM25FScorer::new();
+            bm25f_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(bm25f_scorer));
         }
         QueryScorer::BM25Plus => {
-            let bm25plus_scorer = BM25PlusScorer::new();
+            let mut bm25plus_scorer = BM25PlusScorer::new();
+            bm25plus_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(bm25plus_scorer));
         }
         QueryScorer::TFIDF => {
-            let tfidf_scorer = TFIDFScorer::new();
+            let mut tfidf_scorer = TFIDFScorer::new();
+            tfidf_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(tfidf_scorer));
         }
         QueryScorer::Jaccard => {
-            let jaccard_scorer = JaccardScorer::new();
+            let mut jaccard_scorer = JaccardScorer::new();
+            jaccard_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(jaccard_scorer));
         }
         QueryScorer::QueryRatio => {
-            let query_ratio_scorer = QueryRatioScorer::new();
+            let mut query_ratio_scorer = QueryRatioScorer::new();
+            query_ratio_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(query_ratio_scorer));
         }
         _ => {
