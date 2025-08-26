@@ -219,11 +219,7 @@ pub struct Match {
     pub submatches: Vec<SubMatch>,
 }
 
-impl Match {
-    pub(crate) fn path(&self) -> Option<String> {
-        as_path(&self.path)
-    }
-}
+impl Match {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Context {
@@ -234,11 +230,7 @@ pub struct Context {
     submatches: Vec<SubMatch>,
 }
 
-impl Context {
-    pub(crate) fn path(&self) -> Option<String> {
-        as_path(&self.path)
-    }
-}
+impl Context {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct SubMatch {

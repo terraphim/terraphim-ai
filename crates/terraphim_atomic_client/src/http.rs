@@ -37,7 +37,7 @@ pub mod native {
             for (key, value) in auth_headers.iter() {
                 request = request.header(
                     key.as_str(),
-                    value.to_str().map_err(|e| AtomicError::HeaderToStr(e))?,
+                    value.to_str().map_err(AtomicError::HeaderToStr)?,
                 );
             }
         }

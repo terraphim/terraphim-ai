@@ -2,16 +2,16 @@ use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
 
-use crate::llm::{build_llm_from_role, LlmClient, SummarizeOptions};
+use crate::llm::{build_llm_from_role, SummarizeOptions};
 use crate::rate_limiter::{estimate_tokens, RateLimiterManager};
 use crate::summarization_queue::{
-    Priority, QueueCommand, QueueConfig, QueueStats, SummarizationTask, TaskId, TaskStatus,
+    QueueCommand, QueueConfig, QueueStats, SummarizationTask, TaskId, TaskStatus,
 };
 use crate::ServiceError;
 
@@ -92,7 +92,7 @@ pub struct SummarizationWorker {
     task_queue: BinaryHeap<PriorityTask>,
     task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
     rate_limiter: RateLimiterManager,
-    stats: WorkerStats,
+    stats: Arc<RwLock<WorkerStats>>,
     is_paused: bool,
     active_workers: usize,
     worker_handles: Vec<JoinHandle<()>>,
@@ -111,7 +111,7 @@ impl SummarizationWorker {
             task_queue: BinaryHeap::new(),
             task_status,
             rate_limiter,
-            stats: WorkerStats::default(),
+            stats: Arc::new(RwLock::new(WorkerStats::default())),
             is_paused: false,
             active_workers: 0,
             worker_handles: Vec::new(),
@@ -134,6 +134,7 @@ impl SummarizationWorker {
             let task_receiver = Arc::clone(&task_receiver);
             let rate_limiter = self.rate_limiter.clone();
             let task_status = Arc::clone(&self.task_status);
+            let stats = Arc::clone(&self.stats);
             let retry_delay = self.config.retry_delay;
             let max_retry_delay = self.config.max_retry_delay;
             
@@ -143,6 +144,7 @@ impl SummarizationWorker {
                     task_receiver,
                     rate_limiter,
                     task_status,
+                    stats,
                     retry_delay,
                     max_retry_delay,
                 ).await;
@@ -247,11 +249,9 @@ impl SummarizationWorker {
         }
 
         // If not paused, try to send directly to workers
-        if !self.is_paused && self.active_workers < self.config.max_concurrent_workers {
-            if task_sender.try_send(task.clone()).is_ok() {
-                log::debug!("Task {} sent directly to worker", task_id);
-                return Ok(());
-            }
+        if !self.is_paused && self.active_workers < self.config.max_concurrent_workers && task_sender.try_send(task.clone()).is_ok() {
+            log::debug!("Task {} sent directly to worker", task_id);
+            return Ok(());
         }
 
         // Add to priority queue
@@ -278,7 +278,14 @@ impl SummarizationWorker {
                             reason: reason.clone(),
                         },
                     );
-                    self.stats.record_cancelled();
+                    drop(status_map);
+                    
+                    // Record cancellation in stats
+                    {
+                        let mut worker_stats = self.stats.write().await;
+                        worker_stats.record_cancelled();
+                    }
+                    
                     log::info!("Task {} cancelled: {}", task_id, reason);
                 }
             }
@@ -320,7 +327,10 @@ impl SummarizationWorker {
             completed_tasks: completed,
             failed_tasks: failed,
             cancelled_tasks: cancelled,
-            avg_processing_time_seconds: self.stats.avg_processing_time().map(|d| d.as_secs()),
+            avg_processing_time_seconds: {
+                let stats = self.stats.read().await;
+                stats.avg_processing_time().map(|d| d.as_secs())
+            },
             is_paused: self.is_paused,
             active_workers: self.active_workers,
             rate_limiter_status: self.rate_limiter.get_all_status().await,
@@ -357,14 +367,15 @@ impl SummarizationWorker {
 
     /// Log periodic statistics
     async fn log_stats(&self) {
-        if self.stats.total_processed > 0 && self.stats.total_processed % 50 == 0 {
+        let stats = self.stats.read().await;
+        if stats.total_processed > 0 && stats.total_processed % 50 == 0 {
             log::info!(
                 "Worker stats: {} processed, {} successful, {} failed, {} cancelled, avg time: {:?}",
-                self.stats.total_processed,
-                self.stats.total_successful,
-                self.stats.total_failed,
-                self.stats.total_cancelled,
-                self.stats.avg_processing_time()
+                stats.total_processed,
+                stats.total_successful,
+                stats.total_failed,
+                stats.total_cancelled,
+                stats.avg_processing_time()
             );
         }
     }
@@ -375,6 +386,7 @@ impl SummarizationWorker {
         task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<SummarizationTask>>>,
         rate_limiter: RateLimiterManager,
         task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
+        stats: Arc<RwLock<WorkerStats>>,
         retry_delay: Duration,
         max_retry_delay: Duration,
     ) {
@@ -420,6 +432,14 @@ impl SummarizationWorker {
                             processing_duration_seconds: duration.as_secs(),
                         },
                     );
+                    drop(status_map);
+                    
+                    // Record successful processing in stats
+                    {
+                        let mut worker_stats = stats.write().await;
+                        worker_stats.record_success(duration);
+                    }
+                    
                     log::info!("Worker {} completed task {} in {:?}", worker_id, task_id, duration);
                 }
                 Err(error) => {
@@ -457,6 +477,13 @@ impl SummarizationWorker {
                                 next_retry_at: None,
                             },
                         );
+                        drop(status_map);
+                        
+                        // Record failure in stats (final failure after retries exhausted)
+                        {
+                            let mut worker_stats = stats.write().await;
+                            worker_stats.record_failure();
+                        }
                         log::error!("Worker {} task {} failed permanently after {} retries: {}", 
                                     worker_id, task_id, retry_task.retry_count, error);
                     }
@@ -545,7 +572,7 @@ impl Clone for RateLimiterManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::summarization_queue::QueueConfig;
+    use crate::summarization_queue::Priority;
     use terraphim_config::Role;
     use terraphim_types::Document;
 

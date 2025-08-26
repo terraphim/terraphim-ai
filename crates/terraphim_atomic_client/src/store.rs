@@ -6,7 +6,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use url::Url;
 #[cfg(not(feature = "native"))]
 use wasm_bindgen::prelude::*;
 
@@ -643,7 +642,7 @@ impl Store {
             }
 
             // Walk over all property values and enqueue in-server AtomicURLs
-            for (_prop, value) in &res.properties {
+            for value in res.properties.values() {
                 collect_links_local(&mut queue, value, server_prefix);
             }
         }
@@ -682,104 +681,3 @@ pub struct QueryOpts {
     pub property_values: Option<HashMap<String, String>>,
 }
 
-/// Builds a search URL with the given parameters.
-fn build_search_url(server_url: &str, query: &str, opts: &SearchOpts) -> Result<String> {
-    let mut url = Url::parse(server_url).map_err(|e| AtomicError::Parse(e.to_string()))?;
-    url.set_path("search");
-
-    let mut query_pairs = url.query_pairs_mut();
-    query_pairs.append_pair("q", query);
-
-    if let Some(include) = opts.include {
-        query_pairs.append_pair("include", &include.to_string());
-    }
-
-    if let Some(limit) = opts.limit {
-        query_pairs.append_pair("limit", &limit.to_string());
-    }
-
-    if let Some(parents) = &opts.parents {
-        if !parents.is_empty() {
-            let parents_string = parents.join(",");
-            query_pairs.append_pair("parents", &parents_string);
-        }
-    }
-
-    if let Some(filters) = &opts.filters {
-        if !filters.is_empty() {
-            let filter_string = build_filter_string(filters);
-            query_pairs.append_pair("filters", &filter_string);
-        }
-    }
-
-    drop(query_pairs);
-    Ok(url.to_string())
-}
-
-/// Builds a query URL for a collection with the given parameters.
-fn build_query_url(collection_subject: &str, opts: &QueryOpts) -> Result<String> {
-    let mut url = Url::parse(collection_subject).map_err(|e| AtomicError::Parse(e.to_string()))?;
-
-    let mut query_pairs = url.query_pairs_mut();
-
-    if let Some(include) = opts.include {
-        query_pairs.append_pair("include", &include.to_string());
-    }
-
-    if let Some(page_size) = opts.page_size {
-        query_pairs.append_pair("page_size", &page_size.to_string());
-    }
-
-    if let Some(page) = opts.page {
-        query_pairs.append_pair("page", &page.to_string());
-    }
-
-    if let Some(sort_by) = &opts.sort_by {
-        query_pairs.append_pair("sort_by", sort_by);
-    }
-
-    if let Some(sort_desc) = opts.sort_desc {
-        query_pairs.append_pair("sort_desc", &sort_desc.to_string());
-    }
-
-    if let Some(property_values) = &opts.property_values {
-        for (property, value) in property_values {
-            query_pairs.append_pair(&format!("property_value[{}]", property), value);
-        }
-    }
-
-    drop(query_pairs);
-    Ok(url.to_string())
-}
-
-/// Builds a filter string for the URL.
-fn build_filter_string(filters: &HashMap<String, String>) -> String {
-    filters
-        .iter()
-        .filter_map(|(key, value)| {
-            if !value.is_empty() {
-                Some(format!("{}:\"{}\"", escape_tantivy_key(key), value))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" AND ")
-}
-
-/// Escapes special characters for Tantivy query syntax.
-fn escape_tantivy_key(key: &str) -> String {
-    const SPECIAL_CHARS: &[char] = &[
-        '+', '^', '`', ':', '{', '}', '"', '[', ']', '(', ')', '!', '\\', '*', ' ', '.',
-    ];
-
-    key.chars()
-        .map(|c| {
-            if SPECIAL_CHARS.contains(&c) {
-                format!("\\{}", c)
-            } else {
-                c.to_string()
-            }
-        })
-        .collect()
-}

@@ -121,7 +121,7 @@ pub fn create_api_client() -> reqwest::Result<Client> {
 /// - Browser-like headers to avoid blocking
 /// - HTML content acceptance
 pub fn create_scraping_client() -> reqwest::Result<Client> {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
+    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT};
     
     let mut headers = HeaderMap::new();
     headers.insert(
