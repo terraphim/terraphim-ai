@@ -15,19 +15,59 @@
 
   $: thesaurusEntries = Object.entries($thesaurus);
 
-  function getSuggestions(value: string) {
-    const inputValue = value.trim().toLowerCase();
+  async function getSuggestions(value: string): Promise<string[]> {
+    const inputValue = value.trim();
     const inputLength = inputValue.length;
     
-    return inputLength === 0
-      ? []
-      : thesaurusEntries
-          .filter(([key]) => key.toLowerCase().includes(inputValue))
-          .map(([key]) => key)
-          .slice(0, 5);
+    // Return empty suggestions for very short inputs
+    if (inputLength === 0) {
+      return [];
+    }
+    
+    try {
+      if ($is_tauri) {
+        // In Tauri mode, we might want to call through the Tauri API
+        // For now, fall back to the original thesaurus-based approach
+        return inputLength === 0
+          ? []
+          : thesaurusEntries
+              .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+              .map(([key]) => key)
+              .slice(0, 8);
+      } else {
+        // Web mode: Use FST-based autocomplete endpoint
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(inputValue)}`);
+        if (!response.ok) {
+          // Fall back to thesaurus-based matching on error
+          console.warn('FST autocomplete failed, falling back to thesaurus matching');
+          return thesaurusEntries
+            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+            .map(([key]) => key)
+            .slice(0, 8);
+        }
+        
+        const data = await response.json();
+        if (data.status === 'success' && data.suggestions) {
+          return data.suggestions.map((suggestion: any) => suggestion.term);
+        } else {
+          // Fall back to thesaurus-based matching
+          return thesaurusEntries
+            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+            .map(([key]) => key)
+            .slice(0, 8);
+        }
+      }
+    } catch (error) {
+      console.warn('Error fetching autocomplete suggestions:', error);
+      // Fall back to thesaurus-based matching
+      return thesaurusEntries
+        .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+        .map(([key]) => key)
+        .slice(0, 8);
+    }
   }
 
-  function updateSuggestions(event: Event) {
+  async function updateSuggestions(event: Event) {
     const inputElement = event.target as HTMLInputElement | null;
     if (!inputElement || inputElement.selectionStart == null) {
       return;
@@ -37,7 +77,17 @@
     const words = textBeforeCursor.split(/\s+/);
     const currentWord = words[words.length - 1];
 
-    suggestions = getSuggestions(currentWord);
+    // Only fetch suggestions if the current word has at least 2 characters
+    if (currentWord.length >= 2) {
+      try {
+        suggestions = await getSuggestions(currentWord);
+      } catch (error) {
+        console.warn('Failed to get suggestions:', error);
+        suggestions = [];
+      }
+    } else {
+      suggestions = [];
+    }
     suggestionIndex = -1;
   }
 
