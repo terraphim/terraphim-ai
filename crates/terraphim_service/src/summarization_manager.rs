@@ -16,6 +16,7 @@ use crate::ServiceError;
 pub struct SummarizationManager {
     queue: SummarizationQueue,
     worker_handle: Option<JoinHandle<Result<(), ServiceError>>>,
+    #[allow(dead_code)] // Kept alive to prevent channel closure, queue has its own clone
     command_sender: mpsc::Sender<QueueCommand>,
 }
 
