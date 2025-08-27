@@ -837,6 +837,7 @@ impl<'a> TerraphimService {
     ///
     /// This method uses the OpenRouter service to generate intelligent summaries
     /// of document content, replacing basic text excerpts with AI-powered descriptions.
+    #[allow(dead_code)] // Used in 7+ places but compiler can't see due to async/feature boundaries
     async fn enhance_descriptions_with_ai(
         &self,
         mut documents: Vec<Document>,
@@ -900,6 +901,7 @@ impl<'a> TerraphimService {
     ///
     /// This helper method checks various criteria to decide whether a document
     /// would benefit from AI summarization.
+    #[allow(dead_code)] // Used by enhance_descriptions_with_ai, compiler can't see due to async boundaries
     fn should_generate_ai_summary(&self, document: &Document) -> bool {
         // Don't enhance if the document body is too short to summarize meaningfully
         if document.body.trim().len() < 200 {

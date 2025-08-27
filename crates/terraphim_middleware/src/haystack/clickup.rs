@@ -2,7 +2,6 @@ use crate::indexer::IndexMiddleware;
 use crate::Result;
 use async_trait::async_trait;
 use reqwest::Client;
-use serde::Deserialize;
 use terraphim_config::Haystack;
 use terraphim_types::{Document, Index};
 use terraphim_persistence::Persistable;
@@ -132,10 +131,6 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct UniversalSearchResponse {
-    tasks: Option<Vec<serde_json::Value>>,
-}
 
 async fn search_clickup_universal(
     client: &Client,

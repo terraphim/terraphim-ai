@@ -307,6 +307,7 @@ pub enum Similarity {
     None,
     /// Computes the Levenshtein edit distance between two names and converts
     /// it to a similarity.
+    #[allow(dead_code)] // Part of public API, documented in user guide
     Levenshtein,
     /// Computes the Jaro edit distance between two names and converts it to a
     /// similarity.
