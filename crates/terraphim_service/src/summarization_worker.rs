@@ -543,11 +543,6 @@ impl SummarizationWorker {
         delay.min(max_delay)
     }
 
-    /// Clone the rate limiter (for worker tasks)
-    fn clone_rate_limiter(&self) -> RateLimiterManager {
-        // Create a new manager with the same configuration
-        RateLimiterManager::new(self.config.rate_limits.clone())
-    }
 }
 
 // Implement Clone for RateLimiterManager

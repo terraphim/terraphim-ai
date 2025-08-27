@@ -10,7 +10,6 @@ use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::broadcast::Sender;
-use chrono::Utc;
 
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
@@ -399,6 +398,7 @@ pub struct AsyncSummarizeResponse {
 #[derive(Debug, Deserialize)]
 pub struct TaskStatusRequest {
     /// Task ID to check
+    #[allow(dead_code)] // Task ID comes from URL path, not request body
     pub task_id: String,
 }
 
@@ -429,6 +429,7 @@ pub struct TaskStatusResponse {
 #[derive(Debug, Deserialize)]
 pub struct CancelTaskRequest {
     /// Task ID to cancel
+    #[allow(dead_code)] // Task ID comes from URL path, not request body
     pub task_id: String,
     /// Reason for cancellation
     pub reason: Option<String>,
@@ -552,7 +553,7 @@ pub(crate) async fn chat_completion(
     let role_name = RoleName::new(&request.role);
     let config = config_state.config.lock().await;
 
-    let Some(role_ref) = config.roles.get(&role_name) else {
+    let Some(_role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
@@ -680,7 +681,7 @@ pub(crate) async fn list_openrouter_models(
 ) -> Result<Json<OpenRouterModelsResponse>> {
     let role_name = RoleName::new(&req.role);
     let config = config_state.config.lock().await;
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(_role) = config.roles.get(&role_name) else {
         return Ok(Json(OpenRouterModelsResponse {
             status: Status::Error,
             models: vec![],
@@ -767,7 +768,7 @@ pub(crate) async fn summarize_document(
     let config = config_state.config.lock().await;
 
     // Get the role configuration
-    let Some(role_ref) = config.roles.get(&role_name) else {
+    let Some(_role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(SummarizeDocumentResponse {
             status: Status::Error,
             document_id: request.document_id,
@@ -939,7 +940,7 @@ pub(crate) async fn get_summarization_status(
     let role_name = RoleName::new(&query.role);
     let config = config_state.config.lock().await;
 
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(_role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Role '{}' not found", query.role)),
@@ -996,7 +997,7 @@ pub(crate) async fn async_summarize_document(
     let config = config_state.config.lock().await;
 
     // Get the role configuration
-    let Some(role_ref) = config.roles.get(&role_name) else {
+    let Some(_role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(AsyncSummarizeResponse {
             status: Status::Error,
             task_id: None,
@@ -1285,7 +1286,7 @@ pub(crate) async fn batch_summarize_documents(
     let config = config_state.config.lock().await;
 
     // Get the role configuration
-    let Some(role_ref) = config.roles.get(&role_name) else {
+    let Some(_role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(BatchSummarizeResponse {
             status: Status::Error,
             task_ids: vec![],
@@ -1324,7 +1325,7 @@ pub(crate) async fn batch_summarize_documents(
     let mut queued_count = 0;
     let mut failed_count = 0;
 
-    for (index, item) in request.documents.iter().enumerate() {
+    for (_index, item) in request.documents.iter().enumerate() {
         // Load the document
         let document = match terraphim_service.get_document_by_id(&item.document_id).await {
             Ok(Some(doc)) => doc,
@@ -1468,7 +1469,7 @@ pub(crate) async fn get_autocomplete(
     State(config_state): State<ConfigState>,
     Path((role_name, query)): Path<(String, String)>,
 ) -> Result<Json<AutocompleteResponse>> {
-    use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search, AutocompleteConfig};
+    use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search};
     
     log::debug!("Getting autocomplete for role '{}', query '{}'", role_name, query);
     

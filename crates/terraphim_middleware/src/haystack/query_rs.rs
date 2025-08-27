@@ -66,10 +66,12 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                 documents.extend(docs);
             }
 
-            // Fetch and scrape content for documents that have URLs
+            // Fetch and scrape content for documents that have URLs, but skip crates.io URLs
+            // since they return 404 errors (SPA that requires JavaScript) and we already have
+            // comprehensive data from the API
             let mut enhanced_documents = Vec::new();
             for doc in documents {
-                if !doc.url.is_empty() && doc.url.starts_with("http") {
+                if !doc.url.is_empty() && doc.url.starts_with("http") && !doc.url.contains("crates.io/crates/") {
                     match self.fetch_and_scrape_content(&doc).await {
                         Ok(enhanced_doc) => enhanced_documents.push(enhanced_doc),
                         Err(e) => {
@@ -78,6 +80,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                         }
                     }
                 } else {
+                    // Skip fetching for crates.io URLs or add documents without fetching
                     enhanced_documents.push(doc);
                 }
             }
@@ -95,7 +98,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
 
 impl QueryRsHaystackIndexer {
     /// Normalize document ID to match persistence layer expectations
-    fn normalize_document_id(&self, original_id: &str) -> String {
+    pub fn normalize_document_id(&self, original_id: &str) -> String {
         // Create a dummy document to access the normalize_key method
         let dummy_doc = Document {
             id: "dummy".to_string(),
@@ -109,6 +112,62 @@ impl QueryRsHaystackIndexer {
             rank: None,
         };
         dummy_doc.normalize_key(original_id)
+    }
+
+    /// Extract Reddit post ID from URL
+    /// Example: https://www.reddit.com/r/rust/comments/abc123/title/ -> abc123
+    pub fn extract_reddit_post_id(&self, url: &str) -> Option<String> {
+        // Look for the pattern /comments/{post_id}/
+        if let Some(comments_pos) = url.find("/comments/") {
+            let after_comments = &url[comments_pos + 10..]; // "/comments/" is 10 chars
+            if let Some(slash_pos) = after_comments.find('/') {
+                let post_id = &after_comments[..slash_pos];
+                if !post_id.is_empty() && post_id.chars().all(|c| c.is_alphanumeric()) {
+                    return Some(post_id.to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract a clean identifier from a documentation URL
+    /// Example: https://doc.rust-lang.org/std/iter/trait.Iterator.html -> std_iter_Iterator
+    pub fn extract_doc_identifier(&self, url: &str) -> String {
+        if url.starts_with("https://doc.rust-lang.org/") {
+            let path = &url["https://doc.rust-lang.org/".len()..];
+            // Remove .html extension and replace slashes and dots with underscores  
+            let clean_path = path.trim_end_matches(".html").replace('/', "_").replace('.', "_");
+            return clean_path;
+        }
+        
+        // For other URLs, extract domain and path
+        if let Ok(parsed_url) = url::Url::parse(url) {
+            let host = parsed_url.host_str().unwrap_or("");
+            let path = parsed_url.path().trim_start_matches('/').trim_end_matches('/');
+            let clean_host = host.replace('.', "_");
+            // Clean the path more thoroughly
+            let clean_path = path.replace('/', "_")
+                                .replace('.', "_")
+                                .replace('@', "_")
+                                .replace('#', "_")
+                                .replace('?', "_")
+                                .replace('&', "_")
+                                .replace('=', "_")
+                                .replace('-', "_")
+                                .trim_end_matches("_html")
+                                .to_string();
+            if clean_path.is_empty() {
+                return clean_host;
+            }
+            return format!("{}_{}", clean_host, clean_path);
+        }
+        
+        // Fallback: use a hash of the URL
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        url.hash(&mut hasher);
+        format!("url_{:x}", hasher.finish())
     }
 
     /// Fetch and scrape content from a document's URL
@@ -477,7 +536,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Parse Reddit JSON results
-    fn parse_reddit_json(&self, posts: Vec<Value>) -> Result<Vec<Document>> {
+    pub fn parse_reddit_json(&self, posts: Vec<Value>) -> Result<Vec<Document>> {
         let mut documents = Vec::new();
 
         for post in posts {
@@ -492,7 +551,18 @@ impl QueryRsHaystackIndexer {
                 let body = obj.get("selftext").and_then(|v| v.as_str()).unwrap_or("");
 
                 if !title.is_empty() && !url.is_empty() {
-                    let original_id = format!("reddit-{}", url);
+                    // Extract clean post ID from Reddit URL, fallback to URL hash if extraction fails
+                    let post_identifier = if let Some(post_id) = self.extract_reddit_post_id(url) {
+                        post_id
+                    } else {
+                        // Fallback: use hash of URL for non-standard Reddit URLs
+                        use std::collections::hash_map::DefaultHasher;
+                        use std::hash::{Hash, Hasher};
+                        let mut hasher = DefaultHasher::new();
+                        url.hash(&mut hasher);
+                        format!("{:x}", hasher.finish())
+                    };
+                    let original_id = format!("reddit-{}", post_identifier);
                     let normalized_id = self.normalize_document_id(&original_id);
                     documents.push(Document {
                         id: normalized_id,
@@ -517,7 +587,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Parse suggest API JSON results (OpenSearch Suggestions format)
-    fn parse_suggest_json(&self, suggest_data: Value, query: &str) -> Result<Vec<Document>> {
+    pub fn parse_suggest_json(&self, suggest_data: Value, query: &str) -> Result<Vec<Document>> {
         let mut documents = Vec::new();
 
         // OpenSearch Suggestions format: [query, [completions], [descriptions], [urls]]
@@ -536,7 +606,9 @@ impl QueryRsHaystackIndexer {
                                     let search_type = self.determine_search_type(title, url);
                                     let tags = self.generate_tags_for_search_type(&search_type);
 
-                                    let original_id = format!("{}-{}", search_type, url);
+                                    // Use a clean identifier based on the title and search type instead of the full URL
+                                    let doc_identifier = self.extract_doc_identifier(url);
+                                    let original_id = format!("{}-{}", search_type, doc_identifier);
                                     let normalized_id = self.normalize_document_id(&original_id);
                                     documents.push(Document {
                                         id: normalized_id,
@@ -568,7 +640,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Parse crates.io JSON results
-    fn parse_crates_io_json(&self, crates_data: Value, _query: &str) -> Result<Vec<Document>> {
+    pub fn parse_crates_io_json(&self, crates_data: Value, _query: &str) -> Result<Vec<Document>> {
         let mut documents = Vec::new();
 
         if let Some(crates) = crates_data.get("crates").and_then(|v| v.as_array()) {
@@ -584,9 +656,36 @@ impl QueryRsHaystackIndexer {
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
                     let downloads = obj.get("downloads").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let homepage = obj.get("homepage").and_then(|v| v.as_str()).unwrap_or("");
+                    let documentation = obj.get("documentation").and_then(|v| v.as_str()).unwrap_or("");
+                    let repository = obj.get("repository").and_then(|v| v.as_str()).unwrap_or("");
+                    let keywords = obj.get("keywords").and_then(|v| v.as_array())
+                        .map(|arr| arr.iter().filter_map(|k| k.as_str()).collect::<Vec<_>>().join(", "))
+                        .unwrap_or_default();
                     let url = format!("https://crates.io/crates/{}", name);
 
                     if !name.is_empty() {
+                        // Build a comprehensive body with all available API data
+                        let mut body = format!("Crate: {} v{}\n\n", name, version);
+                        body.push_str(&format!("Description: {}\n\n", description));
+                        body.push_str(&format!("Downloads: {}\n\n", downloads));
+                        
+                        if !keywords.is_empty() {
+                            body.push_str(&format!("Keywords: {}\n\n", keywords));
+                        }
+                        
+                        if !homepage.is_empty() {
+                            body.push_str(&format!("Homepage: {}\n\n", homepage));
+                        }
+                        
+                        if !documentation.is_empty() {
+                            body.push_str(&format!("Documentation: {}\n\n", documentation));
+                        }
+                        
+                        if !repository.is_empty() {
+                            body.push_str(&format!("Repository: {}\n\n", repository));
+                        }
+
                         let original_id = format!("crate-{}", name);
                         let normalized_id = self.normalize_document_id(&original_id);
                         documents.push(Document {
@@ -595,7 +694,7 @@ impl QueryRsHaystackIndexer {
                             title: format!("[CRATE] {} {}", name, version),
                             description: Some(format!("{} ({} downloads)", description, downloads)),
                             summarization: None,
-                            body: format!("Crate: {} - {}", name, description),
+                            body,
                             stub: None,
                             tags: Some(vec![
                                 "rust".to_string(),

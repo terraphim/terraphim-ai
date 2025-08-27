@@ -1,5 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use terraphim_config::{ConfigState, ServiceType};
 use terraphim_types::{Index, SearchQuery};
 
@@ -10,11 +8,6 @@ mod ripgrep;
 use crate::haystack::{AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, QueryRsHaystackIndexer};
 pub use ripgrep::RipgrepIndexer;
 
-fn hash_as_string<T: Hash>(t: &T) -> String {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    format!("{:x}", s.finish())
-}
 
 /// A Middleware is a service that creates an index of documents from
 /// a haystack.

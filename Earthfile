@@ -81,7 +81,7 @@ install-native:
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.75.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
