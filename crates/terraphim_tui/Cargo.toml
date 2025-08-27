@@ -16,6 +16,7 @@ serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+log = "0.4"
 jiff = "0.1"
 urlencoding = "2.1"
 
@@ -23,6 +24,17 @@ terraphim_types = { path = "../terraphim_types" }
 terraphim_settings = { path = "../terraphim_settings" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_config = { path = "../terraphim_config" }
+terraphim_automata = { path = "../terraphim_automata" }
+terraphim_service = { path = "../terraphim_service" }
+terraphim_middleware = { path = "../terraphim_middleware" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+
+[dev-dependencies]
+serial_test = "3.0"
+futures = "0.3"
+portpicker = "0.1"
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
 
 [[bin]]
 name = "terraphim-tui"

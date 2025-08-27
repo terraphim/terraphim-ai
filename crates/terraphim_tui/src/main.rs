@@ -18,12 +18,26 @@ use ratatui::{
 use tokio::runtime::Runtime;
 
 mod client;
+mod service;
 use client::{ApiClient, SearchResponse};
-use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+use service::TuiService;
+use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+
+#[derive(Debug, Clone, PartialEq)]
+enum ViewMode {
+    Search,
+    ResultDetail,
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "terraphim-tui", version, about = "Terraphim TUI interface")]
 struct Cli {
+    /// Use server API mode instead of self-contained offline mode
+    #[arg(long, default_value_t = false)]
+    server: bool,
+    /// Server URL for API mode
+    #[arg(long, default_value = "http://localhost:8000")]
+    server_url: String,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -32,8 +46,8 @@ struct Cli {
 enum Command {
     Search {
         query: String,
-        #[arg(long, default_value = "Default")]
-        role: String,
+        #[arg(long)]
+        role: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
     },
@@ -46,17 +60,24 @@ enum Command {
         sub: ConfigSub,
     },
     Graph {
-        #[arg(long, default_value = "Default")]
-        role: String,
+        #[arg(long)]
+        role: Option<String>,
         #[arg(long, default_value_t = 50)]
         top_k: usize,
     },
     Chat {
-        #[arg(long, default_value = "")]
-        role: String,
+        #[arg(long)]
+        role: Option<String>,
         prompt: String,
         #[arg(long)]
         model: Option<String>,
+    },
+    Extract {
+        text: String,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long, default_value_t = false)]
+        exclude_term: bool,
     },
     Interactive,
 }
@@ -79,162 +100,284 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Command::Interactive) | None => run_tui(),
-        Some(Command::Search { query, role, limit }) => rt.block_on(async move {
-            let api = ApiClient::new(
-                std::env::var("TERRAPHIM_SERVER")
-                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
-            );
+        Some(Command::Interactive) | None => {
+            if cli.server {
+                run_tui_server_mode(&cli.server_url)
+            } else {
+                rt.block_on(run_tui_offline_mode())
+            }
+        },
+        Some(command) => {
+            if cli.server {
+                rt.block_on(run_server_command(command, &cli.server_url))
+            } else {
+                rt.block_on(run_offline_command(command))
+            }
+        },
+    }
+}
+async fn run_tui_offline_mode() -> Result<()> {
+    let service = TuiService::new().await?;
+    run_tui_with_service(service).await
+}
+
+fn run_tui_server_mode(_server_url: &str) -> Result<()> {
+    // TODO: Pass server_url to TUI for API client initialization
+    run_tui()
+}
+
+async fn run_tui_with_service(_service: TuiService) -> Result<()> {
+    // TODO: Update interactive TUI to use local service instead of API client
+    // For now, fall back to the existing TUI implementation
+    run_tui()
+}
+
+async fn run_offline_command(command: Command) -> Result<()> {
+    let service = TuiService::new().await?;
+    
+    match command {
+        Command::Search { query, role, limit } => {
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+            
+            let results = service.search_with_role(&query, &role_name, Some(limit)).await?;
+            for doc in results.iter() {
+                println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+            }
+            Ok(())
+        },
+        Command::Roles { sub } => {
+            match sub {
+                RolesSub::List => {
+                    let roles = service.list_roles().await;
+                    println!("{}", roles.join("\n"));
+                }
+                RolesSub::Select { name } => {
+                    let role_name = RoleName::new(&name);
+                    service.update_selected_role(role_name).await?;
+                    service.save_config().await?;
+                    println!("selected:{}", name);
+                }
+            }
+            Ok(())
+        },
+        Command::Config { sub } => {
+            match sub {
+                ConfigSub::Show => {
+                    let config = service.get_config().await;
+                    println!("{}", serde_json::to_string_pretty(&config)?);
+                }
+                ConfigSub::Set { key, value } => {
+                    match key.as_str() {
+                        "selected_role" => {
+                            let role_name = RoleName::new(&value);
+                            service.update_selected_role(role_name).await?;
+                            service.save_config().await?;
+                            println!("updated selected_role to {}", value);
+                        }
+                        _ => {
+                            println!("unsupported key: {}", key);
+                        }
+                    }
+                }
+            }
+            Ok(())
+        },
+        Command::Graph { role, top_k } => {
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+            
+            let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
+            for concept in concepts {
+                println!("{}", concept);
+            }
+            Ok(())
+        },
+        Command::Chat { role, prompt, model } => {
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+            
+            let response = service.chat(&role_name, &prompt, model).await?;
+            println!("{}", response);
+            Ok(())
+        },
+        Command::Extract { text, role, exclude_term } => {
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+            
+            let results = service.extract_paragraphs(&role_name, &text, exclude_term).await?;
+            
+            if results.is_empty() {
+                println!("No matches found in the text.");
+            } else {
+                println!("Found {} paragraph(s):", results.len());
+                for (i, (matched_term, paragraph)) in results.iter().enumerate() {
+                    println!("\n--- Match {} (term: '{}') ---", i + 1, matched_term);
+                    println!("{}", paragraph);
+                }
+            }
+            
+            Ok(())
+        }
+        Command::Interactive => {
+            unreachable!("Interactive mode should be handled above")
+        }
+    }
+}
+
+async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
+    let api = ApiClient::new(server_url.to_string());
+    
+    match command {
+        Command::Search { query, role, limit } => {
+            // Get selected role from server if not specified
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                let config_res = api.get_config().await?;
+                config_res.config.selected_role
+            };
+            
             let q = SearchQuery {
                 search_term: NormalizedTermValue::from(query.as_str()),
                 skip: Some(0),
                 limit: Some(limit),
-                role: Some(RoleName::new(&role)),
+                role: Some(role_name),
             };
             let res: SearchResponse = api.search(&q).await?;
             for doc in res.results.iter() {
                 println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
             }
             Ok(())
-        }),
-        Some(Command::Roles { sub }) => {
-            let api = ApiClient::new(
-                std::env::var("TERRAPHIM_SERVER")
-                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
-            );
-            rt.block_on(async move {
-                match sub {
-                    RolesSub::List => {
-                        let cfg = api.get_config().await?;
-                        let keys: Vec<String> =
-                            cfg.config.roles.keys().map(|r| r.to_string()).collect();
-                        println!("{}", keys.join("\n"));
-                    }
-                    RolesSub::Select { name } => {
-                        let _ = api.update_selected_role(&name).await?;
-                        println!("selected:{}", name);
-                    }
+        },
+        Command::Roles { sub } => {
+            match sub {
+                RolesSub::List => {
+                    let cfg = api.get_config().await?;
+                    let keys: Vec<String> =
+                        cfg.config.roles.keys().map(|r| r.to_string()).collect();
+                    println!("{}", keys.join("\n"));
                 }
-                Ok(())
-            })
+                RolesSub::Select { name } => {
+                    let _ = api.update_selected_role(&name).await?;
+                    println!("selected:{}", name);
+                }
+            }
+            Ok(())
         }
-        Some(Command::Config { sub }) => {
-            let api = ApiClient::new(
-                std::env::var("TERRAPHIM_SERVER")
-                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
-            );
-            rt.block_on(async move {
-                match sub {
-                    ConfigSub::Show => {
-                        let cfg = api.get_config().await?;
-                        println!("{}", serde_json::to_string_pretty(&cfg.config)?);
-                    }
-                    ConfigSub::Set { key, value } => {
-                        // Minimal keys: selected_role, global_shortcut, role.<name>.theme
-                        let mut cfg = api.get_config().await?.config;
-                        match key.as_str() {
-                            "selected_role" => {
-                                cfg.selected_role = RoleName::new(&value);
-                            }
-                            "global_shortcut" => {
-                                cfg.global_shortcut = value.clone();
-                            }
-                            _ if key.starts_with("role.") && key.ends_with(".theme") => {
-                                // role.<name>.theme
-                                if let Some(name) = key
-                                    .strip_prefix("role.")
-                                    .and_then(|s| s.strip_suffix(".theme"))
-                                {
-                                    let rn = RoleName::new(name);
-                                    if let Some(role) = cfg.roles.get_mut(&rn) {
-                                        role.theme = value.clone();
-                                    } else {
-                                        eprintln!("role not found: {}", name);
-                                    }
-                                }
-                            }
-                            _ => {
-                                eprintln!("unsupported key: {}", key);
-                            }
-                        }
-                        let _ = api.post_config(&cfg).await?;
-                        println!("ok");
-                    }
+        Command::Config { sub } => {
+            match sub {
+                ConfigSub::Show => {
+                    let cfg = api.get_config().await?;
+                    println!("{}", serde_json::to_string_pretty(&cfg.config)?);
                 }
-                Ok(())
-            })
-        }
-        Some(Command::Graph { role, top_k }) => {
-            let api = ApiClient::new(
-                std::env::var("TERRAPHIM_SERVER")
-                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
-            );
-            rt.block_on(async move {
-                let rg = api
-                    .get_rolegraph_edges(if role.is_empty() { None } else { Some(&role) })
-                    .await?;
-                println!("Nodes: {}  Edges: {}", rg.nodes.len(), rg.edges.len());
-                // Build adjacency: for top_k nodes by rank, show connected nodes (by edges)
-                use std::collections::HashMap;
-                let mut label_by_id: HashMap<u64, &str> = HashMap::new();
-                for n in &rg.nodes {
-                    label_by_id.insert(n.id, &n.label);
-                }
-                let mut nodes_sorted = rg.nodes.clone();
-                nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
-                for n in nodes_sorted.into_iter().take(top_k) {
-                    // find neighbors via edges
-                    let mut neighbors = Vec::new();
-                    for e in &rg.edges {
-                        if e.source == n.id {
-                            if let Some(lbl) = label_by_id.get(&e.target) {
-                                neighbors.push((*lbl, e.rank));
-                            }
+                ConfigSub::Set { key, value } => {
+                    let mut cfg = api.get_config().await?.config;
+                    match key.as_str() {
+                        "selected_role" => {
+                            cfg.selected_role = RoleName::new(&value);
+                            let _ = api.post_config(&cfg).await?;
+                            println!("updated selected_role to {}", value);
                         }
-                        if e.target == n.id {
-                            if let Some(lbl) = label_by_id.get(&e.source) {
-                                neighbors.push((*lbl, e.rank));
-                            }
+                        _ => {
+                            println!("unsupported key: {}", key);
                         }
                     }
-                    neighbors.sort_by(|a, b| b.1.cmp(&a.1));
-                    let list = neighbors
-                        .into_iter()
-                        .take(5)
-                        .map(|(l, _r)| l)
-                        .collect::<Vec<&str>>()
-                        .join(", ");
-                    println!("- [{}] {} -> {}", n.rank, n.label, list);
                 }
-                Ok(())
-            })
+            }
+            Ok(())
+        },
+        Command::Graph { role, top_k } => {
+            let role_name = if let Some(role) = role {
+                role
+            } else {
+                let config_res = api.get_config().await?;
+                config_res.config.selected_role.to_string()
+            };
+            
+            let graph_res = api.rolegraph(Some(&role_name)).await?;
+            let mut nodes_sorted = graph_res.nodes.clone();
+            nodes_sorted.sort_by(|a, b| b.rank.cmp(&a.rank));
+            for node in nodes_sorted.into_iter().take(top_k) {
+                println!("{}", node.label);
+            }
+            Ok(())
+        },
+        Command::Chat { role, prompt, model } => {
+            let role_name = if let Some(role) = role {
+                role
+            } else {
+                let config_res = api.get_config().await?;
+                config_res.config.selected_role.to_string()
+            };
+            
+            let chat_res = api.chat(&role_name, &prompt, model.as_deref()).await?;
+            match (chat_res.status.as_str(), chat_res.message) {
+                ("Success", Some(msg)) => println!("{}", msg),
+                _ => println!(
+                    "error: {}",
+                    chat_res.error.unwrap_or_else(|| "unknown error".into())
+                ),
+            }
+            Ok(())
+        },
+        Command::Extract { text, role, exclude_term } => {
+            let role_name = if let Some(role) = role {
+                role
+            } else {
+                let config_res = api.get_config().await?;
+                config_res.config.selected_role.to_string()
+            };
+            
+            // Get the thesaurus from the server for the role
+            let thesaurus_res = api.get_thesaurus(&role_name).await?;
+            
+            // Build thesaurus from response
+            let mut thesaurus = terraphim_types::Thesaurus::new(format!("role-{}", role_name));
+            for entry in thesaurus_res.terms {
+                let normalized_term = terraphim_types::NormalizedTerm::new(
+                    1, // Simple ID for CLI usage
+                    terraphim_types::NormalizedTermValue::from(entry.nterm.clone())
+                );
+                thesaurus.insert(
+                    terraphim_types::NormalizedTermValue::from(entry.nterm), 
+                    normalized_term
+                );
+            }
+            
+            // Extract paragraphs using automata
+            let results = terraphim_automata::matcher::extract_paragraphs_from_automata(
+                &text, 
+                thesaurus, 
+                !exclude_term // include_term is opposite of exclude_term
+            )?;
+            
+            if results.is_empty() {
+                println!("No matches found in the text.");
+            } else {
+                println!("Found {} paragraph(s):", results.len());
+                for (i, (matched, paragraph)) in results.iter().enumerate() {
+                    println!("\n--- Match {} (term: '{}') ---", i + 1, matched.normalized_term.value);
+                    println!("{}", paragraph);
+                }
+            }
+            
+            Ok(())
         }
-        Some(Command::Chat {
-            role,
-            prompt,
-            model,
-        }) => {
-            let api = ApiClient::new(
-                std::env::var("TERRAPHIM_SERVER")
-                    .unwrap_or_else(|_| "http://localhost:8000".to_string()),
-            );
-            rt.block_on(async move {
-                let res = api
-                    .chat(
-                        if role.is_empty() { "Default" } else { &role },
-                        &prompt,
-                        model.as_deref(),
-                    )
-                    .await?;
-                match (res.status.as_str(), res.message) {
-                    ("Success", Some(msg)) => println!("{}", msg),
-                    _ => println!(
-                        "error: {}",
-                        res.error.unwrap_or_else(|| "unknown error".into())
-                    ),
-                }
-                Ok(())
-            })
+        Command::Interactive => {
+            unreachable!("Interactive mode should be handled above")
         }
     }
 }
@@ -262,8 +405,12 @@ fn run_tui() -> Result<()> {
 fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
     let mut input = String::new();
     let mut results: Vec<String> = Vec::new();
+    let mut detailed_results: Vec<Document> = Vec::new();
     let mut terms: Vec<String> = Vec::new();
     let mut suggestions: Vec<String> = Vec::new();
+    let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
+    let mut selected_result_index = 0;
+    let mut view_mode = ViewMode::Search;
     let api = ApiClient::new(
         std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
     );
@@ -271,125 +418,257 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
 
     // Initialize terms from rolegraph (selected role)
     if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
-        let sel = cfg.config.selected_role.to_string();
-        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(sel.as_str())).await }) {
+        current_role = cfg.config.selected_role.to_string();
+        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
             terms = rg.nodes.into_iter().map(|n| n.label).collect();
         }
     }
 
     loop {
         terminal.draw(|f| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(3), // input
-                    Constraint::Length(5), // suggestions
-                    Constraint::Min(3),    // results
-                    Constraint::Length(1), // status
-                ])
-                .split(f.size());
+            match view_mode {
+                ViewMode::Search => {
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(3), // input
+                            Constraint::Length(5), // suggestions
+                            Constraint::Min(3),    // results
+                            Constraint::Length(3), // status
+                        ])
+                        .split(f.area());
 
-            let input_widget = Paragraph::new(Line::from(input.as_str())).block(
-                Block::default()
-                    .title("Search • Type to query, Enter to run, q to quit")
-                    .borders(Borders::ALL),
-            );
-            f.render_widget(input_widget, chunks[0]);
+                    let input_title = format!("Search [Role: {}] • Enter: search, Tab: autocomplete, r: switch role, q: quit", current_role);
+                    let input_widget = Paragraph::new(Line::from(input.as_str())).block(
+                        Block::default()
+                            .title(input_title)
+                            .borders(Borders::ALL),
+                    );
+                    f.render_widget(input_widget, chunks[0]);
 
-            // Suggestions (fixed height 5)
-            let sug_items: Vec<ListItem> = suggestions
-                .iter()
-                .take(5)
-                .map(|s| ListItem::new(s.as_str()))
-                .collect();
-            let sug_list = List::new(sug_items)
-                .block(Block::default().title("Suggestions").borders(Borders::ALL));
-            f.render_widget(sug_list, chunks[1]);
+                    // Suggestions (fixed height 5)
+                    let sug_items: Vec<ListItem> = suggestions
+                        .iter()
+                        .take(5)
+                        .map(|s| ListItem::new(s.as_str()))
+                        .collect();
+                    let sug_list = List::new(sug_items)
+                        .block(Block::default().title("Suggestions").borders(Borders::ALL));
+                    f.render_widget(sug_list, chunks[1]);
 
-            let items: Vec<ListItem> = results.iter().map(|r| ListItem::new(r.as_str())).collect();
-            let list = List::new(items)
-                .block(Block::default().title("Results").borders(Borders::ALL))
-                .highlight_style(Style::default().add_modifier(Modifier::BOLD));
-            f.render_widget(list, chunks[2]);
+                    let items: Vec<ListItem> = results.iter().enumerate().map(|(i, r)| {
+                        let item = ListItem::new(r.as_str());
+                        if i == selected_result_index {
+                            item.style(Style::default().add_modifier(Modifier::REVERSED))
+                        } else {
+                            item
+                        }
+                    }).collect();
+                    let list = List::new(items)
+                        .block(Block::default().title("Results • ↑↓: select, Enter: view details, s: summarize").borders(Borders::ALL));
+                    f.render_widget(list, chunks[2]);
 
-            let status = Paragraph::new(Line::from("Terraphim TUI (MVP)"))
-                .block(Block::default().borders(Borders::ALL));
-            f.render_widget(status, chunks[3]);
+                    let status_text = format!("Terraphim TUI • {} results • Mode: Search", results.len());
+                    let status = Paragraph::new(Line::from(status_text))
+                        .block(Block::default().borders(Borders::ALL));
+                    f.render_widget(status, chunks[3]);
+                }
+                ViewMode::ResultDetail => {
+                    if selected_result_index < detailed_results.len() {
+                        let doc = &detailed_results[selected_result_index];
+                        
+                        let chunks = Layout::default()
+                            .direction(Direction::Vertical)
+                            .constraints([
+                                Constraint::Length(3), // title
+                                Constraint::Min(5),    // content
+                                Constraint::Length(3), // status
+                            ])
+                            .split(f.area());
+
+                        let title_widget = Paragraph::new(Line::from(doc.title.as_str()))
+                            .block(Block::default().title("Document Title").borders(Borders::ALL))
+                            .wrap(ratatui::widgets::Wrap { trim: true });
+                        f.render_widget(title_widget, chunks[0]);
+
+                        let content_text = if doc.body.is_empty() { "No content available" } else { &doc.body };
+                        let content_widget = Paragraph::new(content_text)
+                            .block(Block::default().title("Content • s: summarize, Esc: back to search").borders(Borders::ALL))
+                            .wrap(ratatui::widgets::Wrap { trim: true });
+                        f.render_widget(content_widget, chunks[1]);
+
+                        let status_text = format!("Document Detail • ID: {} • URL: {}", 
+                                                doc.id, 
+                                                if doc.url.is_empty() { "N/A" } else { &doc.url });
+                        let status = Paragraph::new(Line::from(status_text))
+                            .block(Block::default().borders(Borders::ALL));
+                        f.render_widget(status, chunks[2]);
+                    }
+                }
+            }
         })?;
 
         if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Enter => {
-                        let query = input.trim().to_string();
-                        let api = api.clone();
-                        if !query.is_empty() {
-                            if let Ok(lines) = rt.block_on(async move {
-                                let q = SearchQuery {
-                                    search_term: NormalizedTermValue::from(query.as_str()),
-                                    skip: Some(0),
-                                    limit: Some(10),
-                                    role: None,
-                                };
-                                let resp = api.search(&q).await?;
-                                let lines: Vec<String> = resp
-                                    .results
-                                    .into_iter()
-                                    .map(|d| format!("{} {}", d.rank.unwrap_or_default(), d.title))
-                                    .collect();
-                                Ok::<Vec<String>, anyhow::Error>(lines)
-                            }) {
-                                results = lines;
+                match view_mode {
+                    ViewMode::Search => {
+                        match key.code {
+                            KeyCode::Char('q') => break,
+                            KeyCode::Enter => {
+                                let query = input.trim().to_string();
+                                let api = api.clone();
+                                let role = current_role.clone();
+                                if !query.is_empty() {
+                                    if let Ok((lines, docs)) = rt.block_on(async move {
+                                        let q = SearchQuery {
+                                            search_term: NormalizedTermValue::from(query.as_str()),
+                                            skip: Some(0),
+                                            limit: Some(10),
+                                            role: Some(RoleName::new(&role)),
+                                        };
+                                        let resp = api.search(&q).await?;
+                                        let lines: Vec<String> = resp
+                                            .results
+                                            .iter()
+                                            .map(|d| format!("{} {}", d.rank.unwrap_or_default(), d.title))
+                                            .collect();
+                                        let docs = resp.results;
+                                        Ok::<(Vec<String>, Vec<Document>), anyhow::Error>((lines, docs))
+                                    }) {
+                                        results = lines;
+                                        detailed_results = docs;
+                                        selected_result_index = 0;
+                                    }
+                                } else if selected_result_index < detailed_results.len() {
+                                    view_mode = ViewMode::ResultDetail;
+                                }
                             }
+                            KeyCode::Up => {
+                                if selected_result_index > 0 {
+                                    selected_result_index -= 1;
+                                }
+                            }
+                            KeyCode::Down => {
+                                if selected_result_index + 1 < results.len() {
+                                    selected_result_index += 1;
+                                }
+                            }
+                            KeyCode::Tab => {
+                                // Real autocomplete from API
+                                let query = input.trim();
+                                if !query.is_empty() {
+                                    let api = api.clone();
+                                    let role = current_role.clone();
+                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
+                                        api.get_autocomplete(&role, query).await
+                                    }) {
+                                        suggestions = autocomplete_resp.suggestions
+                                            .into_iter()
+                                            .take(5)
+                                            .map(|s| s.text)
+                                            .collect();
+                                    }
+                                }
+                            }
+                            KeyCode::Char('r') => {
+                                // Switch role
+                                let api = api.clone();
+                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+                                    let roles: Vec<String> = cfg.config.roles.keys()
+                                        .map(|k| k.to_string())
+                                        .collect();
+                                    if !roles.is_empty() {
+                                        if let Some(current_idx) = roles.iter().position(|r| r == &current_role) {
+                                            let next_idx = (current_idx + 1) % roles.len();
+                                            current_role = roles[next_idx].clone();
+                                            // Update terms for new role
+                                            if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(&current_role)).await }) {
+                                                terms = rg.nodes.into_iter().map(|n| n.label).collect();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            KeyCode::Char('s') => {
+                                // Summarize current selection
+                                if selected_result_index < detailed_results.len() {
+                                    let doc = detailed_results[selected_result_index].clone();
+                                    let api = api.clone();
+                                    let role = current_role.clone();
+                                    if let Ok(summary) = rt.block_on(async move {
+                                        api.summarize_document(&doc, Some(&role)).await
+                                    }) {
+                                        if let Some(summary_text) = summary.summary {
+                                            // Replace result with summary for display
+                                            if selected_result_index < results.len() {
+                                                results[selected_result_index] = format!("SUMMARY: {}", summary_text);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            KeyCode::Backspace => {
+                                input.pop();
+                                update_local_suggestions(&input, &terms, &mut suggestions);
+                            }
+                            KeyCode::Char(c) => {
+                                input.push(c);
+                                update_local_suggestions(&input, &terms, &mut suggestions);
+                            }
+                            _ => {}
                         }
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                        // update suggestions
-                        let needle = input
-                            .rsplit_once(' ')
-                            .map(|(_, w)| w)
-                            .unwrap_or(input.as_str())
-                            .to_lowercase();
-                        suggestions = if needle.is_empty() {
-                            Vec::new()
-                        } else {
-                            let mut s: Vec<String> = terms
-                                .iter()
-                                .filter(|t| t.to_lowercase().contains(&needle))
-                                .take(50)
-                                .cloned()
-                                .collect();
-                            s.truncate(5);
-                            s
-                        };
+                    ViewMode::ResultDetail => {
+                        match key.code {
+                            KeyCode::Esc => {
+                                view_mode = ViewMode::Search;
+                            }
+                            KeyCode::Char('s') => {
+                                // Summarize current document in detail view
+                                if selected_result_index < detailed_results.len() {
+                                    let doc = detailed_results[selected_result_index].clone();
+                                    let api = api.clone();
+                                    let role = current_role.clone();
+                                    if let Ok(summary) = rt.block_on(async move {
+                                        api.summarize_document(&doc, Some(&role)).await
+                                    }) {
+                                        if let Some(summary_text) = summary.summary {
+                                            // Update the document body with summary
+                                            let original_body = if detailed_results[selected_result_index].body.is_empty() { "No content" } else { &detailed_results[selected_result_index].body };
+                                            detailed_results[selected_result_index].body = format!("SUMMARY:\n{}\n\nORIGINAL:\n{}", 
+                                                summary_text, 
+                                                original_body);
+                                        }
+                                    }
+                                }
+                            }
+                            KeyCode::Char('q') => break,
+                            _ => {}
+                        }
                     }
-                    KeyCode::Char(c) => {
-                        input.push(c);
-                        // update suggestions
-                        let needle = input
-                            .rsplit_once(' ')
-                            .map(|(_, w)| w)
-                            .unwrap_or(input.as_str())
-                            .to_lowercase();
-                        suggestions = if needle.is_empty() {
-                            Vec::new()
-                        } else {
-                            let mut s: Vec<String> = terms
-                                .iter()
-                                .filter(|t| t.to_lowercase().contains(&needle))
-                                .take(50)
-                                .cloned()
-                                .collect();
-                            s.truncate(5);
-                            s
-                        };
-                    }
-                    _ => {}
                 }
             }
         }
     }
     Ok(())
+}
+
+fn update_local_suggestions(input: &str, terms: &[String], suggestions: &mut Vec<String>) {
+    let needle = input
+        .rsplit_once(' ')
+        .map(|(_, w)| w)
+        .unwrap_or(input)
+        .to_lowercase();
+    *suggestions = if needle.is_empty() {
+        Vec::new()
+    } else {
+        let mut s: Vec<String> = terms
+            .iter()
+            .filter(|t| t.to_lowercase().contains(&needle))
+            .take(50)
+            .cloned()
+            .collect();
+        s.truncate(5);
+        s
+    };
 }
