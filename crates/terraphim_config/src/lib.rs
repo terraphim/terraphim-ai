@@ -337,18 +337,37 @@ impl ConfigBuilder {
         }
     }
     pub fn new_with_id(id: ConfigId) -> Self {
+        let device_settings = match id {
+            ConfigId::Embedded => DeviceSettings::default_embedded(),
+            _ => DeviceSettings::new(),
+        };
+        
         Self {
             config: Config {
                 id,
                 ..Config::empty()
             },
-            device_settings: DeviceSettings::new(),
+            device_settings,
             settings_path: PathBuf::new(),
         }
     }
     pub fn build_default_embedded(mut self) -> Self {
         self.config.id = ConfigId::Embedded;
-        self
+        
+        // Add minimal default role for embedded mode
+        self.add_role(
+            "Default",
+            Role {
+                shortname: Some("Default".to_string()),
+                name: "Default".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks: vec![], // Empty haystacks for offline mode
+                extra: AHashMap::new(),
+            },
+        )
     }
 
     pub fn get_default_data_path(&self) -> PathBuf {
