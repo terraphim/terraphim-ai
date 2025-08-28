@@ -997,7 +997,7 @@ pub(crate) async fn async_summarize_document(
     let config = config_state.config.lock().await;
 
     // Get the role configuration
-    let Some(_role_ref) = config.roles.get(&role_name) else {
+    let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(AsyncSummarizeResponse {
             status: Status::Error,
             task_id: None,
@@ -1286,7 +1286,7 @@ pub(crate) async fn batch_summarize_documents(
     let config = config_state.config.lock().await;
 
     // Get the role configuration
-    let Some(_role_ref) = config.roles.get(&role_name) else {
+    let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(BatchSummarizeResponse {
             status: Status::Error,
             task_ids: vec![],

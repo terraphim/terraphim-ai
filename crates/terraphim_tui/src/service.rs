@@ -36,14 +36,14 @@ impl TuiService {
                 }
                 Err(e) => {
                     log::info!("Failed to load config: {:?}, using default embedded", e);
-                    ConfigBuilder::new()
+                    ConfigBuilder::new_with_id(ConfigId::Embedded)
                         .build_default_embedded()
                         .build()?
                 }
             },
             Err(e) => {
                 log::warn!("Failed to build config: {:?}, using default", e);
-                ConfigBuilder::new()
+                ConfigBuilder::new_with_id(ConfigId::Embedded)
                     .build_default_embedded()
                     .build()?
             }

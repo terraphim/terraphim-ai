@@ -80,6 +80,34 @@ impl DeviceSettings {
     pub fn new() -> Self {
         Self::load_from_env_and_file(None).unwrap()
     }
+
+    /// Create default embedded DeviceSettings without filesystem operations
+    /// Used for embedded/offline mode where config files are not needed
+    pub fn default_embedded() -> Self {
+        use std::collections::HashMap;
+        
+        let mut profiles = HashMap::new();
+        
+        // Add minimal required profiles for embedded mode
+        let mut memory_profile = HashMap::new();
+        memory_profile.insert("type".to_string(), "memory".to_string());
+        profiles.insert("memory".to_string(), memory_profile);
+        
+        let mut sqlite_profile = HashMap::new();
+        sqlite_profile.insert("type".to_string(), "sqlite".to_string());
+        sqlite_profile.insert("datadir".to_string(), "/tmp/terraphim_sqlite_embedded".to_string());
+        sqlite_profile.insert("connection_string".to_string(), "/tmp/terraphim_sqlite_embedded/terraphim.db".to_string());
+        sqlite_profile.insert("table".to_string(), "terraphim_kv".to_string());
+        profiles.insert("sqlite".to_string(), sqlite_profile);
+        
+        Self {
+            server_hostname: "127.0.0.1:8000".to_string(),
+            api_endpoint: "http://localhost:8000/api".to_string(),
+            initialized: true,
+            default_data_path: "/tmp/terraphim_embedded".to_string(),
+            profiles,
+        }
+    }
     /// Get the default path for the config file
     ///
     /// This is the default path where the config file is stored.

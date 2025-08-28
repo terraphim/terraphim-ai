@@ -10,7 +10,7 @@ use crossterm::{
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Terminal,
@@ -22,6 +22,24 @@ mod service;
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+
+/// Create a transparent style for UI elements
+fn transparent_style() -> Style {
+    Style::default().bg(Color::Reset)
+}
+
+/// Create a block with optional transparent background
+fn create_block(title: &str, transparent: bool) -> Block {
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL);
+    
+    if transparent {
+        block.style(transparent_style())
+    } else {
+        block
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum ViewMode {
@@ -38,6 +56,9 @@ struct Cli {
     /// Server URL for API mode
     #[arg(long, default_value = "http://localhost:8000")]
     server_url: String,
+    /// Enable transparent background mode
+    #[arg(long, default_value_t = false)]
+    transparent: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -102,9 +123,9 @@ fn main() -> Result<()> {
     match cli.command {
         Some(Command::Interactive) | None => {
             if cli.server {
-                run_tui_server_mode(&cli.server_url)
+                run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
-                rt.block_on(run_tui_offline_mode())
+                rt.block_on(run_tui_offline_mode(cli.transparent))
             }
         },
         Some(command) => {
@@ -116,20 +137,20 @@ fn main() -> Result<()> {
         },
     }
 }
-async fn run_tui_offline_mode() -> Result<()> {
+async fn run_tui_offline_mode(transparent: bool) -> Result<()> {
     let service = TuiService::new().await?;
-    run_tui_with_service(service).await
+    run_tui_with_service(service, transparent).await
 }
 
-fn run_tui_server_mode(_server_url: &str) -> Result<()> {
+fn run_tui_server_mode(_server_url: &str, transparent: bool) -> Result<()> {
     // TODO: Pass server_url to TUI for API client initialization
-    run_tui()
+    run_tui(transparent)
 }
 
-async fn run_tui_with_service(_service: TuiService) -> Result<()> {
+async fn run_tui_with_service(_service: TuiService, transparent: bool) -> Result<()> {
     // TODO: Update interactive TUI to use local service instead of API client
     // For now, fall back to the existing TUI implementation
-    run_tui()
+    run_tui(transparent)
 }
 
 async fn run_offline_command(command: Command) -> Result<()> {
@@ -382,14 +403,14 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
     }
 }
 
-fn run_tui() -> Result<()> {
+fn run_tui(transparent: bool) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let res = ui_loop(&mut terminal);
+    let res = ui_loop(&mut terminal, transparent);
 
     disable_raw_mode()?;
     execute!(
@@ -402,7 +423,7 @@ fn run_tui() -> Result<()> {
     res
 }
 
-fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
+fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: bool) -> Result<()> {
     let mut input = String::new();
     let mut results: Vec<String> = Vec::new();
     let mut detailed_results: Vec<Document> = Vec::new();
@@ -440,9 +461,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
 
                     let input_title = format!("Search [Role: {}] • Enter: search, Tab: autocomplete, r: switch role, q: quit", current_role);
                     let input_widget = Paragraph::new(Line::from(input.as_str())).block(
-                        Block::default()
-                            .title(input_title)
-                            .borders(Borders::ALL),
+                        create_block(&input_title, transparent)
                     );
                     f.render_widget(input_widget, chunks[0]);
 
@@ -453,7 +472,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                         .map(|s| ListItem::new(s.as_str()))
                         .collect();
                     let sug_list = List::new(sug_items)
-                        .block(Block::default().title("Suggestions").borders(Borders::ALL));
+                        .block(create_block("Suggestions", transparent));
                     f.render_widget(sug_list, chunks[1]);
 
                     let items: Vec<ListItem> = results.iter().enumerate().map(|(i, r)| {
@@ -465,12 +484,12 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                         }
                     }).collect();
                     let list = List::new(items)
-                        .block(Block::default().title("Results • ↑↓: select, Enter: view details, s: summarize").borders(Borders::ALL));
+                        .block(create_block("Results • ↑↓: select, Enter: view details, s: summarize", transparent));
                     f.render_widget(list, chunks[2]);
 
                     let status_text = format!("Terraphim TUI • {} results • Mode: Search", results.len());
                     let status = Paragraph::new(Line::from(status_text))
-                        .block(Block::default().borders(Borders::ALL));
+                        .block(create_block("", transparent));
                     f.render_widget(status, chunks[3]);
                 }
                 ViewMode::ResultDetail => {
@@ -487,13 +506,13 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                             .split(f.area());
 
                         let title_widget = Paragraph::new(Line::from(doc.title.as_str()))
-                            .block(Block::default().title("Document Title").borders(Borders::ALL))
+                            .block(create_block("Document Title", transparent))
                             .wrap(ratatui::widgets::Wrap { trim: true });
                         f.render_widget(title_widget, chunks[0]);
 
                         let content_text = if doc.body.is_empty() { "No content available" } else { &doc.body };
                         let content_widget = Paragraph::new(content_text)
-                            .block(Block::default().title("Content • s: summarize, Esc: back to search").borders(Borders::ALL))
+                            .block(create_block("Content • s: summarize, Esc: back to search", transparent))
                             .wrap(ratatui::widgets::Wrap { trim: true });
                         f.render_widget(content_widget, chunks[1]);
 
@@ -501,7 +520,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> 
                                                 doc.id, 
                                                 if doc.url.is_empty() { "N/A" } else { &doc.url });
                         let status = Paragraph::new(Line::from(status_text))
-                            .block(Block::default().borders(Borders::ALL));
+                            .block(create_block("", transparent));
                         f.render_widget(status, chunks[2]);
                     }
                 }

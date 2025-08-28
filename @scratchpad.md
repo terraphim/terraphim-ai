@@ -1277,4 +1277,55 @@
 
 ---
 
-*Last Updated: 2025-08-26*
+## TUI Transparency Implementation (2025-08-28)
+
+**Objective**: Enable transparent terminal backgrounds for the Terraphim TUI on macOS and other platforms.
+
+**User Request**: "Can tui be transparent terminal on mac os x? what's the effort required?" followed by "continue with option 2 and 3, make sure @memories.md and @scratchpad.md and @lessons-learned.md updated"
+
+**Implementation Details**:
+
+**Code Changes Made**:
+1. **Added Color import**: Extended ratatui style imports to include Color::Reset for transparency
+2. **Created helper functions**:
+   - `transparent_style()`: Returns Style with Color::Reset background
+   - `create_block()`: Conditionally applies transparency based on flag
+3. **Added CLI flag**: `--transparent` flag to enable transparency mode
+4. **Updated function signatures**: Threaded transparent parameter through entire call chain
+5. **Replaced all blocks**: Changed all Block::default() calls to use create_block()
+
+**Technical Approach**:
+- **Level 1**: TUI already supported transparency (no explicit backgrounds set)
+- **Level 2**: Added explicit transparent styles using Color::Reset
+- **Level 3**: Full conditional transparency mode with CLI flag control
+
+**Key Implementation Points**:
+- Used `Style::default().bg(Color::Reset)` for transparent backgrounds
+- Color::Reset inherits terminal's background settings
+- macOS Terminal supports native transparency via opacity/blur settings
+- Conditional application allows users to choose transparency level
+
+**Files Modified**:
+- `crates/terraphim_tui/src/main.rs`: Main TUI implementation
+- `@memories.md`: Updated with v1.0.17 entry
+- `@scratchpad.md`: This file
+- `@lessons-learned.md`: Pending update
+
+**Build Status**: ✅ Successful compilation, no errors
+**Test Status**: ✅ Functional testing completed
+**Integration**: ✅ CLI flag properly integrated
+
+**Usage**:
+```bash
+# Run with transparent background
+cargo run --bin terraphim_tui -- --transparent
+
+# Run with default opaque background  
+cargo run --bin terraphim_tui
+```
+
+**Current Status**: Implementation complete, documentation updates in progress
+
+---
+
+*Last Updated: 2025-08-28*

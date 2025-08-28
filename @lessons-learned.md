@@ -1594,3 +1594,85 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 - ✅ **Performance Optimization**: Fast response times with efficient FST data structures
 - ✅ **Graceful Degradation**: Always functional autocomplete even if advanced features fail
 - ✅ **Knowledge Graph Integration**: Semantic understanding through normalized concept relationships
+
+---
+
+## TUI Transparency Implementation Lessons (2025-08-28)
+
+### 🎨 Terminal UI Transparency Principles
+
+1. **Color::Reset for Transparency**
+   - **Lesson**: `ratatui::style::Color::Reset` inherits terminal background settings
+   - **Pattern**: Use `Style::default().bg(Color::Reset)` for transparent backgrounds
+   - **Implementation**: Terminal transparency works by not setting explicit background colors
+   - **Benefits**: Leverages native terminal transparency features (opacity/blur) without code complexity
+
+2. **Conditional Rendering Strategy**
+   - **Lesson**: Provide user control over transparency rather than forcing it
+   - **Pattern**: CLI flag + helper functions for conditional style application
+   - **Implementation**: `--transparent` flag with `create_block()` helper function
+   - **Why**: Different users have different terminal setups and preferences
+
+### 🔧 Implementation Architecture Lessons
+
+1. **Parameter Threading Pattern**
+   - **Lesson**: Thread configuration flags through entire call chain systematically
+   - **Pattern**: Update all function signatures to accept and propagate state
+   - **Implementation**: Added `transparent: bool` parameter to all rendering functions
+   - **Benefits**: Clean, predictable state management throughout TUI hierarchy
+
+2. **Helper Function Abstraction**
+   - **Lesson**: Centralize style logic in helper functions for maintainability
+   - **Pattern**: Create style helpers that encapsulate transparency logic
+   - **Implementation**: `transparent_style()` and `create_block()` functions
+   - **Impact**: Single point of control for transparency behavior across all UI elements
+
+### 🎯 Cross-Platform Compatibility Insights
+
+1. **Terminal Transparency Support**
+   - **Lesson**: Most modern terminals support transparency, not just macOS Terminal
+   - **Pattern**: Design for broad compatibility using standard color reset approaches
+   - **Implementation**: Color::Reset works across iTerm2, Terminal.app, Windows Terminal, Alacritty
+   - **Benefits**: Feature works consistently across development environments
+
+2. **Graceful Degradation**
+   - **Lesson**: Transparency enhancement shouldn't break existing functionality
+   - **Pattern**: Default to opaque behavior, enable transparency only on user request
+   - **Implementation**: `--transparent` flag defaults to false, maintaining existing behavior
+   - **Why**: Backwards compatibility preserves existing user workflows
+
+### 🚀 Development Workflow Lessons
+
+1. **Systematic Code Updates**
+   - **Lesson**: Replace patterns systematically rather than ad-hoc changes
+   - **Pattern**: Find all instances of target pattern, update with consistent approach
+   - **Implementation**: Replaced all `Block::default()` calls with `create_block()` consistently
+   - **Benefits**: Uniform behavior across entire TUI with no missed instances
+
+2. **Compile-First Validation**
+   - **Lesson**: Type system catches integration issues early in TUI changes
+   - **Pattern**: Update function signatures first, then fix compilation errors
+   - **Implementation**: Added transparent parameter to all functions, fixed calls systematically
+   - **Impact**: Zero runtime errors, all issues caught at compile time
+
+### 📊 User Experience Considerations
+
+1. **Progressive Enhancement Philosophy**
+   - **Lesson**: Build base functionality first, add visual enhancements as options
+   - **Pattern**: TUI worked fine without explicit transparency, enhancement makes it better
+   - **Implementation**: Three levels - implicit transparency, explicit transparency, user-controlled
+   - **Benefits**: Solid foundation with optional improvements
+
+2. **Documentation-Driven Development**
+   - **Lesson**: Update tracking files (memories, scratchpad, lessons-learned) as part of implementation
+   - **Pattern**: Document decisions and learnings while implementing, not after
+   - **Implementation**: Real-time updates to @memories.md, @scratchpad.md, @lessons-learned.md
+   - **Why**: Preserves context and reasoning for future development
+
+### 🎪 Terminal UI Best Practices Discovered
+
+- **Color Management**: Use Color::Reset for transparency, explicit colors for branded elements
+- **Flag Integration**: CLI flags should have sensible defaults and clear documentation
+- **Style Consistency**: Helper functions ensure uniform styling across complex TUI hierarchies
+- **Cross-Platform Design**: Test transparency assumptions across different terminal environments
+- **User Choice**: Provide control over visual enhancements rather than imposing them
