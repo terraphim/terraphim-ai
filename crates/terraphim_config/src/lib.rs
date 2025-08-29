@@ -659,6 +659,39 @@ impl ConfigBuilder {
                     extra: AHashMap::new(),
                 },
             )
+            .add_role(
+                "Rust Engineer",
+                Role {
+                    shortname: Some("rust-engineer".to_string()),
+                    name: "Rust Engineer".to_string().into(),
+                    relevance_function: RelevanceFunction::TitleScorer,
+                    terraphim_it: false,
+                    theme: "cosmo".to_string(),
+                    kg: None,
+                    haystacks: vec![Haystack {
+                        location: "https://query.rs".to_string(),
+                        service: ServiceType::QueryRs,
+                        read_only: true,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    }],
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
+                    extra: AHashMap::new(),
+                },
+            )
             .default_role("Terraphim Engineer")
             .unwrap()
     }

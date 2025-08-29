@@ -820,17 +820,58 @@ impl<'a> TerraphimService {
     /// Apply KG preprocessing to a document if needed based on the current selected role
     ///
     /// This helper method checks if the selected role has terraphim_it enabled
-    /// and applies KG term preprocessing accordingly.
-    ///
-    /// NOTE: Disabled to prevent double processing - KG preprocessing is now only applied
-    /// during search results to avoid processing documents multiple times.
+    /// and applies KG term preprocessing accordingly. It prevents double processing
+    /// by checking if KG links already exist in the document.
     async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
-        // DISABLED: KG preprocessing is already applied in search results
-        // to prevent double processing that creates "links to links"
-        log::debug!(
-            "Skipping KG preprocessing for individual document load to prevent double processing"
+        let role = {
+            let config = self.config_state.config.lock().await;
+            let selected_role = &config.selected_role;
+            
+            match config.roles.get(selected_role) {
+                Some(role) => role.clone(), // Clone to avoid borrowing issues
+                None => {
+                    log::debug!(
+                        "Selected role '{}' not found, skipping KG preprocessing",
+                        selected_role
+                    );
+                    return Ok(document);
+                }
+            }
+        }; // Release the lock here
+        
+        // Only apply preprocessing if role has terraphim_it enabled
+        if !role.terraphim_it {
+            log::debug!(
+                "terraphim_it disabled for role '{}', skipping KG preprocessing",
+                role.name
+            );
+            return Ok(document);
+        }
+        
+        // Check if document already has KG links to prevent double processing
+        if document.body.contains("](kg:") {
+            log::debug!(
+                "Document '{}' already has KG links, skipping preprocessing to prevent double processing",
+                document.title
+            );
+            return Ok(document);
+        }
+        
+        log::info!(
+            "🧠 Applying KG preprocessing to document '{}' for role '{}' (terraphim_it enabled)",
+            document.title,
+            role.name
         );
-        Ok(document)
+        
+        // Apply KG preprocessing
+        let processed_doc = self.preprocess_document_content(document, &role).await?;
+        
+        log::debug!(
+            "✅ KG preprocessing completed for document '{}'",
+            processed_doc.title
+        );
+        
+        Ok(processed_doc)
     }
 
     /// Enhance document descriptions with AI-generated summaries using OpenRouter
