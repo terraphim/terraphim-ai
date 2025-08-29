@@ -228,6 +228,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
         },
     };
     let config_state = ConfigState::new(&mut config).await?;
+    
+    // Initialize thesaurus for roles that need it to prevent KG processing warnings
+    {
+        let current_config = config_state.config.lock().await;
+        for (role_name, role) in &current_config.roles {
+            if role.terraphim_it && role.kg.is_some() {
+                log::info!("Checking thesaurus for role '{}' with terraphim_it enabled", role_name);
+                
+                // Try to load existing thesaurus, if it doesn't exist, it will be built when needed
+                let mut thesaurus = terraphim_types::Thesaurus::new(role_name.to_string());
+                match thesaurus.load().await {
+                    Ok(_) => {
+                        log::info!("✅ Thesaurus already exists for role '{}'", role_name);
+                    },
+                    Err(_) => {
+                        log::info!("🔧 Thesaurus not found for role '{}' - will be built on first use", role_name);
+                        // Don't build it synchronously as it can be slow - let it build on demand
+                    }
+                }
+            }
+        }
+    }
+    
     let current_config = config_state.config.lock().await;
     let global_shortcut = current_config.global_shortcut.clone();
     let tray_menu = build_tray_menu(&current_config);
