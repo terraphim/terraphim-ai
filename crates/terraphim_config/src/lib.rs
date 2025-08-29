@@ -354,8 +354,8 @@ impl ConfigBuilder {
     pub fn build_default_embedded(mut self) -> Self {
         self.config.id = ConfigId::Embedded;
         
-        // Add minimal default role for embedded mode
-        self.add_role(
+        // Add Default role with basic functionality
+        self = self.add_role(
             "Default",
             Role {
                 shortname: Some("Default".to_string()),
@@ -364,10 +364,71 @@ impl ConfigBuilder {
                 terraphim_it: false,
                 theme: "spacelab".to_string(),
                 kg: None,
-                haystacks: vec![], // Empty haystacks for offline mode
+                haystacks: vec![Haystack {
+                    location: "docs/src".to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: true,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
                 extra: AHashMap::new(),
             },
-        )
+        );
+
+        // Add Terraphim Engineer role with knowledge graph
+        self = self.add_role(
+            "Terraphim Engineer",
+            Role {
+                shortname: Some("TerraEng".to_string()),
+                name: "Terraphim Engineer".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
+                theme: "lumen".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src/kg"),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    location: "docs/src".to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: true,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: AHashMap::new(),
+            },
+        );
+
+        // Add Rust Engineer role with QueryRs
+        self = self.add_role(
+            "Rust Engineer",
+            Role {
+                shortname: Some("rust-engineer".to_string()),
+                name: "Rust Engineer".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cosmo".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: "https://query.rs".to_string(),
+                    service: ServiceType::QueryRs,
+                    read_only: true,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: AHashMap::new(),
+            },
+        );
+
+        // Set Terraphim Engineer as default and selected role
+        self.config.default_role = RoleName::new("Terraphim Engineer");
+        self.config.selected_role = RoleName::new("Terraphim Engineer");
+        self
     }
 
     pub fn get_default_data_path(&self) -> PathBuf {

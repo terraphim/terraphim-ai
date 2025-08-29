@@ -19,6 +19,10 @@ use tokio::runtime::Runtime;
 
 mod client;
 mod service;
+
+#[cfg(feature = "repl")]
+mod repl;
+
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
@@ -101,6 +105,17 @@ enum Command {
         exclude_term: bool,
     },
     Interactive,
+    
+    /// Start REPL (Read-Eval-Print-Loop) interface
+    #[cfg(feature = "repl")]
+    Repl {
+        /// Start in server mode
+        #[arg(long)]
+        server: bool,
+        /// Server URL for API mode  
+        #[arg(long, default_value = "http://localhost:8000")]
+        server_url: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -128,6 +143,16 @@ fn main() -> Result<()> {
                 rt.block_on(run_tui_offline_mode(cli.transparent))
             }
         },
+        
+        #[cfg(feature = "repl")]
+        Some(Command::Repl { server, server_url }) => {
+            if server {
+                rt.block_on(repl::run_repl_server_mode(&server_url))
+            } else {
+                rt.block_on(repl::run_repl_offline_mode())
+            }
+        },
+        
         Some(command) => {
             if cli.server {
                 rt.block_on(run_server_command(command, &cli.server_url))
@@ -254,6 +279,11 @@ async fn run_offline_command(command: Command) -> Result<()> {
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
+        }
+        
+        #[cfg(feature = "repl")]
+        Command::Repl { .. } => {
+            unreachable!("REPL mode should be handled above")
         }
     }
 }
@@ -399,6 +429,11 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
+        }
+        
+        #[cfg(feature = "repl")]
+        Command::Repl { .. } => {
+            unreachable!("REPL mode should be handled above")
         }
     }
 }

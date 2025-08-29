@@ -157,7 +157,7 @@ async fn run_mcp_server() -> anyhow::Result<()> {
     let config = terraphim_config::ConfigBuilder::new()
         .build_default_desktop()
         .build()
-        .expect("Failed to build default desktop configuration");
+        .map_err(|e| anyhow::anyhow!("Failed to build default desktop configuration: {:?}", e))?;
 
     let mut tmp_config = config.clone();
     let config_state = terraphim_config::ConfigState::new(&mut tmp_config).await?;
@@ -196,8 +196,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         },
         Err(e) => {
             log::error!("Failed to load device settings: {:?}", e);
-            log::error!("Error details: {:?}", e);
-            panic!("Failed to load device settings: {:?}", e);
+            log::info!("Using default device settings due to load error");
+            DeviceSettings::new()
         }
     };
     let device_settings_read = device_settings.clone();
@@ -211,14 +211,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(config) => config,
             Err(e) => {
                 log::info!("Failed to load config: {:?}", e);
-                let config = ConfigBuilder::new()
+                match ConfigBuilder::new()
                     .build_default_desktop()
-                    .build()
-                    .unwrap();
-                config
+                    .build() {
+                    Ok(config) => config,
+                    Err(build_err) => {
+                        log::error!("Failed to build default desktop config: {:?}", build_err);
+                        return Err(format!("Configuration initialization failed: {:?}", build_err).into());
+                    }
+                }
             }
         },
-        Err(e) => panic!("Failed to build config: {:?}", e),
+        Err(e) => {
+            log::error!("Failed to build config: {:?}", e);
+            return Err(format!("Configuration build failed: {:?}", e).into());
+        },
     };
     let config_state = ConfigState::new(&mut config).await?;
     let current_config = config_state.config.lock().await;
