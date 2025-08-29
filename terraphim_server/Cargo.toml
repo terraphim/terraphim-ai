@@ -66,3 +66,20 @@ tokio = { version = "1.35.1", features = ["full"] }
 static-files = "0.2"
 walkdir = "2"
 dircpy = "0.3.15"
+
+[package.metadata.deb]
+maintainer = "Terraphim Contributors <team@terraphim.ai>"
+copyright = "2024, Terraphim Contributors"
+license-file = ["../LICENSE", "4"]
+extended-description = """
+Terraphim AI Server - Privacy-first AI assistant backend.
+Provides HTTP API for semantic search and knowledge graphs.
+Operates locally with support for multiple knowledge repositories."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/terraphim_server", "usr/bin/", "755"],
+    ["default/*.json", "etc/terraphim-ai/", "644"],
+    ["../README.md", "usr/share/doc/terraphim-ai/README", "644"],
+]

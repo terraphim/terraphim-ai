@@ -1,0 +1,124 @@
+#!/bin/bash
+#
+# Native Git commit-msg hook for Terraphim AI
+# Validates conventional commit message format
+#
+set -e
+
+commit_file="$1"
+commit_msg=$(cat "$commit_file")
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+print_status() {
+    local status=$1
+    local message=$2
+    if [ "$status" = "SUCCESS" ]; then
+        echo -e "${GREEN}✓${NC} $message"
+    elif [ "$status" = "FAIL" ]; then
+        echo -e "${RED}✗${NC} $message"
+    elif [ "$status" = "WARN" ]; then
+        echo -e "${YELLOW}⚠${NC} $message"
+    else
+        echo -e "$message"
+    fi
+}
+
+# Skip validation for merge commits and revert commits
+if [[ $commit_msg =~ ^Merge.* ]] || [[ $commit_msg =~ ^Revert.* ]]; then
+    print_status "SUCCESS" "Merge/Revert commit detected, skipping conventional commit validation"
+    exit 0
+fi
+
+# Conventional commit pattern
+# Format: type(optional scope): description
+# 
+# type: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert
+# scope: optional, can be anything (e.g., api, ui, config)
+# description: imperative mood, lowercase, no period at end
+#
+# Examples:
+# feat: add user authentication
+# fix(api): resolve memory leak in handler
+# docs: update README with installation steps
+# chore(deps): bump tokio to 1.35.0
+
+conventional_pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .{1,72}$'
+
+print_status "INFO" "Validating conventional commit format..."
+echo "Commit message: $commit_msg"
+echo ""
+
+# Check if commit message matches conventional format
+if [[ ! $commit_msg =~ $conventional_pattern ]]; then
+    print_status "FAIL" "Commit message does not follow conventional commit format!"
+    echo ""
+    echo "Expected format: type(optional-scope): description"
+    echo ""
+    echo "Valid types:"
+    echo "  feat:     A new feature"
+    echo "  fix:      A bug fix"
+    echo "  docs:     Documentation only changes"
+    echo "  style:    Changes that don't affect the meaning of code (formatting, etc.)"
+    echo "  refactor: A code change that neither fixes a bug nor adds a feature"
+    echo "  perf:     A code change that improves performance"
+    echo "  test:     Adding missing tests or correcting existing tests"
+    echo "  chore:    Changes to build process, dependencies, or auxiliary tools"
+    echo "  build:    Changes that affect the build system or external dependencies"
+    echo "  ci:       Changes to CI configuration files and scripts"
+    echo "  revert:   Reverts a previous commit"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add user authentication system"
+    echo "  fix(api): resolve memory leak in request handler"
+    echo "  docs(readme): update installation instructions"
+    echo "  chore(deps): bump tokio from 1.34.0 to 1.35.0"
+    echo "  style: format code with cargo fmt"
+    echo ""
+    echo "Current message: '$commit_msg'"
+    exit 1
+fi
+
+# Extract type and check for specific requirements
+commit_type=$(echo "$commit_msg" | sed -E 's/^([a-z]+)(\([^)]+\))?: .*/\1/')
+
+# Check description length (should be reasonable)
+description=$(echo "$commit_msg" | sed -E 's/^[a-z]+(\([^)]+\))?: (.*)/\2/')
+desc_length=${#description}
+
+if [ $desc_length -lt 10 ]; then
+    print_status "WARN" "Commit description is quite short ($desc_length characters)"
+    print_status "INFO" "Consider adding more detail to explain the change"
+fi
+
+if [ $desc_length -gt 72 ]; then
+    print_status "WARN" "Commit description is long ($desc_length characters)"
+    print_status "INFO" "Consider using the commit body for additional details"
+fi
+
+# Check if description starts with uppercase (should be lowercase)
+if [[ $description =~ ^[A-Z] ]]; then
+    print_status "WARN" "Commit description should start with lowercase letter"
+    print_status "INFO" "Current: '$description'"
+    print_status "INFO" "Suggested: '${description,}'"
+fi
+
+# Check if description ends with period (shouldn't)
+if [[ $description =~ \.$ ]]; then
+    print_status "WARN" "Commit description shouldn't end with a period"
+fi
+
+# Suggest breaking change format for major changes
+if [[ $commit_msg =~ (break|breaking|major) ]]; then
+    print_status "INFO" "For breaking changes, consider adding '!' after type:"
+    print_status "INFO" "Example: feat!: remove deprecated API endpoint"
+    print_status "INFO" "Or add 'BREAKING CHANGE:' in the commit body"
+fi
+
+print_status "SUCCESS" "Conventional commit format is valid!"
+echo ""
+exit 0
