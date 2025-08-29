@@ -106,6 +106,11 @@ pub mod wasm {
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{Request, RequestInit, RequestMode, Response};
 
+    /// Maximum size for JSON responses (10MB)
+    const MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
+    /// Maximum size for commit data (5MB)
+    const MAX_COMMIT_SIZE: usize = 5 * 1024 * 1024;
+
     /// Gets a resource from the server.
     ///
     /// # Arguments
@@ -157,14 +162,38 @@ pub mod wasm {
             )));
         }
 
-        let json = JsFuture::from(
-            resp.json()
-                .map_err(|e| AtomicError::Api(format!("Failed to get JSON: {:?}", e)))?,
-        )
-        .await
-        .map_err(|e| AtomicError::Api(format!("Failed to parse JSON: {:?}", e)))?;
-        let value: Value = serde_wasm_bindgen::from_value(json)
-            .map_err(|e| AtomicError::Api(format!("Failed to convert JSON: {}", e)))?;
+        // Check content length if available
+        if let Some(content_length) = resp.headers().get("content-length").ok().flatten() {
+            if let Ok(size) = content_length.parse::<usize>() {
+                if size > MAX_RESPONSE_SIZE {
+                    return Err(AtomicError::Api(format!(
+                        "Response too large: {} bytes (max {})", 
+                        size, MAX_RESPONSE_SIZE
+                    )));
+                }
+            }
+        }
+
+        // Get the response as text first to check size
+        let text_promise = resp.text()
+            .map_err(|e| AtomicError::Api(format!("Failed to get response text: {:?}", e)))?;
+        let text_js = JsFuture::from(text_promise)
+            .await
+            .map_err(|e| AtomicError::Api(format!("Failed to get response text: {:?}", e)))?;
+        let text = text_js.as_string()
+            .ok_or_else(|| AtomicError::Api("Response is not a string".to_string()))?;
+        
+        // Check text size before parsing
+        if text.len() > MAX_RESPONSE_SIZE {
+            return Err(AtomicError::Api(format!(
+                "Response too large: {} bytes (max {})", 
+                text.len(), MAX_RESPONSE_SIZE
+            )));
+        }
+        
+        // Parse JSON from the text
+        let value: Value = serde_json::from_str(&text)
+            .map_err(|e| AtomicError::Api(format!("Failed to parse JSON: {}", e)))?;
         Ok(value)
     }
 
@@ -185,7 +214,17 @@ pub mod wasm {
 
         let url = format!("{}/commit", config.server_url);
 
-        let commit_json = JsValue::from_str(&serde_json::to_string(commit)?);
+        let commit_json_str = serde_json::to_string(commit)?;
+        
+        // Check commit size before sending
+        if commit_json_str.len() > MAX_COMMIT_SIZE {
+            return Err(AtomicError::Api(format!(
+                "Commit too large: {} bytes (max {})", 
+                commit_json_str.len(), MAX_COMMIT_SIZE
+            )));
+        }
+        
+        let commit_json = JsValue::from_str(&commit_json_str);
         opts.body(Some(&commit_json));
 
         let mut headers = web_sys::Headers::new()

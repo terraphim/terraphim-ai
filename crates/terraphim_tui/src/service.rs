@@ -162,6 +162,51 @@ impl TuiService {
         Ok(string_results)
     }
 
+    /// Perform autocomplete search using thesaurus for a role
+    pub async fn autocomplete(&self, role_name: &RoleName, query: &str, limit: Option<usize>) -> Result<Vec<terraphim_automata::AutocompleteResult>> {
+        // Get thesaurus for the role
+        let thesaurus = self.get_thesaurus(role_name).await?;
+        
+        // Build autocomplete index
+        let config = Some(terraphim_automata::AutocompleteConfig {
+            max_results: limit.unwrap_or(10),
+            min_prefix_length: 1,
+            case_sensitive: false,
+        });
+        
+        let index = terraphim_automata::build_autocomplete_index(thesaurus, config)?;
+        
+        // Perform search
+        Ok(terraphim_automata::autocomplete_search(&index, query, limit)?)
+    }
+
+    /// Find matches in text using thesaurus
+    pub async fn find_matches(&self, role_name: &RoleName, text: &str) -> Result<Vec<terraphim_automata::Matched>> {
+        // Get thesaurus for the role
+        let thesaurus = self.get_thesaurus(role_name).await?;
+        
+        // Find matches
+        Ok(terraphim_automata::find_matches(text, thesaurus, true)?)
+    }
+
+    /// Replace matches in text with links using thesaurus
+    pub async fn replace_matches(&self, role_name: &RoleName, text: &str, link_type: terraphim_automata::LinkType) -> Result<String> {
+        // Get thesaurus for the role
+        let thesaurus = self.get_thesaurus(role_name).await?;
+        
+        // Replace matches
+        let result = terraphim_automata::replace_matches(text, thesaurus, link_type)?;
+        Ok(String::from_utf8(result).unwrap_or_else(|_| text.to_string()))
+    }
+
+    /// Summarize content using available AI services
+    pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
+        // For now, use the chat method with a summarization prompt
+        let prompt = format!("Please summarize the following content:\n\n{}", content);
+        self.chat(role_name, &prompt, None).await
+    }
+
+
     /// Save configuration changes
     pub async fn save_config(&self) -> Result<()> {
         let config = self.config_state.config.lock().await;

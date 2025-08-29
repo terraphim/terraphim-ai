@@ -167,12 +167,37 @@ impl Default for RipgrepCommand {
 }
 
 impl RipgrepCommand {
+    /// Validates that a needle parameter is safe for use with ripgrep
+    fn validate_needle(needle: &str) -> Result<()> {
+        // Check for shell metacharacters and dangerous patterns
+        if needle.is_empty() {
+            return Err(crate::Error::Validation("Search needle cannot be empty".to_string()));
+        }
+        
+        // Reject needles that could be interpreted as command line options
+        if needle.starts_with('-') {
+            return Err(crate::Error::Validation(
+                "Search needle cannot start with dash (potential flag injection)".to_string()
+            ));
+        }
+        
+        // Check for excessive length (prevent DoS)
+        if needle.len() > 1000 {
+            return Err(crate::Error::Validation(
+                "Search needle too long (max 1000 characters)".to_string()
+            ));
+        }
+        
+        Ok(())
+    }
+
     /// Runs ripgrep to find `needle` in `haystack`
     ///
     /// Returns a Vec of Messages, which correspond to ripgrep's internal
     /// JSON output. Learn more about ripgrep's JSON output here:
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
+        Self::validate_needle(needle)?;
         self.run_with_extra_args(needle, haystack, &[]).await
     }
 
@@ -183,12 +208,35 @@ impl RipgrepCommand {
     /// extra_args like ["--glob", "*#rust*"] or use ripgrep patterns.
     ///
     /// Returns a Vec of Messages, which correspond to ripgrep's internal JSON output.
+    /// Checks if a flag is a safe, known ripgrep option
+    fn is_safe_ripgrep_flag(&self, flag: &str) -> bool {
+        // Whitelist of safe ripgrep flags
+        matches!(flag, 
+            "--all-match" | "-e" | "--glob" | "-t" | "--max-count" | "-C" | "--case-sensitive" |
+            "--ignore-case" | "-i" | "--line-number" | "-n" | "--with-filename" | "-H" |
+            "--no-heading" | "--color=never" | "--json" | "--heading" | "--trim" |
+            "--context" | "--after-context" | "--before-context" | "-A" | "-B"
+        )
+    }
+    
     pub async fn run_with_extra_args(
         &self,
         needle: &str,
         haystack: &Path,
         extra_args: &[String],
     ) -> Result<Vec<Message>> {
+        Self::validate_needle(needle)?;
+        
+        // Validate extra_args to prevent command injection
+        for arg in extra_args {
+            if arg.starts_with('-') && !self.is_safe_ripgrep_flag(arg) {
+                log::warn!("Potentially unsafe ripgrep argument rejected: {}", arg);
+                return Err(crate::Error::Validation(
+                    format!("Unsafe ripgrep argument: {}", arg)
+                ));
+            }
+        }
+        
         // Put options first, then extra args, then needle, then haystack (correct ripgrep argument order)
         let args: Vec<String> = self
             .default_args
@@ -225,6 +273,37 @@ impl RipgrepCommand {
         Ok(messages)
     }
 
+    /// Validates that a parameter value is safe
+    fn validate_parameter_value(key: &str, value: &str) -> Result<()> {
+        // Check for excessive length
+        if value.len() > 200 {
+            return Err(crate::Error::Validation(
+                format!("Parameter value too long for {}: max 200 characters", key)
+            ));
+        }
+        
+        // Reject values that could be interpreted as options
+        if value.starts_with('-') {
+            return Err(crate::Error::Validation(
+                format!("Parameter value cannot start with dash for {}", key)
+            ));
+        }
+        
+        // For numeric parameters, validate they're actually numbers
+        match key {
+            "max_count" | "context" => {
+                if value.parse::<u32>().is_err() {
+                    return Err(crate::Error::Validation(
+                        format!("Parameter {} must be a positive integer", key)
+                    ));
+                }
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+    
     /// Parse extra parameters from haystack configuration into ripgrep arguments
     ///
     /// This method converts key-value pairs from the haystack extra_parameters
@@ -250,6 +329,12 @@ impl RipgrepCommand {
         log::debug!("Processing {} extra parameters: {:?}", extra_params.len(), extra_params);
 
         for (key, value) in extra_params {
+            // Validate each parameter value before processing
+            if let Err(e) = Self::validate_parameter_value(key, value) {
+                log::warn!("Invalid parameter {}: {}", key, e);
+                continue;
+            }
+            
             match key.as_str() {
                 "tag" => {
                     log::info!("🏷️ Processing tag filter: '{}'", value);
