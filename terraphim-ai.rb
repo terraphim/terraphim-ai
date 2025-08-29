@@ -14,8 +14,9 @@ class TerraphimAi < Formula
   depends_on "sqlite"
 
   def install
-    # Build the Rust components
+    # Build all Rust components
     system "cargo", "build", "--release", "--bin", "terraphim_server"
+    system "cargo", "build", "--release", "--bin", "terraphim-tui"
     
     # Build the desktop app (if on macOS)
     if OS.mac?
@@ -31,8 +32,9 @@ class TerraphimAi < Formula
       end
     end
     
-    # Install the server binary
+    # Install all binaries
     bin.install "target/release/terraphim_server"
+    bin.install "target/release/terraphim-tui"
     
     # Install configuration files
     (etc/"terraphim-ai").mkpath
@@ -48,15 +50,17 @@ class TerraphimAi < Formula
       Terraphim AI has been installed with the following components:
       
       1. Server: Run with `terraphim_server`
-      2. Desktop App: Available in Applications folder (macOS only)
+      2. TUI: Run with `terraphim-tui` for terminal interface
+      3. Desktop App: Available in Applications folder (macOS only)
       
       Default configuration files are located in:
         #{etc}/terraphim-ai/
       
       For first-time setup:
-        1. Run `terraphim_server --help` to see available options
-        2. Configuration files can be customized in #{etc}/terraphim-ai/
-        3. The desktop app will create its own config on first run
+        1. Run `terraphim_server --help` to see server options
+        2. Run `terraphim-tui --help` to see TUI options
+        3. Configuration files can be customized in #{etc}/terraphim-ai/
+        4. The desktop app will create its own config on first run
       
       Documentation is available in:
         #{doc}/
@@ -75,11 +79,17 @@ class TerraphimAi < Formula
     # Test that the server binary was installed and shows version info
     system "#{bin}/terraphim_server", "--version"
     
+    # Test that the TUI binary was installed and shows version info
+    system "#{bin}/terraphim-tui", "--version"
+    
     # Test that config files were installed
     assert_predicate etc/"terraphim-ai", :exist?
     
     # Test basic functionality by checking the help output
-    help_output = shell_output("#{bin}/terraphim_server --help")
-    assert_match "Terraphim AI Server", help_output
+    server_help = shell_output("#{bin}/terraphim_server --help")
+    assert_match "Terraphim", server_help
+    
+    tui_help = shell_output("#{bin}/terraphim-tui --help")
+    assert_match "Terraphim", tui_help
   end
 end

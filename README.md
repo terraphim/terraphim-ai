@@ -31,33 +31,48 @@ Terraphim aims to bridge this gap by providing a privacy-first AI assistant that
 
 ## Getting Started
 
-In order to start a terraphim server, run the following command:
+### Quick Start
 
-```bash
-cargo run
-```
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/terraphim/terraphim-ai.git
+   cd terraphim-ai
+   ```
 
-This will start an API endpoint, which can be used to index and query documents.
+2. **Set up development environment**:
+   ```bash
+   # Install Git hooks for code quality (optional but recommended)
+   ./scripts/install-hooks.sh
+   ```
 
-To open the local web-frontend, open a new terminal and run:
+3. **Start the backend server**:
+   ```bash
+   cargo run
+   ```
+   This starts an API endpoint for indexing and querying documents.
 
-```bash
-cd desktop
-yarn # Install dependencies
-yarn run dev
-```
+4. **Run the frontend** (choose one):
 
-Alternatively, you can use the Tauri-based desktop app by running:
+   **Web Frontend:**
+   ```bash
+   cd desktop
+   yarn install
+   yarn run dev
+   ```
 
-```bash
-cd desktop
-# Install dependencies
-yarn
-# run the Tauri dev server 
-yarn run tauri dev
-```
+   **Desktop App (Tauri):**
+   ```bash
+   cd desktop
+   yarn install
+   yarn run tauri dev
+   ```
 
-(See the [desktop README](desktop/README.md) for more details.)
+   **Terminal Interface (TUI):**
+   ```bash
+   cargo run --bin terraphim-tui
+   ```
+
+(See the [desktop README](desktop/README.md) and [development setup guide](docs/src/development-setup.md) for more details.)
 
 ## Terminology
 
@@ -132,10 +147,65 @@ export TERRAPHIM_PROFILE_S3_ENDPOINT="https://s3.amazonaws.com/"
 - `TERRAPHIM_DATA_PATH`: Set the data directory location
 - `LOG_LEVEL`: Set logging verbosity (debug, info, warn, error)
 
+## Installation Methods
+
+### For End Users
+
+#### Homebrew (macOS/Linux)
+```bash
+brew install terraphim/terraphim-ai/terraphim-ai
+```
+This installs the server, TUI, and desktop app (macOS only).
+
+#### Debian/Ubuntu
+```bash
+# Download from GitHub releases
+sudo dpkg -i terraphim-server_*.deb
+sudo dpkg -i terraphim-tui_*.deb 
+sudo dpkg -i terraphim-ai-desktop_*.deb
+```
+
+#### Docker
+```bash
+docker run ghcr.io/terraphim/terraphim-server:latest
+```
+
+#### Direct Download
+Download pre-built binaries from [GitHub Releases](https://github.com/terraphim/terraphim-ai/releases).
+
+### Development Setup
+
+For development, see our comprehensive [Development Setup Guide](docs/src/development-setup.md) which covers:
+- Code quality tools and pre-commit hooks
+- Multiple installation options (no Python required!)
+- IDE integration and troubleshooting
+
 ## Contributing
 
-If you'd like to contribute to the project, please read our
-[Contributing guide](CONTRIBUTING.md).
+We welcome contributions! Here's how to get started:
+
+1. **Read our guides**:
+   - [Contributing guide](CONTRIBUTING.md)
+   - [Development setup](docs/src/development-setup.md)
+
+2. **Set up your environment**:
+   ```bash
+   git clone https://github.com/terraphim/terraphim-ai.git
+   cd terraphim-ai
+   ./scripts/install-hooks.sh  # Sets up code quality tools
+   ```
+
+3. **Code quality standards**:
+   - All commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
+   - Rust code is automatically formatted with `cargo fmt`
+   - JavaScript/TypeScript uses [Biome](https://biomejs.dev/) for linting and formatting
+   - No secrets or large files allowed in commits
+
+4. **Make your changes**:
+   - Create a feature branch: `git checkout -b feat/your-feature`
+   - Make your changes with proper tests
+   - Commit with conventional format: `git commit -m "feat: add amazing feature"`
+   - Push and create a Pull Request
 
 ### Contributors are awesome
 <a href="https://github.com/terraphim/terraphim-ai/graphs/contributors">

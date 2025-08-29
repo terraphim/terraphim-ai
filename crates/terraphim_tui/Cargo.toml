@@ -54,3 +54,19 @@ tokio = { version = "1", features = ["full"] }
 name = "terraphim-tui"
 path = "src/main.rs"
 
+[package.metadata.deb]
+maintainer = "Terraphim Contributors <team@terraphim.ai>"
+copyright = "2024, Terraphim Contributors"
+license-file = ["../../LICENSE", "4"]
+extended-description = """
+Terraphim TUI - Terminal User Interface for Terraphim AI.
+Command-line interface with interactive REPL and ASCII graph visualization.
+Supports search, configuration management, and data exploration."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/terraphim-tui", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/terraphim-tui/README", "644"],
+]
+
