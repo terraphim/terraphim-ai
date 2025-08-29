@@ -3,6 +3,13 @@ name = "terraphim_tui"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
+repl-full = ["repl", "repl-chat", "repl-mcp"]
+repl-chat = ["repl"]  # Chat functionality
+repl-mcp = ["repl"]   # MCP tools integration
+
 [dependencies]
 anyhow = "1.0"
 thiserror = "1.0"
@@ -19,6 +26,13 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = "0.4"
 jiff = "0.1"
 urlencoding = "2.1"
+
+# REPL dependencies - only compiled with features
+rustyline = { version = "14.0", optional = true }
+colored = { version = "2.0", optional = true }
+comfy-table = { version = "7.0", optional = true }
+indicatif = { version = "0.17", optional = true }
+dirs = { version = "5.0", optional = true }
 
 terraphim_types = { path = "../terraphim_types" }
 terraphim_settings = { path = "../terraphim_settings" }
