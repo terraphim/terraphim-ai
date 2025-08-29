@@ -581,20 +581,19 @@ impl<'a> TerraphimService {
                 let term = key.as_str();
 
                 // Exclude empty terms, very short terms, and common technical terms
-                if term.is_empty() || term.len() < 5 || excluded_common_terms.contains(&term) {
+                if term.is_empty() || term.len() < 3 || excluded_common_terms.contains(&term) {
                     return false;
                 }
 
-                // Only include highly specific terms:
-                // 1. Very long compound terms (>12 chars) OR
+                // Include terms that are:
+                // 1. Moderately long (>6 chars) OR
                 // 2. Hyphenated compound terms OR
-                // 3. Terms with unique patterns (contains "graph", "terraphim", etc.)
-                term.len() > 12
+                // 3. Underscore-separated compound terms OR
+                // 4. Capitalized terms (likely proper nouns or important concepts)
+                term.len() > 6
                     || term.contains('-')
-                    || term.contains("graph")
-                    || term.contains("terraphim")
-                    || term.contains("knowledge")
-                    || term.contains("embedding")
+                    || term.contains('_')
+                    || term.chars().next().map_or(false, |c| c.is_uppercase())
             })
             .collect();
         sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id)); // Sort by relevance (ID)
@@ -745,6 +744,12 @@ impl<'a> TerraphimService {
     /// and finally falls back to searching by title.
     pub async fn get_document_by_id(&mut self, document_id: &str) -> Result<Option<Document>> {
         log::debug!("Getting document by ID: '{}'", document_id);
+
+        // Validate document_id is not empty or whitespace-only
+        if document_id.trim().is_empty() {
+            log::warn!("Empty or whitespace-only document_id provided");
+            return Ok(None);
+        }
 
         // 1️⃣ Try to load the document directly using the provided ID
         let mut placeholder = Document::default();
