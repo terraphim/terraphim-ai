@@ -52,7 +52,7 @@ The ConfigWizard now provides **full support** for the new haystack structure:
 - **Password Input**: Secure entry with `type="password"`
 - **Optional**: Clear help text "Leave empty for anonymous access"
 
-#### **4. Extra Parameters Manager** 
+#### **4. Extra Parameters Manager**
 Advanced parameter configuration for Ripgrep:
 
 ```html
@@ -61,7 +61,7 @@ Advanced parameter configuration for Ripgrep:
   + Tag Filter
 </button>
 <button on:click={() => addExtraParameter(idx, hIdx, "max_count", "10")}>
-  + Max Results  
+  + Max Results
 </button>
 <button on:click={() => addExtraParameter(idx, hIdx, "", "")}>
   + Custom Parameter
@@ -104,7 +104,7 @@ Advanced parameter configuration for Ripgrep:
 ```
 **Ripgrep command**: `rg --glob "*#rust*" "search_term" /path`
 
-#### Multiple Parameters  
+#### Multiple Parameters
 ```json
 {
   "extra_parameters": {
@@ -121,7 +121,7 @@ Advanced parameter configuration for Ripgrep:
 ```json
 {
   "location": "https://localhost:9883",
-  "service": "Atomic", 
+  "service": "Atomic",
   "atomic_server_secret": "base64_encoded_secret",
   "read_only": true
 }
@@ -176,7 +176,7 @@ if self.service == ServiceType::Atomic && self.atomic_server_secret.is_some() {
         },
         {
           "location": "https://localhost:9883",
-          "service": "Atomic", 
+          "service": "Atomic",
           "read_only": true,
           "atomic_server_secret": "YWRtaW46cGFzc3dvcmQ="
         }
@@ -222,7 +222,7 @@ The ConfigWizard now supports **100% of haystack functionality**:
 ```json
 {
   "path": "/documents",
-  "service": "Ripgrep", 
+  "service": "Ripgrep",
   "read_only": false
 }
 ```
@@ -276,4 +276,4 @@ The enhanced haystack configuration system provides:
 - **🛡️ Type Safety**: Comprehensive TypeScript integration
 - **📚 Documentation**: Complete usage examples and migration guide
 
-This system supports both simple file search and advanced document management workflows with atomic server integration. 
+This system supports both simple file search and advanced document management workflows with atomic server integration.

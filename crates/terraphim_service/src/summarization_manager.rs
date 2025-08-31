@@ -31,9 +31,9 @@ impl SummarizationManager {
 
         // Create and start the worker
         let worker = SummarizationWorker::new(config, task_status);
-        let worker_handle = Some(tokio::spawn(async move {
-            worker.run(command_receiver).await
-        }));
+        let worker_handle = Some(tokio::spawn(
+            async move { worker.run(command_receiver).await },
+        ));
 
         Self {
             queue,
@@ -109,7 +109,7 @@ impl SummarizationManager {
     /// * `role` - Role configuration for summarization
     /// * `extract_description` - Whether to extract description from content if missing
     /// * `queue_summarization` - Whether to queue AI summarization task
-    /// 
+    ///
     /// # Returns
     /// * `Result<Option<TaskId>, ServiceError>` - Task ID if summarization was queued, None if only description was processed
     pub async fn process_document_fields(
@@ -125,40 +125,64 @@ impl SummarizationManager {
         if extract_description && doc.description.is_none() && !doc.body.is_empty() {
             match Self::extract_description_from_body(&doc.body, 200) {
                 Ok(description) => {
-                    log::debug!("Generated description for document '{}': {} chars", doc.id, description.len());
+                    log::debug!(
+                        "Generated description for document '{}': {} chars",
+                        doc.id,
+                        description.len()
+                    );
                     doc.description = Some(description);
                 }
                 Err(e) => {
-                    log::warn!("Failed to extract description for document '{}': {}", doc.id, e);
+                    log::warn!(
+                        "Failed to extract description for document '{}': {}",
+                        doc.id,
+                        e
+                    );
                 }
             }
         }
 
         // Queue AI summarization if requested and content is substantial
         if queue_summarization && doc.body.len() >= 500 {
-            let submit_result = self.summarize_document(
-                doc.clone(),
-                role.clone(),
-                Some(Priority::Normal),
-                Some(300), // max summary length
-                Some(false), // don't force regenerate
-                None, // no callback URL
-            ).await?;
-            
+            let submit_result = self
+                .summarize_document(
+                    doc.clone(),
+                    role.clone(),
+                    Some(Priority::Normal),
+                    Some(300),   // max summary length
+                    Some(false), // don't force regenerate
+                    None,        // no callback URL
+                )
+                .await?;
+
             match submit_result {
-                SubmitResult::Queued { task_id: queued_task_id, .. } => {
+                SubmitResult::Queued {
+                    task_id: queued_task_id,
+                    ..
+                } => {
                     task_id = Some(queued_task_id.clone());
-                    log::debug!("Queued AI summarization for document '{}' with task ID: {:?}", doc.id, queued_task_id);
+                    log::debug!(
+                        "Queued AI summarization for document '{}' with task ID: {:?}",
+                        doc.id,
+                        queued_task_id
+                    );
                 }
                 SubmitResult::Duplicate(existing_task_id) => {
                     task_id = Some(existing_task_id.clone());
-                    log::debug!("Document '{}' already has summarization task: {:?}", doc.id, existing_task_id);
+                    log::debug!(
+                        "Document '{}' already has summarization task: {:?}",
+                        doc.id,
+                        existing_task_id
+                    );
                 }
                 SubmitResult::ValidationError(error) => {
                     log::warn!("Validation error for document '{}': {}", doc.id, error);
                 }
                 SubmitResult::QueueFull => {
-                    log::warn!("Summarization queue is full, cannot queue document '{}'", doc.id);
+                    log::warn!(
+                        "Summarization queue is full, cannot queue document '{}'",
+                        doc.id
+                    );
                 }
             }
         }
@@ -177,7 +201,10 @@ impl SummarizationManager {
     ///
     /// # Returns
     /// * `Result<String, ServiceError>` - Extracted description or error
-    pub fn extract_description_from_body(body: &str, max_length: usize) -> Result<String, ServiceError> {
+    pub fn extract_description_from_body(
+        body: &str,
+        max_length: usize,
+    ) -> Result<String, ServiceError> {
         if body.is_empty() {
             return Err(ServiceError::Config("Document body is empty".to_string()));
         }
@@ -233,14 +260,20 @@ impl SummarizationManager {
         extract_description: bool,
         queue_summarization: bool,
     ) -> Result<Vec<Option<TaskId>>, ServiceError> {
-        log::info!("Processing {} documents for description and summarization", documents.len());
-        
+        log::info!(
+            "Processing {} documents for description and summarization",
+            documents.len()
+        );
+
         let mut task_ids = Vec::with_capacity(documents.len());
         let mut successful_count = 0;
         let mut error_count = 0;
 
         for doc in documents.iter_mut() {
-            match self.process_document_fields(doc, role, extract_description, queue_summarization).await {
+            match self
+                .process_document_fields(doc, role, extract_description, queue_summarization)
+                .await
+            {
                 Ok(task_id) => {
                     task_ids.push(task_id);
                     successful_count += 1;
@@ -253,7 +286,11 @@ impl SummarizationManager {
             }
         }
 
-        log::info!("Completed batch processing: {} successful, {} errors", successful_count, error_count);
+        log::info!(
+            "Completed batch processing: {} successful, {} errors",
+            successful_count,
+            error_count
+        );
         Ok(task_ids)
     }
 
@@ -279,7 +316,9 @@ impl SummarizationManager {
 
     /// Check if the manager is healthy (worker is running)
     pub fn is_healthy(&self) -> bool {
-        self.worker_handle.as_ref().is_some_and(|handle| !handle.is_finished())
+        self.worker_handle
+            .as_ref()
+            .is_some_and(|handle| !handle.is_finished())
     }
 
     /// Get a reference to the internal queue for direct access if needed
@@ -339,7 +378,9 @@ impl Default for SummarizationManagerBuilder {
 
 // Add a method to SummarizationQueue to expose task status storage
 impl SummarizationQueue {
-    pub(crate) fn get_task_status_storage(&self) -> Arc<RwLock<std::collections::HashMap<TaskId, TaskStatus>>> {
+    pub(crate) fn get_task_status_storage(
+        &self,
+    ) -> Arc<RwLock<std::collections::HashMap<TaskId, TaskStatus>>> {
         Arc::clone(&self.task_status)
     }
 }
@@ -389,7 +430,10 @@ mod tests {
             openrouter_chat_model: None,
             extra: {
                 let mut extra = ahash::AHashMap::new();
-                extra.insert("llm_provider".to_string(), serde_json::Value::String("test".to_string()));
+                extra.insert(
+                    "llm_provider".to_string(),
+                    serde_json::Value::String("test".to_string()),
+                );
                 extra
             },
         }
@@ -421,27 +465,29 @@ mod tests {
         let manager = SummarizationManager::new(QueueConfig::default());
         // Give worker time to start
         sleep(Duration::from_millis(100)).await;
-        
+
         let document = create_test_document();
         let role = create_test_role();
 
-        let result = manager.summarize_document(
-            document,
-            role,
-            Some(Priority::High),
-            Some(200),
-            Some(false),
-            Some("http://callback.com".to_string()),
-        ).await;
+        let result = manager
+            .summarize_document(
+                document,
+                role,
+                Some(Priority::High),
+                Some(200),
+                Some(false),
+                Some("http://callback.com".to_string()),
+            )
+            .await;
 
         // Should succeed even without real LLM (task will fail in worker, but submission succeeds)
         assert!(result.is_ok());
-        
+
         match result.unwrap() {
             SubmitResult::Queued { task_id, .. } => {
                 // Wait a bit for the task to be processed by the worker
                 sleep(Duration::from_millis(100)).await;
-                
+
                 // Should be able to get task status
                 let status = manager.get_task_status(&task_id).await;
                 assert!(status.is_some());
@@ -451,30 +497,36 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Flaky test - timing dependent"] 
+    #[ignore = "Flaky test - timing dependent"]
     async fn test_task_cancellation() {
         let manager = SummarizationManager::new(QueueConfig::default());
         // Give worker time to start
         sleep(Duration::from_millis(100)).await;
-        
+
         // Pause the queue so tasks don't get processed immediately
         manager.pause().await.expect("Failed to pause manager");
-        
+
         let document = create_test_document();
         let role = create_test_role();
 
-        let result = manager.summarize_document(
-            document,
-            role,
-            Some(Priority::Low), // Low priority so it stays queued
-            None,
-            None,
-            None,
-        ).await.unwrap();
+        let result = manager
+            .summarize_document(
+                document,
+                role,
+                Some(Priority::Low), // Low priority so it stays queued
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
 
         if let SubmitResult::Queued { task_id, .. } = result {
             // Cancel the task while the queue is paused (so it's still queued)
-            let cancelled = manager.cancel_task(task_id.clone(), "Test cancellation".to_string()).await.unwrap();
+            let cancelled = manager
+                .cancel_task(task_id.clone(), "Test cancellation".to_string())
+                .await
+                .unwrap();
             assert!(cancelled, "Task cancellation should succeed");
 
             // Check status
@@ -493,7 +545,7 @@ mod tests {
         let manager = SummarizationManager::new(QueueConfig::default());
         // Give worker time to start
         sleep(Duration::from_millis(100)).await;
-        
+
         let stats = manager.get_stats().await.unwrap();
         assert_eq!(stats.queue_size, 0);
         assert_eq!(stats.pending_tasks, 0);
@@ -506,7 +558,7 @@ mod tests {
         let manager = SummarizationManager::new(QueueConfig::default());
         // Give worker time to start
         sleep(Duration::from_millis(100)).await;
-        
+
         // Pause
         manager.pause().await.unwrap();
         let stats = manager.get_stats().await.unwrap();
@@ -523,7 +575,7 @@ mod tests {
         let mut manager = SummarizationManager::new(QueueConfig::default());
         // Give worker time to start
         sleep(Duration::from_millis(100)).await;
-        
+
         assert!(manager.is_healthy());
 
         manager.shutdown().await.unwrap();

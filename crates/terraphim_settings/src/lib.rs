@@ -85,21 +85,27 @@ impl DeviceSettings {
     /// Used for embedded/offline mode where config files are not needed
     pub fn default_embedded() -> Self {
         use std::collections::HashMap;
-        
+
         let mut profiles = HashMap::new();
-        
+
         // Add minimal required profiles for embedded mode
         let mut memory_profile = HashMap::new();
         memory_profile.insert("type".to_string(), "memory".to_string());
         profiles.insert("memory".to_string(), memory_profile);
-        
+
         let mut sqlite_profile = HashMap::new();
         sqlite_profile.insert("type".to_string(), "sqlite".to_string());
-        sqlite_profile.insert("datadir".to_string(), "/tmp/terraphim_sqlite_embedded".to_string());
-        sqlite_profile.insert("connection_string".to_string(), "/tmp/terraphim_sqlite_embedded/terraphim.db".to_string());
+        sqlite_profile.insert(
+            "datadir".to_string(),
+            "/tmp/terraphim_sqlite_embedded".to_string(),
+        );
+        sqlite_profile.insert(
+            "connection_string".to_string(),
+            "/tmp/terraphim_sqlite_embedded/terraphim.db".to_string(),
+        );
         sqlite_profile.insert("table".to_string(), "terraphim_kv".to_string());
         profiles.insert("sqlite".to_string(), sqlite_profile);
-        
+
         Self {
             server_hostname: "127.0.0.1:8000".to_string(),
             api_endpoint: "http://localhost:8000/api".to_string(),
@@ -159,8 +165,8 @@ impl DeviceSettings {
 
     /// Save settings to a specified file
     fn save_to_file(&self, path: &PathBuf) -> Result<(), Error> {
-        let serialized_settings = toml::to_string_pretty(self)
-            .map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+        let serialized_settings =
+            toml::to_string_pretty(self).map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         std::fs::write(path, serialized_settings).map_err(Error::IoError)?;
 
@@ -240,7 +246,7 @@ mod tests {
         let mut config =
             DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
         config.initialized = false;
-        assert_eq!(config.initialized, false);
+        assert!(!config.initialized);
 
         // Update to true
         config
@@ -250,6 +256,6 @@ mod tests {
         // Check if initialized is now true
         let config_copy =
             DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
-        assert_eq!(config_copy.initialized, true);
+        assert!(config_copy.initialized);
     }
 }

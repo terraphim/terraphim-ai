@@ -166,16 +166,16 @@ let client = AtomicClient::with_session(server_url, session)?;
 pub enum AtomicClientError {
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
-    
+
     #[error("Authentication failed: {0}")]
     Auth(String),
-    
+
     #[error("Resource not found: {0}")]
     NotFound(String),
-    
+
     #[error("Invalid resource: {0}")]
     InvalidResource(String),
-    
+
     #[error("Server error: {0}")]
     Server(String),
 }
@@ -267,14 +267,14 @@ features = ["wasm-bindgen"]
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_get_resource() {
         let client = AtomicClient::new("https://atomic.example.com")?;
         let resource = client.get_resource("https://atomic.example.com/test").await?;
         assert_eq!(resource.subject, "https://atomic.example.com/test");
     }
-    
+
     #[tokio::test]
     async fn test_create_resource() {
         let client = AtomicClient::new("https://atomic.example.com")?;
@@ -283,7 +283,7 @@ mod tests {
             "https://schema.org/name",
             AtomicValue::String("Test Resource".to_string())
         )?;
-        
+
         let created = client.create_resource(&resource).await?;
         assert_eq!(created.subject, "https://atomic.example.com/new");
     }
@@ -296,7 +296,7 @@ mod tests {
 fn test_authentication() {
     let credentials = Credentials::new("test", "password")?;
     let client = AtomicClient::with_credentials("https://atomic.example.com", credentials)?;
-    
+
     // Test authenticated operations
     let resource = client.get_resource("https://atomic.example.com/private").await?;
     assert!(resource.properties.contains_key("https://schema.org/name"));
@@ -436,4 +436,4 @@ for document in local_documents {
 1. Update import statements
 2. Replace client instantiation
 3. Update method calls to match API
-4. Test authentication and error handling 
+4. Test authentication and error handling

@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
-use terraphim_types::{Document, Index};
 use terraphim_persistence::Persistable;
+use terraphim_types::{Document, Index};
 
 use super::IndexMiddleware;
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
@@ -39,7 +39,7 @@ impl IndexMiddleware for RipgrepIndexer {
         if let Ok(entries) = fs::read_dir(haystack_path) {
             let files: Vec<_> = entries
                 .filter_map(|entry| entry.ok())
-                .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "md"))
+                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "md"))
                 .collect();
             log::debug!(
                 "Found {} markdown files in haystack: {:?}",
@@ -51,10 +51,8 @@ impl IndexMiddleware for RipgrepIndexer {
         // Parse extra parameters from haystack configuration
         let extra_params = haystack.get_extra_parameters();
         log::debug!("Haystack extra_parameters: {:?}", extra_params);
-        
-        let extra_args = self
-            .command
-            .parse_extra_parameters(extra_params);
+
+        let extra_args = self.command.parse_extra_parameters(extra_params);
         if !extra_args.is_empty() {
             log::info!("🏷️ Using extra ripgrep parameters: {:?}", extra_args);
             log::info!("🔍 This will modify the ripgrep command to include tag filtering");
@@ -285,9 +283,8 @@ impl RipgrepIndexer {
             };
         }
 
-        log::debug!("Index_inner completed: {} documents processed, {} matches found, {} documents in final index", 
+        log::debug!("Index_inner completed: {} documents processed, {} matches found, {} documents in final index",
                  document_count, match_count, index.len());
         index
     }
 }
-

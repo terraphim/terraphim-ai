@@ -39,22 +39,22 @@ check_server() {
 start_server_if_needed() {
     if ! check_server; then
         echo -e "${YELLOW}🚧 Starting server...${NC}"
-        
+
         # Check if we're in the right directory
         if [[ ! -f "Cargo.toml" ]] || [[ ! -d "terraphim_server" ]]; then
             echo -e "${RED}❌ Not in project root directory${NC}"
             echo "Please run this script from the terraphim-ai project root"
             exit 1
         fi
-        
+
         # Build and start server in background
         echo -e "${BLUE}Building server...${NC}"
         cargo build --bin terraphim_server --release
-        
+
         echo -e "${BLUE}Starting server in background...${NC}"
         RUST_LOG=info cargo run --bin terraphim_server --release -- --config terraphim_engineer_config.json &
         SERVER_PID=$!
-        
+
         # Wait for server to be ready
         echo -e "${YELLOW}Waiting for server to be ready...${NC}"
         for i in $(seq 1 $SERVER_TIMEOUT); do
@@ -79,10 +79,10 @@ run_test() {
     local test_name="$1"
     local test_command="$2"
     local description="$3"
-    
+
     echo -e "\n${BLUE}🧪 Running: $test_name${NC}"
     echo -e "${YELLOW}   $description${NC}"
-    
+
     if eval "timeout ${TEST_TIMEOUT} $test_command"; then
         echo -e "${GREEN}✅ $test_name PASSED${NC}"
         return 0
@@ -237,7 +237,7 @@ if [[ $FAILED_TESTS -eq 0 ]]; then
     exit 0
 else
     echo -e "\n${RED}💥 $FAILED_TESTS test(s) failed. TUI implementation needs fixes.${NC}"
-    
+
     # Provide helpful suggestions
     echo -e "\n${YELLOW}💡 Troubleshooting suggestions:${NC}"
     echo "1. Ensure server is running and accessible"
@@ -245,6 +245,6 @@ else
     echo "3. Verify configuration files are valid"
     echo "4. Run individual test commands for detailed output"
     echo "5. Check network connectivity and firewall settings"
-    
+
     exit 1
 fi

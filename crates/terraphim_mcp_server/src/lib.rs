@@ -10,9 +10,11 @@ use rmcp::{
     service::RequestContext,
     Error as McpError, RoleServer, ServerHandler,
 };
-use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_automata::builder::json_decode;
-use terraphim_automata::matcher::{find_matches, replace_matches, extract_paragraphs_from_automata};
+use terraphim_automata::matcher::{
+    extract_paragraphs_from_automata, find_matches, replace_matches,
+};
+use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
@@ -120,6 +122,8 @@ impl McpService {
 
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::from(query),
+            search_terms: None,
+            operator: None,
             role: Some(role_name),
             limit: limit.map(|l| l as usize),
             skip: skip.map(|s| s as usize),
@@ -290,7 +294,7 @@ impl McpService {
         role: Option<String>,
     ) -> Result<CallToolResult, McpError> {
         // Determine which role to use (provided role or selected role)
-        let role_name = if let Some(role_str) = role {
+        let _role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
         } else {
             self.config_state.get_selected_role().await
@@ -362,7 +366,7 @@ impl McpService {
                 combined.len()
             )));
             for r in combined.into_iter().take(max_results) {
-                let line = format!("{}", r.term);
+                let line = r.term.to_string();
                 contents.push(Content::text(line));
             }
             return Ok(CallToolResult::success(contents));
@@ -382,7 +386,7 @@ impl McpService {
         role: Option<String>,
     ) -> Result<CallToolResult, McpError> {
         // Determine which role to use (provided role or selected role)
-        let role_name = if let Some(role_str) = role {
+        let _role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
         } else {
             self.config_state.get_selected_role().await
@@ -425,6 +429,8 @@ impl McpService {
             for r in results.into_iter().take(max_results) {
                 let sq = SearchQuery {
                     search_term: NormalizedTermValue::from(r.term.clone()),
+                    search_terms: None,
+                    operator: None,
                     role: None,
                     limit: Some(1),
                     skip: Some(0),
@@ -574,7 +580,7 @@ impl McpService {
             let min_similarity = similarity.unwrap_or(0.6);
             let max_results = limit.unwrap_or(10);
 
-                            match terraphim_automata::fuzzy_autocomplete_search(
+            match terraphim_automata::fuzzy_autocomplete_search(
                 index,
                 &query,
                 min_similarity,
@@ -624,7 +630,7 @@ impl McpService {
                         "Successfully serialized autocomplete index to {} bytes",
                         bytes.len()
                     )));
-                    
+
                     // Convert bytes to base64 for text representation
                     let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
                     contents.push(Content::text("Base64 encoded data:".to_string()));
@@ -634,7 +640,8 @@ impl McpService {
                 }
                 Err(e) => {
                     error!("Serialize autocomplete index failed: {}", e);
-                    let error_content = Content::text(format!("Serialize autocomplete index failed: {}", e));
+                    let error_content =
+                        Content::text(format!("Serialize autocomplete index failed: {}", e));
                     Ok(CallToolResult::error(vec![error_content]))
                 }
             }
@@ -677,7 +684,8 @@ impl McpService {
             }
             Err(e) => {
                 error!("Deserialize autocomplete index failed: {}", e);
-                let error_content = Content::text(format!("Deserialize autocomplete index failed: {}", e));
+                let error_content =
+                    Content::text(format!("Deserialize autocomplete index failed: {}", e));
                 Ok(CallToolResult::error(vec![error_content]))
             }
         }
@@ -714,7 +722,7 @@ impl McpService {
                 }
 
                 let return_pos = return_positions.unwrap_or(false);
-                
+
                 match find_matches(&text, thesaurus_data, return_pos) {
                     Ok(matches) => {
                         let mut contents = Vec::new();
@@ -725,7 +733,7 @@ impl McpService {
                         );
                         contents.push(Content::text(summary));
 
-                        for (_idx, matched) in matches.iter().enumerate() {
+                        for matched in matches.iter() {
                             let match_info = if return_pos {
                                 if let Some((start, end)) = matched.pos {
                                     format!("• {} (pos: {}-{})", matched.term, start, end)
@@ -806,7 +814,7 @@ impl McpService {
                     Ok(replaced_bytes) => {
                         let replaced_text = String::from_utf8(replaced_bytes)
                             .unwrap_or_else(|_| "Binary output (non-UTF8)".to_string());
-                        
+
                         let mut contents = Vec::new();
                         contents.push(Content::text(format!(
                             "Successfully replaced terms in text for role '{}' using {} format",
@@ -866,7 +874,7 @@ impl McpService {
                 }
 
                 let include_term_bool = include_term.unwrap_or(true);
-                
+
                 match extract_paragraphs_from_automata(&text, thesaurus_data, include_term_bool) {
                     Ok(paragraphs) => {
                         let mut contents = Vec::new();
@@ -888,7 +896,8 @@ impl McpService {
                     }
                     Err(e) => {
                         error!("Extract paragraphs failed: {}", e);
-                        let error_content = Content::text(format!("Extract paragraphs failed: {}", e));
+                        let error_content =
+                            Content::text(format!("Extract paragraphs failed: {}", e));
                         Ok(CallToolResult::error(vec![error_content]))
                     }
                 }
@@ -905,10 +914,7 @@ impl McpService {
     }
 
     /// Parse Logseq JSON output using terraphim_automata
-    pub async fn json_decode(
-        &self,
-        jsonlines: String,
-    ) -> Result<CallToolResult, McpError> {
+    pub async fn json_decode(&self, jsonlines: String) -> Result<CallToolResult, McpError> {
         match json_decode(&jsonlines) {
             Ok(messages) => {
                 let mut contents = Vec::new();
@@ -931,12 +937,10 @@ impl McpService {
     }
 
     /// Load thesaurus from automata path (local file or remote URL)
-    pub async fn load_thesaurus(
-        &self,
-        automata_path: String,
-    ) -> Result<CallToolResult, McpError> {
+    pub async fn load_thesaurus(&self, automata_path: String) -> Result<CallToolResult, McpError> {
         // Parse the automata path
-        let path = if automata_path.starts_with("http://") || automata_path.starts_with("https://") {
+        let path = if automata_path.starts_with("http://") || automata_path.starts_with("https://")
+        {
             terraphim_automata::AutomataPath::from_remote(&automata_path)
                 .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
         } else {
@@ -963,7 +967,10 @@ impl McpService {
                         contents.push(Content::text(term_info));
                     }
                     if thesaurus.len() > 10 {
-                        contents.push(Content::text(format!("... and {} more terms", thesaurus.len() - 10)));
+                        contents.push(Content::text(format!(
+                            "... and {} more terms",
+                            thesaurus.len() - 10
+                        )));
                     }
                 }
 
@@ -1001,7 +1008,10 @@ impl McpService {
                         contents.push(Content::text(term_info));
                     }
                     if thesaurus.len() > 10 {
-                        contents.push(Content::text(format!("... and {} more terms", thesaurus.len() - 10)));
+                        contents.push(Content::text(format!(
+                            "... and {} more terms",
+                            thesaurus.len() - 10
+                        )));
                     }
                 }
 
@@ -1009,7 +1019,8 @@ impl McpService {
             }
             Err(e) => {
                 error!("Load thesaurus from JSON failed: {}", e);
-                let error_content = Content::text(format!("Load thesaurus from JSON failed: {}", e));
+                let error_content =
+                    Content::text(format!("Load thesaurus from JSON failed: {}", e));
                 Ok(CallToolResult::error(vec![error_content]))
             }
         }
@@ -1091,8 +1102,9 @@ impl McpService {
                         }
 
                         // Extract matched terms
-                        let matched_terms: Vec<String> = matches.iter().map(|m| m.term.clone()).collect();
-                        
+                        let matched_terms: Vec<String> =
+                            matches.iter().map(|m| m.term.clone()).collect();
+
                         // Create a RoleGraph instance to check connectivity
                         // For now, we'll use a simple approach by checking if we can build a graph
                         // In a full implementation, you might want to load the actual graph structure
@@ -1103,11 +1115,11 @@ impl McpService {
                             role_name,
                             matched_terms
                         )));
-                        
+
                         // Note: This is a placeholder implementation
                         // The actual RoleGraph::is_all_terms_connected_by_path would need the graph structure
                         contents.push(Content::text("Note: Graph connectivity check requires full graph structure loading. This is a preview of matched terms."));
-                        
+
                         Ok(CallToolResult::success(contents))
                     }
                     Err(e) => {
@@ -1147,7 +1159,7 @@ impl ServerHandler for McpService {
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         tracing::debug!("list_tools function called!");
-        
+
         // Convert JSON values to Arc<Map<String, Value>> for input_schema
         let search_schema = serde_json::json!({
             "type": "object",
@@ -1217,8 +1229,7 @@ impl ServerHandler for McpService {
             },
             "required": ["query"]
         });
-        let autocomplete_snippets_map =
-            autocomplete_snippets_schema.as_object().unwrap().clone();
+        let autocomplete_snippets_map = autocomplete_snippets_schema.as_object().unwrap().clone();
 
         let fuzzy_autocomplete_schema = serde_json::json!({
             "type": "object",
@@ -1445,447 +1456,455 @@ impl ServerHandler for McpService {
                 annotations: None,
             }
         ];
-        
+
         tracing::debug!("Created {} tools", tools.len());
         tracing::debug!("First tool name: {:?}", tools.first().map(|t| &t.name));
-        
+
         let result = ListToolsResult {
             tools,
             next_cursor: None,
         };
-        
-        tracing::debug!("Returning ListToolsResult with {} tools", result.tools.len());
-        
+
+        tracing::debug!(
+            "Returning ListToolsResult with {} tools",
+            result.tools.len()
+        );
+
         Ok(result)
     }
 
-    fn call_tool(
+    async fn call_tool(
         &self,
         request: CallToolRequestParam,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<CallToolResult, ErrorData>> + Send + '_ {
-        async move {
-            match request.name.as_ref() {
-                "search" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments
-                        .get("query")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
-                        })?
-                        .to_string();
+    ) -> Result<CallToolResult, ErrorData> {
+        match request.name.as_ref() {
+            "search" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
 
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
-                    let limit = arguments
-                        .get("limit")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as i32);
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as i32);
 
-                    let skip = arguments
-                        .get("skip")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as i32);
+                let skip = arguments
+                    .get("skip")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as i32);
 
-                    self.search(query, role, limit, skip)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "update_config_tool" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let config_str = arguments
-                        .get("config_str")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params(
-                                "Missing 'config_str' parameter".to_string(),
-                                None,
-                            )
-                        })?
-                        .to_string();
-
-                    self.update_config_tool(config_str)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "build_autocomplete_index" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-
-                    self.build_autocomplete_index(role)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "fuzzy_autocomplete_search" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments
-                        .get("query")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
-
-                    let limit = arguments
-                        .get("limit")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as usize);
-
-                    self.fuzzy_autocomplete_search(query, similarity, limit)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "autocomplete_terms" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments
-                        .get("query")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
-                        })?
-                        .to_string();
-                    let limit = arguments
-                        .get("limit")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as usize);
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    self.autocomplete_terms(query, limit, role)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "autocomplete_with_snippets" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments
-                        .get("query")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
-                        })?
-                        .to_string();
-                    let limit = arguments
-                        .get("limit")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as usize);
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    self.autocomplete_with_snippets(query, limit, role)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "fuzzy_autocomplete_search_levenshtein" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments
-                        .get("query")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    let max_edit_distance = arguments
-                        .get("max_edit_distance")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as usize);
-
-                    let limit = arguments
-                        .get("limit")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as usize);
-
-                    self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "fuzzy_autocomplete_search_jaro_winkler" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let query = arguments
-                        .get("query")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
-
-                    let limit = arguments
-                        .get("limit")
-                        .and_then(|v| v.as_i64())
-                        .map(|i| i as usize);
-
-                    self.fuzzy_autocomplete_search_jaro_winkler(query, similarity, limit)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "serialize_autocomplete_index" => {
-                    self.serialize_autocomplete_index()
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "deserialize_autocomplete_index" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let base64_data = arguments
-                        .get("base64_data")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'base64_data' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    self.deserialize_autocomplete_index(base64_data)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "find_matches" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let text = arguments
-                        .get("text")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
-                        })?
-                        .to_string();
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    let return_positions = arguments
-                        .get("return_positions")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false);
-
-                    self.find_matches(text, role, Some(return_positions))
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "replace_matches" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let text = arguments
-                        .get("text")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
-                        })?
-                        .to_string();
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    let link_type = arguments
-                        .get("link_type")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'link_type' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    self.replace_matches(text, role, link_type)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "extract_paragraphs_from_automata" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let text = arguments
-                        .get("text")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
-                        })?
-                        .to_string();
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-                    let include_term = arguments
-                        .get("include_term")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(true);
-
-                    self.extract_paragraphs_from_automata(text, role, Some(include_term))
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "json_decode" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let jsonlines = arguments
-                        .get("jsonlines")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'jsonlines' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    self.json_decode(jsonlines)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "load_thesaurus" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let automata_path = arguments
-                        .get("automata_path")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'automata_path' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    self.load_thesaurus(automata_path)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "load_thesaurus_from_json" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let json_str = arguments
-                        .get("json_str")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'json_str' parameter".to_string(), None)
-                        })?
-                        .to_string();
-
-                    self.load_thesaurus_from_json(json_str)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                "is_all_terms_connected_by_path" => {
-                    let arguments = request.arguments.unwrap_or_default();
-                    let text = arguments
-                        .get("text")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
-                        })?
-                        .to_string();
-                    let role = arguments
-                        .get("role")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string());
-
-                    self.is_all_terms_connected_by_path(text, role)
-                        .await
-                        .map_err(TerraphimMcpError::Mcp)
-                        .map_err(ErrorData::from)
-                }
-                _ => Err(ErrorData::method_not_found::<
-                    rmcp::model::CallToolRequestMethod,
-                >()),
+                self.search(query, role, limit, skip)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
             }
+            "update_config_tool" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let config_str = arguments
+                    .get("config_str")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params(
+                            "Missing 'config_str' parameter".to_string(),
+                            None,
+                        )
+                    })?
+                    .to_string();
+
+                self.update_config_tool(config_str)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "build_autocomplete_index" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+
+                self.build_autocomplete_index(role)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "fuzzy_autocomplete_search" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
+
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+
+                self.fuzzy_autocomplete_search(query, similarity, limit)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "autocomplete_terms" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                self.autocomplete_terms(query, limit, role)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "autocomplete_with_snippets" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                self.autocomplete_with_snippets(query, limit, role)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "fuzzy_autocomplete_search_levenshtein" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                let max_edit_distance = arguments
+                    .get("max_edit_distance")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+
+                self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "fuzzy_autocomplete_search_jaro_winkler" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let query = arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
+
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|v| v.as_i64())
+                    .map(|i| i as usize);
+
+                self.fuzzy_autocomplete_search_jaro_winkler(query, similarity, limit)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "serialize_autocomplete_index" => self
+                .serialize_autocomplete_index()
+                .await
+                .map_err(TerraphimMcpError::Mcp)
+                .map_err(ErrorData::from),
+            "deserialize_autocomplete_index" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let base64_data = arguments
+                    .get("base64_data")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params(
+                            "Missing 'base64_data' parameter".to_string(),
+                            None,
+                        )
+                    })?
+                    .to_string();
+
+                self.deserialize_autocomplete_index(base64_data)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "find_matches" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let text = arguments
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let return_positions = arguments
+                    .get("return_positions")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                self.find_matches(text, role, Some(return_positions))
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "replace_matches" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let text = arguments
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let link_type = arguments
+                    .get("link_type")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'link_type' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                self.replace_matches(text, role, link_type)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "extract_paragraphs_from_automata" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let text = arguments
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let include_term = arguments
+                    .get("include_term")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+
+                self.extract_paragraphs_from_automata(text, role, Some(include_term))
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "json_decode" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let jsonlines = arguments
+                    .get("jsonlines")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'jsonlines' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                self.json_decode(jsonlines)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "load_thesaurus" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let automata_path = arguments
+                    .get("automata_path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params(
+                            "Missing 'automata_path' parameter".to_string(),
+                            None,
+                        )
+                    })?
+                    .to_string();
+
+                self.load_thesaurus(automata_path)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "load_thesaurus_from_json" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let json_str = arguments
+                    .get("json_str")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'json_str' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                self.load_thesaurus_from_json(json_str)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "is_all_terms_connected_by_path" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let text = arguments
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let role = arguments
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+
+                self.is_all_terms_connected_by_path(text, role)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            _ => Err(ErrorData::method_not_found::<
+                rmcp::model::CallToolRequestMethod,
+            >()),
         }
     }
 
-    fn list_resources(
+    async fn list_resources(
         &self,
         _request: Option<rmcp::model::PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> + Send + '_ {
-        async move {
-            let mut service = self
-                .terraphim_service()
+    ) -> Result<ListResourcesResult, ErrorData> {
+        let mut service = self
+            .terraphim_service()
+            .await
+            .map_err(TerraphimMcpError::Anyhow)?;
+
+        // Use a broad search term to find documents instead of empty search
+        // We'll try common terms that should match documents in our KG
+        let search_terms = vec!["terraphim", "graph", "service", "haystack"];
+        let mut all_documents = std::collections::HashSet::new();
+
+        // Perform multiple searches to gather available documents
+        for term in search_terms {
+            let search_query = terraphim_types::SearchQuery {
+                search_term: terraphim_types::NormalizedTermValue::new(term.to_string()),
+                search_terms: None,
+                operator: None,
+                limit: Some(50), // Reasonable limit per search
+                skip: None,
+                role: None,
+            };
+
+            match service.search(&search_query).await {
+                Ok(documents) => {
+                    for doc in documents {
+                        all_documents.insert(doc.id.clone());
+                    }
+                }
+                Err(_) => {
+                    // Continue with other terms if one fails
+                    continue;
+                }
+            }
+        }
+
+        // If we still have no documents, try a final broad search
+        if all_documents.is_empty() {
+            let fallback_query = terraphim_types::SearchQuery {
+                search_term: terraphim_types::NormalizedTermValue::new("*".to_string()),
+                search_terms: None,
+                operator: None,
+                limit: Some(100),
+                skip: None,
+                role: None,
+            };
+
+            let documents = service
+                .search(&fallback_query)
                 .await
-                .map_err(|e| TerraphimMcpError::Anyhow(e))?;
-
-            // Use a broad search term to find documents instead of empty search
-            // We'll try common terms that should match documents in our KG
-            let search_terms = vec!["terraphim", "graph", "service", "haystack"];
-            let mut all_documents = std::collections::HashSet::new();
-
-            // Perform multiple searches to gather available documents
-            for term in search_terms {
-                let search_query = terraphim_types::SearchQuery {
-                    search_term: terraphim_types::NormalizedTermValue::new(term.to_string()),
-                    limit: Some(50), // Reasonable limit per search
-                    skip: None,
-                    role: None,
-                };
-
-                match service.search(&search_query).await {
-                    Ok(documents) => {
-                        for doc in documents {
-                            all_documents.insert(doc.id.clone());
-                        }
-                    }
-                    Err(_) => {
-                        // Continue with other terms if one fails
-                        continue;
-                    }
-                }
-            }
-
-            // If we still have no documents, try a final broad search
-            if all_documents.is_empty() {
-                let fallback_query = terraphim_types::SearchQuery {
-                    search_term: terraphim_types::NormalizedTermValue::new("*".to_string()),
-                    limit: Some(100),
-                    skip: None,
-                    role: None,
-                };
-
-                let documents = service
-                    .search(&fallback_query)
-                    .await
-                    .map_err(TerraphimMcpError::Service)?;
-
-                let resources = self
-                    .resource_mapper
-                    .documents_to_resources(&documents)
-                    .map_err(TerraphimMcpError::Anyhow)?;
-
-                return Ok(ListResourcesResult {
-                    resources,
-                    next_cursor: None,
-                });
-            }
-
-            // Convert unique document IDs back to documents for resource mapping
-            // For now, we'll do individual searches to get full document objects
-            let mut final_documents = Vec::new();
-            for doc_id in all_documents.iter().take(50) {
-                // Limit to 50 resources
-                if let Ok(Some(doc)) = service.get_document_by_id(doc_id).await {
-                    final_documents.push(doc);
-                }
-            }
+                .map_err(TerraphimMcpError::Service)?;
 
             let resources = self
                 .resource_mapper
-                .documents_to_resources(&final_documents)
+                .documents_to_resources(&documents)
                 .map_err(TerraphimMcpError::Anyhow)?;
 
-            Ok(ListResourcesResult {
+            return Ok(ListResourcesResult {
                 resources,
                 next_cursor: None,
-            })
+            });
         }
+
+        // Convert unique document IDs back to documents for resource mapping
+        // For now, we'll do individual searches to get full document objects
+        let mut final_documents = Vec::new();
+        for doc_id in all_documents.iter().take(50) {
+            // Limit to 50 resources
+            if let Ok(Some(doc)) = service.get_document_by_id(doc_id).await {
+                final_documents.push(doc);
+            }
+        }
+
+        let resources = self
+            .resource_mapper
+            .documents_to_resources(&final_documents)
+            .map_err(TerraphimMcpError::Anyhow)?;
+
+        Ok(ListResourcesResult {
+            resources,
+            next_cursor: None,
+        })
     }
 
     async fn read_resource(
@@ -1900,7 +1919,7 @@ impl ServerHandler for McpService {
         let mut service = self
             .terraphim_service()
             .await
-            .map_err(|e| TerraphimMcpError::Anyhow(e))?;
+            .map_err(TerraphimMcpError::Anyhow)?;
         let document = service
             .get_document_by_id(&doc_id)
             .await
@@ -1922,14 +1941,13 @@ impl ServerHandler for McpService {
     }
 
     fn get_info(&self) -> ServerInfo {
-        let server_info = ServerInfo {
+        ServerInfo {
             server_info: rmcp::model::Implementation {
                 name: "terraphim-mcp".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
             instructions: Some("This server provides Terraphim knowledge graph search capabilities through the Model Context Protocol. You can search for documents using the search tool and access resources that represent Terraphim documents.".to_string()),
             ..Default::default()
-        };
-        server_info
+        }
     }
 }

@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load configuration from environment variables
     let config = Config::from_env()?;
     let store = Store::new(config)?;
-    
+
     // Create a resource
     let mut properties = HashMap::new();
     properties.insert(
@@ -75,11 +75,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "https://atomicdata.dev/properties/isA".to_string(),
         json!(["https://atomicdata.dev/classes/Thing"]),
     );
-    
+
     let subject = format!("{}/{}", store.config.server_url, "my-resource");
     let result = store.create_with_commit(&subject, properties).await?;
     println!("Resource created: {:#?}", result);
-    
+
     Ok(())
 }
 ```
@@ -95,4 +95,4 @@ atomic-server-client = { git = "https://github.com/yourusername/atomic-server-cl
 
 ## License
 
-MIT 
+MIT

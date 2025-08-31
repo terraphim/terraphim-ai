@@ -33,8 +33,7 @@ impl std::fmt::Display for TaskId {
 }
 
 /// Priority levels for summarization tasks
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum Priority {
     /// Low priority - batch processing
     Low = 0,
@@ -47,35 +46,34 @@ pub enum Priority {
     Critical = 3,
 }
 
-
 /// Status of a summarization task
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskStatus {
     /// Task is queued and waiting to be processed
-    Pending { 
+    Pending {
         queued_at: DateTime<Utc>,
         position_in_queue: Option<usize>,
     },
     /// Task is currently being processed
-    Processing { 
+    Processing {
         started_at: DateTime<Utc>,
         progress: Option<f32>,
     },
     /// Task completed successfully
-    Completed { 
+    Completed {
         summary: String,
         completed_at: DateTime<Utc>,
         processing_duration_seconds: u64,
     },
     /// Task failed with error
-    Failed { 
+    Failed {
         error: String,
         failed_at: DateTime<Utc>,
         retry_count: u32,
         next_retry_at: Option<DateTime<Utc>>,
     },
     /// Task was cancelled
-    Cancelled { 
+    Cancelled {
         cancelled_at: DateTime<Utc>,
         reason: String,
     },
@@ -83,7 +81,10 @@ pub enum TaskStatus {
 
 impl TaskStatus {
     pub fn is_terminal(&self) -> bool {
-        matches!(self, TaskStatus::Completed { .. } | TaskStatus::Failed { .. } | TaskStatus::Cancelled { .. })
+        matches!(
+            self,
+            TaskStatus::Completed { .. } | TaskStatus::Failed { .. } | TaskStatus::Cancelled { .. }
+        )
     }
 
     pub fn is_processing(&self) -> bool {
@@ -196,16 +197,22 @@ pub struct QueueConfig {
 impl Default for QueueConfig {
     fn default() -> Self {
         let mut rate_limits = HashMap::new();
-        rate_limits.insert("openrouter".to_string(), RateLimitConfig {
-            max_requests_per_minute: 60,
-            max_tokens_per_minute: 10000,
-            burst_size: 10,
-        });
-        rate_limits.insert("ollama".to_string(), RateLimitConfig {
-            max_requests_per_minute: 300,
-            max_tokens_per_minute: 50000,
-            burst_size: 50,
-        });
+        rate_limits.insert(
+            "openrouter".to_string(),
+            RateLimitConfig {
+                max_requests_per_minute: 60,
+                max_tokens_per_minute: 10000,
+                burst_size: 10,
+            },
+        );
+        rate_limits.insert(
+            "ollama".to_string(),
+            RateLimitConfig {
+                max_requests_per_minute: 300,
+                max_tokens_per_minute: 50000,
+                burst_size: 50,
+            },
+        );
 
         Self {
             max_queue_size: 1000,
@@ -234,7 +241,7 @@ pub struct RateLimitConfig {
 #[derive(Debug)]
 pub enum QueueCommand {
     /// Submit a new task
-    SubmitTask(SummarizationTask),
+    SubmitTask(Box<SummarizationTask>),
     /// Cancel a task
     CancelTask(TaskId, String),
     /// Pause processing
@@ -289,7 +296,7 @@ pub struct RateLimiterStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubmitResult {
     /// Task was successfully queued
-    Queued { 
+    Queued {
         task_id: TaskId,
         position_in_queue: usize,
         estimated_wait_time_seconds: Option<u64>,
@@ -325,7 +332,10 @@ impl SummarizationQueue {
     }
 
     /// Submit a task to the queue
-    pub async fn submit_task(&self, task: SummarizationTask) -> Result<SubmitResult, crate::ServiceError> {
+    pub async fn submit_task(
+        &self,
+        task: SummarizationTask,
+    ) -> Result<SubmitResult, crate::ServiceError> {
         // Check if task already exists
         let task_status = self.task_status.read().await;
         if task_status.contains_key(&task.id) {
@@ -335,7 +345,9 @@ impl SummarizationQueue {
 
         // Validate task
         if task.document.body.trim().is_empty() {
-            return Ok(SubmitResult::ValidationError("Document body is empty".to_string()));
+            return Ok(SubmitResult::ValidationError(
+                "Document body is empty".to_string(),
+            ));
         }
 
         // Check queue capacity
@@ -346,8 +358,15 @@ impl SummarizationQueue {
 
         // Submit to worker
         let task_id = task.id.clone();
-        if let Err(_) = self.command_sender.send(QueueCommand::SubmitTask(task)).await {
-            return Err(crate::ServiceError::Config("Queue worker not running".to_string()));
+        if (self
+            .command_sender
+            .send(QueueCommand::SubmitTask(Box::new(task)))
+            .await)
+            .is_err()
+        {
+            return Err(crate::ServiceError::Config(
+                "Queue worker not running".to_string(),
+            ));
         }
 
         // Return success with estimated position
@@ -360,15 +379,26 @@ impl SummarizationQueue {
     }
 
     /// Cancel a task
-    pub async fn cancel_task(&self, task_id: TaskId, reason: String) -> Result<bool, crate::ServiceError> {
+    pub async fn cancel_task(
+        &self,
+        task_id: TaskId,
+        reason: String,
+    ) -> Result<bool, crate::ServiceError> {
         let task_status = self.task_status.read().await;
         if !task_status.contains_key(&task_id) {
             return Ok(false);
         }
         drop(task_status);
 
-        if let Err(_) = self.command_sender.send(QueueCommand::CancelTask(task_id, reason)).await {
-            return Err(crate::ServiceError::Config("Queue worker not running".to_string()));
+        if (self
+            .command_sender
+            .send(QueueCommand::CancelTask(task_id, reason))
+            .await)
+            .is_err()
+        {
+            return Err(crate::ServiceError::Config(
+                "Queue worker not running".to_string(),
+            ));
         }
 
         Ok(true)
@@ -383,27 +413,39 @@ impl SummarizationQueue {
     /// Get queue statistics
     pub async fn get_stats(&self) -> Result<QueueStats, crate::ServiceError> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        
-        if let Err(_) = self.command_sender.send(QueueCommand::GetStats(sender)).await {
-            return Err(crate::ServiceError::Config("Queue worker not running".to_string()));
+
+        if (self
+            .command_sender
+            .send(QueueCommand::GetStats(sender))
+            .await)
+            .is_err()
+        {
+            return Err(crate::ServiceError::Config(
+                "Queue worker not running".to_string(),
+            ));
         }
 
-        receiver.await
+        receiver
+            .await
             .map_err(|_| crate::ServiceError::Config("Failed to get queue stats".to_string()))
     }
 
     /// Pause queue processing
     pub async fn pause(&self) -> Result<(), crate::ServiceError> {
-        if let Err(_) = self.command_sender.send(QueueCommand::Pause).await {
-            return Err(crate::ServiceError::Config("Queue worker not running".to_string()));
+        if (self.command_sender.send(QueueCommand::Pause).await).is_err() {
+            return Err(crate::ServiceError::Config(
+                "Queue worker not running".to_string(),
+            ));
         }
         Ok(())
     }
 
     /// Resume queue processing
     pub async fn resume(&self) -> Result<(), crate::ServiceError> {
-        if let Err(_) = self.command_sender.send(QueueCommand::Resume).await {
-            return Err(crate::ServiceError::Config("Queue worker not running".to_string()));
+        if (self.command_sender.send(QueueCommand::Resume).await).is_err() {
+            return Err(crate::ServiceError::Config(
+                "Queue worker not running".to_string(),
+            ));
         }
         Ok(())
     }
@@ -418,15 +460,18 @@ impl SummarizationQueue {
         // divided by number of concurrent workers
         let avg_processing_time = Duration::from_secs(10);
         let concurrent_workers = self.config.max_concurrent_workers;
-        
-        let estimated_seconds = (position as u64 * avg_processing_time.as_secs()) / concurrent_workers as u64;
+
+        let estimated_seconds =
+            (position as u64 * avg_processing_time.as_secs()) / concurrent_workers as u64;
         Some(Duration::from_secs(estimated_seconds))
     }
 
     /// Shutdown the queue
     pub async fn shutdown(&self) -> Result<(), crate::ServiceError> {
-        if let Err(_) = self.command_sender.send(QueueCommand::Shutdown).await {
-            return Err(crate::ServiceError::Config("Queue worker not running".to_string()));
+        if (self.command_sender.send(QueueCommand::Shutdown).await).is_err() {
+            return Err(crate::ServiceError::Config(
+                "Queue worker not running".to_string(),
+            ));
         }
         Ok(())
     }
@@ -445,7 +490,7 @@ mod tests {
             body: "This is a test document for summarization.".to_string(),
             url: "http://example.com".to_string(),
             description: None,
-        summarization: None,
+            summarization: None,
             stub: None,
             tags: Some(vec![]),
             rank: None,
@@ -490,7 +535,7 @@ mod tests {
     fn test_task_creation() {
         let document = create_test_document();
         let role = create_test_role();
-        
+
         let task = SummarizationTask::new(document.clone(), role.clone());
         assert_eq!(task.document.id, document.id);
         assert_eq!(task.role.name, role.name);
@@ -503,7 +548,7 @@ mod tests {
     fn test_task_builder_methods() {
         let document = create_test_document();
         let role = create_test_role();
-        
+
         let task = SummarizationTask::new(document, role)
             .with_priority(Priority::High)
             .with_max_retries(5)
@@ -514,7 +559,7 @@ mod tests {
         assert_eq!(task.priority, Priority::High);
         assert_eq!(task.max_retries, 5);
         assert_eq!(task.get_summary_length(), 500);
-        assert_eq!(task.force_regenerate, true);
+        assert!(task.force_regenerate);
         assert_eq!(task.callback_url, Some("http://callback.com".to_string()));
     }
 
@@ -527,7 +572,7 @@ mod tests {
 
     #[test]
     fn test_task_status_checks() {
-        let pending = TaskStatus::Pending { 
+        let pending = TaskStatus::Pending {
             queued_at: Utc::now(),
             position_in_queue: Some(1),
         };
@@ -548,7 +593,7 @@ mod tests {
         let config = QueueConfig::default();
         let (command_sender, _receiver) = mpsc::channel(10);
         let queue = SummarizationQueue::new(config, command_sender);
-        
+
         // Queue should be created successfully
         assert!(queue.task_status.read().await.is_empty());
     }

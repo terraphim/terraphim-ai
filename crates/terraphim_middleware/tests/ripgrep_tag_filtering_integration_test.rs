@@ -29,7 +29,7 @@ async fn test_ripgrep_tag_filtering_integration() {
         Ok(index) => {
             println!("✅ Tag filtering search completed");
             println!("   Found {} documents with tag filtering", index.len());
-            
+
             // Log document details for debugging
             for (id, doc) in index.iter().take(3) {
                 println!("   📄 Document: {} - {}", doc.title, id);
@@ -63,14 +63,19 @@ async fn test_ripgrep_tag_filtering_integration() {
         Ok(index) => {
             println!("✅ Unfiltered search completed");
             println!("   Found {} documents without tag filtering", index.len());
-            
+
             // Compare results
             if let Ok(tagged_index) = &tagged_results {
                 if index.len() >= tagged_index.len() {
-                    println!("✅ Tag filtering working as expected (fewer or equal results with filter)");
+                    println!(
+                        "✅ Tag filtering working as expected (fewer or equal results with filter)"
+                    );
                 } else {
-                    println!("⚠️ Unexpected result count: unfiltered ({}) < tagged ({})", 
-                             index.len(), tagged_index.len());
+                    println!(
+                        "⚠️ Unexpected result count: unfiltered ({}) < tagged ({})",
+                        index.len(),
+                        tagged_index.len()
+                    );
                 }
             }
         }
@@ -97,12 +102,8 @@ async fn test_various_tag_scenarios() {
     let mut single_tag_params = HashMap::new();
     single_tag_params.insert("tag".to_string(), "#docs".to_string());
 
-    let single_tag_haystack = Haystack::new(
-        base_path.to_string(),
-        ServiceType::Ripgrep,
-        true,
-    )
-    .with_extra_parameters(single_tag_params);
+    let single_tag_haystack = Haystack::new(base_path.to_string(), ServiceType::Ripgrep, true)
+        .with_extra_parameters(single_tag_params);
 
     println!("Scenario 1: Single tag filter (#docs)");
     match indexer.index("documentation", &single_tag_haystack).await {
@@ -115,12 +116,8 @@ async fn test_various_tag_scenarios() {
     multi_tag_params.insert("tag".to_string(), "#test #rust".to_string());
     multi_tag_params.insert("context".to_string(), "2".to_string());
 
-    let multi_tag_haystack = Haystack::new(
-        base_path.to_string(),
-        ServiceType::Ripgrep,
-        true,
-    )
-    .with_extra_parameters(multi_tag_params);
+    let multi_tag_haystack = Haystack::new(base_path.to_string(), ServiceType::Ripgrep, true)
+        .with_extra_parameters(multi_tag_params);
 
     println!("Scenario 2: Multiple tags (#test #rust)");
     match indexer.index("testing", &multi_tag_haystack).await {
@@ -132,12 +129,8 @@ async fn test_various_tag_scenarios() {
     let mut nonexistent_tag_params = HashMap::new();
     nonexistent_tag_params.insert("tag".to_string(), "#nonexistent".to_string());
 
-    let nonexistent_tag_haystack = Haystack::new(
-        base_path.to_string(),
-        ServiceType::Ripgrep,
-        true,
-    )
-    .with_extra_parameters(nonexistent_tag_params);
+    let nonexistent_tag_haystack = Haystack::new(base_path.to_string(), ServiceType::Ripgrep, true)
+        .with_extra_parameters(nonexistent_tag_params);
 
     println!("Scenario 3: Non-existent tag (#nonexistent)");
     match indexer.index("any", &nonexistent_tag_haystack).await {
@@ -145,9 +138,12 @@ async fn test_various_tag_scenarios() {
             if index.is_empty() {
                 println!("   ✅ Correctly returned no results for non-existent tag");
             } else {
-                println!("   ⚠️ Unexpectedly found {} results for non-existent tag", index.len());
+                println!(
+                    "   ⚠️ Unexpectedly found {} results for non-existent tag",
+                    index.len()
+                );
             }
-        },
+        }
         Err(e) => println!("   Error: {:?}", e),
     }
 
@@ -158,12 +154,8 @@ async fn test_various_tag_scenarios() {
     complex_params.insert("context".to_string(), "1".to_string());
     complex_params.insert("case_sensitive".to_string(), "true".to_string());
 
-    let complex_haystack = Haystack::new(
-        base_path.to_string(),
-        ServiceType::Ripgrep,
-        true,
-    )
-    .with_extra_parameters(complex_params);
+    let complex_haystack = Haystack::new(base_path.to_string(), ServiceType::Ripgrep, true)
+        .with_extra_parameters(complex_params);
 
     println!("Scenario 4: Complex parameters (tag + max_count + context + case_sensitive)");
     match indexer.index("Rust", &complex_haystack).await {
@@ -240,14 +232,14 @@ async fn demonstrate_command_construction() {
     ui_config.insert("max_count".to_string(), "10".to_string());
 
     let extra_args = command.parse_extra_parameters(&ui_config);
-    
+
     // Simulate the complete command construction
     let needle = "async";
     let haystack_path = "/path/to/documents";
-    
+
     // This mirrors the logic in RipgrepCommand::run_with_extra_args
-    let default_args = vec!["--json", "--trim", "-C3", "--ignore-case", "-tmarkdown"];
-    
+    let default_args = ["--json", "--trim", "-C3", "--ignore-case", "-tmarkdown"];
+
     let full_command: Vec<String> = default_args
         .iter()
         .map(|s| s.to_string())
@@ -258,7 +250,7 @@ async fn demonstrate_command_construction() {
     println!("Expected full command: rg {}", full_command.join(" "));
     println!("This should be equivalent to:");
     println!("  rg --json --trim -C3 --ignore-case -tmarkdown --all-match --max-count 10 -e async -e #rust /path/to/documents");
-    
+
     // Verify key components
     assert!(full_command.contains(&"--all-match".to_string()));
     assert!(full_command.contains(&"-e".to_string()));

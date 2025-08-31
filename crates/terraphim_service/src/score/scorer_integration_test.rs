@@ -8,7 +8,9 @@ mod tests {
             Document {
                 id: "doc1".to_string(),
                 title: "Rust Programming".to_string(),
-                body: "Rust is a systems programming language that focuses on safety and performance".to_string(),
+                body:
+                    "Rust is a systems programming language that focuses on safety and performance"
+                        .to_string(),
                 url: "http://example.com/doc1".to_string(),
                 description: Some("About Rust programming".to_string()),
                 summarization: None,
@@ -30,7 +32,8 @@ mod tests {
             Document {
                 id: "doc3".to_string(),
                 title: "Machine Learning".to_string(),
-                body: "Machine learning involves algorithms that improve through experience".to_string(),
+                body: "Machine learning involves algorithms that improve through experience"
+                    .to_string(),
                 url: "http://example.com/doc3".to_string(),
                 description: Some("About machine learning".to_string()),
                 summarization: None,
@@ -49,7 +52,7 @@ mod tests {
 
         // Test scoring
         let score1 = scorer.score("programming", &documents[0]);
-        let score2 = scorer.score("programming", &documents[1]); 
+        let score2 = scorer.score("programming", &documents[1]);
         let score3 = scorer.score("programming", &documents[2]);
 
         // Documents 1 and 2 should have higher scores than document 3 for "programming" query
@@ -112,10 +115,10 @@ mod tests {
         assert!(score2 > score3);
     }
 
-    #[test] 
+    #[test]
     fn test_with_params_functionality() {
         use super::super::common::BM25Params;
-        
+
         let params = BM25Params {
             k1: 2.0,
             b: 0.5,
@@ -160,7 +163,7 @@ mod tests {
         // Test with TFIDF scorer
         let query = Query {
             name: "programming".to_string(),
-            name_scorer: QueryScorer::TFIDF,
+            name_scorer: QueryScorer::Tfidf,
             similarity: Similarity::default(),
             size: 30,
         };

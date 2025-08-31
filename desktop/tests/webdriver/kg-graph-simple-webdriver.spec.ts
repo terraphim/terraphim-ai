@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Simple WebDriver test for KG Graph Functionality with Tauri v1
- * 
+ *
  * This test uses Playwright to test the Tauri application in a way that
  * simulates WebDriver testing without requiring the Tauri v2 WebDriver plugin.
  */
@@ -11,14 +11,14 @@ test.describe('KG Graph Functionality - Simple WebDriver Test', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the Tauri app
     await page.goto('/');
-    
+
     // Wait for the app to load
     await page.waitForSelector('input[type="search"], #search-input, .search-input', { timeout: 30000 });
   });
 
   test('should prove KG graph functionality with simple WebDriver approach', async ({ page }) => {
     console.log('🔍 PROVING KG Graph Functionality with Simple WebDriver Test...');
-    
+
     // Verify search interface is working
     const searchInput = page.locator('input[type="search"], #search-input, .search-input').first();
     await expect(searchInput).toBeVisible();
@@ -27,23 +27,23 @@ test.describe('KG Graph Functionality - Simple WebDriver Test', () => {
     // Test basic search functionality
     await searchInput.fill('terraphim');
     await searchInput.press('Enter');
-    
+
     // Wait for search to complete
     await page.waitForTimeout(3000);
     console.log('✅ Search functionality working');
 
     // Navigate to graph visualization
     console.log('📊 Testing graph navigation...');
-    
+
     // Try to find navigation to graph
     let graphLink = page.locator('a[href="/graph"], a[href*="graph"], button:has-text("Graph"), .nav-link:has-text("Graph")');
-    
+
     // Check for footer navigation
     try {
       const footer = page.locator('footer');
       await footer.hover();
       await page.waitForTimeout(500);
-      
+
       await expect(graphLink).toBeVisible({ timeout: 5000 });
     } catch (e) {
       console.log('⚠️ Footer navigation not found, trying direct navigation');
@@ -310,13 +310,13 @@ test.describe('KG Graph Functionality - Simple WebDriver Test', () => {
 
     // Check if we're in a Tauri environment
     const isTauri = await page.evaluate(() => {
-      return typeof window !== 'undefined' && 
+      return typeof window !== 'undefined' &&
              typeof (window as any).__TAURI__ !== 'undefined';
     });
 
     if (isTauri) {
       console.log('✅ Running in Tauri environment');
-      
+
       // Test Tauri commands if available
       try {
         const tauriCommands = await page.evaluate(() => {
@@ -325,7 +325,7 @@ test.describe('KG Graph Functionality - Simple WebDriver Test', () => {
           }
           return false;
         });
-        
+
         if (tauriCommands) {
           console.log('✅ Tauri commands are available');
         }
@@ -353,4 +353,4 @@ test.describe('KG Graph Functionality - Simple WebDriver Test', () => {
     console.log('');
     console.log('🎯 CONCLUSION: KG Graph functionality is working properly in Tauri v1 context!');
   });
-}); 
+});

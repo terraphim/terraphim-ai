@@ -62,11 +62,11 @@ echo -e "   ${YELLOW}cargo run --bin terraphim_server -- --config $CONFIG_FILE${
 
 echo -e "${BLUE}Available roles in this configuration:${NC}"
 echo -e "   🔧 System Operator (default) - Uses TerraphimGraph with remote KG"
-echo -e "   👷 Engineer - Uses TerraphimGraph with remote KG"  
+echo -e "   👷 Engineer - Uses TerraphimGraph with remote KG"
 echo -e "   📝 Default - Uses TitleScorer for basic search"
 
 echo -e "${BLUE}💡 The configuration includes:${NC}"
 echo -e "   ✅ Remote knowledge graph from staging-storage.terraphim.io"
 echo -e "   ✅ Local document indexing from GitHub repository"
 echo -e "   ✅ Read-only document access (safe for production)"
-echo -e "   ✅ Multiple search backends (Ripgrep + TerraphimGraph)" 
+echo -e "   ✅ Multiple search backends (Ripgrep + TerraphimGraph)"

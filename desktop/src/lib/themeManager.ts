@@ -43,4 +43,4 @@ function applyTheme(name: string) {
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 const unsubscribe = theme.subscribe(applyTheme);
-// We never unsubscribe because the application lives as long as the page. 
+// We never unsubscribe because the application lives as long as the page.

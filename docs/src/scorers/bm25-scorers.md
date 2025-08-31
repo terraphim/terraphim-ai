@@ -143,4 +143,4 @@ BM25 scorers integrate seamlessly with Terraphim's existing scoring infrastructu
 - Compatible with existing `QueryScorer` enum
 - Works with current document indexing system
 - Supports all existing document fields
-- Maintains backward compatibility with similarity-based scoring 
+- Maintains backward compatibility with similarity-based scoring

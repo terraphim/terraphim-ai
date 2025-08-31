@@ -27,7 +27,7 @@ mod tests {
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
             .add_role(
-                "Default".into(),
+                "Default",
                 Role {
                     shortname: Some("Default".to_string()),
                     name: "Default".into(),
@@ -41,12 +41,26 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                     }],
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                     extra: AHashMap::new(),
                     terraphim_it: false,
                 },
             )
             .add_role(
-                "Engineer".into(),
+                "Engineer",
                 Role {
                     shortname: Some("Engineer".into()),
                     name: "Engineer".into(),
@@ -68,12 +82,26 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                     }],
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                     extra: AHashMap::new(),
                     terraphim_it: false,
                 },
             )
             .add_role(
-                "System Operator".into(),
+                "System Operator",
                 Role {
                     shortname: Some("operator".to_string()),
                     name: "System Operator".into(),
@@ -95,6 +123,20 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                     }],
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                     extra: AHashMap::new(),
                     terraphim_it: false,
                 },
@@ -130,7 +172,7 @@ mod tests {
 
     async fn wait_for_server_ready(address: SocketAddr) {
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
@@ -186,11 +228,13 @@ mod tests {
     async fn test_rolegraph_visualization_structure() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Trigger search to ensure KG indexing is warmed up
         let _ = client
-            .get(format!("http://{server}/documents/search?search_term=haystack&role=Engineer"))
+            .get(format!(
+                "http://{server}/documents/search?search_term=haystack&role=Engineer"
+            ))
             .send()
             .await
             .ok();
@@ -261,11 +305,13 @@ mod tests {
     async fn test_rolegraph_visualization_system_operator() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Trigger search warmup
         let _ = client
-            .get(format!("http://{server}/documents/search?search_term=haystack&role=System%20Operator"))
+            .get(format!(
+                "http://{server}/documents/search?search_term=haystack&role=System%20Operator"
+            ))
             .send()
             .await
             .ok();
@@ -305,7 +351,7 @@ mod tests {
     async fn test_rolegraph_visualization_no_kg() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Test Default role (no knowledge graph)
         let response = client
@@ -324,7 +370,7 @@ mod tests {
     async fn test_rolegraph_visualization_default_role() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Test without specifying role (should use selected role)
         let response = client
@@ -343,7 +389,7 @@ mod tests {
     async fn test_rolegraph_visualization_consistency() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Test Engineer role multiple times to ensure consistency
         let response1 = client
@@ -395,7 +441,7 @@ mod tests {
     async fn test_rolegraph_visualization_invalid_role() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Test with invalid role name
         let response = client
@@ -414,7 +460,7 @@ mod tests {
     async fn test_rolegraph_visualization_node_labels() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         let response = client
             .get(format!("http://{server}/rolegraph?role=Engineer"))
@@ -452,7 +498,7 @@ mod tests {
     async fn test_rolegraph_visualization_edge_relationships() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         let response = client
             .get(format!("http://{server}/rolegraph?role=Engineer"))

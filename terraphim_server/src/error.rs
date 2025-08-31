@@ -39,12 +39,14 @@ impl IntoResponse for ApiError {
         let mut current_error: &dyn std::error::Error = self.1.as_ref();
         loop {
             // Check for specific service error types
-            if let Some(service_err) = current_error.downcast_ref::<terraphim_service::ServiceError>() {
+            if let Some(service_err) =
+                current_error.downcast_ref::<terraphim_service::ServiceError>()
+            {
                 category = Some(format!("{:?}", service_err.category()).to_lowercase());
                 recoverable = Some(service_err.is_recoverable());
                 break;
             }
-            
+
             // Continue down the error chain
             match current_error.source() {
                 Some(source) => current_error = source,

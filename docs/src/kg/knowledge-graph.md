@@ -48,7 +48,7 @@ use terraphim_rolegraph::RoleGraph;
 let documents = load_documents_from_path("./docs/src/kg")?;
 let graph = RoleGraph::from_documents(&documents)?;
 
-println!("Graph contains {} nodes and {} edges", 
+println!("Graph contains {} nodes and {} edges",
     graph.nodes.len(), graph.edges.len());
 ```
 
@@ -183,7 +183,7 @@ for doc in &ranked_docs {
 // Apply knowledge graph preprocessing
 if role.terraphim_it {
     let enhanced_doc = service.preprocess_document_content(doc, &role).await?;
-    
+
     // Document now contains KG links
     println!("Enhanced document: {}", enhanced_doc.body);
 }
@@ -289,7 +289,7 @@ graph.recalculate_ranks()?;
 fn test_graph_construction() {
     let documents = create_test_documents();
     let graph = RoleGraph::from_documents(&documents)?;
-    
+
     assert!(graph.nodes.len() > 0);
     assert!(graph.edges.len() > 0);
     assert!(graph.thesaurus.len() > 0);
@@ -301,11 +301,11 @@ fn test_graph_construction() {
 #[test]
 fn test_graph_traversal() {
     let graph = create_test_graph();
-    
+
     // Test node traversal
     let connected = graph.get_connected_nodes(1)?;
     assert!(!connected.is_empty());
-    
+
     // Test path finding
     let path = graph.find_shortest_path(1, 5)?;
     assert!(!path.is_empty());
@@ -318,14 +318,14 @@ fn test_graph_traversal() {
 async fn test_kg_integration() {
     let config_state = create_test_config_state();
     let mut service = TerraphimService::new(config_state);
-    
+
     let search_query = SearchQuery {
         search_term: NormalizedTermValue::from("rust"),
         skip: None,
         limit: Some(10),
         role: Some(RoleName::from("Engineer")),
     };
-    
+
     let results = service.search(&search_query).await?;
     assert!(!results.is_empty());
 }
@@ -365,4 +365,4 @@ async fn test_kg_integration() {
 2. **Semantic similarity**: Advanced similarity measures
 3. **Graph neural networks**: Deep learning for graph analysis
 4. **Temporal graphs**: Time-aware graph structures
-5. **Heterogeneous graphs**: Multi-type node and edge support 
+5. **Heterogeneous graphs**: Multi-type node and edge support

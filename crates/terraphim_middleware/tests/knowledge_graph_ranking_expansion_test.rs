@@ -47,7 +47,7 @@ async fn test_knowledge_graph_ranking_expansion() {
         .await
         .expect("Failed to read kg directory");
     while let Some(entry) = entries.next_entry().await.expect("Failed to read entry") {
-        if entry.path().extension().map_or(false, |ext| ext == "md") {
+        if entry.path().extension().is_some_and(|ext| ext == "md") {
             let file_name = entry.file_name();
             let source_path = entry.path();
             let dest_path = temp_kg_path.join(&file_name);
@@ -101,7 +101,7 @@ async fn test_knowledge_graph_ranking_expansion() {
         .await
         .expect("Failed to read temp kg directory");
     while let Some(entry) = entries.next_entry().await.expect("Failed to read entry") {
-        if entry.path().extension().map_or(false, |ext| ext == "md") {
+        if entry.path().extension().is_some_and(|ext| ext == "md") {
             let content = fs::read_to_string(&entry.path())
                 .await
                 .expect("Failed to read file");
@@ -167,7 +167,7 @@ This concept extends the capabilities of graph-based systems by providing deeper
 ## Key Features
 
 - Advanced relationship detection
-- Semantic connectivity mapping  
+- Semantic connectivity mapping
 - Dynamic graph structure analysis
 - Knowledge pattern recognition
 
@@ -216,7 +216,7 @@ The Graph Analysis component works closely with existing graph processing system
         .await
         .expect("Failed to read temp kg directory");
     while let Some(entry) = entries.next_entry().await.expect("Failed to read entry") {
-        if entry.path().extension().map_or(false, |ext| ext == "md") {
+        if entry.path().extension().is_some_and(|ext| ext == "md") {
             let content = fs::read_to_string(&entry.path())
                 .await
                 .expect("Failed to read file");

@@ -66,7 +66,7 @@ export class NovelAutocompleteService {
           return true;
         }
       }
-      
+
       console.warn('Failed to build Novel autocomplete index');
       return false;
     } catch (error) {
@@ -91,14 +91,14 @@ export class NovelAutocompleteService {
     try {
       // Extract the last word or phrase from the prompt for autocomplete
       const lastWord = this.extractLastWord(request.prompt);
-      
+
       if (!lastWord || lastWord.length < 2) {
         return { text: '' };
       }
 
       // Get suggestions with snippets for better context
       const suggestions = await this.getSuggestionsWithSnippets(lastWord, 5);
-      
+
       if (suggestions.length === 0) {
         return { text: '' };
       }
@@ -106,11 +106,11 @@ export class NovelAutocompleteService {
       // Return the best suggestion as completion text
       const bestSuggestion = suggestions[0];
       const completionText = bestSuggestion.text;
-      
+
       // Calculate token usage (approximate)
       const promptTokens = request.prompt.length / 4; // Rough estimate
       const completionTokens = completionText.length / 4;
-      
+
       return {
         text: completionText,
         usage: {
@@ -163,7 +163,7 @@ export class NovelAutocompleteService {
           return this.parseAutocompleteContent(result.result.content);
         }
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error getting autocomplete suggestions:', error);
@@ -209,7 +209,7 @@ export class NovelAutocompleteService {
           return this.parseAutocompleteWithSnippetsContent(result.result.content);
         }
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error getting autocomplete suggestions with snippets:', error);
@@ -230,7 +230,7 @@ export class NovelAutocompleteService {
    */
   private parseAutocompleteContent(content: any[]): NovelAutocompleteSuggestion[] {
     const suggestions: NovelAutocompleteSuggestion[] = [];
-    
+
     for (const item of content) {
       if (item.type === 'text' && item.text) {
         // Skip the summary line (e.g., "Found X suggestions")
@@ -245,7 +245,7 @@ export class NovelAutocompleteService {
         }
       }
     }
-    
+
     return suggestions;
   }
 
@@ -254,7 +254,7 @@ export class NovelAutocompleteService {
    */
   private parseAutocompleteWithSnippetsContent(content: any[]): NovelAutocompleteSuggestion[] {
     const suggestions: NovelAutocompleteSuggestion[] = [];
-    
+
     for (const item of content) {
       if (item.type === 'text' && item.text) {
         // Skip the summary line
@@ -278,7 +278,7 @@ export class NovelAutocompleteService {
         }
       }
     }
-    
+
     return suggestions;
   }
 

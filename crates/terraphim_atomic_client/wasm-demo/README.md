@@ -41,4 +41,4 @@ Run with Trunk and open demo:
 trunk serve
 ```
 
-Open http://localhost:8080/ in your browser for the CRUD playground or navigate to `/tests.html` for the automated WASM test runner. You can also click the link at the top of the index page. 
+Open http://localhost:8080/ in your browser for the CRUD playground or navigate to `/tests.html` for the automated WASM test runner. You can also click the link at the top of the index page.

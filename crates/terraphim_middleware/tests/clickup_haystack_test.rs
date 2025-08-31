@@ -43,6 +43,7 @@ async fn clickup_live_search_returns_documents() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()
@@ -60,9 +61,11 @@ async fn clickup_live_search_returns_documents() {
         skip: Some(0),
         limit: Some(10),
         role: Some("ClickUp".into()),
+        operator: None,
+        search_terms: None,
     };
-    let results = search_haystacks(config_state, query).await.unwrap();
-    assert!(results.len() >= 0);
+    let _results = search_haystacks(config_state, query).await.unwrap();
+    // Results should be empty or non-empty (both are valid for this test)
 }
 
 #[tokio::test]
@@ -89,6 +92,7 @@ async fn clickup_live_search_work_term() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()
@@ -106,7 +110,12 @@ async fn clickup_live_search_work_term() {
         skip: Some(0),
         limit: Some(10),
         role: Some("ClickUp".into()),
+        operator: None,
+        search_terms: None,
     };
     let results = search_haystacks(config_state, query).await.unwrap();
-    assert!(results.len() > 0, "expected some ClickUp results for term 'work'");
+    assert!(
+        !results.is_empty(),
+        "expected some ClickUp results for term 'work'"
+    );
 }

@@ -10,7 +10,7 @@ This directory contains comprehensive integration tests and role configurations 
    ```bash
    # Install Ollama (if not already installed)
    curl -fsSL https://ollama.ai/install.sh | sh
-   
+
    # Start Ollama service
    ollama serve
    ```
@@ -180,7 +180,7 @@ The Ollama integration is implemented in `crates/terraphim_service/src/llm.rs`:
    ```bash
    # Check if Ollama is running
    ps aux | grep ollama
-   
+
    # Start Ollama service
    ollama serve
    ```
@@ -189,7 +189,7 @@ The Ollama integration is implemented in `crates/terraphim_service/src/llm.rs`:
    ```bash
    # List available models
    ollama list
-   
+
    # Pull the required model
    ollama pull llama3.2:3b
    ```
@@ -198,7 +198,7 @@ The Ollama integration is implemented in `crates/terraphim_service/src/llm.rs`:
    ```bash
    # Check Ollama port
    netstat -an | grep 11434
-   
+
    # Test connectivity
    curl -v http://127.0.0.1:11434/api/tags
    ```
@@ -207,7 +207,7 @@ The Ollama integration is implemented in `crates/terraphim_service/src/llm.rs`:
    ```bash
    # Run with verbose output
    cargo test --features ollama ollama -- --nocapture
-   
+
    # Check logs
    export RUST_LOG=debug
    ```

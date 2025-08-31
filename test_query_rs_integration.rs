@@ -9,7 +9,7 @@ async fn main() {
 
     // Create the QueryRs haystack indexer
     let indexer = QueryRsHaystackIndexer::new();
-    
+
     // Create a haystack configuration
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
@@ -29,7 +29,7 @@ async fn main() {
         match indexer.index(query, &haystack).await {
             Ok(index) => {
                 println!("✅ Successfully indexed {} documents", index.len());
-                
+
                 // Show some sample results
                 for (id, doc) in index.iter().take(3) {
                     println!("  📄 {}: {}", doc.title, doc.url);
@@ -56,4 +56,4 @@ async fn main() {
     println!("  ✅ It can make HTTP requests to query.rs endpoints");
     println!("  ✅ It can parse responses into Document format");
     println!("  ✅ It handles errors gracefully");
-} 
+}

@@ -105,9 +105,8 @@ mod tests {
             .expect("Failed to delete resource via commit");
 
         // Verify the resource was deleted
-        match store.get_resource(&test_resource_id).await {
-            Ok(_) => panic!("Resource was not deleted"),
-            Err(_) => (),
+        if store.get_resource(&test_resource_id).await.is_ok() {
+            panic!("Resource was not deleted")
         }
     }
 }

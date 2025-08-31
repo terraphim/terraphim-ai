@@ -5,7 +5,7 @@ This document demonstrates the KG auto-linking functionality.
 When using the Terraphim Engineer role with `terraphim_it: true`, terms from the knowledge graph should automatically become clickable links:
 
 - The **graph** concept is central to our architecture
-- Our **haystack** system indexes documents efficiently  
+- Our **haystack** system indexes documents efficiently
 - The **service** layer provides core functionality
 - **graph embeddings** improve semantic search
 
@@ -20,6 +20,6 @@ To test this functionality:
 
 The preprocessing should convert:
 - `graph` → `[graph](kg:graph)`
-- `haystack` → `[haystack](kg:haystack)` 
+- `haystack` → `[haystack](kg:haystack)`
 - `service` → `[service](kg:service)`
-- `graph embeddings` → `[graph embeddings](kg:graph-embeddings)` 
+- `graph embeddings` → `[graph embeddings](kg:graph-embeddings)`

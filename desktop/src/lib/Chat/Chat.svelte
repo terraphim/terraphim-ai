@@ -108,7 +108,7 @@
       </div>
     </div>
   </div>
-  
+
 </section>
 
 <style>
@@ -131,5 +131,3 @@
   .loading { display: inline-flex; gap: 0.5rem; align-items: center; }
   .chat-input { align-items: flex-end; }
 </style>
-
-

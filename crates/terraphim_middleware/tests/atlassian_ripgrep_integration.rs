@@ -32,6 +32,7 @@ async fn atlassian_ripgrep_haystack_smoke() {
             true,
         )],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()
@@ -51,10 +52,18 @@ async fn atlassian_ripgrep_haystack_smoke() {
         skip: Some(0),
         limit: Some(10),
         role: Some("Atlassian".into()),
+        operator: Some(terraphim_types::LogicalOperator::And),
+        search_terms: None,
     };
     let result = search_haystacks(config_state, query).await;
-    assert!(result.is_ok(), "search should succeed against Atlassian haystack");
+    assert!(
+        result.is_ok(),
+        "search should succeed against Atlassian haystack"
+    );
 
     let index = result.unwrap();
-    eprintln!("Atlassian haystack search returned {} documents", index.len());
+    eprintln!(
+        "Atlassian haystack search returned {} documents",
+        index.len()
+    );
 }

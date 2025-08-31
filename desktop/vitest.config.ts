@@ -26,4 +26,4 @@ export default defineConfig({
       '$app': new URL('./.svelte-kit/dev/runtime/app', import.meta.url).pathname
     }
   }
-}); 
+});

@@ -66,14 +66,14 @@ cargo test --test terraphim_engineer_integration_test -- --nocapture
 ### Roles Available
 
 1. **Terraphim Engineer** (Default)
-   - **Relevance Function**: `terraphim-graph` 
+   - **Relevance Function**: `terraphim-graph`
    - **Theme**: `lumen` (light theme)
    - **Local KG**: ✅ Built from `./docs/src/kg`
    - **Local Docs**: ✅ `./docs/src`
 
 2. **Engineer**
    - **Relevance Function**: `terraphim-graph`
-   - **Theme**: `lumen` (light theme)  
+   - **Theme**: `lumen` (light theme)
    - **Local KG**: ✅ Built from `./docs/src/kg`
    - **Local Docs**: ✅ `./docs/src`
 
@@ -87,7 +87,7 @@ cargo test --test terraphim_engineer_integration_test -- --nocapture
 
 - **Source**: `./docs/src/kg/*.md` files
 - **Build Time**: During server startup (10-30 seconds)
-- **Content**: 
+- **Content**:
   - `terraphim-graph.md` - Graph architecture concepts
   - `service.md` - Service definitions
   - `haystack.md` - Haystack integration
@@ -95,9 +95,9 @@ cargo test --test terraphim_engineer_integration_test -- --nocapture
 
 ### Document Collection Details
 
-- **Source**: `./docs/src/*.md` files  
+- **Source**: `./docs/src/*.md` files
 - **Count**: ~15 documentation files
-- **Content**: 
+- **Content**:
   - Architecture documentation
   - API guides
   - Use cases and examples
@@ -178,7 +178,7 @@ When searching for "service":
    ```bash
    # Check if KG files exist
    ls -la docs/src/kg/
-   
+
    # Verify markdown files
    find docs/src/kg -name "*.md"
    ```
@@ -192,7 +192,7 @@ When searching for "service":
    ```bash
    # Check if port is in use
    lsof -i :8000
-   
+
    # Use different port
    cargo run --bin terraphim_server -- --config terraphim_server/default/terraphim_engineer_config.json --addr 127.0.0.1:8080
    ```
@@ -238,7 +238,7 @@ docker run -p 8000:8000 \
 
 ### Knowledge Graph Files
 - **terraphim-graph.md**: 352 bytes, 11 lines - Graph architecture concepts
-- **service.md**: 52 bytes, 3 lines - Service definitions  
+- **service.md**: 52 bytes, 3 lines - Service definitions
 - **haystack.md**: 49 bytes, 2 lines - Haystack integration
 
 ### Documentation Files
@@ -282,4 +282,4 @@ To improve the Terraphim Engineer configuration:
 
 ## 📄 License
 
-This configuration is part of the Terraphim project and follows the same Apache 2.0 license. 
+This configuration is part of the Terraphim project and follows the same Apache 2.0 license.

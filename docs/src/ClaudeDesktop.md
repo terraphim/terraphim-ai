@@ -22,7 +22,7 @@ The `terraphim-ai-desktop` binary can run in MCP server mode, providing the exac
 
 The dedicated `terraphim_mcp_server` binary provides MCP server functionality:
 
-```bash  
+```bash
 ./target/debug/terraphim_mcp_server
 ```
 
@@ -33,10 +33,10 @@ The dedicated `terraphim_mcp_server` binary provides MCP server functionality:
 * Build the Terraphim AI binaries:
   ```bash
   cd /path/to/terraphim-ai
-  
+
   # Build desktop binary (includes MCP server mode)
   cargo build --package terraphim-ai-desktop
-  
+
   # Optional: Build standalone MCP server
   cargo build --package terraphim_mcp_server
   ```
@@ -74,7 +74,7 @@ mcp-server
 
 1. Open **Claude Desktop → Settings → Tools → Custom MCP backend**
 2. Set **Executable** to the **absolute path** of your chosen binary
-3. Set **Arguments** as specified above  
+3. Set **Arguments** as specified above
 4. *(Optional)* Enable **Reuse process** to keep the server alive between sessions
 5. Save and connect
 
@@ -82,7 +82,7 @@ mcp-server
 
 Both MCP server options now use the **desktop configuration** which provides:
 
-- **Default Role:** "Terraphim Engineer" 
+- **Default Role:** "Terraphim Engineer"
 - **Knowledge Graph:** Local KG built from `docs/src/kg/` (10 entries)
 - **Relevance Function:** TerraphimGraph
 - **Haystacks:** Local markdown files in `docs/src/`
@@ -96,7 +96,7 @@ Test your setup manually:
 # Test desktop binary in MCP mode
 echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | ./target/debug/terraphim-ai-desktop mcp-server 2>/dev/null
 
-# Test standalone MCP server  
+# Test standalone MCP server
 echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | ./target/debug/terraphim_mcp_server 2>/dev/null
 ```
 
@@ -107,7 +107,7 @@ Both should return a JSON response with `"serverInfo":{"name":"terraphim-mcp","v
 With the default Terraphim Engineer configuration, Claude can search for:
 
 - **Terraphim-specific terms:** "terraphim-graph", "graph embeddings", "knowledge graph based embeddings"
-- **Technical concepts:** "haystack", "service", "middleware", "provider"  
+- **Technical concepts:** "haystack", "service", "middleware", "provider"
 - **General terms:** "graph", "agent", "datasource"
 
 Example search queries that work:
@@ -128,7 +128,7 @@ Example search queries that work:
 ## Related Commands
 
 * **GUI mode (default):** `./target/debug/terraphim-ai-desktop`
-* **MCP server mode (desktop binary):** `./target/debug/terraphim-ai-desktop mcp-server`  
+* **MCP server mode (desktop binary):** `./target/debug/terraphim-ai-desktop mcp-server`
 * **Standalone MCP server:** `./target/debug/terraphim_mcp_server`
 * **Set log directory:** `TERRAPHIM_LOG_DIR=/custom/path ./target/debug/...`
 
@@ -143,4 +143,4 @@ Both now use the same desktop configuration ensuring consistent search results a
 
 **Tags:**
 
-- terraphim-graph 
+- terraphim-graph

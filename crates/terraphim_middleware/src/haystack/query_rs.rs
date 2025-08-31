@@ -5,8 +5,8 @@ use reqwest::Client;
 use scraper::{Html, Selector};
 use serde_json::Value;
 use terraphim_config::Haystack;
-use terraphim_types::{Document, Index};
 use terraphim_persistence::Persistable;
+use terraphim_types::{Document, Index};
 
 /// Middleware that uses query.rs as a haystack.
 /// Supports comprehensive Rust documentation search including:
@@ -29,13 +29,14 @@ impl Default for QueryRsHaystackIndexer {
             .user_agent("Terraphim/1.0 (https://terraphim.ai)")
             .build()
             .unwrap_or_else(|_| Client::new());
-            
+
         Self { client }
     }
 }
 
 #[async_trait]
 impl IndexMiddleware for QueryRsHaystackIndexer {
+    #[allow(clippy::manual_async_fn)]
     fn index(
         &self,
         needle: &str,
@@ -71,7 +72,10 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
             // comprehensive data from the API
             let mut enhanced_documents = Vec::new();
             for doc in documents {
-                if !doc.url.is_empty() && doc.url.starts_with("http") && !doc.url.contains("crates.io/crates/") {
+                if !doc.url.is_empty()
+                    && doc.url.starts_with("http")
+                    && !doc.url.contains("crates.io/crates/")
+                {
                     match self.fetch_and_scrape_content(&doc).await {
                         Ok(enhanced_doc) => enhanced_documents.push(enhanced_doc),
                         Err(e) => {
@@ -111,7 +115,71 @@ impl QueryRsHaystackIndexer {
             tags: None,
             rank: None,
         };
-        dummy_doc.normalize_key(original_id)
+        let normalized = dummy_doc.normalize_key(original_id);
+
+        // Validate the normalized ID to ensure it follows expected patterns
+        self.validate_document_id(&normalized, original_id)
+    }
+
+    /// Validate and potentially fix document IDs to prevent malformed entries
+    fn validate_document_id(&self, normalized_id: &str, original_id: &str) -> String {
+        // Check for common malformed patterns that cause OpenDAL warnings
+        let is_malformed = normalized_id.contains("crategravitydb")
+            || normalized_id.contains("crategqlite000")
+            || normalized_id.ends_with("md")
+            || normalized_id.len() > 50  // Reduced threshold for testing
+            || original_id.ends_with(".md")  // Check original too
+            || original_id.is_empty();
+
+        if is_malformed {
+            log::warn!("Detected potentially malformed document ID: '{}' (from '{}'). Applying additional normalization.",
+                      normalized_id, original_id);
+
+            // Apply additional cleaning for legacy compatibility
+            return self.apply_legacy_id_cleanup(original_id);
+        }
+
+        normalized_id.to_string()
+    }
+
+    /// Apply cleanup for legacy malformed IDs
+    fn apply_legacy_id_cleanup(&self, original_id: &str) -> String {
+        let mut cleaned = original_id.to_lowercase();
+
+        // Remove common problematic patterns
+        cleaned = cleaned.replace(".md", "");
+        if cleaned.ends_with("md") {
+            cleaned = cleaned.strip_suffix("md").unwrap_or(&cleaned).to_string();
+        }
+        cleaned = cleaned.replace("-", "_");
+        cleaned = cleaned.replace(".", "_");
+        cleaned = cleaned.replace("/", "_");
+
+        // Replace multiple underscores with single ones
+        while cleaned.contains("__") {
+            cleaned = cleaned.replace("__", "_");
+        }
+
+        // Trim underscores from start/end
+        cleaned = cleaned.trim_matches('_').to_string();
+
+        // Limit length to prevent very long IDs
+        if cleaned.len() > 50 {
+            cleaned = cleaned.chars().take(50).collect::<String>();
+            cleaned = cleaned.trim_matches('_').to_string();
+        }
+
+        // Ensure we have a valid ID
+        if cleaned.is_empty() {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            original_id.hash(&mut hasher);
+            cleaned = format!("legacy_{:x}", hasher.finish());
+        }
+
+        log::info!("Legacy ID cleanup: '{}' → '{}'", original_id, cleaned);
+        cleaned
     }
 
     /// Extract Reddit post ID from URL
@@ -133,35 +201,31 @@ impl QueryRsHaystackIndexer {
     /// Extract a clean identifier from a documentation URL
     /// Example: https://doc.rust-lang.org/std/iter/trait.Iterator.html -> std_iter_Iterator
     pub fn extract_doc_identifier(&self, url: &str) -> String {
-        if url.starts_with("https://doc.rust-lang.org/") {
-            let path = &url["https://doc.rust-lang.org/".len()..];
-            // Remove .html extension and replace slashes and dots with underscores  
-            let clean_path = path.trim_end_matches(".html").replace('/', "_").replace('.', "_");
+        if let Some(path) = url.strip_prefix("https://doc.rust-lang.org/") {
+            // Remove .html extension and replace slashes and dots with underscores
+            let clean_path = path.trim_end_matches(".html").replace(['/', '.'], "_");
             return clean_path;
         }
-        
+
         // For other URLs, extract domain and path
         if let Ok(parsed_url) = url::Url::parse(url) {
             let host = parsed_url.host_str().unwrap_or("");
-            let path = parsed_url.path().trim_start_matches('/').trim_end_matches('/');
+            let path = parsed_url
+                .path()
+                .trim_start_matches('/')
+                .trim_end_matches('/');
             let clean_host = host.replace('.', "_");
             // Clean the path more thoroughly
-            let clean_path = path.replace('/', "_")
-                                .replace('.', "_")
-                                .replace('@', "_")
-                                .replace('#', "_")
-                                .replace('?', "_")
-                                .replace('&', "_")
-                                .replace('=', "_")
-                                .replace('-', "_")
-                                .trim_end_matches("_html")
-                                .to_string();
+            let clean_path = path
+                .replace(['/', '.', '@', '#', '?', '&', '=', '-'], "_")
+                .trim_end_matches("_html")
+                .to_string();
             if clean_path.is_empty() {
                 return clean_host;
             }
             return format!("{}_{}", clean_host, clean_path);
         }
-        
+
         // Fallback: use a hash of the URL
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -604,7 +668,7 @@ impl QueryRsHaystackIndexer {
                                 if !title.is_empty() && !url.is_empty() {
                                     // Determine search type based on URL or title
                                     let search_type = self.determine_search_type(title, url);
-                                    let tags = self.generate_tags_for_search_type(&search_type);
+                                    let tags = self.generate_tags_for_search_type(search_type);
 
                                     // Use a clean identifier based on the title and search type instead of the full URL
                                     let doc_identifier = self.extract_doc_identifier(url);
@@ -657,10 +721,20 @@ impl QueryRsHaystackIndexer {
                         .unwrap_or("");
                     let downloads = obj.get("downloads").and_then(|v| v.as_u64()).unwrap_or(0);
                     let homepage = obj.get("homepage").and_then(|v| v.as_str()).unwrap_or("");
-                    let documentation = obj.get("documentation").and_then(|v| v.as_str()).unwrap_or("");
+                    let documentation = obj
+                        .get("documentation")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     let repository = obj.get("repository").and_then(|v| v.as_str()).unwrap_or("");
-                    let keywords = obj.get("keywords").and_then(|v| v.as_array())
-                        .map(|arr| arr.iter().filter_map(|k| k.as_str()).collect::<Vec<_>>().join(", "))
+                    let keywords = obj
+                        .get("keywords")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|k| k.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
                         .unwrap_or_default();
                     let url = format!("https://crates.io/crates/{}", name);
 
@@ -669,19 +743,19 @@ impl QueryRsHaystackIndexer {
                         let mut body = format!("Crate: {} v{}\n\n", name, version);
                         body.push_str(&format!("Description: {}\n\n", description));
                         body.push_str(&format!("Downloads: {}\n\n", downloads));
-                        
+
                         if !keywords.is_empty() {
                             body.push_str(&format!("Keywords: {}\n\n", keywords));
                         }
-                        
+
                         if !homepage.is_empty() {
                             body.push_str(&format!("Homepage: {}\n\n", homepage));
                         }
-                        
+
                         if !documentation.is_empty() {
                             body.push_str(&format!("Documentation: {}\n\n", documentation));
                         }
-                        
+
                         if !repository.is_empty() {
                             body.push_str(&format!("Repository: {}\n\n", repository));
                         }

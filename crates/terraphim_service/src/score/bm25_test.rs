@@ -1,8 +1,8 @@
 use crate::score::bm25::{BM25FScorer, BM25PlusScorer};
-use crate::score::common::{BM25Params, FieldWeights};
 use crate::score::bm25_additional::{
     JaccardScorer, OkapiBM25Scorer, QueryRatioScorer, TFIDFScorer,
 };
+use crate::score::common::{BM25Params, FieldWeights};
 use terraphim_types::Document;
 
 fn create_test_documents() -> Vec<Document> {
@@ -153,7 +153,7 @@ fn test_jaccard_scorer_similarity_based() {
         .collect();
 
     // All scores should be between 0.0 and 1.0 (Jaccard similarity)
-    assert!(scores.iter().all(|&score| score >= 0.0 && score <= 1.0));
+    assert!(scores.iter().all(|&score| (0.0..=1.0).contains(&score)));
 
     // Document 1 should have the highest similarity as it contains both terms
     assert!(scores[0] > scores[2]);
@@ -172,7 +172,7 @@ fn test_query_ratio_scorer_term_matching() {
         .collect();
 
     // All scores should be between 0.0 and 1.0 (ratio of matched terms)
-    assert!(scores.iter().all(|&score| score >= 0.0 && score <= 1.0));
+    assert!(scores.iter().all(|&score| (0.0..=1.0).contains(&score)));
 
     // Document 1 should have the highest ratio as it contains both "rust" and "systems"
     assert!(scores[0] > scores[1]);
@@ -194,7 +194,7 @@ fn test_scorer_initialization_with_empty_documents() {
 
     // Should not panic with empty documents
     // Note: We can't access private fields, so we just verify initialization doesn't panic
-    assert!(true); // Placeholder assertion
+    // Test passes by not panicking during initialization
 }
 
 #[test]

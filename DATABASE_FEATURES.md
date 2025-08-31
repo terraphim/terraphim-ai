@@ -6,7 +6,7 @@ This document describes the optional database backend features available in Terr
 
 By default, Terraphim AI uses lightweight, dependency-free storage backends:
 - **Memory**: In-memory storage (no persistence)
-- **DashMap**: Fast concurrent hash map storage 
+- **DashMap**: Fast concurrent hash map storage
 - **ReDB**: Pure Rust embedded database (default for persistence)
 
 Heavy database backends like SQLite and RocksDB are now **optional features** to:
@@ -21,9 +21,9 @@ Heavy database backends like SQLite and RocksDB are now **optional features** to
 - `services-redb`: Pure Rust embedded database
 - `services-atomicserver`: Atomic Server integration
 
-### Optional Features  
+### Optional Features
 - `services-sqlite`: SQLite database support
-- `services-rocksdb`: RocksDB database support  
+- `services-rocksdb`: RocksDB database support
 - `services-redis`: Redis backend support
 - `full-db`: Enable all database backends
 
@@ -34,7 +34,7 @@ Heavy database backends like SQLite and RocksDB are now **optional features** to
 # Enable SQLite only
 cargo build --features sqlite
 
-# Enable RocksDB only  
+# Enable RocksDB only
 cargo build --features rocksdb
 
 # Enable Redis only
@@ -122,7 +122,7 @@ If you were previously relying on SQLite or RocksDB being available by default:
   run: cargo build
 
 # Full build with all features
-- name: Full Build  
+- name: Full Build
   run: cargo build --features full-db
 ```
 

@@ -7,7 +7,7 @@ const __dirname = dirname(__filename);
 
 /**
  * Playwright configuration for WebDriver-based Tauri tests
- * 
+ *
  * This configuration is specifically designed for testing Tauri applications
  * using the official Tauri WebDriver support.
  */
@@ -23,8 +23,8 @@ export default defineConfig({
   /* Single worker for WebDriver tests */
   workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI 
-    ? [['github'], ['html'], ['json', { outputFile: 'test-results/webdriver-results.json' }]] 
+  reporter: process.env.CI
+    ? [['github'], ['html'], ['json', { outputFile: 'test-results/webdriver-results.json' }]]
     : [['html'], ['list']],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -62,7 +62,7 @@ export default defineConfig({
     {
       name: 'Tauri WebDriver Tests',
       testDir: './tests/webdriver',
-      use: { 
+      use: {
         ...devices['Desktop Chrome'],
         // Custom settings for Tauri WebDriver testing
         viewport: { width: 1280, height: 720 },
@@ -94,23 +94,23 @@ export default defineConfig({
     timeout: 180 * 1000,
     reuseExistingServer: !process.env.CI,
   },
-  
+
   /* Global test timeout - increased for WebDriver tests */
   timeout: process.env.CI ? 120000 : 60000,
-  
+
   /* Global setup and teardown */
   globalSetup: join(__dirname, 'tests/webdriver/setup.ts'),
   globalTeardown: join(__dirname, 'tests/webdriver/teardown.ts'),
-  
+
   /* Configure folders */
   outputDir: 'test-results/webdriver/',
-  
+
   /* Expect configuration */
   expect: {
     /* Maximum time expect() should wait for the condition to be met */
     timeout: process.env.CI ? 20000 : 10000,
   },
-  
+
   /* CI-specific configurations */
   ...(process.env.CI && {
     // Preserve test artifacts in CI
@@ -121,4 +121,4 @@ export default defineConfig({
       threshold: 30000,
     },
   }),
-}); 
+});

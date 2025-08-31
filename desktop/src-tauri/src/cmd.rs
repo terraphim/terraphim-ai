@@ -125,7 +125,7 @@ pub async fn get_config(config_state: tauri::State<'_, ConfigState>) -> Result<C
 
     Ok(ConfigResponse {
         status: Status::Success,
-        config: config,
+        config,
     })
 }
 
@@ -139,7 +139,7 @@ pub async fn update_config(
     let config = terraphim_service.update_config(config_new).await?;
     Ok(ConfigResponse {
         status: Status::Success,
-        config: config,
+        config,
     })
 }
 
@@ -460,6 +460,25 @@ pub struct AtomicSaveResponse {
     pub message: String,
 }
 
+/// Autocomplete suggestion data structure
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AutocompleteSuggestion {
+    pub term: String,
+    pub normalized_term: Option<String>,
+    pub url: Option<String>,
+    pub score: f64,
+}
+
+/// Response type for autocomplete operations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AutocompleteResponse {
+    pub status: Status,
+    pub suggestions: Vec<AutocompleteSuggestion>,
+    pub error: Option<String>,
+}
+
 /// Save an article to atomic server
 ///
 /// This command saves a document as an article to the specified atomic server.
@@ -597,4 +616,125 @@ pub async fn save_article_to_atomic(
             )))
         }
     }
+}
+
+/// Get autocomplete suggestions using FST-based autocomplete
+///
+/// This command provides fast, intelligent autocomplete suggestions based on the
+/// knowledge graph thesaurus for the specified or selected role.
+#[command]
+pub async fn get_autocomplete_suggestions(
+    config_state: State<'_, ConfigState>,
+    query: String,
+    role_name: Option<String>,
+    limit: Option<usize>,
+) -> Result<AutocompleteResponse> {
+    use terraphim_automata::{
+        autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search,
+    };
+
+    log::debug!(
+        "Getting autocomplete suggestions for query '{}', role {:?}",
+        query,
+        role_name
+    );
+
+    let config = {
+        let config_guard = config_state.config.lock().await;
+        config_guard.clone()
+    };
+
+    // Use provided role or fall back to selected role
+    let role = match role_name {
+        Some(name) => terraphim_types::RoleName::new(&name),
+        None => config.selected_role.clone(),
+    };
+
+    // Get the rolegraph for the specified role
+    let Some(rolegraph_sync) = config_state.roles.get(&role) else {
+        return Ok(AutocompleteResponse {
+            status: Status::Error,
+            suggestions: vec![],
+            error: Some(format!(
+                "Role '{}' not found or has no knowledge graph configured",
+                role.original
+            )),
+        });
+    };
+
+    let rolegraph = rolegraph_sync.lock().await;
+
+    // Build FST autocomplete index from the thesaurus
+    let autocomplete_index = match build_autocomplete_index(rolegraph.thesaurus.clone(), None) {
+        Ok(index) => index,
+        Err(e) => {
+            log::error!("Failed to build autocomplete index: {}", e);
+            return Ok(AutocompleteResponse {
+                status: Status::Error,
+                suggestions: vec![],
+                error: Some(format!("Failed to build autocomplete index: {}", e)),
+            });
+        }
+    };
+
+    let limit = limit.unwrap_or(8);
+
+    // Get autocomplete suggestions based on query length
+    let results = if query.len() >= 3 {
+        // For longer queries, try fuzzy search for better UX (0.7 = 70% similarity threshold)
+        match fuzzy_autocomplete_search(&autocomplete_index, &query, 0.7, Some(limit)) {
+            Ok(results) => results,
+            Err(e) => {
+                log::warn!("Fuzzy search failed, trying exact search: {}", e);
+                // Fall back to exact search
+                match autocomplete_search(&autocomplete_index, &query, Some(limit)) {
+                    Ok(results) => results,
+                    Err(e) => {
+                        log::error!("Both fuzzy and exact search failed: {}", e);
+                        return Ok(AutocompleteResponse {
+                            status: Status::Error,
+                            suggestions: vec![],
+                            error: Some(format!("Autocomplete search failed: {}", e)),
+                        });
+                    }
+                }
+            }
+        }
+    } else {
+        // For short queries, use exact prefix search only
+        match autocomplete_search(&autocomplete_index, &query, Some(limit)) {
+            Ok(results) => results,
+            Err(e) => {
+                log::error!("Exact search failed: {}", e);
+                return Ok(AutocompleteResponse {
+                    status: Status::Error,
+                    suggestions: vec![],
+                    error: Some(format!("Autocomplete search failed: {}", e)),
+                });
+            }
+        }
+    };
+
+    // Convert results to autocomplete suggestions
+    let suggestions: Vec<AutocompleteSuggestion> = results
+        .into_iter()
+        .map(|result| AutocompleteSuggestion {
+            term: result.term,
+            normalized_term: Some(result.normalized_term.to_string()),
+            url: result.url,
+            score: result.score,
+        })
+        .collect();
+
+    log::debug!(
+        "Found {} autocomplete suggestions for query '{}'",
+        suggestions.len(),
+        query
+    );
+
+    Ok(AutocompleteResponse {
+        status: Status::Success,
+        suggestions,
+        error: None,
+    })
 }

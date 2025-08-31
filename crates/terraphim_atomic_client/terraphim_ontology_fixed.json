@@ -2,7 +2,7 @@
   {
     "https://atomicdata.dev/properties/classes": [
       "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/document",
-      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/node", 
+      "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/node",
       "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/edge",
       "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/thesaurus",
       "01jezwvdrkqjjc4t741gra3m2h/terraphim/class/role",
@@ -260,4 +260,4 @@
     "https://atomicdata.dev/properties/parent": "01jezwvdrkqjjc4t741gra3m2h/terraphim",
     "https://atomicdata.dev/properties/shortname": "path"
   }
-] 
+]

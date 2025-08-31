@@ -81,7 +81,7 @@ mod tests {
             "https://atomicdata.dev/properties/name".to_string(),
             json!(format!("Test Resource {}", timestamp)),
         );
-        let resource = Resource {
+        let _resource = Resource {
             subject: test_resource_id.clone(),
             properties: properties.clone(),
         };
@@ -137,9 +137,8 @@ mod tests {
             .expect("Failed to delete resource via commit");
 
         // Verify the resource was deleted
-        match store.get_resource(&test_resource_id).await {
-            Ok(_) => panic!("Resource was not deleted"),
-            Err(_) => (),
+        if store.get_resource(&test_resource_id).await.is_ok() {
+            panic!("Resource was not deleted")
         }
     }
 
@@ -319,10 +318,10 @@ async fn test_create_and_query() {
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     // Use the API endpoint directly to query by class
-    let query_url = format!("{}/query?property=https://atomicdata.dev/properties/isA&value=https://atomicdata.dev/classes/Article", 
+    let query_url = format!("{}/query?property=https://atomicdata.dev/properties/isA&value=https://atomicdata.dev/classes/Article",
                            store.config.server_url.trim_end_matches('/'));
     let query_resource = store.get_resource(&query_url).await.expect("Query failed");
-    let query_results = vec![query_resource];
+    let query_results = [query_resource];
 
     // Verify that we found at least one result
     assert!(!query_results.is_empty(), "Query returned no results");

@@ -4,7 +4,6 @@
 //! actual haystack.md document from docs/src/kg/
 
 use std::path::PathBuf;
-use tokio;
 
 use serial_test::serial;
 use terraphim_persistence::Persistable;

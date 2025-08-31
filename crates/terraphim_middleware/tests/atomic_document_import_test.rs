@@ -132,7 +132,7 @@ async fn test_document_import_and_search() {
         for entry in WalkDir::new(src_path)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
         {
             let file_path = entry.path();
             let relative_path = file_path.strip_prefix(src_path).unwrap_or(file_path);
@@ -347,8 +347,8 @@ fn extract_title_from_markdown(content: &str) -> Option<String> {
     // Look for the first heading in the markdown
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("# ") {
-            return Some(trimmed[2..].trim().to_string());
+        if let Some(stripped) = trimmed.strip_prefix("# ") {
+            return Some(stripped.trim().to_string());
         }
     }
     None
