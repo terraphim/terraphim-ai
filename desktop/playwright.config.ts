@@ -19,8 +19,8 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI 
-    ? [['github'], ['html'], ['json', { outputFile: 'test-results/results.json' }]] 
+  reporter: process.env.CI
+    ? [['github'], ['html'], ['json', { outputFile: 'test-results/results.json' }]]
     : [['html'], ['list']],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -58,7 +58,7 @@ export default defineConfig({
     {
       name: 'Desktop App Tests',
       testDir: './tests/e2e',
-      use: { 
+      use: {
         ...devices['Desktop Chrome'],
         // Custom settings for desktop app testing
         viewport: { width: 1280, height: 720 },
@@ -70,7 +70,7 @@ export default defineConfig({
         timezoneId: 'UTC',
       },
     },
-    
+
     {
       name: 'Visual Regression Tests',
       testDir: './tests/visual',
@@ -90,17 +90,17 @@ export default defineConfig({
     timeout: 180 * 1000,
     reuseExistingServer: !process.env.CI,
   },
-  
+
   /* Global test timeout - increased for CI */
   timeout: process.env.CI ? 120000 : 60000,
-  
+
   /* Global setup and teardown */
   globalSetup: join(__dirname, 'tests/global-setup.ts'),
   globalTeardown: join(__dirname, 'tests/global-teardown.ts'),
-  
+
   /* Configure folders */
   outputDir: 'test-results/',
-  
+
   /* Expect configuration */
   expect: {
     /* Maximum time expect() should wait for the condition to be met */
@@ -108,7 +108,7 @@ export default defineConfig({
     /* Threshold for visual comparisons */
     threshold: 0.2,
   },
-  
+
   /* CI-specific configurations */
   ...(process.env.CI && {
     // Preserve test artifacts in CI
@@ -119,4 +119,4 @@ export default defineConfig({
       threshold: 30000,
     },
   }),
-}); 
+});

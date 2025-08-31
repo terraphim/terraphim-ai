@@ -76,7 +76,7 @@ async fn test_dual_haystack_comprehensive_validation() {
     }
 
     // Create comprehensive test documents that will be found in atomic server
-    let test_documents = vec![
+    let test_documents = [
         (
             "ATOMIC: Dual Haystack Architecture Guide",
             "Comprehensive guide for using dual haystack architecture in Terraphim. This document explains how to configure both Atomic and Ripgrep haystacks for optimal search performance and coverage."
@@ -151,7 +151,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -182,7 +182,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -202,7 +202,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 kg: None,
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
-                extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -224,7 +224,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                     ServiceType::Ripgrep,
                     true,
                 )],
-                extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -397,14 +397,12 @@ async fn test_dual_haystack_comprehensive_validation() {
             );
 
             // For dual roles, validate we get results from both sources for some terms
-            if role_name.starts_with("Dual") && atomic_secret.is_some() {
-                if *total > 0 {
-                    log::info!(
-                        "    ✅ Dual role '{}' found results for '{}'",
-                        role_name,
-                        term
-                    );
-                }
+            if role_name.starts_with("Dual") && atomic_secret.is_some() && *total > 0 {
+                log::info!(
+                    "    ✅ Dual role '{}' found results for '{}'",
+                    role_name,
+                    term
+                );
             }
         }
     }
@@ -493,6 +491,8 @@ async fn test_dual_haystack_comprehensive_validation() {
                     skip: Some(0),
                     limit: Some(10),
                     role: Some(config.roles.keys().next().unwrap().clone()),
+                    operator: Some(terraphim_types::LogicalOperator::And),
+                    search_terms: None,
                 };
 
                 let pipeline_start = std::time::Instant::now();
@@ -709,7 +709,7 @@ async fn test_source_differentiation_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()

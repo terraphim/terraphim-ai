@@ -9,15 +9,20 @@ use axum::{
 };
 use regex::Regex;
 use rust_embed::RustEmbed;
+
+// Pre-compiled regex for normalizing document IDs (performance optimization)
+static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create normalize regex")
+});
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
+use terraphim_service::summarization_manager::SummarizationManager;
+use terraphim_service::summarization_queue::QueueConfig;
 use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
 use tokio::sync::broadcast::channel;
-use terraphim_service::summarization_queue::QueueConfig;
-use terraphim_service::summarization_manager::SummarizationManager;
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
@@ -93,7 +98,7 @@ fn create_document_description(content: &str) -> Option<String> {
             if i == 0 {
                 result.push_str(" - ");
             } else {
-                result.push_str(" ");
+                result.push(' ');
             }
             result.push_str(part);
         }
@@ -212,9 +217,9 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                 let filename =
                                                     entry.file_name().to_string_lossy().to_string();
                                                 let normalized_id = {
-                                                    let re = Regex::new(r"[^a-zA-Z0-9]+")
-                                                        .expect("Failed to create regex");
-                                                    re.replace_all(&filename, "").to_lowercase()
+                                                    NORMALIZE_REGEX
+                                                        .replace_all(&filename, "")
+                                                        .to_lowercase()
                                                 };
 
                                                 let document = Document {
@@ -242,17 +247,20 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                 } else {
                                                     log::debug!("Document '{}' has {} chars of body content", filename, document.body.len());
                                                 }
-                                                
+
                                                 // Then add to rolegraph for KG indexing using the same normalized ID
                                                 let document_clone = document.clone();
                                                 rolegraph_with_docs
                                                     .insert_document(&normalized_id, document);
-                                                    
+
                                                 // Log rolegraph statistics after insertion
-                                                let node_count = rolegraph_with_docs.get_node_count();
-                                                let edge_count = rolegraph_with_docs.get_edge_count();
-                                                let doc_count = rolegraph_with_docs.get_document_count();
-                                                
+                                                let node_count =
+                                                    rolegraph_with_docs.get_node_count();
+                                                let edge_count =
+                                                    rolegraph_with_docs.get_edge_count();
+                                                let doc_count =
+                                                    rolegraph_with_docs.get_document_count();
+
                                                 log::info!(
                                                     "✅ Indexed document '{}' into rolegraph (body: {} chars, nodes: {}, edges: {}, docs: {})",
                                                     filename, document_clone.body.len(), node_count, edge_count, doc_count
@@ -294,9 +302,9 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         .to_string_lossy()
                                                         .to_string();
                                                     let normalized_id = {
-                                                        let re = Regex::new(r"[^a-zA-Z0-9]+")
-                                                            .expect("Failed to create regex");
-                                                        re.replace_all(&filename, "").to_lowercase()
+                                                        NORMALIZE_REGEX
+                                                            .replace_all(&filename, "")
+                                                            .to_lowercase()
                                                     };
 
                                                     // Skip if this is already a KG document (avoid duplicates)
@@ -387,14 +395,35 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/summarization/status", get(api::get_summarization_status))
         .route("/summarization/status/", get(api::get_summarization_status))
         // New async summarization endpoints
-        .route("/documents/async_summarize", post(api::async_summarize_document))
-        .route("/documents/async_summarize/", post(api::async_summarize_document))
+        .route(
+            "/documents/async_summarize",
+            post(api::async_summarize_document),
+        )
+        .route(
+            "/documents/async_summarize/",
+            post(api::async_summarize_document),
+        )
         .route("/summarization/batch", post(api::batch_summarize_documents))
-        .route("/summarization/batch/", post(api::batch_summarize_documents))
-        .route("/summarization/task/:task_id/status", get(api::get_task_status))
-        .route("/summarization/task/:task_id/status/", get(api::get_task_status))
-        .route("/summarization/task/:task_id/cancel", post(api::cancel_task))
-        .route("/summarization/task/:task_id/cancel/", post(api::cancel_task))
+        .route(
+            "/summarization/batch/",
+            post(api::batch_summarize_documents),
+        )
+        .route(
+            "/summarization/task/:task_id/status",
+            get(api::get_task_status),
+        )
+        .route(
+            "/summarization/task/:task_id/status/",
+            get(api::get_task_status),
+        )
+        .route(
+            "/summarization/task/:task_id/cancel",
+            post(api::cancel_task),
+        )
+        .route(
+            "/summarization/task/:task_id/cancel/",
+            post(api::cancel_task),
+        )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
         .route("/chat", post(api::chat_completion))
@@ -414,7 +443,10 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             get(find_documents_by_kg_term),
         )
         .route("/thesaurus/:role_name", get(api::get_thesaurus))
-        .route("/autocomplete/:role_name/:query", get(api::get_autocomplete))
+        .route(
+            "/autocomplete/:role_name/:query",
+            get(api::get_autocomplete),
+        )
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
@@ -480,4 +512,101 @@ async fn index_html() -> Response {
 
 async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "404").into_response()
+}
+
+pub async fn build_router_for_tests() -> Router {
+    use terraphim_config::ConfigBuilder;
+
+    // Create minimal test configuration
+    let mut config = ConfigBuilder::new()
+        .build_default_embedded()
+        .build()
+        .expect("Failed to build test config");
+
+    let config_state = ConfigState::new(&mut config)
+        .await
+        .expect("Failed to create ConfigState");
+
+    let (tx, _rx) = channel::<IndexedDocument>(10);
+
+    // Initialize summarization manager
+    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
+
+    Router::new()
+        .route("/health", get(health))
+        .route("/documents", post(create_document))
+        .route("/documents/", post(create_document))
+        .route("/documents/search", get(search_documents))
+        .route("/documents/search", post(search_documents_post))
+        .route("/documents/summarize", post(api::summarize_document))
+        .route("/documents/summarize/", post(api::summarize_document))
+        .route("/summarization/status", get(api::get_summarization_status))
+        .route("/summarization/status/", get(api::get_summarization_status))
+        .route(
+            "/documents/async_summarize",
+            post(api::async_summarize_document),
+        )
+        .route(
+            "/documents/async_summarize/",
+            post(api::async_summarize_document),
+        )
+        .route("/summarization/batch", post(api::batch_summarize_documents))
+        .route(
+            "/summarization/batch/",
+            post(api::batch_summarize_documents),
+        )
+        .route(
+            "/summarization/task/:task_id/status",
+            get(api::get_task_status),
+        )
+        .route(
+            "/summarization/task/:task_id/status/",
+            get(api::get_task_status),
+        )
+        .route(
+            "/summarization/task/:task_id/cancel",
+            post(api::cancel_task),
+        )
+        .route(
+            "/summarization/task/:task_id/cancel/",
+            post(api::cancel_task),
+        )
+        .route("/summarization/queue/stats", get(api::get_queue_stats))
+        .route("/summarization/queue/stats/", get(api::get_queue_stats))
+        .route("/chat", post(api::chat_completion))
+        .route("/chat/", post(api::chat_completion))
+        .route("/config", get(api::get_config))
+        .route("/config/", get(api::get_config))
+        .route("/config", post(api::update_config))
+        .route("/config/", post(api::update_config))
+        .route("/config/schema", get(api::get_config_schema))
+        .route("/config/schema/", get(api::get_config_schema))
+        .route("/config/selected_role", post(api::update_selected_role))
+        .route("/config/selected_role/", post(api::update_selected_role))
+        .route("/rolegraph", get(get_rolegraph))
+        .route("/rolegraph/", get(get_rolegraph))
+        .route(
+            "/roles/:role_name/kg_search",
+            get(find_documents_by_kg_term),
+        )
+        .route("/thesaurus/:role_name", get(api::get_thesaurus))
+        .route(
+            "/autocomplete/:role_name/:query",
+            get(api::get_autocomplete),
+        )
+        .with_state(config_state)
+        .layer(Extension(tx))
+        .layer(Extension(summarization_manager))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_headers(Any)
+                .allow_methods(vec![
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ]),
+        )
 }

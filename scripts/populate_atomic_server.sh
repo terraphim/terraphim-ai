@@ -154,4 +154,4 @@ fi
 echo -e "${GREEN}🎉 Atomic Server population completed!${NC}"
 echo -e "${BLUE}🔧 You can now test the new roles with these configurations:${NC}"
 echo -e "${BLUE}   - atomic_title_scorer_config.json${NC}"
-echo -e "${BLUE}   - atomic_graph_embeddings_config.json${NC}" 
+echo -e "${BLUE}   - atomic_graph_embeddings_config.json${NC}"

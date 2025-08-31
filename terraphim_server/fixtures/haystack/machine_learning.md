@@ -28,4 +28,4 @@ links:: [Local library](zotero://select/library/items/ML0001), [Web library](htt
 	- Accuracy, Precision, Recall, F1 Score
 	- Mean Squared Error (MSE)
 	- Area Under the ROC Curve (AUC)
-	- Confusion Matrix 
+	- Confusion Matrix

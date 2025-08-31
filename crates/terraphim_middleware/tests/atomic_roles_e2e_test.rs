@@ -6,7 +6,7 @@ use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_middleware::{
     haystack::AtomicHaystackIndexer, indexer::IndexMiddleware, search_haystacks,
 };
-use terraphim_types::{Index, RelevanceFunction, SearchQuery};
+use terraphim_types::{RelevanceFunction, SearchQuery};
 use uuid::Uuid;
 
 /// Test that demonstrates atomic server haystack integration with Title Scorer role
@@ -132,7 +132,7 @@ async fn test_atomic_haystack_title_scorer_role() {
         store
             .create_with_commit(&doc_subject, doc_properties)
             .await
-            .expect(&format!("Failed to create document {}", shortname));
+            .unwrap_or_else(|_| panic!("Failed to create document {}", shortname));
 
         created_documents.push(doc_subject);
         log::info!("Created test document: {} - {}", shortname, title);
@@ -156,6 +156,7 @@ async fn test_atomic_haystack_title_scorer_role() {
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -184,18 +185,15 @@ async fn test_atomic_haystack_title_scorer_role() {
     for (search_term, expected_min_results) in search_terms {
         log::info!("Testing title-based search for: '{}'", search_term);
 
-        let mut found_docs = 0;
-        let mut index = Index::new();
-
         // Single search call - indexing should be instant for local server
         let start_time = std::time::Instant::now();
-        index = indexer
+        let index = indexer
             .index(search_term, haystack)
             .await
-            .expect(&format!("Search failed for term: {}", search_term));
+            .unwrap_or_else(|_| panic!("Search failed for term: {}", search_term));
         let search_duration = start_time.elapsed();
 
-        found_docs = index.len();
+        let found_docs = index.len();
         log::info!(
             "  Search took {:?} and found {} documents for '{}' (expected at least {})",
             search_duration,
@@ -233,8 +231,8 @@ async fn test_atomic_haystack_title_scorer_role() {
                     let found_in_content = title_lower.contains(&term_lower) ||
                                           body_lower.contains(&term_lower) ||
                                           // Also check for partial matches (first word of search term)
-                                          title_lower.contains(&term_lower.split_whitespace().next().unwrap_or("")) ||
-                                          body_lower.contains(&term_lower.split_whitespace().next().unwrap_or(""));
+                                          title_lower.contains(term_lower.split_whitespace().next().unwrap_or("")) ||
+                                          body_lower.contains(term_lower.split_whitespace().next().unwrap_or(""));
 
                     if !found_in_content {
                         log::warn!(
@@ -252,7 +250,7 @@ async fn test_atomic_haystack_title_scorer_role() {
                     // For atomic server, we expect the search term to be found somewhere in the document
                     // since it uses full-text search across all properties
                     assert!(found_in_content,
-                           "Document should contain search term '{}' somewhere for full-text search. Title: '{}', Body preview: '{}'", 
+                           "Document should contain search term '{}' somewhere for full-text search. Title: '{}', Body preview: '{}'",
                            search_term, doc.title, doc.body.chars().take(100).collect::<String>());
                 }
             }
@@ -277,6 +275,8 @@ async fn test_atomic_haystack_title_scorer_role() {
         skip: Some(0),
         limit: Some(10),
         role: Some("AtomicTitleScorer".into()),
+        operator: None,
+        search_terms: None,
     };
 
     let pipeline_start_time = std::time::Instant::now();
@@ -471,7 +471,7 @@ async fn test_atomic_haystack_graph_embeddings_role() {
         store
             .create_with_commit(&doc_subject, doc_properties)
             .await
-            .expect(&format!("Failed to create document {}", shortname));
+            .unwrap_or_else(|_| panic!("Failed to create document {}", shortname));
 
         created_documents.push(doc_subject);
         log::info!("Created test document: {} - {}", shortname, title);
@@ -503,6 +503,7 @@ async fn test_atomic_haystack_graph_embeddings_role() {
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -530,18 +531,15 @@ async fn test_atomic_haystack_graph_embeddings_role() {
     for (search_term, expected_min_results) in search_terms {
         log::info!("Testing graph-based search for: '{}'", search_term);
 
-        let mut found_docs = 0;
-        let mut index = Index::new();
-
         // Single search call - indexing should be instant for local server
         let start_time = std::time::Instant::now();
-        index = indexer
+        let index = indexer
             .index(search_term, haystack)
             .await
-            .expect(&format!("Search failed for term: {}", search_term));
+            .unwrap_or_else(|_| panic!("Search failed for term: {}", search_term));
         let search_duration = start_time.elapsed();
 
-        found_docs = index.len();
+        let found_docs = index.len();
         log::info!(
             "  Search took {:?} and found {} documents for '{}' (expected at least {})",
             search_duration,
@@ -590,6 +588,8 @@ async fn test_atomic_haystack_graph_embeddings_role() {
         skip: Some(0),
         limit: Some(10),
         role: Some("AtomicGraphEmbeddings".into()),
+        operator: None,
+        search_terms: None,
     };
 
     let pipeline_start_time = std::time::Instant::now();
@@ -741,7 +741,7 @@ async fn test_atomic_haystack_role_comparison() {
         store
             .create_with_commit(&doc_subject, doc_properties)
             .await
-            .expect(&format!("Failed to create document {}", shortname));
+            .unwrap_or_else(|_| panic!("Failed to create document {}", shortname));
 
         created_documents.push(doc_subject);
         log::info!("Created test document: {} - {}", shortname, title);
@@ -770,6 +770,7 @@ async fn test_atomic_haystack_role_comparison() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -802,6 +803,7 @@ async fn test_atomic_haystack_role_comparison() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -831,10 +833,7 @@ async fn test_atomic_haystack_role_comparison() {
         let title_index = indexer
             .index(search_term, title_haystack)
             .await
-            .expect(&format!(
-                "Title scorer search failed for term: {}",
-                search_term
-            ));
+            .unwrap_or_else(|_| panic!("Title scorer search failed for term: {}", search_term));
         let title_duration = title_start_time.elapsed();
 
         // Search with graph embeddings
@@ -842,10 +841,7 @@ async fn test_atomic_haystack_role_comparison() {
         let graph_index = indexer
             .index(search_term, graph_haystack)
             .await
-            .expect(&format!(
-                "Graph embeddings search failed for term: {}",
-                search_term
-            ));
+            .unwrap_or_else(|_| panic!("Graph embeddings search failed for term: {}", search_term));
         let graph_duration = graph_start_time.elapsed();
 
         log::info!(
@@ -873,7 +869,7 @@ async fn test_atomic_haystack_role_comparison() {
         // Both should find some results for valid terms
         if search_term != "nonexistent" {
             assert!(
-                title_index.len() > 0 || graph_index.len() > 0,
+                !title_index.is_empty() || !graph_index.is_empty(),
                 "At least one role should find results for '{}'",
                 search_term
             );
@@ -897,6 +893,8 @@ async fn test_atomic_haystack_role_comparison() {
         skip: Some(0),
         limit: Some(10),
         role: None, // Will use default role
+        operator: None,
+        search_terms: None,
     };
 
     // Test with title scorer
@@ -926,7 +924,7 @@ async fn test_atomic_haystack_role_comparison() {
 
     // Both should return results
     assert!(
-        title_results.len() > 0 || graph_results.len() > 0,
+        !title_results.is_empty() || !graph_results.is_empty(),
         "At least one role should return results from search pipeline"
     );
 
@@ -975,6 +973,7 @@ async fn test_atomic_roles_config_validation() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1024,6 +1023,7 @@ async fn test_atomic_roles_config_validation() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1193,6 +1193,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1226,6 +1227,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1260,6 +1262,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     },
                 ],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1302,6 +1305,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     },
                 ],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1520,6 +1524,7 @@ async fn test_atomic_haystack_error_handling() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -1562,6 +1567,7 @@ async fn test_atomic_haystack_error_handling() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()

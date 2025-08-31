@@ -10,20 +10,20 @@ wait_for_port() {
     local port=$1
     local max_attempts=30
     local attempt=1
-    
+
     echo "⏳ Waiting for Vite dev server on port $port..."
-    
+
     while [ $attempt -le $max_attempts ]; do
         if curl -s "http://localhost:$port" > /dev/null 2>&1; then
             echo "✅ Vite dev server is ready on port $port"
             return 0
         fi
-        
+
         echo "   Attempt $attempt/$max_attempts - waiting for server..."
         sleep 2
         attempt=$((attempt + 1))
     done
-    
+
     echo "❌ Timeout waiting for Vite dev server on port $port"
     return 1
 }

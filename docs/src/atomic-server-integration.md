@@ -61,7 +61,7 @@ Configure roles to use atomic server haystacks:
       "terraphim_it": false
     },
     "Atomic Writer": {
-      "shortname": "AtomicWriter", 
+      "shortname": "AtomicWriter",
       "name": "Atomic Writer",
       "relevance_function": "title-scorer",
       "theme": "darkly",
@@ -266,4 +266,4 @@ const saveResponse = await fetch('/api/atomic/save', {
 - **Batch Operations**: Bulk import/export of documents
 - **Real-time Updates**: Live synchronization with atomic server
 - **Advanced Permissions**: Role-based access control
-- **Offline Support**: Local caching and offline operations 
+- **Offline Support**: Local caching and offline operations

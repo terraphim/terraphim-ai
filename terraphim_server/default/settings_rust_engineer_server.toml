@@ -21,7 +21,7 @@ root = "/tmp/dashmaptest"
 # Optional database backends - uncomment if RocksDB feature is enabled
 # [profiles.rock]
 # type = "rocksdb"
-# datadir = "/tmp/opendal/rocksdb" 
+# datadir = "/tmp/opendal/rocksdb"
 
 [profiles.memory]
 type = "memory"

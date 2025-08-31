@@ -101,11 +101,27 @@ impl AutomataPath {
     /// Local example for testing
     pub fn local_example() -> Self {
         log::debug!("Current folder {:?}", std::env::current_dir());
-        AutomataPath::from_local("data/term_to_id_simple.json")
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let simple_path = if cwd.ends_with("terraphim_automata") {
+            "../../test-fixtures/term_to_id_simple.json"
+        } else if cwd.file_name().is_some_and(|name| name == "terraphim-ai") {
+            "test-fixtures/term_to_id_simple.json"
+        } else {
+            "data/term_to_id_simple.json" // fallback to old path
+        };
+        AutomataPath::from_local(simple_path)
     }
     /// Full Local example for testing
     pub fn local_example_full() -> Self {
-        AutomataPath::from_local("data/term_to_id.json")
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let full_path = if cwd.ends_with("terraphim_automata") {
+            "../../test-fixtures/term_to_id.json"
+        } else if cwd.file_name().is_some_and(|name| name == "terraphim-ai") {
+            "test-fixtures/term_to_id.json"
+        } else {
+            "data/term_to_id.json" // fallback to old path
+        };
+        AutomataPath::from_local(full_path)
     }
 
     /// Create a sample remote AutomataPath for testing
@@ -221,7 +237,7 @@ mod tests {
     #[cfg(feature = "remote-loading")]
     #[tokio::test]
     async fn test_load_thesaurus_from_file() {
-        let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
+        let automata_path = AutomataPath::local_example();
         let thesaurus = load_thesaurus(&automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
@@ -256,7 +272,7 @@ mod tests {
     #[cfg(not(feature = "remote-loading"))]
     #[test]
     fn test_load_thesaurus_from_file_sync() {
-        let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
+        let automata_path = AutomataPath::local_example();
         let thesaurus = load_thesaurus(&automata_path).unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(
@@ -276,7 +292,7 @@ mod tests {
     #[cfg(feature = "remote-loading")]
     #[tokio::test]
     async fn test_load_thesaurus_from_file_async() {
-        let automata_path = AutomataPath::from_local("data/term_to_id_simple.json");
+        let automata_path = AutomataPath::local_example();
         let thesaurus = load_thesaurus(&automata_path).await.unwrap();
         assert_eq!(thesaurus.len(), 3);
         assert_eq!(

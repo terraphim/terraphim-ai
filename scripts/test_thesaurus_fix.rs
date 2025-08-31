@@ -30,14 +30,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Try to load the Terraphim Engineer thesaurus
     let role_name = RoleName::new("Terraphim Engineer");
-    
+
     println!("📚 Loading thesaurus for: {}", role_name);
     let result = service.ensure_thesaurus_loaded(&role_name).await;
 
     match result {
         Ok(thesaurus) => {
             println!("✅ SUCCESS: Thesaurus loaded with {} entries", thesaurus.len());
-            
+
             // Test a few entries
             if thesaurus.contains_key("haystack") {
                 println!("  ✓ Contains 'haystack' entry");
@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if thesaurus.contains_key("terraphim-graph") {
                 println!("  ✓ Contains 'terraphim-graph' entry");
             }
-            
+
             println!("🎉 Thesaurus loading fix works correctly!");
         }
         Err(e) => {

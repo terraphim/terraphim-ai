@@ -34,7 +34,7 @@ print_info "Test 1: Validating Rust Engineer configuration..."
 if [ -f "terraphim_server/default/rust_engineer_config.json" ]; then
     if jq -e '.roles["Rust Engineer"]' terraphim_server/default/rust_engineer_config.json >/dev/null 2>&1; then
         print_success "Rust Engineer role configuration exists and is valid"
-        
+
         # Show the configuration
         echo "Configuration details:"
         jq '.roles["Rust Engineer"]' terraphim_server/default/rust_engineer_config.json
@@ -69,7 +69,7 @@ fi
 print_info "Test 4: Checking QueryRs haystack implementation..."
 if [ -f "crates/terraphim_middleware/src/haystack/query_rs.rs" ]; then
     print_success "QueryRs haystack implementation exists"
-    
+
     # Check that it implements IndexMiddleware
     if grep -q "impl IndexMiddleware for QueryRsHaystackIndexer" crates/terraphim_middleware/src/haystack/query_rs.rs; then
         print_success "QueryRsHaystackIndexer implements IndexMiddleware trait"
@@ -145,12 +145,12 @@ sleep 10
 # Test server is running
 if curl -s http://localhost:8000/config >/dev/null 2>&1; then
     print_success "Terraphim server is running"
-    
+
     # Test configuration endpoint
     CONFIG_RESPONSE=$(curl -s http://localhost:8000/config)
     if echo "$CONFIG_RESPONSE" | jq -e '.config.roles["Rust Engineer"]' >/dev/null 2>&1; then
         print_success "Server is using Rust Engineer configuration"
-        
+
         # Show the active configuration
         echo "Active server configuration:"
         echo "$CONFIG_RESPONSE" | jq '.config.roles["Rust Engineer"]'
@@ -159,21 +159,21 @@ if curl -s http://localhost:8000/config >/dev/null 2>&1; then
         kill $SERVER_PID 2>/dev/null || true
         exit 1
     fi
-    
+
     # Test search endpoint with Rust Engineer role
     echo "Testing search with Rust Engineer role..."
     SEARCH_RESPONSE=$(curl -s -X POST http://localhost:8000/documents/search \
         -H "Content-Type: application/json" \
         -d '{"search_term": "async", "role": "Rust Engineer"}' 2>/dev/null || echo "{}")
-    
+
     if echo "$SEARCH_RESPONSE" | jq -e '.status' >/dev/null 2>&1; then
         print_success "Search endpoint responded successfully"
         echo "Search response status: $(echo "$SEARCH_RESPONSE" | jq -r '.status')"
-        
+
         # Check if we got any results
         RESULT_COUNT=$(echo "$SEARCH_RESPONSE" | jq '.results | length // 0')
         echo "Found $RESULT_COUNT results"
-        
+
         if [ "$RESULT_COUNT" -gt 0 ]; then
             print_success "QueryRs haystack returned search results!"
             echo "Sample results:"
@@ -186,7 +186,7 @@ if curl -s http://localhost:8000/config >/dev/null 2>&1; then
         print_error "Search endpoint failed"
         echo "Response: $SEARCH_RESPONSE"
     fi
-    
+
     # Clean up
     kill $SERVER_PID 2>/dev/null || true
 else
@@ -262,4 +262,4 @@ echo ""
 echo "Search examples:"
 echo "  curl -X POST http://localhost:8000/documents/search \\"
 echo "    -H 'Content-Type: application/json' \\"
-echo "    -d '{\"search_term\": \"async\", \"role\": \"Rust Engineer\"}'" 
+echo "    -d '{\"search_term\": \"async\", \"role\": \"Rust Engineer\"}'"

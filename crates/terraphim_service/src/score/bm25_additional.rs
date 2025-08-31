@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use terraphim_types::Document;
 use super::common::BM25Params;
+use terraphim_types::Document;
 
 /// Okapi BM25 scorer implementation
 pub struct OkapiBM25Scorer {
@@ -23,6 +23,7 @@ impl OkapiBM25Scorer {
     }
 
     /// Create a new Okapi BM25 scorer with custom parameters
+    #[allow(dead_code)]
     pub fn with_params(params: BM25Params) -> Self {
         Self {
             params,

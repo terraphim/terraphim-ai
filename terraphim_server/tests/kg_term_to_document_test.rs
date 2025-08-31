@@ -97,7 +97,7 @@ async fn test_kg_term_to_document_lookup() {
     // Test 1: Health check
     log::info!("🧪 Testing health endpoint");
     let health_response = client
-        .get(&format!("{}/health", base_url))
+        .get(format!("{}/health", base_url))
         .timeout(Duration::from_secs(10))
         .send()
         .await;
@@ -110,7 +110,7 @@ async fn test_kg_term_to_document_lookup() {
     // Test 2: Get config to ensure server is properly configured
     log::info!("🧪 Testing config endpoint");
     let config_response = client
-        .get(&format!("{}/config", base_url))
+        .get(format!("{}/config", base_url))
         .timeout(Duration::from_secs(10))
         .send()
         .await;
@@ -132,7 +132,7 @@ async fn test_kg_term_to_document_lookup() {
     // Test 3: KG term to document lookup - Test with "haystack" term
     log::info!("🧪 Testing KG term to document lookup for 'haystack'");
     let kg_search_response = client
-        .get(&format!(
+        .get(format!(
             "{}/roles/Terraphim Engineer/kg_search?term=haystack",
             base_url
         ))
@@ -202,7 +202,7 @@ async fn test_kg_term_to_document_lookup() {
     // Test 4: Test with a synonym term (should find the same haystack document)
     log::info!("🧪 Testing KG term to document lookup for synonym 'service'");
     let synonym_search_response = client
-        .get(&format!(
+        .get(format!(
             "{}/roles/Terraphim Engineer/kg_search?term=service",
             base_url
         ))
@@ -233,7 +233,7 @@ async fn test_kg_term_to_document_lookup() {
     // Test 5: Test with non-existent term
     log::info!("🧪 Testing KG term to document lookup for non-existent term 'nonexistentterm'");
     let empty_search_response = client
-        .get(&format!(
+        .get(format!(
             "{}/roles/Terraphim Engineer/kg_search?term=nonexistentterm",
             base_url
         ))
@@ -306,7 +306,7 @@ async fn test_kg_term_lookup_invalid_role() {
     // Test with invalid role name
     log::info!("🧪 Testing KG search with invalid role name");
     let invalid_role_response = client
-        .get(&format!(
+        .get(format!(
             "{}/roles/NonExistentRole/kg_search?term=test",
             base_url
         ))

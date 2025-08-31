@@ -32,7 +32,7 @@ Example configuration for this KG:
 },
 ```
 
-- [ ] 
+- [ ]
 
 - to do list
 - todo list

@@ -59,15 +59,15 @@ describe('BackButton', () => {
   it('renders with default props on non-home routes', () => {
     setPath('/graph');
     render(BackButton);
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     expect(button).toBeInTheDocument();
     // Svelma/Bulma button class present
     expect(button).toHaveClass('button');
-    
+
     const icon = document.querySelector('.fas.fa-arrow-left');
     expect(icon).toBeInTheDocument();
-    
+
     const text = screen.getByText('Back');
     expect(text).toBeInTheDocument();
   });
@@ -75,10 +75,10 @@ describe('BackButton', () => {
   it('renders without text when showText is false', () => {
     setPath('/graph');
     render(BackButton, { showText: false });
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     expect(button).toBeInTheDocument();
-    
+
     const text = screen.queryByText('Back');
     expect(text).not.toBeInTheDocument();
   });
@@ -87,7 +87,7 @@ describe('BackButton', () => {
     setPath('/graph');
     const customClass = 'custom-back-button';
     render(BackButton, { customClass });
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     expect(button).toHaveClass(customClass);
     expect(button).toHaveClass('back-button');
@@ -99,12 +99,12 @@ describe('BackButton', () => {
       value: 3,
       writable: true
     });
-    
+
     render(BackButton);
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     fireEvent.click(button);
-    
+
     expect(mockHistoryBack).toHaveBeenCalledTimes(1);
     expect(mockLocationHref).not.toHaveBeenCalled();
   });
@@ -115,13 +115,13 @@ describe('BackButton', () => {
       value: 1,
       writable: true
     });
-    
+
     const fallbackPath = '/home';
     render(BackButton, { fallbackPath });
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     fireEvent.click(button);
-    
+
     expect(mockHistoryBack).not.toHaveBeenCalled();
     expect(mockLocationHref).toHaveBeenCalledWith('/home');
   });
@@ -132,19 +132,19 @@ describe('BackButton', () => {
       value: 1,
       writable: true
     });
-    
+
     render(BackButton);
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     fireEvent.click(button);
-    
+
     expect(mockLocationHref).toHaveBeenCalledWith('/');
   });
 
   it('has correct accessibility attributes', () => {
     setPath('/graph');
     render(BackButton);
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     expect(button).toHaveAttribute('title', 'Go back');
     expect(button).toHaveAttribute('aria-label', 'Go back');
@@ -153,13 +153,13 @@ describe('BackButton', () => {
   it('has correct positioning styles', () => {
     setPath('/graph');
     render(BackButton);
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
     // Check that the button has the correct CSS class
     expect(button).toHaveClass('back-button');
     // Uses svelma/bulma class
     expect(button).toHaveClass('button');
-    
+
     // Check that the button is rendered (positioning handled by CSS)
     expect(button).toBeInTheDocument();
   });
@@ -167,16 +167,16 @@ describe('BackButton', () => {
   it('handles keyboard navigation', () => {
     setPath('/graph');
     render(BackButton);
-    
+
     const button = screen.getByRole('button', { name: /go back/i });
-    
+
     // Test Enter key
     fireEvent.keyDown(button, { key: 'Enter' });
     expect(mockHistoryBack).toHaveBeenCalledTimes(1);
-    
+
     // Reset mock for next test
     vi.clearAllMocks();
-    
+
     // Test Space key
     fireEvent.keyDown(button, { key: ' ' });
     expect(mockHistoryBack).toHaveBeenCalledTimes(1);
@@ -185,10 +185,10 @@ describe('BackButton', () => {
   it('maintains state between renders', () => {
     setPath('/graph');
     const { rerender } = render(BackButton, { showText: true });
-    
+
     let button = screen.getByRole('button', { name: /go back/i });
     expect(button).toHaveTextContent('Back');
-    
+
     rerender({ showText: false });
     button = screen.getByRole('button', { name: /go back/i });
     // The text should still be there since we're not fully re-rendering

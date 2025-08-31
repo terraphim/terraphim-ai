@@ -44,9 +44,9 @@ run_test() {
     local test_name="$1"
     local test_function="$2"
     local description="$3"
-    
+
     echo -e "${BLUE}📋 Running: ${description}${NC}"
-    
+
     if (cd crates/terraphim_middleware && cargo test --test atomic_roles_e2e_test "$test_function" -- --nocapture --test-threads=1); then
         echo -e "${GREEN}✅ ${test_name} passed${NC}"
         return 0
@@ -77,21 +77,21 @@ if [ -z "$ATOMIC_SERVER_SECRET" ]; then
     echo -e "${YELLOW}   export ATOMIC_SERVER_SECRET=your-secret-here${NC}"
 else
     echo -e "${GREEN}✅ ATOMIC_SERVER_SECRET is set, running integration tests${NC}"
-    
+
     # Run Title Scorer role test
     if run_test "Title Scorer Role" "test_atomic_haystack_title_scorer_role" "Atomic Server with Title Scorer Role"; then
         ((passed_tests++))
     else
         ((failed_tests++))
     fi
-    
+
     # Run Graph Embeddings role test
     if run_test "Graph Embeddings Role" "test_atomic_haystack_graph_embeddings_role" "Atomic Server with Graph Embeddings Role"; then
         ((passed_tests++))
     else
         ((failed_tests++))
     fi
-    
+
     # Run role comparison test
     if run_test "Role Comparison" "test_atomic_haystack_role_comparison" "Comparing Title Scorer vs Graph Embeddings Roles"; then
         ((passed_tests++))
@@ -117,4 +117,4 @@ echo -e "${BLUE}   - atomic_graph_embeddings_config.json${NC}"
 echo -e "${BLUE}📋 Test files created:${NC}"
 echo -e "${BLUE}   - crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs${NC}"
 
-echo -e "${BLUE}🚀 Ready to use the new atomic server roles!${NC}" 
+echo -e "${BLUE}🚀 Ready to use the new atomic server roles!${NC}"

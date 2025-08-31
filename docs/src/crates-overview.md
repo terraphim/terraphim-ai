@@ -207,4 +207,4 @@ Designed for multiple platforms:
 - **Memory efficiency**: Shared types and minimal allocations
 - **Async operations**: Non-blocking I/O throughout
 - **Caching**: Document and configuration caching
-- **Indexing**: Efficient document indexing and search 
+- **Indexing**: Efficient document indexing and search

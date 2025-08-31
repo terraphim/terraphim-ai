@@ -69,4 +69,3 @@ assets = [
     ["target/release/terraphim-tui", "usr/bin/", "755"],
     ["../../README.md", "usr/share/doc/terraphim-tui/README", "644"],
 ]
-

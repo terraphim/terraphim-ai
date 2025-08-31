@@ -19,6 +19,7 @@ fn create_test_role() -> Role {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     }
 }
 
@@ -33,7 +34,7 @@ fn create_test_config() -> terraphim_config::Config {
 #[tokio::test]
 #[serial]
 async fn test_indexer() {
-    let config = create_test_config();
+    let _config = create_test_config();
     let haystack = Haystack {
         location: "fixtures/haystack".to_string(),
         service: ServiceType::Ripgrep,
@@ -103,7 +104,7 @@ mod nested_tests {
         let _role = config.roles.get(&RoleName::new("Test")).unwrap();
 
         // Test basic role existence
-        assert!(config.roles.len() > 0);
+        assert!(!config.roles.is_empty());
 
         Ok(())
     }

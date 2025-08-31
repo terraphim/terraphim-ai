@@ -28,7 +28,7 @@ pipeline:
 
 rustlib:
   BUILD +install
-  BUILD +build 
+  BUILD +build
 
 native:
   BUILD +install-native
@@ -124,7 +124,7 @@ source:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
-  DO rust+CARGO --args=fetch  
+  DO rust+CARGO --args=fetch
 
 cross-build:
   FROM +source
@@ -164,7 +164,7 @@ test:
 
 fmt:
   FROM +build-debug-native
-  RUN cargo fmt --check 
+  RUN cargo fmt --check
 
 lint:
   FROM +build-debug-native
@@ -240,7 +240,7 @@ docker-aarch64:
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ 
+      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
   ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
   RUN cargo build --release --target aarch64-unknown-linux-gnu
   SAVE ARTIFACT /code/target/aarch64-unknown-linux-gnu/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_linux-aarch64
@@ -261,12 +261,12 @@ docker-scratch:
     SAVE IMAGE aks/terraphim_server:scratch
 
 docs-deps:
-  FROM +install-native 
+  FROM +install-native
   RUN cargo install mdbook
   RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
-  # RUN cargo install --git https://github.com/typst/typst typst-cli 
+  # RUN cargo install --git https://github.com/typst/typst typst-cli
   # RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
   RUN cargo install mdbook-mermaid
   RUN cargo install mdbook-alerts
@@ -275,7 +275,7 @@ docs-deps:
   RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
 
 
-  
+
 docs-pages:
   FROM +docs-deps
   COPY --keep-ts docs /docs

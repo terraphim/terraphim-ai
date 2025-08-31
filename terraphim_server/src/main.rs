@@ -28,10 +28,10 @@ use terraphim_settings::DeviceSettings;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Role configuration to use (Default, RustEngineer, TerraphimEngineer, Combined)
+    /// Role configuration to use (Default, `RustEngineer`, `TerraphimEngineer`, Combined)
     #[arg(long, default_value = "TerraphimEngineer")]
     role: String,
-    
+
     /// Custom config file path (overrides role selection)
     #[arg(long)]
     config: Option<String>,
@@ -49,11 +49,10 @@ async fn main() -> Result<()> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn run_server(args: Args) -> Result<()> {
     // Set up logger for the server
-    terraphim_service::logging::init_logging(
-        terraphim_service::logging::detect_logging_config()
-    );
+    terraphim_service::logging::init_logging(terraphim_service::logging::detect_logging_config());
 
     let server_settings =
         DeviceSettings::load_from_env_and_file(None).context("Failed to load settings")?;
@@ -64,21 +63,25 @@ async fn run_server(args: Args) -> Result<()> {
 
     // Pre-create directories for storage backends early in startup to prevent persistence errors
     log::info!("🔧 Pre-creating storage directories...");
-    log::info!("Found {} profiles: {:?}", server_settings.profiles.len(), server_settings.profiles.keys().collect::<Vec<_>>());
+    log::info!(
+        "Found {} profiles: {:?}",
+        server_settings.profiles.len(),
+        server_settings.profiles.keys().collect::<Vec<_>>()
+    );
     for (profile_name, profile) in &server_settings.profiles {
         let unknown = "unknown".to_string();
         let profile_type = profile.get("type").unwrap_or(&unknown);
-        log::info!("Processing profile '{}' of type '{}'", profile_name, profile_type);
+        log::info!("Processing profile '{profile_name}' of type '{profile_type}'");
         match profile_type.as_str() {
             "sqlite" => {
                 // Handle both datadir and connection_string formats
                 if let Some(datadir) = profile.get("datadir") {
                     if !datadir.is_empty() {
-                        log::info!("🔧 Creating SQLite directory: {}", datadir);
+                        log::info!("🔧 Creating SQLite directory: {datadir}");
                         if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create SQLite directory '{}': {}", datadir, e);
+                            log::warn!("Failed to create SQLite directory '{datadir}': {e}");
                         } else {
-                            log::info!("✅ Created SQLite directory: {}", datadir);
+                            log::info!("✅ Created SQLite directory: {datadir}");
                         }
                     }
                 } else if let Some(connection_string) = profile.get("connection_string") {
@@ -86,11 +89,11 @@ async fn run_server(args: Args) -> Result<()> {
                     if let Some(parent_dir) = std::path::Path::new(connection_string).parent() {
                         let dir_str = parent_dir.to_string_lossy();
                         if !dir_str.is_empty() {
-                            log::info!("🔧 Creating SQLite directory: {}", dir_str);
+                            log::info!("🔧 Creating SQLite directory: {dir_str}");
                             if let Err(e) = std::fs::create_dir_all(parent_dir) {
-                                log::warn!("Failed to create SQLite directory '{}': {}", dir_str, e);
+                                log::warn!("Failed to create SQLite directory '{dir_str}': {e}");
                             } else {
-                                log::info!("✅ Created SQLite directory: {}", dir_str);
+                                log::info!("✅ Created SQLite directory: {dir_str}");
                             }
                         }
                     }
@@ -103,11 +106,11 @@ async fn run_server(args: Args) -> Result<()> {
             "dashmap" => {
                 if let Some(root) = profile.get("root") {
                     if !root.is_empty() {
-                        log::info!("🔧 Creating DashMap directory: {}", root);
+                        log::info!("🔧 Creating DashMap directory: {root}");
                         if let Err(e) = std::fs::create_dir_all(root) {
-                            log::warn!("Failed to create DashMap directory '{}': {}", root, e);
+                            log::warn!("Failed to create DashMap directory '{root}': {e}");
                         } else {
-                            log::info!("✅ Created DashMap directory: {}", root);
+                            log::info!("✅ Created DashMap directory: {root}");
                         }
                     }
                 }
@@ -133,24 +136,31 @@ async fn run_server(args: Args) -> Result<()> {
             // Determine config file based on role
             let config_filename = match args.role.to_lowercase().as_str() {
                 "default" => "default_role_config.json",
-                "rustengineer" => "rust_engineer_config.json", 
+                "rustengineer" => "rust_engineer_config.json",
                 "terraphimengineer" => "terraphim_engineer_config.json",
                 "combined" => "combined_roles_config.json",
                 _ => {
-                    log::warn!("Unknown role '{}', using terraphim_engineer_config.json", args.role);
+                    log::warn!(
+                        "Unknown role '{}', using terraphim_engineer_config.json",
+                        args.role
+                    );
                     "terraphim_engineer_config.json"
                 }
             };
             std::path::Path::new("terraphim_server/default").join(config_filename)
         };
-        
-        log::info!("Loading configuration from {:?} (role: {})", config_path, args.role);
-        
+
+        log::info!(
+            "Loading configuration from {} (role: {})",
+            config_path.display(),
+            args.role
+        );
+
         if config_path.exists() {
             log::info!(
-                "Loading {} role configuration from {:?}",
+                "Loading {} role configuration from {}",
                 args.role,
-                config_path
+                config_path.display()
             );
             match std::fs::read_to_string(&config_path) {
                 Ok(config_content) => {
@@ -166,7 +176,11 @@ async fn run_server(args: Args) -> Result<()> {
                                     saved_config
                                 }
                                 Err(e) => {
-                                    log::info!("No saved config found, using {} role config: {:?}", args.role, e);
+                                    log::info!(
+                                        "No saved config found, using {} role config: {:?}",
+                                        args.role,
+                                        e
+                                    );
                                     role_config
                                 }
                             }
@@ -187,8 +201,7 @@ async fn run_server(args: Args) -> Result<()> {
                                     }
                                     Err(e) => {
                                         log::info!(
-                                            "Failed to load saved config, using default: {:?}",
-                                            e
+                                            "Failed to load saved config, using default: {e:?}"
                                         );
                                         ConfigBuilder::new_with_id(ConfigId::Server)
                                             .build_default_server()
@@ -214,7 +227,7 @@ async fn run_server(args: Args) -> Result<()> {
                                 config
                             }
                             Err(e) => {
-                                log::info!("Failed to load saved config, using default: {:?}", e);
+                                log::info!("Failed to load saved config, using default: {e:?}");
                                 ConfigBuilder::new_with_id(ConfigId::Server)
                                     .build_default_server()
                                     .build()
@@ -227,9 +240,9 @@ async fn run_server(args: Args) -> Result<()> {
             }
         } else {
             log::info!(
-                "{} role config not found at {:?}",
+                "{} role config not found at {}",
                 args.role,
-                config_path
+                config_path.display()
             );
             log::info!("Using default server configuration");
             match ConfigBuilder::new_with_id(ConfigId::Server)
@@ -242,7 +255,7 @@ async fn run_server(args: Args) -> Result<()> {
                         config
                     }
                     Err(e) => {
-                        log::info!("Failed to load saved config, using default: {:?}", e);
+                        log::info!("Failed to load saved config, using default: {e:?}");
                         ConfigBuilder::new_with_id(ConfigId::Server)
                             .build_default_server()
                             .build()

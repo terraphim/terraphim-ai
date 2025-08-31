@@ -29,8 +29,8 @@ The QueryRs haystack implements concurrent search across all query.rs endpoints:
 
 ```rust
 // Concurrent search across all endpoints
-let (reddit_results, stable_results, nightly_results, crates_results, 
-     attributes_results, lints_results, books_results, caniuse_results, 
+let (reddit_results, stable_results, nightly_results, crates_results,
+     attributes_results, lints_results, books_results, caniuse_results,
      error_results) = tokio::join!(
     self.search_reddit_posts(needle),
     self.search_std_docs(needle, "stable"),
@@ -184,25 +184,25 @@ pub struct QueryRsHaystackIndexer {
 impl QueryRsHaystackIndexer {
     // Reddit posts search (JSON API)
     async fn search_reddit_posts(&self, query: &str) -> Result<Vec<Document>>
-    
+
     // Standard library docs search (HTML parsing)
     async fn search_std_docs(&self, query: &str, channel: &str) -> Result<Vec<Document>>
-    
+
     // Crates search (HTML parsing)
     async fn search_crates(&self, query: &str) -> Result<Vec<Document>>
-    
+
     // Attributes search (HTML parsing)
     async fn search_attributes(&self, query: &str) -> Result<Vec<Document>>
-    
+
     // Clippy lints search (HTML parsing)
     async fn search_lints(&self, query: &str) -> Result<Vec<Document>>
-    
+
     // Books search (HTML parsing)
     async fn search_books(&self, query: &str) -> Result<Vec<Document>>
-    
+
     // Caniuse search (HTML parsing)
     async fn search_caniuse(&self, query: &str) -> Result<Vec<Document>>
-    
+
     // Error codes search (HTML parsing)
     async fn search_error_codes(&self, query: &str) -> Result<Vec<Document>>
 }
@@ -329,4 +329,4 @@ To implement HTML parsing for additional endpoints:
 
 ## License
 
-This implementation follows the same license as the Terraphim project. 
+This implementation follows the same license as the Terraphim project.

@@ -48,16 +48,16 @@ update_resource() {
     local resource_url=$1
     local property=$2
     local value=$3
-    
+
     echo "Updating resource: ${resource_url}"
     echo "Setting ${property} to ${value}"
-    
+
     # Generate the commit JSON
     cd test_signature
     export ATOMIC_SERVER_SECRET="$TOKEN"
     cargo run update "$resource_url" "$property" "$value" > ../commit_update.json
     cd ..
-    
+
     # Send the commit to the server
     curl -s -H "Content-Type: application/json" -d @commit_update.json ${SERVER_URL}/commit | jq .
 
@@ -68,15 +68,15 @@ update_resource() {
 # Function to delete a resource
 delete_resource() {
     local resource_url=$1
-    
+
     echo "Deleting resource: ${resource_url}"
-    
+
     # Generate the commit JSON
     cd test_signature
     export ATOMIC_SERVER_SECRET="$TOKEN"
     cargo run delete "$resource_url" > ../commit_delete.json
     cd ..
-    
+
     # Send the commit to the server
     curl -s -H "Content-Type: application/json" -d @commit_delete.json ${SERVER_URL}/commit | jq .
 
@@ -139,4 +139,4 @@ case "$1" in
         echo "  search <query>"
         exit 1
         ;;
-esac 
+esac

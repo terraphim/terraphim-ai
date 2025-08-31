@@ -146,7 +146,7 @@ KG_PATH="$PROJECT_ROOT/../docs/src/kg"
 
 if [ -d "$KG_PATH" ]; then
     echo -e "${GREEN}✅ Knowledge graph directory exists${NC}"
-    
+
     # Check for specific files
     for file in "terraphim-graph.md" "haystack.md" "service.md"; do
         if [ -f "$KG_PATH/$file" ]; then
@@ -222,7 +222,7 @@ if [ "$CI_MODE" = true ]; then
     # CI-specific settings
     export CI=true
     export PLAYWRIGHT_HEADLESS=true
-    
+
     # Run tests with CI configuration
     if [ "$PACKAGE_MANAGER" = "bun" ]; then
         bunx playwright test tests/e2e/rolegraph-search-validation.spec.ts --reporter=github,html,json
@@ -263,4 +263,4 @@ if [ -f "test-config.json" ]; then
 fi
 
 # Exit with test result code
-exit $TEST_EXIT_CODE 
+exit $TEST_EXIT_CODE

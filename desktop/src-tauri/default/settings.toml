@@ -11,4 +11,4 @@ root = "/tmp/dashmaptest"
 
 [profiles.rock]
 type = "rocksdb"
-datadir = "/tmp/rocksdb" 
+datadir = "/tmp/rocksdb"

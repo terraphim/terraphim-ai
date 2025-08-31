@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 use terraphim_atomic_client::{Agent, Commit, CommitBuilder, Config, Store};
 
@@ -134,7 +134,7 @@ fn test_commit_builder_pattern() {
         .unwrap();
 
     assert!(destroy_commit.destroy.is_some());
-    assert_eq!(destroy_commit.destroy.unwrap(), true);
+    assert!(destroy_commit.destroy.unwrap());
 
     println!("✅ CommitBuilder pattern test passed");
 }

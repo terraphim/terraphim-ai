@@ -14,8 +14,8 @@ To run in development mode:
 
 ```sh
 yarn install        # install dependencies
-yarn run dev       # run the Svelte dev server 
-yarn run tauri dev # run the Tauri dev server 
+yarn run dev       # run the Svelte dev server
+yarn run tauri dev # run the Tauri dev server
 ```
 
 ## Testing
@@ -144,7 +144,7 @@ yarn run tauri build # build the Tauri app
 ## Testing Coverage Goals
 
 - **Backend**: >90% coverage for business logic
-- **Frontend**: >85% coverage for components and stores  
+- **Frontend**: >85% coverage for components and stores
 - **E2E**: Cover all major user workflows
 - **Visual**: Test all themes and responsive breakpoints
 - **Performance**: Maintain Lighthouse scores >80
@@ -163,4 +163,3 @@ cd src-tauri && cargo test && cd .. # Backend tests
 yarn e2e            # E2E tests
 npx playwright test tests/visual    # Visual tests
 ```
-

@@ -35,10 +35,14 @@ async fn live_ollama_summarize_deepseek_coder() {
         kg: None,
         haystacks: vec![],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
-    role.extra.insert("llm_provider".into(), serde_json::json!("ollama"));
     role.extra
-        .insert("llm_model".into(), serde_json::json!("deepseek-coder:latest"));
+        .insert("llm_provider".into(), serde_json::json!("ollama"));
+    role.extra.insert(
+        "llm_model".into(),
+        serde_json::json!("deepseek-coder:latest"),
+    );
     role.extra
         .insert("llm_base_url".into(), serde_json::json!(base_url.clone()));
     role.extra
@@ -58,14 +62,9 @@ async fn live_ollama_summarize_deepseek_coder() {
     "#;
 
     let summary = client
-        .summarize(
-            content,
-            llm::SummarizeOptions {
-                max_length: 160,
-            },
-        )
+        .summarize(content, llm::SummarizeOptions { max_length: 160 })
         .await
         .expect("summarize call should succeed");
 
-    assert!(summary.len() > 0, "summary should be non-empty");
+    assert!(!summary.is_empty(), "summary should be non-empty");
 }

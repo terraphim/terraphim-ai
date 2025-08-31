@@ -28,7 +28,7 @@ The tests use the same search terms and expected results as the successful middl
 ```typescript
 const TEST_SEARCH_TERMS = [
   'terraphim-graph',
-  'graph embeddings', 
+  'graph embeddings',
   'graph',
   'knowledge graph based embeddings',
   'terraphim graph scorer'
@@ -286,4 +286,4 @@ When adding new tests:
 3. Validate both API and UI behavior
 4. Include proper error handling
 5. Add descriptive test names and comments
-6. Update this README with new test information 
+6. Update this README with new test information

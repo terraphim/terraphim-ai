@@ -42,6 +42,14 @@ async fn main() -> Result<()> {
                 openrouter_api_key: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )

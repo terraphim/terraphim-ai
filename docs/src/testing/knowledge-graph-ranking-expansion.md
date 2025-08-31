@@ -13,7 +13,7 @@ The Knowledge Graph Ranking Expansion Test validates how adding synonyms to the 
 The test validates five core requirements:
 
 1. **Knowledge Graph Construction** - Build KG from `docs/src/kg` markdown files
-2. **Node/Edge Counting** - Measure graph structure before and after expansion  
+2. **Node/Edge Counting** - Measure graph structure before and after expansion
 3. **Synonym Addition** - Add new records with defined synonyms including target terms
 4. **Structure Changes** - Verify nodes/edges increased after expansion
 5. **Ranking Validation** - Confirm "terraphim-graph" rank changed using Terraphim Engineer role
@@ -27,7 +27,7 @@ The test validates five core requirements:
 let temp_dir = TempDir::new().expect("Failed to create temp directory");
 let temp_kg_path = temp_dir.path().join("kg");
 
-// Copy existing KG files to temp directory  
+// Copy existing KG files to temp directory
 // Files: terraphim-graph.md, service.md, haystack.md
 ```
 
@@ -65,7 +65,7 @@ This concept extends the capabilities of graph-based systems by providing deeper
 
 **New Synonyms Added:**
 - data analysis
-- network analysis  
+- network analysis
 - graph processing
 - relationship mapping
 - connectivity analysis
@@ -107,7 +107,7 @@ assert_ne!(expanded_rank, initial_rank);
 ### Key Findings
 
 1. **Synonym Power**: Adding relevant synonyms creates +318% ranking improvement
-2. **Graph Growth**: Each new concept creates multiple semantic connections  
+2. **Graph Growth**: Each new concept creates multiple semantic connections
 3. **Search Enhancement**: New terms become immediately discoverable
 4. **Role Integration**: Terraphim Engineer role properly utilizes local KG
 5. **Ranking Algorithm**: TerraphimGraph scoring rewards semantic richness
@@ -117,7 +117,7 @@ assert_ne!(expanded_rank, initial_rank);
 All 6 new synonyms are immediately searchable and return results:
 
 - ✅ "data analysis" → 1 result
-- ✅ "network analysis" → 1 result  
+- ✅ "network analysis" → 1 result
 - ✅ "graph processing" → 1 result
 - ✅ "relationship mapping" → 1 result
 - ✅ "connectivity analysis" → 1 result
@@ -172,7 +172,7 @@ let rank = results.first()
 ### Knowledge Graph Enhancement Workflow
 
 1. **Baseline Measurement**: Record current search rankings for key terms
-2. **Synonym Research**: Identify related terms and concepts  
+2. **Synonym Research**: Identify related terms and concepts
 3. **Content Creation**: Add markdown files with strategic synonym mappings
 4. **Impact Validation**: Measure ranking improvements using test framework
 5. **Production Deployment**: Apply successful synonym strategies to live KG
@@ -190,4 +190,4 @@ Track these metrics when expanding knowledge graphs:
 
 The Knowledge Graph Ranking Expansion Test demonstrates that strategic synonym addition can create dramatic search ranking improvements. The test framework provides a reliable method for validating knowledge graph enhancements before production deployment.
 
-**Key Takeaway**: Adding 6 relevant synonyms improved "terraphim-graph" search ranking by 318%, proving the power of semantic connections in graph-based search systems. 
+**Key Takeaway**: Adding 6 relevant synonyms improved "terraphim-graph" search ranking by 318%, proving the power of semantic connections in graph-based search systems.

@@ -78,8 +78,8 @@ impl OpenRouterService {
             ));
         }
 
-        let client = crate::http_client::create_api_client()
-            .unwrap_or_else(|_| reqwest::Client::new());
+        let client =
+            crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
 
         // Allow overriding base URL for testing via env var
         let base_url = std::env::var("OPENROUTER_BASE_URL")
@@ -157,7 +157,7 @@ impl OpenRouterService {
         // Make the API call
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.base_url))
+            .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .header("HTTP-Referer", "https://terraphim.ai") // Required by OpenRouter
@@ -215,7 +215,7 @@ impl OpenRouterService {
     ///
     /// Rule of thumb: ~4 characters per token for English text
     fn calculate_max_tokens(&self, max_chars: usize) -> u32 {
-        let tokens = (max_chars / 3).max(50).min(500); // Reasonable bounds
+        let tokens = (max_chars / 3).clamp(50, 500); // Reasonable bounds
         tokens as u32
     }
 
@@ -273,7 +273,7 @@ impl OpenRouterService {
 
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.base_url))
+            .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .header("HTTP-Referer", "https://terraphim.ai")
@@ -309,7 +309,7 @@ impl OpenRouterService {
     pub async fn list_models(&self) -> Result<Vec<String>> {
         let response = self
             .client
-            .get(&format!("{}/models", self.base_url))
+            .get(format!("{}/models", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("HTTP-Referer", "https://terraphim.ai")
             .header("X-Title", "Terraphim AI")

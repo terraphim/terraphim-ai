@@ -122,7 +122,7 @@ warning: `terraphim_service` (lib) generated 2 warnings
 [2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=stat path=server_config.json -> started
 [2025-07-17T08:41:37Z WARN  opendal::services] service=dashmap operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: dashmap, path: server_config.json } => kv doesn't have this path
 [2025-07-17T08:41:37Z INFO  terraphim_server] No saved config found, using Terraphim Engineer config: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
-    
+
     Context:
        service: dashmap
        path: server_config.json

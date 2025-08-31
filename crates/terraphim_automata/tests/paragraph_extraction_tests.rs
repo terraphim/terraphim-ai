@@ -13,7 +13,8 @@ fn make_thesaurus(terms: &[&str], norm: &str) -> Thesaurus {
 #[test]
 fn finds_paragraph_from_term_start_including_term() {
     let thesaurus = make_thesaurus(&["lorem"], "lorem");
-    let text = "Intro\n\nlorem ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nNext paragraph.";
+    let text =
+        "Intro\n\nlorem ipsum dolor sit amet,\nconsectetur adipiscing elit.\n\nNext paragraph.";
     let res = extract_paragraphs_from_automata(text, thesaurus, true).unwrap();
     assert_eq!(res.len(), 1);
     let (_m, para) = &res[0];

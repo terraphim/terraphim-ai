@@ -18,7 +18,7 @@ echo "=================================================="
 # Check if atomic server is running
 check_atomic_server() {
     echo -e "${BLUE}📡 Checking if Atomic Server is running...${NC}"
-    
+
     if curl -s http://localhost:9883 > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Atomic Server is running at http://localhost:9883${NC}"
         return 0
@@ -34,19 +34,19 @@ check_atomic_server() {
 # Check environment variables
 check_environment() {
     echo -e "${BLUE}🔧 Checking environment variables...${NC}"
-    
+
     if [ -f ".env" ]; then
         echo -e "${GREEN}✅ Found .env file, loading...${NC}"
         source .env
     fi
-    
+
     if [ -z "$ATOMIC_SERVER_URL" ]; then
         echo -e "${YELLOW}⚠️  ATOMIC_SERVER_URL not set, using default: http://localhost:9883${NC}"
         export ATOMIC_SERVER_URL="http://localhost:9883"
     else
         echo -e "${GREEN}✅ ATOMIC_SERVER_URL: $ATOMIC_SERVER_URL${NC}"
     fi
-    
+
     if [ -z "$ATOMIC_SERVER_SECRET" ]; then
         echo -e "${YELLOW}⚠️  ATOMIC_SERVER_SECRET not set${NC}"
         echo -e "${YELLOW}💡 Tests will run with anonymous access (limited functionality)${NC}"
@@ -59,11 +59,11 @@ check_environment() {
 # Run tests
 run_tests() {
     echo -e "${BLUE}🧪 Running atomic server integration tests...${NC}"
-    
+
     # Set logging level for tests
     export RUST_LOG="${RUST_LOG:-terraphim_middleware=debug,terraphim_atomic_client=debug}"
     export RUST_BACKTRACE="${RUST_BACKTRACE:-1}"
-    
+
     echo -e "${BLUE}📋 Test 1: Atomic Haystack Config Integration${NC}"
     if cargo test --test atomic_haystack_config_integration test_atomic_haystack_with_terraphim_config -- --nocapture --test-threads=1; then
         echo -e "${GREEN}✅ Config integration test passed${NC}"
@@ -71,7 +71,7 @@ run_tests() {
         echo -e "${RED}❌ Config integration test failed${NC}"
         return 1
     fi
-    
+
     echo -e "${BLUE}📋 Test 2: Configuration Validation${NC}"
     if cargo test --test atomic_haystack_config_integration test_atomic_haystack_config_validation -- --nocapture; then
         echo -e "${GREEN}✅ Config validation test passed${NC}"
@@ -79,7 +79,7 @@ run_tests() {
         echo -e "${RED}❌ Config validation test failed${NC}"
         return 1
     fi
-    
+
     echo -e "${BLUE}📋 Test 3: Invalid Secret Handling${NC}"
     if cargo test --test atomic_haystack_config_integration test_atomic_haystack_invalid_secret -- --nocapture; then
         echo -e "${GREEN}✅ Invalid secret test passed${NC}"
@@ -87,7 +87,7 @@ run_tests() {
         echo -e "${RED}❌ Invalid secret test failed${NC}"
         return 1
     fi
-    
+
     if [ -n "$ATOMIC_SERVER_SECRET" ]; then
         echo -e "${BLUE}📋 Test 4: Anonymous Access (requires running server)${NC}"
         if cargo test --test atomic_haystack_config_integration test_atomic_haystack_anonymous_access -- --nocapture --ignored; then
@@ -96,7 +96,7 @@ run_tests() {
             echo -e "${YELLOW}⚠️  Anonymous access test failed (may be expected)${NC}"
         fi
     fi
-    
+
     echo -e "${BLUE}📋 Test 5: Document Import and Search (requires running server)${NC}"
     if cargo test --test atomic_document_import_test -- --nocapture --ignored; then
         echo -e "${GREEN}✅ Document import test passed${NC}"
@@ -160,4 +160,4 @@ main() {
     esac
 }
 
-main "$@" 
+main "$@"

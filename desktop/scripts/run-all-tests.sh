@@ -130,7 +130,7 @@ print_success "Prerequisites check passed"
 # Install dependencies
 if [ "$SKIP_INSTALL" = false ]; then
     print_status "Installing dependencies..."
-    
+
     # Install Node.js dependencies
     if yarn install --frozen-lockfile; then
         print_success "Node.js dependencies installed"
@@ -138,7 +138,7 @@ if [ "$SKIP_INSTALL" = false ]; then
         print_error "Failed to install Node.js dependencies"
         exit 1
     fi
-    
+
     # Install Playwright browsers if needed
     if [ "$SKIP_E2E" = false ] || [ "$SKIP_VISUAL" = false ]; then
         if npx playwright install --with-deps; then
@@ -160,16 +160,16 @@ VISUAL_RESULT=0
 # Backend Tests (Rust/Tauri)
 if [ "$SKIP_BACKEND" = false ]; then
     print_status "Running backend tests (Rust/Tauri)..."
-    
+
     cd src-tauri
-    
+
     if [ "$COVERAGE" = true ]; then
         # Install coverage tool if not present
         if ! command_exists "cargo-tarpaulin"; then
             print_status "Installing cargo-tarpaulin for coverage..."
             cargo install cargo-tarpaulin
         fi
-        
+
         if cargo tarpaulin --out xml --output-dir ../coverage/backend; then
             print_success "Backend tests with coverage passed"
         else
@@ -184,7 +184,7 @@ if [ "$SKIP_BACKEND" = false ]; then
             BACKEND_RESULT=1
         fi
     fi
-    
+
     cd ..
 else
     print_warning "Skipping backend tests"
@@ -222,7 +222,7 @@ if [ "$SKIP_FRONTEND" = false ]; then
     print_success "Terraphim Server is up and running"
 
     print_status "Running frontend tests (Svelte/Vitest)..."
-    
+
     if [ "$COVERAGE" = true ]; then
         if yarn test:coverage; then
             print_success "Frontend tests with coverage passed"
@@ -245,7 +245,7 @@ fi
 # Build application for E2E tests
 if [ "$SKIP_E2E" = false ] || [ "$SKIP_VISUAL" = false ]; then
     print_status "Building application for E2E tests..."
-    
+
     if yarn build; then
         print_success "Application built successfully"
     else
@@ -257,7 +257,7 @@ fi
 # End-to-End Tests (Playwright)
 if [ "$SKIP_E2E" = false ]; then
     print_status "Running end-to-end tests (Playwright)..."
-    
+
     if yarn e2e; then
         print_success "E2E tests passed"
     else
@@ -271,7 +271,7 @@ fi
 # Visual Regression Tests (Playwright)
 if [ "$SKIP_VISUAL" = false ]; then
     print_status "Running visual regression tests..."
-    
+
     if npx playwright test tests/visual; then
         print_success "Visual regression tests passed"
     else
@@ -324,4 +324,4 @@ fi
 # At the very end, after tests summary (before exit), ensure the server is stopped
 print_status "Stopping Terraphim Server (PID: $SERVER_PID)..."
 kill $SERVER_PID || true
-print_success "Terraphim Server stopped" 
+print_success "Terraphim Server stopped"

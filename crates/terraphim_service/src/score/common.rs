@@ -1,10 +1,9 @@
 /// Common structures shared across different BM25 scoring implementations
-/// 
-/// This module contains shared structs and utilities used by various BM25 
+///
+/// This module contains shared structs and utilities used by various BM25
 /// scoring algorithms to avoid code duplication and ensure consistency.
-
 /// BM25 parameters used across different BM25 implementations
-/// 
+///
 /// These parameters control the behavior of BM25 family of scoring algorithms:
 /// - k1: Controls term frequency saturation point
 /// - b: Controls document length normalization strength
@@ -30,7 +29,7 @@ impl Default for BM25Params {
 }
 
 /// Field weights for BM25F field-based scoring
-/// 
+///
 /// Different document fields can have different importance weights:
 /// - title: Usually highest weight as titles are most important
 /// - body: Base weight for main content

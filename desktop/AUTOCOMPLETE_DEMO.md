@@ -171,11 +171,11 @@ When MCP server is unavailable, the system gracefully falls back to:
 
 The Terraphim autocomplete integration with Novel editor provides:
 
-✅ **Local, Fast Autocomplete** - No external API calls needed  
-✅ **Knowledge Graph Integration** - Context-aware suggestions  
-✅ **Role-Based Intelligence** - Adapts to user context  
-✅ **Graceful Degradation** - Works even when server unavailable  
-✅ **Extensible Architecture** - Easy to add new features  
+✅ **Local, Fast Autocomplete** - No external API calls needed
+✅ **Knowledge Graph Integration** - Context-aware suggestions
+✅ **Role-Based Intelligence** - Adapts to user context
+✅ **Graceful Degradation** - Works even when server unavailable
+✅ **Extensible Architecture** - Easy to add new features
 
 This creates a powerful, intelligent editing experience that leverages your local knowledge base for enhanced productivity and content creation.
 

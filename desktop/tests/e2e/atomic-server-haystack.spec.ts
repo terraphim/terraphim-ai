@@ -28,9 +28,9 @@ class TerraphimServerManager {
 
   async start(): Promise<void> {
     console.log('🚀 Starting Terraphim server for atomic haystack integration...');
-    
+
     const serverPath = path.join(__dirname, '../../../target/release/terraphim_server');
-    
+
     if (!fs.existsSync(serverPath)) {
       const debugServerPath = path.join(__dirname, '../../../target/debug/terraphim_server');
       if (!fs.existsSync(debugServerPath)) {
@@ -86,7 +86,7 @@ class TerraphimServerManager {
 
   async waitForReady(): Promise<void> {
     console.log('⏳ Waiting for Terraphim server to be ready...');
-    
+
     for (let i = 0; i < 30; i++) {
       try {
         const response = await fetch(`http://localhost:${this.port}/health`, {
@@ -129,7 +129,7 @@ test.describe('Atomic Server Haystack Integration', () => {
 
   test.beforeAll(async () => {
     console.log('🔧 Setting up atomic server haystack integration tests...');
-    
+
     // Verify atomic server is accessible
     try {
       const response = await fetch(ATOMIC_SERVER_URL, {
@@ -203,7 +203,7 @@ test.describe('Atomic Server Haystack Integration', () => {
     if (terraphimServer) {
       await terraphimServer.stop();
     }
-    
+
     // Cleanup
     if (fs.existsSync(configPath)) {
       fs.unlinkSync(configPath);
@@ -213,24 +213,24 @@ test.describe('Atomic Server Haystack Integration', () => {
 
   test('should validate atomic server connectivity and credentials', async () => {
     console.log('🔍 Testing atomic server connectivity...');
-    
+
     // Test basic connectivity
     const response = await fetch(ATOMIC_SERVER_URL);
     expect(response.status).toBeLessThan(500);
-    
+
     // Validate environment variables
     expect(ATOMIC_SERVER_URL).toBeTruthy();
     expect(ATOMIC_SERVER_URL).toMatch(/^https?:\/\//);
-    
+
     console.log('✅ Atomic server connectivity validated');
   });
 
   test('should configure Terraphim server with atomic haystack role', async () => {
     console.log('🔧 Configuring Terraphim server with atomic haystack...');
-    
+
     // Load and parse the configuration
     const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    
+
     // Update Terraphim server configuration
     const updateResponse = await fetch('http://localhost:8000/config', {
       method: 'POST',
@@ -240,35 +240,35 @@ test.describe('Atomic Server Haystack Integration', () => {
       body: JSON.stringify(configData),
       signal: AbortSignal.timeout(10000)
     });
-    
+
     console.log('Config update response status:', updateResponse.status);
     if (!updateResponse.ok) {
       const errorText = await updateResponse.text();
       console.log('Config update error:', errorText);
     }
-    
+
     expect(updateResponse.ok).toBeTruthy();
     console.log('✅ Successfully updated Terraphim server config');
-    
+
     // Wait for configuration to be applied
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
+
     // Verify configuration endpoint
     const configResponse = await fetch('http://localhost:8000/config');
     expect(configResponse.ok).toBeTruthy();
-    
+
     const configResult = await configResponse.json();
     expect(configResult.status).toBe('success');
     expect(configResult.config.roles).toBeDefined();
     expect(configResult.config.roles['Atomic Haystack Tester']).toBeDefined();
     expect(configResult.config.roles['Atomic Haystack Tester'].haystacks[0].service).toBe('Atomic');
-    
+
     console.log('✅ Atomic haystack configuration validated');
   });
 
   test('should perform atomic haystack search and return results', async () => {
     console.log('🔍 Testing atomic haystack search functionality...');
-    
+
     // Test multiple search terms to ensure comprehensive coverage
     const searchTerms = [
       { term: 'test', description: 'general test content' },
@@ -282,7 +282,7 @@ test.describe('Atomic Server Haystack Integration', () => {
 
     for (const { term, description } of searchTerms) {
       console.log(`🔍 Testing search for "${term}" (${description})...`);
-      
+
       try {
         const searchResponse = await fetch('http://localhost:8000/documents/search', {
           method: 'POST',
@@ -296,20 +296,20 @@ test.describe('Atomic Server Haystack Integration', () => {
           }),
           signal: AbortSignal.timeout(15000)
         });
-        
+
         console.log(`📊 Search response status for "${term}":`, searchResponse.status);
-        
+
         if (searchResponse.ok) {
           const contentType = searchResponse.headers.get('content-type');
-          
+
           if (contentType && contentType.includes('application/json')) {
             const results = await searchResponse.json();
             console.log(`📄 Search results for "${term}":`, results.results?.length || 0, 'documents');
-            
+
             if (results.results && Array.isArray(results.results)) {
               totalResults += results.results.length;
               successfulSearches++;
-              
+
               // Validate result structure
               if (results.results.length > 0) {
                 const firstResult = results.results[0];
@@ -331,7 +331,7 @@ test.describe('Atomic Server Haystack Integration', () => {
     }
 
     console.log(`📊 Search summary: ${successfulSearches}/${searchTerms.length} successful searches, ${totalResults} total results`);
-    
+
     // Expect at least some searches to succeed
     expect(successfulSearches).toBeGreaterThanOrEqual(1);
     console.log('✅ Atomic haystack search functionality validated');
@@ -339,7 +339,7 @@ test.describe('Atomic Server Haystack Integration', () => {
 
   test('should validate dual haystack configuration and search', async () => {
     console.log('🔧 Testing dual haystack (Atomic + Ripgrep) configuration...');
-    
+
     // Switch to dual haystack role
     const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     const switchResponse = await fetch('http://localhost:8000/config', {
@@ -353,12 +353,12 @@ test.describe('Atomic Server Haystack Integration', () => {
       }),
       signal: AbortSignal.timeout(10000)
     });
-    
+
     expect(switchResponse.ok).toBeTruthy();
-    
+
     // Wait for role switch
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Test search with dual haystacks
     const searchResponse = await fetch('http://localhost:8000/documents/search', {
       method: 'POST',
@@ -372,26 +372,26 @@ test.describe('Atomic Server Haystack Integration', () => {
       }),
       signal: AbortSignal.timeout(15000)
     });
-    
+
     if (searchResponse.ok) {
       const results = await searchResponse.json();
       console.log('📄 Dual haystack search results:', results.results?.length || 0, 'documents');
-      
+
       if (results.results && results.results.length > 0) {
         // Should have results from both Atomic and Ripgrep sources
         const atomicResults = results.results.filter(doc => doc.url && doc.url.includes('localhost:9883'));
         const ripgrepResults = results.results.filter(doc => doc.url && !doc.url.includes('localhost:9883'));
-        
+
         console.log(`📄 Atomic results: ${atomicResults.length}, Ripgrep results: ${ripgrepResults.length}`);
       }
     }
-    
+
     console.log('✅ Dual haystack functionality validated');
   });
 
   test('should handle error conditions gracefully', async () => {
     console.log('🔧 Testing error handling...');
-    
+
     // Test with invalid role
     const invalidRoleResponse = await fetch('http://localhost:8000/documents/search', {
       method: 'POST',
@@ -405,11 +405,11 @@ test.describe('Atomic Server Haystack Integration', () => {
       }),
       signal: AbortSignal.timeout(10000)
     });
-    
+
     // Should handle gracefully (either 200, 400, 404, 422, or 500 for server errors)
     console.log(`Invalid role response status: ${invalidRoleResponse.status}`);
     expect([200, 400, 404, 422, 500].includes(invalidRoleResponse.status)).toBeTruthy();
-    
+
     // Test with empty search term
     const emptySearchResponse = await fetch('http://localhost:8000/documents/search', {
       method: 'POST',
@@ -423,10 +423,10 @@ test.describe('Atomic Server Haystack Integration', () => {
       }),
       signal: AbortSignal.timeout(10000)
     });
-    
+
     // Should handle empty search gracefully
     expect([200, 400].includes(emptySearchResponse.status)).toBeTruthy();
-    
+
     console.log('✅ Error handling validated');
   });
 });
@@ -435,19 +435,19 @@ test.describe('CI-Friendly Features', () => {
   test('should run efficiently in CI environment', async () => {
     const isCI = Boolean(process.env.CI);
     console.log('CI environment:', isCI);
-    
+
     if (isCI) {
       // In CI, all requests should have reasonable timeouts
       const startTime = Date.now();
-      
+
       try {
         const healthResponse = await fetch('http://localhost:8000/health', {
           signal: AbortSignal.timeout(5000)
         });
-        
+
         const endTime = Date.now();
         const duration = endTime - startTime;
-        
+
         console.log(`Health check completed in ${duration}ms`);
         expect(duration).toBeLessThan(5000);
         expect(healthResponse.ok).toBeTruthy();
@@ -457,7 +457,7 @@ test.describe('CI-Friendly Features', () => {
         expect(error.message).toContain('fetch');
       }
     }
-    
+
     console.log('✅ CI-friendly features validated');
   });
-}); 
+});

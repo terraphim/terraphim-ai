@@ -8,11 +8,12 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Different build targets that can be specified
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub enum BuildTarget {
     /// Native target for release builds
     NativeRelease,
     /// Native target for debug builds
+    #[default]
     NativeDebug,
     /// Cross-compilation target
     CrossCompile(String),
@@ -82,12 +83,6 @@ impl BuildTarget {
     }
 }
 
-impl Default for BuildTarget {
-    fn default() -> Self {
-        BuildTarget::NativeDebug
-    }
-}
-
 impl FromStr for BuildTarget {
     type Err = Error;
 
@@ -97,10 +92,10 @@ impl FromStr for BuildTarget {
             "native-debug" | "debug" => Ok(BuildTarget::NativeDebug),
             "docker" => Ok(BuildTarget::Docker),
             other => {
-                if other.starts_with("cross-") {
-                    Ok(BuildTarget::CrossCompile(other[6..].to_string()))
-                } else if other.starts_with("earthly-") {
-                    Ok(BuildTarget::Earthly(other[8..].to_string()))
+                if let Some(stripped) = other.strip_prefix("cross-") {
+                    Ok(BuildTarget::CrossCompile(stripped.to_string()))
+                } else if let Some(stripped) = other.strip_prefix("earthly-") {
+                    Ok(BuildTarget::Earthly(stripped.to_string()))
                 } else {
                     Ok(BuildTarget::Custom(other.to_string()))
                 }

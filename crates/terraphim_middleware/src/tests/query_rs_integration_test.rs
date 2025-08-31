@@ -9,7 +9,7 @@ async fn test_query_rs_haystack_integration() {
 
     // Create the QueryRs haystack indexer
     let indexer = QueryRsHaystackIndexer::new();
-    
+
     // Create a haystack configuration
     let haystack = Haystack {
         location: "https://query.rs".to_string(),
@@ -29,7 +29,7 @@ async fn test_query_rs_haystack_integration() {
         match indexer.index(query, &haystack).await {
             Ok(index) => {
                 println!("✅ Successfully indexed {} documents", index.len());
-                
+
                 // Show some sample results
                 for (id, doc) in index.iter().take(3) {
                     println!("  📄 {}: {}", doc.title, doc.url);
@@ -40,13 +40,13 @@ async fn test_query_rs_haystack_integration() {
                         println!("     Tags: {:?}", tags);
                     }
                 }
-                
+
                 // Verify document structure
                 for (id, doc) in index.iter() {
                     assert!(!doc.title.is_empty(), "Document title should not be empty");
                     assert!(!doc.url.is_empty(), "Document URL should not be empty");
                     assert!(!doc.id.is_empty(), "Document ID should not be empty");
-                    
+
                     // Verify tags contain rust
                     if let Some(tags) = &doc.tags {
                         assert!(tags.contains(&"rust".to_string()), "Document should have rust tag");
@@ -79,7 +79,7 @@ async fn test_query_rs_service_type_integration() {
 
     // Test that ServiceType::QueryRs is properly defined
     let service_type = ServiceType::QueryRs;
-    
+
     match service_type {
         ServiceType::QueryRs => {
             println!("✅ ServiceType::QueryRs is properly defined");
@@ -101,7 +101,7 @@ async fn test_query_rs_service_type_integration() {
     assert_eq!(haystack.service, ServiceType::QueryRs);
     assert_eq!(haystack.location, "https://query.rs");
     assert!(haystack.read_only);
-    
+
     println!("✅ Haystack configuration with QueryRs service works correctly");
     println!("✅ ServiceType::QueryRs integration is complete");
 }
@@ -129,23 +129,23 @@ async fn test_query_rs_document_format() {
                     println!("📄 Document: {}", doc.title);
                     println!("   URL: {}", doc.url);
                     println!("   ID: {}", doc.id);
-                    
+
                     // Verify document format
                     assert!(!doc.title.is_empty(), "Title should not be empty");
                     assert!(!doc.url.is_empty(), "URL should not be empty");
                     assert!(!doc.id.is_empty(), "ID should not be empty");
-                    
+
                     // Check for expected tags
                     if let Some(tags) = &doc.tags {
                         assert!(tags.contains(&"rust".to_string()), "Should have rust tag");
-                        
+
                         // Check for specific source tags
                         let has_valid_source = tags.iter().any(|tag| {
                             matches!(tag.as_str(), "std" | "crate" | "docs.rs" | "reddit" | "community")
                         });
                         assert!(has_valid_source, "Should have a valid source tag");
                     }
-                    
+
                     // Check title format
                     if doc.title.contains("[STABLE]") || doc.title.contains("[NIGHTLY]") {
                         assert!(doc.title.starts_with('['), "STD docs should start with [");
@@ -158,7 +158,7 @@ async fn test_query_rs_document_format() {
                         assert!(doc.title.starts_with("[docs.rs]"), "Docs.rs should start with [docs.rs]");
                     }
                 }
-                
+
                 println!("✅ Document format validation passed");
             } else {
                 println!("⚠️  No documents returned (network may be unavailable)");
@@ -171,4 +171,4 @@ async fn test_query_rs_document_format() {
     }
 
     println!("✅ QueryRs Document Format Test Complete");
-} 
+}

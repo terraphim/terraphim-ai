@@ -11,7 +11,7 @@ RIPGREP: This document explains how haystack integration works in the Terraphim 
 - **Capabilities**: Full-text search using ripgrep
 - **Prefix**: Documents from this haystack are prefixed with "RIPGREP:"
 
-### Atomic Server Haystack  
+### Atomic Server Haystack
 - **Type**: Atomic Server based
 - **Service**: Atomic
 - **Location**: HTTP URLs
@@ -22,4 +22,4 @@ RIPGREP: This document explains how haystack integration works in the Terraphim 
 
 Haystacks are configured per role in the Terraphim configuration system. Each role can have multiple haystacks for comprehensive search coverage.
 
-This RIPGREP document demonstrates the filesystem-based haystack functionality. 
+This RIPGREP document demonstrates the filesystem-based haystack functionality.

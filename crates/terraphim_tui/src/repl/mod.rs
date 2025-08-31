@@ -1,5 +1,5 @@
 //! REPL (Read-Eval-Print-Loop) interface for Terraphim TUI
-//! 
+//!
 //! This module provides a command-line interface that matches the functionality
 //! available in the Tauri desktop application, with commands for search, chat,
 //! configuration management, and MCP tools integration.

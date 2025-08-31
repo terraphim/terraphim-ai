@@ -55,7 +55,7 @@ echo "✅ Target validation: Search for 'terraphim-graph', 'graph embeddings', e
 if [ $test_result -ne 0 ]; then
     echo "⚠️  Next steps needed:"
     echo "   1. Build thesaurus from docs/src/kg markdown files"
-    echo "   2. Set automata_path in role configuration"  
+    echo "   2. Set automata_path in role configuration"
     echo "   3. Validate search returns results for domain terms"
     echo ""
     echo "🎯 Expected outcome: Same results as rolegraph test (rank 34 for all terms)"
@@ -66,4 +66,4 @@ echo "🔗 Related successful test:"
 echo "   crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs"
 echo "   ✅ All tests pass with 'Terraphim Engineer' configuration"
 
-exit $test_result 
+exit $test_result

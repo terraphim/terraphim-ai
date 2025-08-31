@@ -47,7 +47,7 @@ mkdir -p .git/hooks
 # Function to install native hooks
 install_native_hooks() {
     print_status "INFO" "Installing native Git hooks..."
-    
+
     if [ -f "scripts/hooks/pre-commit" ]; then
         cp scripts/hooks/pre-commit .git/hooks/pre-commit
         chmod +x .git/hooks/pre-commit
@@ -55,7 +55,7 @@ install_native_hooks() {
     else
         print_status "WARN" "Native pre-commit hook not found at scripts/hooks/pre-commit"
     fi
-    
+
     if [ -f "scripts/hooks/commit-msg" ]; then
         cp scripts/hooks/commit-msg .git/hooks/commit-msg
         chmod +x .git/hooks/commit-msg
@@ -70,7 +70,7 @@ setup_biome() {
     if [ -d "desktop" ] && [ -f "desktop/package.json" ]; then
         print_status "INFO" "Setting up Biome for JavaScript/TypeScript..."
         cd desktop
-        
+
         # Check if Biome is already installed
         if ! command_exists npx || ! npx @biomejs/biome --version >/dev/null 2>&1; then
             print_status "INFO" "Installing Biome..."
@@ -87,7 +87,7 @@ setup_biome() {
         else
             print_status "SUCCESS" "Biome is already available"
         fi
-        
+
         cd ..
     else
         print_status "INFO" "Desktop directory not found, skipping Biome setup"
@@ -216,20 +216,20 @@ if command_exists pre-commit; then
     pre-commit install --hook-type commit-msg
     HOOK_MANAGER_INSTALLED=true
     print_status "SUCCESS" "pre-commit hooks installed"
-    
+
 elif command_exists prek; then
     print_status "SUCCESS" "Found prek, installing hooks..."
     prek install
     prek install --hook-type commit-msg
     HOOK_MANAGER_INSTALLED=true
     print_status "SUCCESS" "prek hooks installed"
-    
+
 elif command_exists lefthook; then
     print_status "SUCCESS" "Found lefthook, installing hooks..."
     lefthook install
     HOOK_MANAGER_INSTALLED=true
     print_status "SUCCESS" "lefthook hooks installed"
-    
+
     # Create lefthook configuration if it doesn't exist
     if [ ! -f "lefthook.yml" ]; then
         print_status "INFO" "Creating lefthook.yml configuration..."
@@ -240,22 +240,22 @@ pre-commit:
     trailing-whitespace:
       run: git diff --cached --check
       stage_fixed: true
-    
+
     cargo-fmt:
       glob: "*.rs"
       run: cargo fmt --all -- --check
       stage_fixed: true
-    
+
     cargo-clippy:
       glob: "*.rs"
       run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-    
+
     biome:
       glob: "desktop/**/*.{js,ts,tsx,jsx,json,jsonc}"
       root: desktop/
       run: npx @biomejs/biome check --write false --no-errors-on-unmatched
       stage_fixed: true
-    
+
     secrets:
       run: ./scripts/hooks/pre-commit
 
@@ -266,7 +266,7 @@ commit-msg:
 EOF
         print_status "SUCCESS" "Created lefthook.yml configuration"
     fi
-    
+
 else
     print_status "WARN" "No hook manager found (pre-commit, prek, or lefthook)"
     print_status "INFO" "Installing native Git hooks as fallback..."

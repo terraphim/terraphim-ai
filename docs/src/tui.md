@@ -68,4 +68,3 @@ terraphim-tui
 - ASCII graph filters and alternative sort metrics.
 - Streaming chat into the TUI pane.
 - Thesaurus-backed suggestions when published by role config.
-

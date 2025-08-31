@@ -192,10 +192,10 @@ let automata = builder::Builder::from_terms(terms)?.build()?;
 pub enum AutomataError {
     #[error("FST construction failed: {0}")]
     FstConstruction(String),
-    
+
     #[error("Invalid term: {0}")]
     InvalidTerm(String),
-    
+
     #[error("Search failed: {0}")]
     SearchError(String),
 }
@@ -217,14 +217,14 @@ let results = automata.prefix_search("term")?;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_prefix_search() {
         let automata = Automata::new(vec!["rust".to_string()])?;
         let results = automata.prefix_search("ru")?;
         assert_eq!(results, vec!["rust"]);
     }
-    
+
     #[test]
     fn test_fuzzy_autocomplete() {
         let autocomplete = Autocomplete::new(vec!["rust".to_string()])?;
@@ -240,13 +240,13 @@ mod tests {
 fn test_algorithm_comparison() {
     let terms = vec!["rust".to_string(), "programming".to_string()];
     let autocomplete = Autocomplete::new(terms)?;
-    
+
     // Jaro-Winkler (faster)
     let jw_results = autocomplete.fuzzy_autocomplete_search("rust", 0.8)?;
-    
+
     // Levenshtein (baseline)
     let lev_results = autocomplete.fuzzy_autocomplete_search_levenshtein("rust", 2)?;
-    
+
     // Results should be similar but Jaro-Winkler is faster
     assert!(jw_results.len() >= lev_results.len());
 }
@@ -374,4 +374,4 @@ let enhanced_text = matcher::replace_matches(&text, &thesaurus, Format::Wiki)?;
 1. Use Jaro-Winkler for general autocomplete
 2. Use Levenshtein for exact edit distance needs
 3. Batch operations when possible
-4. Reuse automata instances 
+4. Reuse automata instances

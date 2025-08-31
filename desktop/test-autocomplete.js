@@ -85,7 +85,7 @@ async function testMCPEndpoint() {
       const autocompleteResult = await autocompleteResponse.json();
       console.log('✅ Autocomplete response received');
       console.log('Result:', autocompleteResult);
-      
+
       if (autocompleteResult.result?.content) {
         console.log('\n📝 Autocomplete Suggestions:');
         autocompleteResult.result.content.forEach((item, index) => {

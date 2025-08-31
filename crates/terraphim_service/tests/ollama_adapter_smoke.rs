@@ -30,11 +30,14 @@ async fn test_ollama_summarize_minimal() {
         theme: "default".into(),
         kg: None,
         haystacks: vec![],
-        extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
-    role.extra.insert("llm_provider".into(), serde_json::json!("ollama"));
-    role.extra.insert("llm_model".into(), serde_json::json!("llama3.1"));
-    role.extra.insert("llm_base_url".into(), serde_json::json!(server.uri()));
+    role.extra
+        .insert("llm_provider".into(), serde_json::json!("ollama"));
+    role.extra
+        .insert("llm_model".into(), serde_json::json!("llama3.1"));
+    role.extra
+        .insert("llm_base_url".into(), serde_json::json!(server.uri()));
 
     let client = llm::build_llm_from_role(&role).expect("client");
     let out = tokio::time::timeout(

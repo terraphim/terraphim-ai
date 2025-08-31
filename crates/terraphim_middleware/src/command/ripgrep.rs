@@ -171,23 +171,25 @@ impl RipgrepCommand {
     fn validate_needle(needle: &str) -> Result<()> {
         // Check for shell metacharacters and dangerous patterns
         if needle.is_empty() {
-            return Err(crate::Error::Validation("Search needle cannot be empty".to_string()));
+            return Err(crate::Error::Validation(
+                "Search needle cannot be empty".to_string(),
+            ));
         }
-        
+
         // Reject needles that could be interpreted as command line options
         if needle.starts_with('-') {
             return Err(crate::Error::Validation(
-                "Search needle cannot start with dash (potential flag injection)".to_string()
+                "Search needle cannot start with dash (potential flag injection)".to_string(),
             ));
         }
-        
+
         // Check for excessive length (prevent DoS)
         if needle.len() > 1000 {
             return Err(crate::Error::Validation(
-                "Search needle too long (max 1000 characters)".to_string()
+                "Search needle too long (max 1000 characters)".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 
@@ -211,14 +213,34 @@ impl RipgrepCommand {
     /// Checks if a flag is a safe, known ripgrep option
     fn is_safe_ripgrep_flag(&self, flag: &str) -> bool {
         // Whitelist of safe ripgrep flags
-        matches!(flag, 
-            "--all-match" | "-e" | "--glob" | "-t" | "--max-count" | "-C" | "--case-sensitive" |
-            "--ignore-case" | "-i" | "--line-number" | "-n" | "--with-filename" | "-H" |
-            "--no-heading" | "--color=never" | "--json" | "--heading" | "--trim" |
-            "--context" | "--after-context" | "--before-context" | "-A" | "-B"
+        matches!(
+            flag,
+            "--all-match"
+                | "-e"
+                | "--glob"
+                | "-t"
+                | "--max-count"
+                | "-C"
+                | "--case-sensitive"
+                | "--ignore-case"
+                | "-i"
+                | "--line-number"
+                | "-n"
+                | "--with-filename"
+                | "-H"
+                | "--no-heading"
+                | "--color=never"
+                | "--json"
+                | "--heading"
+                | "--trim"
+                | "--context"
+                | "--after-context"
+                | "--before-context"
+                | "-A"
+                | "-B"
         )
     }
-    
+
     pub async fn run_with_extra_args(
         &self,
         needle: &str,
@@ -226,17 +248,18 @@ impl RipgrepCommand {
         extra_args: &[String],
     ) -> Result<Vec<Message>> {
         Self::validate_needle(needle)?;
-        
+
         // Validate extra_args to prevent command injection
         for arg in extra_args {
             if arg.starts_with('-') && !self.is_safe_ripgrep_flag(arg) {
                 log::warn!("Potentially unsafe ripgrep argument rejected: {}", arg);
-                return Err(crate::Error::Validation(
-                    format!("Unsafe ripgrep argument: {}", arg)
-                ));
+                return Err(crate::Error::Validation(format!(
+                    "Unsafe ripgrep argument: {}",
+                    arg
+                )));
             }
         }
-        
+
         // Put options first, then extra args, then needle, then haystack (correct ripgrep argument order)
         let args: Vec<String> = self
             .default_args
@@ -277,33 +300,36 @@ impl RipgrepCommand {
     fn validate_parameter_value(key: &str, value: &str) -> Result<()> {
         // Check for excessive length
         if value.len() > 200 {
-            return Err(crate::Error::Validation(
-                format!("Parameter value too long for {}: max 200 characters", key)
-            ));
+            return Err(crate::Error::Validation(format!(
+                "Parameter value too long for {}: max 200 characters",
+                key
+            )));
         }
-        
+
         // Reject values that could be interpreted as options
         if value.starts_with('-') {
-            return Err(crate::Error::Validation(
-                format!("Parameter value cannot start with dash for {}", key)
-            ));
+            return Err(crate::Error::Validation(format!(
+                "Parameter value cannot start with dash for {}",
+                key
+            )));
         }
-        
+
         // For numeric parameters, validate they're actually numbers
         match key {
             "max_count" | "context" => {
                 if value.parse::<u32>().is_err() {
-                    return Err(crate::Error::Validation(
-                        format!("Parameter {} must be a positive integer", key)
-                    ));
+                    return Err(crate::Error::Validation(format!(
+                        "Parameter {} must be a positive integer",
+                        key
+                    )));
                 }
             }
             _ => {}
         }
-        
+
         Ok(())
     }
-    
+
     /// Parse extra parameters from haystack configuration into ripgrep arguments
     ///
     /// This method converts key-value pairs from the haystack extra_parameters
@@ -320,13 +346,17 @@ impl RipgrepCommand {
         extra_params: &std::collections::HashMap<String, String>,
     ) -> Vec<String> {
         let mut args = Vec::new();
-        
+
         if extra_params.is_empty() {
             log::debug!("No extra parameters to process");
             return args;
         }
-        
-        log::debug!("Processing {} extra parameters: {:?}", extra_params.len(), extra_params);
+
+        log::debug!(
+            "Processing {} extra parameters: {:?}",
+            extra_params.len(),
+            extra_params
+        );
 
         for (key, value) in extra_params {
             // Validate each parameter value before processing
@@ -334,7 +364,7 @@ impl RipgrepCommand {
                 log::warn!("Invalid parameter {}: {}", key, e);
                 continue;
             }
-            
+
             match key.as_str() {
                 "tag" => {
                     log::info!("🏷️ Processing tag filter: '{}'", value);

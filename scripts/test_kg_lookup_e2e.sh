@@ -103,24 +103,24 @@ TEST_TERMS=("service" "haystack" "terraphim-graph" "graph" "system")
 
 for term in "${TEST_TERMS[@]}"; do
     echo -e "${BLUE}Testing term: '$term'${NC}"
-    
+
     # URL encode the role name and term
     ENCODED_ROLE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('Terraphim Engineer'))")
     ENCODED_TERM=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$term'))")
-    
+
     URL="http://127.0.0.1:8000/roles/${ENCODED_ROLE}/kg_search?term=${ENCODED_TERM}"
     echo -e "  URL: $URL"
-    
+
     RESPONSE=$(curl -s "$URL")
     STATUS=$(echo "$RESPONSE" | jq -r '.status' 2>/dev/null || echo "unknown")
     RESULTS_COUNT=$(echo "$RESPONSE" | jq -r '.results | length' 2>/dev/null || echo "0")
-    
+
     echo -e "  Status: $STATUS"
     echo -e "  Results: $RESULTS_COUNT"
-    
+
     if [ "$STATUS" = "success" ] && [ "$RESULTS_COUNT" -gt "0" ]; then
         echo -e "  ${GREEN}✅ Found $RESULTS_COUNT documents for '$term'${NC}"
-        
+
         # Show the top result
         FIRST_TITLE=$(echo "$RESPONSE" | jq -r '.results[0].title' 2>/dev/null || echo "N/A")
         FIRST_RANK=$(echo "$RESPONSE" | jq -r '.results[0].rank' 2>/dev/null || echo "N/A")
@@ -144,11 +144,11 @@ for term in "${EXPECTED_TERMS[@]}"; do
     ENCODED_ROLE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('Terraphim Engineer'))")
     ENCODED_TERM=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$term'))")
     URL="http://127.0.0.1:8000/roles/${ENCODED_ROLE}/kg_search?term=${ENCODED_TERM}"
-    
+
     RESPONSE=$(curl -s "$URL")
     STATUS=$(echo "$RESPONSE" | jq -r '.status' 2>/dev/null || echo "unknown")
     RESULTS_COUNT=$(echo "$RESPONSE" | jq -r '.results | length' 2>/dev/null || echo "0")
-    
+
     if [ "$STATUS" = "success" ] && [ "$RESULTS_COUNT" -gt "0" ]; then
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
         echo -e "${GREEN}✅ '$term' lookup successful${NC}"
@@ -178,4 +178,4 @@ grep -E "(Knowledge graph|Building rolegraph|Found.*markdown files|Successfully 
 # Cleanup
 cleanup
 
-exit $EXIT_CODE 
+exit $EXIT_CODE

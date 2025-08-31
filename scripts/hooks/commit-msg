@@ -36,7 +36,7 @@ fi
 
 # Conventional commit pattern
 # Format: type(optional scope): description
-# 
+#
 # type: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert
 # scope: optional, can be anything (e.g., api, ui, config)
 # description: imperative mood, lowercase, no period at end

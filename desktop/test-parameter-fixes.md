@@ -95,4 +95,4 @@ yarn run tauri dev
 - All parameter names must match exactly between frontend and backend
 - Tauri commands use snake_case in Rust backend
 - Frontend TypeScript must use snake_case for Tauri command parameters
-- Caching issues can cause old code to persist - clear caches if needed 
+- Caching issues can cause old code to persist - clear caches if needed

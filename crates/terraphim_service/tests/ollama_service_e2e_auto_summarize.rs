@@ -58,10 +58,14 @@ async fn e2e_search_auto_summarize_with_ollama() {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
-    role.extra.insert("llm_provider".into(), serde_json::json!("ollama"));
     role.extra
-        .insert("llm_model".into(), serde_json::json!("deepseek-coder:latest"));
+        .insert("llm_provider".into(), serde_json::json!("ollama"));
+    role.extra.insert(
+        "llm_model".into(),
+        serde_json::json!("deepseek-coder:latest"),
+    );
     role.extra
         .insert("llm_base_url".into(), serde_json::json!(base_url.clone()));
     role.extra
@@ -82,6 +86,7 @@ async fn e2e_search_auto_summarize_with_ollama() {
         limit: Some(5),
         skip: None,
         role: Some(role_name.clone()),
+        ..Default::default()
     };
 
     let results = service.search(&search_query).await.expect("search ok");
@@ -92,6 +97,14 @@ async fn e2e_search_auto_summarize_with_ollama() {
     }
 
     // We expect auto-summarization to attempt to fill description
-    let had_description = results.iter().any(|d| d.description.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false));
-    assert!(had_description, "at least one result should have a non-empty AI-generated description");
+    let had_description = results.iter().any(|d| {
+        d.description
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+    });
+    assert!(
+        had_description,
+        "at least one result should have a non-empty AI-generated description"
+    );
 }

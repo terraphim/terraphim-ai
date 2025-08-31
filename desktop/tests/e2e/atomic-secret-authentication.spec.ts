@@ -34,7 +34,7 @@ class TerraphimServerManager {
     }
 
     console.log('🚀 Starting Terraphim server for atomic secret authentication...');
-    
+
     // Start the server process
     this.process = spawn('cargo', ['run', '--bin', 'terraphim_server'], {
       cwd: path.resolve(__dirname, '../../'),
@@ -68,7 +68,7 @@ class TerraphimServerManager {
 
   async waitForReady(): Promise<void> {
     console.log('⏳ Waiting for Terraphim server to be ready...');
-    
+
     for (let i = 0; i < 30; i++) {
       try {
         const response = await fetch(`http://localhost:${this.port}/health`);
@@ -81,7 +81,7 @@ class TerraphimServerManager {
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    
+
     throw new Error('Terraphim server failed to start within 30 seconds');
   }
 
@@ -99,9 +99,9 @@ test.describe('Atomic Secret Authentication', () => {
 
   test.beforeAll(async () => {
     test.skip(shouldSkipAtomicTests, "ATOMIC_SERVER_SECRET not available");
-    
+
     console.log('🔧 Setting up atomic secret authentication tests...');
-    
+
     // Test atomic server connectivity
     try {
       const response = await fetch(ATOMIC_SERVER_URL);
@@ -111,7 +111,7 @@ test.describe('Atomic Secret Authentication', () => {
       console.log('❌ Atomic server not accessible:', error);
       test.skip(true, "Atomic server not accessible");
     }
-    
+
     serverManager = new TerraphimServerManager();
   });
 
@@ -124,11 +124,11 @@ test.describe('Atomic Secret Authentication', () => {
 
   test('should validate atomic server secret format and authentication', async () => {
     console.log('🔐 Testing atomic server secret validation...');
-    
+
     // Validate that the secret is properly formatted
     expect(ATOMIC_SERVER_SECRET).toBeTruthy();
     expect(ATOMIC_SERVER_SECRET!.length).toBeGreaterThan(0);
-    
+
     // Test that the secret can be decoded as base64
     try {
       const decoded = Buffer.from(ATOMIC_SERVER_SECRET!, 'base64').toString();
@@ -138,7 +138,7 @@ test.describe('Atomic Secret Authentication', () => {
       console.log('❌ Atomic server secret is not valid base64:', error);
       throw error;
     }
-    
+
     // Test authenticated access to atomic server
     const authResponse = await fetch(`${ATOMIC_SERVER_URL}/agents`, {
       headers: {
@@ -146,7 +146,7 @@ test.describe('Atomic Secret Authentication', () => {
         'Authorization': `Bearer ${ATOMIC_SERVER_SECRET}`
       }
     });
-    
+
     // Should get a proper response (not 401/403 for invalid auth)
     expect([200, 400, 404, 422]).toContain(authResponse.status);
     console.log(`✅ Authenticated access test completed with status: ${authResponse.status}`);
@@ -154,9 +154,9 @@ test.describe('Atomic Secret Authentication', () => {
 
   test('should configure Terraphim server with authenticated atomic haystack', async () => {
     console.log('🔧 Configuring Terraphim server with authenticated atomic haystack...');
-    
+
     await serverManager.start();
-    
+
     // Create configuration with authenticated atomic haystack
     const config = {
       id: "Server",
@@ -181,7 +181,7 @@ test.describe('Atomic Secret Authentication', () => {
         }
       }
     };
-    
+
     // Update server configuration
     const configResponse = await fetch(`${TERRAPHIM_SERVER_URL}/api/config`, {
       method: 'PUT',
@@ -191,7 +191,7 @@ test.describe('Atomic Secret Authentication', () => {
       body: JSON.stringify(config),
       signal: AbortSignal.timeout(10000)
     });
-    
+
     console.log(`Config update response status: ${configResponse.status}`);
     expect(configResponse.ok).toBeTruthy();
     console.log('✅ Successfully updated Terraphim server config with authenticated atomic haystack');
@@ -199,7 +199,7 @@ test.describe('Atomic Secret Authentication', () => {
 
   test('should perform authenticated atomic haystack search', async () => {
     console.log('🔍 Testing authenticated atomic haystack search...');
-    
+
     // Test search with authenticated access
     const searchResponse = await fetch(`${TERRAPHIM_SERVER_URL}/documents/search`, {
       method: 'POST',
@@ -213,21 +213,21 @@ test.describe('Atomic Secret Authentication', () => {
       }),
       signal: AbortSignal.timeout(15000)
     });
-    
+
     expect(searchResponse.ok).toBeTruthy();
-    
+
     if (searchResponse.ok) {
       const results = await searchResponse.json();
       console.log(`📄 Authenticated search results: ${results.results?.length || 0} documents`);
       expect(results.results).toBeDefined();
     }
-    
+
     console.log('✅ Authenticated atomic haystack search completed');
   });
 
   test('should handle authentication errors gracefully', async () => {
     console.log('🔧 Testing authentication error handling...');
-    
+
     // Test with invalid secret
     const invalidSecret = 'invalid_base64_secret';
     const invalidConfig = {
@@ -252,7 +252,7 @@ test.describe('Atomic Secret Authentication', () => {
         }
       }
     };
-    
+
     // Update server configuration with invalid secret
     const configResponse = await fetch(`${TERRAPHIM_SERVER_URL}/api/config`, {
       method: 'PUT',
@@ -262,7 +262,7 @@ test.describe('Atomic Secret Authentication', () => {
       body: JSON.stringify(invalidConfig),
       signal: AbortSignal.timeout(10000)
     });
-    
+
     // Should handle invalid secret gracefully
     expect([200, 400, 422, 500]).toContain(configResponse.status);
     console.log(`✅ Invalid secret handling completed with status: ${configResponse.status}`);
@@ -270,14 +270,14 @@ test.describe('Atomic Secret Authentication', () => {
 
   test('should compare public vs authenticated access', async () => {
     console.log('🔍 Comparing public vs authenticated access...');
-    
+
     // Test public access
     const publicResponse = await fetch(`${ATOMIC_SERVER_URL}/agents`, {
       headers: {
         'Accept': 'application/json'
       }
     });
-    
+
     // Test authenticated access
     const authResponse = await fetch(`${ATOMIC_SERVER_URL}/agents`, {
       headers: {
@@ -285,14 +285,14 @@ test.describe('Atomic Secret Authentication', () => {
         'Authorization': `Bearer ${ATOMIC_SERVER_SECRET}`
       }
     });
-    
+
     console.log(`Public access status: ${publicResponse.status}`);
     console.log(`Authenticated access status: ${authResponse.status}`);
-    
+
     // Both should return valid responses
     expect([200, 400, 404, 422]).toContain(publicResponse.status);
     expect([200, 400, 404, 422]).toContain(authResponse.status);
-    
+
     console.log('✅ Public vs authenticated access comparison completed');
   });
-}); 
+});

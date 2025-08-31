@@ -24,7 +24,7 @@ root = "/tmp/dashmaptest"
 
 [profiles.rock]
 type = "rocksdb"
-datadir = "/tmp/opendal/rocksdb" 
+datadir = "/tmp/opendal/rocksdb"
 
 [profiles.redb]
 type = "redb"
