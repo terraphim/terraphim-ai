@@ -33,7 +33,7 @@ class TerraphimServerManager {
     }
 
     console.log('🚀 Starting Terraphim server for atomic save widget tests...');
-    
+
     // Start the server process
     this.process = spawn('cargo', ['run', '--bin', 'terraphim_server'], {
       cwd: path.resolve(__dirname, '../../'),
@@ -67,7 +67,7 @@ class TerraphimServerManager {
 
   async waitForReady(): Promise<void> {
     console.log('⏳ Waiting for Terraphim server to be ready...');
-    
+
     for (let i = 0; i < 30; i++) {
       try {
         const response = await fetch(`http://localhost:${this.port}/health`);
@@ -80,7 +80,7 @@ class TerraphimServerManager {
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    
+
     throw new Error('Terraphim server failed to start within 30 seconds');
   }
 
@@ -98,9 +98,9 @@ test.describe('Atomic Save Widget', () => {
 
   test.beforeAll(async () => {
     test.skip(shouldSkipAtomicTests, "ATOMIC_SERVER_SECRET not available");
-    
+
     console.log('🔧 Setting up atomic save widget tests...');
-    
+
     // Test atomic server connectivity
     try {
       const response = await fetch(ATOMIC_SERVER_URL);
@@ -110,7 +110,7 @@ test.describe('Atomic Save Widget', () => {
       console.log('❌ Atomic server not accessible:', error);
       test.skip(true, "Atomic server not accessible");
     }
-    
+
     serverManager = new TerraphimServerManager();
   });
 
@@ -123,40 +123,40 @@ test.describe('Atomic Save Widget', () => {
 
   test('should open atomic save modal and display form', async ({ page }) => {
     console.log('🔧 Testing atomic save modal functionality...');
-    
+
     await serverManager.start();
-    
+
     // Navigate to the desktop app
     await page.goto(DESKTOP_APP_URL);
-    
+
     // Wait for the app to load
     await page.waitForLoadState('networkidle');
-    
+
     // Look for a button or trigger that opens the atomic save modal
     // This might be a button with text like "Save to Atomic" or similar
     const saveButton = page.locator('button:has-text("Save to Atomic"), button:has-text("Atomic"), [data-testid="atomic-save-button"]').first();
-    
+
     if (await saveButton.isVisible()) {
       await saveButton.click();
       console.log('✅ Clicked atomic save button');
     } else {
       console.log('⚠️ Atomic save button not found, testing modal directly');
     }
-    
+
     // Look for the atomic save modal
     const modal = page.locator('[data-testid="atomic-save-modal"], .atomic-save-modal, #atomic-save-modal').first();
-    
+
     if (await modal.isVisible()) {
       console.log('✅ Atomic save modal is visible');
-      
+
       // Check for form fields
       const titleField = modal.locator('input[name="title"], input[placeholder*="title"], [data-testid="atomic-title"]').first();
       const contentField = modal.locator('textarea[name="content"], textarea[placeholder*="content"], [data-testid="atomic-content"]').first();
-      
+
       if (await titleField.isVisible()) {
         console.log('✅ Title field found');
       }
-      
+
       if (await contentField.isVisible()) {
         console.log('✅ Content field found');
       }
@@ -167,9 +167,9 @@ test.describe('Atomic Save Widget', () => {
 
   test('should save article to atomic server via API', async () => {
     console.log('🔧 Testing atomic save API functionality...');
-    
+
     await serverManager.start();
-    
+
     // Test data for saving to atomic server
     const testArticle = {
       title: "Test Article for Atomic Save",
@@ -177,7 +177,7 @@ test.describe('Atomic Save Widget', () => {
       description: "A test article for validating atomic save functionality",
       tags: ["test", "atomic", "save"]
     };
-    
+
     // Test saving via API endpoint (if available)
     try {
       const saveResponse = await fetch(`${TERRAPHIM_SERVER_URL}/api/atomic/save`, {
@@ -189,9 +189,9 @@ test.describe('Atomic Save Widget', () => {
         body: JSON.stringify(testArticle),
         signal: AbortSignal.timeout(10000)
       });
-      
+
       console.log(`Atomic save API response status: ${saveResponse.status}`);
-      
+
       if (saveResponse.ok) {
         const result = await saveResponse.json();
         console.log('✅ Article saved successfully via API');
@@ -207,14 +207,14 @@ test.describe('Atomic Save Widget', () => {
 
   test('should validate atomic server write permissions', async () => {
     console.log('🔧 Testing atomic server write permissions...');
-    
+
     // Test if we can write to the atomic server
     const testResource = {
       "@id": "test-resource-" + Date.now(),
       "https://atomicdata.dev/properties/description": "Test resource for write permission validation",
       "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Resource"]
     };
-    
+
     try {
       const writeResponse = await fetch(`${ATOMIC_SERVER_URL}`, {
         method: 'POST',
@@ -225,12 +225,12 @@ test.describe('Atomic Save Widget', () => {
         body: JSON.stringify(testResource),
         signal: AbortSignal.timeout(10000)
       });
-      
+
       console.log(`Atomic write test response status: ${writeResponse.status}`);
-      
+
       // Should get a valid response (success or appropriate error)
       expect([200, 201, 400, 401, 403, 404, 422, 500]).toContain(writeResponse.status);
-      
+
       if (writeResponse.ok) {
         console.log('✅ Atomic server write permissions validated');
       } else {
@@ -243,14 +243,14 @@ test.describe('Atomic Save Widget', () => {
 
   test('should handle atomic save errors gracefully', async () => {
     console.log('🔧 Testing atomic save error handling...');
-    
+
     // Test with invalid data
     const invalidArticle = {
       title: "", // Empty title should cause validation error
       content: "",
       description: ""
     };
-    
+
     try {
       const errorResponse = await fetch(`${TERRAPHIM_SERVER_URL}/api/atomic/save`, {
         method: 'POST',
@@ -261,9 +261,9 @@ test.describe('Atomic Save Widget', () => {
         body: JSON.stringify(invalidArticle),
         signal: AbortSignal.timeout(10000)
       });
-      
+
       console.log(`Invalid data save response status: ${errorResponse.status}`);
-      
+
       // Should handle invalid data gracefully
       expect([400, 404, 422, 500]).toContain(errorResponse.status);
       console.log('✅ Invalid data handling completed');
@@ -274,21 +274,21 @@ test.describe('Atomic Save Widget', () => {
 
   test('should test atomic save widget integration', async ({ page }) => {
     console.log('🔧 Testing atomic save widget integration...');
-    
+
     await serverManager.start();
-    
+
     // Navigate to the desktop app
     await page.goto(DESKTOP_APP_URL);
-    
+
     // Wait for the app to load
     await page.waitForLoadState('networkidle');
-    
+
     // Look for any atomic-related UI elements
     const atomicElements = page.locator('[data-testid*="atomic"], .atomic-*, [class*="atomic"]');
-    
+
     if (await atomicElements.count() > 0) {
       console.log(`✅ Found ${await atomicElements.count()} atomic-related UI elements`);
-      
+
       // Test interaction with atomic elements
       for (let i = 0; i < Math.min(await atomicElements.count(), 3); i++) {
         const element = atomicElements.nth(i);
@@ -299,16 +299,16 @@ test.describe('Atomic Save Widget', () => {
     } else {
       console.log('⚠️ No atomic-related UI elements found, this might be expected');
     }
-    
+
     // Test if there's a search or content area where atomic save might be triggered
     const searchArea = page.locator('input[type="search"], textarea, [contenteditable="true"]').first();
-    
+
     if (await searchArea.isVisible()) {
       console.log('✅ Found search/content area for potential atomic save integration');
-      
+
       // Type some test content
       await searchArea.fill('Test content for atomic save widget');
       console.log('✅ Entered test content');
     }
   });
-}); 
+});

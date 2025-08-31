@@ -1,7 +1,7 @@
 # Terraphim AI Assistant
 
 [![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
-[![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group) 
+[![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group)
 
 Terraphim is a privacy-first AI assistant that works for you under your complete control and is fully deterministic.
 
@@ -105,13 +105,13 @@ your tasks. You can carry it around with you.
 Similar entities now common in science fiction, for example Destiny 2 has entity called [Ghost][ghost].
 
 
-Or in Star Wars Jedi Survivor there is an AI assistant [BD-1][bd-1]. 
+Or in Star Wars Jedi Survivor there is an AI assistant [BD-1][bd-1].
 
 The compactness and mobility of such AI assistant drives the [[Design Decisions]] of Terraphim.
 
 [bd-1]: https://starwars.fandom.com/wiki/BD-1
-[ghost]: https://www.destinypedia.com/Ghost 
-[relict]: https://www.goodreads.com/en/book/show/196710046  
+[ghost]: https://www.destinypedia.com/Ghost
+[relict]: https://www.goodreads.com/en/book/show/196710046
 
 Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
 
@@ -161,7 +161,7 @@ This installs the server, TUI, and desktop app (macOS only).
 ```bash
 # Download from GitHub releases
 sudo dpkg -i terraphim-server_*.deb
-sudo dpkg -i terraphim-tui_*.deb 
+sudo dpkg -i terraphim-tui_*.deb
 sudo dpkg -i terraphim-ai-desktop_*.deb
 ```
 
@@ -217,4 +217,3 @@ We welcome contributions! Here's how to get started:
 ## License
 
 This project is licensed under the [Apache license](LICENSE).
-

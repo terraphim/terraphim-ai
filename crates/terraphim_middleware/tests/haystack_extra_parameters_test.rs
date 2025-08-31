@@ -1,4 +1,3 @@
-use serde_json;
 use std::collections::HashMap;
 use terraphim_config::{Haystack, ServiceType};
 use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
@@ -81,7 +80,14 @@ async fn test_ripgrep_extra_parameters() {
     let tag_args = ripgrep_command.parse_extra_parameters(&tag_params);
     println!("Tag filter args: {:?}", tag_args);
 
-    assert_eq!(tag_args, vec!["--all-match".to_string(), "-e".to_string(), "#rust".to_string()]);
+    assert_eq!(
+        tag_args,
+        vec![
+            "--all-match".to_string(),
+            "-e".to_string(),
+            "#rust".to_string()
+        ]
+    );
 
     // Test 2: Multiple parameters
     let mut multi_params = HashMap::new();
@@ -152,7 +158,7 @@ async fn test_haystack_builder_and_extra_parameters() {
 
     assert_eq!(haystack.location, "test_docs/");
     assert_eq!(haystack.service, ServiceType::Ripgrep);
-    assert_eq!(haystack.read_only, true);
+    assert!(haystack.read_only);
     assert_eq!(haystack.atomic_server_secret, None);
 
     let params = haystack.get_extra_parameters();

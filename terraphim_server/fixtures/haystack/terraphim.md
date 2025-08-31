@@ -28,4 +28,4 @@ links:: [Local library](zotero://select/library/items/TERRA001), [Web library](h
 	- Technical documentation management
 	- Knowledge base for engineering teams
 	- Research and development knowledge sharing
-	- Technical support knowledge aggregation 
+	- Technical support knowledge aggregation

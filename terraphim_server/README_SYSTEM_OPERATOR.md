@@ -64,14 +64,14 @@ cargo test --test system_operator_integration_test -- --nocapture
 ### Roles Available
 
 1. **System Operator** (Default)
-   - **Relevance Function**: `terraphim-graph` 
+   - **Relevance Function**: `terraphim-graph`
    - **Theme**: `superhero` (dark theme)
    - **Remote KG**: ✅ Enabled
    - **Local Docs**: ✅ `/tmp/system_operator/pages`
 
 2. **Engineer**
    - **Relevance Function**: `terraphim-graph`
-   - **Theme**: `lumen` (light theme)  
+   - **Theme**: `lumen` (light theme)
    - **Remote KG**: ✅ Enabled
    - **Local Docs**: ✅ `/tmp/system_operator/pages`
 
@@ -178,7 +178,7 @@ When searching for "MBSE":
    ```bash
    # Check if port is in use
    lsof -i :8000
-   
+
    # Use different port
    cargo run --bin terraphim_server -- --config terraphim_server/default/system_operator_config.json --addr 127.0.0.1:8080
    ```
@@ -237,4 +237,4 @@ To improve the system operator configuration:
 
 ## 📄 License
 
-This configuration is part of the Terraphim project and follows the same Apache 2.0 license. 
+This configuration is part of the Terraphim project and follows the same Apache 2.0 license.

@@ -107,7 +107,7 @@ describe('BackButton Integration Tests', () => {
   describe('RoleGraphVisualization Component', () => {
     it('renders BackButton in RoleGraphVisualization component', () => {
       render(RoleGraphVisualization);
-      
+
       const backButton = screen.getByRole('button', { name: /go back/i });
       expect(backButton).toBeInTheDocument();
       expect(backButton).toHaveClass('back-button');
@@ -115,10 +115,10 @@ describe('BackButton Integration Tests', () => {
 
     it('BackButton in RoleGraphVisualization has correct fallback path', () => {
       render(RoleGraphVisualization);
-      
+
       const backButton = screen.getByRole('button', { name: /go back/i });
       expect(backButton).toBeInTheDocument();
-      
+
       backButton.click();
       expect(mockHistoryBack).toHaveBeenCalledTimes(1);
     });
@@ -127,7 +127,7 @@ describe('BackButton Integration Tests', () => {
   describe('Chat Component', () => {
     it('renders BackButton in Chat component', () => {
       render(Chat);
-      
+
       const backButton = screen.getByRole('button', { name: /go back/i });
       expect(backButton).toBeInTheDocument();
       expect(backButton).toHaveClass('back-button');
@@ -135,10 +135,10 @@ describe('BackButton Integration Tests', () => {
 
     it('BackButton in Chat has correct fallback path', () => {
       render(Chat);
-      
+
       const backButton = screen.getByRole('button', { name: /go back/i });
       expect(backButton).toBeInTheDocument();
-      
+
       backButton.click();
       expect(mockHistoryBack).toHaveBeenCalledTimes(1);
     });
@@ -147,7 +147,7 @@ describe('BackButton Integration Tests', () => {
   describe('ConfigWizard Component', () => {
     it('renders BackButton in ConfigWizard component', () => {
       render(ConfigWizard);
-      
+
       const backButton = screen.getByRole('button', { name: /go back/i });
       expect(backButton).toBeInTheDocument();
       expect(backButton).toHaveClass('back-button');
@@ -155,10 +155,10 @@ describe('BackButton Integration Tests', () => {
 
     it('BackButton in ConfigWizard has correct fallback path', () => {
       render(ConfigWizard);
-      
+
       const backButton = screen.getByRole('button', { name: /go back/i });
       expect(backButton).toBeInTheDocument();
-      
+
       backButton.click();
       expect(mockHistoryBack).toHaveBeenCalledTimes(1);
     });
@@ -184,7 +184,7 @@ describe('BackButton Integration Tests', () => {
       expect(Chat).toBeDefined();
       expect(ConfigWizard).toBeDefined();
       expect(ConfigJsonEditor).toBeDefined();
-      
+
       // All components should have BackButton imported
       // The actual rendering and functionality is tested in the individual component tests
       expect(true).toBe(true);

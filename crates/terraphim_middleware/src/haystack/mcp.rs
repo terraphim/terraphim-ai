@@ -1,6 +1,6 @@
+use crate::{indexer::IndexMiddleware, Result};
 use terraphim_config::Haystack;
 use terraphim_types::{Document, Index};
-use crate::{indexer::IndexMiddleware, Result};
 
 /// MCP client haystack indexer
 ///
@@ -70,10 +70,7 @@ impl IndexMiddleware for McpHaystackIndexer {
                         Err(e) => log::warn!("MCP stdio query failed: {}", e),
                     },
                     "oauth" => {
-                        let token = haystack
-                            .get_extra_parameters()
-                            .get("oauth_token")
-                            .cloned();
+                        let token = haystack.get_extra_parameters().get("oauth_token").cloned();
                         match query_mcp_sse(&base, &_needle, token.as_deref()).await {
                             Ok(index) => return Ok(index),
                             Err(e) => log::warn!("MCP oauth SSE query failed: {}", e),
@@ -103,10 +100,7 @@ impl IndexMiddleware for McpHaystackIndexer {
 /// Convert a generic JSON item into a `Document` best-effort.
 fn item_to_document(item: &serde_json::Value) -> Option<Document> {
     let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let title = item
-        .get("title")
-        .and_then(|v| v.as_str())
-        .unwrap_or(id);
+    let title = item.get("title").and_then(|v| v.as_str()).unwrap_or(id);
     let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
     let body = item
         .get("content")
@@ -116,18 +110,20 @@ fn item_to_document(item: &serde_json::Value) -> Option<Document> {
     if title.is_empty() {
         return None;
     }
-    let mut doc = Document::default();
-    doc.id = if !id.is_empty() {
-        id.to_string()
-    } else if !url.is_empty() {
-        url.to_string()
-    } else {
-        title.to_string()
+    let doc = Document {
+        id: if !id.is_empty() {
+            id.to_string()
+        } else if !url.is_empty() {
+            url.to_string()
+        } else {
+            title.to_string()
+        },
+        title: title.to_string(),
+        url: url.to_string(),
+        body: body.to_string(),
+        description: Some(body.chars().take(180).collect()),
+        ..Document::default()
     };
-    doc.title = title.to_string();
-    doc.url = url.to_string();
-    doc.body = body.to_string();
-    doc.description = Some(body.chars().take(180).collect());
     Some(doc)
 }
 
@@ -140,12 +136,13 @@ async fn http_fallback_list_or_search(
     let mut index = Index::new();
     let try_endpoints = vec![format!("{}/search", base), format!("{}/list", base)];
     for url in try_endpoints {
-        let mut req = client.post(&url).json(&serde_json::json!({ "query": needle }));
+        let mut req = client
+            .post(&url)
+            .json(&serde_json::json!({ "query": needle }));
         if let Some(token) = bearer {
             req = req.bearer_auth(token);
         }
-        match req.send().await
-        {
+        match req.send().await {
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(json) = resp.json::<serde_json::Value>().await {
                     if let Some(items) = json.as_array() {
@@ -185,7 +182,10 @@ async fn query_mcp_sse(base: &str, needle: &str, _bearer: Option<&str>) -> Resul
     let sse_url = format!("{}/sse", base);
     let env: HashMap<String, String> = HashMap::new();
     let transport = SseTransport::new(sse_url, env);
-    let handle = transport.start().await.map_err(|e| crate::Error::Indexation(e.to_string()))?;
+    let handle = transport
+        .start()
+        .await
+        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
     let mut client = McpClient::new(McpService::new(handle));
     let _ = client
         .initialize(
@@ -256,13 +256,15 @@ async fn query_mcp_sse(base: &str, needle: &str, _bearer: Option<&str>) -> Resul
 
 #[cfg(feature = "mcp-rust-sdk")]
 async fn query_mcp_stdio(needle: &str) -> Result<Index> {
-    use mcp_client::{ClientInfo, McpClient, McpClientTrait, McpService, StdioTransport, Transport};
+    use mcp_client::{
+        ClientInfo, McpClient, McpClientTrait, McpService, StdioTransport, Transport,
+    };
     use serde_json::json;
     use std::collections::HashMap;
     use tokio::process::Command;
 
     // Launch server-everything in stdio mode
-    let mut child = Command::new("npx")
+    let mut _child = Command::new("npx")
         .arg("-y")
         .arg("@modelcontextprotocol/server-everything")
         .arg("stdio")
@@ -283,7 +285,10 @@ async fn query_mcp_stdio(needle: &str) -> Result<Index> {
         // env
         HashMap::new(),
     );
-    let handle = transport.start().await.map_err(|e| crate::Error::Indexation(e.to_string()))?;
+    let handle = transport
+        .start()
+        .await
+        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
     let mut client = McpClient::new(McpService::new(handle));
     let _ = client
         .initialize(
@@ -307,7 +312,11 @@ async fn query_mcp_stdio(needle: &str) -> Result<Index> {
         .find(|&n| n == "search" || n == "list")
         .unwrap_or("list");
 
-    let args = if tool_name == "search" { json!({ "query": needle }) } else { json!({}) };
+    let args = if tool_name == "search" {
+        json!({ "query": needle })
+    } else {
+        json!({})
+    };
     let call = client
         .call_tool(tool_name, args)
         .await

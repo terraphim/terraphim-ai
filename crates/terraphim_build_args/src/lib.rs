@@ -20,7 +20,7 @@ pub mod cli;
 ///
 /// let config = BuildConfig::builder()
 ///     .target(BuildTarget::NativeRelease)
-///     .features(FeatureSet::from_str("openrouter,typescript"))
+///     .features(FeatureSet::from_string("openrouter,typescript"))
 ///     .environment("production")
 ///     .build()?;
 ///

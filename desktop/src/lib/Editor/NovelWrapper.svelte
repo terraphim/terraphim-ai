@@ -3,7 +3,7 @@
   import { Markdown } from 'tiptap-markdown';
   import { onMount } from 'svelte';
   import { novelAutocompleteService } from '../services/novelAutocompleteService';
-  
+
   export let html: any = '';          // initial content in HTML/JSON
   export let readOnly: boolean = false;
   export let outputFormat: 'html' | 'markdown' = 'html';  // New prop to control output format
@@ -29,7 +29,7 @@
           // Load mock suggestions for demonstration
           mockSuggestions = [
             'terraphim-graph',
-            'terraphim-automata', 
+            'terraphim-automata',
             'terraphim-service',
             'terraphim-types',
             'terraphim-config',
@@ -47,7 +47,7 @@
         // Load mock suggestions for demonstration
         mockSuggestions = [
           'terraphim-graph',
-          'terraphim-automata', 
+          'terraphim-automata',
           'terraphim-service',
           'terraphim-types',
           'terraphim-config',
@@ -65,7 +65,7 @@
    *  wrapper's `html` variable so the parent can bind to it. */
   const handleUpdate = (editorInstance: any) => {
     editor = editorInstance;
-    
+
     // Choose output format based on the outputFormat prop
     // For markdown content, use getMarkdown() to preserve markdown syntax
     // For HTML content, use getHTML() to preserve rich formatting
@@ -132,7 +132,7 @@ Try typing these terms to see autocomplete suggestions:
 - automata
 
 The autocomplete system provides suggestions based on your knowledge graph and document content.`;
-      
+
       editor.commands.setContent(demoText);
       alert('Demo content inserted! Type "terraphim" or "graph" to see autocomplete suggestions.');
     }
@@ -153,14 +153,14 @@ The autocomplete system provides suggestions based on your knowledge graph and d
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <strong style="color: #495057;">Local Autocomplete Status:</strong>
       <div style="display: flex; gap: 8px;">
-        <button 
+        <button
           on:click={testAutocomplete}
           style="
-            padding: 4px 8px; 
-            background: #007bff; 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
+            padding: 4px 8px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
           "
@@ -168,28 +168,28 @@ The autocomplete system provides suggestions based on your knowledge graph and d
         >
           Test
         </button>
-        <button 
+        <button
           on:click={rebuildIndex}
           style="
-            padding: 4px 8px; 
-            background: #28a745; 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
+            padding: 4px 8px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
           "
         >
           Rebuild Index
         </button>
-        <button 
+        <button
           on:click={demonstrateAutocomplete}
           style="
-            padding: 4px 8px; 
-            background: #ffc107; 
-            color: #212529; 
-            border: none; 
-            border-radius: 4px; 
+            padding: 4px 8px;
+            background: #ffc107;
+            color: #212529;
+            border: none;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
           "
@@ -199,11 +199,11 @@ The autocomplete system provides suggestions based on your knowledge graph and d
         </button>
       </div>
     </div>
-    
+
     <div style="font-size: 13px; color: #6c757d; margin-bottom: 8px;">
       {autocompleteStatus}
     </div>
-    
+
     <div style="font-size: 12px; color: #6c757d;">
       <strong>Features:</strong>
       {#if showSnippets}

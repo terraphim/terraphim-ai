@@ -10,8 +10,6 @@
 //! 4. Validating API endpoint response format
 //! 5. Testing both service layer and API layer functionality
 
-use tokio;
-
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_server::{axum_server, SearchResponse};
 use terraphim_service::TerraphimService;
@@ -20,9 +18,7 @@ use terraphim_types::RoleName;
 #[tokio::test]
 async fn test_e2e_kg_haystack_lookup_comprehensive() {
     // Initialize logging for test debugging
-    terraphim_service::logging::init_logging(
-        terraphim_service::logging::LoggingConfig::Test
-    );
+    terraphim_service::logging::init_logging(terraphim_service::logging::LoggingConfig::Test);
 
     println!("🚀 Starting comprehensive E2E test for KG term to document lookup");
 
@@ -73,7 +69,7 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
         let results = terraphim_service
             .find_documents_for_kg_term(&engineer_role, term)
             .await
-            .expect(&format!("Failed to find documents for term '{}'", term));
+            .unwrap_or_else(|_| panic!("Failed to find documents for term '{}'", term));
 
         println!(
             "    📄 Found {} documents for term '{}'",
@@ -249,10 +245,7 @@ async fn test_kg_haystack_specific_document_validation() {
         let results = terraphim_service
             .find_documents_for_kg_term(&role_name, synonym)
             .await
-            .expect(&format!(
-                "Failed to find documents for synonym '{}'",
-                synonym
-            ));
+            .unwrap_or_else(|_| panic!("Failed to find documents for synonym '{}'", synonym));
 
         synonym_results.insert(synonym, results.len());
         println!("Synonym '{}' found {} documents", synonym, results.len());

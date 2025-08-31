@@ -48,7 +48,7 @@ pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> 
             bm25plus_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(bm25plus_scorer));
         }
-        QueryScorer::TFIDF => {
+        QueryScorer::Tfidf => {
             let mut tfidf_scorer = TFIDFScorer::new();
             tfidf_scorer.initialize(&documents);
             scorer = scorer.with_scorer(Box::new(tfidf_scorer));
@@ -125,6 +125,7 @@ impl Scorer {
     ///
     /// If there was a problem reading the underlying index or the IMDb data,
     /// then an error is returned.
+    #[allow(dead_code)]
     pub fn score(
         &mut self,
         query: &Query,
@@ -171,7 +172,7 @@ impl Scorer {
                     }
                 }
             }
-            QueryScorer::TFIDF => {
+            QueryScorer::Tfidf => {
                 if let Some(scorer) = &self.scorer {
                     if let Some(tfidf_scorer) = scorer.downcast_ref::<TFIDFScorer>() {
                         results.rescore(|document| tfidf_scorer.score(&query.name, document));
@@ -239,6 +240,7 @@ impl Query {
     /// Return true if and only if this query is empty.
     ///
     /// Searching with an empty query always yields no results.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.name.is_empty()
     }
@@ -261,6 +263,7 @@ impl Query {
     /// query.
     ///
     /// By default, no similarity function is used.
+    #[allow(dead_code)]
     pub fn similarity(mut self, sim: Similarity) -> Query {
         self.similarity = sim;
         self
@@ -285,7 +288,6 @@ impl fmt::Display for Query {
         Ok(())
     }
 }
-
 
 /// A ranking function to use when searching IMDb records.
 ///

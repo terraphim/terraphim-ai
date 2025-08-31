@@ -30,7 +30,7 @@ for (const testCase of testCases) {
     console.log('Key:', testCase.key);
     console.log('Length:', testCase.key.length);
     console.log('Length % 4:', testCase.key.length % 4);
-    
+
     try {
         const decoded = Buffer.from(testCase.key, 'base64');
         console.log(`✅ ${testCase.name} decode successful,`, decoded.length, 'bytes');
@@ -48,17 +48,17 @@ if (ATOMIC_SERVER_SECRET) {
         const decoded = Buffer.from(ATOMIC_SERVER_SECRET, 'base64');
         const jsonStr = decoded.toString('utf8');
         const json = JSON.parse(jsonStr);
-        
+
         console.log('✅ Full secret decode successful');
         console.log('JSON keys:', Object.keys(json));
-        
+
         // Test the privateKey from the decoded JSON
         if (json.privateKey) {
             console.log('\n🔍 Testing privateKey from decoded JSON:');
             console.log('Private key from JSON:', json.privateKey);
             console.log('Length:', json.privateKey.length);
             console.log('Length % 4:', json.privateKey.length % 4);
-            
+
             try {
                 const privateKeyDecoded = Buffer.from(json.privateKey, 'base64');
                 console.log('✅ PrivateKey from JSON decode successful,', privateKeyDecoded.length, 'bytes');
@@ -71,4 +71,4 @@ if (ATOMIC_SERVER_SECRET) {
     }
 } else {
     console.log('❌ ATOMIC_SERVER_SECRET not set');
-} 
+}

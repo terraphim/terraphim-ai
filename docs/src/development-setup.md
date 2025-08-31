@@ -28,7 +28,7 @@ This guide walks you through setting up a development environment for contributi
    ```bash
    # Install Rust dependencies
    cargo build
-   
+
    # Install desktop dependencies
    cd desktop
    yarn install

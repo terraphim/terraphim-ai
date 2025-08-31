@@ -147,7 +147,7 @@
 
 **Key Files Modified**:
 1. `crates/terraphim_service/src/score/common.rs` - NEW: Shared BM25 structs and utilities
-2. `crates/terraphim_service/src/score/bm25.rs` - Updated imports to use common module  
+2. `crates/terraphim_service/src/score/bm25.rs` - Updated imports to use common module
 3. `crates/terraphim_service/src/score/bm25_additional.rs` - Updated imports to use common module
 4. `crates/terraphim_service/src/score/mod.rs` - Added common module, consolidated Query struct
 5. `crates/terraphim_service/src/score/bm25_test.rs` - Fixed test imports for new module structure
@@ -172,7 +172,7 @@
 **Investigation Details**:
 - **Error Location**: Occurs when loading thesaurus data in `terraphim_service`
 - **Root Cause**: Default settings include S3 profile requiring AWS credentials
-- **Settings Chain**: 
+- **Settings Chain**:
   1. `terraphim_persistence/src/lib.rs` tries to use `settings_local_dev.toml`
   2. `terraphim_settings/src/lib.rs` has `DEFAULT_SETTINGS` pointing to `settings_full.toml`
   3. When no config exists, it creates one using `settings_full.toml` content
@@ -762,7 +762,7 @@
 }
 ```
 
-**Result**: 
+**Result**:
 - Before: `devPath: http://localhost:8080/` (incorrect)
 - After: `devPath: http://localhost:5173/` (correct)
 - Tauri now correctly waits for Vite dev server on port 5173
@@ -778,9 +778,9 @@
 ## Current Tasks
 
 ### ✅ COMPLETE - Back Button Integration Across Major Screens
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-30  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-30
+**Priority**: HIGH
 
 **Objective**: Add a back button to all major screens in the Svelte application with proper positioning and navigation functionality.
 
@@ -833,9 +833,9 @@
 ---
 
 ### ✅ COMPLETE - StartupScreen Testing Implementation
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-30  
-**Priority**: MEDIUM  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-30
+**Priority**: MEDIUM
 
 **Objective**: Create comprehensive tests for the StartupScreen component to ensure Tauri integration functionality works correctly.
 
@@ -882,9 +882,9 @@
 ## Previous Tasks
 
 ### ✅ COMPLETE - BM25 Relevance Function Integration
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-29  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-29
+**Priority**: HIGH
 
 **Objective**: Integrate BM25, BM25F, and BM25Plus relevance functions into the search pipeline alongside existing TitleScorer and TerraphimGraph functions.
 
@@ -910,9 +910,9 @@
 ---
 
 ### ✅ COMPLETE - Playwright Tests for CI-Friendly Atomic Haystack Integration
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-28  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-28
+**Priority**: HIGH
 
 **Objective**: Create comprehensive Playwright tests for atomic server haystack integration that run reliably in CI environments.
 
@@ -946,9 +946,9 @@
 ---
 
 ### ✅ COMPLETE - MCP Server Rolegraph Validation Framework
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-27  
-**Priority**: MEDIUM  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-27
+**Priority**: MEDIUM
 
 **Objective**: Create comprehensive test framework for MCP server rolegraph validation to ensure same functionality as successful rolegraph test.
 
@@ -979,9 +979,9 @@
 ---
 
 ### ✅ COMPLETE - Desktop App Testing Transformation
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-26  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-26
+**Priority**: HIGH
 
 **Objective**: Transform desktop app testing from complex mocking to real API integration testing for improved reliability and validation.
 
@@ -1009,9 +1009,9 @@
 ---
 
 ### ✅ COMPLETE - Terraphim Engineer Configuration
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-25  
-**Priority**: MEDIUM  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-25
+**Priority**: MEDIUM
 
 **Objective**: Create complete Terraphim Engineer configuration with local knowledge graph and internal documentation integration.
 
@@ -1037,9 +1037,9 @@
 ---
 
 ### ✅ COMPLETE - System Operator Configuration
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-24  
-**Priority**: MEDIUM  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-24
+**Priority**: MEDIUM
 
 **Objective**: Create complete System Operator configuration with remote knowledge graph and GitHub document integration.
 
@@ -1065,9 +1065,9 @@
 ---
 
 ### ✅ COMPLETE - KG Auto-linking Implementation
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-23  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-23
+**Priority**: HIGH
 
 **Objective**: Implement knowledge graph auto-linking with optimal selective filtering for clean, readable documents.
 
@@ -1096,9 +1096,9 @@
 ---
 
 ### ✅ COMPLETE - FST-based Autocomplete Implementation
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-22  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-22
+**Priority**: HIGH
 
 **Objective**: Create comprehensive FST-based autocomplete implementation for terraphim_automata crate with JARO-WINKLER as default fuzzy search.
 
@@ -1127,9 +1127,9 @@
 ---
 
 ### ✅ COMPLETE - MCP Server Rolegraph Validation Framework
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-21  
-**Priority**: MEDIUM  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-21
+**Priority**: MEDIUM
 
 **Objective**: Create comprehensive test framework for MCP server rolegraph validation to ensure same functionality as successful rolegraph test.
 
@@ -1160,9 +1160,9 @@
 ---
 
 ### ✅ COMPLETE - TypeScript Bindings Full Integration
-**Status**: COMPLETE - PRODUCTION READY  
-**Date**: 2024-12-20  
-**Priority**: HIGH  
+**Status**: COMPLETE - PRODUCTION READY
+**Date**: 2024-12-20
+**Priority**: HIGH
 
 **Objective**: Replace all manual TypeScript type definitions with generated types from Rust backend for complete type synchronization.
 
@@ -1189,9 +1189,9 @@
 ## Ongoing Work
 
 ### 🔄 In Progress - TUI Application Development
-**Status**: IN PROGRESS  
-**Priority**: MEDIUM  
-**Start Date**: 2024-12-19  
+**Status**: IN PROGRESS
+**Priority**: MEDIUM
+**Start Date**: 2024-12-19
 
 **Objective**: Develop Rust TUI app (`terraphim_tui`) that mirrors desktop features with agentic plan/execute workflows.
 
@@ -1320,7 +1320,7 @@
 # Run with transparent background
 cargo run --bin terraphim_tui -- --transparent
 
-# Run with default opaque background  
+# Run with default opaque background
 cargo run --bin terraphim_tui
 ```
 

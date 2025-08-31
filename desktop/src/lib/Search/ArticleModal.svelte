@@ -14,10 +14,10 @@
   // New props for KG context
   export let kgTerm: string | null = null;
   export let kgRank: number | null = null;
-  
+
   let editing = false;
   let contentElement: HTMLElement;
-  
+
   // KG modal state (similar to ResultItem.svelte)
   let showKgModal = false;
   let kgDocument: Document | null = null;
@@ -43,8 +43,8 @@
     // Or if it starts with HTML-like structure (not markdown)
     /^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
   ) : false;
-  
-  // Determine the original format for editing to preserve it  
+
+  // Determine the original format for editing to preserve it
   $: originalFormat = isHtml ? 'html' : 'markdown';
 
   async function loadDocument() {
@@ -76,31 +76,31 @@
   async function handleKgClick(term: string) {
     loadingKg = true;
     kgTermForModal = term;
-    
+
     // Add debugging information
     console.log('🔍 KG Link Click Debug Info:');
     console.log('  Term clicked:', term);
     console.log('  Current role:', $role);
     console.log('  Is Tauri mode:', $is_tauri);
-    
+
     try {
       if ($is_tauri) {
         // Use Tauri command for desktop app
         console.log('  Making Tauri invoke call...');
         console.log('  Tauri command: find_documents_for_kg_term');
         console.log('  Tauri params:', { roleName: $role, term: term });
-        
+
         const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
           roleName: $role,
           term: term
         });
-        
+
         console.log('  📥 Tauri response received:');
         console.log('    Status:', response.status);
         console.log('    Results count:', response.results?.length || 0);
         console.log('    Total:', response.total || 0);
         console.log('    Full response:', JSON.stringify(response, null, 2));
-        
+
         if (response.status === 'success' && response.results && response.results.length > 0) {
           // Get the first (highest-ranked) document
           kgDocument = response.results[0];
@@ -125,31 +125,31 @@
         const encodedRole = encodeURIComponent($role);
         const encodedTerm = encodeURIComponent(term);
         const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
-        
+
         console.log('  📤 HTTP Request details:');
         console.log('    Base URL:', baseUrl);
         console.log('    Role (encoded):', encodedRole);
         console.log('    Term (encoded):', encodedTerm);
         console.log('    Full URL:', url);
-        
+
         const response = await fetch(url);
-        
+
         console.log('  📥 HTTP Response received:');
         console.log('    Status code:', response.status);
         console.log('    Status text:', response.statusText);
         console.log('    Headers:', Object.fromEntries(response.headers.entries()));
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('  📄 Response data:');
         console.log('    Status:', data.status);
         console.log('    Results count:', data.results?.length || 0);
         console.log('    Total:', data.total || 0);
         console.log('    Full response:', JSON.stringify(data, null, 2));
-        
+
         if (data.status === 'success' && data.results && data.results.length > 0) {
           // Get the first (highest-ranked) document
           kgDocument = data.results[0];
@@ -179,14 +179,14 @@
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()
       });
-      
+
       if (!$is_tauri && error.message?.includes('Failed to fetch')) {
         console.error('  💡 Network error suggestions:');
         console.error('    1. Check if server is running on expected port');
         console.error('    2. Check CORS configuration');
         console.error('    3. Verify server URL in CONFIG.ServerURL');
       }
-      
+
       // Graceful fallback: could show error message or do nothing
     } finally {
       loadingKg = false;
@@ -196,7 +196,7 @@
   // Handle clicks on KG links (kg: protocol)
   function handleContentClick(event: MouseEvent) {
     const target = event.target as HTMLElement;
-    
+
     // Check if the clicked element is a link with kg: protocol
     if (target.tagName === 'A') {
       const href = target.getAttribute('href');
@@ -217,19 +217,19 @@
     if (event.type === 'dblclick') {
       return;
     }
-    
+
     // Enable editing with Ctrl+E or Cmd+E
     if ((event.ctrlKey || event.metaKey) && event.key === 'e') {
       event.preventDefault();
       editing = true;
     }
-    
+
     // Save with Ctrl+S or Cmd+S when editing
     if (editing && (event.ctrlKey || event.metaKey) && event.key === 's') {
       event.preventDefault();
       saveDocument();
     }
-    
+
     // Escape to exit edit mode or close modal
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -246,7 +246,7 @@
   <div class="box wrapper">
     <!-- Close button following Bulma styling -->
     <button class="delete is-large modal-close-btn" on:click={() => active = false} aria-label="close"></button>
-    
+
     <!-- KG Context Header -->
     {#if kgTerm && kgRank !== null}
       <div class="kg-context">
@@ -257,7 +257,7 @@
         <hr />
       </div>
     {/if}
-    
+
     <h2>{item.title}</h2>
 
     {#if editing}
@@ -272,7 +272,7 @@
         </button>
       </div>
     {:else}
-      <div 
+      <div
         class="content-viewer"
         bind:this={contentElement}
         on:dblclick={handleDoubleClick}
@@ -303,7 +303,7 @@
     <div class="box wrapper">
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={() => showKgModal = false} aria-label="close"></button>
-      
+
       <!-- KG Context Header -->
       {#if kgTermForModal && kgRankForModal !== null}
         <div class="kg-context">
@@ -314,10 +314,10 @@
           <hr />
         </div>
       {/if}
-      
+
       <h2>{kgDocument.title}</h2>
 
-      <div 
+      <div
         class="content-viewer"
         on:click={handleContentClick}
         tabindex="0"
@@ -345,26 +345,26 @@
     font-weight: bold;
     margin-bottom: 2rem;
   }
-  
+
   .wrapper {
     position: relative;
     width: 100%;
     height: 100%;
     /* Remove overflow from wrapper - let the global modal handle scrolling */
   }
-  
+
   /* Close button positioning using Bulma's delete styling */
   .modal-close-btn {
     position: absolute !important;
     top: 1rem;
     right: 1rem;
     z-index: 10;
-    
+
     /* Enhanced hover effect that respects theme */
     &:hover {
       transform: scale(1.1);
     }
-    
+
     &:active {
       transform: scale(0.95);
     }
@@ -376,12 +376,12 @@
     border: 2px solid transparent;
     border-radius: 4px;
     transition: border-color 0.2s ease, background-color 0.2s ease;
-    
+
     &:hover {
       border-color: #f0f0f0;
       background-color: #fafafa;
     }
-    
+
     &:focus {
       outline: none;
       border-color: #3273dc;
@@ -396,15 +396,15 @@
     background-color: #f8f9fa;
     border-radius: 6px;
     border-left: 4px solid #3273dc;
-    
+
     .subtitle {
       margin-bottom: 0.5rem;
     }
-    
+
     .tag {
       margin-right: 0.5rem;
     }
-    
+
     hr {
       margin: 0.5rem 0 0 0;
       background-color: #dee2e6;
@@ -422,13 +422,13 @@
     padding: 0.1rem 0.2rem;
     border-radius: 3px;
     transition: all 0.2s ease;
-    
+
     &:hover {
       background-color: rgba(142, 68, 173, 0.1);
       border-bottom-color: #8e44ad;
       text-decoration: none !important;
     }
-    
+
     &:before {
       content: "🔗 ";
       opacity: 0.7;
@@ -443,13 +443,13 @@
     padding: 0.1rem 0.2rem;
     border-radius: 3px;
     transition: all 0.2s ease;
-    
+
     &:hover {
       background-color: rgba(142, 68, 173, 0.1);
       border-bottom-color: #8e44ad;
       text-decoration: none !important;
     }
-    
+
     &:before {
       content: "🔗 ";
       opacity: 0.7;
@@ -462,7 +462,7 @@
     background-color: #f5f5f5;
     border-radius: 4px;
     text-align: center;
-    
+
     .hint-text {
       font-size: 0.875rem;
       color: #666;
@@ -484,35 +484,35 @@
     max-height: calc(100vh - 2rem) !important;
     margin: 1rem auto !important;
     overflow-y: auto !important;
-    
+
     /* Responsive breakpoints */
     @media (min-width: 768px) {
       width: 90vw !important;
       max-height: calc(100vh - 4rem) !important;
       margin: 2rem auto !important;
     }
-    
+
     @media (min-width: 1024px) {
       width: 80vw !important;
       max-height: calc(100vh - 6rem) !important;
       margin: 3rem auto !important;
     }
-    
+
     @media (min-width: 1216px) {
       width: 75vw !important;
     }
-    
+
     @media (min-width: 1408px) {
       width: 70vw !important;
     }
   }
-  
+
   /* Ensure modal background doesn't interfere with scrolling */
   :global(.modal) {
     padding: 0 !important;
     overflow-y: auto !important;
   }
-  
+
   @media (max-width: 767px) {
     :global(.modal-content) {
       width: calc(100vw - 2rem) !important;
@@ -520,51 +520,51 @@
       margin: 0.5rem auto !important;
     }
   }
-  
+
   /* Markdown content styling */
   .markdown-content {
     line-height: 1.6;
     color: #333;
   }
-  
+
   /* Markdown element styles with global selectors */
   .markdown-content :global(h1) {
     font-size: 2em;
     margin-bottom: 0.5em;
     font-weight: bold;
   }
-  
+
   .markdown-content :global(h2) {
     font-size: 1.5em;
     margin-bottom: 0.5em;
     font-weight: bold;
   }
-  
+
   .markdown-content :global(h3) {
     font-size: 1.25em;
     margin-bottom: 0.5em;
     font-weight: bold;
   }
-  
+
   .markdown-content :global(h4) {
     font-size: 1.1em;
     margin-bottom: 0.5em;
     font-weight: bold;
   }
-  
+
   .markdown-content :global(p) {
     margin-bottom: 1em;
   }
-  
+
   .markdown-content :global(ul), .markdown-content :global(ol) {
     margin-bottom: 1em;
     padding-left: 2em;
   }
-  
+
   .markdown-content :global(li) {
     margin-bottom: 0.25em;
   }
-  
+
   .markdown-content :global(blockquote) {
     border-left: 4px solid #ddd;
     margin: 0 0 1em 0;
@@ -572,7 +572,7 @@
     background-color: #f9f9f9;
     font-style: italic;
   }
-  
+
   .markdown-content :global(code) {
     background-color: #f5f5f5;
     border-radius: 3px;
@@ -580,7 +580,7 @@
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 0.9em;
   }
-  
+
   .markdown-content :global(pre) {
     background-color: #f5f5f5;
     border-radius: 5px;
@@ -588,38 +588,38 @@
     margin-bottom: 1em;
     overflow-x: auto;
   }
-  
+
   .markdown-content :global(pre code) {
     background: none;
     padding: 0;
   }
-  
+
   .markdown-content :global(a) {
     color: #3273dc;
     text-decoration: none;
   }
-  
+
   .markdown-content :global(a:hover) {
     text-decoration: underline;
   }
-  
+
   .markdown-content :global(table) {
     border-collapse: collapse;
     width: 100%;
     margin-bottom: 1em;
   }
-  
+
   .markdown-content :global(th), .markdown-content :global(td) {
     border: 1px solid #ddd;
     padding: 8px;
     text-align: left;
   }
-  
+
   .markdown-content :global(th) {
     background-color: #f2f2f2;
     font-weight: bold;
   }
-  
+
   .markdown-content :global(hr) {
     border: none;
     border-top: 2px solid #eee;

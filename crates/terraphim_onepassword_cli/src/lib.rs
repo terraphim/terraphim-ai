@@ -44,7 +44,7 @@ pub struct OnePasswordSecret {
 /// A result containing the fetched secret or an error if it fails
 pub fn fetch_secret(vault: &str, item: &str) -> OnePasswordResult<OnePasswordSecret> {
     let output = Command::new("op")
-        .args(&["item", "get", item, "--vault", vault, "--format", "json"])
+        .args(["item", "get", item, "--vault", vault, "--format", "json"])
         .output()
         .expect("Failed to execute op command");
 

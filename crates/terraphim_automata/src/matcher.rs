@@ -100,9 +100,9 @@ pub fn extract_paragraphs_from_automata(
     let mut results: Vec<(Matched, String)> = Vec::new();
 
     for m in matches.into_iter() {
-        let (start, end) = m
-            .pos
-            .ok_or_else(|| TerraphimAutomataError::Dict("Positions were not returned".to_string()))?;
+        let (start, end) = m.pos.ok_or_else(|| {
+            TerraphimAutomataError::Dict("Positions were not returned".to_string())
+        })?;
 
         // Start at term start (or right after the term) depending on flag
         let paragraph_start = if include_term { start } else { end };
@@ -128,7 +128,10 @@ fn find_paragraph_end(text: &str, from_index: usize) -> usize {
     let mut end_rel: Option<usize> = None;
     for sep in ["\r\n\r\n", "\n\n", "\r\r"] {
         if let Some(i) = tail.find(sep) {
-            end_rel = Some(match end_rel { Some(cur) => cur.min(i), None => i });
+            end_rel = Some(match end_rel {
+                Some(cur) => cur.min(i),
+                None => i,
+            });
         }
     }
     match end_rel {

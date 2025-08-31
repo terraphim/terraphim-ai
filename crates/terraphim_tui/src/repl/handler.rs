@@ -1,10 +1,10 @@
 //! REPL handler implementation
 
+use super::commands::{ConfigSubcommand, ReplCommand, RoleSubcommand};
+use crate::{client::ApiClient, service::TuiService};
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
-use crate::{service::TuiService, client::ApiClient};
-use super::commands::{ReplCommand, ConfigSubcommand, RoleSubcommand};
 
 #[cfg(feature = "repl")]
 use rustyline::Editor;
@@ -38,30 +38,30 @@ impl ReplHandler {
     #[cfg(feature = "repl")]
     pub async fn run(&mut self) -> Result<()> {
         use rustyline::completion::{Completer, Pair};
-        use rustyline::{Context, Helper};
-        use rustyline::hint::Hinter;
         use rustyline::highlight::Highlighter;
+        use rustyline::hint::Hinter;
         use rustyline::validate::Validator;
-        
+        use rustyline::{Context, Helper};
+
         // Create a command completer
         #[derive(Clone)]
         struct CommandCompleter;
-        
+
         impl Helper for CommandCompleter {}
         impl Hinter for CommandCompleter {
             type Hint = String;
-            
+
             fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
                 None
             }
         }
-        
+
         impl Highlighter for CommandCompleter {}
         impl Validator for CommandCompleter {}
-        
+
         impl Completer for CommandCompleter {
             type Candidate = Pair;
-            
+
             fn complete(
                 &self,
                 line: &str,
@@ -69,11 +69,15 @@ impl ReplHandler {
                 _ctx: &Context<'_>,
             ) -> rustyline::Result<(usize, Vec<Pair>)> {
                 let line = &line[..pos];
-                
+
                 if line.starts_with('/') || line.is_empty() {
-                    let prefix = if line.starts_with('/') { &line[1..] } else { line };
+                    let prefix = if line.starts_with('/') {
+                        &line[1..]
+                    } else {
+                        line
+                    };
                     let commands = ReplCommand::available_commands();
-                    
+
                     let matches: Vec<Pair> = commands
                         .into_iter()
                         .filter(|cmd| cmd.starts_with(prefix))
@@ -82,23 +86,27 @@ impl ReplHandler {
                             replacement: format!("/{}", cmd),
                         })
                         .collect();
-                    
-                    let start_pos = if line.starts_with('/') { pos - prefix.len() - 1 } else { 0 };
+
+                    let start_pos = if line.starts_with('/') {
+                        pos - prefix.len() - 1
+                    } else {
+                        0
+                    };
                     Ok((start_pos, matches))
                 } else {
                     Ok((pos, Vec::new()))
                 }
             }
         }
-        
+
         let mut rl = Editor::<CommandCompleter, rustyline::history::DefaultHistory>::new()?;
         rl.set_helper(Some(CommandCompleter));
-        
+
         // Load command history if it exists
         let history_file = dirs::home_dir()
             .map(|h| h.join(".terraphim_tui_history"))
             .unwrap_or_else(|| std::path::PathBuf::from(".terraphim_tui_history"));
-        
+
         let _ = rl.load_history(&history_file);
 
         println!("{}", "=".repeat(60).cyan());
@@ -109,7 +117,7 @@ impl ReplHandler {
 
         loop {
             let prompt = format!("{}> ", self.current_role.green().bold());
-            
+
             match rl.readline(&prompt) {
                 Ok(line) => {
                     let line = line.trim();
@@ -148,7 +156,7 @@ impl ReplHandler {
         // Save command history
         let _ = rl.save_history(&history_file);
         println!("{}", "Goodbye! 👋".cyan());
-        
+
         Ok(())
     }
 
@@ -159,19 +167,24 @@ impl ReplHandler {
     }
 
     async fn show_welcome(&self) {
-        println!("Type {} for help, {} to exit", "/help".yellow(), "/quit".yellow());
-        
+        println!(
+            "Type {} for help, {} to exit",
+            "/help".yellow(),
+            "/quit".yellow()
+        );
+
         let mode = if self.service.is_some() {
             "Offline Mode"
         } else {
             "Server Mode"
         };
-        
-        println!("Mode: {} | Current Role: {}", 
-            mode.bold(), 
+
+        println!(
+            "Mode: {} | Current Role: {}",
+            mode.bold(),
             self.current_role.green().bold()
         );
-        
+
         self.show_available_commands();
     }
 
@@ -182,22 +195,25 @@ impl ReplHandler {
         println!("  {} - Manage configuration", "/config [show|set]".yellow());
         println!("  {} - Manage roles", "/role [list|select]".yellow());
         println!("  {} - Show knowledge graph", "/graph".yellow());
-        
+
         #[cfg(feature = "repl-chat")]
         {
             println!("  {} - Chat with AI", "/chat [message]".yellow());
             println!("  {} - Summarize content", "/summarize <target>".yellow());
         }
-        
+
         #[cfg(feature = "repl-mcp")]
         {
-            println!("  {} - Autocomplete terms", "/autocomplete <query>".yellow());
+            println!(
+                "  {} - Autocomplete terms",
+                "/autocomplete <query>".yellow()
+            );
             println!("  {} - Extract paragraphs", "/extract <text>".yellow());
             println!("  {} - Find matches", "/find <text>".yellow());
             println!("  {} - Replace matches", "/replace <text>".yellow());
             println!("  {} - Show thesaurus", "/thesaurus".yellow());
         }
-        
+
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
     }
@@ -209,7 +225,7 @@ impl ReplHandler {
 
     async fn execute_command(&mut self, input: &str) -> Result<bool> {
         let command = ReplCommand::from_str(input)?;
-        
+
         match command {
             ReplCommand::Search { query, role, limit } => {
                 self.handle_search(query, role, limit).await?;
@@ -232,56 +248,61 @@ impl ReplHandler {
             ReplCommand::Clear => {
                 self.handle_clear().await?;
             }
-            
+
             #[cfg(feature = "repl-chat")]
             ReplCommand::Chat { message } => {
                 self.handle_chat(message).await?;
             }
-            
+
             #[cfg(feature = "repl-chat")]
             ReplCommand::Summarize { target } => {
                 self.handle_summarize(target).await?;
             }
-            
+
             #[cfg(feature = "repl-mcp")]
             ReplCommand::Autocomplete { query, limit } => {
                 self.handle_autocomplete(query, limit).await?;
             }
-            
+
             #[cfg(feature = "repl-mcp")]
             ReplCommand::Extract { text, exclude_term } => {
                 self.handle_extract(text, exclude_term).await?;
             }
-            
+
             #[cfg(feature = "repl-mcp")]
             ReplCommand::Find { text } => {
                 self.handle_find(text).await?;
             }
-            
+
             #[cfg(feature = "repl-mcp")]
             ReplCommand::Replace { text, format } => {
                 self.handle_replace(text, format).await?;
             }
-            
+
             #[cfg(feature = "repl-mcp")]
             ReplCommand::Thesaurus { role } => {
                 self.handle_thesaurus(role).await?;
             }
         }
-        
+
         Ok(false)
     }
 
-    async fn handle_search(&self, query: String, role: Option<String>, limit: Option<usize>) -> Result<()> {
+    async fn handle_search(
+        &self,
+        query: String,
+        role: Option<String>,
+        limit: Option<usize>,
+    ) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::{Table, Cell};
-            use comfy_table::presets::UTF8_FULL;
             use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            
+            use comfy_table::presets::UTF8_FULL;
+            use comfy_table::{Cell, Table};
+
             println!("{} Searching for: '{}'", "🔍".bold(), query.cyan());
-            
+
             if let Some(service) = &self.service {
                 // Offline mode
                 let role_name = if let Some(role) = role {
@@ -289,9 +310,9 @@ impl ReplHandler {
                 } else {
                     service.get_selected_role().await
                 };
-                
+
                 let results = service.search_with_role(&query, &role_name, limit).await?;
-                
+
                 if results.is_empty() {
                     println!("{} No results found", "ℹ".blue().bold());
                 } else {
@@ -304,7 +325,7 @@ impl ReplHandler {
                             Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
                             Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
                         ]);
-                    
+
                     for doc in &results {
                         table.add_row(vec![
                             Cell::new(doc.rank.unwrap_or_default().to_string()),
@@ -312,22 +333,28 @@ impl ReplHandler {
                             Cell::new(if doc.url.is_empty() { "N/A" } else { &doc.url }),
                         ]);
                     }
-                    
+
                     println!("{}", table);
-                    println!("{} Found {} result(s)", "✅".bold(), results.len().to_string().green());
+                    println!(
+                        "{} Found {} result(s)",
+                        "✅".bold(),
+                        results.len().to_string().green()
+                    );
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode
-                use terraphim_types::{SearchQuery, NormalizedTermValue, RoleName};
-                
+                use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+
                 let role_name = role.map(|r| RoleName::new(&r));
                 let search_query = SearchQuery {
                     search_term: NormalizedTermValue::from(query.as_str()),
+                    search_terms: None,
+                    operator: None,
                     skip: Some(0),
                     limit,
                     role: role_name,
                 };
-                
+
                 match api_client.search(&search_query).await {
                     Ok(response) => {
                         if response.results.is_empty() {
@@ -342,7 +369,7 @@ impl ReplHandler {
                                     Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
                                     Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
                                 ]);
-                            
+
                             for doc in &response.results {
                                 table.add_row(vec![
                                     Cell::new(doc.rank.unwrap_or_default().to_string()),
@@ -350,9 +377,13 @@ impl ReplHandler {
                                     Cell::new(if doc.url.is_empty() { "N/A" } else { &doc.url }),
                                 ]);
                             }
-                            
+
                             println!("{}", table);
-                            println!("{} Found {} result(s)", "✅".bold(), response.results.len().to_string().green());
+                            println!(
+                                "{} Found {} result(s)",
+                                "✅".bold(),
+                                response.results.len().to_string().green()
+                            );
                         }
                     }
                     Err(e) => {
@@ -361,12 +392,12 @@ impl ReplHandler {
                 }
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Search functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -384,13 +415,20 @@ impl ReplHandler {
                             println!("{}", config_json);
                         }
                         Err(e) => {
-                            println!("{} Failed to get config: {}", "❌".bold(), e.to_string().red());
+                            println!(
+                                "{} Failed to get config: {}",
+                                "❌".bold(),
+                                e.to_string().red()
+                            );
                         }
                     }
                 }
             }
             ConfigSubcommand::Set { key, value } => {
-                println!("{} Config modification not yet implemented", "ℹ".blue().bold());
+                println!(
+                    "{} Config modification not yet implemented",
+                    "ℹ".blue().bold()
+                );
                 println!("Would set {} = {}", key.yellow(), value.cyan());
             }
         }
@@ -404,23 +442,38 @@ impl ReplHandler {
                     let roles = service.list_roles().await;
                     println!("{}", "Available roles:".bold());
                     for role in roles {
-                        let marker = if role == self.current_role { "▶" } else { " " };
+                        let marker = if role == self.current_role {
+                            "▶"
+                        } else {
+                            " "
+                        };
                         println!("  {} {}", marker.green(), role);
                     }
                 } else if let Some(api_client) = &self.api_client {
                     match api_client.get_config().await {
                         Ok(response) => {
                             println!("{}", "Available roles:".bold());
-                            let roles: Vec<String> = response.config.roles.keys()
+                            let roles: Vec<String> = response
+                                .config
+                                .roles
+                                .keys()
                                 .map(|k| k.to_string())
                                 .collect();
                             for role in roles {
-                                let marker = if role == self.current_role { "▶" } else { " " };
+                                let marker = if role == self.current_role {
+                                    "▶"
+                                } else {
+                                    " "
+                                };
                                 println!("  {} {}", marker.green(), role);
                             }
                         }
                         Err(e) => {
-                            println!("{} Failed to get roles: {}", "❌".bold(), e.to_string().red());
+                            println!(
+                                "{} Failed to get roles: {}",
+                                "❌".bold(),
+                                e.to_string().red()
+                            );
                         }
                     }
                 }
@@ -435,11 +488,11 @@ impl ReplHandler {
 
     async fn handle_graph(&self, top_k: Option<usize>) -> Result<()> {
         let k = top_k.unwrap_or(10);
-        
+
         if let Some(service) = &self.service {
             let role_name = service.get_selected_role().await;
             let concepts = service.get_role_graph_top_k(&role_name, k).await?;
-            
+
             println!("{} Top {} concepts:", "📊".bold(), k.to_string().cyan());
             for (i, concept) in concepts.iter().enumerate() {
                 println!("  {}. {}", (i + 1).to_string().yellow(), concept);
@@ -449,22 +502,27 @@ impl ReplHandler {
                 Ok(response) => {
                     let mut nodes = response.nodes;
                     nodes.sort_by(|a, b| b.rank.cmp(&a.rank));
-                    
+
                     println!("{} Top {} concepts:", "📊".bold(), k.to_string().cyan());
                     for (i, node) in nodes.iter().take(k).enumerate() {
-                        println!("  {}. {} (rank: {})", 
-                            (i + 1).to_string().yellow(), 
-                            node.label, 
+                        println!(
+                            "  {}. {} (rank: {})",
+                            (i + 1).to_string().yellow(),
+                            node.label,
                             node.rank.to_string().blue()
                         );
                     }
                 }
                 Err(e) => {
-                    println!("{} Failed to get graph: {}", "❌".bold(), e.to_string().red());
+                    println!(
+                        "{} Failed to get graph: {}",
+                        "❌".bold(),
+                        e.to_string().red()
+                    );
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -473,7 +531,11 @@ impl ReplHandler {
             if let Some(help_text) = ReplCommand::get_command_help(&cmd) {
                 println!("{}", help_text);
             } else {
-                println!("{} No help available for command: {}", "ℹ".blue().bold(), cmd.yellow());
+                println!(
+                    "{} No help available for command: {}",
+                    "ℹ".blue().bold(),
+                    cmd.yellow()
+                );
             }
         } else {
             self.show_available_commands();
@@ -492,13 +554,13 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            
+
             if let Some(msg) = message {
                 println!("{} Sending message: '{}'", "💬".bold(), msg.cyan());
-                
+
                 if let Some(service) = &self.service {
                     let role_name = service.get_selected_role().await;
-                    
+
                     match service.chat(&role_name, &msg, None).await {
                         Ok(response) => {
                             println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
@@ -525,12 +587,12 @@ impl ReplHandler {
                 println!("Usage: {} <message>", "/chat".yellow());
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Chat functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -539,25 +601,29 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            
+
             println!("{} Summarizing: '{}'", "📝".bold(), target.cyan());
-            
+
             if let Some(service) = &self.service {
                 let role_name = service.get_selected_role().await;
-                
+
                 match service.summarize(&role_name, &target).await {
                     Ok(summary) => {
                         println!("\n{} {}\n", "📋".bold(), "Summary:".bold());
                         println!("{}", summary);
                     }
                     Err(e) => {
-                        println!("{} Summarization failed: {}", "❌".bold(), e.to_string().red());
+                        println!(
+                            "{} Summarization failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
                     }
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode summarization - create a temporary document
                 use terraphim_types::Document;
-                
+
                 let doc = Document {
                     id: "temp-summary".to_string(),
                     url: "".to_string(),
@@ -569,24 +635,36 @@ impl ReplHandler {
                     tags: Some(vec![]),
                     rank: None,
                 };
-                
-                match api_client.summarize_document(&doc, Some(&self.current_role)).await {
+
+                match api_client
+                    .summarize_document(&doc, Some(&self.current_role))
+                    .await
+                {
                     Ok(response) => {
                         println!("\n{} {}\n", "📋".bold(), "Summary:".bold());
-                        println!("{}", response.summary.unwrap_or_else(|| "No summary available".to_string()));
+                        println!(
+                            "{}",
+                            response
+                                .summary
+                                .unwrap_or_else(|| "No summary available".to_string())
+                        );
                     }
                     Err(e) => {
-                        println!("{} Summarization failed: {}", "❌".bold(), e.to_string().red());
+                        println!(
+                            "{} Summarization failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
                     }
                 }
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Summarization functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -595,15 +673,15 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::{Table, Cell};
-            use comfy_table::presets::UTF8_FULL;
             use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            
+            use comfy_table::presets::UTF8_FULL;
+            use comfy_table::{Cell, Table};
+
             println!("{} Autocompleting: '{}'", "🔍".bold(), query.cyan());
-            
+
             if let Some(service) = &self.service {
                 let role_name = service.get_selected_role().await;
-                
+
                 match service.autocomplete(&role_name, &query, limit).await {
                     Ok(results) => {
                         if results.is_empty() {
@@ -618,7 +696,7 @@ impl ReplHandler {
                                     Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
                                     Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
                                 ]);
-                            
+
                             for result in &results {
                                 table.add_row(vec![
                                     Cell::new(&result.term),
@@ -626,25 +704,36 @@ impl ReplHandler {
                                     Cell::new(result.url.as_deref().unwrap_or("N/A")),
                                 ]);
                             }
-                            
+
                             println!("{}", table);
-                            println!("{} Found {} suggestion(s)", "✅".bold(), results.len().to_string().green());
+                            println!(
+                                "{} Found {} suggestion(s)",
+                                "✅".bold(),
+                                results.len().to_string().green()
+                            );
                         }
                     }
                     Err(e) => {
-                        println!("{} Autocomplete failed: {}", "❌".bold(), e.to_string().red());
+                        println!(
+                            "{} Autocomplete failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
                     }
                 }
             } else {
-                println!("{} Autocomplete requires offline mode with thesaurus", "ℹ".blue().bold());
+                println!(
+                    "{} Autocomplete requires offline mode with thesaurus",
+                    "ℹ".blue().bold()
+                );
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Autocomplete functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -653,16 +742,19 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::{Table, Cell};
-            use comfy_table::presets::UTF8_FULL;
             use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            
+            use comfy_table::presets::UTF8_FULL;
+            use comfy_table::{Cell, Table};
+
             println!("{} Extracting paragraphs from text...", "📄".bold());
-            
+
             if let Some(service) = &self.service {
                 let role_name = service.get_selected_role().await;
-                
-                match service.extract_paragraphs(&role_name, &text, exclude_term).await {
+
+                match service
+                    .extract_paragraphs(&role_name, &text, exclude_term)
+                    .await
+                {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No paragraphs found", "ℹ".blue().bold());
@@ -673,24 +765,27 @@ impl ReplHandler {
                                 .apply_modifier(UTF8_ROUND_CORNERS)
                                 .set_header(vec![
                                     Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Paragraph").add_attribute(comfy_table::Attribute::Bold),
+                                    Cell::new("Paragraph")
+                                        .add_attribute(comfy_table::Attribute::Bold),
                                 ]);
-                            
+
                             for (term, paragraph) in &results {
                                 let truncated_paragraph = if paragraph.len() > 100 {
                                     format!("{}...", &paragraph[..97])
                                 } else {
                                     paragraph.clone()
                                 };
-                                
-                                table.add_row(vec![
-                                    Cell::new(term),
-                                    Cell::new(truncated_paragraph),
-                                ]);
+
+                                table
+                                    .add_row(vec![Cell::new(term), Cell::new(truncated_paragraph)]);
                             }
-                            
+
                             println!("{}", table);
-                            println!("{} Found {} paragraph(s)", "✅".bold(), results.len().to_string().green());
+                            println!(
+                                "{} Found {} paragraph(s)",
+                                "✅".bold(),
+                                results.len().to_string().green()
+                            );
                         }
                     }
                     Err(e) => {
@@ -698,15 +793,18 @@ impl ReplHandler {
                     }
                 }
             } else {
-                println!("{} Extract requires offline mode with thesaurus", "ℹ".blue().bold());
+                println!(
+                    "{} Extract requires offline mode with thesaurus",
+                    "ℹ".blue().bold()
+                );
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Extract functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -715,15 +813,15 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::{Table, Cell};
-            use comfy_table::presets::UTF8_FULL;
             use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            
+            use comfy_table::presets::UTF8_FULL;
+            use comfy_table::{Cell, Table};
+
             println!("{} Finding matches in text...", "🔍".bold());
-            
+
             if let Some(service) = &self.service {
                 let role_name = service.get_selected_role().await;
-                
+
                 match service.find_matches(&role_name, &text).await {
                     Ok(results) => {
                         if results.is_empty() {
@@ -738,7 +836,7 @@ impl ReplHandler {
                                     Cell::new("Start").add_attribute(comfy_table::Attribute::Bold),
                                     Cell::new("End").add_attribute(comfy_table::Attribute::Bold),
                                 ]);
-                            
+
                             for matched in &results {
                                 let (start, end) = matched.pos.unwrap_or((0, 0));
                                 table.add_row(vec![
@@ -747,9 +845,13 @@ impl ReplHandler {
                                     Cell::new(end.to_string()),
                                 ]);
                             }
-                            
+
                             println!("{}", table);
-                            println!("{} Found {} match(es)", "✅".bold(), results.len().to_string().green());
+                            println!(
+                                "{} Found {} match(es)",
+                                "✅".bold(),
+                                results.len().to_string().green()
+                            );
                         }
                     }
                     Err(e) => {
@@ -757,15 +859,18 @@ impl ReplHandler {
                     }
                 }
             } else {
-                println!("{} Find requires offline mode with thesaurus", "ℹ".blue().bold());
+                println!(
+                    "{} Find requires offline mode with thesaurus",
+                    "ℹ".blue().bold()
+                );
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Find functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -774,19 +879,19 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            
+
             println!("{} Replacing matches in text...", "🔄".bold());
-            
+
             let link_type = match format.as_deref() {
                 Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
                 Some("html") => terraphim_automata::LinkType::HTMLLinks,
                 Some("wiki") => terraphim_automata::LinkType::WikiLinks,
                 _ => terraphim_automata::LinkType::MarkdownLinks, // Default
             };
-            
+
             if let Some(service) = &self.service {
                 let role_name = service.get_selected_role().await;
-                
+
                 match service.replace_matches(&role_name, &text, link_type).await {
                     Ok(result) => {
                         println!("\n{} {}\n", "📝".bold(), "Result:".bold());
@@ -797,15 +902,18 @@ impl ReplHandler {
                     }
                 }
             } else {
-                println!("{} Replace requires offline mode with thesaurus", "ℹ".blue().bold());
+                println!(
+                    "{} Replace requires offline mode with thesaurus",
+                    "ℹ".blue().bold()
+                );
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Replace functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 
@@ -814,19 +922,19 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::{Table, Cell};
-            use comfy_table::presets::UTF8_FULL;
             use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            
+            use comfy_table::presets::UTF8_FULL;
+            use comfy_table::{Cell, Table};
+
             println!("{} Loading thesaurus...", "📚".bold());
-            
+
             if let Some(service) = &self.service {
                 let role_name = if let Some(role_str) = role {
                     terraphim_types::RoleName::new(&role_str)
                 } else {
                     service.get_selected_role().await
                 };
-                
+
                 match service.get_thesaurus(&role_name).await {
                     Ok(thesaurus) => {
                         let mut table = Table::new();
@@ -839,9 +947,10 @@ impl ReplHandler {
                                 Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
                                 Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
                             ]);
-                        
+
                         let mut count = 0;
-                        for (term, normalized) in (&thesaurus).into_iter().take(20) { // Show first 20 entries
+                        for (term, normalized) in (&thesaurus).into_iter().take(20) {
+                            // Show first 20 entries
                             table.add_row(vec![
                                 Cell::new(term.as_str()),
                                 Cell::new(normalized.id.to_string()),
@@ -850,10 +959,11 @@ impl ReplHandler {
                             ]);
                             count += 1;
                         }
-                        
+
                         println!("{}", table);
-                        println!("{} Showing {} of {} thesaurus entries for role '{}'", 
-                            "✅".bold(), 
+                        println!(
+                            "{} Showing {} of {} thesaurus entries for role '{}'",
+                            "✅".bold(),
                             count.to_string().green(),
                             thesaurus.len().to_string().cyan(),
                             role_name.to_string().yellow()
@@ -867,12 +977,12 @@ impl ReplHandler {
                 println!("{} Thesaurus requires offline mode", "ℹ".blue().bold());
             }
         }
-        
+
         #[cfg(not(feature = "repl"))]
         {
             println!("Thesaurus functionality requires repl feature");
         }
-        
+
         Ok(())
     }
 }

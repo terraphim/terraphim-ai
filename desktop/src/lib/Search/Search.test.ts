@@ -41,7 +41,7 @@ describe('Search Component - Real API Integration', () => {
 
   it('renders search input with proper placeholder', () => {
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox');
     expect(searchInput).toBeInTheDocument();
     expect(searchInput).toHaveAttribute('placeholder', expect.stringContaining('Search'));
@@ -49,11 +49,11 @@ describe('Search Component - Real API Integration', () => {
 
   it('renders logo when no results', () => {
     render(Search);
-    
+
     // Should show the logo initially
     const logo = screen.getByAltText(/terraphim logo/i);
     expect(logo).toBeInTheDocument();
-    
+
     const assistantText = screen.getByText(/I am Terraphim, your personal assistant/i);
     expect(assistantText).toBeInTheDocument();
   });
@@ -63,12 +63,12 @@ describe('Search Component - Real API Integration', () => {
     input.set('machine learning');
 
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox');
     const form = searchInput.closest('form');
-    
+
     await fireEvent.submit(form!);
-    
+
     // No assertion on content - ensure component stays responsive without errors
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   }, TEST_TIMEOUT);
@@ -78,12 +78,12 @@ describe('Search Component - Real API Integration', () => {
     input.set('software engineering');
 
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox');
     const form = searchInput.closest('form');
-    
+
     await fireEvent.submit(form!);
-    
+
     // Ensure component remains mounted
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   }, TEST_TIMEOUT);
@@ -93,12 +93,12 @@ describe('Search Component - Real API Integration', () => {
     input.set('research methodology');
 
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox');
     const form = searchInput.closest('form');
-    
+
     await fireEvent.submit(form!);
-    
+
     // Ensure component remains mounted
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   }, TEST_TIMEOUT);
@@ -107,13 +107,13 @@ describe('Search Component - Real API Integration', () => {
     input.set('');
 
     render(Search);
-    
+
     const form = screen.getByRole('textbox').closest('form');
     await fireEvent.submit(form!);
-    
+
     // Should not crash with empty search - should show logo or handle gracefully
     expect(screen.getByRole('textbox')).toBeInTheDocument();
-    
+
     // Should either show logo or an appropriate message
     const logo = screen.queryByAltText(/terraphim logo/i);
     expect(logo).toBeInTheDocument();
@@ -125,33 +125,33 @@ describe('Search Component - Real API Integration', () => {
     input.set('test query');
 
     render(Search);
-    
+
     const form = screen.getByRole('textbox').closest('form');
     await fireEvent.submit(form!);
-    
+
     // Wait for error handling
     await waitFor(() => {
       const error = screen.queryByText(/error/i);
       expect(error).toBeInTheDocument();
     }, { timeout: 5000 });
-    
+
     // Reset server URL for other tests
     serverUrl.set(TEST_SERVER_URL);
   }, 6000);
 
   it('updates input value when typing', async () => {
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox') as HTMLInputElement;
-    
+
     await fireEvent.input(searchInput, { target: { value: 'artificial intelligence' } });
-    
+
     expect(searchInput.value).toBe('artificial intelligence');
   });
 
   it('shows different placeholders based on typeahead setting', () => {
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox');
     // Should have some form of search placeholder
     expect(searchInput).toHaveAttribute('placeholder', expect.stringMatching(/search/i));
@@ -161,37 +161,37 @@ describe('Search Component - Real API Integration', () => {
     input.set('test search term');
 
     render(Search);
-    
+
     const searchInput = screen.getByRole('textbox');
     const form = searchInput.closest('form');
-    
+
     // Submit form
     await fireEvent.submit(form!);
-    
+
     // Ensure component remains mounted
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   }, TEST_TIMEOUT);
 
   it('can switch between different roles and maintain search functionality', async () => {
     render(Search);
-    
+
     // Test with first role
     role.set('Engineer');
     input.set('programming');
-    
+
     const form = screen.getByRole('textbox').closest('form');
     await fireEvent.submit(form!);
-    
+
     // Wait a bit for first search
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Switch role and search again
     role.set('System Operator');
     input.set('methodology');
-    
+
     await fireEvent.submit(form!);
-    
+
     // Should handle role switching without crashes
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   }, TEST_TIMEOUT);
-}); 
+});

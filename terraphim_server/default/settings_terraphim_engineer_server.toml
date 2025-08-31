@@ -23,11 +23,11 @@ root = "/tmp/dashmaptest"
 
 [profiles.rock]
 type = "rocksdb"
-datadir = "/tmp/opendal/rocksdb" 
+datadir = "/tmp/opendal/rocksdb"
 
 [profiles.atomicserver]
 endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"
 type = "atomicserver"
 private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
 public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
-parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}" 
+parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}"

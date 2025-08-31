@@ -38,12 +38,12 @@ Terraphim implements a layered testing approach:
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_basic_functionality() {
         // Test implementation
     }
-    
+
     #[tokio::test]
     async fn test_async_functionality() {
         // Async test implementation
@@ -74,12 +74,12 @@ fn test_bm25_scorer_basic_functionality() {
     let documents = create_test_documents();
     let mut bm25_scorer = OkapiBM25Scorer::new();
     bm25_scorer.initialize(&documents);
-    
+
     let query = "rust programming";
     let scores: Vec<f64> = documents.iter()
         .map(|doc| bm25_scorer.score(query, doc))
         .collect();
-    
+
     assert!(scores.iter().all(|&score| score >= 0.0));
 }
 ```
@@ -92,14 +92,14 @@ fn test_bm25_scorer_basic_functionality() {
 async fn test_search_integration() {
     let config_state = create_test_config_state();
     let mut service = TerraphimService::new(config_state);
-    
+
     let search_query = SearchQuery {
         search_term: NormalizedTermValue::from("test"),
         skip: None,
         limit: Some(10),
         role: None,
     };
-    
+
     let results = service.search(&search_query).await?;
     assert!(!results.is_empty());
 }
@@ -110,12 +110,12 @@ async fn test_search_integration() {
 #[tokio::test]
 async fn test_atomic_data_integration() {
     let client = AtomicClient::new("http://localhost:9883")?;
-    
+
     // Test resource creation
     let resource = create_test_resource();
     let created = client.create_resource(&resource).await?;
     assert_eq!(created.subject, resource.subject);
-    
+
     // Test search functionality
     let results = client.search("test").await?;
     assert!(!results.is_empty());
@@ -128,7 +128,7 @@ async fn test_atomic_data_integration() {
 fn test_knowledge_graph_construction() {
     let documents = load_test_documents();
     let graph = build_knowledge_graph(&documents)?;
-    
+
     assert!(graph.nodes.len() > 0);
     assert!(graph.edges.len() > 0);
 }
@@ -143,7 +143,7 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
     // Connect to MCP server
     let transport = TokioChildProcess::new(cmd)?;
     let service = ().serve(transport).await?;
-    
+
     // Build autocomplete index for Terraphim Engineer role
     let build_result = service
         .call_tool(CallToolRequestParam {
@@ -151,7 +151,7 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
             arguments: json!({"role": "Terraphim Engineer"}),
         })
         .await?;
-    
+
     // Test comprehensive bug report extraction
     let extract_result = service
         .call_tool(CallToolRequestParam {
@@ -163,7 +163,7 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Validates extraction of 2,615+ paragraphs from bug reports
     assert!(extract_result.is_ok());
 }
@@ -184,9 +184,9 @@ async fn test_kg_bug_reporting_terms_available() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Validates payroll terms: 3 suggestions
-    // data consistency terms: 9 suggestions  
+    // data consistency terms: 9 suggestions
     // quality assurance terms: 9 suggestions
     assert!(payroll_autocomplete.is_ok());
 }
@@ -200,11 +200,11 @@ import { test, expect } from '@playwright/test';
 
 test('search functionality', async ({ page }) => {
   await page.goto('http://localhost:5173');
-  
+
   // Test search input
   await page.fill('[data-testid="search-input"]', 'rust programming');
   await page.click('[data-testid="search-button"]');
-  
+
   // Verify results
   const results = await page.locator('[data-testid="search-result"]');
   await expect(results).toHaveCount(3);
@@ -215,14 +215,14 @@ test('search functionality', async ({ page }) => {
 ```typescript
 test('desktop search with BM25', async ({ page }) => {
   await page.goto('http://localhost:5174');
-  
+
   // Select BM25 scorer
   await page.selectOption('[data-testid="scorer-select"]', 'bm25f');
-  
+
   // Perform search
   await page.fill('[data-testid="search-input"]', 'test query');
   await page.click('[data-testid="search-button"]');
-  
+
   // Verify BM25 results
   const results = await page.locator('[data-testid="search-result"]');
   await expect(results).toHaveCount(5);
@@ -234,15 +234,15 @@ test('desktop search with BM25', async ({ page }) => {
 test('atomic server haystack integration', async ({ page }) => {
   // Setup atomic server
   await setupAtomicServer();
-  
+
   // Test document creation
   await createTestDocument();
-  
+
   // Test search through atomic server
   await page.goto('http://localhost:5173');
   await page.fill('[data-testid="search-input"]', 'ATOMIC-test');
   await page.click('[data-testid="search-button"]');
-  
+
   // Verify atomic document results
   const atomicResults = await page.locator('[data-testid="atomic-result"]');
   await expect(atomicResults).toHaveCount(1);
@@ -259,7 +259,7 @@ fn benchmark_bm25_scoring(c: &mut Criterion) {
     let documents = create_large_test_dataset();
     let mut bm25_scorer = BM25FScorer::new();
     bm25_scorer.initialize(&documents);
-    
+
     c.bench_function("bm25f_scoring", |b| {
         b.iter(|| {
             bm25_scorer.score("rust programming", &documents[0])
@@ -277,13 +277,13 @@ criterion_main!(benches);
 fn test_automata_throughput() {
     let terms = generate_large_term_set(10000);
     let automata = Automata::new(terms)?;
-    
+
     let start = std::time::Instant::now();
     for _ in 0..1000 {
         let _results = automata.prefix_search("rust")?;
     }
     let duration = start.elapsed();
-    
+
     assert!(duration.as_millis() < 100); // Should complete in under 100ms
 }
 ```
@@ -297,7 +297,7 @@ fn test_automata_throughput() {
 fn test_wasm_automata() {
     let terms = vec!["rust".to_string(), "programming".to_string()];
     let automata = Automata::new(terms)?;
-    
+
     let results = automata.prefix_search("ru")?;
     assert_eq!(results, vec!["rust"]);
 }
@@ -307,10 +307,10 @@ fn test_wasm_automata() {
 ```typescript
 test('WASM autocomplete in browser', async ({ page }) => {
   await page.goto('http://localhost:5173');
-  
+
   // Test WASM autocomplete
   await page.fill('[data-testid="autocomplete-input"]', 'ru');
-  
+
   const suggestions = await page.locator('[data-testid="autocomplete-suggestion"]');
   await expect(suggestions).toHaveCount(1);
   await expect(suggestions.first()).toHaveText('rust');
@@ -364,16 +364,16 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      
+
       - name: Run unit tests
         run: cargo test --all
-      
+
       - name: Run integration tests
         run: cargo test --test integration
-      
+
       - name: Run E2E tests
         run: yarn test:e2e
-      
+
       - name: Run performance tests
         run: cargo bench
 ```
@@ -420,7 +420,7 @@ async fn test_async_operation() {
 fn test_error_handling() {
     let result = function_that_may_fail();
     assert!(result.is_err());
-    
+
     if let Err(ExpectedError::SpecificError) = result {
         // Test specific error case
     }
@@ -438,7 +438,7 @@ fn test_with_mocks() {
         .expect_search()
         .with(eq("test query"))
         .returning(|_| Ok(vec![test_document()]));
-    
+
     let result = mock_service.search("test query")?;
     assert!(!result.is_empty());
 }
@@ -465,4 +465,4 @@ fn test_with_mocks() {
 2. **Fuzzing**: Automated input testing for edge cases
 3. **Load testing**: High-volume performance validation
 4. **Security testing**: Vulnerability assessment
-5. **Accessibility testing**: UI accessibility validation 
+5. **Accessibility testing**: UI accessibility validation

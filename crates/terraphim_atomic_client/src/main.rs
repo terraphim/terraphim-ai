@@ -2,7 +2,6 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::env;
 use terraphim_atomic_client::{Config, Store};
-use urlencoding;
 
 #[cfg(feature = "native")]
 #[tokio::main]
@@ -292,10 +291,10 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
 
         use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .user_agent("Terraphim-Atomic-Client/1.0")
-                .build()
-                .unwrap_or_else(|_| reqwest::Client::new());
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent("Terraphim-Atomic-Client/1.0")
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers =
                 terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -376,7 +375,7 @@ async fn fetch_all_subresources(
 
             // Also collect links from root resource properties
             let server_prefix = store.config.server_url.trim_end_matches('/');
-            for (_prop, value) in &res.properties {
+            for value in res.properties.values() {
                 collect_links(&mut queue, value, server_prefix);
             }
         }
@@ -416,7 +415,7 @@ async fn fetch_all_subresources(
                 let server_prefix = store.config.server_url.trim_end_matches('/');
 
                 // Collect links from all properties (for nested resources)
-                for (_prop, value) in &res.properties {
+                for value in res.properties.values() {
                     collect_links(&mut queue, value, server_prefix);
                 }
             }
@@ -495,7 +494,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     // Build mapping of subject -> localId (path relative to ontology root)
     let ontology_path = {
         let url = ontology_subject.trim_end_matches('/');
-        let after = url.split('/').last().unwrap_or("");
+        let after = url.split('/').next_back().unwrap_or("");
         if after.is_empty() {
             url
         } else {
@@ -682,7 +681,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                 }
                 let prop_key = mapping.get(prop).unwrap_or(prop).clone();
                 // First filter out invalid objects, then map values
-                let filtered_val = filter_invalid_objects(&val);
+                let filtered_val = filter_invalid_objects(val);
                 obj.insert(
                     prop_key,
                     map_value(&filtered_val, &mapping, &ontology_subject_owned),
@@ -765,10 +764,10 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 
         use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .user_agent("Terraphim-Atomic-Client/1.0")
-                .build()
-                .unwrap_or_else(|_| reqwest::Client::new());
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent("Terraphim-Atomic-Client/1.0")
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers =
                 terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -883,7 +882,7 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     let filtered_resources: Vec<_> = resources
         .into_iter()
         .filter(|res| {
-            !res.subject.contains("/agents/") && 
+            !res.subject.contains("/agents/") &&
             !res.subject.contains("/commits/") &&
             // Only include resources that are part of the borrower-portal domain
             (res.subject.contains("/borrower-portal/") || res.subject == root_subject)
@@ -1068,7 +1067,7 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
                 }
                 let prop_key = mapping.get(prop).unwrap_or(prop).clone();
                 // First filter out invalid objects, then map values
-                let filtered_val = filter_invalid_objects(&val);
+                let filtered_val = filter_invalid_objects(val);
                 obj.insert(
                     prop_key,
                     map_value(&filtered_val, &mapping, &root_subject_owned),
@@ -1147,10 +1146,10 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         let body = serde_json::to_vec(&transformed)?;
         use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .user_agent("Terraphim-Atomic-Client/1.0")
-                .build()
-                .unwrap_or_else(|_| reqwest::Client::new());
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent("Terraphim-Atomic-Client/1.0")
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         let resp = if let Some(agent) = &store.config.agent {
             let mut headers =
                 terraphim_atomic_client::get_authentication_headers(agent, &import_url, "POST")?;
@@ -1194,7 +1193,7 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     // Skip program name and command name, start from actual arguments
     let import_args = &args[2..];
 
-    if import_args.len() < 1 {
+    if import_args.is_empty() {
         println!(
             "Usage: terraphim_atomic_client import-ontology <json_file> [parent_url] [--validate]"
         );
@@ -1284,7 +1283,7 @@ async fn import_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 #[cfg(feature = "native")]
 fn sort_resources_by_dependencies(
     resources: Vec<serde_json::Map<String, serde_json::Value>>,
-    parent_url: &str,
+    _parent_url: &str,
 ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>, Box<dyn std::error::Error>> {
     // Define dependency order: ontology -> classes -> properties
     let mut sorted = Vec::new();

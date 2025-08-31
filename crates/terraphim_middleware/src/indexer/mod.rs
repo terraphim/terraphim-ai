@@ -5,9 +5,10 @@ use crate::{Error, Result};
 
 mod ripgrep;
 
-use crate::haystack::{AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, QueryRsHaystackIndexer};
+use crate::haystack::{
+    AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, QueryRsHaystackIndexer,
+};
 pub use ripgrep::RipgrepIndexer;
-
 
 /// A Middleware is a service that creates an index of documents from
 /// a haystack.
@@ -71,7 +72,7 @@ pub async fn search_haystacks(
             }
             ServiceType::Mcp => {
                 // Search via MCP client
-                let mcp = McpHaystackIndexer::default();
+                let mcp = McpHaystackIndexer;
                 mcp.index(needle, haystack).await?
             }
         };

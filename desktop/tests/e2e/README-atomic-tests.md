@@ -7,7 +7,7 @@ This directory contains comprehensive Playwright tests for atomic server haystac
 The atomic server integration tests validate:
 
 - **Atomic Server Connectivity**: Connection, authentication, and credential validation
-- **Terraphim Server Integration**: Configuration updates and role management  
+- **Terraphim Server Integration**: Configuration updates and role management
 - **Haystack Search Functionality**: End-to-end search through atomic server backend
 - **Dual Haystack Support**: Combined Atomic + Ripgrep haystack operations
 - **Error Handling**: Graceful handling of various error conditions
@@ -19,7 +19,7 @@ The atomic server integration tests validate:
 **Comprehensive test suite covering the complete atomic haystack integration flow:**
 
 - ✅ Atomic server connectivity and credential validation
-- ✅ Terraphim server configuration with atomic roles  
+- ✅ Terraphim server configuration with atomic roles
 - ✅ Search functionality with multiple search terms
 - ✅ Dual haystack (Atomic + Ripgrep) configuration and testing
 - ✅ Error handling and edge cases
@@ -33,7 +33,7 @@ The atomic server integration tests validate:
 - ✅ Terraphim server startup with atomic configuration
 - ✅ Simple search functionality testing
 
-### 3. `atomic-haystack-search-validation.spec.ts` (Search Validation) 
+### 3. `atomic-haystack-search-validation.spec.ts` (Search Validation)
 **Detailed search functionality validation:**
 
 - ✅ Multiple search term testing
@@ -75,7 +75,7 @@ yarn run test:atomic
 
 # Run specific test files
 yarn run test:atomic:only          # atomic-server-haystack.spec.ts
-yarn run test:atomic:connection    # atomic-connection.spec.ts  
+yarn run test:atomic:connection    # atomic-connection.spec.ts
 yarn run test:atomic:search        # atomic-haystack-search-validation.spec.ts
 
 # Run in CI mode
@@ -110,7 +110,7 @@ CI=true playwright test tests/e2e/atomic-*.spec.ts --workers=1 --retries=3
 # Specific test in debug mode
 playwright test tests/e2e/atomic-server-haystack.spec.ts --debug
 
-# Headed mode for visual debugging  
+# Headed mode for visual debugging
 playwright test tests/e2e/atomic-server-haystack.spec.ts --headed
 ```
 
@@ -135,7 +135,7 @@ const isCI = Boolean(process.env.CI);
 if (isCI) {
   // Use CI-optimized settings
   actionTimeout: 60000,
-  navigationTimeout: 60000,  
+  navigationTimeout: 60000,
   retries: 3,
   workers: 1
 }
@@ -169,7 +169,7 @@ Tests create temporary role configurations:
       "shortname": "AtomicTest",
       "haystacks": [{
         "location": "http://localhost:9883",
-        "service": "Atomic", 
+        "service": "Atomic",
         "atomic_server_secret": "<secret>"
       }]
     }
@@ -232,7 +232,7 @@ DEBUG=pw:test playwright test tests/e2e/atomic-server-haystack.spec.ts
 # Interactive debugging
 playwright test tests/e2e/atomic-server-haystack.spec.ts --debug
 
-# Save screenshots on failure  
+# Save screenshots on failure
 playwright test tests/e2e/atomic-server-haystack.spec.ts --screenshot=only-on-failure
 ```
 
@@ -265,7 +265,7 @@ These tests validate the complete flow:
 ### Performance Expectations
 
 - **Server Startup**: ~5-10 seconds
-- **Configuration Update**: ~2-3 seconds  
+- **Configuration Update**: ~2-3 seconds
 - **Search Response**: ~1-5 seconds per query
 - **Total Test Duration**: ~30-60 seconds per test file
 
@@ -287,15 +287,15 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Your Atomic Feature', () => {
   let terraphimServer: TerraphimServerManager;
-  
+
   test.beforeAll(async () => {
     // Setup server and configuration
   });
-  
+
   test.afterAll(async () => {
     // Cleanup
   });
-  
+
   test('should validate your feature', async () => {
     // Test implementation with CI-friendly timeouts
   });
@@ -306,4 +306,4 @@ test.describe('Your Atomic Feature', () => {
 
 ✅ **Production Ready**: All atomic haystack integration tests are comprehensive, stable, and CI-friendly.
 
-The test suite provides complete validation of atomic server integration from frontend configuration through backend search functionality, ensuring robust operation in both development and production environments. 
+The test suite provides complete validation of atomic server integration from frontend configuration through backend search functionality, ensuring robust operation in both development and production environments.

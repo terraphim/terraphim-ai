@@ -46,4 +46,4 @@ echo "🧪 Testing complete server configuration..."
 cd ../../terraphim_server
 cargo test -- --nocapture
 
-echo "✅ All tests completed successfully!" 
+echo "✅ All tests completed successfully!"

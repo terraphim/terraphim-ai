@@ -13,4 +13,4 @@ Object.defineProperty(HTMLInputElement.prototype, 'selectionStart', {
 Object.defineProperty(HTMLInputElement.prototype, 'setSelectionRange', {
   value: () => {},
   configurable: true
-}); 
+});

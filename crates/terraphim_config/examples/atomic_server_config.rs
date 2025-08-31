@@ -31,6 +31,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
                 extra: ahash::AHashMap::new(),
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
             },
         )
         .build()
@@ -44,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 2: Hybrid configuration with both ripgrep and atomic server
     println!("\n📋 Example 2: Hybrid Ripgrep + Atomic Server Configuration");
 
-    let hybrid_config = ConfigBuilder::new()
+    let _hybrid_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+Shift+T")
         .add_role(
             "LocalResearcher",
@@ -71,6 +85,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .with_atomic_secret(Some("your-base64-secret-here".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
             },
         )
         .add_role(
@@ -98,6 +126,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .with_atomic_secret(Some("secret-for-server-2".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
             },
         )
         .build()
@@ -113,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 3: Anonymous access to atomic server
     println!("\n📋 Example 3: Anonymous Access to Atomic Server");
 
-    let anonymous_config = ConfigBuilder::new()
+    let _anonymous_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+Alt+T")
         .add_role(
             "AnonymousUser",
@@ -131,6 +173,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // No authentication (atomic_server_secret: None is default)
                 )],
                 extra: ahash::AHashMap::new(),
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
             },
         )
         .build()
@@ -143,7 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 4: Public document server configuration
     println!("\n📋 Example 4: Public Document Server Configuration");
 
-    let public_docs_config = ConfigBuilder::new()
+    let _public_docs_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+P")
         .add_role(
             "PublicReader",
@@ -171,6 +227,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ),
                 ],
                 extra: ahash::AHashMap::new(),
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
             },
         )
         .build()
@@ -233,6 +303,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Create configuration from environment variables
+#[allow(dead_code)]
 fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>> {
     let server_url =
         std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
@@ -258,6 +329,20 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 haystacks: vec![Haystack::new(server_url, ServiceType::Atomic, read_only)
                     .with_atomic_secret(secret)],
                 extra: ahash::AHashMap::new(),
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
             },
         )
         .build()?;

@@ -12,10 +12,10 @@ pub enum QueryScorer {
     /// into account.
     #[default]
     OkapiBM25,
-    /// TFIDF is the traditional TF-IDF ranking function, which does not
+    /// Tfidf is the traditional TF-IDF ranking function, which does not
     /// incorporate document length.
     #[allow(dead_code)]
-    TFIDF,
+    Tfidf,
     /// Jaccard is a ranking function determined by computing the similarity
     /// of ngrams between the query and a name in the index. The similarity
     /// is computed by dividing the number of ngrams in common by the total
@@ -54,7 +54,7 @@ impl QueryScorer {
     pub fn as_str(&self) -> &'static str {
         match *self {
             QueryScorer::OkapiBM25 => "okapibm25",
-            QueryScorer::TFIDF => "tfidf",
+            QueryScorer::Tfidf => "tfidf",
             QueryScorer::Jaccard => "jaccard",
             QueryScorer::QueryRatio => "queryratio",
             QueryScorer::BM25 => "bm25",

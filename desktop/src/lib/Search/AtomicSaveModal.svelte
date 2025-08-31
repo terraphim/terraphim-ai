@@ -57,7 +57,7 @@
     // Find atomic server haystacks from current role configuration
     const currentRoleName = $role;
     const config = $configStore;
-    
+
     if (!config?.roles || !currentRoleName) {
       console.warn('No role configuration found');
       return;
@@ -65,18 +65,18 @@
 
     // Find the current role object - handle the complex role structure
     let currentRole: Role | null = null;
-    
+
     try {
       // Handle both string keys and RoleName objects in the roles map
       for (const [roleName, roleConfig] of Object.entries(config.roles)) {
         // Cast roleConfig to Role type for proper access
         const role = roleConfig as Role;
-        
+
         // Check various ways the role name might match
-        const roleNameStr = typeof role.name === 'object' 
-          ? role.name.original 
+        const roleNameStr = typeof role.name === 'object'
+          ? role.name.original
           : String(role.name);
-          
+
         if (roleName === currentRoleName || roleNameStr === currentRoleName) {
           currentRole = role;
           break;
@@ -93,8 +93,8 @@
     }
 
     // Filter haystacks to find atomic servers
-    atomicHaystacks = currentRole.haystacks?.filter(haystack => 
-      haystack.service === "Atomic" && 
+    atomicHaystacks = currentRole.haystacks?.filter(haystack =>
+      haystack.service === "Atomic" &&
       haystack.location &&
       !haystack.read_only
     ) || [];
@@ -114,7 +114,7 @@
 
   function buildParentUrl(): string {
     const baseUrl = selectedAtomicServer.replace(/\/$/, '');
-    
+
     if (useCustomParent && customParent.trim()) {
       // Custom parent - ensure it doesn't start with server URL to avoid duplication
       const parentPath = customParent.trim();
@@ -212,7 +212,7 @@
 
       success = true;
       console.log('✅ Article saved successfully to atomic server');
-      
+
       // Auto-close after 2 seconds
       setTimeout(() => {
         active = false;
@@ -249,8 +249,8 @@
       </div>
       <div class="level-right">
         <div class="level-item">
-          <button 
-            class="delete is-large" 
+          <button
+            class="delete is-large"
             on:click={handleClose}
             disabled={saving}
             aria-label="close"
@@ -301,7 +301,7 @@
         <div class="control">
           {#if atomicHaystacks.length > 0}
             <div class="select is-fullwidth">
-              <select 
+              <select
                 id="atomic-server-select"
                 bind:value={selectedAtomicServer}
                 disabled={saving}
@@ -337,7 +337,7 @@
         <div class="field">
           <label class="label" for="article-title">Article Title</label>
           <div class="control">
-            <Input 
+            <Input
               id="article-title"
               bind:value={articleTitle}
               placeholder="Enter article title"
@@ -350,7 +350,7 @@
         <div class="field">
           <label class="label" for="article-description">Description</label>
           <div class="control">
-            <textarea 
+            <textarea
               id="article-description"
               class="textarea"
               bind:value={articleDescription}
@@ -366,18 +366,18 @@
           <label class="label">Parent Collection</label>
           <div class="control">
             <label class="radio">
-              <input 
-                type="radio" 
-                bind:group={useCustomParent} 
+              <input
+                type="radio"
+                bind:group={useCustomParent}
                 value={false}
                 disabled={saving}
               />
               Use predefined collection
             </label>
             <label class="radio">
-              <input 
-                type="radio" 
-                bind:group={useCustomParent} 
+              <input
+                type="radio"
+                bind:group={useCustomParent}
                 value={true}
                 disabled={saving}
               />
@@ -401,14 +401,14 @@
         {:else}
           <div class="field">
             <div class="control">
-              <Input 
+              <Input
                 bind:value={customParent}
                 placeholder="e.g., my-collection or http://server/custom-parent"
                 disabled={saving}
               />
             </div>
             <p class="help">
-              Enter a collection name (e.g., "my-articles") or full URL. 
+              Enter a collection name (e.g., "my-articles") or full URL.
               If the collection doesn't exist, it will be created.
             </p>
           </div>
@@ -492,4 +492,4 @@
   .level {
     margin-bottom: 1rem;
   }
-</style> 
+</style>

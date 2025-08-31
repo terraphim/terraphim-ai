@@ -131,7 +131,7 @@ cargo install cargo-deb
 
 # Build packages
 cargo deb -p terraphim_server
-cargo deb -p terraphim-ai-desktop  
+cargo deb -p terraphim-ai-desktop
 cargo deb -p terraphim_tui
 
 # Test installation
@@ -159,7 +159,7 @@ earthly +docker-all
 
 ### Conventional Commits
 - `feat:` → Minor version bump
-- `fix:` → Patch version bump  
+- `fix:` → Patch version bump
 - `feat!:` or `BREAKING CHANGE:` → Major version bump
 
 ### Multi-Package Versioning

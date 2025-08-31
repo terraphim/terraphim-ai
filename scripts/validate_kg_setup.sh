@@ -47,7 +47,7 @@ KG_DIR="docs/src/kg"
 if [ -d "$KG_DIR" ]; then
     KG_COUNT=$(find "$KG_DIR" -name "*.md" -type f | wc -l)
     echo -e "${GREEN}✅ Knowledge graph directory: $KG_DIR (${KG_COUNT} markdown files)${NC}"
-    
+
     # List KG files
     echo -e "${BLUE}📋 KG Files:${NC}"
     find "$KG_DIR" -name "*.md" -type f | while read file; do
@@ -108,4 +108,4 @@ echo -e "${GREEN}3. Check server logs for KG building progress${NC}"
 echo -e "${GREEN}4. Test KG lookup:${NC} curl \"http://127.0.0.1:8000/roles/Terraphim%20Engineer/kg_search?term=service\""
 
 echo ""
-echo -e "${GREEN}✅ All validations passed! Your Terraphim KG setup is ready.${NC}" 
+echo -e "${GREEN}✅ All validations passed! Your Terraphim KG setup is ready.${NC}"

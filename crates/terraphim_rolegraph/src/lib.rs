@@ -131,7 +131,7 @@ impl RoleGraph {
         // Build adjacency map of node_id -> neighbor node_ids
         let mut adj: AHashMap<u64, ahash::AHashSet<u64>> = AHashMap::new();
         for (node_id, node) in &self.nodes {
-            let entry = adj.entry(*node_id).or_insert_with(ahash::AHashSet::new);
+            let entry = adj.entry(*node_id).or_default();
             for edge_id in &node.connected_with {
                 if let Some(edge) = self.edges.get(edge_id) {
                     let (a, b) = magic_unpair(edge.id);
@@ -141,7 +141,10 @@ impl RoleGraph {
         }
 
         // If any target is isolated, fail fast
-        if targets.iter().any(|t| adj.get(t).map(|s| s.is_empty()).unwrap_or(true)) {
+        if targets
+            .iter()
+            .any(|t| adj.get(t).map(|s| s.is_empty()).unwrap_or(true))
+        {
             return false;
         }
 
@@ -157,7 +160,11 @@ impl RoleGraph {
             }
             if let Some(neighbors) = adj.get(&current) {
                 for &n in neighbors {
-                    let edge = if current < n { (current, n) } else { (n, current) };
+                    let edge = if current < n {
+                        (current, n)
+                    } else {
+                        (n, current)
+                    };
                     if visited_edges.contains(&edge) {
                         continue;
                     }
@@ -228,8 +235,7 @@ impl RoleGraph {
     //     //     sorted_vector_by_rank_weighted.push((document_id, weighted_rank));
     //     // }
     // }
-
-    /// Performs a query on the graph using the query string.
+    ///   Performs a query on the graph using the query string.
     ///
     /// Returns a list of document IDs ranked and weighted by the weighted mean
     /// average of node rank, edge rank, and document rank.
@@ -241,13 +247,13 @@ impl RoleGraph {
     ) -> Result<Vec<(String, IndexedDocument)>> {
         log::debug!("Performing graph query with string: '{query_string}'");
         let node_ids = self.find_matching_node_ids(query_string);
-        
+
         // Early return if no matching terms found in thesaurus
         if node_ids.is_empty() {
             log::debug!("No matching terms found in thesaurus for query: '{query_string}'");
             return Ok(vec![]);
         }
-        
+
         // Early return if graph has no nodes (not populated yet)
         if self.nodes.is_empty() {
             log::debug!("Graph has no nodes yet - no documents have been indexed");
@@ -261,16 +267,23 @@ impl RoleGraph {
                 log::trace!("Node ID {} from thesaurus not found in graph - no documents contain this term yet", node_id);
                 continue;
             };
-            
+
             let Some(normalized_term) = self.ac_reverse_nterm.get(&node_id) else {
-                log::warn!("Node ID {} found in graph but missing from thesaurus reverse lookup", node_id);
+                log::warn!(
+                    "Node ID {} found in graph but missing from thesaurus reverse lookup",
+                    node_id
+                );
                 continue;
             };
             log::debug!("Processing node ID: {:?} with rank: {}", node_id, node.rank);
 
             for edge_id in &node.connected_with {
                 let Some(edge) = self.edges.get(edge_id) else {
-                    log::warn!("Edge ID {} referenced by node {} not found in edges map", edge_id, node_id);
+                    log::warn!(
+                        "Edge ID {} referenced by node {} not found in edges map",
+                        edge_id,
+                        node_id
+                    );
                     continue;
                 };
                 log::trace!("Processing edge ID: {:?} with rank: {}", edge_id, edge.rank);
@@ -306,10 +319,247 @@ impl RoleGraph {
         let documents: Vec<_> = ranked_documents
             .into_iter()
             .skip(offset.unwrap_or(0))
-            .take(limit.unwrap_or(std::usize::MAX))
+            .take(limit.unwrap_or(usize::MAX))
             .collect();
 
         log::debug!("Query resulted in {} documents", documents.len());
+        Ok(documents)
+    }
+
+    /// Query the graph with multiple terms and logical operators (AND/OR)
+    pub fn query_graph_with_operators(
+        &self,
+        search_terms: &[&str],
+        operator: &terraphim_types::LogicalOperator,
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, IndexedDocument)>> {
+        use terraphim_types::LogicalOperator;
+
+        log::debug!(
+            "Performing multi-term graph query with {} terms using {:?} operator",
+            search_terms.len(),
+            operator
+        );
+
+        if search_terms.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Handle single term case as fallback to existing method
+        if search_terms.len() == 1 {
+            return self.query_graph(search_terms[0], offset, limit);
+        }
+
+        // Early return if graph has no nodes
+        if self.nodes.is_empty() {
+            log::debug!("Graph has no nodes yet - no documents have been indexed");
+            return Ok(vec![]);
+        }
+
+        match operator {
+            LogicalOperator::Or => self.query_graph_or(search_terms, offset, limit),
+            LogicalOperator::And => self.query_graph_and(search_terms, offset, limit),
+        }
+    }
+
+    /// Perform OR operation: return documents that match ANY of the search terms
+    fn query_graph_or(
+        &self,
+        search_terms: &[&str],
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, IndexedDocument)>> {
+        let mut results = AHashMap::new();
+
+        for term in search_terms {
+            let node_ids = self.find_matching_node_ids(term);
+
+            for node_id in node_ids {
+                let Some(node) = self.nodes.get(&node_id) else {
+                    continue;
+                };
+
+                let Some(normalized_term) = self.ac_reverse_nterm.get(&node_id) else {
+                    continue;
+                };
+
+                for edge_id in &node.connected_with {
+                    let Some(edge) = self.edges.get(edge_id) else {
+                        continue;
+                    };
+
+                    for (document_id, document_rank) in &edge.doc_hash {
+                        let total_rank = node.rank + edge.rank + document_rank;
+                        match results.entry(document_id.clone()) {
+                            Entry::Vacant(e) => {
+                                e.insert(IndexedDocument {
+                                    id: document_id.clone(),
+                                    matched_edges: vec![edge.clone()],
+                                    rank: total_rank,
+                                    tags: vec![normalized_term.to_string()],
+                                    nodes: vec![node_id],
+                                });
+                            }
+                            Entry::Occupied(mut e) => {
+                                let doc = e.get_mut();
+                                doc.rank += total_rank;
+                                doc.matched_edges.push(edge.clone());
+                                doc.matched_edges.dedup_by_key(|e| e.id);
+                                // Add the tag if not already present
+                                if !doc.tags.contains(&normalized_term.to_string()) {
+                                    doc.tags.push(normalized_term.to_string());
+                                }
+                                if !doc.nodes.contains(&node_id) {
+                                    doc.nodes.push(node_id);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut ranked_documents = results.into_iter().collect::<Vec<_>>();
+        ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
+
+        let documents: Vec<_> = ranked_documents
+            .into_iter()
+            .skip(offset.unwrap_or(0))
+            .take(limit.unwrap_or(usize::MAX))
+            .collect();
+
+        log::debug!("OR query resulted in {} documents", documents.len());
+        Ok(documents)
+    }
+
+    /// Perform AND operation: return documents that match ALL of the search terms
+    fn query_graph_and(
+        &self,
+        search_terms: &[&str],
+        offset: Option<usize>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, IndexedDocument)>> {
+        // First, collect document sets for each term
+        let mut term_document_sets: Vec<AHashMap<String, (IndexedDocument, Vec<String>)>> =
+            Vec::new();
+
+        for term in search_terms {
+            let node_ids = self.find_matching_node_ids(term);
+            let mut term_docs = AHashMap::new();
+
+            for node_id in node_ids {
+                let Some(node) = self.nodes.get(&node_id) else {
+                    continue;
+                };
+
+                let Some(normalized_term) = self.ac_reverse_nterm.get(&node_id) else {
+                    continue;
+                };
+
+                for edge_id in &node.connected_with {
+                    let Some(edge) = self.edges.get(edge_id) else {
+                        continue;
+                    };
+
+                    for (document_id, document_rank) in &edge.doc_hash {
+                        let total_rank = node.rank + edge.rank + document_rank;
+                        match term_docs.entry(document_id.clone()) {
+                            Entry::Vacant(e) => {
+                                e.insert((
+                                    IndexedDocument {
+                                        id: document_id.clone(),
+                                        matched_edges: vec![edge.clone()],
+                                        rank: total_rank,
+                                        tags: vec![normalized_term.to_string()],
+                                        nodes: vec![node_id],
+                                    },
+                                    vec![term.to_string()],
+                                ));
+                            }
+                            Entry::Occupied(mut e) => {
+                                let (doc, terms) = e.get_mut();
+                                doc.rank += total_rank;
+                                doc.matched_edges.push(edge.clone());
+                                doc.matched_edges.dedup_by_key(|e| e.id);
+                                if !doc.tags.contains(&normalized_term.to_string()) {
+                                    doc.tags.push(normalized_term.to_string());
+                                }
+                                if !doc.nodes.contains(&node_id) {
+                                    doc.nodes.push(node_id);
+                                }
+                                if !terms.contains(&term.to_string()) {
+                                    terms.push(term.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            term_document_sets.push(term_docs);
+        }
+
+        // Find intersection: documents that appear in ALL term sets
+        if term_document_sets.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut final_results = AHashMap::new();
+        let first_set = &term_document_sets[0];
+
+        for (doc_id, (first_doc, first_terms)) in first_set {
+            // Check if this document appears in all other term sets
+            let mut appears_in_all = true;
+            let mut combined_doc = first_doc.clone();
+            let mut all_matched_terms = first_terms.clone();
+
+            for term_set in &term_document_sets[1..] {
+                if let Some((term_doc, term_matched)) = term_set.get(doc_id) {
+                    // Combine the rankings and metadata
+                    combined_doc.rank += term_doc.rank;
+                    combined_doc
+                        .matched_edges
+                        .extend(term_doc.matched_edges.clone());
+                    combined_doc.matched_edges.dedup_by_key(|e| e.id);
+
+                    for tag in &term_doc.tags {
+                        if !combined_doc.tags.contains(tag) {
+                            combined_doc.tags.push(tag.clone());
+                        }
+                    }
+
+                    for node in &term_doc.nodes {
+                        if !combined_doc.nodes.contains(node) {
+                            combined_doc.nodes.push(*node);
+                        }
+                    }
+
+                    all_matched_terms.extend(term_matched.clone());
+                } else {
+                    appears_in_all = false;
+                    break;
+                }
+            }
+
+            if appears_in_all && all_matched_terms.len() == search_terms.len() {
+                final_results.insert(doc_id.clone(), combined_doc);
+            }
+        }
+
+        let mut ranked_documents = final_results.into_iter().collect::<Vec<_>>();
+        ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
+
+        let documents: Vec<_> = ranked_documents
+            .into_iter()
+            .skip(offset.unwrap_or(0))
+            .take(limit.unwrap_or(usize::MAX))
+            .collect();
+
+        log::debug!(
+            "AND query resulted in {} documents (from {} search terms)",
+            documents.len(),
+            search_terms.len()
+        );
         Ok(documents)
     }
 
@@ -359,27 +609,27 @@ impl RoleGraph {
             }
         };
     }
-    
+
     /// Get the number of nodes in the graph
     pub fn get_node_count(&self) -> usize {
         self.nodes.len()
     }
-    
-    /// Get the number of edges in the graph  
+
+    /// Get the number of edges in the graph
     pub fn get_edge_count(&self) -> usize {
         self.edges.len()
     }
-    
+
     /// Get the number of documents in the graph
     pub fn get_document_count(&self) -> usize {
         self.documents.len()
     }
-    
+
     /// Check if the graph has been properly populated
     pub fn is_graph_populated(&self) -> bool {
         !self.nodes.is_empty() && !self.edges.is_empty() && !self.documents.is_empty()
     }
-    
+
     /// Get graph statistics for debugging
     pub fn get_graph_stats(&self) -> GraphStats {
         GraphStats {
@@ -390,34 +640,34 @@ impl RoleGraph {
             is_populated: self.is_graph_populated(),
         }
     }
-    
+
     /// Validate that documents have content and are indexed properly
     pub fn validate_documents(&self) -> Vec<String> {
         let mut warnings = Vec::new();
-        
+
         for (doc_id, _indexed_doc) in &self.documents {
             // Check if this document contributed to graph structure
-            let has_nodes = self.nodes.values().any(|node| 
-                node.connected_with.iter().any(|edge_id|
-                    self.edges.get(edge_id).map_or(false, |edge|
-                        edge.doc_hash.contains_key(doc_id)
-                    )
-                )
-            );
-            
+            let has_nodes = self.nodes.values().any(|node| {
+                node.connected_with.iter().any(|edge_id| {
+                    self.edges
+                        .get(edge_id)
+                        .is_some_and(|edge| edge.doc_hash.contains_key(doc_id))
+                })
+            });
+
             if !has_nodes {
                 warnings.push(format!("Document '{}' did not create any nodes (may have empty body or no thesaurus matches)", doc_id));
             }
         }
-        
+
         warnings
     }
-    
+
     /// Find all document IDs that contain a specific term
     pub fn find_document_ids_for_term(&self, term: &str) -> Vec<String> {
         let node_ids = self.find_matching_node_ids(term);
         let mut document_ids = std::collections::HashSet::new();
-        
+
         for node_id in node_ids {
             if let Some(node) = self.nodes.get(&node_id) {
                 for edge_id in &node.connected_with {
@@ -429,7 +679,7 @@ impl RoleGraph {
                 }
             }
         }
-        
+
         document_ids.into_iter().collect()
     }
 
@@ -474,7 +724,6 @@ impl RoleGraph {
     pub fn edges_map(&self) -> &ahash::AHashMap<u64, Edge> {
         &self.edges
     }
-
 }
 
 /// Wraps the `RoleGraph` for ingesting documents and is `Send` and `Sync`
@@ -530,11 +779,9 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 /// func unpair(z int) (int, int) {
 ///   q := int(math.Floor(math.Sqrt(float64(z))))
 ///     l := z - q * q
-
 ///   if l < q {
 ///       return l, q
 //   }
-
 ///   return q, l - q
 /// }
 #[memoize(CustomHasher: ahash::AHashMap)]
@@ -636,12 +883,12 @@ mod tests {
             .unwrap();
         let document_id = Ulid::new().to_string();
         let test_document = r#"
-        This folder is an example of personal knowledge graph used for testing and fixtures 
+        This folder is an example of personal knowledge graph used for testing and fixtures
         terraphim-graph
         "#;
         println!("thesaurus: {:?}", thesaurus);
         assert_eq!(thesaurus.len(), 10);
-        let matches = rolegraph.find_matching_node_ids(&test_document);
+        let matches = rolegraph.find_matching_node_ids(test_document);
         println!("Matches {:?}", matches);
         for (a, b) in matches.into_iter().tuple_windows() {
             rolegraph.add_or_update_document(&document_id, a, b);
@@ -658,7 +905,7 @@ mod tests {
             summarization: None,
         };
         rolegraph.insert_document(&document_id, document);
-        println!("query with {}", "terraphim-graph and service".to_string());
+        println!("query with terraphim-graph and service");
         let results: Vec<(String, IndexedDocument)> =
             match rolegraph.query_graph("terraphim-graph and service", Some(0), Some(10)) {
                 Ok(results) => results,
@@ -677,9 +924,9 @@ mod tests {
         let test_document2 = r#"
         # Terraphim-Graph scorer
         Terraphim-Graph (scorer) is using unique graph embeddings, where the rank of the term is defined by number of synonyms connected to the concept.
-        
-        synonyms:: graph embeddings, graph, knowledge graph based embeddings 
-        
+
+        synonyms:: graph embeddings, graph, knowledge graph based embeddings
+
         Now we will have a concept "Terrpahim Graph Scorer" with synonyms "graph embeddings" and "terraphim-graph". This provides service
         "#;
         let document2 = Document {
@@ -699,7 +946,7 @@ mod tests {
             .query_graph("terraphim-graph and service", Some(0), Some(10))
             .unwrap();
         println!("results: {:#?}", results);
-        let top_result = results.get(0).unwrap();
+        let top_result = results.first().unwrap();
         println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
         println!("Top result {:#?}", top_result.1);
         println!("Nodes {:#?}   ", rolegraph.nodes);
@@ -754,7 +1001,7 @@ mod tests {
             )
             .unwrap();
         println!("results: {:#?}", results);
-        let top_result = results.get(0).unwrap();
+        let top_result = results.first().unwrap();
         println!("Top result {:?} Rank {:?}", top_result.0, top_result.1.rank);
         println!("Top result {:#?}", top_result.1);
         assert_eq!(results.len(), 4);
@@ -795,26 +1042,43 @@ mod tests {
             .expect("Failed to create rolegraph");
 
         // Verify thesaurus is loaded properly
-        assert!(!rolegraph.thesaurus.is_empty(), "Thesaurus should not be empty");
-        assert!(!rolegraph.ac_reverse_nterm.is_empty(), "Reverse term lookup should be populated");
-        log::info!("✅ Loaded thesaurus with {} terms", rolegraph.thesaurus.len());
+        assert!(
+            !rolegraph.thesaurus.is_empty(),
+            "Thesaurus should not be empty"
+        );
+        assert!(
+            !rolegraph.ac_reverse_nterm.is_empty(),
+            "Reverse term lookup should be populated"
+        );
+        log::info!(
+            "✅ Loaded thesaurus with {} terms",
+            rolegraph.thesaurus.len()
+        );
 
         // Test 1: Query empty graph (should return empty results, not NodeIdNotFound error)
         log::info!("🔍 Testing query on empty graph");
-        let empty_results = rolegraph.query_graph("Life cycle concepts", None, Some(10))
+        let empty_results = rolegraph
+            .query_graph("Life cycle concepts", None, Some(10))
             .expect("Query on empty graph should not fail");
-        assert!(empty_results.is_empty(), "Empty graph should return no results");
+        assert!(
+            empty_results.is_empty(),
+            "Empty graph should return no results"
+        );
         log::info!("✅ Empty graph query handled gracefully");
 
         // Test 2: Query with non-existent terms (should return empty, not error)
-        let nonexistent_results = rolegraph.query_graph("nonexistentterms", None, Some(10))
+        let nonexistent_results = rolegraph
+            .query_graph("nonexistentterms", None, Some(10))
             .expect("Query with non-existent terms should not fail");
-        assert!(nonexistent_results.is_empty(), "Non-existent terms should return no results");
+        assert!(
+            nonexistent_results.is_empty(),
+            "Non-existent terms should return no results"
+        );
         log::info!("✅ Non-existent terms query handled gracefully");
 
         // Test 3: Use the same text from working tests that contains thesaurus terms
         let document_text = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
-        
+
         // Create document that will definitely match thesaurus terms
         let test_document = Document {
             id: "test_doc".to_string(),
@@ -837,31 +1101,44 @@ mod tests {
         log::info!("  - Graph now has {} documents", rolegraph.documents.len());
 
         // Verify graph structure was created
-        assert!(!rolegraph.nodes.is_empty(), "Nodes should be created from document indexing");
-        assert!(!rolegraph.edges.is_empty(), "Edges should be created from document indexing");
+        assert!(
+            !rolegraph.nodes.is_empty(),
+            "Nodes should be created from document indexing"
+        );
+        assert!(
+            !rolegraph.edges.is_empty(),
+            "Edges should be created from document indexing"
+        );
         assert_eq!(rolegraph.documents.len(), 1, "1 document should be stored");
 
         // Test 4: Query populated graph (should return results without NodeIdNotFound errors)
         let test_queries = vec![
             "Life cycle concepts",
-            "Trained operators", 
+            "Trained operators",
             "Paradigm Map",
             "project planning",
         ];
 
         for query in test_queries {
             log::info!("🔍 Testing query: '{}'", query);
-            let results = rolegraph.query_graph(query, None, Some(10))
-                .expect(&format!("Query '{}' should not fail", query));
-            
+            let results = rolegraph
+                .query_graph(query, None, Some(10))
+                .unwrap_or_else(|_| panic!("Query '{}' should not fail", query));
+
             log::info!("  - Found {} results", results.len());
-            
+
             // Some queries should return results if they match indexed documents
-            if query == "Life cycle concepts" || query == "Trained operators" || query == "Paradigm Map" {
+            if query == "Life cycle concepts"
+                || query == "Trained operators"
+                || query == "Paradigm Map"
+            {
                 if !results.is_empty() {
                     log::info!("  ✅ Found expected results for query '{}'", query);
                 } else {
-                    log::info!("  ⚠️ No results for '{}' but no error - this is acceptable", query);
+                    log::info!(
+                        "  ⚠️ No results for '{}' but no error - this is acceptable",
+                        query
+                    );
                 }
             }
         }
@@ -871,17 +1148,23 @@ mod tests {
         if !document_ids.is_empty() {
             log::info!("✅ Found {} documents for term lookup", document_ids.len());
         } else {
-            log::info!("⚠️ No documents found for term lookup - acceptable if term not in indexed docs");
+            log::info!(
+                "⚠️ No documents found for term lookup - acceptable if term not in indexed docs"
+            );
         }
 
         // Test 6: Verify that original NodeIdNotFound scenarios now work
-        let original_failing_query = rolegraph.query_graph("terraphim-graph", None, Some(10))
+        let original_failing_query = rolegraph
+            .query_graph("terraphim-graph", None, Some(10))
             .expect("Query that previously caused NodeIdNotFound should now work");
-        log::info!("✅ Previously failing query now works - found {} results", original_failing_query.len());
+        log::info!(
+            "✅ Previously failing query now works - found {} results",
+            original_failing_query.len()
+        );
 
         log::info!("🎉 All rolegraph and thesaurus tests completed successfully!");
         log::info!("✅ Thesaurus loading: Working");
-        log::info!("✅ Document indexing: Working");  
+        log::info!("✅ Document indexing: Working");
         log::info!("✅ Graph querying: Working (no NodeIdNotFound errors)");
         log::info!("✅ Defensive error handling: Working");
     }

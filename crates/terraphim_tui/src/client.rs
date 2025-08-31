@@ -16,13 +16,14 @@ impl ApiClient {
             .user_agent("Terraphim-TUI/1.0")
             .build()
             .unwrap_or_else(|_| Client::new());
-            
+
         Self {
             http: client,
             base: base_url.into(),
         }
     }
 
+    #[allow(dead_code)]
     pub async fn health(&self) -> Result<()> {
         let url = format!("{}/health", self.base);
         let res = self.http.get(url).send().await?;
@@ -65,6 +66,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[allow(dead_code)]
     pub async fn get_rolegraph_edges(&self, role: Option<&str>) -> Result<RoleGraphResponseDto> {
         self.rolegraph(role).await
     }
@@ -273,16 +275,26 @@ impl ApiClient {
         Ok(body)
     }
 
-    pub async fn get_autocomplete(&self, role_name: &str, query: &str) -> Result<AutocompleteResponse> {
-        let url = format!("{}/autocomplete/{}/{}", 
-                         self.base, 
-                         urlencoding::encode(role_name),
-                         urlencoding::encode(query));
+    pub async fn get_autocomplete(
+        &self,
+        role_name: &str,
+        query: &str,
+    ) -> Result<AutocompleteResponse> {
+        let url = format!(
+            "{}/autocomplete/{}/{}",
+            self.base,
+            urlencoding::encode(role_name),
+            urlencoding::encode(query)
+        );
         let res = self.http.get(url).send().await?;
-        let body = res.error_for_status()?.json::<AutocompleteResponse>().await?;
+        let body = res
+            .error_for_status()?
+            .json::<AutocompleteResponse>()
+            .await?;
         Ok(body)
     }
 
+    #[allow(dead_code)]
     pub async fn async_summarize_document(
         &self,
         document: &Document,
@@ -294,24 +306,38 @@ impl ApiClient {
             role: role.map(|r| r.to_string()),
         };
         let res = self.http.post(url).json(&req).send().await?;
-        let body = res.error_for_status()?.json::<AsyncSummarizeResponse>().await?;
+        let body = res
+            .error_for_status()?
+            .json::<AsyncSummarizeResponse>()
+            .await?;
         Ok(body)
     }
 
+    #[allow(dead_code)]
     pub async fn get_task_status(&self, task_id: &str) -> Result<TaskStatusResponse> {
-        let url = format!("{}/summarization/task/{}/status", self.base, urlencoding::encode(task_id));
+        let url = format!(
+            "{}/summarization/task/{}/status",
+            self.base,
+            urlencoding::encode(task_id)
+        );
         let res = self.http.get(url).send().await?;
         let body = res.error_for_status()?.json::<TaskStatusResponse>().await?;
         Ok(body)
     }
 
+    #[allow(dead_code)]
     pub async fn cancel_task(&self, task_id: &str) -> Result<TaskStatusResponse> {
-        let url = format!("{}/summarization/task/{}/cancel", self.base, urlencoding::encode(task_id));
+        let url = format!(
+            "{}/summarization/task/{}/cancel",
+            self.base,
+            urlencoding::encode(task_id)
+        );
         let res = self.http.post(url).send().await?;
         let body = res.error_for_status()?.json::<TaskStatusResponse>().await?;
         Ok(body)
     }
 
+    #[allow(dead_code)]
     pub async fn get_queue_stats(&self) -> Result<QueueStatsResponse> {
         let url = format!("{}/summarization/queue/stats", self.base);
         let res = self.http.get(url).send().await?;
@@ -319,6 +345,7 @@ impl ApiClient {
         Ok(body)
     }
 
+    #[allow(dead_code)]
     pub async fn batch_summarize_documents(
         &self,
         documents: &[Document],
@@ -330,7 +357,10 @@ impl ApiClient {
             role: role.map(|r| r.to_string()),
         };
         let res = self.http.post(url).json(&req).send().await?;
-        let body = res.error_for_status()?.json::<BatchSummarizeResponse>().await?;
+        let body = res
+            .error_for_status()?
+            .json::<BatchSummarizeResponse>()
+            .await?;
         Ok(body)
     }
 }

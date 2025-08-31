@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, '..');
 
-// Load .env file from project root  
+// Load .env file from project root
 function loadEnvFile() {
   const envPath = join(__dirname, '../../.env');
   if (existsSync(envPath)) {
@@ -25,23 +25,23 @@ function loadEnvFile() {
 
 async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...');
-  
+
   // Load environment variables from .env file
   loadEnvFile();
-  
+
   // In CI environment, we might need to build the app first
   if (process.env.CI) {
     console.log('Building Tauri app for CI...');
     // Add any CI-specific setup here
   }
-  
+
   // Setup test data directory
   const testDataDir = join(__dirname, '../test-data');
   if (!existsSync(testDataDir)) {
     mkdirSync(testDataDir, { recursive: true });
     console.log('Created test data directory');
   }
-  
+
   // Create test fixtures
   const testConfig = {
     knowledge_graphs: [
@@ -58,23 +58,23 @@ async function globalSetup(config: FullConfig) {
     theme: 'default',
     server_url: 'http://localhost:3000'
   };
-  
+
   writeFileSync(
     join(testDataDir, 'test-config.json'),
     JSON.stringify(testConfig, null, 2)
   );
-  
+
   // Create test documents
   const docsDir = join(testDataDir, 'test-documents');
   if (!existsSync(docsDir)) {
     mkdirSync(docsDir, { recursive: true });
   }
-  
+
   const testDocuments = [
     {
       name: 'test-doc-1.md',
       content: `# Test Document 1
-      
+
 This is a test document for artificial intelligence testing.
 It contains information about machine learning and neural networks.
       `
@@ -82,18 +82,18 @@ It contains information about machine learning and neural networks.
     {
       name: 'test-doc-2.md',
       content: `# Test Document 2
-      
+
 This document covers advanced topics in data science.
 Including topics like deep learning and computer vision.
       `
     }
   ];
-  
+
   testDocuments.forEach(doc => {
     writeFileSync(join(docsDir, doc.name), doc.content);
   });
-  
+
   console.log('✅ Global setup completed');
 }
 
-export default globalSetup; 
+export default globalSetup;

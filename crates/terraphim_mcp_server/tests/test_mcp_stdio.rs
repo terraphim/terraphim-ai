@@ -1,12 +1,15 @@
-use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader, Write};
 use std::env;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Command, Stdio};
 
 #[test]
 fn test_mcp_autocomplete_via_stdio() {
     // Set the environment variable for local dev settings
-    env::set_var("TERRAPHIM_SETTINGS_PATH", "../terraphim_settings/default/settings_local_dev.toml");
-    
+    env::set_var(
+        "TERRAPHIM_SETTINGS_PATH",
+        "../terraphim_settings/default/settings_local_dev.toml",
+    );
+
     // Start the MCP server
     let mut child = Command::new("cargo")
         .args(["run", "--", "--verbose"])
@@ -16,14 +19,14 @@ fn test_mcp_autocomplete_via_stdio() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("Failed to start MCP server");
-    
+
     let mut stdin = child.stdin.take().expect("Failed to get stdin");
     let stdout = child.stdout.take().expect("Failed to get stdout");
     let mut reader = BufReader::new(stdout);
-    
+
     // Wait a bit for server to start
     std::thread::sleep(std::time::Duration::from_secs(3));
-    
+
     // Step 1: Send initialization request
     let init_request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -40,16 +43,18 @@ fn test_mcp_autocomplete_via_stdio() {
             }
         }
     });
-    
+
     println!("1. Sending initialization request...");
     writeln!(stdin, "{}", init_request).expect("Failed to write to stdin");
     stdin.flush().expect("Failed to flush stdin");
-    
+
     // Read response
     let mut response = String::new();
-    reader.read_line(&mut response).expect("Failed to read response");
+    reader
+        .read_line(&mut response)
+        .expect("Failed to read response");
     println!("Response: {}", response.trim());
-    
+
     // Step 2: List available tools
     let tools_request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -57,20 +62,22 @@ fn test_mcp_autocomplete_via_stdio() {
         "method": "tools/list",
         "params": {}
     });
-    
+
     println!("2. Listing available tools...");
     writeln!(stdin, "{}", tools_request).expect("Failed to write to stdin");
     stdin.flush().expect("Failed to flush stdin");
-    
+
     // Read the complete tools list response
     response.clear();
-    reader.read_line(&mut response).expect("Failed to read response");
+    reader
+        .read_line(&mut response)
+        .expect("Failed to read response");
     println!("Tools list response: {}", response.trim());
-    
+
     // Parse the response to see what tools are available
     if let Ok(tools_response) = serde_json::from_str::<serde_json::Value>(&response) {
         println!("Parsed tools response: {:#?}", tools_response);
-        
+
         // Check if tools are present
         if let Some(result) = tools_response.get("result") {
             if let Some(tools) = result.get("tools") {
@@ -83,7 +90,7 @@ fn test_mcp_autocomplete_via_stdio() {
             }
         }
     }
-    
+
     // Step 3: Build autocomplete index
     let build_index_request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -96,15 +103,17 @@ fn test_mcp_autocomplete_via_stdio() {
             }
         }
     });
-    
+
     println!("3. Building autocomplete index...");
     writeln!(stdin, "{}", build_index_request).expect("Failed to write to stdin");
     stdin.flush().expect("Failed to flush stdin");
-    
+
     response.clear();
-    reader.read_line(&mut response).expect("Failed to read response");
+    reader
+        .read_line(&mut response)
+        .expect("Failed to read response");
     println!("Build index response: {}", response.trim());
-    
+
     // Step 4: Test autocomplete with snippets
     let autocomplete_request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -119,15 +128,17 @@ fn test_mcp_autocomplete_via_stdio() {
             }
         }
     });
-    
+
     println!("4. Testing autocomplete with snippets...");
     writeln!(stdin, "{}", autocomplete_request).expect("Failed to write to stdin");
     stdin.flush().expect("Failed to flush stdin");
-    
+
     response.clear();
-    reader.read_line(&mut response).expect("Failed to read response");
+    reader
+        .read_line(&mut response)
+        .expect("Failed to read response");
     println!("Autocomplete response: {}", response.trim());
-    
+
     // Step 5: Test autocomplete terms
     let terms_request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -142,17 +153,19 @@ fn test_mcp_autocomplete_via_stdio() {
             }
         }
     });
-    
+
     println!("5. Testing autocomplete terms...");
     writeln!(stdin, "{}", terms_request).expect("Failed to write to stdin");
     stdin.flush().expect("Failed to flush stdin");
-    
+
     response.clear();
-    reader.read_line(&mut response).expect("Failed to read response");
+    reader
+        .read_line(&mut response)
+        .expect("Failed to read response");
     println!("Terms response: {}", response.trim());
-    
+
     println!("Test completed successfully!");
-    
+
     // Clean up
     child.kill().expect("Failed to kill child process");
     child.wait().expect("Failed to wait for child");

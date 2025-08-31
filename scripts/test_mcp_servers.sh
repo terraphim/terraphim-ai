@@ -24,10 +24,10 @@ echo "Binary: ./target/debug/terraphim-ai-desktop mcp-server"
 if [[ -f "./target/debug/terraphim-ai-desktop" ]]; then
     echo "✅ Binary exists"
     echo "🔍 Testing initialization..."
-    
+
     # Use timeout and capture response
     response=$(timeout 5s bash -c "echo '$TEST_MSG' | ./target/debug/terraphim-ai-desktop mcp-server 2>/dev/null" || echo "TIMEOUT")
-    
+
     if [[ "$response" == "TIMEOUT" ]]; then
         echo "⚠️  Test timed out (this is normal for MCP servers)"
         echo "✅ Desktop binary MCP server is working (times out after sending response)"
@@ -48,10 +48,10 @@ echo "Binary: ./target/debug/terraphim_mcp_server"
 if [[ -f "./target/debug/terraphim_mcp_server" ]]; then
     echo "✅ Binary exists"
     echo "🔍 Testing initialization..."
-    
+
     # Use timeout and capture response
     response=$(timeout 5s bash -c "echo '$TEST_MSG' | ./target/debug/terraphim_mcp_server 2>/dev/null" || echo "TIMEOUT")
-    
+
     if [[ "$response" == "TIMEOUT" ]]; then
         echo "⚠️  Test timed out (this is normal for MCP servers)"
         echo "✅ Standalone MCP server is working (times out after sending response)"
@@ -86,4 +86,4 @@ echo "   - 10 KG entries for search"
 echo
 echo "📚 For full documentation see: docs/src/ClaudeDesktop.md"
 echo
-echo "🚀 Ready for Claude Desktop integration!" 
+echo "🚀 Ready for Claude Desktop integration!"

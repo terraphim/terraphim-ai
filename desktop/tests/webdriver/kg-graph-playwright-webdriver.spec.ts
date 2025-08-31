@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Playwright WebDriver test for KG Graph Functionality
- * 
+ *
  * This test uses Playwright with WebDriver capabilities to test the Tauri application
  * in a more native way, providing better integration with the actual Tauri app.
  */
@@ -11,14 +11,14 @@ test.describe('KG Graph Functionality - Playwright WebDriver', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the Tauri app
     await page.goto('/');
-    
+
     // Wait for the app to load
     await page.waitForSelector('input[type="search"], #search-input, .search-input', { timeout: 30000 });
   });
 
   test('should prove KG graph functionality with WebDriver', async ({ page }) => {
     console.log('🔍 PROVING KG Graph Functionality with Playwright WebDriver...');
-    
+
     // Verify search interface is working
     const searchInput = page.locator('input[type="search"], #search-input, .search-input').first();
     await expect(searchInput).toBeVisible();
@@ -27,14 +27,14 @@ test.describe('KG Graph Functionality - Playwright WebDriver', () => {
     // Test basic search functionality
     await searchInput.fill('terraphim');
     await searchInput.press('Enter');
-    
+
     // Wait for search to complete
     await page.waitForTimeout(3000);
     console.log('✅ Search functionality working');
 
     // Navigate to graph visualization
     console.log('📊 Testing graph navigation...');
-    
+
     // Hover over footer to reveal navigation
     const footer = page.locator('footer');
     await footer.hover();
@@ -308,4 +308,4 @@ test.describe('KG Graph Functionality - Playwright WebDriver', () => {
     console.log('');
     console.log('🎯 CONCLUSION: KG Graph functionality is working properly in Playwright WebDriver context!');
   });
-}); 
+});

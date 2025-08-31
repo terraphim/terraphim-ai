@@ -77,13 +77,13 @@ async fn test_atomic_haystack_with_terraphim_config() {
             "A comprehensive guide to Rust programming language covering ownership, borrowing, and async programming patterns."
         ),
         (
-            "terraphim-architecture", 
+            "terraphim-architecture",
             "Terraphim AI Architecture Overview",
             "This document describes the architecture of Terraphim AI system including atomic server integration and search capabilities."
         ),
         (
             "atomic-server-intro",
-            "Introduction to Atomic Server", 
+            "Introduction to Atomic Server",
             "Learn about atomic data protocols and how to build applications with atomic server for knowledge management."
         ),
     ];
@@ -123,7 +123,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
         store
             .create_with_commit(&doc_subject, doc_properties)
             .await
-            .expect(&format!("Failed to create document {}", shortname));
+            .unwrap_or_else(|_| panic!("Failed to create document {}", shortname));
 
         created_documents.push(doc_subject);
         log::info!("Created test document: {} - {}", shortname, title);
@@ -151,6 +151,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
                 )
                 .with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()
@@ -176,11 +177,11 @@ async fn test_atomic_haystack_with_terraphim_config() {
         let mut index = Index::new();
 
         // Poll with retries to account for search indexing delays
-        for attempt in 0..10 {
+        for _attempt in 0..10 {
             index = indexer
                 .index(search_term, haystack)
                 .await
-                .expect(&format!("Search failed for term: {}", search_term));
+                .unwrap_or_else(|_| panic!("Search failed for term: {}", search_term));
 
             found_docs = index.len();
             if found_docs >= expected_min_results {
@@ -237,6 +238,8 @@ async fn test_atomic_haystack_with_terraphim_config() {
         skip: Some(0),
         limit: Some(10),
         role: Some("AtomicUser".into()),
+        operator: None,
+        search_terms: None,
     };
 
     let search_results = search_haystacks(config_state, search_query)
@@ -444,7 +447,7 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
     )];
 
     // Add authenticated haystack if secret is available
-    if let Some(secret) = std::env::var("ATOMIC_SERVER_SECRET").ok() {
+    if let Ok(secret) = std::env::var("ATOMIC_SERVER_SECRET") {
         haystacks.push(
             Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                 .with_atomic_secret(Some(secret)),
@@ -464,6 +467,7 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
                 kg: None,
                 haystacks,
                 extra: ahash::AHashMap::new(),
+                ..Default::default()
             },
         )
         .build()

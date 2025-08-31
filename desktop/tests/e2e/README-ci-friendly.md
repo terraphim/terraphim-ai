@@ -362,4 +362,4 @@ test('search test', async ({ page }) => {
 
 ## Conclusion
 
-All Playwright tests in this project are now CI-friendly and will execute reliably in both development and CI environments. The utilities automatically handle timeout adjustments, error handling, and environment-specific configurations, making the test suite robust and maintainable. 
+All Playwright tests in this project are now CI-friendly and will execute reliably in both development and CI environments. The utilities automatically handle timeout adjustments, error handling, and environment-specific configurations, making the test suite robust and maintainable.

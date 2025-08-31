@@ -33,63 +33,63 @@ pub fn generate_typescript_bindings() -> Result<(), Box<dyn std::error::Error>> 
 
     // Core types from terraphim_types
     all_bindings.push_str("// === Core Types ===\n");
-    all_bindings.push_str(&RoleName::DECL);
+    all_bindings.push_str(RoleName::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&NormalizedTermValue::DECL);
+    all_bindings.push_str(NormalizedTermValue::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&Document::DECL);
+    all_bindings.push_str(Document::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&SearchQuery::DECL);
+    all_bindings.push_str(SearchQuery::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&RelevanceFunction::DECL);
+    all_bindings.push_str(RelevanceFunction::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&KnowledgeGraphInputType::DECL);
+    all_bindings.push_str(KnowledgeGraphInputType::DECL);
     all_bindings.push('\n');
 
     // Automata types from terraphim_automata
     all_bindings.push_str("// === Automata Types ===\n");
-    all_bindings.push_str(&AutomataPath::DECL);
+    all_bindings.push_str(AutomataPath::DECL);
     all_bindings.push('\n');
 
     // Config types from terraphim_config
     all_bindings.push_str("// === Configuration Types ===\n");
-    all_bindings.push_str(&ServiceType::DECL);
+    all_bindings.push_str(ServiceType::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&Haystack::DECL);
+    all_bindings.push_str(Haystack::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&KnowledgeGraphLocal::DECL);
+    all_bindings.push_str(KnowledgeGraphLocal::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&KnowledgeGraph::DECL);
+    all_bindings.push_str(KnowledgeGraph::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&Role::DECL);
+    all_bindings.push_str(Role::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&ConfigId::DECL);
+    all_bindings.push_str(ConfigId::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&Config::DECL);
+    all_bindings.push_str(Config::DECL);
     all_bindings.push('\n');
 
     // Command response types
     all_bindings.push_str("// === Command Response Types ===\n");
-    all_bindings.push_str(&Status::DECL);
+    all_bindings.push_str(Status::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&ConfigResponse::DECL);
+    all_bindings.push_str(ConfigResponse::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&SearchResponse::DECL);
+    all_bindings.push_str(SearchResponse::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&DocumentListResponse::DECL);
+    all_bindings.push_str(DocumentListResponse::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&DocumentResponse::DECL);
+    all_bindings.push_str(DocumentResponse::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&InitialSettings::DECL);
+    all_bindings.push_str(InitialSettings::DECL);
     all_bindings.push('\n');
 
     // Role graph visualization types
     all_bindings.push_str("// === Role Graph Visualization Types ===\n");
-    all_bindings.push_str(&GraphNodeDto::DECL);
+    all_bindings.push_str(GraphNodeDto::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&GraphEdgeDto::DECL);
+    all_bindings.push_str(GraphEdgeDto::DECL);
     all_bindings.push('\n');
-    all_bindings.push_str(&RoleGraphResponse::DECL);
+    all_bindings.push_str(RoleGraphResponse::DECL);
     all_bindings.push('\n');
 
     // Write to the bindings file

@@ -114,11 +114,11 @@ UPDATED_CONFIG=$(curl -s http://localhost:8000/config)
 
 if echo "$UPDATED_CONFIG" | jq -e '.config.roles["Rust Engineer"]' >/dev/null 2>&1; then
     print_success "Rust Engineer role found in configuration"
-    
+
     # Show the role configuration
     echo "Rust Engineer role configuration:"
     echo "$UPDATED_CONFIG" | jq '.config.roles["Rust Engineer"]'
-    
+
     # Verify haystack configuration
     HAYSTACK_SERVICE=$(echo "$UPDATED_CONFIG" | jq -r '.config.roles["Rust Engineer"].haystacks[0].service')
     if [ "$HAYSTACK_SERVICE" = "QueryRs" ]; then
@@ -127,7 +127,7 @@ if echo "$UPDATED_CONFIG" | jq -e '.config.roles["Rust Engineer"]' >/dev/null 2>
         print_error "QueryRs service not configured correctly. Found: $HAYSTACK_SERVICE"
         exit 1
     fi
-    
+
     HAYSTACK_LOCATION=$(echo "$UPDATED_CONFIG" | jq -r '.config.roles["Rust Engineer"].haystacks[0].location')
     if [ "$HAYSTACK_LOCATION" = "https://query.rs" ]; then
         print_success "QueryRs location is properly configured"
@@ -135,7 +135,7 @@ if echo "$UPDATED_CONFIG" | jq -e '.config.roles["Rust Engineer"]' >/dev/null 2>
         print_error "QueryRs location not configured correctly. Found: $HAYSTACK_LOCATION"
         exit 1
     fi
-    
+
 else
     print_error "Rust Engineer role not found in configuration"
     echo "Available roles:"
@@ -149,7 +149,7 @@ print_info "Step 5: Testing search with Rust Engineer role..."
 # Test multiple queries covering different query.rs search types
 QUERIES=(
     "async"           # Reddit posts
-    "tokio"           # Reddit posts  
+    "tokio"           # Reddit posts
     "serde"           # Reddit posts
     "Iterator"        # Std docs
     "Vec"             # Std docs
@@ -169,25 +169,25 @@ for query in "${QUERIES[@]}"; do
     echo ""
     echo "🔍 Testing query: '$query'"
     echo "----------------------------------------"
-    
+
     SEARCH_RESPONSE=$(curl -s -X POST http://localhost:8000/documents/search \
       -H "Content-Type: application/json" \
       -d "{\"search_term\": \"$query\", \"role\": \"Rust Engineer\"}")
-    
+
     if echo "$SEARCH_RESPONSE" | jq -e '.status' >/dev/null 2>&1; then
         print_success "Search request successful for '$query'"
-        
+
         # Get status
         STATUS=$(echo "$SEARCH_RESPONSE" | jq -r '.status')
         echo "   Status: $STATUS"
-        
+
         # Get result count
         RESULT_COUNT=$(echo "$SEARCH_RESPONSE" | jq '.results | length // 0')
         echo "   Found $RESULT_COUNT results"
-        
+
         if [ "$RESULT_COUNT" -gt 0 ]; then
             print_success "QueryRs haystack returned results for '$query'"
-            
+
             # Show first 3 results
             echo "   Sample results:"
             echo "$SEARCH_RESPONSE" | jq -r '.results[0:3] | .[] | "   - \(.title) (\(.url))"'
@@ -240,4 +240,4 @@ echo ""
 echo "To use it:"
 echo "  curl -X POST http://localhost:8000/documents/search \\"
 echo "    -H 'Content-Type: application/json' \\"
-echo "    -d '{\"search_term\": \"async\", \"role\": \"Rust Engineer\"}'" 
+echo "    -d '{\"search_term\": \"async\", \"role\": \"Rust Engineer\"}'"

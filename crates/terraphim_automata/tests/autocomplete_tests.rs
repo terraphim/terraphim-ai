@@ -179,7 +179,7 @@ fn test_autocomplete_search_empty_and_short_prefixes() {
     let index = build_autocomplete_index(thesaurus, None).unwrap();
 
     // Empty prefix - should return results (FST can handle this)
-    let results = autocomplete_search(&index, "", Some(5)).unwrap();
+    let _results = autocomplete_search(&index, "", Some(5)).unwrap();
     // FST implementation may return results for empty prefix
 
     // Single character prefix
@@ -209,11 +209,11 @@ fn test_autocomplete_search_special_characters() {
     let index = build_autocomplete_index(thesaurus, None).unwrap();
 
     // Test searching for terms with special characters
-    let results = autocomplete_search(&index, "special", None).unwrap();
+    let _results = autocomplete_search(&index, "special", None).unwrap();
     // May or may not find results depending on normalization
 
     // Test unicode characters
-    let results = autocomplete_search(&index, "unicode", None).unwrap();
+    let _results = autocomplete_search(&index, "unicode", None).unwrap();
     // Should handle unicode properly
 }
 
@@ -223,10 +223,10 @@ fn test_fuzzy_autocomplete_search_basic() {
     let index = build_autocomplete_index(thesaurus, None).unwrap();
 
     // Test fuzzy search with typos (now using Jaro-Winkler by default)
-    let results = fuzzy_autocomplete_search(&index, "machne", 0.6, Some(5)).unwrap();
+    let _results = fuzzy_autocomplete_search(&index, "machne", 0.6, Some(5)).unwrap();
     // Should find "machine" related terms even with typo
 
-    let results = fuzzy_autocomplete_search(&index, "pythonx", 0.6, Some(5)).unwrap();
+    let _results = fuzzy_autocomplete_search(&index, "pythonx", 0.6, Some(5)).unwrap();
     // Should find "python" with extra character
 }
 
@@ -237,7 +237,7 @@ fn test_fuzzy_autocomplete_search_similarity_thresholds() {
 
     // Test different similarity thresholds (now using Jaro-Winkler)
     for similarity in [0.3, 0.5, 0.7] {
-        let results = fuzzy_autocomplete_search(&index, "maching", similarity, Some(10)).unwrap();
+        let _results = fuzzy_autocomplete_search(&index, "maching", similarity, Some(10)).unwrap();
         // Higher similarity threshold should potentially find fewer results
     }
 }
@@ -470,7 +470,7 @@ fn test_autocomplete_config_defaults() {
 
     assert_eq!(config.max_results, 10);
     assert_eq!(config.min_prefix_length, 1);
-    assert_eq!(config.case_sensitive, false);
+    assert!(!config.case_sensitive);
 }
 
 #[test]

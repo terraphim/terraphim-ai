@@ -82,7 +82,7 @@ impl FeatureSet {
     }
 
     /// Creates a feature set from a comma-separated string
-    pub fn from_str(features: &str) -> Result<Self> {
+    pub fn from_string(features: &str) -> Result<Self> {
         if features.trim().is_empty() {
             return Ok(Self::new());
         }
@@ -333,7 +333,7 @@ impl FromStr for FeatureSet {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        Self::from_str(s)
+        Self::from_string(s)
     }
 }
 
@@ -380,13 +380,13 @@ fn get_feature_category(feature: &str) -> FeatureCategory {
 impl FeatureConstraints {
     /// Creates default constraints for Terraphim project
     pub fn terraphim_constraints() -> Self {
-        let mut constraints = Self::default();
-
-        // Mutually exclusive features
-        constraints.mutually_exclusive = vec![
-            vec!["debug-info".to_string(), "optimizations".to_string()],
-            vec!["mock-services".to_string(), "production".to_string()],
-        ];
+        let mut constraints = Self {
+            mutually_exclusive: vec![
+                vec!["debug-info".to_string(), "optimizations".to_string()],
+                vec!["mock-services".to_string(), "production".to_string()],
+            ],
+            ..Default::default()
+        };
 
         // Feature dependencies
         constraints.dependencies.insert(
@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_feature_set_from_string() {
-        let features = FeatureSet::from_str("openrouter,typescript,native").unwrap();
+        let features = FeatureSet::from_string("openrouter,typescript,native").unwrap();
         assert!(features.is_enabled("openrouter"));
         assert!(features.is_enabled("typescript"));
         assert!(features.is_enabled("native"));

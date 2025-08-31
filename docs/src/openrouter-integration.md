@@ -293,4 +293,4 @@ Future enhancements planned:
 For more information:
 - [OpenRouter Documentation](https://openrouter.ai/docs)
 - [Terraphim Configuration Guide](./configuration.md)
-- [Feature Flags Documentation](./features.md) 
+- [Feature Flags Documentation](./features.md)

@@ -8,7 +8,7 @@ This file is for temporary notes, tasks, and ideas.
 
 **Core Knowledge Graph Tests**: ✅ **3/3 PASSING**
 - `test_rolegraph_knowledge_graph_ranking`: Full integration test validates complete search pipeline
-- `test_build_thesaurus_from_kg_files`: Validates thesaurus extraction from KG markdown files  
+- `test_build_thesaurus_from_kg_files`: Validates thesaurus extraction from KG markdown files
 - `test_demonstrates_issue_with_wrong_thesaurus`: Proves remote vs local thesaurus differences
 
 **Knowledge Graph Terms Extracted**: ✅ **10 Total Terms**
@@ -27,7 +27,7 @@ Term: 'graph' -> Concept: 'terraphim-graph' (ID: 3)
 
 **Search Validation Results**: ✅ **ALL 5 TEST QUERIES SUCCESSFUL**
 - "terraphim-graph" → Found 1 result, rank: 34
-- "graph embeddings" → Found 1 result, rank: 34  
+- "graph embeddings" → Found 1 result, rank: 34
 - "graph" → Found 1 result, rank: 34
 - "knowledge graph based embeddings" → Found 1 result, rank: 34
 - "terraphim graph scorer" → Found 1 result, rank: 34
@@ -187,7 +187,7 @@ Successfully implemented and tested JSON-AD export with validation:
 
 ## Generated Files
 - `export.json` - JSON format (294KB)
-- `export-json-ad.json` - JSON-AD format (294KB)  
+- `export-json-ad.json` - JSON-AD format (294KB)
 - `export.ttl` - Turtle format (422KB)
 
 ## Minor Issues to Consider
@@ -198,4 +198,4 @@ Successfully implemented and tested JSON-AD export with validation:
 ## Next Development Areas
 - Consider adding validation for Turtle format authorization issues
 - May want to add more detailed error reporting
-- Export functionality is complete and working across all formats 
+- Export functionality is complete and working across all formats

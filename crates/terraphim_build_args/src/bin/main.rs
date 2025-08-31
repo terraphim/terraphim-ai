@@ -90,7 +90,7 @@ fn main() {
     }
 
     if let Some(features) = matches.get_one::<String>("features") {
-        match FeatureSet::from_str(features) {
+        match FeatureSet::from_string(features) {
             Ok(f) => config.features = f,
             Err(e) => {
                 eprintln!("Error parsing features: {}", e);

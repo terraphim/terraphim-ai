@@ -1,11 +1,11 @@
 import { writable } from "svelte/store";
 import { CONFIG } from "../config";
 // Import generated types instead of manual definitions
-import type { 
-  Role, 
-  Config, 
+import type {
+  Role,
+  Config,
   ConfigResponse,
-  RoleName 
+  RoleName
 } from "./generated/types";
 
 // Custom interface for thesaurus (not in generated types)

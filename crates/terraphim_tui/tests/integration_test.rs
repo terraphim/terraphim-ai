@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use serial_test::serial;
-use terraphim_tui::client::{ApiClient, SearchResponse, ConfigResponse, ChatResponse};
+use terraphim_tui::client::{ApiClient, ChatResponse, ConfigResponse, SearchResponse};
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";
@@ -58,7 +58,7 @@ async fn test_api_client_search() {
 
     let result = client.search(&query).await;
     assert!(result.is_ok(), "Search should succeed");
-    
+
     let response: SearchResponse = result.unwrap();
     assert_eq!(response.status, "Success");
     assert!(response.results.len() <= 5);
@@ -75,7 +75,7 @@ async fn test_api_client_get_config() {
     let client = ApiClient::new(TEST_SERVER_URL);
     let result = client.get_config().await;
     assert!(result.is_ok(), "Get config should succeed");
-    
+
     let response: ConfigResponse = result.unwrap();
     assert_eq!(response.status, "Success");
     assert!(!response.config.roles.is_empty());
@@ -90,26 +90,24 @@ async fn test_api_client_update_selected_role() {
     }
 
     let client = ApiClient::new(TEST_SERVER_URL);
-    
+
     // Get current config to find available roles
     let config_result = client.get_config().await;
     assert!(config_result.is_ok());
     let config = config_result.unwrap();
-    
+
     // Get first available role
-    let role_names: Vec<String> = config.config.roles.keys()
-        .map(|k| k.to_string())
-        .collect();
-    
+    let role_names: Vec<String> = config.config.roles.keys().map(|k| k.to_string()).collect();
+
     if role_names.is_empty() {
         println!("No roles available, skipping role update test");
         return;
     }
-    
+
     let test_role = &role_names[0];
     let result = client.update_selected_role(test_role).await;
     assert!(result.is_ok(), "Update selected role should succeed");
-    
+
     let response: ConfigResponse = result.unwrap();
     assert_eq!(response.status, "Success");
     assert_eq!(response.config.selected_role.to_string(), *test_role);
@@ -126,7 +124,7 @@ async fn test_api_client_get_rolegraph() {
     let client = ApiClient::new(TEST_SERVER_URL);
     let result = client.get_rolegraph_edges(None).await;
     assert!(result.is_ok(), "Get rolegraph should succeed");
-    
+
     let response = result.unwrap();
     assert_eq!(response.status, "Success");
     // Nodes and edges can be empty, that's valid
@@ -143,7 +141,7 @@ async fn test_api_client_chat() {
     let client = ApiClient::new(TEST_SERVER_URL);
     let result = client.chat("Default", "Hello, this is a test", None).await;
     assert!(result.is_ok(), "Chat should succeed");
-    
+
     let response: ChatResponse = result.unwrap();
     // Chat might succeed or fail depending on LLM availability
     // We just check that the response structure is correct
@@ -168,16 +166,14 @@ async fn test_search_with_different_roles() {
     }
 
     let client = ApiClient::new(TEST_SERVER_URL);
-    
+
     // Get available roles
     let config_result = client.get_config().await;
     assert!(config_result.is_ok());
     let config = config_result.unwrap();
-    
-    let role_names: Vec<String> = config.config.roles.keys()
-        .map(|k| k.to_string())
-        .collect();
-    
+
+    let role_names: Vec<String> = config.config.roles.keys().map(|k| k.to_string()).collect();
+
     if role_names.is_empty() {
         println!("No roles available, skipping multi-role search test");
         return;
@@ -193,8 +189,12 @@ async fn test_search_with_different_roles() {
         };
 
         let result = client.search(&query).await;
-        assert!(result.is_ok(), "Search with role {} should succeed", role_name);
-        
+        assert!(
+            result.is_ok(),
+            "Search with role {} should succeed",
+            role_name
+        );
+
         let response: SearchResponse = result.unwrap();
         assert_eq!(response.status, "Success");
         assert!(response.results.len() <= 3);
@@ -210,7 +210,7 @@ async fn test_search_pagination() {
     }
 
     let client = ApiClient::new(TEST_SERVER_URL);
-    
+
     // Search first page
     let query1 = SearchQuery {
         search_term: NormalizedTermValue::from("test"),
@@ -218,10 +218,10 @@ async fn test_search_pagination() {
         limit: Some(2),
         role: Some(RoleName::new("Default")),
     };
-    
+
     let result1 = client.search(&query1).await;
     assert!(result1.is_ok());
-    
+
     // Search second page
     let query2 = SearchQuery {
         search_term: NormalizedTermValue::from("test"),
@@ -229,23 +229,19 @@ async fn test_search_pagination() {
         limit: Some(2),
         role: Some(RoleName::new("Default")),
     };
-    
+
     let result2 = client.search(&query2).await;
     assert!(result2.is_ok());
-    
+
     let response1: SearchResponse = result1.unwrap();
     let response2: SearchResponse = result2.unwrap();
-    
+
     // If there are enough results, pages should be different
     if response1.results.len() == 2 && response2.results.len() > 0 {
         // Results should be different (assuming different documents)
-        let ids1: Vec<String> = response1.results.iter()
-            .map(|d| d.id.clone())
-            .collect();
-        let ids2: Vec<String> = response2.results.iter()
-            .map(|d| d.id.clone())
-            .collect();
-        
+        let ids1: Vec<String> = response1.results.iter().map(|d| d.id.clone()).collect();
+        let ids2: Vec<String> = response2.results.iter().map(|d| d.id.clone()).collect();
+
         // Should have different document IDs (no overlap)
         for id1 in &ids1 {
             assert!(!ids2.contains(id1), "Pages should have different documents");
@@ -267,7 +263,16 @@ fn test_tui_cli_search_command() {
     }
 
     let output = Command::new("cargo")
-        .args(&["run", "--bin", "terraphim_tui", "--", "search", "test", "--limit", "3"])
+        .args(&[
+            "run",
+            "--bin",
+            "terraphim_tui",
+            "--",
+            "search",
+            "test",
+            "--limit",
+            "3",
+        ])
         .env("TERRAPHIM_SERVER", TEST_SERVER_URL)
         .output();
 
@@ -341,8 +346,10 @@ fn test_tui_cli_config_show_command() {
             if !stdout.is_empty() {
                 // Try to parse as JSON if we got content
                 if stdout.starts_with('{') {
-                    assert!(serde_json::from_str::<serde_json::Value>(&stdout).is_ok(),
-                        "Config output should be valid JSON");
+                    assert!(
+                        serde_json::from_str::<serde_json::Value>(&stdout).is_ok(),
+                        "Config output should be valid JSON"
+                    );
                 }
             }
         } else {
@@ -366,7 +373,15 @@ fn test_tui_cli_graph_command() {
     }
 
     let output = Command::new("cargo")
-        .args(&["run", "--bin", "terraphim_tui", "--", "graph", "--top-k", "5"])
+        .args(&[
+            "run",
+            "--bin",
+            "terraphim_tui",
+            "--",
+            "graph",
+            "--top-k",
+            "5",
+        ])
         .env("TERRAPHIM_SERVER", TEST_SERVER_URL)
         .output();
 
@@ -375,8 +390,10 @@ fn test_tui_cli_graph_command() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             println!("CLI graph output: {}", stdout);
             // Should show nodes/edges count and top-k nodes
-            assert!(stdout.contains("Nodes:") && stdout.contains("Edges:"),
-                "Graph output should show node and edge counts");
+            assert!(
+                stdout.contains("Nodes:") && stdout.contains("Edges:"),
+                "Graph output should show node and edge counts"
+            );
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
             println!("CLI graph failed: {}", stderr);
@@ -393,7 +410,7 @@ async fn test_api_error_handling() {
     }
 
     let client = ApiClient::new(TEST_SERVER_URL);
-    
+
     // Test search with invalid parameters
     let query = SearchQuery {
         search_term: NormalizedTermValue::from(""), // Empty search
@@ -401,7 +418,7 @@ async fn test_api_error_handling() {
         limit: Some(0), // Invalid limit
         role: Some(RoleName::new("NonExistentRole")),
     };
-    
+
     let result = client.search(&query).await;
     // This might succeed or fail depending on server implementation
     // We just ensure it doesn't panic

@@ -59,7 +59,7 @@ VENV_DIR="${SCRIPT_DIR}/.venv"
 # Check if uv is installed, and install it if needed
 if ! command -v uv &> /dev/null; then
     echo -e "${YELLOW}uv package manager not found, installing...${RESET}"
-    
+
     if command -v curl &> /dev/null; then
         curl -LsSf https://astral.sh/uv/install.sh | sh
     elif command -v wget &> /dev/null; then
@@ -68,14 +68,14 @@ if ! command -v uv &> /dev/null; then
         echo -e "${RED}Error: Neither curl nor wget is available to install uv${RESET}"
         exit 1
     fi
-    
+
     # Update PATH to include uv
     if [[ -f "${HOME}/.cargo/env" ]]; then
         source "${HOME}/.cargo/env"
     else
         export PATH="${HOME}/.cargo/bin:${PATH}"
     fi
-    
+
     echo -e "${GREEN}uv package manager installed${RESET}"
 fi
 
@@ -176,4 +176,4 @@ fi
 # Deactivate virtual environment
 deactivate 2>/dev/null || true
 
-exit ${TEST_EXIT_CODE} 
+exit ${TEST_EXIT_CODE}

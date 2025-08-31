@@ -56,4 +56,4 @@
   <div class="editor">
     <JSONEditor {content} onChange={handleChange} />
   </div>
-</div> 
+</div>

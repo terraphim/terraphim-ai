@@ -8,7 +8,7 @@ import sys
 async def test_server_methods():
     """Test what methods the server supports"""
     binary_path = "/Users/alex/projects/terraphim/terraphim-ai/target/release/terraphim_mcp_server"
-    
+
     proc = subprocess.Popen(
         [binary_path],
         stdin=subprocess.PIPE,
@@ -16,7 +16,7 @@ async def test_server_methods():
         stderr=subprocess.PIPE,
         text=True
     )
-    
+
     try:
         # Step 1: Initialize
         init_request = {
@@ -32,12 +32,12 @@ async def test_server_methods():
                 }
             }
         }
-        
+
         proc.stdin.write(json.dumps(init_request) + "\n")
         proc.stdin.flush()
         response = proc.stdout.readline()
         print(f"Initialize: {response.strip()}")
-        
+
         # Step 2: Initialized notification
         initialized_notification = {
             "jsonrpc": "2.0",
@@ -45,7 +45,7 @@ async def test_server_methods():
         }
         proc.stdin.write(json.dumps(initialized_notification) + "\n")
         proc.stdin.flush()
-        
+
         # Test different method calls to see what's supported
         test_methods = [
             ("tools/list", {}),
@@ -55,7 +55,7 @@ async def test_server_methods():
             ("list_resources", {}),
             ("list_tools", {}),
         ]
-        
+
         for i, (method, params) in enumerate(test_methods):
             request = {
                 "jsonrpc": "2.0",
@@ -63,23 +63,23 @@ async def test_server_methods():
                 "method": method,
                 "params": params
             }
-            
+
             print(f"\nTesting method: {method}")
             proc.stdin.write(json.dumps(request) + "\n")
             proc.stdin.flush()
-            
+
             response = proc.stdout.readline()
             print(f"Response: {response.strip()}")
-            
+
     except Exception as e:
         print(f"Error: {e}")
     finally:
         proc.terminate()
         proc.wait()
-        
+
         stderr_output = proc.stderr.read()
         if stderr_output:
             print(f"Stderr: {stderr_output}")
 
 if __name__ == "__main__":
-    asyncio.run(test_server_methods()) 
+    asyncio.run(test_server_methods())

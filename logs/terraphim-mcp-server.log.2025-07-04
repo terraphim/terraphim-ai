@@ -1,156 +1,156 @@
 [2m2025-07-04T08:19:39.932943Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T08:19:39.933056Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T08:19:39.933622Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T08:19:39.933667Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T08:19:39.933750Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T08:19:39.933758Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T08:19:39.933761Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T08:19:39.933764Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:19:40.094587Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T08:19:40.250650Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T08:19:40.250681Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T08:19:40.250685Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:19:40.382713Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T08:19:39.933056Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:19:39.933622Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T08:19:39.933667Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:19:39.933750Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:19:39.933758Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:19:39.933761Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:19:39.933764Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:19:40.094587Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:19:40.250650Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:19:40.250681Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:19:40.250685Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:19:40.382713Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T08:41:11.800539Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T08:41:11.800641Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T08:41:11.801135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T08:41:11.801161Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T08:41:11.801232Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T08:41:11.801241Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T08:41:11.801244Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T08:41:11.801248Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:41:11.946408Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T08:41:12.108599Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T08:41:12.108629Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T08:41:12.108634Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:41:12.220911Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T08:41:11.800641Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:41:11.801135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T08:41:11.801161Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:41:11.801232Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:41:11.801241Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:41:11.801244Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:41:11.801248Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:41:11.946408Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:41:12.108599Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:41:12.108629Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:41:12.108634Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:41:12.220911Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T08:41:51.651908Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T08:41:51.651970Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T08:41:51.652335Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T08:41:51.652353Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T08:41:51.652402Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T08:41:51.652409Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T08:41:51.652412Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:41:51.786155Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T08:41:51.937835Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T08:41:51.937860Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T08:41:51.937864Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:41:52.058118Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T08:41:52.209563Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-07-04T08:41:51.651970Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:41:51.652335Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T08:41:51.652353Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:41:51.652402Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:41:51.652409Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:41:51.652412Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:41:51.786155Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:41:51.937835Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:41:51.937860Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:41:51.937864Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:41:52.058118Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:41:52.209563Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
 [2m2025-07-04T08:54:02.157471Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T08:54:02.157577Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T08:54:02.158244Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T08:54:02.158530Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T08:54:02.158825Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T08:54:02.158834Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T08:54:02.158837Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:54:02.327672Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T08:54:02.501006Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T08:54:02.501034Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T08:54:02.501038Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T08:54:02.501040Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:54:02.639109Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T08:54:02.157577Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:54:02.158244Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T08:54:02.158530Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:54:02.158825Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:54:02.158834Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:54:02.158837Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:54:02.327672Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:54:02.501006Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:54:02.501034Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:54:02.501038Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:54:02.501040Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:54:02.639109Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T08:57:33.395691Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T08:57:33.398015Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T08:57:33.400837Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T08:57:33.402049Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T08:57:33.403161Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T08:57:33.403384Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T08:57:33.403388Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T08:57:33.403391Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:57:33.571328Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T08:57:33.733228Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T08:57:33.733254Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T08:57:33.733258Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T08:57:33.853141Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T08:57:33.398015Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:57:33.400837Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T08:57:33.402049Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:57:33.403161Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:57:33.403384Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:57:33.403388Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:57:33.403391Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:57:33.571328Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:57:33.733228Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:57:33.733254Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:57:33.733258Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:57:33.853141Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T09:02:47.740042Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:02:47.740126Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:02:47.740522Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:02:47.740816Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:02:47.740889Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T09:02:47.740898Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:02:47.740901Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:02:47.740904Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:02:47.900111Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:02:48.057536Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:02:48.057583Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:02:48.057590Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:02:48.196990Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T09:02:47.740126Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:02:47.740522Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:02:47.740816Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:02:47.740889Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T09:02:47.740898Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:02:47.740901Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:02:47.740904Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:02:47.900111Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:02:48.057536Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:02:48.057583Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:02:48.057590Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:02:48.196990Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T09:03:25.746693Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:03:25.746765Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:03:25.747147Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:03:25.747168Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:03:25.747228Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T09:03:25.747238Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:03:25.747241Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:03:25.747243Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:03:25.907052Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:03:26.064452Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:03:26.064478Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:03:26.064482Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:03:26.175950Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T09:03:25.746765Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:03:25.747147Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:03:25.747168Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:03:25.747228Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T09:03:25.747238Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:03:25.747241Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:03:25.747243Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:03:25.907052Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:03:26.064452Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:03:26.064478Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:03:26.064482Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:03:26.175950Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T09:04:23.468859Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:04:23.468932Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:04:23.469270Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:04:23.469292Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:04:23.469350Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:04:23.469358Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:04:23.469361Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:04:23.608424Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:04:23.775017Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T09:04:23.775041Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:04:23.775046Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:04:23.775049Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:04:23.897284Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T09:04:23.468932Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:04:23.469270Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:04:23.469292Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:04:23.469350Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:04:23.469358Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:04:23.469361Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:04:23.608424Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:04:23.775017Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T09:04:23.775041Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:04:23.775046Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:04:23.775049Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:04:23.897284Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T09:07:13.693634Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:07:13.693702Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:07:13.694054Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:07:13.694073Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:07:13.694122Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T09:07:13.694129Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:07:13.694132Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:07:13.694135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:07:13.874385Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:07:14.033823Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:07:14.033849Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:07:14.033853Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:07:14.150491Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T09:07:13.693702Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:07:13.694054Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:07:13.694073Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:07:13.694122Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T09:07:13.694129Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:07:13.694132Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:07:13.694135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:07:13.874385Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:07:14.033823Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:07:14.033849Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:07:14.033853Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:07:14.150491Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T09:07:27.790753Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:07:27.790832Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:07:27.791300Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:07:27.791325Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:07:27.791394Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T09:07:27.791401Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:07:27.791404Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:07:27.791408Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:07:27.922176Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:07:28.080171Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:07:28.080197Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:07:28.080201Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:07:28.201947Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T09:07:27.790832Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:07:27.791300Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:07:27.791325Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:07:27.791394Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T09:07:27.791401Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:07:27.791404Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:07:27.791408Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:07:27.922176Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:07:28.080171Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:07:28.080197Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:07:28.080201Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:07:28.201947Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
 [2m2025-07-04T09:07:59.281438Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:07:59.281509Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:07:59.281920Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:07:59.281940Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:07:59.281996Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:07:59.282004Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:07:59.282008Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:07:59.448263Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:07:59.611774Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:07:59.611797Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:07:59.611801Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:07:59.780113Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:07:59.943993Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
+[2m2025-07-04T09:07:59.281509Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:07:59.281920Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:07:59.281940Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:07:59.281996Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:07:59.282004Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:07:59.282008Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:07:59.448263Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:07:59.611774Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:07:59.611797Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:07:59.611801Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:07:59.780113Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:07:59.943993Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
 [2m2025-07-04T09:23:53.204017Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
-[2m2025-07-04T09:23:53.204074Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...    
-[2m2025-07-04T09:23:53.204536Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai    
-[2m2025-07-04T09:23:53.204556Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-07-04T09:23:53.204600Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default    
-[2m2025-07-04T09:23:53.204607Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator    
-[2m2025-07-04T09:23:53.204610Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path    
-[2m2025-07-04T09:23:53.204613Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:23:53.358293Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
-[2m2025-07-04T09:23:53.513980Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer    
-[2m2025-07-04T09:23:53.514020Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path    
-[2m2025-07-04T09:23:53.514024Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-07-04T09:23:53.650143Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path    
+[2m2025-07-04T09:23:53.204074Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T09:23:53.204536Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai
+[2m2025-07-04T09:23:53.204556Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T09:23:53.204600Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T09:23:53.204607Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T09:23:53.204610Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T09:23:53.204613Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:23:53.358293Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T09:23:53.513980Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T09:23:53.514020Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T09:23:53.514024Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T09:23:53.650143Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path

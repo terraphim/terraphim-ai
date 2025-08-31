@@ -22,7 +22,7 @@ fn main() {
     // Create a build configuration using the builder pattern
     let config = BuildConfig::builder()
         .target(BuildTarget::NativeRelease)
-        .features(FeatureSet::from_str("openrouter,typescript").unwrap())
+        .features(FeatureSet::from_string("openrouter,typescript").unwrap())
         .environment("production")
         .build()
         .unwrap();
@@ -46,4 +46,3 @@ fn main() {
 ## License
 
 This project is licensed under the Apache License, Version 2.0.
-

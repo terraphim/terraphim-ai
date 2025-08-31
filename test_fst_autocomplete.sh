@@ -6,8 +6,8 @@ echo
 echo "1. Testing current thesaurus endpoint (HashMap-based):"
 echo "   GET /thesaurus/Terraphim%20Engineer"
 curl -s "http://127.0.0.1:8000/thesaurus/Terraphim%20Engineer" | jq '{
-  status, 
-  thesaurus_count: (.thesaurus | length), 
+  status,
+  thesaurus_count: (.thesaurus | length),
   sample_terms: (.thesaurus | keys | .[0:5])
 }' 2>/dev/null || echo "   Server may not be running"
 
@@ -59,7 +59,7 @@ curl -s "http://127.0.0.1:8000/config" | jq '{
 echo
 echo "7. Expected behavior for FST-based autocomplete:"
 echo "   - Input 'know' should suggest: knowledge graph, knowledge management, etc."
-echo "   - Input 'terr' should suggest: terraphim-graph, terraform, etc." 
+echo "   - Input 'terr' should suggest: terraphim-graph, terraform, etc."
 echo "   - Input 'kg' should suggest: knowledge graph, kg:terraphim-graph, etc."
 echo "   - Fuzzy matching should handle typos: 'knolege' -> 'knowledge'"
 

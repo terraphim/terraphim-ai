@@ -15,9 +15,9 @@ def send_mcp_message(message):
 
 def test_mcp_autocomplete():
     """Test MCP autocomplete functionality with proper protocol handshake"""
-    
+
     print("Starting MCP autocomplete test via stdio transport...")
-    
+
     # Start the MCP server
     env = {"TERRAPHIM_SETTINGS_PATH": "../terraphim_settings/default/settings_local_dev.toml"}
     process = subprocess.Popen(
@@ -29,11 +29,11 @@ def test_mcp_autocomplete():
         cwd=".",
         text=True
     )
-    
+
     try:
         # Wait for server to start
         time.sleep(3)
-        
+
         # Step 1: Send initialization request
         init_request = {
             "jsonrpc": "2.0",
@@ -50,15 +50,15 @@ def test_mcp_autocomplete():
                 }
             }
         }
-        
+
         print("\n1. Sending initialization request...")
         process.stdin.write(send_mcp_message(init_request))
         process.stdin.flush()
-        
+
         # Read response
         response = process.stdout.readline()
         print(f"Response: {response.strip()}")
-        
+
         # Step 2: List available tools
         tools_request = {
             "jsonrpc": "2.0",
@@ -66,14 +66,14 @@ def test_mcp_autocomplete():
             "method": "tools/list",
             "params": {}
         }
-        
+
         print("\n2. Listing available tools...")
         process.stdin.write(send_mcp_message(tools_request))
         process.stdin.flush()
-        
+
         response = process.stdout.readline()
         print(f"Response: {response.strip()}")
-        
+
         # Step 3: Build autocomplete index
         build_index_request = {
             "jsonrpc": "2.0",
@@ -86,14 +86,14 @@ def test_mcp_autocomplete():
                 }
             }
         }
-        
+
         print("\n3. Building autocomplete index...")
         process.stdin.write(send_mcp_message(build_index_request))
         process.stdin.flush()
-        
+
         response = process.stdout.readline()
         print(f"Response: {response.strip()}")
-        
+
         # Step 4: Test autocomplete with snippets
         autocomplete_request = {
             "jsonrpc": "2.0",
@@ -108,14 +108,14 @@ def test_mcp_autocomplete():
                 }
             }
         }
-        
+
         print("\n4. Testing autocomplete with snippets...")
         process.stdin.write(send_mcp_message(autocomplete_request))
         process.stdin.flush()
-        
+
         response = process.stdout.readline()
         print(f"Response: {response.strip()}")
-        
+
         # Step 5: Test autocomplete terms
         terms_request = {
             "jsonrpc": "2.0",
@@ -130,16 +130,16 @@ def test_mcp_autocomplete():
                 }
             }
         }
-        
+
         print("\n5. Testing autocomplete terms...")
         process.stdin.write(send_mcp_message(terms_request))
         process.stdin.flush()
-        
+
         response = process.stdout.readline()
         print(f"Response: {response.strip()}")
-        
+
         print("\nTest completed successfully!")
-        
+
     except Exception as e:
         print(f"Error during test: {e}")
     finally:

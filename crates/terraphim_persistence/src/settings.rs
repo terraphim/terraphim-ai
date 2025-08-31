@@ -24,7 +24,6 @@ use opendal::Operator;
 use opendal::Result as OpendalResult;
 use opendal::Scheme;
 
-use log::debug;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
@@ -70,21 +69,6 @@ pub fn resolve_relative_path(path: &Path) -> Cow<Path> {
     result.into()
 }
 
-/// Ensure directory exists for storage backends that require it
-fn ensure_directory_exists(path: &str) -> Result<()> {
-    if !path.is_empty() {
-        log::info!("🔧 Creating directory: {}", path);
-        std::fs::create_dir_all(path).map_err(|e| {
-            Error::OpenDal(opendal::Error::new(
-                opendal::ErrorKind::Unexpected,
-                &format!("Failed to create directory '{}': {}", path, e)
-            ))
-        })?;
-        log::info!("✅ Successfully created directory: {}", path);
-    }
-    Ok(())
-}
-
 /// Ensure SQLite table exists for OpenDAL
 #[cfg(feature = "services-sqlite")]
 fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Result<()> {
@@ -94,50 +78,66 @@ fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Resu
     } else {
         connection_string
     };
-    
-    log::info!("🔧 Ensuring SQLite table '{}' exists in database: {}", table_name, db_path);
-    
+
+    log::info!(
+        "🔧 Ensuring SQLite table '{}' exists in database: {}",
+        table_name,
+        db_path
+    );
+
     // Create the database file and table if they don't exist
     let connection = rusqlite::Connection::open(db_path).map_err(|e| {
-        Error::OpenDal(opendal::Error::new(
+        Error::OpenDal(Box::new(opendal::Error::new(
             opendal::ErrorKind::Unexpected,
-            &format!("Failed to open SQLite database '{}': {}", db_path, e)
-        ))
+            &format!("Failed to open SQLite database '{}': {}", db_path, e),
+        )))
     })?;
-    
+
     // Enable WAL mode for concurrent access
-    connection.pragma_update(None, "journal_mode", "WAL").map_err(|e| {
-        Error::OpenDal(opendal::Error::new(
-            opendal::ErrorKind::Unexpected,
-            &format!("Failed to enable WAL mode: {}", e)
-        ))
-    })?;
-    
+    connection
+        .pragma_update(None, "journal_mode", "WAL")
+        .map_err(|e| {
+            Error::OpenDal(Box::new(opendal::Error::new(
+                opendal::ErrorKind::Unexpected,
+                &format!("Failed to enable WAL mode: {}", e),
+            )))
+        })?;
+
     // Set synchronous mode to NORMAL for better performance
-    connection.pragma_update(None, "synchronous", "NORMAL").map_err(|e| {
-        Error::OpenDal(opendal::Error::new(
-            opendal::ErrorKind::Unexpected,
-            &format!("Failed to set synchronous mode: {}", e)
-        ))
-    })?;
-    
+    connection
+        .pragma_update(None, "synchronous", "NORMAL")
+        .map_err(|e| {
+            Error::OpenDal(Box::new(opendal::Error::new(
+                opendal::ErrorKind::Unexpected,
+                &format!("Failed to set synchronous mode: {}", e),
+            )))
+        })?;
+
     // Create table with key-value schema expected by OpenDAL
     let create_table_sql = format!(
         "CREATE TABLE IF NOT EXISTS {} (key TEXT PRIMARY KEY, value BLOB)",
         table_name
     );
-    
+
     connection.execute(&create_table_sql, []).map_err(|e| {
-        Error::OpenDal(opendal::Error::new(
+        Error::OpenDal(Box::new(opendal::Error::new(
             opendal::ErrorKind::Unexpected,
-            &format!("Failed to create SQLite table '{}': {}", table_name, e)
-        ))
+            &format!("Failed to create SQLite table '{}': {}", table_name, e),
+        )))
     })?;
-    
+
     log::info!("✅ SQLite table '{}' ready", table_name);
     Ok(())
 }
 
+/// Create a memory operator as fallback
+#[allow(clippy::result_large_err)]
+fn create_memory_operator() -> OpendalResult<Operator> {
+    let builder = services::Memory::default();
+    Ok(Operator::new(builder)?
+        .layer(LoggingLayer::default())
+        .finish())
+}
 
 pub async fn parse_profile(
     settings: &DeviceSettings,
@@ -173,35 +173,62 @@ pub async fn parse_profile(
     let scheme = Scheme::from_str(svc)?;
     log::info!("🔧 Profile '{}' using scheme: {:?}", profile_name, scheme);
     let op = match scheme {
-        Scheme::Azblob => Operator::from_map::<services::Azblob>(profile.clone())?.finish(),
-        Scheme::Azdls => Operator::from_map::<services::Azdls>(profile.clone())?.finish(),
+        Scheme::Azblob => {
+            log::warn!("Azure Blob Storage not supported in this build");
+            create_memory_operator()?
+        }
+        Scheme::Azdls => {
+            log::warn!("Azure Data Lake Storage not supported in this build");
+            create_memory_operator()?
+        }
         #[cfg(feature = "services-dashmap")]
         Scheme::Dashmap => {
             // Ensure directory exists for DashMap
             if let Some(root) = profile.get("root") {
-                ensure_directory_exists(root)?;
+                std::fs::create_dir_all(root).map_err(|e| {
+                    Error::OpenDal(Box::new(opendal::Error::new(
+                        opendal::ErrorKind::Unexpected,
+                        &format!("Failed to create directory '{}': {}", root, e),
+                    )))
+                })?;
             }
             let builder = services::Dashmap::default();
             // Init an operator
-            let op = Operator::new(builder)?
+            Operator::new(builder)?
                 // Init with logging layer enabled.
                 .layer(LoggingLayer::default())
-                .finish();
-            debug!("operator: {op:?}");
-            op
+                .finish()
         }
         #[cfg(feature = "services-atomicserver")]
         Scheme::Atomicserver => {
             Operator::from_map::<services::Atomicserver>(profile.clone())?.finish()
         }
-        Scheme::Gcs => Operator::from_map::<services::Gcs>(profile.clone())?.finish(),
-        Scheme::Ghac => Operator::from_map::<services::Ghac>(profile.clone())?.finish(),
-        Scheme::Http => Operator::from_map::<services::Http>(profile.clone())?.finish(),
+        Scheme::Gcs => {
+            log::warn!("Google Cloud Storage not supported in this build");
+            create_memory_operator()?
+        }
+        Scheme::Ghac => {
+            log::warn!("GitHub Actions Cache not supported in this build");
+            create_memory_operator()?
+        }
+        Scheme::Http => {
+            log::warn!("HTTP service not supported in this build");
+            create_memory_operator()?
+        }
         #[cfg(feature = "services-ipfs")]
         Scheme::Ipfs => Operator::from_map::<services::Ipfs>(profile.clone())?.finish(),
-        Scheme::Ipmfs => Operator::from_map::<services::Ipmfs>(profile.clone())?.finish(),
-        Scheme::Obs => Operator::from_map::<services::Obs>(profile.clone())?.finish(),
-        Scheme::Oss => Operator::from_map::<services::Oss>(profile.clone())?.finish(),
+        Scheme::Ipmfs => {
+            log::warn!("IPFS MFS not supported in this build");
+            create_memory_operator()?
+        }
+        Scheme::Obs => {
+            log::warn!("Huawei Object Storage not supported in this build");
+            create_memory_operator()?
+        }
+        Scheme::Oss => {
+            log::warn!("Alibaba Object Storage not supported in this build");
+            create_memory_operator()?
+        }
         #[cfg(feature = "services-redis")]
         Scheme::Redis => Operator::from_map::<services::Redis>(profile.clone())?.finish(),
         #[cfg(feature = "services-rocksdb")]
@@ -213,28 +240,39 @@ pub async fn parse_profile(
                 if let Some(parent) = std::path::Path::new(datadir).parent() {
                     let parent_str = parent.to_string_lossy();
                     if !parent_str.is_empty() {
-                        ensure_directory_exists(&parent_str)?;
+                        std::fs::create_dir_all(&*parent_str).map_err(|e| {
+                            Error::OpenDal(Box::new(opendal::Error::new(
+                                opendal::ErrorKind::Unexpected,
+                                &format!("Failed to create directory '{}': {}", parent_str, e),
+                            )))
+                        })?;
                     }
                 }
             }
             Operator::from_map::<services::Redb>(profile.clone())?.finish()
-        },
+        }
         #[cfg(feature = "services-sqlite")]
         Scheme::Sqlite => {
             // Ensure directory exists for SQLite
             if let Some(datadir) = profile.get("datadir") {
-                ensure_directory_exists(datadir)?;
+                std::fs::create_dir_all(datadir).map_err(|e| {
+                    Error::OpenDal(Box::new(opendal::Error::new(
+                        opendal::ErrorKind::Unexpected,
+                        &format!("Failed to create directory '{}': {}", datadir, e),
+                    )))
+                })?;
             }
-            
+
             // Ensure SQLite table exists before OpenDAL tries to use it
-            if let (Some(connection_string), Some(table_name)) = 
-                (profile.get("connection_string"), profile.get("table")) {
+            if let (Some(connection_string), Some(table_name)) =
+                (profile.get("connection_string"), profile.get("table"))
+            {
                 ensure_sqlite_table_exists(connection_string, table_name)?;
             }
-            
+
             // SQLite configuration with proper field names
             let mut sqlite_profile = profile.clone();
-            
+
             // Ensure required fields are set with proper defaults
             if !sqlite_profile.contains_key("root") {
                 sqlite_profile.insert("root".to_string(), "/".to_string());
@@ -245,33 +283,35 @@ pub async fn parse_profile(
             if !sqlite_profile.contains_key("value_field") {
                 sqlite_profile.insert("value_field".to_string(), "value".to_string());
             }
-            
+
             Operator::from_map::<services::Sqlite>(sqlite_profile)?.finish()
-        },
-        Scheme::S3 => {
-            match Operator::from_map::<services::S3>(profile.clone()) {
-                Ok(builder) => builder.finish(),
-                Err(e) => {
-                    log::warn!("Failed to create S3 operator (missing AWS credentials?): {:?}", e);
-                    log::info!("Falling back to memory operator for profile: {}", profile_name);
-                    let builder = services::Memory::default();
-                    Operator::new(builder)?
-                        .layer(LoggingLayer::default())
-                        .finish()
-                }
+        }
+        #[cfg(feature = "s3")]
+        Scheme::S3 => match Operator::from_map::<services::S3>(profile.clone()) {
+            Ok(builder) => builder.finish(),
+            Err(e) => {
+                log::warn!("Failed to create S3 operator: {:?}", e);
+                log::info!("Falling back to memory operator");
+                create_memory_operator()?
             }
         },
-        Scheme::Webdav => Operator::from_map::<services::Webdav>(profile.clone())?.finish(),
-        Scheme::Webhdfs => Operator::from_map::<services::Webhdfs>(profile.clone())?.finish(),
+        #[cfg(not(feature = "s3"))]
+        Scheme::S3 => {
+            log::warn!("S3 support not compiled in this binary");
+            log::info!("Using memory operator instead");
+            create_memory_operator()?
+        }
+        Scheme::Webdav => {
+            log::warn!("WebDAV not supported in this build");
+            create_memory_operator()?
+        }
+        Scheme::Webhdfs => {
+            log::warn!("WebHDFS not supported in this build");
+            create_memory_operator()?
+        }
         _ => {
             log::info!("Got request for {scheme} operator; initializing in-memory operator.");
-            let builder = services::Memory::default();
-
-            // Init operator
-            Operator::new(builder)?
-                // Init with logging layer enabled.
-                .layer(LoggingLayer::default())
-                .finish()
+            create_memory_operator()?
         }
     };
     // Benchmark the operator I/O speed
@@ -322,7 +362,7 @@ mod tests {
         async fn load(&mut self) -> Result<Self> {
             let op = &self.load_config().await?.1;
             let key = self.get_key();
-            self.load_from_operator(&key, &op).await
+            self.load_from_operator(&key, op).await
         }
 
         fn get_key(&self) -> String {
@@ -506,45 +546,59 @@ mod tests {
 
     /// Test that directories are created automatically for operators
     #[tokio::test]
-    #[serial_test::serial] 
+    #[serial_test::serial]
     async fn test_operators_create_directories() -> Result<()> {
         use tempfile::TempDir;
         use terraphim_types::Document;
-        
+
         // Create temporary directory for test
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
-        
+
         // Create test settings with custom paths in temporary directory
         let sqlite_path = temp_path.join("test_sqlite");
         let redb_path = temp_path.join("test_redb");
         let dashmap_path = temp_path.join("test_dashmap");
-        
+
         let mut profiles = std::collections::HashMap::new();
-        
+
         // SQLite profile with proper configuration
         let mut sqlite_profile = std::collections::HashMap::new();
         sqlite_profile.insert("type".to_string(), "sqlite".to_string());
-        sqlite_profile.insert("connection_string".to_string(), 
-            format!("{}/test.db", sqlite_path.to_string_lossy()));
-        sqlite_profile.insert("datadir".to_string(), sqlite_path.to_string_lossy().to_string());
+        sqlite_profile.insert(
+            "connection_string".to_string(),
+            format!("{}/test.db", sqlite_path.to_string_lossy()),
+        );
+        sqlite_profile.insert(
+            "datadir".to_string(),
+            sqlite_path.to_string_lossy().to_string(),
+        );
         sqlite_profile.insert("table".to_string(), "test_table".to_string());
         profiles.insert("test_sqlite".to_string(), sqlite_profile);
-        
+
         // ReDB profile with proper configuration
         let mut redb_profile = std::collections::HashMap::new();
         redb_profile.insert("type".to_string(), "redb".to_string());
-        redb_profile.insert("datadir".to_string(), redb_path.to_string_lossy().to_string());
+        redb_profile.insert(
+            "datadir".to_string(),
+            redb_path.to_string_lossy().to_string(),
+        );
         redb_profile.insert("table".to_string(), "test_table".to_string());
-        redb_profile.insert("path".to_string(), format!("{}/test.redb", redb_path.to_string_lossy()));
+        redb_profile.insert(
+            "path".to_string(),
+            format!("{}/test.redb", redb_path.to_string_lossy()),
+        );
         profiles.insert("test_redb".to_string(), redb_profile);
-        
+
         // DashMap profile
         let mut dashmap_profile = std::collections::HashMap::new();
         dashmap_profile.insert("type".to_string(), "dashmap".to_string());
-        dashmap_profile.insert("root".to_string(), dashmap_path.to_string_lossy().to_string());
+        dashmap_profile.insert(
+            "root".to_string(),
+            dashmap_path.to_string_lossy().to_string(),
+        );
         profiles.insert("test_dashmap".to_string(), dashmap_profile);
-        
+
         let settings = DeviceSettings {
             server_hostname: "localhost:8000".to_string(),
             api_endpoint: "http://localhost:8000/api".to_string(),
@@ -552,12 +606,12 @@ mod tests {
             default_data_path: temp_path.to_string_lossy().to_string(),
             profiles,
         };
-        
+
         // Test that init_device_storage_with_settings creates directories and operators
         use crate::init_device_storage_with_settings;
         let storage = init_device_storage_with_settings(settings).await?;
         let operators = storage.ops;
-        
+
         // Verify directories were created (only check for ones that were actually created)
         if operators.contains_key("test_sqlite") {
             assert!(sqlite_path.exists(), "SQLite directory should be created");
@@ -565,21 +619,21 @@ mod tests {
         } else {
             log::warn!("SQLite operator not available (feature not enabled)");
         }
-        
+
         if operators.contains_key("test_redb") {
             assert!(redb_path.exists(), "ReDB directory should be created");
             log::info!("✅ ReDB directory created successfully");
         } else {
             log::warn!("ReDB operator not available (feature not enabled)");
         }
-        
+
         if operators.contains_key("test_dashmap") {
             assert!(dashmap_path.exists(), "DashMap directory should be created");
             log::info!("✅ DashMap directory created successfully");
         } else {
             log::warn!("DashMap operator not available (feature not enabled)");
         }
-        
+
         // Test that we can save a document to each operator
         let test_doc = Document {
             id: "test_document".to_string(),
@@ -592,7 +646,7 @@ mod tests {
             tags: None,
             rank: None,
         };
-        
+
         // Save document to each operator to verify they work
         for (name, (op, _)) in &operators {
             let key = format!("document_{}.json", test_doc.id);
@@ -602,7 +656,7 @@ mod tests {
                 Err(e) => log::warn!("Failed to save to {}: {:?}", name, e),
             }
         }
-        
+
         Ok(())
     }
 }

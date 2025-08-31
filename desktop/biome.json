@@ -1,8 +1,5 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -13,16 +10,14 @@
       },
       "style": {
         "useConst": "error",
-        "useTemplate": "error",
-        "noVar": "error"
+        "useTemplate": "error"
       },
       "suspicious": {
         "noDebugger": "error",
-        "noConsoleLog": "warn"
+        "noConsole": "warn"
       },
       "complexity": {
-        "noExtraBooleanCast": "error",
-        "noMultipleSpacesInRegularExpressionLiterals": "error"
+        "noExtraBooleanCast": "error"
       },
       "performance": {
         "noDelete": "error"
@@ -60,7 +55,7 @@
     }
   },
   "files": {
-    "include": [
+    "includes": [
       "src/**/*.js",
       "src/**/*.ts",
       "src/**/*.tsx",
@@ -71,34 +66,25 @@
       "*.json",
       "*.jsonc"
     ],
-    "ignore": [
-      "node_modules/**/*",
-      "dist/**/*",
-      ".svelte-kit/**/*",
-      "build/**/*",
-      "src-tauri/target/**/*",
-      "*.d.ts",
-      ".DS_Store",
-      "*.log"
-    ]
+    "ignoreUnknown": false
   },
   "overrides": [
     {
-      "include": ["src/**/*.svelte"],
+      "includes": ["src/**/*.svelte"],
       "linter": {
         "rules": {
           "suspicious": {
-            "noConsoleLog": "off"
+            "noConsole": "off"
           }
         }
       }
     },
     {
-      "include": ["src/**/*.test.ts", "src/**/*.test.js", "src/**/*.spec.ts", "src/**/*.spec.js"],
+      "includes": ["src/**/*.test.ts", "src/**/*.test.js", "src/**/*.spec.ts", "src/**/*.spec.js"],
       "linter": {
         "rules": {
           "suspicious": {
-            "noConsoleLog": "off"
+            "noConsole": "off"
           }
         }
       }

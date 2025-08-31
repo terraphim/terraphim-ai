@@ -163,4 +163,4 @@ This test validates the integration between:
 - **Atomic Server integration** (creating and searching documents)
 - **Terraphim middleware** (using `AtomicHaystackIndexer`)
 
-The test ensures that the complete pipeline from filesystem to search results works correctly, which is essential for the Terraphim desktop application's ability to import and search local documents through Atomic Server. 
+The test ensures that the complete pipeline from filesystem to search results works correctly, which is essential for the Terraphim desktop application's ability to import and search local documents through Atomic Server.

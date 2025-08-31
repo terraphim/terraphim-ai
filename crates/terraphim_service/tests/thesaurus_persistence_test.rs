@@ -1,5 +1,5 @@
 //! Comprehensive test for thesaurus persistence
-//! 
+//!
 //! This test validates that thesaurus objects can be properly saved to and loaded from
 //! persistence, covering the full lifecycle including KG building, saving, and retrieval.
 
@@ -10,7 +10,7 @@ use tracing::Level;
 
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_service::TerraphimService;
-use terraphim_types::{RoleName, SearchQuery, NormalizedTermValue};
+use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
 #[tokio::test]
 #[serial]
@@ -47,15 +47,21 @@ async fn test_thesaurus_full_persistence_lifecycle() {
     // First load - should build from KG files
     println!("  🔍 First load: Building thesaurus from KG files");
     let first_load_result = timeout(
-        Duration::from_secs(60), 
-        terraphim_service.ensure_thesaurus_loaded(&role_name)
+        Duration::from_secs(60),
+        terraphim_service.ensure_thesaurus_loaded(&role_name),
     )
     .await
     .expect("First thesaurus load timed out")
     .expect("First thesaurus load failed");
 
-    println!("  ✅ First load succeeded: {} entries", first_load_result.len());
-    assert!(!first_load_result.is_empty(), "Thesaurus should not be empty after building from KG");
+    println!(
+        "  ✅ First load succeeded: {} entries",
+        first_load_result.len()
+    );
+    assert!(
+        !first_load_result.is_empty(),
+        "Thesaurus should not be empty after building from KG"
+    );
 
     // Verify specific terms from our KG exist
     let expected_terms = vec!["haystack", "service", "terraphim-graph"];
@@ -71,19 +77,22 @@ async fn test_thesaurus_full_persistence_lifecycle() {
     // Step 4: Test persistence by creating a new service instance
     println!("🔄 Step 4: Testing persistence with new service instance");
     let mut new_service = TerraphimService::new(config_state.clone());
-    
+
     // Second load - should load from persistence
     println!("  🔍 Second load: Loading thesaurus from persistence");
     let second_load_result = timeout(
         Duration::from_secs(30),
-        new_service.ensure_thesaurus_loaded(&role_name)
+        new_service.ensure_thesaurus_loaded(&role_name),
     )
     .await
     .expect("Second thesaurus load timed out")
     .expect("Second thesaurus load failed");
 
-    println!("  ✅ Second load succeeded: {} entries", second_load_result.len());
-    
+    println!(
+        "  ✅ Second load succeeded: {} entries",
+        second_load_result.len()
+    );
+
     // Step 5: Verify consistency between loads
     println!("🔍 Step 5: Verifying consistency between loads");
     assert_eq!(
@@ -97,7 +106,7 @@ async fn test_thesaurus_full_persistence_lifecycle() {
         let normalized_term = NormalizedTermValue::from(term.to_string());
         let first_has = first_load_result.get(&normalized_term).is_some();
         let second_has = second_load_result.get(&normalized_term).is_some();
-        
+
         if first_has {
             assert!(second_has, "Term '{}' should persist between loads", term);
             println!("    ✓ Term '{}' persisted correctly", term);
@@ -111,32 +120,30 @@ async fn test_thesaurus_full_persistence_lifecycle() {
         role: Some(role_name.clone()),
         skip: None,
         limit: Some(5),
+        ..Default::default()
     };
 
-    let search_result = timeout(
-        Duration::from_secs(30),
-        new_service.search(&search_query)
-    )
-    .await
-    .expect("Search timed out")
-    .expect("Search failed");
+    let search_result = timeout(Duration::from_secs(30), new_service.search(&search_query))
+        .await
+        .expect("Search timed out")
+        .expect("Search failed");
 
-    println!("  📊 Search with persisted thesaurus: {} results", search_result.len());
-    
+    println!(
+        "  📊 Search with persisted thesaurus: {} results",
+        search_result.len()
+    );
+
     // Step 7: Verify the rolegraph is properly updated in config_state
     println!("📋 Step 7: Verifying rolegraph in config_state");
     let config_data = new_service.fetch_config().await;
-    
+
     assert!(
         config_data.roles.contains_key(&role_name),
         "Terraphim Engineer role should exist in config"
     );
 
     let terraphim_role = &config_data.roles[&role_name];
-    assert_eq!(
-        terraphim_role.name, role_name,
-        "Role name should match"
-    );
+    assert_eq!(terraphim_role.name, role_name, "Role name should match");
 
     println!("🎉 All persistence tests passed!");
     println!("✅ Thesaurus builds correctly from KG files");
@@ -191,7 +198,10 @@ async fn test_thesaurus_persistence_error_handling() {
 
     match result {
         Ok(thesaurus) => {
-            println!("    ✅ Successfully loaded thesaurus: {} entries", thesaurus.len());
+            println!(
+                "    ✅ Successfully loaded thesaurus: {} entries",
+                thesaurus.len()
+            );
         }
         Err(e) => {
             println!("    ❌ Failed to load thesaurus: {:?}", e);
@@ -202,7 +212,7 @@ async fn test_thesaurus_persistence_error_handling() {
     println!("✅ Error handling test completed");
 }
 
-#[tokio::test]  
+#[tokio::test]
 #[serial]
 async fn test_thesaurus_memory_vs_persistence() {
     println!("🧪 Testing thesaurus memory vs persistence behavior");
@@ -214,7 +224,7 @@ async fn test_thesaurus_memory_vs_persistence() {
         .with_max_level(Level::INFO)
         .try_init();
 
-    // Step 1: Initialize memory-only persistence 
+    // Step 1: Initialize memory-only persistence
     terraphim_persistence::DeviceStorage::init_memory_only()
         .await
         .expect("Failed to initialize memory-only persistence");
@@ -234,25 +244,29 @@ async fn test_thesaurus_memory_vs_persistence() {
 
     // Step 3: Load thesaurus multiple times to test stability
     println!("  🔄 Testing multiple loads for stability");
-    
+
     for i in 1..=3 {
         println!("    🔍 Load attempt {}", i);
-        
+
         let result = timeout(
             Duration::from_secs(30),
-            service.ensure_thesaurus_loaded(&role_name)
+            service.ensure_thesaurus_loaded(&role_name),
         )
         .await
         .expect("Load timed out")
         .expect("Load failed");
 
         println!("      ✅ Load {} succeeded: {} entries", i, result.len());
-        assert!(!result.is_empty(), "Thesaurus should not be empty on load {}", i);
-        
+        assert!(
+            !result.is_empty(),
+            "Thesaurus should not be empty on load {}",
+            i
+        );
+
         // Verify some expected terms
         let haystack_term = NormalizedTermValue::from("haystack".to_string());
         let service_term = NormalizedTermValue::from("service".to_string());
-        
+
         if result.get(&haystack_term).is_some() {
             println!("      ✓ Contains 'haystack'");
         }

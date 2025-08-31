@@ -33,7 +33,7 @@ echo "Searching for 'graph'..."
 echo "$SEARCH_GRAPH" | timeout 10s ./target/debug/terraphim_mcp_server --profile desktop 2>/dev/null | head -5 | tail -4
 
 echo
-echo "🧪 Test 2: MCP Server with Server Profile" 
+echo "🧪 Test 2: MCP Server with Server Profile"
 echo "Expected: Should find different results due to remote KG"
 echo
 
@@ -52,16 +52,16 @@ echo "🧪 Test 3: Desktop Binary in MCP Mode"
 echo "Expected: Should match desktop profile results"
 echo
 
-# Test desktop binary  
+# Test desktop binary
 echo "Initializing..."
 echo "$INIT_MSG" | timeout 10s ./target/debug/terraphim-ai-desktop mcp-server 2>/dev/null | head -1
 
 echo "Searching for 'testing'..."
 echo "$SEARCH_TESTING" | timeout 10s ./target/debug/terraphim-ai-desktop mcp-server 2>/dev/null | head -5 | tail -4
 
-echo "Searching for 'graph'..."  
+echo "Searching for 'graph'..."
 echo "$SEARCH_GRAPH" | timeout 10s ./target/debug/terraphim-ai-desktop mcp-server 2>/dev/null | head -5 | tail -4
 
 echo
 echo "✅ Role search behavior testing complete"
-echo "Compare the results above to verify role-specific search functionality" 
+echo "Compare the results above to verify role-specific search functionality"

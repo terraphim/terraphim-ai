@@ -37,7 +37,7 @@ build-kernel:
   ENV DEBIAN_FRONTEND noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN true
   RUN apt-get update
-  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget 
+  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget
   WORKDIR /opt/linux.git
   COPY +code/linux.git .
   RUN wget --no-check-certificate https://raw.githubusercontent.com/firecracker-microvm/firecracker/main/resources/guest_configs/microvm-kernel-ci-$ARCH-5.10.config -O .config
@@ -89,7 +89,7 @@ bionic-image:
       build-essential \
       python3 \
       python3-pip
-    RUN systemctl enable redis 
+    RUN systemctl enable redis
     RUN apt-get clean && rm -rf /var/lib/apt/lists/*
     RUN mkdir "/etc/systemd/system/serial-getty@ttyS0.service.d/"
     # COPY autologin.conf "/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf"
@@ -109,7 +109,7 @@ bionic-terraphim:
     FROM +bionic-image
     ENV DEBIAN_FRONTEND noninteractive
     ENV DEBCONF_NONINTERACTIVE_SEEN true
-    RUN useradd --no-log-init --create-home --shell /bin/bash --home-dir /terraphim terraphim 
+    RUN useradd --no-log-init --create-home --shell /bin/bash --home-dir /terraphim terraphim
     COPY scripts/cmdline.sh /usr/bin/cmdline.sh
     COPY --dir scripts /opt/rediscluster
     COPY scripts/rgcluster.service /etc/systemd/system/

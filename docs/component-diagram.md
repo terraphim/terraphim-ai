@@ -18,17 +18,17 @@ graph TB
         CONFIG[terraphim_config<br/>⚙️ Configuration Management]
         SETTINGS[terraphim_settings<br/>🔧 Settings & Environment]
         PERSISTENCE[terraphim_persistence<br/>💾 Data Persistence Layer]
-        
+
         AUTOMATA[terraphim_automata<br/>🤖 FST-based Autocomplete & Matching]
         ROLEGRAPH[terraphim_rolegraph<br/>🕸️ Knowledge Graph & Role-based Search]
         MIDDLEWARE[terraphim_middleware<br/>🔗 Integration & Indexing Services]
         SERVICE[terraphim_service<br/>🎯 Core Business Logic & Search]
-        
+
         ATOMIC_CLIENT[terraphim_atomic_client<br/>🔌 Atomic Server Integration]
         MCP_SERVER[terraphim_mcp_server<br/>🤝 MCP Protocol Server]
         BUILD_ARGS[terraphim_build_args<br/>🔨 Build-time Configuration]
         MARKDOWN_PARSER[terraphim-markdown-parser<br/>📝 Markdown Processing]
-        
+
         ONEPASSWORD[terraphim_onepassword_cli<br/>🔐 1Password CLI Integration]
     end
 
@@ -230,4 +230,4 @@ graph TB
 - **Type Safety**: Shared types ensure consistency across components
 - **Async Runtime**: Tokio-based async operations throughout
 - **Cross-Platform**: Support for desktop, web, and Node.js environments
-- **Extensible**: Plugin-based architecture with MCP server support 
+- **Extensible**: Plugin-based architecture with MCP server support

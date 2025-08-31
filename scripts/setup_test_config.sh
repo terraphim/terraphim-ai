@@ -43,14 +43,14 @@ if command -v envsubst >/dev/null 2>&1; then
     envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
 else
     echo "📝 envsubst not found, using sed for substitution..."
-    
+
     # Manual substitution using sed
     cp "$TEMPLATE_FILE" "$OUTPUT_FILE"
     sed -i.bak "s|\${ATOMIC_SERVER_URL}|$ATOMIC_SERVER_URL|g" "$OUTPUT_FILE"
     sed -i.bak "s|\${ATOMIC_SERVER_SECRET}|$ATOMIC_SERVER_SECRET|g" "$OUTPUT_FILE"
     sed -i.bak "s|\${OPENROUTER_API_KEY}|$OPENROUTER_API_KEY|g" "$OUTPUT_FILE"
     sed -i.bak "s|\${OPENROUTER_MODEL}|$OPENROUTER_MODEL|g" "$OUTPUT_FILE"
-    
+
     # Clean up backup files
     rm -f "$OUTPUT_FILE.bak"
 fi
@@ -112,4 +112,4 @@ echo ""
 echo "🎉 Test configuration setup complete!"
 echo "   Use the following file for testing: $OUTPUT_FILE"
 echo "   Test info available in: test_config_info.json"
-echo "" 
+echo ""

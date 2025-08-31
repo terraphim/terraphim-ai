@@ -122,11 +122,11 @@ pub mod wasm {
     ///
     /// A Result containing the resource as a JSON value or an error if retrieval fails
     pub async fn get_resource(subject: &str, config: &Config) -> Result<Value> {
-        let mut opts = RequestInit::new();
-        opts.method("GET");
-        opts.mode(RequestMode::Cors);
+        let opts = RequestInit::new();
+        opts.set_method("GET");
+        opts.set_mode(RequestMode::Cors);
 
-        let mut headers = web_sys::Headers::new()
+        let headers = web_sys::Headers::new()
             .map_err(|e| AtomicError::Api(format!("Failed to create headers: {:?}", e)))?;
         headers
             .append("Accept", "application/ad+json")
@@ -137,12 +137,17 @@ pub mod wasm {
             let auth_headers = get_authentication_headers(agent, subject, "GET")?;
             for (key, value) in auth_headers.iter() {
                 headers
-                    .append(key, value)
+                    .append(
+                        key.as_str(),
+                        value.to_str().map_err(|e| {
+                            AtomicError::Api(format!("Invalid header value: {:?}", e))
+                        })?,
+                    )
                     .map_err(|e| AtomicError::Api(format!("Failed to append header: {:?}", e)))?;
             }
         }
 
-        opts.headers(&headers);
+        opts.set_headers(&headers);
 
         let request = Request::new_with_str_and_init(subject, &opts)
             .map_err(|e| AtomicError::Api(format!("Failed to create request: {:?}", e)))?;
@@ -167,7 +172,7 @@ pub mod wasm {
             if let Ok(size) = content_length.parse::<usize>() {
                 if size > MAX_RESPONSE_SIZE {
                     return Err(AtomicError::Api(format!(
-                        "Response too large: {} bytes (max {})", 
+                        "Response too large: {} bytes (max {})",
                         size, MAX_RESPONSE_SIZE
                     )));
                 }
@@ -175,22 +180,25 @@ pub mod wasm {
         }
 
         // Get the response as text first to check size
-        let text_promise = resp.text()
+        let text_promise = resp
+            .text()
             .map_err(|e| AtomicError::Api(format!("Failed to get response text: {:?}", e)))?;
         let text_js = JsFuture::from(text_promise)
             .await
             .map_err(|e| AtomicError::Api(format!("Failed to get response text: {:?}", e)))?;
-        let text = text_js.as_string()
+        let text = text_js
+            .as_string()
             .ok_or_else(|| AtomicError::Api("Response is not a string".to_string()))?;
-        
+
         // Check text size before parsing
         if text.len() > MAX_RESPONSE_SIZE {
             return Err(AtomicError::Api(format!(
-                "Response too large: {} bytes (max {})", 
-                text.len(), MAX_RESPONSE_SIZE
+                "Response too large: {} bytes (max {})",
+                text.len(),
+                MAX_RESPONSE_SIZE
             )));
         }
-        
+
         // Parse JSON from the text
         let value: Value = serde_json::from_str(&text)
             .map_err(|e| AtomicError::Api(format!("Failed to parse JSON: {}", e)))?;
@@ -208,26 +216,27 @@ pub mod wasm {
     ///
     /// A Result containing () or an error if the commit fails
     pub async fn send_commit(commit: &Commit, config: &Config) -> Result<()> {
-        let mut opts = RequestInit::new();
-        opts.method("POST");
-        opts.mode(RequestMode::Cors);
+        let opts = RequestInit::new();
+        opts.set_method("POST");
+        opts.set_mode(RequestMode::Cors);
 
         let url = format!("{}/commit", config.server_url);
 
         let commit_json_str = serde_json::to_string(commit)?;
-        
+
         // Check commit size before sending
         if commit_json_str.len() > MAX_COMMIT_SIZE {
             return Err(AtomicError::Api(format!(
-                "Commit too large: {} bytes (max {})", 
-                commit_json_str.len(), MAX_COMMIT_SIZE
+                "Commit too large: {} bytes (max {})",
+                commit_json_str.len(),
+                MAX_COMMIT_SIZE
             )));
         }
-        
-        let commit_json = JsValue::from_str(&commit_json_str);
-        opts.body(Some(&commit_json));
 
-        let mut headers = web_sys::Headers::new()
+        let commit_json = JsValue::from_str(&commit_json_str);
+        opts.set_body(&commit_json);
+
+        let headers = web_sys::Headers::new()
             .map_err(|e| AtomicError::Api(format!("Failed to create headers: {:?}", e)))?;
         headers
             .append("Content-Type", "application/json")
@@ -235,7 +244,7 @@ pub mod wasm {
         headers
             .append("Accept", "application/ad+json")
             .map_err(|e| AtomicError::Api(format!("Failed to append header: {:?}", e)))?;
-        opts.headers(&headers);
+        opts.set_headers(&headers);
 
         let request = Request::new_with_str_and_init(&url, &opts)
             .map_err(|e| AtomicError::Api(format!("Failed to create request: {:?}", e)))?;

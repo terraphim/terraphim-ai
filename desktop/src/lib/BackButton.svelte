@@ -39,7 +39,7 @@
 </script>
 
 {#if isVisible}
-	<button 
+	<button
 		class="button is-light back-button {customClass}"
 		on:click={goBack}
 		on:keydown={(e) => {
@@ -72,26 +72,26 @@
 		align-items: center;
 		gap: 0.5rem;
 	}
-	
+
 	/* Hover/active effects layer on top of Bulma button styles */
 	.back-button:hover {
 		transform: translateY(-1px);
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 	}
-	
+
 	.back-button:active {
 		transform: translateY(0);
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 	}
-	
+
 	.back-button .icon {
 		font-size: 0.875rem;
 	}
-	
+
 	.back-button .back-text {
 		font-weight: 500;
 	}
-	
+
 	/* Responsive design */
 	@media (max-width: 768px) {
 		.back-button {

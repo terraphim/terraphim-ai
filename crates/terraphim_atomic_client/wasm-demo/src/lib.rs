@@ -274,4 +274,4 @@ pub async fn run_tests() -> Result<JsValue, JsValue> {
     push_res!("generic_classes_crud", test_generic_classes_crud());
 
     Ok(JsValue::from_str(&serde_json::to_string(&results).unwrap()))
-} 
+}

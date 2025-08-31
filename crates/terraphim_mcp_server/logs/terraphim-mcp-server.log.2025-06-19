@@ -1,14 +1,14 @@
 [2m2025-06-19T21:45:47.452388Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
-[2m2025-06-19T21:45:47.452756Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...    
-[2m2025-06-19T21:45:47.454640Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
-[2m2025-06-19T21:45:47.454727Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-06-19T21:45:47.455127Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default    
-[2m2025-06-19T21:45:47.455157Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer    
-[2m2025-06-19T21:45:47.455164Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly    
-[2m2025-06-19T21:45:47.455170Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-06-19T21:45:47.801891Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator    
-[2m2025-06-19T21:45:47.801920Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly    
-[2m2025-06-19T21:45:47.801925Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-19T21:45:47.452756Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...
+[2m2025-06-19T21:45:47.454640Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-19T21:45:47.454727Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-19T21:45:47.455127Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default
+[2m2025-06-19T21:45:47.455157Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer
+[2m2025-06-19T21:45:47.455164Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-19T21:45:47.455170Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-19T21:45:47.801891Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator
+[2m2025-06-19T21:45:47.801920Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-19T21:45:47.801925Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
 [2m2025-06-19T21:45:48.083462Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
 [2m2025-06-19T21:45:48.084393Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
 [2m2025-06-19T21:45:48.084553Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
@@ -16,19 +16,19 @@
 [2m2025-06-19T21:45:48.085410Z[0m [32m INFO[0m [2mterraphim_middleware::indexer[0m[2m:[0m Finding documents in haystack: Haystack {
     path: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
     service: Ripgrep,
-}    
+}
 [2m2025-06-19T21:45:48.200178Z[0m [31mERROR[0m [2mterraphim_mcp_server[0m[2m:[0m Failed to parse config: unknown variant `default`, expected one of `Server`, `Desktop`, `Embedded` at line 1 column 17
 [2m2025-06-19T21:48:00.113450Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
-[2m2025-06-19T21:48:00.113944Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...    
-[2m2025-06-19T21:48:00.114966Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
-[2m2025-06-19T21:48:00.115045Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-06-19T21:48:00.115390Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default    
-[2m2025-06-19T21:48:00.115416Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer    
-[2m2025-06-19T21:48:00.115422Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly    
-[2m2025-06-19T21:48:00.115427Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-06-19T21:48:00.447578Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator    
-[2m2025-06-19T21:48:00.447597Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly    
-[2m2025-06-19T21:48:00.447601Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-19T21:48:00.113944Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...
+[2m2025-06-19T21:48:00.114966Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-19T21:48:00.115045Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-19T21:48:00.115390Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default
+[2m2025-06-19T21:48:00.115416Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer
+[2m2025-06-19T21:48:00.115422Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-19T21:48:00.115427Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-19T21:48:00.447578Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator
+[2m2025-06-19T21:48:00.447597Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-19T21:48:00.447601Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
 [2m2025-06-19T21:48:00.731370Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
 [2m2025-06-19T21:48:00.732401Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
 [2m2025-06-19T21:48:00.732565Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
@@ -36,18 +36,18 @@
 [2m2025-06-19T21:48:00.733482Z[0m [32m INFO[0m [2mterraphim_middleware::indexer[0m[2m:[0m Finding documents in haystack: Haystack {
     path: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
     service: Ripgrep,
-}    
+}
 [2m2025-06-19T21:51:01.118845Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
-[2m2025-06-19T21:51:01.119641Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...    
-[2m2025-06-19T21:51:01.121374Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
-[2m2025-06-19T21:51:01.121434Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-06-19T21:51:01.121748Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator    
-[2m2025-06-19T21:51:01.121777Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly    
-[2m2025-06-19T21:51:01.121783Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-06-19T21:51:01.433401Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default    
-[2m2025-06-19T21:51:01.433426Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer    
-[2m2025-06-19T21:51:01.433430Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly    
-[2m2025-06-19T21:51:01.433434Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-19T21:51:01.119641Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...
+[2m2025-06-19T21:51:01.121374Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-19T21:51:01.121434Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-19T21:51:01.121748Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator
+[2m2025-06-19T21:51:01.121777Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-19T21:51:01.121783Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-19T21:51:01.433401Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default
+[2m2025-06-19T21:51:01.433426Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer
+[2m2025-06-19T21:51:01.433430Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-19T21:51:01.433434Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
 [2m2025-06-19T21:51:01.715786Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
 [2m2025-06-19T21:51:01.716762Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
 [2m2025-06-19T21:51:01.716915Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
@@ -55,22 +55,22 @@
 [2m2025-06-19T21:51:01.717807Z[0m [32m INFO[0m [2mterraphim_middleware::indexer[0m[2m:[0m Finding documents in haystack: Haystack {
     path: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
     service: Ripgrep,
-}    
+}
 [2m2025-06-19T21:51:01.832825Z[0m [32m INFO[0m [2mterraphim_middleware::indexer[0m[2m:[0m Finding documents in haystack: Haystack {
     path: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
     service: Ripgrep,
-}    
+}
 [2m2025-06-19T22:19:35.021111Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
-[2m2025-06-19T22:19:35.021760Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...    
-[2m2025-06-19T22:19:35.023623Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server    
-[2m2025-06-19T22:19:35.023722Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"    
-[2m2025-06-19T22:19:35.024115Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator    
-[2m2025-06-19T22:19:35.024144Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly    
-[2m2025-06-19T22:19:35.024149Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
-[2m2025-06-19T22:19:35.342549Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default    
-[2m2025-06-19T22:19:35.342575Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer    
-[2m2025-06-19T22:19:35.342580Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly    
-[2m2025-06-19T22:19:35.342583Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")    
+[2m2025-06-19T22:19:35.021760Z[0m [32m INFO[0m [2mterraphim_settings[0m[2m:[0m Loading device settings...
+[2m2025-06-19T22:19:35.023623Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-19T22:19:35.023722Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-19T22:19:35.024115Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role System Operator
+[2m2025-06-19T22:19:35.024144Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-19T22:19:35.024149Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-19T22:19:35.342549Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Default
+[2m2025-06-19T22:19:35.342575Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Creating role Engineer
+[2m2025-06-19T22:19:35.342580Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-19T22:19:35.342583Z[0m [32m INFO[0m [2mterraphim_config[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
 [2m2025-06-19T22:19:35.626215Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
 [2m2025-06-19T22:19:35.627151Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
 [2m2025-06-19T22:19:35.627304Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
@@ -78,4 +78,4 @@
 [2m2025-06-19T22:19:35.628188Z[0m [32m INFO[0m [2mterraphim_middleware::indexer[0m[2m:[0m Finding documents in haystack: Haystack {
     path: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
     service: Ripgrep,
-}    
+}

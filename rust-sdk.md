@@ -122,7 +122,7 @@ T-transport:
   - changed-files:
     - any-glob-to-any-file: ['crates/rmcp/src/transport/**/*']
 
-# Service layer changes  
+# Service layer changes
 T-service:
   - changed-files:
     - any-glob-to-any-file: ['crates/rmcp/src/service/**/*']
@@ -393,7 +393,7 @@ jobs:
           cargo +nightly doc --no-deps -p rmcp -p rmcp-macros --all-features
         env:
           RUSTDOCFLAGS: --cfg docsrs -Dwarnings
-          RUSTFLAGS: --cfg docsrs 
+          RUSTFLAGS: --cfg docsrs
 
   release:
     name: Release crates
@@ -411,7 +411,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Update Rust
-        run: | 
+        run: |
           rustup update stable
           rustup default stable
 
@@ -425,11 +425,11 @@ jobs:
         continue-on-error: true
       - name: Publish macro
         if: ${{ startsWith(github.ref, 'refs/tags/release') }}
-        continue-on-error: true 
+        continue-on-error: true
         run: cargo publish -p rmcp-macros
       - name: Publish rmcp
         if: ${{ startsWith(github.ref, 'refs/tags/release') }}
-        continue-on-error: true 
+        continue-on-error: true
         run: cargo publish -p rmcp
 
 ---
@@ -17627,7 +17627,7 @@ mod tests {
         #[tool(
             name = "direct-annotated-tool",
             annotations = {
-                title: "Annotated Tool", 
+                title: "Annotated Tool",
                 readOnlyHint: true
             }
         )]
@@ -22852,7 +22852,7 @@ impl Config {
 File: modelcontextprotocol-rust-sdk-13e72ec/examples/simple-chat-client/src/config.toml
 ---
 
-openai_key = "key" 
+openai_key = "key"
 chat_url = "url"
 model_name = "model_name"
 proxy = false
@@ -23983,4 +23983,3 @@ group_imports = "StdExternalCrate" # Create 3 groups: std, external crates, and 
 imports_granularity = "Crate" # Merge imports from the same crate into a single use statement
 style_edition = "2024"
 max_width = 100
-

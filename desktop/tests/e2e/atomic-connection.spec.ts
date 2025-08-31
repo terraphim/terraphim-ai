@@ -21,9 +21,9 @@ class TerraphimServerManager {
 
   async start(): Promise<void> {
     console.log('🚀 Starting Terraphim server with new storage backend...');
-    
+
     const serverPath = path.join(__dirname, '../../../target/release/terraphim_server');
-    
+
     this.process = spawn(serverPath, [], {
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: path.join(__dirname, '../../..')
@@ -65,7 +65,7 @@ class TerraphimServerManager {
 
   async waitForReady(): Promise<void> {
     console.log('⏳ Waiting for Terraphim server to be ready...');
-    
+
     for (let i = 0; i < 30; i++) {
       try {
         const response = await fetch(`http://localhost:${this.port}/health`);
@@ -157,7 +157,7 @@ test.describe("Complete Atomic Server Integration", () => {
     if (terraphimServer) {
       await terraphimServer.stop();
     }
-    
+
     // Cleanup
     if (fs.existsSync(configPath)) {
       fs.unlinkSync(configPath);
@@ -166,7 +166,7 @@ test.describe("Complete Atomic Server Integration", () => {
 
   test("should perform atomic server haystack search and return results", async () => {
     console.log('🔍 Testing atomic server haystack search...');
-    
+
     try {
       // Update Terraphim server configuration with atomic role
       const updateResponse = await fetch('http://localhost:8000/config', {
@@ -176,16 +176,16 @@ test.describe("Complete Atomic Server Integration", () => {
         },
         body: fs.readFileSync(configPath, 'utf8')
       });
-      
+
       if (updateResponse.ok) {
         console.log('✅ Successfully updated Terraphim server config');
       } else {
         console.log('⚠️ Config update response:', updateResponse.status, await updateResponse.text());
       }
-      
+
       // Wait a moment for configuration to be applied
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       // Perform search through atomic haystack
       const searchResponse = await fetch('http://localhost:8000/documents/search', {
         method: 'POST',
@@ -198,16 +198,16 @@ test.describe("Complete Atomic Server Integration", () => {
           limit: 10
         })
       });
-      
+
       console.log('🔍 Search response status:', searchResponse.status);
       console.log('🔍 Search response headers:', Object.fromEntries(searchResponse.headers.entries()));
-      
+
       if (!searchResponse.ok) {
         const errorText = await searchResponse.text();
         console.log('❌ Search response error:', errorText);
         throw new Error(`Search failed: ${searchResponse.status} - ${errorText}`);
       }
-      
+
       // Check if response is JSON
       const contentType = searchResponse.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
@@ -215,17 +215,17 @@ test.describe("Complete Atomic Server Integration", () => {
         console.log('⚠️ Non-JSON response:', responseText.substring(0, 200));
         throw new Error('Expected JSON response but got: ' + contentType);
       }
-      
+
       const searchResults = await searchResponse.json();
       console.log('🔍 Search results:', JSON.stringify(searchResults, null, 2));
-      
+
       // Verify we got results structure
       expect(searchResults).toBeDefined();
-      
+
       // Even if no documents match, we should get a valid response structure
       if (searchResults.results && Array.isArray(searchResults.results)) {
         console.log(`✅ Search returned ${searchResults.results.length} results from atomic server haystack`);
-        
+
         // If we have results, verify they have the expected structure
         if (searchResults.results.length > 0) {
           const firstResult = searchResults.results[0];
@@ -238,7 +238,7 @@ test.describe("Complete Atomic Server Integration", () => {
       } else {
         console.log('ℹ️ Search response structure:', Object.keys(searchResults));
       }
-      
+
     } catch (error) {
       console.error('❌ Search test error:', error);
       throw error;
@@ -247,16 +247,16 @@ test.describe("Complete Atomic Server Integration", () => {
 
   test("should validate atomic server role configuration structure", async () => {
     console.log('🔧 Testing role configuration structure...');
-    
+
     const configData = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(configData);
-    
+
     expect(config.roles['Atomic Integration Test']).toBeDefined();
     expect(config.roles['Atomic Integration Test'].haystacks).toHaveLength(1);
     expect(config.roles['Atomic Integration Test'].haystacks[0].service).toBe('Atomic');
     expect(config.roles['Atomic Integration Test'].haystacks[0].location).toBe(ATOMIC_SERVER_URL);
     expect(config.roles['Atomic Integration Test'].haystacks[0].atomic_server_secret).toBe(ATOMIC_SERVER_SECRET);
-    
+
     console.log('✅ Atomic server role configuration is valid');
   });
 });

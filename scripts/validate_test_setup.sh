@@ -43,7 +43,7 @@ if command -v jq >/dev/null 2>&1; then
         echo "❌ Template configuration is invalid JSON"
         exit 1
     fi
-    
+
     echo "📝 Validating final configuration..."
     if jq empty terraphim_engineer_test_config_final.json 2>/dev/null; then
         echo "✅ Final configuration is valid JSON"
@@ -51,7 +51,7 @@ if command -v jq >/dev/null 2>&1; then
         echo "❌ Final configuration is invalid JSON"
         exit 1
     fi
-    
+
     echo "📝 Validating test info..."
     if jq empty test_config_info.json 2>/dev/null; then
         echo "✅ Test configuration info is valid JSON"
@@ -80,7 +80,7 @@ fi
 # Check for atomic haystack
 if echo "$CONFIG_CONTENT" | jq -e '.roles["Terraphim Engineer Test"].haystacks[] | select(.service == "Atomic")' >/dev/null 2>&1; then
     echo "✅ Atomic haystack configured"
-    
+
     # Check that URL is substituted (not a template variable)
     ATOMIC_URL=$(echo "$CONFIG_CONTENT" | jq -r '.roles["Terraphim Engineer Test"].haystacks[] | select(.service == "Atomic") | .location')
     if [[ "$ATOMIC_URL" == *"${"* ]]; then
@@ -89,7 +89,7 @@ if echo "$CONFIG_CONTENT" | jq -e '.roles["Terraphim Engineer Test"].haystacks[]
     else
         echo "✅ Atomic server URL properly substituted: $ATOMIC_URL"
     fi
-    
+
     # Check if secret is substituted
     ATOMIC_SECRET=$(echo "$CONFIG_CONTENT" | jq -r '.roles["Terraphim Engineer Test"].haystacks[] | select(.service == "Atomic") | .atomic_server_secret')
     if [[ "$ATOMIC_SECRET" == *"${"* ]]; then
@@ -118,7 +118,7 @@ if echo "$CONFIG_CONTENT" | jq -e '.roles["Terraphim Engineer Test"].openrouter_
     OPENROUTER_ENABLED=$(echo "$CONFIG_CONTENT" | jq -r '.roles["Terraphim Engineer Test"].openrouter_enabled')
     if [ "$OPENROUTER_ENABLED" = "true" ]; then
         echo "✅ OpenRouter enabled in configuration"
-        
+
         # Check API key substitution
         OPENROUTER_KEY=$(echo "$CONFIG_CONTENT" | jq -r '.roles["Terraphim Engineer Test"].openrouter_api_key')
         if [[ "$OPENROUTER_KEY" == *"${"* ]]; then
@@ -129,7 +129,7 @@ if echo "$CONFIG_CONTENT" | jq -e '.roles["Terraphim Engineer Test"].openrouter_
         else
             echo "✅ OpenRouter API key properly substituted (***hidden***)"
         fi
-        
+
         # Check model configuration
         OPENROUTER_MODEL=$(echo "$CONFIG_CONTENT" | jq -r '.roles["Terraphim Engineer Test"].openrouter_model')
         if [[ "$OPENROUTER_MODEL" == *"${"* ]]; then
@@ -148,12 +148,12 @@ fi
 # Check knowledge graph configuration
 if echo "$CONFIG_CONTENT" | jq -e '.roles["Terraphim Engineer Test"].kg' >/dev/null 2>&1; then
     echo "✅ Knowledge graph configuration found"
-    
+
     # Check KG path
     KG_PATH=$(echo "$CONFIG_CONTENT" | jq -r '.roles["Terraphim Engineer Test"].kg.knowledge_graph_local.path')
     if [ "$KG_PATH" != "null" ]; then
         echo "✅ Knowledge graph path configured: $KG_PATH"
-        
+
         # Check if path exists
         if [ -d "$KG_PATH" ]; then
             KG_FILE_COUNT=$(find "$KG_PATH" -name "*.md" | wc -l)
@@ -175,7 +175,7 @@ echo "🔍 4. Testing connectivity..."
 # Read atomic server URL from test info
 if command -v jq >/dev/null 2>&1; then
     ATOMIC_URL=$(jq -r '.atomicServerUrl' test_config_info.json)
-    
+
     if command -v curl >/dev/null 2>&1; then
         if curl -s --max-time 5 "$ATOMIC_URL" >/dev/null 2>&1; then
             echo "✅ Atomic server accessible at $ATOMIC_URL"
@@ -250,4 +250,4 @@ sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -Iseconds)/" test_validation_summary.json
 sed -i "s/ATOMIC_PLACEHOLDER/$HAS_ATOMIC_SECRET/" test_validation_summary.json
 sed -i "s/OPENROUTER_PLACEHOLDER/$HAS_OPENROUTER_KEY/" test_validation_summary.json
 
-echo "📝 Validation summary saved to: test_validation_summary.json" 
+echo "📝 Validation summary saved to: test_validation_summary.json"

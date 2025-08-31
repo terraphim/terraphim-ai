@@ -182,18 +182,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Initialize logging only for desktop app mode (not MCP server mode)
-    terraphim_service::logging::init_logging(
-        terraphim_service::logging::detect_logging_config()
-    );
-    
+    terraphim_service::logging::init_logging(terraphim_service::logging::detect_logging_config());
+
     log::info!("Starting Terraphim Desktop app...");
     log::info!("Current working directory: {:?}", std::env::current_dir()?);
-    
+
     let device_settings = match DeviceSettings::load_from_env_and_file(None) {
         Ok(settings) => {
             log::info!("Successfully loaded device settings: {:?}", settings);
             settings
-        },
+        }
         Err(e) => {
             log::error!("Failed to load device settings: {:?}", e);
             log::info!("Using default device settings due to load error");
@@ -211,13 +209,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(config) => config,
             Err(e) => {
                 log::info!("Failed to load config: {:?}", e);
-                match ConfigBuilder::new()
-                    .build_default_desktop()
-                    .build() {
+                match ConfigBuilder::new().build_default_desktop().build() {
                     Ok(config) => config,
                     Err(build_err) => {
                         log::error!("Failed to build default desktop config: {:?}", build_err);
-                        return Err(format!("Configuration initialization failed: {:?}", build_err).into());
+                        return Err(format!(
+                            "Configuration initialization failed: {:?}",
+                            build_err
+                        )
+                        .into());
                     }
                 }
             }
@@ -225,32 +225,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Err(e) => {
             log::error!("Failed to build config: {:?}", e);
             return Err(format!("Configuration build failed: {:?}", e).into());
-        },
+        }
     };
     let config_state = ConfigState::new(&mut config).await?;
-    
+
     // Initialize thesaurus for roles that need it to prevent KG processing warnings
     {
         let current_config = config_state.config.lock().await;
         for (role_name, role) in &current_config.roles {
             if role.terraphim_it && role.kg.is_some() {
-                log::info!("Checking thesaurus for role '{}' with terraphim_it enabled", role_name);
-                
+                log::info!(
+                    "Checking thesaurus for role '{}' with terraphim_it enabled",
+                    role_name
+                );
+
                 // Try to load existing thesaurus, if it doesn't exist, it will be built when needed
                 let mut thesaurus = terraphim_types::Thesaurus::new(role_name.to_string());
                 match thesaurus.load().await {
                     Ok(_) => {
                         log::info!("✅ Thesaurus already exists for role '{}'", role_name);
-                    },
+                    }
                     Err(_) => {
-                        log::info!("🔧 Thesaurus not found for role '{}' - will be built on first use", role_name);
+                        log::info!(
+                            "🔧 Thesaurus not found for role '{}' - will be built on first use",
+                            role_name
+                        );
                         // Don't build it synchronously as it can be slow - let it build on demand
                     }
                 }
             }
         }
     }
-    
+
     let current_config = config_state.config.lock().await;
     let global_shortcut = current_config.global_shortcut.clone();
     let tray_menu = build_tray_menu(&current_config);
@@ -369,7 +375,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::select_role,
             cmd::get_rolegraph,
             cmd::find_documents_for_kg_term,
-            cmd::save_article_to_atomic
+            cmd::save_article_to_atomic,
+            cmd::get_autocomplete_suggestions
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();

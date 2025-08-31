@@ -31,13 +31,13 @@ class AtomicServerManager {
   async testConnection(): Promise<boolean> {
     console.log(`🔗 Testing connection to ${this.baseUrl}...`);
     const isConnected = await this.isReady();
-    
+
     if (isConnected) {
       console.log('✅ Atomic server connection successful');
     } else {
       console.log('❌ Atomic server connection failed');
     }
-    
+
     return isConnected;
   }
 }
@@ -87,7 +87,7 @@ test.describe('Atomic Server Configuration Tests', () => {
         }
       }
     };
-    
+
     expect(config.roles['Test Role']).toBeDefined();
     expect(config.roles['Test Role'].haystacks).toHaveLength(1);
     expect(config.roles['Test Role'].haystacks[0].service).toBe('Atomic');
@@ -109,18 +109,18 @@ test.describe('Atomic Server Configuration Tests', () => {
         }
       }
     };
-    
+
     const configPath = 'test-atomic-config.json';
-    
+
     // Write config
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     expect(fs.existsSync(configPath)).toBe(true);
-    
+
     // Read and validate
     const readConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     expect(readConfig).toEqual(config);
-    
+
     // Cleanup
     fs.unlinkSync(configPath);
   });
-}); 
+});

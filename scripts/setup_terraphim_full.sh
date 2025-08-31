@@ -226,22 +226,22 @@ create_document() {
     local file_path="$1"
     local file_name=$(basename "$file_path")
     local file_name_no_ext="${file_name%.*}"
-    
+
     # Convert to lowercase and replace special characters for valid slug
     local slug=$(echo "$file_name_no_ext" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
-    
+
     # Read file content
     local content=$(cat "$file_path")
-    
+
     # Extract title from first line or use filename
     local title=$(echo "$content" | head -n 1 | sed 's/^# //' | sed 's/^## //' | sed 's/^### //')
     if [ -z "$title" ] || [ "$title" = "$content" ]; then
         title="$file_name_no_ext"
     fi
-    
+
     # Use the full content as description
     local description="$content"
-    
+
     # Use CLI to create Article resource
     if terraphim_atomic_client create "$slug" "$title" "$description" "Article" > /dev/null 2>&1; then
         echo -e "${GREEN}  ✅ Created: ${title}${NC}"
@@ -318,7 +318,7 @@ fi
 
 if [ "$terraphim_server_available" = true ]; then
     print_header "🌐 Phase 3: Configuring Terraphim Server"
-    
+
     # Test configuration endpoint
     print_step "Testing Terraphim Server configuration endpoint..."
     if curl -s -f "${TERRAPHIM_SERVER_URL}/config" > /dev/null; then
@@ -327,7 +327,7 @@ if [ "$terraphim_server_available" = true ]; then
         print_error "Configuration endpoint is not accessible"
         exit 1
     fi
-    
+
     # Apply System Operator configuration if available
     if [ -f "$SYSTEM_OPERATOR_CONFIG" ]; then
         print_step "Applying System Operator configuration..."
@@ -340,7 +340,7 @@ if [ "$terraphim_server_available" = true ]; then
             print_warning "Failed to apply System Operator configuration"
         fi
     fi
-    
+
     # Apply Terraphim Engineer configuration if available
     if [ -f "$TERRAPHIM_ENGINEER_CONFIG" ]; then
         print_step "Applying Terraphim Engineer configuration..."
@@ -353,7 +353,7 @@ if [ "$terraphim_server_available" = true ]; then
             print_warning "Failed to apply Terraphim Engineer configuration"
         fi
     fi
-    
+
     # Test configuration after update
     print_step "Verifying configuration update..."
     if curl -s "${TERRAPHIM_SERVER_URL}/config" | jq '.config.roles' > /dev/null 2>&1; then
@@ -361,7 +361,7 @@ if [ "$terraphim_server_available" = true ]; then
     else
         print_warning "Configuration verification failed"
     fi
-    
+
 else
     print_header "🌐 Phase 3: Terraphim Server Configuration Skipped"
     print_warning "Terraphim Server not available or not specified"
@@ -397,4 +397,4 @@ echo ""
 echo -e "${CYAN}Available configurations:${NC}"
 echo -e "   🔧 System Operator - Remote KG + GitHub docs"
 echo -e "   🔧 Terraphim Engineer - Local KG + Internal docs"
-echo -e "   📝 Default - Title scorer + Local docs" 
+echo -e "   📝 Default - Title scorer + Local docs"

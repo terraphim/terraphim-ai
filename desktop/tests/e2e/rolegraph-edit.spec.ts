@@ -32,8 +32,8 @@ test.describe('RoleGraphVisualization Edit Functionality', () => {
     const cancelButton = modal.locator('button.is-light');
     await expect(cancelButton).toBeVisible();
     await cancelButton.click();
-    
+
     // 7. Assert that the modal is no longer visible
     await expect(modal).not.toBeVisible();
   });
-}); 
+});

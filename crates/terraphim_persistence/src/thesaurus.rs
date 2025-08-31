@@ -36,9 +36,9 @@ impl Persistable for Thesaurus {
         let name = self.name();
         let normalized = self.normalize_key(name);
         let key = format!("thesaurus_{}.json", normalized);
-        
+
         log::debug!("Thesaurus key generation: name='{}' → key='{}'", name, key);
-        
+
         key
     }
 }

@@ -8,11 +8,11 @@
   // @ts-ignore
   import { configStore } from "$lib/stores";
   // Import generated types
-  import type { 
-    Config, 
-    Role, 
-    Haystack, 
-    KnowledgeGraph, 
+  import type {
+    Config,
+    Role,
+    Haystack,
+    KnowledgeGraph,
     ServiceType,
     ConfigId,
     RelevanceFunction,
@@ -21,7 +21,7 @@
   import BackButton from "./BackButton.svelte";
 
   const schema = writable<any>(null);
-  
+
   // Form types derived from generated types
   type ConfigDraft = {
     id: ConfigId;
@@ -29,31 +29,31 @@
     default_theme: string;
     default_role: string;
   };
-  
+
   // HaystackForm now matches the generated Haystack type
-  type HaystackForm = { 
-    path: string; 
-    read_only: boolean; 
+  type HaystackForm = {
+    path: string;
+    read_only: boolean;
     service: ServiceType;
     atomic_server_secret?: string;
     extra_parameters: { [key: string]: string };
   };
-  
-  type KnowledgeGraphForm = { 
-    url: string; 
-    local_path: string; 
-    local_type: KnowledgeGraphInputType; 
-    public: boolean; 
-    publish: boolean 
+
+  type KnowledgeGraphForm = {
+    url: string;
+    local_path: string;
+    local_type: KnowledgeGraphInputType;
+    public: boolean;
+    publish: boolean
   };
-  
-  type RoleForm = { 
-    name: string; 
-    shortname: string; 
-    relevance_function: RelevanceFunction; 
+
+  type RoleForm = {
+    name: string;
+    shortname: string;
+    relevance_function: RelevanceFunction;
     terraphim_it: boolean;
-    theme: string; 
-    haystacks: HaystackForm[]; 
+    theme: string;
+    haystacks: HaystackForm[];
     kg: KnowledgeGraphForm;
     openrouter_enabled?: boolean;
     openrouter_api_key?: string;
@@ -73,13 +73,13 @@
   // File selection functions for Tauri
   async function selectHaystackPath(roleIdx: number, hsIdx: number) {
     if (!get(is_tauri)) return;
-    
+
     try {
       const selected = await open({
         directory: true,
         multiple: false
       });
-      
+
       if (selected && typeof selected === "string") {
         draft.update(d => {
           d.roles[roleIdx].haystacks[hsIdx].path = selected;
@@ -93,13 +93,13 @@
 
   async function selectKnowledgeGraphPath(roleIdx: number) {
     if (!get(is_tauri)) return;
-    
+
     try {
       const selected = await open({
         directory: true,
         multiple: false
       });
-      
+
       if (selected && typeof selected === "string") {
         draft.update(d => {
           d.roles[roleIdx].kg.local_path = selected;
@@ -263,13 +263,13 @@ async function fetchLlmModels(roleIdx: number) {
   }
 
   function addRole() {
-    draft.update((d) => ({ ...d, roles: [...d.roles, { 
-      name: "New Role", 
-      shortname:"new", 
-      relevance_function: "title-scorer", 
+    draft.update((d) => ({ ...d, roles: [...d.roles, {
+      name: "New Role",
+      shortname:"new",
+      relevance_function: "title-scorer",
       terraphim_it: false,
-      theme: "spacelab", 
-      haystacks: [], 
+      theme: "spacelab",
+      haystacks: [],
       kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false},
       openrouter_enabled: false,
       openrouter_api_key: "",
@@ -291,8 +291,8 @@ async function fetchLlmModels(roleIdx: number) {
   function addHaystack(roleIdx:number){
     draft.update(d=>{
       d.roles[roleIdx].haystacks.push({
-        path:"", 
-        read_only:false, 
+        path:"",
+        read_only:false,
         service: "Ripgrep",
         atomic_server_secret: "",
         extra_parameters: {}
@@ -444,14 +444,14 @@ async function fetchLlmModels(roleIdx: number) {
     <h3 class="title is-4" style="margin-bottom: 0;">Configuration Wizard</h3>
     <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
   </div>
-  
+
   {#if saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
       <button class="delete" on:click={() => saveStatus = ''}></button>
       Configuration saved successfully!
     </div>
   {/if}
-  
+
   {#if saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
       <button class="delete" on:click={() => saveStatus = ''}></button>
@@ -536,22 +536,30 @@ async function fetchLlmModels(roleIdx: number) {
         <div class="field">
           <label class="label" for={`role-relevance-${idx}`}>Relevance function</label>
           <div class="control">
-            <input class="input" id={`role-relevance-${idx}`} type="text" bind:value={$draft.roles[idx].relevance_function} />
+            <div class="select is-fullwidth">
+              <select id={`role-relevance-${idx}`} bind:value={$draft.roles[idx].relevance_function}>
+                <option value="title-scorer">title-scorer</option>
+                <option value="terraphim-graph">terraphim-graph</option>
+                <option value="bm25">bm25</option>
+                <option value="bm25f">bm25f</option>
+                <option value="bm25plus">bm25plus</option>
+              </select>
+            </div>
           </div>
         </div>
-        
+
         <div class="field">
           <label class="label" for={`role-terraphim-it-${idx}`}>
-            <input 
-              class="checkbox" 
-              id={`role-terraphim-it-${idx}`} 
-              type="checkbox" 
-              bind:checked={$draft.roles[idx].terraphim_it} 
+            <input
+              class="checkbox"
+              id={`role-terraphim-it-${idx}`}
+              type="checkbox"
+              bind:checked={$draft.roles[idx].terraphim_it}
             />
             Enable Terraphim IT features (KG preprocessing, auto-linking)
           </label>
         </div>
-        
+
         <h5 class="title is-6">Haystacks</h5>
         {#each roleItem.haystacks as hs, hIdx}
           <div class="box is-light">
@@ -578,12 +586,12 @@ async function fetchLlmModels(roleIdx: number) {
                 {/if}
               </label>
               <div class="control">
-                <input 
-                  class="input" 
-                  id={`haystack-path-${idx}-${hIdx}`} 
-                  type="text" 
-                  placeholder={$draft.roles[idx].haystacks[hIdx].service === "Atomic" ? "https://localhost:9883" : "/path/to/documents"} 
-                  bind:value={$draft.roles[idx].haystacks[hIdx].path} 
+                <input
+                  class="input"
+                  id={`haystack-path-${idx}-${hIdx}`}
+                  type="text"
+                  placeholder={$draft.roles[idx].haystacks[hIdx].service === "Atomic" ? "https://localhost:9883" : "/path/to/documents"}
+                  bind:value={$draft.roles[idx].haystacks[hIdx].path}
                   readonly={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic"}
                   on:click={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic" ? () => selectHaystackPath(idx, hIdx) : undefined}
                 />
@@ -598,12 +606,12 @@ async function fetchLlmModels(roleIdx: number) {
               <div class="field">
                 <label class="label" for={`haystack-secret-${idx}-${hIdx}`}>Atomic Server Secret</label>
                 <div class="control">
-                  <input 
-                    class="input" 
-                    id={`haystack-secret-${idx}-${hIdx}`} 
-                    type="password" 
-                    placeholder="Base64 encoded secret (optional)" 
-                    bind:value={$draft.roles[idx].haystacks[hIdx].atomic_server_secret} 
+                  <input
+                    class="input"
+                    id={`haystack-secret-${idx}-${hIdx}`}
+                    type="password"
+                    placeholder="Base64 encoded secret (optional)"
+                    bind:value={$draft.roles[idx].haystacks[hIdx].atomic_server_secret}
                   />
                 </div>
                 <p class="help">Leave empty for anonymous access</p>
@@ -649,25 +657,25 @@ async function fetchLlmModels(roleIdx: number) {
                 {#each Object.entries($draft.roles[idx].haystacks[hIdx].extra_parameters || {}) as [paramKey, paramValue], paramIdx}
                   <div class="field is-grouped">
                     <div class="control">
-                      <input 
-                        class="input" 
-                        type="text" 
+                      <input
+                        class="input"
+                        type="text"
                         placeholder="Parameter name"
                         value={paramKey}
                         on:blur={(e) => handleParameterKeyChange(idx, hIdx, paramKey, e)}
                       />
                     </div>
                     <div class="control is-expanded">
-                      <input 
-                        class="input" 
-                        type="text" 
+                      <input
+                        class="input"
+                        type="text"
                         placeholder="Parameter value"
                         bind:value={$draft.roles[idx].haystacks[hIdx].extra_parameters[paramKey]}
                       />
                     </div>
                     <div class="control">
-                      <button 
-                        class="button is-small is-danger" 
+                      <button
+                        class="button is-small is-danger"
                         on:click={() => removeExtraParameter(idx, hIdx, paramKey)}
                       >
                         ×
@@ -675,37 +683,37 @@ async function fetchLlmModels(roleIdx: number) {
                     </div>
                   </div>
                 {/each}
-                
+
                 <!-- Predefined parameter buttons for common use cases -->
                 <div class="field is-grouped">
                   <div class="control">
-                    <button 
-                      class="button is-small is-link is-light" 
+                    <button
+                      class="button is-small is-link is-light"
                       on:click={() => addExtraParameter(idx, hIdx, "tag", "#rust")}
                     >
                       + Tag Filter
                     </button>
                   </div>
                   <div class="control">
-                    <button 
-                      class="button is-small is-link is-light" 
+                    <button
+                      class="button is-small is-link is-light"
                       on:click={() => addExtraParameter(idx, hIdx, "max_count", "10")}
                     >
                       + Max Results
                     </button>
                   </div>
                   <div class="control">
-                    <button 
-                      class="button is-small is-link is-light" 
+                    <button
+                      class="button is-small is-link is-light"
                       on:click={() => addExtraParameter(idx, hIdx, "", "")}
                     >
                       + Custom Parameter
                     </button>
                   </div>
                 </div>
-                
+
                 <p class="help">
-                  Common parameters: <code>tag</code> (e.g., "#rust"), <code>glob</code> (e.g., "*.md"), 
+                  Common parameters: <code>tag</code> (e.g., "#rust"), <code>glob</code> (e.g., "*.md"),
                   <code>max_count</code> (e.g., "10"), <code>context</code> (e.g., "5")
                 </p>
               </div>
@@ -791,12 +799,12 @@ async function fetchLlmModels(roleIdx: number) {
           <div class="field">
             <label class="label" for={`openrouter-api-key-${idx}`}>OpenRouter API Key</label>
             <div class="control">
-              <input 
-                class="input" 
-                id={`openrouter-api-key-${idx}`} 
-                type="password" 
-                placeholder="sk-or-v1-..." 
-                bind:value={$draft.roles[idx].openrouter_api_key} 
+              <input
+                class="input"
+                id={`openrouter-api-key-${idx}`}
+                type="password"
+                placeholder="sk-or-v1-..."
+                bind:value={$draft.roles[idx].openrouter_api_key}
               />
             </div>
             <p class="help">Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener">OpenRouter</a></p>
@@ -870,12 +878,12 @@ async function fetchLlmModels(roleIdx: number) {
         <div class="field">
           <label class="label" for={`kg-local-path-${idx}`}>Local KG path</label>
           <div class="control">
-            <input 
-              class="input" 
-              id={`kg-local-path-${idx}`} 
-              type="text" 
-              placeholder="/path/to/markdown" 
-              bind:value={$draft.roles[idx].kg.local_path} 
+            <input
+              class="input"
+              id={`kg-local-path-${idx}`}
+              type="text"
+              placeholder="/path/to/markdown"
+              bind:value={$draft.roles[idx].kg.local_path}
               readonly={$is_tauri}
               on:click={$is_tauri ? () => selectKnowledgeGraphPath(idx) : undefined}
             />
@@ -920,7 +928,7 @@ async function fetchLlmModels(roleIdx: number) {
         <li><strong>Default Theme:</strong> {$draft.default_theme}</li>
         <li><strong>Default Role:</strong> {$draft.default_role}</li>
       </ul>
-      
+
       <h5>Roles:</h5>
       {#each $draft.roles as role, idx}
         <div class="box">
@@ -949,4 +957,4 @@ async function fetchLlmModels(roleIdx: number) {
       {/if}
     </div>
   </nav>
-</div> 
+</div>

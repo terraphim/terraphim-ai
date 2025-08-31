@@ -76,7 +76,7 @@ echo "✅ Configuration Loading: PASSED"
 echo "✅ 5 Role Structure: VALIDATED"
 echo "   - Dual Haystack Title Scorer (atomic + ripgrep + title-scorer)"
 echo "   - Dual Haystack Graph Embeddings (atomic + ripgrep + terraphim-graph + KG)"
-echo "   - Dual Haystack Hybrid Researcher (atomic + 2x ripgrep + terraphim-graph + KG)" 
+echo "   - Dual Haystack Hybrid Researcher (atomic + 2x ripgrep + terraphim-graph + KG)"
 echo "   - Single Atomic Reference (atomic only + title-scorer)"
 echo "   - Single Ripgrep Reference (ripgrep only + title-scorer)"
 echo ""
@@ -92,4 +92,4 @@ echo "   - All test scenarios passing"
 echo "   - Comprehensive validation coverage"
 echo "   - Ready for integration with MCP server and desktop application"
 
-cd ../.. 
+cd ../..

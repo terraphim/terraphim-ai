@@ -85,7 +85,7 @@ echo -e "   ${YELLOW}cargo run --bin terraphim_server -- --config $CONFIG_FILE${
 
 echo -e "${BLUE}Available roles in this configuration:${NC}"
 echo -e "   🔧 Terraphim Engineer (default) - Uses local KG from docs/src/kg"
-echo -e "   👷 Engineer - Uses local KG from docs/src/kg"  
+echo -e "   👷 Engineer - Uses local KG from docs/src/kg"
 echo -e "   📝 Default - Uses TitleScorer for basic search"
 
 echo -e "${BLUE}💡 The configuration includes:${NC}"
@@ -101,4 +101,4 @@ echo -e "   ✅ Haystack integration guides"
 echo -e "   ✅ Engineering best practices"
 
 echo -e "${YELLOW}💡 Note: This configuration builds KG from local files during server startup${NC}"
-echo -e "${YELLOW}   First startup may take 10-30 seconds to build the knowledge graph${NC}" 
+echo -e "${YELLOW}   First startup may take 10-30 seconds to build the knowledge graph${NC}"

@@ -68,16 +68,16 @@
     }));
     roles.set(rolesArray);
     role.set(config.selected_role);
-    
+
     // Set theme based on selected role
     const selectedRoleSettings = config.roles[config.selected_role];
     console.log("Selected role settings:", selectedRoleSettings);
-    
+
     if (selectedRoleSettings) {
       const newTheme = selectedRoleSettings.theme || "spacelab";
       console.log("Setting theme to:", newTheme);
       theme.set(newTheme);
-      
+
       // Handle thesaurus publishing
       if (selectedRoleSettings.kg?.publish) {
         if ($is_tauri) {

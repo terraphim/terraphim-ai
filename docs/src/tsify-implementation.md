@@ -12,7 +12,7 @@ We have implemented a comprehensive TypeScript bindings system that automaticall
 
 **Core Crates with TypeScript Support:**
 - `crates/terraphim_config` - Configuration types
-- `crates/terraphim_types` - Core domain types  
+- `crates/terraphim_types` - Core domain types
 - `crates/terraphim_automata` - Automata and path types
 - `desktop/src-tauri` - Tauri command response types
 
@@ -51,7 +51,7 @@ typescript = ["tsify", "wasm-bindgen"]
 **Command Response Types (`desktop/src-tauri/cmd.rs`):**
 - `Status` - Success/error status
 - `ConfigResponse` - Configuration API response
-- `SearchResponse` - Search API response  
+- `SearchResponse` - Search API response
 - `DocumentResponse` - Document API response
 - `InitialSettings` - Application startup settings
 
@@ -121,10 +121,10 @@ export interface ConfigResponse {
 
 **Import Pattern:**
 ```typescript
-import type { 
-  Config, 
-  Role, 
-  Haystack, 
+import type {
+  Config,
+  Role,
+  Haystack,
   ServiceType,
   ConfigId,
   RelevanceFunction,
@@ -139,7 +139,7 @@ import type {
 - **Compile-Time Verification**: TypeScript catches type errors immediately
 - **IDE Autocomplete**: Full IntelliSense support for all Rust-defined types
 
-### ✅ **Maintenance Efficiency**  
+### ✅ **Maintenance Efficiency**
 - **Single Source of Truth**: Types defined once in Rust, used everywhere
 - **Automatic Updates**: Changes to Rust types automatically propagate to frontend
 - **No Manual Sync**: Eliminates handcrafted TypeScript definitions
@@ -151,7 +151,7 @@ import type {
 
 ### ✅ **Feature Completeness**
 - **Full Haystack Support**: Service types, extra parameters, atomic secrets
-- **Configuration Wizard**: Complete UI support for all configuration options  
+- **Configuration Wizard**: Complete UI support for all configuration options
 - **API Compatibility**: Perfect alignment between Tauri commands and frontend types
 
 ## Usage Instructions
@@ -233,4 +233,4 @@ The tsify implementation provides a robust, maintainable solution for TypeScript
 - **Supports all configuration features**
 - **Integrates seamlessly with existing workflow**
 
-This foundation enables confident frontend development with guaranteed backend compatibility. 
+This foundation enables confident frontend development with guaranteed backend compatibility.

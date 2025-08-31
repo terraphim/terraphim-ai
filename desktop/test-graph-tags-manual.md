@@ -70,4 +70,4 @@ yarn run tauri dev
 ## Notes
 - The fix involved changing `roleName` to `role_name` in all Tauri command calls
 - Multiple commands were affected: `find_documents_for_kg_term`, `publish_thesaurus`, `select_role`, `get_rolegraph`
-- Dependency issues in `terraphim_onepassword_cli` were also resolved 
+- Dependency issues in `terraphim_onepassword_cli` were also resolved

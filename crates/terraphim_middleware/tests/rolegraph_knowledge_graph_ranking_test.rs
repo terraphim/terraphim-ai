@@ -54,6 +54,7 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         haystacks: vec![],
         extra: ahash::AHashMap::new(),
         terraphim_it: false,
+        ..Default::default()
     };
 
     // 3. Build thesaurus from local markdown files in kg directory

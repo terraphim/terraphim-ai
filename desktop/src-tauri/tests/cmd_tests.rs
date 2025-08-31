@@ -10,7 +10,6 @@ async fn create_test_config_state() -> ConfigState {
     ConfigState::new(&mut config).await.unwrap()
 }
 
-
 #[tokio::test]
 async fn test_search_command() {
     let config_state = create_test_config_state().await;

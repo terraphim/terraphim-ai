@@ -1,6 +1,6 @@
 use terraphim_atomic_client::{store::Store, types::Config, Agent};
-use terraphim_types::{Document, Index};
 use terraphim_persistence::Persistable;
+use terraphim_types::{Document, Index};
 
 use crate::{indexer::IndexMiddleware, Result};
 use terraphim_config::Haystack;

@@ -8,10 +8,10 @@ const __dirname = join(__filename, '..');
 
 async function globalTeardown(config: FullConfig) {
   console.log('🧹 Starting global test teardown...');
-  
+
   // Clean up test data if needed
   const testDataDir = join(__dirname, '../test-data');
-  
+
   // Only clean up in CI to avoid removing useful test data during development
   if (process.env.CI && existsSync(testDataDir)) {
     try {
@@ -21,8 +21,8 @@ async function globalTeardown(config: FullConfig) {
       console.warn('Failed to clean up test data:', error);
     }
   }
-  
+
   console.log('✅ Global teardown completed');
 }
 
-export default globalTeardown; 
+export default globalTeardown;

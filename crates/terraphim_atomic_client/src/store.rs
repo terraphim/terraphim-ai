@@ -680,4 +680,3 @@ pub struct QueryOpts {
     /// Property-value filters
     pub property_values: Option<HashMap<String, String>>,
 }
-

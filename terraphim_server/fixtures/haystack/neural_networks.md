@@ -22,4 +22,4 @@ links:: [Local library](zotero://select/library/items/NEURAL001), [Web library](
 	- Convolutional Neural Networks (CNN)
 	- Recurrent Neural Networks (RNN)
 	- Long Short-Term Memory Networks (LSTM)
-	- Generative Adversarial Networks (GAN) 
+	- Generative Adversarial Networks (GAN)

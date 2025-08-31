@@ -101,7 +101,7 @@ assert!(dual_atomic_ripgrep_role.haystacks.len() == 2);
 // Comprehensive role testing
 let test_roles = vec![
     "Dual Haystack Title Scorer",
-    "Dual Haystack Graph Embeddings", 
+    "Dual Haystack Graph Embeddings",
     "Hybrid Researcher",
     "Single Atomic Reference",
     "Single Ripgrep Reference"
@@ -209,8 +209,8 @@ let initial_rank = measure_search_rank("terraphim-graph");
 ```rust
 // Add new KG record with synonyms
 let new_kg_content = r#"
-synonyms:: data analysis, network analysis, graph processing, 
-          relationship mapping, connectivity analysis, 
+synonyms:: data analysis, network analysis, graph processing,
+          relationship mapping, connectivity analysis,
           terraphim-graph, graph embeddings
 "#;
 ```
@@ -296,7 +296,7 @@ assert!(performance.within_limits());
 
 **Validation Areas:**
 - Functional correctness
-- Performance characteristics  
+- Performance characteristics
 - Error handling
 - Integration points
 
@@ -318,7 +318,7 @@ async fn test_knowledge_graph_functionality() {
 ### 4. Detailed Logging and Metrics
 
 ```rust
-println!("📊 Initial State: {} terms, {} nodes, {} edges", 
+println!("📊 Initial State: {} terms, {} nodes, {} edges",
     initial_terms, initial_nodes, initial_edges);
 println!("📈 Growth: +{} terms, +{} nodes, +{} edges",
     term_growth, node_growth, edge_growth);
@@ -398,4 +398,4 @@ The comprehensive testing framework for Terraphim provides robust validation acr
 - 📈 **Ranking Expansion**: 318% improvement demonstration with measurement framework
 - 🔧 **MCP Server**: Full Model Context Protocol integration validation
 
-The testing framework provides both validation confidence and measurement tools for continuous improvement of the Terraphim AI system. 
+The testing framework provides both validation confidence and measurement tools for continuous improvement of the Terraphim AI system.

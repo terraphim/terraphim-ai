@@ -7408,6 +7408,7 @@ dependencies = [
  "terraphim_rolegraph",
  "terraphim_service",
  "terraphim_settings",
+ "terraphim_tui",
  "terraphim_types",
  "tokio",
  "tokio-stream",

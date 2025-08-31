@@ -1,5 +1,5 @@
 //! Centralized logging initialization utilities
-//! 
+//!
 //! This module provides standardized logging setup functions for different contexts
 //! (servers, tests, development) to ensure consistent logging behavior across the codebase.
 
@@ -8,7 +8,7 @@
 pub enum LoggingConfig {
     /// Production server logging (WARN level, structured format)
     Server,
-    /// Development server logging (INFO level, human-readable format)  
+    /// Development server logging (INFO level, human-readable format)
     Development,
     /// Test environment logging (DEBUG level, test-friendly format)
     Test,
@@ -64,9 +64,7 @@ pub fn init_integration_test_logging() {
 
 /// Initialize logging with custom level
 pub fn init_custom_logging(level: log::LevelFilter) {
-    let _ = env_logger::builder()
-        .filter_level(level)
-        .try_init();
+    let _ = env_logger::builder().filter_level(level).try_init();
 }
 
 /// Initialize logging respecting LOG_LEVEL environment variable
@@ -77,7 +75,7 @@ pub fn init_env_logging() {
             std::env::var("LOG_LEVEL")
                 .ok()
                 .and_then(|level| level.parse::<log::LevelFilter>().ok())
-                .unwrap_or(log::LevelFilter::Info)
+                .unwrap_or(log::LevelFilter::Info),
         )
         .try_init();
 }
@@ -86,15 +84,11 @@ pub fn init_env_logging() {
 #[cfg(feature = "tracing")]
 pub fn init_tracing_logging(level: tracing::Level) {
     use tracing_subscriber::prelude::*;
-    
+
     let _ = tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_env_filter(
-                    tracing_subscriber::EnvFilter::from_default_env()
-                        .add_directive(level.into())
-                )
-        )
+        .with(tracing_subscriber::fmt::layer().with_filter(
+            tracing_subscriber::EnvFilter::from_default_env().add_directive(level.into()),
+        ))
         .try_init();
 }
 
@@ -103,10 +97,10 @@ pub fn init_tracing_logging(level: tracing::Level) {
 pub fn init_external_tracing_logging(verbose: bool) {
     // This is for applications that already have tracing as a dependency
     // We can't use the tracing types here, so we provide a helper that callers use
-    
+
     // The actual implementation should be done by the caller with their tracing setup
     // This is just a marker function to show the intended pattern
-    
+
     if verbose {
         log::info!("Verbose logging enabled (external tracing should be configured by caller)");
     } else {
@@ -122,12 +116,12 @@ pub fn detect_logging_config() -> LoggingConfig {
             return LoggingConfig::Custom { level };
         }
     }
-    
+
     // Detect test environment
     if cfg!(test) || std::env::var("RUST_TEST_THREADS").is_ok() {
         return LoggingConfig::Test;
     }
-    
+
     // Detect development vs production based on debug assertions
     if cfg!(debug_assertions) {
         LoggingConfig::Development
@@ -139,15 +133,15 @@ pub fn detect_logging_config() -> LoggingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_logging_config_detection() {
         // This will use Test config in test environment
         let config = detect_logging_config();
         matches!(config, LoggingConfig::Test);
     }
-    
-    #[test] 
+
+    #[test]
     fn test_logging_initialization() {
         // Test that initialization doesn't panic
         init_logging(LoggingConfig::Test);

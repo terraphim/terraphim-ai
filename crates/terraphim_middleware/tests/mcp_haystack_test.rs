@@ -24,12 +24,11 @@ async fn mcp_live_haystack_smoke() {
         terraphim_it: false,
         theme: "lumen".to_string(),
         kg: None,
-        haystacks: vec![
-            Haystack::new(base_url.clone(), ServiceType::Mcp, true)
-                .with_extra_parameter("base_url".into(), base_url.clone())
-                .with_extra_parameter("transport".into(), "sse".into()),
-        ],
+        haystacks: vec![Haystack::new(base_url.clone(), ServiceType::Mcp, true)
+            .with_extra_parameter("base_url".into(), base_url.clone())
+            .with_extra_parameter("transport".into(), "sse".into())],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()
@@ -49,12 +48,19 @@ async fn mcp_live_haystack_smoke() {
         skip: Some(0),
         limit: Some(10),
         role: Some("MCP".into()),
+        operator: None,
+        search_terms: None,
     };
 
-    let result = search_haystacks(config_state, query).await.expect("search ok");
+    let result = search_haystacks(config_state, query)
+        .await
+        .expect("search ok");
     // If server-everything is running and exposes search/list, we expect results
     // Otherwise, the index may be empty and this test remains a smoke check
     if !result.is_empty() {
-        assert!(result.values().next().is_some(), "expect at least one document");
+        assert!(
+            result.values().next().is_some(),
+            "expect at least one document"
+        );
     }
 }

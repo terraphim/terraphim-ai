@@ -83,7 +83,7 @@ rootfs:
     COPY +tar2ext4/tar2ext4 /usr/bin/tar2ext4
 
     WORKDIR imgbuild
-    
+
     WITH DOCKER --load my-build:latest=+test-image
         RUN docker save my-build:latest > image.tar
     END
@@ -97,7 +97,7 @@ rootfs:
     WORKDIR rootfs
     RUN mkdir -pv rootfs/{sbin,dev,proc,run,sys,var} && \
         tar -cf ../rootfs.tar *
-    
+
     WORKDIR /imgbuild
 
     RUN tar2ext4 -i rootfs.tar -o rootfs.ext4 && \

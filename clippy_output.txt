@@ -1,0 +1,1978 @@
+warning: the borrowed expression implements the required traits
+   --> crates/terraphim_service/src/openrouter.rs:160:19
+    |
+160 |             .post(&format!("{}/chat/completions", self.base_url))
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("{}/chat/completions", self.base_url)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+    = note: `#[warn(clippy::needless_borrows_for_generic_args)]` on by default
+
+warning: clamp-like pattern without using clamp function
+   --> crates/terraphim_service/src/openrouter.rs:218:22
+    |
+218 |         let tokens = (max_chars / 3).max(50).min(500); // Reasonable bounds
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `(max_chars / 3).clamp(50, 500)`
+    |
+    = note: clamp will panic if max < min
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_clamp
+    = note: `#[warn(clippy::manual_clamp)]` on by default
+
+warning: the borrowed expression implements the required traits
+   --> crates/terraphim_service/src/openrouter.rs:276:19
+    |
+276 |             .post(&format!("{}/chat/completions", self.base_url))
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("{}/chat/completions", self.base_url)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+
+warning: the borrowed expression implements the required traits
+   --> crates/terraphim_service/src/openrouter.rs:312:18
+    |
+312 |             .get(&format!("{}/models", self.base_url))
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("{}/models", self.base_url)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+
+warning: redundant pattern matching, consider using `is_err()`
+   --> crates/terraphim_service/src/summarization_queue.rs:361:16
+    |
+361 |         if let Err(_) = self
+    |                ^^^^^^
+    |
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+    = note: `#[warn(clippy::redundant_pattern_matching)]` on by default
+help: try
+    |
+361 ~         if (self
+362 +             .command_sender
+363 +             .send(QueueCommand::SubmitTask(Box::new(task)))
+364 +             .await).is_err()
+    |
+
+warning: redundant pattern matching, consider using `is_err()`
+   --> crates/terraphim_service/src/summarization_queue.rs:392:16
+    |
+392 |         if let Err(_) = self
+    |                ^^^^^^
+    |
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+help: try
+    |
+392 ~         if (self
+393 +             .command_sender
+394 +             .send(QueueCommand::CancelTask(task_id, reason))
+395 +             .await).is_err()
+    |
+
+warning: redundant pattern matching, consider using `is_err()`
+   --> crates/terraphim_service/src/summarization_queue.rs:415:16
+    |
+415 |         if let Err(_) = self
+    |                ^^^^^^
+    |
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+help: try
+    |
+415 ~         if (self
+416 +             .command_sender
+417 +             .send(QueueCommand::GetStats(sender))
+418 +             .await).is_err()
+    |
+
+warning: redundant pattern matching, consider using `is_err()`
+   --> crates/terraphim_service/src/summarization_queue.rs:432:16
+    |
+432 |         if let Err(_) = self.command_sender.send(QueueCommand::Pause).await {
+    |         -------^^^^^^------------------------------------------------------ help: try: `if (self.command_sender.send(QueueCommand::Pause).await).is_err()`
+    |
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+
+warning: redundant pattern matching, consider using `is_err()`
+   --> crates/terraphim_service/src/summarization_queue.rs:442:16
+    |
+442 |         if let Err(_) = self.command_sender.send(QueueCommand::Resume).await {
+    |         -------^^^^^^------------------------------------------------------- help: try: `if (self.command_sender.send(QueueCommand::Resume).await).is_err()`
+    |
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+
+warning: redundant pattern matching, consider using `is_err()`
+   --> crates/terraphim_service/src/summarization_queue.rs:468:16
+    |
+468 |         if let Err(_) = self.command_sender.send(QueueCommand::Shutdown).await {
+    |         -------^^^^^^--------------------------------------------------------- help: try: `if (self.command_sender.send(QueueCommand::Shutdown).await).is_err()`
+    |
+    = note: this will change drop order of the result, as well as all temporaries
+    = note: add `#[allow(clippy::redundant_pattern_matching)]` if this is important
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_pattern_matching
+
+warning: this lifetime isn't used in the impl
+   --> crates/terraphim_service/src/lib.rs:106:6
+    |
+106 | impl<'a> TerraphimService {
+    |      ^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#extra_unused_lifetimes
+    = note: `#[warn(clippy::extra_unused_lifetimes)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_service/src/lib.rs:806:9
+    |
+806 |         placeholder.id = document_id.to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: document_id.to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_service/src/lib.rs:805:9
+    |
+805 |         let mut placeholder = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_service/src/lib.rs:831:13
+    |
+831 |             normalized_placeholder.id = normalized_id.clone();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: normalized_id.clone(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_service/src/lib.rs:830:13
+    |
+830 |             let mut normalized_placeholder = Document::default();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1183:25
+     |
+1183 |                         placeholder.id = document.id.clone();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: document.id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1182:25
+     |
+1182 |                         let mut placeholder = Document::default();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1235:25
+     |
+1235 |                         placeholder.id = document.id.clone();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: document.id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1234:25
+     |
+1234 |                         let mut placeholder = Document::default();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1247:29
+     |
+1247 | ...                   normalized_placeholder.id = normalized_id.clone();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: normalized_id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1246:29
+     |
+1246 | ...                   let mut normalized_placeholder = Document::default();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1257:33
+     |
+1257 | ...                   md_placeholder.id = normalized_id_with_md.clone();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: normalized_id_with_md.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1256:33
+     |
+1256 | ...                   let mut md_placeholder = Document::default();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1852:25
+     |
+1852 |                         placeholder.id = document.id.clone();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: document.id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1851:25
+     |
+1851 |                         let mut placeholder = Document::default();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1904:25
+     |
+1904 |                         placeholder.id = document.id.clone();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: document.id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1903:25
+     |
+1903 |                         let mut placeholder = Document::default();
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1916:29
+     |
+1916 | ...                   normalized_placeholder.id = normalized_id.clone();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: normalized_id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1915:29
+     |
+1915 | ...                   let mut normalized_placeholder = Document::default();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:1926:33
+     |
+1926 | ...                   md_placeholder.id = normalized_id_with_md.clone();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: normalized_id_with_md.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:1925:33
+     |
+1925 | ...                   let mut md_placeholder = Document::default();
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> crates/terraphim_service/src/lib.rs:2160:17
+     |
+2160 |                 placeholder.id = doc_id.clone();
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `terraphim_types::Document { id: doc_id.clone(), ..Default::default() }` and removing relevant reassignments
+    --> crates/terraphim_service/src/lib.rs:2159:17
+     |
+2159 |                 let mut placeholder = Document::default();
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: redundant closure
+    --> crates/terraphim_service/src/lib.rs:2293:60
+     |
+2293 |             OpenRouterService::new(api_key, model).map_err(|e| ServiceError::OpenRouter(e))?;
+     |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `ServiceError::OpenRouter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+     = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: redundant closure
+    --> crates/terraphim_service/src/lib.rs:2308:22
+     |
+2308 |             .map_err(|e| ServiceError::OpenRouter(e))?;
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `ServiceError::OpenRouter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+
+warning: `terraphim_service` (lib) generated 24 warnings (run `cargo clippy --fix --lib -p terraphim_service` to apply 5 suggestions)
+    Checking terraphim_mcp_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server)
+    Checking terraphim_tui v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_tui)
+warning: terraphim_server@0.1.0: No changes in JS source files, skipping JS build.
+warning: terraphim_server@0.1.0: Found ./dist, skipping copy
+    Checking terraphim_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/terraphim_server)
+warning: terraphim-ai-desktop@0.1.0: Successfully copied config files to build
+warning: field assignment outside of initializer for an instance created with Default::default()
+  --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:50:9
+   |
+50 |         document.id = input.to_string();
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider initializing the variable with `terraphim_types::Document { id: input.to_string(), ..Default::default() }` and removing relevant reassignments
+  --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:49:9
+   |
+49 |         let mut document = Document::default();
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+   = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:157:9
+    |
+157 |         document.id = id.to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: id.to_string(), title: format!("Test Document for {}", id), body: format!("This is the body content for document {}", id), url: format!("https://example.com/{}", id), description: Some(format!("Description for document {}", id)), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:156:9
+    |
+156 |         let mut document = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:169:9
+    |
+169 |         loaded_document.id = id.to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: id.to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:168:9
+    |
+168 |         let mut loaded_document = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:261:5
+    |
+261 |     document.id = document_id.to_string();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: document_id.to_string(), title: "Cross Backend Test Document".to_string(), body: "This is a test document for cross-backend consistency.".to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:260:5
+    |
+260 |     let mut document = Document::default();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:270:5
+    |
+270 |     loaded_document.id = document_id.to_string();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: document_id.to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:269:5
+    |
+269 |     let mut loaded_document = Document::default();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:404:9
+    |
+404 |         document.id = id;
+    |         ^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: id, ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/tests/persistence_consistency_test.rs:403:9
+    |
+403 |         let mut document = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+  --> crates/terraphim_persistence/src/document.rs:72:9
+   |
+72 |         test_doc.id = "test-document-123".to_string();
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider initializing the variable with `terraphim_types::Document { id: "test-document-123".to_string(), title: "Test Document".to_string(), body: "This is a test document for persistence validation.".to_string(), url: "https://example.com/test-document".to_string(), description: Some("Test document description".to_string()), summarization: Some("Test document AI-generated summary".to_string()), tags: Some(vec!["test".to_string(), "persistence".to_string()]), rank: Some(100), ..Default::default() }` and removing relevant reassignments
+  --> crates/terraphim_persistence/src/document.rs:71:9
+   |
+71 |         let mut test_doc = Document::default();
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+   = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:123:9
+    |
+123 |         test_doc.id = "test-document-all-backends".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "test-document-all-backends".to_string(), title: "Test Document All Backends".to_string(), body: "This document tests saving to all backends.".to_string(), url: "https://example.com/all-backends".to_string(), description: Some("Testing all backends".to_string()), summarization: Some("Summary for all backends test".to_string()), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:122:9
+    |
+122 |         let mut test_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:181:13
+    |
+181 |             test_doc.id = id.to_string();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: id.to_string(), title: format!("Test Document {}", id), body: format!("Body content for document {}", id), url: format!("https://example.com/{}", id), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:180:13
+    |
+180 |             let mut test_doc = Document::default();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:221:9
+    |
+221 |         test_doc.id = "memory-test-document".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "memory-test-document".to_string(), title: "Memory Backend Test".to_string(), body: "Testing memory backend persistence.".to_string(), url: "memory://test".to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:220:9
+    |
+220 |         let mut test_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:272:13
+    |
+272 |             document.id = id.to_string();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: id.to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:271:13
+    |
+271 |             let mut document = Document::default();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:292:9
+    |
+292 |         empty_doc.id = "empty-document".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "empty-document".to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:291:9
+    |
+291 |         let mut empty_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:328:9
+    |
+328 |         large_doc.id = "large-document".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "large-document".to_string(), title: "Large Document Test".to_string(), body: large_body.clone(), url: "https://example.com/large-doc".to_string(), description: Some("A document with large body content".to_string()), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:327:9
+    |
+327 |         let mut large_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:370:9
+    |
+370 |         unicode_doc.id = "unicode-document".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "unicode-document".to_string(), title: "Unicode Test: 🚀 café naïve résumé".to_string(), body: "Content with unicode: 中文, العربية, 🎉, математика".to_string(), url: "https://example.com/unicode".to_string(), description: Some("Testing unicode in documents: ñoño".to_string()), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:369:9
+    |
+369 |         let mut unicode_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:412:9
+    |
+412 |         test_doc.id = "redb-test-document".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "redb-test-document".to_string(), title: "ReDB Backend Test".to_string(), body: "Testing ReDB backend persistence.".to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:411:9
+    |
+411 |         let mut test_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/src/document.rs:454:9
+    |
+454 |         test_doc.id = "sqlite-test-document".to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: "sqlite-test-document".to_string(), title: "SQLite Backend Test".to_string(), body: "Testing SQLite backend persistence.".to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/src/document.rs:453:9
+    |
+453 |         let mut test_doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+  --> crates/terraphim_persistence/tests/quick_validation_test.rs:55:5
+   |
+55 |     document.id = "Test Document ID".to_string();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider initializing the variable with `terraphim_types::Document { id: "Test Document ID".to_string(), title: "Test Document".to_string(), body: "Test content".to_string(), ..Default::default() }` and removing relevant reassignments
+  --> crates/terraphim_persistence/tests/quick_validation_test.rs:54:5
+   |
+54 |     let mut document = Document::default();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+   = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+  --> crates/terraphim_persistence/tests/quick_validation_test.rs:70:5
+   |
+70 |     loaded_document.id = "Test Document ID".to_string();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider initializing the variable with `terraphim_types::Document { id: "Test Document ID".to_string(), ..Default::default() }` and removing relevant reassignments
+  --> crates/terraphim_persistence/tests/quick_validation_test.rs:69:5
+   |
+69 |     let mut loaded_document = Document::default();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/terraphim_persistence/tests/quick_validation_test.rs:103:9
+    |
+103 |         doc.id = input.to_string();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `terraphim_types::Document { id: input.to_string(), ..Default::default() }` and removing relevant reassignments
+   --> crates/terraphim_persistence/tests/quick_validation_test.rs:102:9
+    |
+102 |         let mut doc = Document::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: `terraphim_persistence` (test "persistence_consistency_test") generated 6 warnings
+warning: `terraphim_persistence` (lib test) generated 10 warnings
+warning: `terraphim_persistence` (test "quick_validation_test") generated 3 warnings
+    Checking terraphim_middleware v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware)
+warning: this import is redundant
+ --> crates/terraphim_middleware/tests/haystack_extra_parameters_test.rs:1:1
+  |
+1 | use serde_json;
+  | ^^^^^^^^^^^^^^^ help: remove it entirely
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_component_path_imports
+  = note: `#[warn(clippy::single_component_path_imports)]` on by default
+
+warning: used `assert_eq!` with a literal bool
+   --> crates/terraphim_middleware/tests/haystack_extra_parameters_test.rs:162:5
+    |
+162 |     assert_eq!(haystack.read_only, true);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+    = note: `#[warn(clippy::bool_assert_comparison)]` on by default
+help: replace it with `assert!(..)`
+    |
+162 -     assert_eq!(haystack.read_only, true);
+162 +     assert!(haystack.read_only);
+    |
+
+warning: `terraphim_middleware` (test "haystack_extra_parameters_test") generated 2 warnings (run `cargo clippy --fix --test "haystack_extra_parameters_test"` to apply 2 suggestions)
+warning: unused variable: `id`
+  --> crates/terraphim_middleware/src/tests/query_rs_haystack_test.rs:24:18
+   |
+24 |             for (id, doc) in index.iter() {
+   |                  ^^ help: if this is intentional, prefix it with an underscore: `_id`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `id`
+  --> crates/terraphim_middleware/src/tests/query_rs_haystack_test.rs:59:18
+   |
+59 |             for (id, doc) in index.iter() {
+   |                  ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `id`
+  --> crates/terraphim_middleware/src/tests/query_rs_haystack_test.rs:95:18
+   |
+95 |             for (id, doc) in index.iter() {
+   |                  ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: `terraphim_middleware` (lib test) generated 3 warnings
+warning: unused import: `std::collections::HashMap`
+ --> crates/terraphim_middleware/tests/query_rs_document_id_fix_test.rs:1:5
+  |
+1 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `Haystack` and `ServiceType`
+ --> crates/terraphim_middleware/tests/query_rs_document_id_fix_test.rs:2:24
+  |
+2 | use terraphim_config::{Haystack, ServiceType};
+  |                        ^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `terraphim_middleware::indexer::IndexMiddleware`
+ --> crates/terraphim_middleware/tests/query_rs_document_id_fix_test.rs:4:5
+  |
+4 | use terraphim_middleware::indexer::IndexMiddleware;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `terraphim_middleware` (test "query_rs_document_id_fix_test") generated 3 warnings (run `cargo clippy --fix --test "query_rs_document_id_fix_test"` to apply 3 suggestions)
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:154:23
+    |
+154 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:156:23
+    |
+156 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:158:23
+    |
+158 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:160:23
+    |
+160 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:162:23
+    |
+162 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:164:23
+    |
+164 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:166:23
+    |
+166 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:199:23
+    |
+199 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:201:23
+    |
+201 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:203:23
+    |
+203 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:205:23
+    |
+205 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:207:23
+    |
+207 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:154:23
+    |
+154 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:156:23
+    |
+156 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:158:23
+    |
+158 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:160:23
+    |
+160 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:162:23
+    |
+162 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:22:15
+   |
+22 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:24:15
+   |
+24 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:26:15
+   |
+26 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:28:15
+   |
+28 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:30:15
+   |
+30 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:32:15
+   |
+32 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+  --> crates/terraphim_middleware/tests/ripgrep.rs:34:15
+   |
+34 |         #[cfg(feature = "openrouter")]
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+   = help: consider adding `openrouter` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:209:23
+    |
+209 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:211:23
+    |
+211 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:233:23
+    |
+233 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:235:23
+    |
+235 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:237:23
+    |
+237 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:239:23
+    |
+239 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:241:23
+    |
+241 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:243:23
+    |
+243 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:245:23
+    |
+245 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:269:23
+    |
+269 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:271:23
+    |
+271 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:273:23
+    |
+273 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:275:23
+    |
+275 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:277:23
+    |
+277 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:279:23
+    |
+279 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:281:23
+    |
+281 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:479:23
+    |
+479 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:481:23
+    |
+481 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:483:23
+    |
+483 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:485:23
+    |
+485 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:487:23
+    |
+487 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: this `if` statement can be collapsed
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:456:13
+    |
+456 | /             if role_name.starts_with("Dual") && atomic_secret.is_some() {
+457 | |                 if *total > 0 {
+458 | |                     log::info!(
+459 | |                         "    ✅ Dual role '{}' found results for '{}'",
+...   |
+464 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+456 ~             if role_name.starts_with("Dual") && atomic_secret.is_some() && *total > 0 {
+457 +                 log::info!(
+458 ~                     "    ✅ Dual role '{}' found results for '{}'",
+459 +                     role_name,
+460 +                     term
+461 +                 );
+462 +             }
+    |
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:770:23
+    |
+770 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:772:23
+    |
+772 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:774:23
+    |
+774 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:776:23
+    |
+776 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:778:23
+    |
+778 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:780:23
+    |
+780 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openrouter`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:782:23
+    |
+782 |                 #[cfg(feature = "openrouter")]
+    |                       ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `mcp`, `mcp-client`, `mcp-rust-sdk`, `mcp-spec`, `mcp-sse`, and `reqwest-eventsource`
+    = help: consider adding `openrouter` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:140:13
+    |
+140 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+  --> crates/terraphim_middleware/tests/atlassian_ripgrep_integration.rs:22:16
+   |
+22 |     let role = Role {
+   |                ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/haystack_refactor_test.rs:243:16
+    |
+243 |     let role = Role {
+    |                ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:149:13
+    |
+149 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+ --> crates/terraphim_middleware/tests/ripgrep.rs:7:5
+  |
+7 |     Role {
+  |     ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+  --> crates/terraphim_middleware/tests/rolegraph_knowledge_graph_ranking_test.rs:40:35
+   |
+40 |     let terraphim_engineer_role = Role {
+   |                                   ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+  --> crates/terraphim_middleware/tests/clickup_haystack_test.rs:32:16
+   |
+32 |     let role = Role {
+   |                ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:142:13
+    |
+142 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:179:13
+    |
+179 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:224:13
+    |
+224 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:257:13
+    |
+257 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+  --> crates/terraphim_middleware/tests/clickup_haystack_test.rs:80:16
+   |
+80 |     let role = Role {
+   |                ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+For more information about this error, try `rustc --explain E0063`.
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs:470:13
+    |
+470 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error: could not compile `terraphim_middleware` (test "atlassian_ripgrep_integration") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:490:13
+    |
+490 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:762:13
+    |
+762 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:786:13
+    |
+786 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:969:13
+    |
+969 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1010:13
+     |
+1010 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+warning: `terraphim_middleware` (test "ripgrep") generated 7 warnings
+error: could not compile `terraphim_middleware` (test "ripgrep") due to 1 previous error; 7 warnings emitted
+error: could not compile `terraphim_middleware` (test "haystack_refactor_test") due to 1 previous error
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+   --> crates/terraphim_middleware/tests/dual_haystack_validation_test.rs:758:13
+    |
+758 |             Role {
+    |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1187:13
+     |
+1187 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1212:13
+     |
+1212 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1245:13
+     |
+1245 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1279:13
+     |
+1279 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error: could not compile `terraphim_middleware` (test "clickup_haystack_test") due to 2 previous errors
+error: could not compile `terraphim_middleware` (test "rolegraph_knowledge_graph_ranking_test") due to 1 previous error
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1514:13
+     |
+1514 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+error[E0063]: missing fields `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields in initializer of `terraphim_config::Role`
+    --> crates/terraphim_middleware/tests/atomic_roles_e2e_test.rs:1556:13
+     |
+1556 |             Role {
+     |             ^^^^ missing `openrouter_api_key`, `openrouter_auto_summarize`, `openrouter_chat_enabled` and 4 other fields
+
+warning: `terraphim_middleware` (test "dual_haystack_validation_test") generated 36 warnings
+error: could not compile `terraphim_middleware` (test "dual_haystack_validation_test") due to 5 previous errors; 36 warnings emitted
+error: could not compile `terraphim_middleware` (test "atomic_roles_e2e_test") due to 12 previous errors
+warning: `terraphim_middleware` (test "atomic_haystack_config_integration") generated 10 warnings
+error: could not compile `terraphim_middleware` (test "atomic_haystack_config_integration") due to 2 previous errors; 10 warnings emitted
+warning: unused variable: `role_name`
+   --> crates/terraphim_mcp_server/src/lib.rs:297:13
+    |
+297 |         let role_name = if let Some(role_str) = role {
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_role_name`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `role_name`
+   --> crates/terraphim_mcp_server/src/lib.rs:389:13
+    |
+389 |         let role_name = if let Some(role_str) = role {
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_role_name`
+
+warning: useless use of `format!`
+   --> crates/terraphim_mcp_server/src/lib.rs:369:28
+    |
+369 |                 let line = format!("{}", r.term);
+    |                            ^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `r.term.to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_format
+    = note: `#[warn(clippy::useless_format)]` on by default
+
+warning: you seem to use `.enumerate()` and immediately discard the index
+   --> crates/terraphim_mcp_server/src/lib.rs:736:48
+    |
+736 |                         for (_idx, matched) in matches.iter().enumerate() {
+    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_enumerate_index
+    = note: `#[warn(clippy::unused_enumerate_index)]` on by default
+help: remove the `.enumerate()` call
+    |
+736 -                         for (_idx, matched) in matches.iter().enumerate() {
+736 +                         for matched in matches.iter() {
+    |
+
+warning: this function can be simplified using the `async fn` syntax
+    --> crates/terraphim_mcp_server/src/lib.rs:1476:5
+     |
+1476 | /     fn call_tool(
+1477 | |         &self,
+1478 | |         request: CallToolRequestParam,
+1479 | |         _context: RequestContext<RoleServer>,
+1480 | |     ) -> impl std::future::Future<Output = Result<CallToolResult, ErrorData>> + Send + '_ {
+     | |_________________________________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_async_fn
+     = note: `#[warn(clippy::manual_async_fn)]` on by default
+help: make the function `async` and return the output of the future directly
+     |
+1476 ~     async fn call_tool(
+1477 +         &self,
+1478 +         request: CallToolRequestParam,
+1479 +         _context: RequestContext<RoleServer>,
+1480 ~     ) -> Result<CallToolResult, ErrorData> {
+1481 +         match request.name.as_ref() {
+1482 +             "search" => {
+1483 +                 let arguments = request.arguments.unwrap_or_default();
+1484 +                 let query = arguments
+1485 +                     .get("query")
+1486 +                     .and_then(|v| v.as_str())
+1487 +                     .ok_or_else(|| {
+1488 +                         ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+1489 +                     })?
+1490 +                     .to_string();
+1491 +
+1492 +                 let role = arguments
+1493 +                     .get("role")
+1494 +                     .and_then(|v| v.as_str())
+1495 +                     .map(|s| s.to_string());
+1496 +
+1497 +                 let limit = arguments
+1498 +                     .get("limit")
+1499 +                     .and_then(|v| v.as_i64())
+1500 +                     .map(|i| i as i32);
+1501 +
+1502 +                 let skip = arguments
+1503 +                     .get("skip")
+1504 +                     .and_then(|v| v.as_i64())
+1505 +                     .map(|i| i as i32);
+1506 +
+1507 +                 self.search(query, role, limit, skip)
+1508 +                     .await
+1509 +                     .map_err(TerraphimMcpError::Mcp)
+1510 +                     .map_err(ErrorData::from)
+1511 +             }
+1512 +             "update_config_tool" => {
+1513 +                 let arguments = request.arguments.unwrap_or_default();
+1514 +                 let config_str = arguments
+1515 +                     .get("config_str")
+1516 +                     .and_then(|v| v.as_str())
+1517 +                     .ok_or_else(|| {
+1518 +                         ErrorData::invalid_params(
+1519 +                             "Missing 'config_str' parameter".to_string(),
+1520 +                             None,
+1521 +                         )
+1522 +                     })?
+1523 +                     .to_string();
+1524 +
+1525 +                 self.update_config_tool(config_str)
+1526 +                     .await
+1527 +                     .map_err(TerraphimMcpError::Mcp)
+1528 +                     .map_err(ErrorData::from)
+1529 +             }
+1530 +             "build_autocomplete_index" => {
+1531 +                 let arguments = request.arguments.unwrap_or_default();
+1532 +                 let role = arguments
+1533 +                     .get("role")
+1534 +                     .and_then(|v| v.as_str())
+1535 +                     .map(|s| s.to_string());
+1536 +
+1537 +                 self.build_autocomplete_index(role)
+1538 +                     .await
+1539 +                     .map_err(TerraphimMcpError::Mcp)
+1540 +                     .map_err(ErrorData::from)
+1541 +             }
+1542 +             "fuzzy_autocomplete_search" => {
+1543 +                 let arguments = request.arguments.unwrap_or_default();
+1544 +                 let query = arguments
+1545 +                     .get("query")
+1546 +                     .and_then(|v| v.as_str())
+1547 +                     .ok_or_else(|| {
+1548 +                         ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+1549 +                     })?
+1550 +                     .to_string();
+1551 +
+1552 +                 let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
+1553 +
+1554 +                 let limit = arguments
+1555 +                     .get("limit")
+1556 +                     .and_then(|v| v.as_i64())
+1557 +                     .map(|i| i as usize);
+1558 +
+1559 +                 self.fuzzy_autocomplete_search(query, similarity, limit)
+1560 +                     .await
+1561 +                     .map_err(TerraphimMcpError::Mcp)
+1562 +                     .map_err(ErrorData::from)
+1563 +             }
+1564 +             "autocomplete_terms" => {
+1565 +                 let arguments = request.arguments.unwrap_or_default();
+1566 +                 let query = arguments
+1567 +                     .get("query")
+1568 +                     .and_then(|v| v.as_str())
+1569 +                     .ok_or_else(|| {
+1570 +                         ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+1571 +                     })?
+1572 +                     .to_string();
+1573 +                 let limit = arguments
+1574 +                     .get("limit")
+1575 +                     .and_then(|v| v.as_i64())
+1576 +                     .map(|i| i as usize);
+1577 +                 let role = arguments
+1578 +                     .get("role")
+1579 +                     .and_then(|v| v.as_str())
+1580 +                     .map(|s| s.to_string());
+1581 +                 self.autocomplete_terms(query, limit, role)
+1582 +                     .await
+1583 +                     .map_err(TerraphimMcpError::Mcp)
+1584 +                     .map_err(ErrorData::from)
+1585 +             }
+1586 +             "autocomplete_with_snippets" => {
+1587 +                 let arguments = request.arguments.unwrap_or_default();
+1588 +                 let query = arguments
+1589 +                     .get("query")
+1590 +                     .and_then(|v| v.as_str())
+1591 +                     .ok_or_else(|| {
+1592 +                         ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+1593 +                     })?
+1594 +                     .to_string();
+1595 +                 let limit = arguments
+1596 +                     .get("limit")
+1597 +                     .and_then(|v| v.as_i64())
+1598 +                     .map(|i| i as usize);
+1599 +                 let role = arguments
+1600 +                     .get("role")
+1601 +                     .and_then(|v| v.as_str())
+1602 +                     .map(|s| s.to_string());
+1603 +                 self.autocomplete_with_snippets(query, limit, role)
+1604 +                     .await
+1605 +                     .map_err(TerraphimMcpError::Mcp)
+1606 +                     .map_err(ErrorData::from)
+1607 +             }
+1608 +             "fuzzy_autocomplete_search_levenshtein" => {
+1609 +                 let arguments = request.arguments.unwrap_or_default();
+1610 +                 let query = arguments
+1611 +                     .get("query")
+1612 +                     .and_then(|v| v.as_str())
+1613 +                     .ok_or_else(|| {
+1614 +                         ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+1615 +                     })?
+1616 +                     .to_string();
+1617 +
+1618 +                 let max_edit_distance = arguments
+1619 +                     .get("max_edit_distance")
+1620 +                     .and_then(|v| v.as_i64())
+1621 +                     .map(|i| i as usize);
+1622 +
+1623 +                 let limit = arguments
+1624 +                     .get("limit")
+1625 +                     .and_then(|v| v.as_i64())
+1626 +                     .map(|i| i as usize);
+1627 +
+1628 +                 self.fuzzy_autocomplete_search_levenshtein(query, max_edit_distance, limit)
+1629 +                     .await
+1630 +                     .map_err(TerraphimMcpError::Mcp)
+1631 +                     .map_err(ErrorData::from)
+1632 +             }
+1633 +             "fuzzy_autocomplete_search_jaro_winkler" => {
+1634 +                 let arguments = request.arguments.unwrap_or_default();
+1635 +                 let query = arguments
+1636 +                     .get("query")
+1637 +                     .and_then(|v| v.as_str())
+1638 +                     .ok_or_else(|| {
+1639 +                         ErrorData::invalid_params("Missing 'query' parameter".to_string(), None)
+1640 +                     })?
+1641 +                     .to_string();
+1642 +
+1643 +                 let similarity = arguments.get("similarity").and_then(|v| v.as_f64());
+1644 +
+1645 +                 let limit = arguments
+1646 +                     .get("limit")
+1647 +                     .and_then(|v| v.as_i64())
+1648 +                     .map(|i| i as usize);
+1649 +
+1650 +                 self.fuzzy_autocomplete_search_jaro_winkler(query, similarity, limit)
+1651 +                     .await
+1652 +                     .map_err(TerraphimMcpError::Mcp)
+1653 +                     .map_err(ErrorData::from)
+1654 +             }
+1655 +             "serialize_autocomplete_index" => self
+1656 +                 .serialize_autocomplete_index()
+1657 +                 .await
+1658 +                 .map_err(TerraphimMcpError::Mcp)
+1659 +                 .map_err(ErrorData::from),
+1660 +             "deserialize_autocomplete_index" => {
+1661 +                 let arguments = request.arguments.unwrap_or_default();
+1662 +                 let base64_data = arguments
+1663 +                     .get("base64_data")
+1664 +                     .and_then(|v| v.as_str())
+1665 +                     .ok_or_else(|| {
+1666 +                         ErrorData::invalid_params(
+1667 +                             "Missing 'base64_data' parameter".to_string(),
+1668 +                             None,
+1669 +                         )
+1670 +                     })?
+1671 +                     .to_string();
+1672 +
+1673 +                 self.deserialize_autocomplete_index(base64_data)
+1674 +                     .await
+1675 +                     .map_err(TerraphimMcpError::Mcp)
+1676 +                     .map_err(ErrorData::from)
+1677 +             }
+1678 +             "find_matches" => {
+1679 +                 let arguments = request.arguments.unwrap_or_default();
+1680 +                 let text = arguments
+1681 +                     .get("text")
+1682 +                     .and_then(|v| v.as_str())
+1683 +                     .ok_or_else(|| {
+1684 +                         ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+1685 +                     })?
+1686 +                     .to_string();
+1687 +                 let role = arguments
+1688 +                     .get("role")
+1689 +                     .and_then(|v| v.as_str())
+1690 +                     .map(|s| s.to_string());
+1691 +                 let return_positions = arguments
+1692 +                     .get("return_positions")
+1693 +                     .and_then(|v| v.as_bool())
+1694 +                     .unwrap_or(false);
+1695 +
+1696 +                 self.find_matches(text, role, Some(return_positions))
+1697 +                     .await
+1698 +                     .map_err(TerraphimMcpError::Mcp)
+1699 +                     .map_err(ErrorData::from)
+1700 +             }
+1701 +             "replace_matches" => {
+1702 +                 let arguments = request.arguments.unwrap_or_default();
+1703 +                 let text = arguments
+1704 +                     .get("text")
+1705 +                     .and_then(|v| v.as_str())
+1706 +                     .ok_or_else(|| {
+1707 +                         ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+1708 +                     })?
+1709 +                     .to_string();
+1710 +                 let role = arguments
+1711 +                     .get("role")
+1712 +                     .and_then(|v| v.as_str())
+1713 +                     .map(|s| s.to_string());
+1714 +                 let link_type = arguments
+1715 +                     .get("link_type")
+1716 +                     .and_then(|v| v.as_str())
+1717 +                     .ok_or_else(|| {
+1718 +                         ErrorData::invalid_params(
+1719 +                             "Missing 'link_type' parameter".to_string(),
+1720 +                             None,
+1721 +                         )
+1722 +                     })?
+1723 +                     .to_string();
+1724 +
+1725 +                 self.replace_matches(text, role, link_type)
+1726 +                     .await
+1727 +                     .map_err(TerraphimMcpError::Mcp)
+1728 +                     .map_err(ErrorData::from)
+1729 +             }
+1730 +             "extract_paragraphs_from_automata" => {
+1731 +                 let arguments = request.arguments.unwrap_or_default();
+1732 +                 let text = arguments
+1733 +                     .get("text")
+1734 +                     .and_then(|v| v.as_str())
+1735 +                     .ok_or_else(|| {
+1736 +                         ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+1737 +                     })?
+1738 +                     .to_string();
+1739 +                 let role = arguments
+1740 +                     .get("role")
+1741 +                     .and_then(|v| v.as_str())
+1742 +                     .map(|s| s.to_string());
+1743 +                 let include_term = arguments
+1744 +                     .get("include_term")
+1745 +                     .and_then(|v| v.as_bool())
+1746 +                     .unwrap_or(true);
+1747 +
+1748 +                 self.extract_paragraphs_from_automata(text, role, Some(include_term))
+1749 +                     .await
+1750 +                     .map_err(TerraphimMcpError::Mcp)
+1751 +                     .map_err(ErrorData::from)
+1752 +             }
+1753 +             "json_decode" => {
+1754 +                 let arguments = request.arguments.unwrap_or_default();
+1755 +                 let jsonlines = arguments
+1756 +                     .get("jsonlines")
+1757 +                     .and_then(|v| v.as_str())
+1758 +                     .ok_or_else(|| {
+1759 +                         ErrorData::invalid_params(
+1760 +                             "Missing 'jsonlines' parameter".to_string(),
+1761 +                             None,
+1762 +                         )
+1763 +                     })?
+1764 +                     .to_string();
+1765 +
+1766 +                 self.json_decode(jsonlines)
+1767 +                     .await
+1768 +                     .map_err(TerraphimMcpError::Mcp)
+1769 +                     .map_err(ErrorData::from)
+1770 +             }
+1771 +             "load_thesaurus" => {
+1772 +                 let arguments = request.arguments.unwrap_or_default();
+1773 +                 let automata_path = arguments
+1774 +                     .get("automata_path")
+1775 +                     .and_then(|v| v.as_str())
+1776 +                     .ok_or_else(|| {
+1777 +                         ErrorData::invalid_params(
+1778 +                             "Missing 'automata_path' parameter".to_string(),
+1779 +                             None,
+1780 +                         )
+1781 +                     })?
+1782 +                     .to_string();
+1783 +
+1784 +                 self.load_thesaurus(automata_path)
+1785 +                     .await
+1786 +                     .map_err(TerraphimMcpError::Mcp)
+1787 +                     .map_err(ErrorData::from)
+1788 +             }
+1789 +             "load_thesaurus_from_json" => {
+1790 +                 let arguments = request.arguments.unwrap_or_default();
+1791 +                 let json_str = arguments
+1792 +                     .get("json_str")
+1793 +                     .and_then(|v| v.as_str())
+1794 +                     .ok_or_else(|| {
+1795 +                         ErrorData::invalid_params(
+1796 +                             "Missing 'json_str' parameter".to_string(),
+1797 +                             None,
+1798 +                         )
+1799 +                     })?
+1800 +                     .to_string();
+1801 +
+1802 +                 self.load_thesaurus_from_json(json_str)
+1803 +                     .await
+1804 +                     .map_err(TerraphimMcpError::Mcp)
+1805 +                     .map_err(ErrorData::from)
+1806 +             }
+1807 +             "is_all_terms_connected_by_path" => {
+1808 +                 let arguments = request.arguments.unwrap_or_default();
+1809 +                 let text = arguments
+1810 +                     .get("text")
+1811 +                     .and_then(|v| v.as_str())
+1812 +                     .ok_or_else(|| {
+1813 +                         ErrorData::invalid_params("Missing 'text' parameter".to_string(), None)
+1814 +                     })?
+1815 +                     .to_string();
+1816 +                 let role = arguments
+1817 +                     .get("role")
+1818 +                     .and_then(|v| v.as_str())
+1819 +                     .map(|s| s.to_string());
+1820 +
+1821 +                 self.is_all_terms_connected_by_path(text, role)
+1822 +                     .await
+1823 +                     .map_err(TerraphimMcpError::Mcp)
+1824 +                     .map_err(ErrorData::from)
+1825 +             }
+1826 +             _ => Err(ErrorData::method_not_found::<
+1827 +                 rmcp::model::CallToolRequestMethod,
+1828 +             >()),
+1829 +         }
+1830 +     }
+     |
+
+warning: this function can be simplified using the `async fn` syntax
+    --> crates/terraphim_mcp_server/src/lib.rs:1834:5
+     |
+1834 | /     fn list_resources(
+1835 | |         &self,
+1836 | |         _request: Option<rmcp::model::PaginatedRequestParam>,
+1837 | |         _context: RequestContext<RoleServer>,
+1838 | |     ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> + Send + '_ {
+     | |______________________________________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_async_fn
+help: make the function `async` and return the output of the future directly
+     |
+1834 ~     async fn list_resources(
+1835 +         &self,
+1836 +         _request: Option<rmcp::model::PaginatedRequestParam>,
+1837 +         _context: RequestContext<RoleServer>,
+1838 ~     ) -> Result<ListResourcesResult, ErrorData> {
+1839 +         let mut service = self
+1840 +             .terraphim_service()
+1841 +             .await
+1842 +             .map_err(|e| TerraphimMcpError::Anyhow(e))?;
+1843 +
+1844 +         // Use a broad search term to find documents instead of empty search
+1845 +         // We'll try common terms that should match documents in our KG
+1846 +         let search_terms = vec!["terraphim", "graph", "service", "haystack"];
+1847 +         let mut all_documents = std::collections::HashSet::new();
+1848 +
+1849 +         // Perform multiple searches to gather available documents
+1850 +         for term in search_terms {
+1851 +             let search_query = terraphim_types::SearchQuery {
+1852 +                 search_term: terraphim_types::NormalizedTermValue::new(term.to_string()),
+1853 +                 search_terms: None,
+1854 +                 operator: None,
+1855 +                 limit: Some(50), // Reasonable limit per search
+1856 +                 skip: None,
+1857 +                 role: None,
+1858 +             };
+1859 +
+1860 +             match service.search(&search_query).await {
+1861 +                 Ok(documents) => {
+1862 +                     for doc in documents {
+1863 +                         all_documents.insert(doc.id.clone());
+1864 +                     }
+1865 +                 }
+1866 +                 Err(_) => {
+1867 +                     // Continue with other terms if one fails
+1868 +                     continue;
+1869 +                 }
+1870 +             }
+1871 +         }
+1872 +
+1873 +         // If we still have no documents, try a final broad search
+1874 +         if all_documents.is_empty() {
+1875 +             let fallback_query = terraphim_types::SearchQuery {
+1876 +                 search_term: terraphim_types::NormalizedTermValue::new("*".to_string()),
+1877 +                 search_terms: None,
+1878 +                 operator: None,
+1879 +                 limit: Some(100),
+1880 +                 skip: None,
+1881 +                 role: None,
+1882 +             };
+1883 +
+1884 +             let documents = service
+1885 +                 .search(&fallback_query)
+1886 +                 .await
+1887 +                 .map_err(TerraphimMcpError::Service)?;
+1888 +
+1889 +             let resources = self
+1890 +                 .resource_mapper
+1891 +                 .documents_to_resources(&documents)
+1892 +                 .map_err(TerraphimMcpError::Anyhow)?;
+1893 +
+1894 +             return Ok(ListResourcesResult {
+1895 +                 resources,
+1896 +                 next_cursor: None,
+1897 +             });
+1898 +         }
+1899 +
+1900 +         // Convert unique document IDs back to documents for resource mapping
+1901 +         // For now, we'll do individual searches to get full document objects
+1902 +         let mut final_documents = Vec::new();
+1903 +         for doc_id in all_documents.iter().take(50) {
+1904 +             // Limit to 50 resources
+1905 +             if let Ok(Some(doc)) = service.get_document_by_id(doc_id).await {
+1906 +                 final_documents.push(doc);
+1907 +             }
+1908 +         }
+1909 +
+1910 +         let resources = self
+1911 +             .resource_mapper
+1912 +             .documents_to_resources(&final_documents)
+1913 +             .map_err(TerraphimMcpError::Anyhow)?;
+1914 +
+1915 +         Ok(ListResourcesResult {
+1916 +             resources,
+1917 +             next_cursor: None,
+1918 +         })
+1919 +     }
+     |
+
+warning: redundant closure
+    --> crates/terraphim_mcp_server/src/lib.rs:1843:26
+     |
+1843 |                 .map_err(|e| TerraphimMcpError::Anyhow(e))?;
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `TerraphimMcpError::Anyhow`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+     = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: redundant closure
+    --> crates/terraphim_mcp_server/src/lib.rs:1935:22
+     |
+1935 |             .map_err(|e| TerraphimMcpError::Anyhow(e))?;
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `TerraphimMcpError::Anyhow`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+
+warning: returning the result of a `let` binding from a block
+    --> crates/terraphim_mcp_server/src/lib.rs:1965:9
+     |
+1957 | /         let server_info = ServerInfo {
+1958 | |             server_info: rmcp::model::Implementation {
+1959 | |                 name: "terraphim-mcp".to_string(),
+1960 | |                 version: env!("CARGO_PKG_VERSION").to_string(),
+...    |
+1963 | |             ..Default::default()
+1964 | |         };
+     | |__________- unnecessary `let` binding
+1965 |           server_info
+     |           ^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#let_and_return
+     = note: `#[warn(clippy::let_and_return)]` on by default
+help: return the expression directly
+     |
+1957 ~
+1958 ~         ServerInfo {
+1959 +             server_info: rmcp::model::Implementation {
+1960 +                 name: "terraphim-mcp".to_string(),
+1961 +                 version: env!("CARGO_PKG_VERSION").to_string(),
+1962 +             },
+1963 +             instructions: Some("This server provides Terraphim knowledge graph search capabilities through the Model Context Protocol. You can search for documents using the search tool and access resources that represent Terraphim documents.".to_string()),
+1964 +             ..Default::default()
+1965 +         }
+     |
+
+warning: `terraphim_mcp_server` (lib) generated 9 warnings (run `cargo clippy --fix --lib -p terraphim_mcp_server` to apply 7 suggestions)
+warning: unneeded `return` statement
+   --> terraphim_server/src/api.rs:623:29
+    |
+623 | / ...                   return Ok(Json(ChatResponse {
+624 | | ...                       status: Status::Success,
+625 | | ...                       message: Some(reply),
+626 | | ...                       model_used: Some(used_model),
+627 | | ...                       error: None,
+628 | | ...                   }));
+    | |_________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+    = note: `#[warn(clippy::needless_return)]` on by default
+help: remove `return`
+    |
+623 ~                             Ok(Json(ChatResponse {
+624 +                                 status: Status::Success,
+625 +                                 message: Some(reply),
+626 +                                 model_used: Some(used_model),
+627 +                                 error: None,
+628 ~                             }))
+    |
+
+warning: unneeded `return` statement
+   --> terraphim_server/src/api.rs:631:29
+    |
+631 | / ...                   return Ok(Json(ChatResponse {
+632 | | ...                       status: Status::Error,
+633 | | ...                       message: None,
+634 | | ...                       model_used: Some(used_model),
+635 | | ...                       error: Some(format!("Chat failed: {}", e)),
+636 | | ...                   }));
+    | |_________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+help: remove `return`
+    |
+631 ~                             Ok(Json(ChatResponse {
+632 +                                 status: Status::Error,
+633 +                                 message: None,
+634 +                                 model_used: Some(used_model),
+635 +                                 error: Some(format!("Chat failed: {}", e)),
+636 ~                             }))
+    |
+
+warning: unneeded `return` statement
+   --> terraphim_server/src/api.rs:641:21
+    |
+641 | /                     return Ok(Json(ChatResponse {
+642 | |                         status: Status::Error,
+643 | |                         message: None,
+644 | |                         model_used: None,
+645 | |                         error: Some(format!("Failed to initialize OpenRouter: {}", e)),
+646 | |                     }));
+    | |_______________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_return
+help: remove `return`
+    |
+641 ~                     Ok(Json(ChatResponse {
+642 +                         status: Status::Error,
+643 +                         message: None,
+644 +                         model_used: None,
+645 +                         error: Some(format!("Failed to initialize OpenRouter: {}", e)),
+646 ~                     }))
+    |
+
+warning: compiling a regex in a loop
+   --> terraphim_server/src/lib.rs:215:62
+    |
+215 | ...                   let re = Regex::new(r"[^a-zA-Z0-9]+")
+    |                                ^^^^^^^^^^
+    |
+help: move the regex construction outside this loop
+   --> terraphim_server/src/lib.rs:201:33
+    |
+201 | ...                   for entry in entries.filter_map(|e| e.ok()) {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#regex_creation_in_loops
+    = note: `#[warn(clippy::regex_creation_in_loops)]` on by default
+
+warning: compiling a regex in a loop
+   --> terraphim_server/src/lib.rs:300:66
+    |
+300 | ...                   let re = Regex::new(r"[^a-zA-Z0-9]+")
+    |                                ^^^^^^^^^^
+    |
+help: move the regex construction outside this loop
+   --> terraphim_server/src/lib.rs:280:37
+    |
+280 | / ...                   for entry in WalkDir::new(&haystack.location)
+281 | | ...                       .into_iter()
+282 | | ...                       .filter_map(|e| e.ok())
+283 | | ...                       .filter(|e| e.file_type().is_file())
+    | |______________________________________________________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#regex_creation_in_loops
+
+warning: `terraphim_server` (lib) generated 5 warnings (run `cargo clippy --fix --lib -p terraphim_server` to apply 3 suggestions)

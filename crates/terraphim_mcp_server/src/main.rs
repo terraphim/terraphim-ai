@@ -2,12 +2,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use rmcp::{ServiceExt, transport::{stdio, sse_server::{SseServer, SseServerConfig}}};
+use rmcp::{
+    transport::{
+        sse_server::{SseServer, SseServerConfig},
+        stdio,
+    },
+    ServiceExt,
+};
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_mcp_server::McpService;
-use tokio_util;
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[derive(Parser, Debug)]
 #[command(name = "terraphim_mcp_server")]
@@ -49,16 +53,19 @@ async fn shutdown_signal() {
 async fn main() -> Result<()> {
     // Initialize logging
     let args = Args::parse();
-    
+
     // Standardized tracing setup
-    let level = if args.verbose { Level::DEBUG } else { Level::INFO };
+    let level = if args.verbose {
+        Level::DEBUG
+    } else {
+        Level::INFO
+    };
     let subscriber = tracing_subscriber::fmt()
         .with_max_level(level)
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(level.into())
+            tracing_subscriber::EnvFilter::from_default_env().add_directive(level.into()),
         );
-        
+
     if args.sse {
         // SSE mode needs timestamps for server logs - write to stdout
         subscriber.init();
@@ -69,10 +76,10 @@ async fn main() -> Result<()> {
             .with_writer(std::io::stderr)
             .init();
     }
-    
+
     info!("Starting Terraphim MCP Server...");
     info!("Args: {:?}", args);
-    
+
     // Build configuration based on selected profile
     let config = match args.profile {
         ConfigProfile::Desktop => {
@@ -99,10 +106,10 @@ async fn main() -> Result<()> {
 
     // Create the MCP service
     let service = McpService::new(Arc::new(config_state));
-    
+
     if args.sse {
         info!("Starting SSE server on {}", args.bind);
-        
+
         // Start SSE server
         let config = SseServerConfig {
             bind: args.bind.parse().expect("Invalid bind address"),
@@ -128,20 +135,20 @@ async fn main() -> Result<()> {
         });
 
         let _ct = sse_server.with_service(move || service.clone());
-        
+
         // Wait for shutdown signal
         shutdown_signal().await;
     } else {
         info!("Starting stdio server");
-        
+
         // Initialize autocomplete index by default
         service.init_autocomplete_default().await;
         info!("Initialized Terraphim MCP service");
-        
+
         // Start stdio server
         let mcp_service = service.serve(stdio()).await?;
         mcp_service.waiting().await?;
     }
-    
+
     Ok(())
 }

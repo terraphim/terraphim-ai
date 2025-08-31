@@ -45,9 +45,9 @@ impl Persistable for Document {
     fn get_key(&self) -> String {
         let normalized = self.normalize_key(&self.id);
         let key = format!("document_{}.json", normalized);
-        
+
         log::debug!("Document key generation: id='{}' → key='{}'", self.id, key);
-        
+
         key
     }
 }
@@ -68,15 +68,17 @@ mod tests {
         init_test_persistence().await?;
 
         // Create a test document
-        let mut test_doc = Document::default();
-        test_doc.id = "test-document-123".to_string();
-        test_doc.title = "Test Document".to_string();
-        test_doc.body = "This is a test document for persistence validation.".to_string();
-        test_doc.url = "https://example.com/test-document".to_string();
-        test_doc.description = Some("Test document description".to_string());
-        test_doc.summarization = Some("Test document AI-generated summary".to_string());
-        test_doc.tags = Some(vec!["test".to_string(), "persistence".to_string()]);
-        test_doc.rank = Some(100);
+        let test_doc = Document {
+            id: "test-document-123".to_string(),
+            title: "Test Document".to_string(),
+            body: "This is a test document for persistence validation.".to_string(),
+            url: "https://example.com/test-document".to_string(),
+            description: Some("Test document description".to_string()),
+            summarization: Some("Test document AI-generated summary".to_string()),
+            tags: Some(vec!["test".to_string(), "persistence".to_string()]),
+            rank: Some(100),
+            ..Default::default()
+        };
 
         // Save the document
         test_doc.save_to_one("memory").await?;
@@ -87,13 +89,28 @@ mod tests {
 
         // Verify all fields match
         assert_eq!(loaded_doc.id, test_doc.id, "Document IDs should match");
-        assert_eq!(loaded_doc.title, test_doc.title, "Document titles should match");
-        assert_eq!(loaded_doc.body, test_doc.body, "Document bodies should match");
+        assert_eq!(
+            loaded_doc.title, test_doc.title,
+            "Document titles should match"
+        );
+        assert_eq!(
+            loaded_doc.body, test_doc.body,
+            "Document bodies should match"
+        );
         assert_eq!(loaded_doc.url, test_doc.url, "Document URLs should match");
-        assert_eq!(loaded_doc.description, test_doc.description, "Document descriptions should match");
-        assert_eq!(loaded_doc.summarization, test_doc.summarization, "Document summarizations should match");
+        assert_eq!(
+            loaded_doc.description, test_doc.description,
+            "Document descriptions should match"
+        );
+        assert_eq!(
+            loaded_doc.summarization, test_doc.summarization,
+            "Document summarizations should match"
+        );
         assert_eq!(loaded_doc.tags, test_doc.tags, "Document tags should match");
-        assert_eq!(loaded_doc.rank, test_doc.rank, "Document ranks should match");
+        assert_eq!(
+            loaded_doc.rank, test_doc.rank,
+            "Document ranks should match"
+        );
 
         Ok(())
     }
@@ -104,13 +121,15 @@ mod tests {
         init_test_persistence().await?;
 
         // Create a test document
-        let mut test_doc = Document::default();
-        test_doc.id = "test-document-all-backends".to_string();
-        test_doc.title = "Test Document All Backends".to_string();
-        test_doc.body = "This document tests saving to all backends.".to_string();
-        test_doc.url = "https://example.com/all-backends".to_string();
-        test_doc.description = Some("Testing all backends".to_string());
-        test_doc.summarization = Some("Summary for all backends test".to_string());
+        let test_doc = Document {
+            id: "test-document-all-backends".to_string(),
+            title: "Test Document All Backends".to_string(),
+            body: "This document tests saving to all backends.".to_string(),
+            url: "https://example.com/all-backends".to_string(),
+            description: Some("Testing all backends".to_string()),
+            summarization: Some("Summary for all backends test".to_string()),
+            ..Default::default()
+        };
 
         // Save the document to all backends
         test_doc.save().await?;
@@ -121,11 +140,23 @@ mod tests {
 
         // Verify loaded document matches original
         assert_eq!(loaded_doc.id, test_doc.id, "Document IDs should match");
-        assert_eq!(loaded_doc.title, test_doc.title, "Document titles should match");
-        assert_eq!(loaded_doc.body, test_doc.body, "Document bodies should match");
+        assert_eq!(
+            loaded_doc.title, test_doc.title,
+            "Document titles should match"
+        );
+        assert_eq!(
+            loaded_doc.body, test_doc.body,
+            "Document bodies should match"
+        );
         assert_eq!(loaded_doc.url, test_doc.url, "Document URLs should match");
-        assert_eq!(loaded_doc.description, test_doc.description, "Document descriptions should match");
-        assert_eq!(loaded_doc.summarization, test_doc.summarization, "Document summarizations should match");
+        assert_eq!(
+            loaded_doc.description, test_doc.description,
+            "Document descriptions should match"
+        );
+        assert_eq!(
+            loaded_doc.summarization, test_doc.summarization,
+            "Document summarizations should match"
+        );
 
         Ok(())
     }
@@ -150,11 +181,13 @@ mod tests {
             println!("Testing document persistence for ID: '{}'", id);
 
             // Create document
-            let mut test_doc = Document::default();
-            test_doc.id = id.to_string();
-            test_doc.title = format!("Test Document {}", id);
-            test_doc.body = format!("Body content for document {}", id);
-            test_doc.url = format!("https://example.com/{}", id);
+            let test_doc = Document {
+                id: id.to_string(),
+                title: format!("Test Document {}", id),
+                body: format!("Body content for document {}", id),
+                url: format!("https://example.com/{}", id),
+                ..Default::default()
+            };
 
             // Save document
             test_doc.save_to_one("memory").await?;
@@ -165,8 +198,18 @@ mod tests {
 
             // Verify
             assert_eq!(loaded_doc.id, id, "Document ID should match for '{}'", id);
-            assert_eq!(loaded_doc.title, format!("Test Document {}", id), "Document title should match for '{}'", id);
-            assert_eq!(loaded_doc.body, format!("Body content for document {}", id), "Document body should match for '{}'", id);
+            assert_eq!(
+                loaded_doc.title,
+                format!("Test Document {}", id),
+                "Document title should match for '{}'",
+                id
+            );
+            assert_eq!(
+                loaded_doc.body,
+                format!("Body content for document {}", id),
+                "Document body should match for '{}'",
+                id
+            );
 
             println!("  ✅ Successfully persisted document with ID: '{}'", id);
         }
@@ -180,11 +223,13 @@ mod tests {
         init_test_persistence().await?;
 
         // Create a test document
-        let mut test_doc = Document::default();
-        test_doc.id = "memory-test-document".to_string();
-        test_doc.title = "Memory Backend Test".to_string();
-        test_doc.body = "Testing memory backend persistence.".to_string();
-        test_doc.url = "memory://test".to_string();
+        let test_doc = Document {
+            id: "memory-test-document".to_string(),
+            title: "Memory Backend Test".to_string(),
+            body: "Testing memory backend persistence.".to_string(),
+            url: "memory://test".to_string(),
+            ..Default::default()
+        };
 
         // Save to memory backend
         test_doc.save_to_one("memory").await?;
@@ -194,10 +239,22 @@ mod tests {
         loaded_doc = loaded_doc.load().await?;
 
         // Verify
-        assert_eq!(loaded_doc.id, test_doc.id, "Memory backend document ID should match");
-        assert_eq!(loaded_doc.title, test_doc.title, "Memory backend document title should match");
-        assert_eq!(loaded_doc.body, test_doc.body, "Memory backend document body should match");
-        assert_eq!(loaded_doc.url, test_doc.url, "Memory backend document URL should match");
+        assert_eq!(
+            loaded_doc.id, test_doc.id,
+            "Memory backend document ID should match"
+        );
+        assert_eq!(
+            loaded_doc.title, test_doc.title,
+            "Memory backend document title should match"
+        );
+        assert_eq!(
+            loaded_doc.body, test_doc.body,
+            "Memory backend document body should match"
+        );
+        assert_eq!(
+            loaded_doc.url, test_doc.url,
+            "Memory backend document URL should match"
+        );
 
         Ok(())
     }
@@ -212,17 +269,24 @@ mod tests {
             ("Doc-with-Dashes_123", "document_doc_with_dashes_123.json"),
             ("Doc@Special#Chars!", "document_doc_special_chars.json"),
             ("UPPERCASE_DOC", "document_uppercase_doc.json"),
-            ("http://example.com/doc", "document_http_example_com_doc.json"),
+            (
+                "http://example.com/doc",
+                "document_http_example_com_doc.json",
+            ),
         ];
 
         for (id, expected_key) in test_cases {
-            let mut document = Document::default();
-            document.id = id.to_string();
+            let document = Document {
+                id: id.to_string(),
+                ..Default::default()
+            };
             let actual_key = document.get_key();
-            
-            assert_eq!(actual_key, expected_key, 
-                      "Key normalization failed for ID '{}': got '{}', expected '{}'", 
-                      id, actual_key, expected_key);
+
+            assert_eq!(
+                actual_key, expected_key,
+                "Key normalization failed for ID '{}': got '{}', expected '{}'",
+                id, actual_key, expected_key
+            );
         }
 
         Ok(())
@@ -234,8 +298,10 @@ mod tests {
         init_test_persistence().await?;
 
         // Test saving and loading a minimal document
-        let mut empty_doc = Document::default();
-        empty_doc.id = "empty-document".to_string();
+        let empty_doc = Document {
+            id: "empty-document".to_string(),
+            ..Default::default()
+        };
         // All other fields remain default/empty
 
         // Save empty document
@@ -246,11 +312,17 @@ mod tests {
         loaded_doc = loaded_doc.load().await?;
 
         // Verify
-        assert_eq!(loaded_doc.id, "empty-document", "Empty document ID should match");
+        assert_eq!(
+            loaded_doc.id, "empty-document",
+            "Empty document ID should match"
+        );
         assert_eq!(loaded_doc.title, "", "Empty document title should be empty");
         assert_eq!(loaded_doc.body, "", "Empty document body should be empty");
         assert_eq!(loaded_doc.url, "", "Empty document URL should be empty");
-        assert_eq!(loaded_doc.description, None, "Empty document description should be None");
+        assert_eq!(
+            loaded_doc.description, None,
+            "Empty document description should be None"
+        );
         assert_eq!(loaded_doc.tags, None, "Empty document tags should be None");
         assert_eq!(loaded_doc.rank, None, "Empty document rank should be None");
 
@@ -264,12 +336,14 @@ mod tests {
 
         // Create a document with large content
         let large_body = "Lorem ipsum ".repeat(1000); // ~11KB of text
-        let mut large_doc = Document::default();
-        large_doc.id = "large-document".to_string();
-        large_doc.title = "Large Document Test".to_string();
-        large_doc.body = large_body.clone();
-        large_doc.url = "https://example.com/large-doc".to_string();
-        large_doc.description = Some("A document with large body content".to_string());
+        let large_doc = Document {
+            id: "large-document".to_string(),
+            title: "Large Document Test".to_string(),
+            body: large_body.clone(),
+            url: "https://example.com/large-doc".to_string(),
+            description: Some("A document with large body content".to_string()),
+            ..Default::default()
+        };
 
         // Save large document
         large_doc.save_to_one("memory").await?;
@@ -279,10 +353,23 @@ mod tests {
         loaded_doc = loaded_doc.load().await?;
 
         // Verify large content is preserved
-        assert_eq!(loaded_doc.id, large_doc.id, "Large document ID should match");
-        assert_eq!(loaded_doc.title, large_doc.title, "Large document title should match");
-        assert_eq!(loaded_doc.body, large_body, "Large document body should match");
-        assert_eq!(loaded_doc.body.len(), large_body.len(), "Large document body length should match");
+        assert_eq!(
+            loaded_doc.id, large_doc.id,
+            "Large document ID should match"
+        );
+        assert_eq!(
+            loaded_doc.title, large_doc.title,
+            "Large document title should match"
+        );
+        assert_eq!(
+            loaded_doc.body, large_body,
+            "Large document body should match"
+        );
+        assert_eq!(
+            loaded_doc.body.len(),
+            large_body.len(),
+            "Large document body length should match"
+        );
 
         Ok(())
     }
@@ -293,12 +380,14 @@ mod tests {
         init_test_persistence().await?;
 
         // Create document with unicode content
-        let mut unicode_doc = Document::default();
-        unicode_doc.id = "unicode-document".to_string();
-        unicode_doc.title = "Unicode Test: 🚀 café naïve résumé".to_string();
-        unicode_doc.body = "Content with unicode: 中文, العربية, 🎉, математика".to_string();
-        unicode_doc.url = "https://example.com/unicode".to_string();
-        unicode_doc.description = Some("Testing unicode in documents: ñoño".to_string());
+        let unicode_doc = Document {
+            id: "unicode-document".to_string(),
+            title: "Unicode Test: 🚀 café naïve résumé".to_string(),
+            body: "Content with unicode: 中文, العربية, 🎉, математика".to_string(),
+            url: "https://example.com/unicode".to_string(),
+            description: Some("Testing unicode in documents: ñoño".to_string()),
+            ..Default::default()
+        };
 
         // Save unicode document
         unicode_doc.save_to_one("memory").await?;
@@ -308,10 +397,22 @@ mod tests {
         loaded_doc = loaded_doc.load().await?;
 
         // Verify unicode content is preserved
-        assert_eq!(loaded_doc.id, unicode_doc.id, "Unicode document ID should match");
-        assert_eq!(loaded_doc.title, unicode_doc.title, "Unicode document title should match");
-        assert_eq!(loaded_doc.body, unicode_doc.body, "Unicode document body should match");
-        assert_eq!(loaded_doc.description, unicode_doc.description, "Unicode document description should match");
+        assert_eq!(
+            loaded_doc.id, unicode_doc.id,
+            "Unicode document ID should match"
+        );
+        assert_eq!(
+            loaded_doc.title, unicode_doc.title,
+            "Unicode document title should match"
+        );
+        assert_eq!(
+            loaded_doc.body, unicode_doc.body,
+            "Unicode document body should match"
+        );
+        assert_eq!(
+            loaded_doc.description, unicode_doc.description,
+            "Unicode document description should match"
+        );
 
         Ok(())
     }
@@ -323,10 +424,12 @@ mod tests {
         init_test_persistence().await?;
 
         // Create a test document
-        let mut test_doc = Document::default();
-        test_doc.id = "redb-test-document".to_string();
-        test_doc.title = "ReDB Backend Test".to_string();
-        test_doc.body = "Testing ReDB backend persistence.".to_string();
+        let test_doc = Document {
+            id: "redb-test-document".to_string(),
+            title: "ReDB Backend Test".to_string(),
+            body: "Testing ReDB backend persistence.".to_string(),
+            ..Default::default()
+        };
 
         // Try to save to ReDB backend - this might not be configured in all environments
         match test_doc.save_to_one("redb").await {
@@ -337,11 +440,20 @@ mod tests {
 
                 // Verify
                 assert_eq!(loaded_doc.id, test_doc.id, "ReDB document ID should match");
-                assert_eq!(loaded_doc.title, test_doc.title, "ReDB document title should match");
-                assert_eq!(loaded_doc.body, test_doc.body, "ReDB document body should match");
+                assert_eq!(
+                    loaded_doc.title, test_doc.title,
+                    "ReDB document title should match"
+                );
+                assert_eq!(
+                    loaded_doc.body, test_doc.body,
+                    "ReDB document body should match"
+                );
             }
             Err(e) => {
-                println!("ReDB backend not available for document (expected in some environments): {:?}", e);
+                println!(
+                    "ReDB backend not available for document (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have ReDB configured
             }
         }
@@ -355,11 +467,13 @@ mod tests {
     async fn test_document_sqlite_backend() -> Result<()> {
         init_test_persistence().await?;
 
-        // Create a test document  
-        let mut test_doc = Document::default();
-        test_doc.id = "sqlite-test-document".to_string();
-        test_doc.title = "SQLite Backend Test".to_string();
-        test_doc.body = "Testing SQLite backend persistence.".to_string();
+        // Create a test document
+        let test_doc = Document {
+            id: "sqlite-test-document".to_string(),
+            title: "SQLite Backend Test".to_string(),
+            body: "Testing SQLite backend persistence.".to_string(),
+            ..Default::default()
+        };
 
         // Try to save to SQLite backend - this might not be configured in all environments
         match test_doc.save_to_one("sqlite").await {
@@ -369,9 +483,18 @@ mod tests {
                 loaded_doc = loaded_doc.load().await?;
 
                 // Verify
-                assert_eq!(loaded_doc.id, test_doc.id, "SQLite document ID should match");
-                assert_eq!(loaded_doc.title, test_doc.title, "SQLite document title should match");
-                assert_eq!(loaded_doc.body, test_doc.body, "SQLite document body should match");
+                assert_eq!(
+                    loaded_doc.id, test_doc.id,
+                    "SQLite document ID should match"
+                );
+                assert_eq!(
+                    loaded_doc.title, test_doc.title,
+                    "SQLite document title should match"
+                );
+                assert_eq!(
+                    loaded_doc.body, test_doc.body,
+                    "SQLite document body should match"
+                );
             }
             Err(e) => {
                 println!("SQLite backend not available for document (expected in some environments): {:?}", e);

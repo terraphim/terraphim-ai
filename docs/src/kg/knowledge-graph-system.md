@@ -23,7 +23,7 @@ Knowledge graphs are built from markdown files in `docs/src/kg/`:
 ```
 docs/src/kg/
 ├── terraphim-graph.md    # Graph architecture concepts
-├── service.md           # Service definitions  
+├── service.md           # Service definitions
 ├── haystack.md          # Haystack integration
 ├── bug-reporting.md     # Bug reporting terminology and structured analysis
 ├── issue-tracking.md    # Domain-specific issue tracking terminology
@@ -35,13 +35,13 @@ docs/src/kg/
 Markdown files use the `synonyms::` syntax to define concept relationships:
 
 ```markdown
-# Terraphim-graph 
+# Terraphim-graph
 
 ## Terraphim Graph scorer
 
 Terraphim Graph (scorer) is using unique graph embeddings.
 
-synonyms:: graph embeddings, graph, knowledge graph based embeddings 
+synonyms:: graph embeddings, graph, knowledge graph based embeddings
 
 Now we will have a concept "Terraphim Graph Scorer" with synonyms.
 ```
@@ -60,7 +60,7 @@ let thesaurus = logseq_builder
 **Example thesaurus output:**
 ```
 'terraphim-graph' -> 'terraphim-graph' (ID: 3)
-'graph embeddings' -> 'terraphim-graph' (ID: 3)  
+'graph embeddings' -> 'terraphim-graph' (ID: 3)
 'graph' -> 'terraphim-graph' (ID: 3)
 'knowledge graph based embeddings' -> 'terraphim-graph' (ID: 3)
 'haystack' -> 'haystack' (ID: 1)
@@ -128,7 +128,7 @@ let total_rank = node.rank + edge.rank + document_rank;
 
 The ranking rewards:
 - **Concept Importance** (node.rank) - How central the concept is
-- **Connection Strength** (edge.rank) - How strongly concepts are related  
+- **Connection Strength** (edge.rank) - How strongly concepts are related
 - **Document Relevance** (document_rank) - How relevant the document is
 
 ### Query Processing
@@ -142,15 +142,15 @@ pub fn query_graph(
 ) -> Result<Vec<(String, IndexedDocument)>> {
     // 1. Find matching node IDs using Aho-Corasick
     let node_ids = self.find_matching_node_ids(query_string);
-    
+
     // 2. Traverse graph structure for each matched node
     for node_id in node_ids {
         let node = self.nodes.get(&node_id)?;
-        
+
         // 3. Follow edges to find connected documents
         for edge_id in &node.connected_with {
             let edge = self.edges.get(edge_id)?;
-            
+
             // 4. Calculate combined ranking
             for (document_id, document_rank) in &edge.doc_hash {
                 let total_rank = node.rank + edge.rank + document_rank;
@@ -158,7 +158,7 @@ pub fn query_graph(
             }
         }
     }
-    
+
     // 5. Sort by rank and return top results
     ranked_documents.sort_by_key(|(_, doc)| std::cmp::Reverse(doc.rank));
     Ok(documents)
@@ -257,8 +257,8 @@ let new_kg_content = r#"
 
 Graph Analysis provides deep insights into data relationships.
 
-synonyms:: data analysis, network analysis, graph processing, 
-          relationship mapping, connectivity analysis, 
+synonyms:: data analysis, network analysis, graph processing,
+          relationship mapping, connectivity analysis,
           terraphim-graph, graph embeddings
 
 This enhances graph-based system capabilities.
@@ -288,7 +288,7 @@ let node_growth = expanded_nodes - initial_nodes;
 let edge_growth = expanded_edges - initial_edges;
 let term_growth = expanded_terms - initial_terms;
 
-println!("Growth: +{} terms, +{} nodes, +{} edges", 
+println!("Growth: +{} terms, +{} nodes, +{} edges",
     term_growth, node_growth, edge_growth);
 ```
 
@@ -339,14 +339,14 @@ println!("Growth: +{} terms, +{} nodes, +{} edges",
 ```rust
 // Print thesaurus contents
 for (term, normalized_term) in &thesaurus {
-    println!("'{}' -> '{}' (ID: {})", 
-        term.as_str(), 
-        normalized_term.value.as_str(), 
+    println!("'{}' -> '{}' (ID: {})",
+        term.as_str(),
+        normalized_term.value.as_str(),
         normalized_term.id);
 }
 
 // Check graph structure
-println!("Nodes: {}, Edges: {}, Documents: {}", 
+println!("Nodes: {}, Edges: {}, Documents: {}",
     rolegraph.nodes_map().len(),
     rolegraph.edges_map().len(),
     rolegraph.get_all_documents().count());
@@ -365,7 +365,7 @@ The Terraphim KG system has been enhanced with comprehensive bug reporting and i
 **bug-reporting.md** - Core bug reporting concepts:
 - **Steps to Reproduce** - Comprehensive synonyms for reproduction procedures
 - **Expected Behaviour** - Terminology for intended system behavior
-- **Actual Behaviour** - Variations for describing observed problems  
+- **Actual Behaviour** - Variations for describing observed problems
 - **Impact Analysis** - Business and operational impact terminology
 - **Bug Classification** - Issue categorization and severity terms
 - **Quality Assurance** - QA processes and testing terminology
@@ -431,4 +431,4 @@ The Terraphim Knowledge Graph system provides powerful semantic search capabilit
 - 🔧 **Easy Expansion** - Simple markdown syntax for adding knowledge
 - 📊 **Measurable Impact** - Comprehensive testing framework for validation
 
-The knowledge graph system forms the foundation for intelligent, context-aware search in the Terraphim AI platform. 
+The knowledge graph system forms the foundation for intelligent, context-aware search in the Terraphim AI platform.

@@ -29,4 +29,4 @@ export function unmount(component) {
   if (component && typeof component.$destroy === 'function') {
     component.$destroy();
   }
-} 
+}

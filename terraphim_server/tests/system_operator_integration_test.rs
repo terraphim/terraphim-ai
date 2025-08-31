@@ -19,7 +19,7 @@ use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
 async fn test_system_operator_remote_kg_integration() {
     // Set up logging
     terraphim_service::logging::init_logging(
-        terraphim_service::logging::LoggingConfig::IntegrationTest
+        terraphim_service::logging::LoggingConfig::IntegrationTest,
     );
 
     // Check if system operator data exists
@@ -99,7 +99,7 @@ async fn test_system_operator_remote_kg_integration() {
     // Test 1: Health check
     log::info!("🔍 Testing server health...");
     let health_response = client
-        .get(&format!("{}/health", base_url))
+        .get(format!("{}/health", base_url))
         .send()
         .await
         .expect("Health check failed");
@@ -113,7 +113,7 @@ async fn test_system_operator_remote_kg_integration() {
     // Test 2: Get configuration
     log::info!("🔍 Testing configuration endpoint...");
     let config_response = client
-        .get(&format!("{}/config", base_url))
+        .get(format!("{}/config", base_url))
         .send()
         .await
         .expect("Config request failed");
@@ -140,7 +140,7 @@ async fn test_system_operator_remote_kg_integration() {
     let search_params = [("q", "system"), ("role", "System Operator"), ("limit", "5")];
 
     let search_response = client
-        .get(&format!("{}/documents/search", base_url))
+        .get(format!("{}/documents/search", base_url))
         .query(&search_params)
         .send()
         .await
@@ -174,17 +174,17 @@ async fn test_system_operator_remote_kg_integration() {
         let search_params = [("q", *term), ("role", "System Operator"), ("limit", "3")];
 
         let search_response = client
-            .get(&format!("{}/documents/search", base_url))
+            .get(format!("{}/documents/search", base_url))
             .query(&search_params)
             .send()
             .await
-            .expect(&format!("Search for '{}' failed", term));
+            .unwrap_or_else(|_| panic!("Search for '{}' failed", term));
 
         if search_response.status().is_success() {
             let search_json: SearchResponse = search_response
                 .json()
                 .await
-                .expect(&format!("Failed to parse search response for '{}'", term));
+                .unwrap_or_else(|_| panic!("Failed to parse search response for '{}'", term));
 
             log::info!(
                 "✅ Found {} results for '{}'",

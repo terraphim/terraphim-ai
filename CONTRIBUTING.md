@@ -31,7 +31,7 @@ Thank you for your interest in contributing to Terraphim AI! This guide will hel
    ```bash
    # Install pre-commit hooks for code quality
    ./scripts/install-hooks.sh
-   
+
    # Install sample data for system_operator role
    git clone https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
    ```
@@ -40,15 +40,15 @@ Thank you for your interest in contributing to Terraphim AI! This guide will hel
    ```bash
    # Terminal 1: Backend server
    cargo run
-   
+
    # Terminal 2: Frontend (web)
    cd desktop
    yarn install
    yarn run dev
-   
+
    # Alternative: Desktop app
    yarn run tauri dev
-   
+
    # Alternative: Terminal interface
    cargo run --bin terraphim-tui
    ```
@@ -57,7 +57,7 @@ Thank you for your interest in contributing to Terraphim AI! This guide will hel
 
 ### Prerequisites
 - **Rust**: Install via [rustup](https://rustup.rs/)
-- **Node.js**: Version 18+ 
+- **Node.js**: Version 18+
 - **Yarn**: Package manager for JavaScript dependencies
 - **Git**: For version control
 
@@ -87,7 +87,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 Examples:
 feat: add user authentication system
-fix(api): resolve memory leak in handler  
+fix(api): resolve memory leak in handler
 docs(readme): update installation steps
 chore(deps): bump tokio to 1.35.0
 ```
@@ -216,7 +216,7 @@ terraphim-ai/
 - Add comprehensive documentation for public APIs
 - Use `#[cfg(test)]` for test modules
 
-### Frontend Code  
+### Frontend Code
 - Use TypeScript for type safety
 - Follow component-based architecture
 - Use Biome for formatting and linting (automatic via hooks)
@@ -227,7 +227,7 @@ terraphim-ai/
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 - `feat:` for new features
-- `fix:` for bug fixes  
+- `fix:` for bug fixes
 - `docs:` for documentation changes
 - `style:` for formatting changes
 - `refactor:` for code refactoring

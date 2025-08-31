@@ -111,7 +111,7 @@ Terraphim AI is a privacy-first AI assistant that operates locally, providing se
 
 ### Critical Crates
 - `terraphim_service`: Main service layer with search, document management, and AI integration
-- `terraphim_middleware`: Haystack indexing, document processing, and search orchestration  
+- `terraphim_middleware`: Haystack indexing, document processing, and search orchestration
 - `terraphim_rolegraph`: Knowledge graph implementation with node/edge relationships
 - `terraphim_automata`: Text matching, autocomplete, and thesaurus building
 - `terraphim_config`: Configuration management and role-based settings
@@ -144,7 +144,7 @@ yarn install
 yarn run dev
 
 # Run Tauri desktop app
-cd desktop  
+cd desktop
 yarn run tauri dev
 ```
 
@@ -196,7 +196,7 @@ The system uses role-based configuration with multiple backends:
 
 ### Key Config Files
 - `terraphim_engineer_config.json`: Main engineering role
-- `system_operator_config.json`: System administration role  
+- `system_operator_config.json`: System administration role
 - `settings.toml`: Device and server settings
 
 ### Environment Variables
@@ -489,7 +489,7 @@ OLLAMA_BASE_URL=http://127.0.0.1:11434 cargo test ollama_live_test -- --ignored
    ```bash
    # Start Ollama first
    ollama serve
-   
+
    # Run with Ollama config
    cargo run --release -- --config ollama_llama_config.json
    ```

@@ -115,7 +115,10 @@ impl LlmClient for OpenRouterClient {
     }
 
     async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String> {
-        let summary = self.inner.generate_summary(content, opts.max_length).await?;
+        let summary = self
+            .inner
+            .generate_summary(content, opts.max_length)
+            .await?;
         Ok(summary)
     }
 
@@ -214,12 +217,15 @@ impl LlmClient for OllamaClient {
                                 .unwrap_or("")
                                 .trim()
                                 .to_string();
-                            
+
                             // Post-process to respect max_length constraint
                             if content.len() > opts.max_length {
                                 // Try to truncate at a word boundary
-                                let truncated = if let Some(last_space) = content[..opts.max_length].rfind(' ') {
-                                    if last_space > opts.max_length * 3 / 4 { // Only truncate if we can keep most of the content
+                                let truncated = if let Some(last_space) =
+                                    content[..opts.max_length].rfind(' ')
+                                {
+                                    if last_space > opts.max_length * 3 / 4 {
+                                        // Only truncate if we can keep most of the content
                                         format!("{}...", &content[..last_space])
                                     } else {
                                         format!("{}...", &content[..opts.max_length])
@@ -229,7 +235,7 @@ impl LlmClient for OllamaClient {
                                 };
                                 content = truncated;
                             }
-                            
+
                             return Ok(content);
                         }
                         Err(e) => {
@@ -305,8 +311,7 @@ fn build_ollama_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmCl
         .or_else(|| get_string_extra(&role.extra, "ollama_base_url"))
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
-    let http = crate::http_client::create_api_client()
-        .unwrap_or_else(|_| reqwest::Client::new());
+    let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
     Some(Arc::new(OllamaClient {
         http,
         base_url,

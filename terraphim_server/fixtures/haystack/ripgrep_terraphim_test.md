@@ -17,4 +17,4 @@ The Terraphim system consists of:
 - Configuration management
 - Theme switching capabilities
 
-This document is served from the RIPGREP haystack to demonstrate the difference between haystack sources. 
+This document is served from the RIPGREP haystack to demonstrate the difference between haystack sources.

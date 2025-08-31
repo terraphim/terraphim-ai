@@ -4,12 +4,12 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
+use tokio::sync::Mutex;
 
 use terraphim_config::Config;
 use terraphim_config::ConfigState;
@@ -338,8 +338,10 @@ pub struct SummarizeDocumentRequest {
     /// Role to use for summarization (determines OpenRouter configuration)
     pub role: String,
     /// Optional: Override max summary length (default: 250 characters)
+    #[allow(dead_code)]
     pub max_length: Option<usize>,
     /// Optional: Force regeneration even if summary exists
+    #[allow(dead_code)]
     pub force_regenerate: Option<bool>,
 }
 
@@ -553,7 +555,7 @@ pub(crate) async fn chat_completion(
     let role_name = RoleName::new(&request.role);
     let config = config_state.config.lock().await;
 
-    let Some(_role_ref) = config.roles.get(&role_name) else {
+    let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
@@ -619,32 +621,26 @@ pub(crate) async fn chat_completion(
                         .chat_completion(messages_json, Some(1024), Some(0.2))
                         .await
                     {
-                        Ok(reply) => {
-                            return Ok(Json(ChatResponse {
-                                status: Status::Success,
-                                message: Some(reply),
-                                model_used: Some(used_model),
-                                error: None,
-                            }));
-                        }
-                        Err(e) => {
-                            return Ok(Json(ChatResponse {
-                                status: Status::Error,
-                                message: None,
-                                model_used: Some(used_model),
-                                error: Some(format!("Chat failed: {}", e)),
-                            }));
-                        }
+                        Ok(reply) => Ok(Json(ChatResponse {
+                            status: Status::Success,
+                            message: Some(reply),
+                            model_used: Some(used_model),
+                            error: None,
+                        })),
+                        Err(e) => Ok(Json(ChatResponse {
+                            status: Status::Error,
+                            message: None,
+                            model_used: Some(used_model),
+                            error: Some(format!("Chat failed: {}", e)),
+                        })),
                     }
                 }
-                Err(e) => {
-                    return Ok(Json(ChatResponse {
-                        status: Status::Error,
-                        message: None,
-                        model_used: None,
-                        error: Some(format!("Failed to initialize OpenRouter: {}", e)),
-                    }));
-                }
+                Err(e) => Ok(Json(ChatResponse {
+                    status: Status::Error,
+                    message: None,
+                    model_used: None,
+                    error: Some(format!("Failed to initialize OpenRouter: {}", e)),
+                })),
             }
         }
     }
@@ -681,7 +677,7 @@ pub(crate) async fn list_openrouter_models(
 ) -> Result<Json<OpenRouterModelsResponse>> {
     let role_name = RoleName::new(&req.role);
     let config = config_state.config.lock().await;
-    let Some(_role) = config.roles.get(&role_name) else {
+    let Some(role) = config.roles.get(&role_name) else {
         return Ok(Json(OpenRouterModelsResponse {
             status: Status::Error,
             models: vec![],
@@ -768,7 +764,7 @@ pub(crate) async fn summarize_document(
     let config = config_state.config.lock().await;
 
     // Get the role configuration
-    let Some(_role_ref) = config.roles.get(&role_name) else {
+    let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(SummarizeDocumentResponse {
             status: Status::Error,
             document_id: request.document_id,
@@ -940,7 +936,7 @@ pub(crate) async fn get_summarization_status(
     let role_name = RoleName::new(&query.role);
     let config = config_state.config.lock().await;
 
-    let Some(_role) = config.roles.get(&role_name) else {
+    let Some(role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Role '{}' not found", query.role)),
@@ -984,7 +980,9 @@ pub(crate) async fn get_summarization_status(
 /// Submit a document for async summarization
 pub(crate) async fn async_summarize_document(
     State(config_state): State<ConfigState>,
-    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Extension(summarization_manager): Extension<
+        Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
+    >,
     Json(request): Json<AsyncSummarizeRequest>,
 ) -> Result<Json<AsyncSummarizeResponse>> {
     log::debug!(
@@ -1012,7 +1010,10 @@ pub(crate) async fn async_summarize_document(
 
     // Load the document
     let mut terraphim_service = TerraphimService::new(config_state);
-    let document = match terraphim_service.get_document_by_id(&request.document_id).await {
+    let document = match terraphim_service
+        .get_document_by_id(&request.document_id)
+        .await
+    {
         Ok(Some(doc)) => doc,
         Ok(None) => {
             return Ok(Json(AsyncSummarizeResponse {
@@ -1048,65 +1049,67 @@ pub(crate) async fn async_summarize_document(
                 task_id: None,
                 position_in_queue: None,
                 estimated_wait_seconds: None,
-                error: Some(format!("Invalid priority '{}'. Use: low, normal, high, or critical", invalid)),
+                error: Some(format!(
+                    "Invalid priority '{}'. Use: low, normal, high, or critical",
+                    invalid
+                )),
             }));
         }
     };
 
     // Submit to queue
     let manager = summarization_manager.lock().await;
-    match manager.summarize_document(
-        document,
-        role,
-        priority,
-        request.max_length,
-        request.force_regenerate,
-        request.callback_url,
-    ).await {
-        Ok(result) => {
-            match result {
-                terraphim_service::summarization_queue::SubmitResult::Queued { 
-                    task_id, 
-                    position_in_queue,
-                    estimated_wait_time_seconds 
-                } => {
-                    Ok(Json(AsyncSummarizeResponse {
-                        status: Status::Success,
-                        task_id: Some(task_id.to_string()),
-                        position_in_queue: Some(position_in_queue),
-                        estimated_wait_seconds: estimated_wait_time_seconds,
-                        error: None,
-                    }))
-                }
-                terraphim_service::summarization_queue::SubmitResult::QueueFull => {
-                    Ok(Json(AsyncSummarizeResponse {
-                        status: Status::Error,
-                        task_id: None,
-                        position_in_queue: None,
-                        estimated_wait_seconds: None,
-                        error: Some("Queue is full, please try again later".to_string()),
-                    }))
-                }
-                terraphim_service::summarization_queue::SubmitResult::Duplicate(existing_id) => {
-                    Ok(Json(AsyncSummarizeResponse {
-                        status: Status::Success,
-                        task_id: Some(existing_id.to_string()),
-                        position_in_queue: None,
-                        estimated_wait_seconds: None,
-                        error: Some("Task already exists for this document".to_string()),
-                    }))
-                }
-                terraphim_service::summarization_queue::SubmitResult::ValidationError(err) => {
-                    Ok(Json(AsyncSummarizeResponse {
-                        status: Status::Error,
-                        task_id: None,
-                        position_in_queue: None,
-                        estimated_wait_seconds: None,
-                        error: Some(err),
-                    }))
-                }
+    match manager
+        .summarize_document(
+            document,
+            role,
+            priority,
+            request.max_length,
+            request.force_regenerate,
+            request.callback_url,
+        )
+        .await
+    {
+        Ok(result) => match result {
+            terraphim_service::summarization_queue::SubmitResult::Queued {
+                task_id,
+                position_in_queue,
+                estimated_wait_time_seconds,
+            } => Ok(Json(AsyncSummarizeResponse {
+                status: Status::Success,
+                task_id: Some(task_id.to_string()),
+                position_in_queue: Some(position_in_queue),
+                estimated_wait_seconds: estimated_wait_time_seconds,
+                error: None,
+            })),
+            terraphim_service::summarization_queue::SubmitResult::QueueFull => {
+                Ok(Json(AsyncSummarizeResponse {
+                    status: Status::Error,
+                    task_id: None,
+                    position_in_queue: None,
+                    estimated_wait_seconds: None,
+                    error: Some("Queue is full, please try again later".to_string()),
+                }))
             }
-        }
+            terraphim_service::summarization_queue::SubmitResult::Duplicate(existing_id) => {
+                Ok(Json(AsyncSummarizeResponse {
+                    status: Status::Success,
+                    task_id: Some(existing_id.to_string()),
+                    position_in_queue: None,
+                    estimated_wait_seconds: None,
+                    error: Some("Task already exists for this document".to_string()),
+                }))
+            }
+            terraphim_service::summarization_queue::SubmitResult::ValidationError(err) => {
+                Ok(Json(AsyncSummarizeResponse {
+                    status: Status::Error,
+                    task_id: None,
+                    position_in_queue: None,
+                    estimated_wait_seconds: None,
+                    error: Some(err),
+                }))
+            }
+        },
         Err(e) => {
             log::error!("Failed to submit summarization task: {:?}", e);
             Ok(Json(AsyncSummarizeResponse {
@@ -1122,7 +1125,9 @@ pub(crate) async fn async_summarize_document(
 
 /// Get the status of a summarization task
 pub(crate) async fn get_task_status(
-    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Extension(summarization_manager): Extension<
+        Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
+    >,
     Path(task_id): Path<String>,
 ) -> Result<Json<TaskStatusResponse>> {
     let task_id = match task_id.parse() {
@@ -1145,38 +1150,69 @@ pub(crate) async fn get_task_status(
     let manager = summarization_manager.lock().await;
     match manager.get_task_status(&task_id).await {
         Some(status) => {
-            let (task_status_str, progress, summary, error, duration_ms, next_retry, retry_count) = match status {
-                terraphim_service::summarization_queue::TaskStatus::Pending { .. } => {
-                    ("pending".to_string(), None, None, None, None, None, None)
-                }
-                terraphim_service::summarization_queue::TaskStatus::Processing { progress, .. } => {
-                    ("processing".to_string(), progress, None, None, None, None, None)
-                }
-                terraphim_service::summarization_queue::TaskStatus::Completed { 
-                    summary, 
-                    processing_duration_seconds, 
-                    .. 
-                } => {
-                    ("completed".to_string(), Some(100.0), Some(summary), None, 
-                     Some(processing_duration_seconds * 1000), None, None)
-                }
-                terraphim_service::summarization_queue::TaskStatus::Failed { 
-                    error, 
-                    retry_count,
-                    next_retry_at,
-                    .. 
-                } => {
-                    let next_retry_seconds = next_retry_at.map(|t| {
-                        let duration = t.signed_duration_since(chrono::Utc::now());
-                        duration.num_seconds().max(0) as u64
-                    });
-                    ("failed".to_string(), None, None, Some(error), None, 
-                     next_retry_seconds, Some(retry_count))
-                }
-                terraphim_service::summarization_queue::TaskStatus::Cancelled { reason, .. } => {
-                    ("cancelled".to_string(), None, None, Some(reason), None, None, None)
-                }
-            };
+            let (task_status_str, progress, summary, error, duration_ms, next_retry, retry_count) =
+                match status {
+                    terraphim_service::summarization_queue::TaskStatus::Pending { .. } => {
+                        ("pending".to_string(), None, None, None, None, None, None)
+                    }
+                    terraphim_service::summarization_queue::TaskStatus::Processing {
+                        progress,
+                        ..
+                    } => (
+                        "processing".to_string(),
+                        progress,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                    terraphim_service::summarization_queue::TaskStatus::Completed {
+                        summary,
+                        processing_duration_seconds,
+                        ..
+                    } => (
+                        "completed".to_string(),
+                        Some(100.0),
+                        Some(summary),
+                        None,
+                        Some(processing_duration_seconds * 1000),
+                        None,
+                        None,
+                    ),
+                    terraphim_service::summarization_queue::TaskStatus::Failed {
+                        error,
+                        retry_count,
+                        next_retry_at,
+                        ..
+                    } => {
+                        let next_retry_seconds = next_retry_at.map(|t| {
+                            let duration = t.signed_duration_since(chrono::Utc::now());
+                            duration.num_seconds().max(0) as u64
+                        });
+                        (
+                            "failed".to_string(),
+                            None,
+                            None,
+                            Some(error),
+                            None,
+                            next_retry_seconds,
+                            Some(retry_count),
+                        )
+                    }
+                    terraphim_service::summarization_queue::TaskStatus::Cancelled {
+                        reason,
+                        ..
+                    } => (
+                        "cancelled".to_string(),
+                        None,
+                        None,
+                        Some(reason),
+                        None,
+                        None,
+                        None,
+                    ),
+                };
 
             Ok(Json(TaskStatusResponse {
                 status: Status::Success,
@@ -1190,25 +1226,25 @@ pub(crate) async fn get_task_status(
                 retry_count,
             }))
         }
-        None => {
-            Ok(Json(TaskStatusResponse {
-                status: Status::Error,
-                task_id: task_id.to_string(),
-                task_status: None,
-                progress: None,
-                summary: None,
-                error: Some("Task not found".to_string()),
-                processing_duration_ms: None,
-                next_retry_seconds: None,
-                retry_count: None,
-            }))
-        }
+        None => Ok(Json(TaskStatusResponse {
+            status: Status::Error,
+            task_id: task_id.to_string(),
+            task_status: None,
+            progress: None,
+            summary: None,
+            error: Some("Task not found".to_string()),
+            processing_duration_ms: None,
+            next_retry_seconds: None,
+            retry_count: None,
+        })),
     }
 }
 
 /// Cancel a summarization task
 pub(crate) async fn cancel_task(
-    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Extension(summarization_manager): Extension<
+        Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
+    >,
     Path(task_id): Path<String>,
     Json(request): Json<CancelTaskRequest>,
 ) -> Result<Json<CancelTaskResponse>> {
@@ -1224,17 +1260,20 @@ pub(crate) async fn cancel_task(
     };
 
     let manager = summarization_manager.lock().await;
-    match manager.cancel_task(
-        task_id.clone(),
-        request.reason.unwrap_or_else(|| "Cancelled by user".to_string()),
-    ).await {
-        Ok(cancelled) => {
-            Ok(Json(CancelTaskResponse {
-                status: Status::Success,
-                cancelled,
-                error: None,
-            }))
-        }
+    match manager
+        .cancel_task(
+            task_id.clone(),
+            request
+                .reason
+                .unwrap_or_else(|| "Cancelled by user".to_string()),
+        )
+        .await
+    {
+        Ok(cancelled) => Ok(Json(CancelTaskResponse {
+            status: Status::Success,
+            cancelled,
+            error: None,
+        })),
         Err(e) => {
             log::error!("Failed to cancel task {}: {:?}", task_id, e);
             Ok(Json(CancelTaskResponse {
@@ -1248,17 +1287,17 @@ pub(crate) async fn cancel_task(
 
 /// Get queue statistics
 pub(crate) async fn get_queue_stats(
-    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Extension(summarization_manager): Extension<
+        Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
+    >,
 ) -> Result<Json<QueueStatsResponse>> {
     let manager = summarization_manager.lock().await;
     match manager.get_stats().await {
-        Ok(stats) => {
-            Ok(Json(QueueStatsResponse {
-                status: Status::Success,
-                stats: Some(stats),
-                error: None,
-            }))
-        }
+        Ok(stats) => Ok(Json(QueueStatsResponse {
+            status: Status::Success,
+            stats: Some(stats),
+            error: None,
+        })),
         Err(e) => {
             log::error!("Failed to get queue stats: {:?}", e);
             Ok(Json(QueueStatsResponse {
@@ -1273,7 +1312,9 @@ pub(crate) async fn get_queue_stats(
 /// Submit multiple documents for batch summarization
 pub(crate) async fn batch_summarize_documents(
     State(config_state): State<ConfigState>,
-    Extension(summarization_manager): Extension<Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>>,
+    Extension(summarization_manager): Extension<
+        Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
+    >,
     Json(request): Json<BatchSummarizeRequest>,
 ) -> Result<Json<BatchSummarizeResponse>> {
     log::debug!(
@@ -1312,7 +1353,10 @@ pub(crate) async fn batch_summarize_documents(
                 task_ids: vec![],
                 queued_count: 0,
                 failed_count: request.documents.len(),
-                errors: vec![format!("Invalid priority '{}'. Use: low, normal, high, or critical", invalid)],
+                errors: vec![format!(
+                    "Invalid priority '{}'. Use: low, normal, high, or critical",
+                    invalid
+                )],
             }));
         }
     };
@@ -1325,9 +1369,12 @@ pub(crate) async fn batch_summarize_documents(
     let mut queued_count = 0;
     let mut failed_count = 0;
 
-    for (_index, item) in request.documents.iter().enumerate() {
+    for item in request.documents.iter() {
         // Load the document
-        let document = match terraphim_service.get_document_by_id(&item.document_id).await {
+        let document = match terraphim_service
+            .get_document_by_id(&item.document_id)
+            .await
+        {
             Ok(Some(doc)) => doc,
             Ok(None) => {
                 errors.push(format!("Document {} not found", item.document_id));
@@ -1336,28 +1383,39 @@ pub(crate) async fn batch_summarize_documents(
             }
             Err(e) => {
                 log::error!("Failed to load document '{}': {:?}", item.document_id, e);
-                errors.push(format!("Failed to load document {}: {}", item.document_id, e));
+                errors.push(format!(
+                    "Failed to load document {}: {}",
+                    item.document_id, e
+                ));
                 failed_count += 1;
                 continue;
             }
         };
 
         // Submit to queue
-        match manager.summarize_document(
-            document,
-            role.clone(),
-            priority.clone(),
-            item.max_length,
-            item.force_regenerate,
-            request.callback_url.clone(),
-        ).await {
+        match manager
+            .summarize_document(
+                document,
+                role.clone(),
+                priority.clone(),
+                item.max_length,
+                item.force_regenerate,
+                request.callback_url.clone(),
+            )
+            .await
+        {
             Ok(result) => {
                 match result {
-                    terraphim_service::summarization_queue::SubmitResult::Queued { task_id, .. } => {
+                    terraphim_service::summarization_queue::SubmitResult::Queued {
+                        task_id,
+                        ..
+                    } => {
                         task_ids.push(task_id.to_string());
                         queued_count += 1;
                     }
-                    terraphim_service::summarization_queue::SubmitResult::Duplicate(existing_id) => {
+                    terraphim_service::summarization_queue::SubmitResult::Duplicate(
+                        existing_id,
+                    ) => {
                         task_ids.push(existing_id.to_string());
                         queued_count += 1; // Count as success for batch
                     }
@@ -1366,21 +1424,35 @@ pub(crate) async fn batch_summarize_documents(
                         failed_count += 1;
                     }
                     terraphim_service::summarization_queue::SubmitResult::ValidationError(err) => {
-                        errors.push(format!("Validation error for document {}: {}", item.document_id, err));
+                        errors.push(format!(
+                            "Validation error for document {}: {}",
+                            item.document_id, err
+                        ));
                         failed_count += 1;
                     }
                 }
             }
             Err(e) => {
-                log::error!("Failed to submit task for document '{}': {:?}", item.document_id, e);
-                errors.push(format!("Failed to submit task for document {}: {}", item.document_id, e));
+                log::error!(
+                    "Failed to submit task for document '{}': {:?}",
+                    item.document_id,
+                    e
+                );
+                errors.push(format!(
+                    "Failed to submit task for document {}: {}",
+                    item.document_id, e
+                ));
                 failed_count += 1;
             }
         }
     }
 
     Ok(Json(BatchSummarizeResponse {
-        status: if failed_count == 0 { Status::Success } else { Status::PartialSuccess },
+        status: if failed_count == 0 {
+            Status::Success
+        } else {
+            Status::PartialSuccess
+        },
         task_ids,
         queued_count,
         failed_count,
@@ -1430,9 +1502,9 @@ pub(crate) async fn get_thesaurus(
     Path(role_name): Path<String>,
 ) -> Result<Json<ThesaurusResponse>> {
     log::debug!("Getting thesaurus for role '{}'", role_name);
-    
+
     let role_name = RoleName::new(&role_name);
-    
+
     // Get the role graph for the specified role
     let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
         return Ok(Json(ThesaurusResponse {
@@ -1441,19 +1513,23 @@ pub(crate) async fn get_thesaurus(
             error: Some(format!("Role '{}' not found", role_name)),
         }));
     };
-    
+
     let rolegraph = rolegraph_sync.lock().await;
-    
+
     // Convert the thesaurus to a simple HashMap<String, String> format
     // that matches what the UI expects
     let mut thesaurus_map = std::collections::HashMap::new();
-    
+
     for (key, value) in &rolegraph.thesaurus {
         thesaurus_map.insert(key.as_str().to_string(), value.value.as_str().to_string());
     }
-    
-    log::debug!("Found {} thesaurus entries for role '{}'", thesaurus_map.len(), role_name);
-    
+
+    log::debug!(
+        "Found {} thesaurus entries for role '{}'",
+        thesaurus_map.len(),
+        role_name
+    );
+
     Ok(Json(ThesaurusResponse {
         status: Status::Success,
         thesaurus: Some(thesaurus_map),
@@ -1469,12 +1545,18 @@ pub(crate) async fn get_autocomplete(
     State(config_state): State<ConfigState>,
     Path((role_name, query)): Path<(String, String)>,
 ) -> Result<Json<AutocompleteResponse>> {
-    use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search};
-    
-    log::debug!("Getting autocomplete for role '{}', query '{}'", role_name, query);
-    
+    use terraphim_automata::{
+        autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search,
+    };
+
+    log::debug!(
+        "Getting autocomplete for role '{}', query '{}'",
+        role_name,
+        query
+    );
+
     let role_name = RoleName::new(&role_name);
-    
+
     // Get the role graph for the specified role
     let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
         return Ok(Json(AutocompleteResponse {
@@ -1483,9 +1565,9 @@ pub(crate) async fn get_autocomplete(
             error: Some(format!("Role '{}' not found", role_name)),
         }));
     };
-    
+
     let rolegraph = rolegraph_sync.lock().await;
-    
+
     // Build FST autocomplete index from the thesaurus
     let autocomplete_index = match build_autocomplete_index(rolegraph.thesaurus.clone(), None) {
         Ok(index) => index,
@@ -1498,7 +1580,7 @@ pub(crate) async fn get_autocomplete(
             }));
         }
     };
-    
+
     // Try exact prefix search first
     let results = if query.len() >= 3 {
         // For longer queries, try fuzzy search for better UX (0.7 = 70% similarity threshold)
@@ -1534,19 +1616,24 @@ pub(crate) async fn get_autocomplete(
             }
         }
     };
-    
+
     // Convert FST results to API response format
-    let suggestions: Vec<AutocompleteSuggestion> = results.into_iter().map(|result| {
-        AutocompleteSuggestion {
+    let suggestions: Vec<AutocompleteSuggestion> = results
+        .into_iter()
+        .map(|result| AutocompleteSuggestion {
             term: result.term,
             normalized_term: result.normalized_term.as_str().to_string(),
             url: result.url,
             score: result.score,
-        }
-    }).collect();
-    
-    log::debug!("Found {} autocomplete suggestions for query '{}'", suggestions.len(), query);
-    
+        })
+        .collect();
+
+    log::debug!(
+        "Found {} autocomplete suggestions for query '{}'",
+        suggestions.len(),
+        query
+    );
+
     Ok(Json(AutocompleteResponse {
         status: Status::Success,
         suggestions,

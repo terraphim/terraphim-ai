@@ -24,15 +24,15 @@ score(document) = Σ(node.rank + edge.rank + doc.rank)  for all matches
 - **🆕 TF-IDF Enhancement**: For `TerraphimGraph` relevance function, documents are now re-scored using TF-IDF weighting (30% weight) combined with the original graph ranking, providing better semantic relevance while maintaining the fast graph-based foundation.
 
 ### 1.4 Strengths
-✔  Zero-cost online updates (plain counters).  
-✔  Deterministic and explainable (frequency == relevance).  
+✔  Zero-cost online updates (plain counters).
+✔  Deterministic and explainable (frequency == relevance).
 ✔  Small memory footprint (no float vectors).
 ✔  **🆕 Hybrid TF-IDF scoring** improves semantic relevance while preserving graph structure benefits.
 
 ### 1.5 Limitations
-✖  **No semantic smoothing** – synonyms outside thesaurus are unseen.  
-✖  **Ties & coarse granularity** – many docs share identical sums (partially addressed by TF-IDF).  
-✖  Ignores global topology (2-hop, motifs, community structure).  
+✖  **No semantic smoothing** – synonyms outside thesaurus are unseen.
+✖  **Ties & coarse granularity** – many docs share identical sums (partially addressed by TF-IDF).
+✖  Ignores global topology (2-hop, motifs, community structure).
 ✖  Ranking deteriorates for long-tail terms with low frequency (partially addressed by TF-IDF).
 
 ---
@@ -107,4 +107,4 @@ Terraphim Graph offers lightning-fast, explainable ranking, but lacks deeper sem
 
 The implementation leverages the existing `TFIDFScorer` from `crates/terraphim_service/src/score/bm25_additional.rs`, demonstrating proper architecture and reuse of existing components.
 
-> _"Counts get you so far; embeddings get you the rest."_ 
+> _"Counts get you so far; embeddings get you the rest."_

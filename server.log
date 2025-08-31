@@ -1,6 +1,6 @@
 listening on http://127.0.0.1:8000
 [2025-08-11T10:45:48Z ERROR terraphim_service] Failed to load thesaurus: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
-    
+
     Context:
        service: dashmap
        path: thesaurus_terraphimengineer.json

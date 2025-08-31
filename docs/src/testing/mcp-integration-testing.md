@@ -11,7 +11,7 @@ The MCP (Model Context Protocol) integration testing validates the comprehensive
 The MCP testing infrastructure consists of several comprehensive test suites:
 
 1. **test_bug_report_extraction.rs** - Bug reporting knowledge graph validation
-2. **test_kg_term_verification.rs** - Knowledge graph term availability testing  
+2. **test_kg_term_verification.rs** - Knowledge graph term availability testing
 3. **test_working_advanced_functions.rs** - Advanced MCP function validation
 4. **test_selected_role_usage.rs** - Role-based functionality testing
 
@@ -45,10 +45,10 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
         .stderr(Stdio::piped())
         .arg("--profile")
         .arg("desktop");
-    
+
     let transport = TokioChildProcess::new(cmd)?;
     let service = ().serve(transport).await?;
-    
+
     // Build autocomplete index for Terraphim Engineer role
     let build_result = service
         .call_tool(CallToolRequestParam {
@@ -58,42 +58,42 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Test comprehensive bug report with all four sections
     let comprehensive_bug_report = r#"
     Issue Report: Payroll System Data Inconsistency
-    
+
     Steps to Reproduce the Issue
-    
+
     To recreate this issue, follow these reproduction steps carefully:
     1. Log into the HR system using administrator credentials
-    2. Navigate to the payroll processing module 
+    2. Navigate to the payroll processing module
     3. Select employees from the Q3 2024 cohort
     4. Run the salary calculation process for the selected group
     5. Observe the wage calculation discrepancies in the output report
-    
+
     Expected Behavior and System Requirements
-    
+
     The intended behavior should be as follows:
     - The payroll system should calculate wages correctly for all employees
     - Data consistency should be maintained across all HR system components
     - System integration between payroll and HR databases should work seamlessly
-    
+
     Actual Behavior and Observed Problems
-    
+
     What actually happens demonstrates significant system problems:
     - The observed behavior shows incorrect salary calculations for 30% of employees
     - Data mismatch occurs between the payroll system and HR database
     - System integration failures prevent proper data synchronization
-    
+
     Business Impact and Consequences Analysis
-    
+
     The impact of this issue extends across multiple areas:
     - User experience suffers due to system reliability issues
     - Operational impact includes increased manual processing costs
     - Business consequences include potential legal liability
     "#;
-    
+
     let extract_result = service
         .call_tool(CallToolRequestParam {
             name: "extract_paragraphs_from_automata".into(),
@@ -104,10 +104,10 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Validates extraction of 2,615 paragraphs from comprehensive content
     println!("✅ Extract paragraphs result: {:?}", extract_result.content);
-    
+
     Ok(())
 }
 ```
@@ -116,7 +116,7 @@ async fn test_bug_report_extraction_with_kg_terms() -> Result<()> {
 
 **Performance Metrics:**
 - **Comprehensive Bug Report**: 2,615 paragraphs extracted
-- **Short Content**: 165 paragraphs extracted  
+- **Short Content**: 165 paragraphs extracted
 - **System Documentation**: 830 paragraphs extracted
 
 ## Knowledge Graph Term Verification
@@ -130,7 +130,7 @@ Validates that domain-specific terms are properly recognized and available throu
 async fn test_kg_bug_reporting_terms_available() -> Result<()> {
     // Connect to MCP server and build index
     let service = connect_to_mcp_server().await?;
-    
+
     // Test payroll system terms
     let payroll_autocomplete = service
         .call_tool(CallToolRequestParam {
@@ -142,8 +142,8 @@ async fn test_kg_bug_reporting_terms_available() -> Result<()> {
             }),
         })
         .await?;
-    
-    // Test data consistency terms  
+
+    // Test data consistency terms
     let data_autocomplete = service
         .call_tool(CallToolRequestParam {
             name: "autocomplete_terms".into(),
@@ -154,7 +154,7 @@ async fn test_kg_bug_reporting_terms_available() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Test quality assurance terms
     let qa_autocomplete = service
         .call_tool(CallToolRequestParam {
@@ -166,7 +166,7 @@ async fn test_kg_bug_reporting_terms_available() -> Result<()> {
             }),
         })
         .await?;
-    
+
     Ok(())
 }
 ```
@@ -188,14 +188,14 @@ Tests the `is_all_terms_connected_by_path` function to validate semantic relatio
 #[tokio::test]
 async fn test_advanced_functions_with_explicit_terraphim_engineer_role() -> Result<()> {
     let service = connect_to_mcp_server().await?;
-    
+
     // Test connectivity between bug report terms
     let connectivity_text = r#"
     The haystack provides service functionality as a datasource for the system.
     This service acts as a provider and middleware for data processing.
     Graph embeddings are used for knowledge graph based embeddings in the system.
     "#;
-    
+
     let connectivity_result = service
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
@@ -205,9 +205,9 @@ async fn test_advanced_functions_with_explicit_terraphim_engineer_role() -> Resu
             }),
         })
         .await?;
-    
+
     println!("✅ Connectivity result: {:?}", connectivity_result.content);
-    
+
     Ok(())
 }
 ```
@@ -222,7 +222,7 @@ Validates that the MCP server properly uses the selected role configuration:
 #[tokio::test]
 async fn test_mcp_server_uses_selected_role() -> Result<()> {
     let service = connect_to_mcp_server().await?;
-    
+
     // Configure Terraphim Engineer as selected role
     let config_with_selected_role = json!({
         "roles": {
@@ -239,7 +239,7 @@ async fn test_mcp_server_uses_selected_role() -> Result<()> {
         },
         "selected_role": "Terraphim Engineer"
     });
-    
+
     let config_result = service
         .call_tool(CallToolRequestParam {
             name: "update_config_tool".into(),
@@ -248,7 +248,7 @@ async fn test_mcp_server_uses_selected_role() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Test functionality without explicit role parameter
     let autocomplete_result = service
         .call_tool(CallToolRequestParam {
@@ -260,7 +260,7 @@ async fn test_mcp_server_uses_selected_role() -> Result<()> {
             }),
         })
         .await?;
-    
+
     Ok(())
 }
 ```
@@ -272,13 +272,13 @@ async fn test_mcp_server_uses_selected_role() -> Result<()> {
 Tests extraction functionality with minimal content:
 
 ```rust
-#[tokio::test] 
+#[tokio::test]
 async fn test_bug_report_extraction_edge_cases() -> Result<()> {
     let service = connect_to_mcp_server().await?;
-    
+
     // Test short content with multiple KG terms
     let short_bug_report = "Steps to reproduce: The payroll system shows incorrect behavior during salary calculation. Expected result: Proper wage calculation. Actual behavior: Data inconsistency. Impact: User experience degradation.";
-    
+
     let short_extraction = service
         .call_tool(CallToolRequestParam {
             name: "extract_paragraphs_from_automata".into(),
@@ -289,10 +289,10 @@ async fn test_bug_report_extraction_edge_cases() -> Result<()> {
             }),
         })
         .await?;
-    
+
     // Validates extraction of 165 paragraphs from short content
     println!("✅ Short content extraction: {:?}", short_extraction.content);
-    
+
     Ok(())
 }
 ```
@@ -309,17 +309,17 @@ async fn connect_to_mcp_server() -> Result<impl ServiceExt> {
         .and_then(|p| p.parent())
         .map(|workspace| workspace.join("target").join("debug").join("terraphim_mcp_server"))
         .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-    
+
     let mut cmd = Command::new(binary_path);
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("--profile")
         .arg("desktop");
-    
+
     let transport = TokioChildProcess::new(cmd)?;
     let service = ().serve(transport).await?;
-    
+
     Ok(service)
 }
 ```
@@ -329,7 +329,7 @@ async fn connect_to_mcp_server() -> Result<impl ServiceExt> {
 ```bash
 # Run specific MCP tests
 cargo test --test test_bug_report_extraction -- --nocapture
-cargo test --test test_kg_term_verification -- --nocapture  
+cargo test --test test_kg_term_verification -- --nocapture
 cargo test --test test_working_advanced_functions -- --nocapture
 cargo test --test test_selected_role_usage -- --nocapture
 
@@ -370,7 +370,7 @@ cargo test -p terraphim_mcp_server -- --nocapture
 All tests demonstrate successful integration of:
 
 1. **Knowledge Graph Enhancement**: Domain-specific terminology properly integrated
-2. **MCP Server Functionality**: All tools and functions working correctly  
+2. **MCP Server Functionality**: All tools and functions working correctly
 3. **Role-Based Processing**: Proper role selection and configuration handling
 4. **Semantic Understanding**: Enhanced document analysis capabilities
 5. **Test Infrastructure**: Comprehensive validation framework

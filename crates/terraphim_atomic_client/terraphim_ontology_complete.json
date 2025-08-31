@@ -3,7 +3,7 @@
     "@id": "http://localhost:9883/terraphim-drive/terraphim",
     "https://atomicdata.dev/properties/classes": [
       "http://localhost:9883/terraphim-drive/terraphim/class/document",
-      "http://localhost:9883/terraphim-drive/terraphim/class/node", 
+      "http://localhost:9883/terraphim-drive/terraphim/class/node",
       "http://localhost:9883/terraphim-drive/terraphim/class/edge",
       "http://localhost:9883/terraphim-drive/terraphim/class/thesaurus",
       "http://localhost:9883/terraphim-drive/terraphim/class/role",
@@ -33,4 +33,4 @@
     "https://atomicdata.dev/properties/shortname": "terraphim",
     "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive"
   }
-] 
+]

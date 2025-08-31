@@ -14,14 +14,14 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
-use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_automata::autocomplete::{
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
     AutocompleteIndex,
 };
-use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 use terraphim_automata::matcher::extract_paragraphs_from_automata;
+use terraphim_automata::{load_thesaurus, AutomataPath};
+use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 #[cfg(feature = "tokio-runtime")]
 use tokio::runtime::Runtime;
@@ -199,12 +199,12 @@ fn bench_fuzzy_algorithm_comparison(c: &mut Criterion) {
 
     for (case_name, query) in test_cases {
         // Benchmark Levenshtein distance approach
-        group.bench_function(&format!("levenshtein_{}", case_name), |b| {
+        group.bench_function(format!("levenshtein_{}", case_name), |b| {
             b.iter(|| fuzzy_autocomplete_search_levenshtein(&index, query, 2, Some(10)).unwrap())
         });
 
         // Benchmark Jaro-Winkler similarity approach (now the default)
-        group.bench_function(&format!("jaro_winkler_{}", case_name), |b| {
+        group.bench_function(format!("jaro_winkler_{}", case_name), |b| {
             b.iter(|| fuzzy_autocomplete_search(&index, query, 0.5, Some(10)).unwrap())
         });
     }
@@ -246,7 +246,7 @@ fn bench_memory_scaling(c: &mut Criterion) {
 
     // Measure index building time vs memory usage
     for size in &[100, 500, 1000, 2500] {
-        let thesaurus = create_large_thesaurus(*size);
+        let _thesaurus = create_large_thesaurus(*size);
         let estimated_memory = size * 200; // Rough estimate: 200 bytes per term
 
         group.throughput(Throughput::Bytes(estimated_memory as u64));
@@ -294,7 +294,7 @@ fn bench_realistic_usage(c: &mut Criterion) {
     let index = create_benchmark_index(3000);
 
     // Simulate realistic user typing patterns
-    let typing_patterns = vec![
+    let typing_patterns = [
         vec!["m", "ma", "mac", "mach", "machi", "machin", "machine"],
         vec![
             "a",

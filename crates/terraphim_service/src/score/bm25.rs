@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::f64;
 
-use terraphim_types::Document;
 use super::common::{BM25Params, FieldWeights};
+use terraphim_types::Document;
 
 /// BM25F scorer implementation
 pub struct BM25FScorer {
@@ -26,6 +26,7 @@ impl BM25FScorer {
     }
 
     /// Create a new BM25F scorer with custom parameters
+    #[allow(dead_code)]
     pub fn with_params(params: BM25Params, weights: FieldWeights) -> Self {
         Self {
             params,
@@ -188,6 +189,7 @@ impl BM25PlusScorer {
     }
 
     /// Create a new BM25+ scorer with custom parameters
+    #[allow(dead_code)]
     pub fn with_params(params: BM25Params) -> Self {
         Self {
             params,

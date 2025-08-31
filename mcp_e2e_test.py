@@ -78,7 +78,7 @@ def main():
     args = parser.parse_args()
 
     runner = E2ETestRunner(args.binary, args.debug, args.expect_data)
-    
+
     # Use asyncio.run() instead of manually managing the event loop
     try:
         if asyncio.run(runner.run_tests()):
@@ -95,4 +95,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

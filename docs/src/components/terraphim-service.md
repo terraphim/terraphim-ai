@@ -249,7 +249,7 @@ The service implements caching for:
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_search_documents() {
         // Test implementation
@@ -341,4 +341,4 @@ let service = TerraphimService::new(config_state);
 2. Add to `QueryScorer` enum
 3. Update scoring logic in `Scorer::score_documents`
 4. Add tests for the new algorithm
-5. Update documentation 
+5. Update documentation

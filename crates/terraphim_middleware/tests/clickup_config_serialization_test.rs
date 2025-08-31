@@ -23,6 +23,7 @@ fn role_with_clickup_haystack_is_valid() {
         kg: None,
         haystacks: vec![Haystack::new("clickup".into(), ServiceType::ClickUp, true)],
         extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
     let json = serde_json::to_string(&role).unwrap();
     assert!(json.contains("ClickUp"));

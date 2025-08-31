@@ -261,4 +261,4 @@ To add new test cases or modify existing ones:
 
 - [Atomic Server Documentation](https://docs.atomicdata.dev/)
 - [Terraphim Architecture](docs/src/Architecture.md)
-- [Existing Atomic Tests](crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs) 
+- [Existing Atomic Tests](crates/terraphim_middleware/tests/atomic_haystack_config_integration.rs)

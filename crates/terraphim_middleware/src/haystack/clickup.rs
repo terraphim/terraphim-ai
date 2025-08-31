@@ -3,8 +3,8 @@ use crate::Result;
 use async_trait::async_trait;
 use reqwest::Client;
 use terraphim_config::Haystack;
-use terraphim_types::{Document, Index};
 use terraphim_persistence::Persistable;
+use terraphim_types::{Document, Index};
 
 #[derive(Debug, Clone)]
 pub struct ClickUpHaystackIndexer {
@@ -98,9 +98,16 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
             let mut documents: Vec<Document> = Vec::new();
 
             if let Some(list) = list_id.clone() {
-                if let Ok(mut docs) =
-                    search_clickup_list(&client, &token, &list, &query, include_closed, subtasks, &self)
-                        .await
+                if let Ok(mut docs) = search_clickup_list(
+                    &client,
+                    &token,
+                    &list,
+                    &query,
+                    include_closed,
+                    subtasks,
+                    self,
+                )
+                .await
                 {
                     documents.append(&mut docs);
                 }
@@ -113,7 +120,7 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
                     &page,
                     include_closed,
                     subtasks,
-                    &self,
+                    self,
                 )
                 .await
                 {
@@ -131,7 +138,7 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
     }
 }
 
-
+#[allow(clippy::too_many_arguments)]
 async fn search_clickup_universal(
     client: &Client,
     token: &str,
@@ -220,7 +227,6 @@ async fn search_clickup_list(
 
     Ok(results)
 }
-
 
 fn parse_bool_param(val: Option<&String>, default_value: bool) -> bool {
     val.and_then(|s| s.parse::<bool>().ok())

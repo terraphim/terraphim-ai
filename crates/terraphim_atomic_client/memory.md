@@ -129,4 +129,4 @@ This confirms that the exported JSON-AD data can be successfully imported back i
 ## Next Steps
 - Consider adding validation for Turtle format authorization issues
 - May want to add more detailed error reporting for failed resource exports
-- Export functionality is production-ready for all three formats 
+- Export functionality is production-ready for all three formats

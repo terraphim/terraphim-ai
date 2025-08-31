@@ -102,25 +102,25 @@
   function checkAtomicServerAvailable(): boolean {
     const currentRoleName = $role;
     const config = $roleConfigStore;
-    
+
     if (!config?.roles || !currentRoleName) {
       return false;
     }
 
     // Find the current role object - handle the complex role structure
     let currentRole: Role | null = null;
-    
+
     try {
       // Handle both string keys and RoleName objects in the roles map
       for (const [roleName, roleConfig] of Object.entries(config.roles)) {
         // Cast roleConfig to Role type for proper access
         const role = roleConfig as Role;
-        
+
         // Check various ways the role name might match
-        const roleNameStr = typeof role.name === 'object' 
-          ? role.name.original 
+        const roleNameStr = typeof role.name === 'object'
+          ? role.name.original
           : String(role.name);
-          
+
         if (roleName === currentRoleName || roleNameStr === currentRoleName) {
           currentRole = role;
           break;
@@ -136,8 +136,8 @@
     }
 
     // Check if role has any writable atomic server haystacks
-    const atomicHaystacks = currentRole.haystacks?.filter(haystack => 
-      haystack.service === "Atomic" && 
+    const atomicHaystacks = currentRole.haystacks?.filter(haystack =>
+      haystack.service === "Atomic" &&
       haystack.location &&
       !haystack.read_only
     ) || [];
@@ -157,31 +157,31 @@
   async function handleTagClick(tag: string) {
     loadingKg = true;
     kgTerm = tag;
-    
+
     // Add debugging information
     console.log('🔍 KG Search Debug Info:');
     console.log('  Tag clicked:', tag);
     console.log('  Current role:', $role);
     console.log('  Is Tauri mode:', $is_tauri);
-    
+
     try {
       if ($is_tauri) {
         // Use Tauri command for desktop app
         console.log('  Making Tauri invoke call...');
         console.log('  Tauri command: find_documents_for_kg_term');
         console.log('  Tauri params:', { roleName: $role, term: tag });
-        
+
         const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
           roleName: $role,
           term: tag
         });
-        
+
         console.log('  📥 Tauri response received:');
         console.log('    Status:', response.status);
         console.log('    Results count:', response.results?.length || 0);
         console.log('    Total:', response.total || 0);
         console.log('    Full response:', JSON.stringify(response, null, 2));
-        
+
         if (response.status === 'success' && response.results && response.results.length > 0) {
           // Get the first (highest-ranked) document
           kgDocument = response.results[0];
@@ -206,31 +206,31 @@
         const encodedRole = encodeURIComponent($role);
         const encodedTerm = encodeURIComponent(tag);
         const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
-        
+
         console.log('  📤 HTTP Request details:');
         console.log('    Base URL:', baseUrl);
         console.log('    Role (encoded):', encodedRole);
         console.log('    Term (encoded):', encodedTerm);
         console.log('    Full URL:', url);
-        
+
         const response = await fetch(url);
-        
+
         console.log('  📥 HTTP Response received:');
         console.log('    Status code:', response.status);
         console.log('    Status text:', response.statusText);
         console.log('    Headers:', Object.fromEntries(response.headers.entries()));
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('  📄 Response data:');
         console.log('    Status:', data.status);
         console.log('    Results count:', data.results?.length || 0);
         console.log('    Total:', data.total || 0);
         console.log('    Full response:', JSON.stringify(data, null, 2));
-        
+
         if (data.status === 'success' && data.results && data.results.length > 0) {
           // Get the first (highest-ranked) document
           kgDocument = data.results[0];
@@ -260,14 +260,14 @@
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()
       });
-      
+
       if (!$is_tauri && error.message?.includes('Failed to fetch')) {
         console.error('  💡 Network error suggestions:');
         console.error('    1. Check if server is running on expected port');
         console.error('    2. Check CORS configuration');
         console.error('    3. Verify server URL in CONFIG.ServerURL');
       }
-      
+
       // Graceful fallback: could show error message or do nothing
     } finally {
       loadingKg = false;
@@ -276,15 +276,15 @@
 
   async function generateSummary() {
     if (summaryLoading || !document.id || !$role) return;
-    
+
     summaryLoading = true;
     summaryError = null;
-    
+
     console.log('🤖 AI Summary Debug Info:');
     console.log('  Document ID:', document.id);
     console.log('  Current role:', $role);
     console.log('  Is Tauri mode:', $is_tauri);
-    
+
     try {
       const requestBody = {
         document_id: document.id,
@@ -292,17 +292,17 @@
         max_length: 250,
         force_regenerate: false
       };
-      
+
       console.log('  📤 Summarization request:', requestBody);
-      
+
       let response;
-      
+
       if ($is_tauri) {
         // For Tauri mode, we'll make an HTTP request directly
         // as we don't have a Tauri command for summarization yet
         const baseUrl = CONFIG.ServerURL;
         const url = `${baseUrl}/documents/summarize`;
-        
+
         response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -314,7 +314,7 @@
         // Web mode - direct HTTP request
         const baseUrl = CONFIG.ServerURL;
         const url = `${baseUrl}/documents/summarize`;
-        
+
         response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -323,18 +323,18 @@
           body: JSON.stringify(requestBody)
         });
       }
-      
+
       console.log('  📥 Summary response received:');
       console.log('    Status code:', response.status);
       console.log('    Status text:', response.statusText);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       console.log('  📄 Summary response data:', data);
-      
+
       if (data.status === 'Success' && data.summary) {
         aiSummary = data.summary;
         summaryFromCache = data.from_cache || false;
@@ -357,9 +357,9 @@
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()
       });
-      
+
       summaryError = error.message || 'Network error occurred';
-      
+
       if (error.message?.includes('Failed to fetch')) {
         console.error('  💡 Network error suggestions:');
         console.error('    1. Check if server is running on expected port');
@@ -374,10 +374,10 @@
 
   function downloadToMarkdown() {
     console.log('📥 Downloading document as markdown:', document.title);
-    
+
     // Create markdown content
     let markdownContent = `# ${document.title}\n\n`;
-    
+
     // Add metadata
     markdownContent += `**Source:** Terraphim Search\n`;
     markdownContent += `**Rank:** ${document.rank || 'N/A'}\n`;
@@ -388,18 +388,18 @@
       markdownContent += `**Tags:** ${document.tags.join(', ')}\n`;
     }
     markdownContent += `**Downloaded:** ${new Date().toISOString()}\n\n`;
-    
+
     // Add description if available
     if (document.description) {
       markdownContent += `## Description\n\n${document.description}\n\n`;
     }
-    
+
     // Add main content
     markdownContent += `## Content\n\n${document.body}\n`;
-    
+
     // Create filename
     const filename = `${document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.md`;
-    
+
     // Create and download file
     const blob = new Blob([markdownContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -410,7 +410,7 @@
     a.click();
     window.document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     console.log('✅ Markdown file downloaded:', filename);
   }
 
@@ -437,8 +437,8 @@
           {#if document.tags}
           <Taglist>
               {#each document.tags as tag}
-                <button 
-                  class="tag-button" 
+                <button
+                  class="tag-button"
                   on:click={() => handleTagClick(tag)}
                   disabled={loadingKg}
                   title="Click to view knowledge graph document"
@@ -470,11 +470,11 @@
               {/if}
             </div>
           </div>
-          
+
           <!-- AI Summary Section -->
           <div class="ai-summary-section">
             {#if !showAiSummary && !summaryLoading && !summaryError}
-              <button 
+              <button
                 class="button is-small is-info is-outlined ai-summary-button"
                 on:click={generateSummary}
                 disabled={summaryLoading}
@@ -486,7 +486,7 @@
                 <span>AI Summary</span>
               </button>
             {/if}
-            
+
             {#if summaryLoading}
               <div class="ai-summary-loading">
                 <span class="icon">
@@ -495,14 +495,14 @@
                 <small>Generating AI summary...</small>
               </div>
             {/if}
-            
+
             {#if summaryError}
               <div class="ai-summary-error">
                 <span class="icon has-text-danger">
                   <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 </span>
                 <small class="has-text-danger">Summary error: {summaryError}</small>
-                <button 
+                <button
                   class="button is-small is-text"
                   on:click={() => { summaryError = null; generateSummary(); }}
                   title="Retry generating summary"
@@ -511,7 +511,7 @@
                 </button>
               </div>
             {/if}
-            
+
             {#if showAiSummary && aiSummary}
               <div class="ai-summary" transition:fade>
                 <div class="ai-summary-header">
@@ -526,7 +526,7 @@
                       <span class="tag is-small is-success">fresh</span>
                     {/if}
                   </small>
-                  <button 
+                  <button
                     class="button is-small is-text"
                     on:click={() => showAiSummary = false}
                     title="Hide AI summary"
@@ -540,7 +540,7 @@
                   <SvelteMarkdown source={aiSummary} />
                 </div>
                 <div class="ai-summary-actions">
-                  <button 
+                  <button
                     class="button is-small is-text"
                     on:click={() => { generateSummary(); }}
                     disabled={summaryLoading}
@@ -555,7 +555,7 @@
               </div>
             {/if}
           </div>
-          
+
           <br />
         </div>
       </div>
@@ -615,9 +615,9 @@
 
 <!-- KG document modal -->
 {#if kgDocument}
-  <ArticleModal 
-    bind:active={showKgModal} 
-    item={kgDocument} 
+  <ArticleModal
+    bind:active={showKgModal}
+    item={kgDocument}
     kgTerm={kgTerm}
     kgRank={kgRank}
   />
@@ -625,8 +625,8 @@
 
 <!-- Atomic Save Modal -->
 {#if hasAtomicServer}
-  <AtomicSaveModal 
-    bind:active={showAtomicSaveModal} 
+  <AtomicSaveModal
+    bind:active={showAtomicSaveModal}
     document={document}
   />
 {/if}
@@ -641,7 +641,7 @@
     outline: inherit;
     display: block;
   }
-  
+
   .tag-button {
     background: none;
     border: none;
@@ -649,17 +649,17 @@
     cursor: pointer;
     outline: inherit;
     display: inline-block;
-    
+
     &:hover {
       opacity: 0.8;
     }
-    
+
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
   }
-  
+
   .title {
     font-size: 1.3em;
     margin-bottom: 0px;
@@ -669,34 +669,34 @@
       text-decoration: underline;
     }
   }
-  
+
   .description {
     margin-top: 0.5rem;
   }
-  
+
   .description-label {
     font-weight: 600;
     color: #666;
     margin-right: 0.5rem;
   }
-  
+
   .description-content {
     display: inline;
-    
+
     // Style markdown content within description
     :global(p) {
       display: inline;
       margin: 0;
     }
-    
+
     :global(strong) {
       font-weight: 600;
     }
-    
+
     :global(em) {
       font-style: italic;
     }
-    
+
     :global(code) {
       background-color: #f5f5f5;
       padding: 0.1rem 0.3rem;
@@ -704,31 +704,31 @@
       font-family: monospace;
       font-size: 0.9em;
     }
-    
+
     :global(a) {
       color: #3273dc;
       text-decoration: none;
-      
+
       &:hover {
         text-decoration: underline;
       }
     }
   }
-  
+
   .no-description {
     color: #999;
     font-style: italic;
   }
-  
+
   /* AI Summary Styling */
   .ai-summary-section {
     margin-top: 0.75rem;
   }
-  
+
   .ai-summary-button {
     margin-top: 0.5rem;
   }
-  
+
   .ai-summary-loading {
     display: flex;
     align-items: center;
@@ -736,14 +736,14 @@
     margin-top: 0.5rem;
     color: #3273dc;
   }
-  
+
   .ai-summary-error {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     margin-top: 0.5rem;
   }
-  
+
   .ai-summary {
     margin-top: 0.75rem;
     padding: 0.75rem;
@@ -751,14 +751,14 @@
     border-left: 4px solid #3273dc;
     border-radius: 4px;
   }
-  
+
   .ai-summary-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
   }
-  
+
   .ai-summary-label {
     display: flex;
     align-items: center;
@@ -766,28 +766,28 @@
     font-weight: 600;
     color: #3273dc;
   }
-  
+
   .ai-summary-content {
     margin-bottom: 0.5rem;
-    
+
     // Style markdown content within AI summary
     :global(p) {
       margin: 0 0 0.5rem 0;
       line-height: 1.4;
     }
-    
+
     :global(p:last-child) {
       margin-bottom: 0;
     }
-    
+
     :global(strong) {
       font-weight: 600;
     }
-    
+
     :global(em) {
       font-style: italic;
     }
-    
+
     :global(code) {
       background-color: #e8e8e8;
       padding: 0.1rem 0.3rem;
@@ -795,17 +795,17 @@
       font-family: monospace;
       font-size: 0.9em;
     }
-    
+
     :global(a) {
       color: #3273dc;
       text-decoration: none;
-      
+
       &:hover {
         text-decoration: underline;
       }
     }
   }
-  
+
   .ai-summary-actions {
     display: flex;
     justify-content: flex-end;

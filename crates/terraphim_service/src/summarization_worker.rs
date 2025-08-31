@@ -39,7 +39,9 @@ impl PartialOrd for PriorityTask {
 impl Ord for PriorityTask {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Higher priority first, then earlier creation time
-        self.task.priority.cmp(&other.task.priority)
+        self.task
+            .priority
+            .cmp(&other.task.priority)
             .then(other.created_at.cmp(&self.created_at))
     }
 }
@@ -59,7 +61,7 @@ impl WorkerStats {
         self.total_processed += 1;
         self.total_successful += 1;
         self.processing_times.push(duration);
-        
+
         // Keep only last 100 processing times for average calculation
         if self.processing_times.len() > 100 {
             self.processing_times.remove(0);
@@ -80,7 +82,7 @@ impl WorkerStats {
         if self.processing_times.is_empty() {
             return None;
         }
-        
+
         let total: Duration = self.processing_times.iter().sum();
         Some(total / self.processing_times.len() as u32)
     }
@@ -100,12 +102,9 @@ pub struct SummarizationWorker {
 
 impl SummarizationWorker {
     /// Create a new summarization worker
-    pub fn new(
-        config: QueueConfig,
-        task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
-    ) -> Self {
+    pub fn new(config: QueueConfig, task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>) -> Self {
         let rate_limiter = RateLimiterManager::new(config.rate_limits.clone());
-        
+
         Self {
             config,
             task_queue: BinaryHeap::new(),
@@ -123,13 +122,15 @@ impl SummarizationWorker {
         mut self,
         mut command_receiver: mpsc::Receiver<QueueCommand>,
     ) -> Result<(), ServiceError> {
-        log::info!("Starting summarization worker with {} max concurrent workers", 
-                   self.config.max_concurrent_workers);
+        log::info!(
+            "Starting summarization worker with {} max concurrent workers",
+            self.config.max_concurrent_workers
+        );
 
         // Spawn worker tasks
         let (task_sender, task_receiver) = mpsc::channel(self.config.max_concurrent_workers * 2);
         let task_receiver = Arc::new(tokio::sync::Mutex::new(task_receiver));
-        
+
         for worker_id in 0..self.config.max_concurrent_workers {
             let task_receiver = Arc::clone(&task_receiver);
             let rate_limiter = self.rate_limiter.clone();
@@ -137,7 +138,7 @@ impl SummarizationWorker {
             let stats = Arc::clone(&self.stats);
             let retry_delay = self.config.retry_delay;
             let max_retry_delay = self.config.max_retry_delay;
-            
+
             let handle = tokio::spawn(async move {
                 Self::worker_loop(
                     worker_id,
@@ -147,9 +148,10 @@ impl SummarizationWorker {
                     stats,
                     retry_delay,
                     max_retry_delay,
-                ).await;
+                )
+                .await;
             });
-            
+
             self.worker_handles.push(handle);
         }
 
@@ -177,7 +179,7 @@ impl SummarizationWorker {
                         }
                     }
                 }
-                
+
                 // Periodic maintenance
                 _ = sleep(Duration::from_secs(10)) => {
                     self.cleanup_old_tasks().await;
@@ -203,7 +205,7 @@ impl SummarizationWorker {
     ) -> Result<bool, ServiceError> {
         match command {
             QueueCommand::SubmitTask(task) => {
-                self.submit_task(task, task_sender).await?;
+                self.submit_task(*task, task_sender).await?;
             }
             QueueCommand::CancelTask(task_id, reason) => {
                 self.cancel_task(task_id, reason).await;
@@ -235,7 +237,7 @@ impl SummarizationWorker {
         task_sender: &mpsc::Sender<SummarizationTask>,
     ) -> Result<(), ServiceError> {
         let task_id = task.id.clone();
-        
+
         // Update task status
         {
             let mut status_map = self.task_status.write().await;
@@ -249,7 +251,10 @@ impl SummarizationWorker {
         }
 
         // If not paused, try to send directly to workers
-        if !self.is_paused && self.active_workers < self.config.max_concurrent_workers && task_sender.try_send(task.clone()).is_ok() {
+        if !self.is_paused
+            && self.active_workers < self.config.max_concurrent_workers
+            && task_sender.try_send(task.clone()).is_ok()
+        {
             log::debug!("Task {} sent directly to worker", task_id);
             return Ok(());
         }
@@ -260,7 +265,11 @@ impl SummarizationWorker {
             created_at: Instant::now(),
         });
 
-        log::debug!("Task {} queued (queue size: {})", task_id, self.task_queue.len());
+        log::debug!(
+            "Task {} queued (queue size: {})",
+            task_id,
+            self.task_queue.len()
+        );
         Ok(())
     }
 
@@ -279,13 +288,13 @@ impl SummarizationWorker {
                         },
                     );
                     drop(status_map);
-                    
+
                     // Record cancellation in stats
                     {
                         let mut worker_stats = self.stats.write().await;
                         worker_stats.record_cancelled();
                     }
-                    
+
                     log::info!("Task {} cancelled: {}", task_id, reason);
                 }
             }
@@ -340,8 +349,9 @@ impl SummarizationWorker {
     /// Clean up old completed tasks
     async fn cleanup_old_tasks(&mut self) {
         let mut status_map = self.task_status.write().await;
-        let cutoff = Utc::now() - chrono::Duration::from_std(self.config.task_retention_time).unwrap_or_default();
-        
+        let cutoff = Utc::now()
+            - chrono::Duration::from_std(self.config.task_retention_time).unwrap_or_default();
+
         let mut to_remove = Vec::new();
         for (task_id, status) in status_map.iter() {
             let should_remove = match status {
@@ -350,7 +360,7 @@ impl SummarizationWorker {
                 TaskStatus::Cancelled { cancelled_at, .. } => *cancelled_at < cutoff,
                 _ => false,
             };
-            
+
             if should_remove {
                 to_remove.push(task_id.clone());
             }
@@ -433,26 +443,43 @@ impl SummarizationWorker {
                         },
                     );
                     drop(status_map);
-                    
+
                     // Record successful processing in stats
                     {
                         let mut worker_stats = stats.write().await;
                         worker_stats.record_success(duration);
                     }
-                    
-                    log::info!("Worker {} completed task {} in {:?}", worker_id, task_id, duration);
+
+                    log::info!(
+                        "Worker {} completed task {} in {:?}",
+                        worker_id,
+                        task_id,
+                        duration
+                    );
                 }
                 Err(error) => {
                     // Handle retry logic
                     let mut retry_task = task.clone();
                     retry_task.increment_retry();
-                    
-                    if retry_task.can_retry() {
-                        let delay = Self::calculate_retry_delay(retry_task.retry_count, retry_delay, max_retry_delay);
-                        log::warn!("Worker {} task {} failed, retrying in {:?} (attempt {}/{}): {}", 
-                                   worker_id, task_id, delay, retry_task.retry_count, retry_task.max_retries, error);
 
-                        let next_retry = Utc::now() + chrono::Duration::from_std(delay).unwrap_or_default();
+                    if retry_task.can_retry() {
+                        let delay = Self::calculate_retry_delay(
+                            retry_task.retry_count,
+                            retry_delay,
+                            max_retry_delay,
+                        );
+                        log::warn!(
+                            "Worker {} task {} failed, retrying in {:?} (attempt {}/{}): {}",
+                            worker_id,
+                            task_id,
+                            delay,
+                            retry_task.retry_count,
+                            retry_task.max_retries,
+                            error
+                        );
+
+                        let next_retry =
+                            Utc::now() + chrono::Duration::from_std(delay).unwrap_or_default();
                         let mut status_map = task_status.write().await;
                         status_map.insert(
                             task_id.clone(),
@@ -478,14 +505,19 @@ impl SummarizationWorker {
                             },
                         );
                         drop(status_map);
-                        
+
                         // Record failure in stats (final failure after retries exhausted)
                         {
                             let mut worker_stats = stats.write().await;
                             worker_stats.record_failure();
                         }
-                        log::error!("Worker {} task {} failed permanently after {} retries: {}", 
-                                    worker_id, task_id, retry_task.retry_count, error);
+                        log::error!(
+                            "Worker {} task {} failed permanently after {} retries: {}",
+                            worker_id,
+                            task_id,
+                            retry_task.retry_count,
+                            error
+                        );
                     }
                 }
             }
@@ -508,12 +540,13 @@ impl SummarizationWorker {
         }
 
         // Build LLM client from role
-        let llm = build_llm_from_role(&task.role)
-            .ok_or_else(|| ServiceError::Config("No LLM provider configured for role".to_string()))?;
+        let llm = build_llm_from_role(&task.role).ok_or_else(|| {
+            ServiceError::Config("No LLM provider configured for role".to_string())
+        })?;
 
         // Estimate tokens needed
         let tokens_needed = estimate_tokens(&task.document.body);
-        
+
         // Wait for rate limit approval
         let provider = llm.name();
         rate_limiter.acquire(provider, tokens_needed).await?;
@@ -531,18 +564,23 @@ impl SummarizationWorker {
             .map_err(|e| ServiceError::Config(format!("LLM error: {}", e)))?;
 
         if summary.trim().is_empty() {
-            return Err(ServiceError::Config("Generated summary is empty".to_string()));
+            return Err(ServiceError::Config(
+                "Generated summary is empty".to_string(),
+            ));
         }
 
         Ok(summary)
     }
 
     /// Calculate retry delay with exponential backoff
-    fn calculate_retry_delay(retry_count: u32, base_delay: Duration, max_delay: Duration) -> Duration {
+    fn calculate_retry_delay(
+        retry_count: u32,
+        base_delay: Duration,
+        max_delay: Duration,
+    ) -> Duration {
         let delay = base_delay * 2_u32.pow(retry_count.saturating_sub(1));
         delay.min(max_delay)
     }
-
 }
 
 // Implement Clone for RateLimiterManager
@@ -554,11 +592,14 @@ impl Clone for RateLimiterManager {
         let mut configs = HashMap::new();
         // We can't easily clone the existing limiters, so we'll create with default configs
         for provider in ["openrouter", "ollama"] {
-            configs.insert(provider.to_string(), crate::summarization_queue::RateLimitConfig {
-                max_requests_per_minute: 60,
-                max_tokens_per_minute: 10000,
-                burst_size: 10,
-            });
+            configs.insert(
+                provider.to_string(),
+                crate::summarization_queue::RateLimitConfig {
+                    max_requests_per_minute: 60,
+                    max_tokens_per_minute: 10000,
+                    burst_size: 10,
+                },
+            );
         }
         Self::new(configs)
     }
@@ -616,12 +657,12 @@ mod tests {
     fn test_priority_task_ordering() {
         let doc = create_test_document();
         let role = create_test_role();
-        
-        let task_low = SummarizationTask::new(doc.clone(), role.clone())
-            .with_priority(Priority::Low);
-        let task_high = SummarizationTask::new(doc.clone(), role.clone())
-            .with_priority(Priority::High);
-        
+
+        let task_low =
+            SummarizationTask::new(doc.clone(), role.clone()).with_priority(Priority::Low);
+        let task_high =
+            SummarizationTask::new(doc.clone(), role.clone()).with_priority(Priority::High);
+
         let priority_low = PriorityTask {
             task: task_low,
             created_at: Instant::now(),
@@ -651,7 +692,7 @@ mod tests {
             SummarizationWorker::calculate_retry_delay(5, base_delay, max_delay),
             Duration::from_secs(16)
         );
-        
+
         // Should be capped at max_delay
         assert_eq!(
             SummarizationWorker::calculate_retry_delay(10, base_delay, max_delay),
@@ -662,7 +703,7 @@ mod tests {
     #[tokio::test]
     async fn test_worker_stats() {
         let mut stats = WorkerStats::default();
-        
+
         stats.record_success(Duration::from_secs(5));
         stats.record_success(Duration::from_secs(3));
         stats.record_failure();
@@ -677,7 +718,7 @@ mod tests {
     async fn test_task_status_updates() {
         let task_status = Arc::new(RwLock::new(HashMap::new()));
         let task_id = TaskId::new();
-        
+
         // Test pending status
         {
             let mut status_map = task_status.write().await;

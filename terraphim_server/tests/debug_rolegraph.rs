@@ -26,7 +26,7 @@ mod tests {
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
             .add_role(
-                "Engineer".into(),
+                "Engineer",
                 Role {
                     terraphim_it: true,
                     shortname: Some("Engineer".into()),
@@ -49,6 +49,20 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                     }],
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                     extra: AHashMap::new(),
                 },
             )
@@ -85,7 +99,7 @@ mod tests {
 
     async fn wait_for_server_ready(address: SocketAddr) {
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
@@ -141,7 +155,7 @@ mod tests {
     async fn debug_rolegraph_visualization() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         // Test Engineer role
         let response = client
@@ -190,7 +204,7 @@ mod tests {
     async fn debug_config() {
         let server = ensure_server_started().await;
         let client = terraphim_service::http_client::create_default_client()
-        .expect("Failed to create HTTP client");
+            .expect("Failed to create HTTP client");
 
         let response = client
             .get(format!("http://{server}/config"))

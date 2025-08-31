@@ -40,7 +40,7 @@ pub enum TerraphimConfigError {
     Profile(String),
 
     #[error("Persistence error")]
-    Persistence(#[from] terraphim_persistence::Error),
+    Persistence(Box<terraphim_persistence::Error>),
 
     #[error("Serde JSON error")]
     Json(#[from] serde_json::Error),
@@ -64,11 +64,17 @@ pub enum TerraphimConfigError {
     Config(String),
 }
 
+impl From<terraphim_persistence::Error> for TerraphimConfigError {
+    fn from(error: terraphim_persistence::Error) -> Self {
+        TerraphimConfigError::Persistence(Box::new(error))
+    }
+}
+
 /// A role is a collection of settings for a specific user
 ///
 /// It contains a user's knowledge graph, a list of haystacks, as
 /// well as preferences for the relevance function and theme
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
@@ -341,7 +347,7 @@ impl ConfigBuilder {
             ConfigId::Embedded => DeviceSettings::default_embedded(),
             _ => DeviceSettings::new(),
         };
-        
+
         Self {
             config: Config {
                 id,
@@ -353,7 +359,7 @@ impl ConfigBuilder {
     }
     pub fn build_default_embedded(mut self) -> Self {
         self.config.id = ConfigId::Embedded;
-        
+
         // Add Default role with basic functionality
         self = self.add_role(
             "Default",
@@ -371,6 +377,20 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         );
@@ -400,6 +420,20 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         );
@@ -421,6 +455,20 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         );
@@ -976,7 +1024,7 @@ impl ConfigState {
         log::debug!("Role name for searching {role_name}");
         log::debug!("All roles defined  {:?}", self.roles.clone().into_keys());
         //FIXME: breaks here for ripgrep, means KB based search is triggered before KG build
-        let role = match self.roles.get(&role_name) {
+        let role = match self.roles.get(role_name) {
             Some(role) => role.lock().await,
             None => {
                 // Handle the None case, e.g., return an empty vector since the function expects Vec<IndexedDocument>
@@ -987,8 +1035,37 @@ impl ConfigState {
                 return Vec::new();
             }
         };
-        let documents = role
-            .query_graph(
+        let documents = if search_query.is_multi_term_query() {
+            // Use multi-term search with logical operators
+            let all_terms: Vec<&str> = search_query
+                .get_all_terms()
+                .iter()
+                .map(|t| t.as_str())
+                .collect();
+            let operator = search_query.get_operator();
+
+            log::debug!(
+                "Performing multi-term search with {} terms using {:?} operator",
+                all_terms.len(),
+                operator
+            );
+
+            role.query_graph_with_operators(
+                &all_terms,
+                &operator,
+                search_query.skip,
+                search_query.limit,
+            )
+            .unwrap_or_else(|e| {
+                log::error!(
+                    "Error while searching graph with operators for documents: {:?}",
+                    e
+                );
+                vec![]
+            })
+        } else {
+            // Use single-term search (backward compatibility)
+            role.query_graph(
                 search_query.search_term.as_str(),
                 search_query.skip,
                 search_query.limit,
@@ -996,7 +1073,8 @@ impl ConfigState {
             .unwrap_or_else(|e| {
                 log::error!("Error while searching graph for documents: {:?}", e);
                 vec![]
-            });
+            })
+        };
 
         documents.into_iter().map(|(_id, doc)| doc).collect()
     }
@@ -1115,6 +1193,20 @@ mod tests {
                         extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                 },
             )
             .add_role(
@@ -1134,6 +1226,20 @@ mod tests {
                         extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                 },
             )
             .add_role(
@@ -1161,6 +1267,20 @@ mod tests {
                         extra_parameters: std::collections::HashMap::new(),
                     }],
                     extra: AHashMap::new(),
+                    #[cfg(feature = "openrouter")]
+                    openrouter_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_api_key: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_model: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_auto_summarize: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_enabled: false,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_system_prompt: None,
+                    #[cfg(feature = "openrouter")]
+                    openrouter_chat_model: None,
                 },
             )
             .default_role("Default")
@@ -1210,6 +1330,20 @@ mod tests {
                 extra_parameters: std::collections::HashMap::new(),
             }],
             extra: AHashMap::new(),
+            #[cfg(feature = "openrouter")]
+            openrouter_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_api_key: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_model: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_auto_summarize: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_system_prompt: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_model: None,
         }
     }
 
@@ -1235,11 +1369,11 @@ mod tests {
                 Ok(config) => config,
                 Err(e) => {
                     log::info!("Failed to load config: {:?}", e);
-                    let config = ConfigBuilder::new()
+
+                    ConfigBuilder::new()
                         .build_default_desktop()
                         .build()
-                        .unwrap();
-                    config
+                        .unwrap()
                 }
             },
             Err(e) => panic!("Failed to build config: {:?}", e),
@@ -1254,8 +1388,8 @@ mod tests {
                 Ok(config) => config,
                 Err(e) => {
                     log::info!("Failed to load config: {:?}", e);
-                    let config = ConfigBuilder::new().build_default_server().build().unwrap();
-                    config
+
+                    ConfigBuilder::new().build_default_server().build().unwrap()
                 }
             },
             Err(e) => panic!("Failed to build config: {:?}", e),
@@ -1270,11 +1404,11 @@ mod tests {
                 Ok(config) => config,
                 Err(e) => {
                     log::info!("Failed to load config: {:?}", e);
-                    let config = ConfigBuilder::new()
+
+                    ConfigBuilder::new()
                         .build_default_embedded()
                         .build()
-                        .unwrap();
-                    config
+                        .unwrap()
                 }
             },
             Err(e) => panic!("Failed to build config: {:?}", e),
@@ -1295,7 +1429,7 @@ mod tests {
         let config = Config::default();
         let json = serde_json::to_string_pretty(&config).unwrap();
         log::debug!("Config: {:#?}", config);
-        assert!(json.len() > 0);
+        assert!(!json.is_empty());
     }
 
     #[tokio::test]
@@ -1303,6 +1437,6 @@ mod tests {
         let config = Config::default();
         let toml = toml::to_string_pretty(&config).unwrap();
         log::debug!("Config: {:#?}", config);
-        assert!(toml.len() > 0);
+        assert!(!toml.is_empty());
     }
 }

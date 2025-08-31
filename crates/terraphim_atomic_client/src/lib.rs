@@ -22,23 +22,23 @@
  *     // Load configuration from environment variables
  *     let config = Config::from_env().unwrap();
  *     let store = Store::new(config).unwrap();
- *     
+ *
  *     // Fetch a resource
  *     let resource = store.get_resource("https://atomicdata.dev").await.unwrap();
  *     println!("Resource: {:?}", resource);
- *     
+ *
  *     // Create a resource
  *     let mut properties = HashMap::new();
  *     properties.insert(
  *         "https://atomicdata.dev/properties/description".to_string(),
  *         json!("A test resource")
  *     );
- *     
+ *
  *     let new_resource = Resource {
  *         subject: "https://example.com/resources/test".to_string(),
  *         properties,
  *     };
- *     
+ *
  *     store.create_resource(new_resource).await.unwrap();
  * }
  * ```

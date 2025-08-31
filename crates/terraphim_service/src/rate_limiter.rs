@@ -30,7 +30,7 @@ impl TokenBucketLimiter {
     /// Create a new token bucket limiter
     pub fn new(config: &RateLimitConfig) -> Self {
         let now = Instant::now();
-        
+
         Self {
             max_tokens: config.burst_size as f64,
             tokens: Arc::new(Mutex::new(config.burst_size as f64)),
@@ -52,7 +52,10 @@ impl TokenBucketLimiter {
 
         // Check request rate limit
         if *request_count >= self.max_requests_per_minute {
-            log::debug!("Rate limit exceeded: {} requests in current minute", *request_count);
+            log::debug!(
+                "Rate limit exceeded: {} requests in current minute",
+                *request_count
+            );
             return false;
         }
 
@@ -60,12 +63,18 @@ impl TokenBucketLimiter {
         if *tokens >= tokens_needed {
             *tokens -= tokens_needed;
             *request_count += 1;
-            log::debug!("Token acquired. Remaining tokens: {:.2}, requests in window: {}", 
-                       *tokens, *request_count);
+            log::debug!(
+                "Token acquired. Remaining tokens: {:.2}, requests in window: {}",
+                *tokens,
+                *request_count
+            );
             true
         } else {
-            log::debug!("Insufficient tokens. Available: {:.2}, needed: {:.2}", 
-                       *tokens, tokens_needed);
+            log::debug!(
+                "Insufficient tokens. Available: {:.2}, needed: {:.2}",
+                *tokens,
+                tokens_needed
+            );
             false
         }
     }
@@ -74,7 +83,7 @@ impl TokenBucketLimiter {
     pub async fn acquire(&self, tokens_needed: f64) -> Result<(), crate::ServiceError> {
         let mut attempts = 0;
         const MAX_ATTEMPTS: u32 = 60; // Maximum 1 minute wait
-        
+
         while attempts < MAX_ATTEMPTS {
             if self.try_acquire(tokens_needed).await {
                 return Ok(());
@@ -85,7 +94,7 @@ impl TokenBucketLimiter {
         }
 
         Err(crate::ServiceError::Config(
-            "Rate limit timeout: unable to acquire token within time limit".to_string()
+            "Rate limit timeout: unable to acquire token within time limit".to_string(),
         ))
     }
 
@@ -151,7 +160,7 @@ impl RateLimiterManager {
     /// Create a new rate limiter manager
     pub fn new(configs: HashMap<String, RateLimitConfig>) -> Self {
         let mut limiters = HashMap::new();
-        
+
         for (provider, config) in configs {
             limiters.insert(provider, TokenBucketLimiter::new(&config));
         }
@@ -170,7 +179,11 @@ impl RateLimiterManager {
     }
 
     /// Wait until a token can be acquired for a specific provider
-    pub async fn acquire(&self, provider: &str, tokens_needed: f64) -> Result<(), crate::ServiceError> {
+    pub async fn acquire(
+        &self,
+        provider: &str,
+        tokens_needed: f64,
+    ) -> Result<(), crate::ServiceError> {
         if let Some(limiter) = self.limiters.get(provider) {
             limiter.acquire(tokens_needed).await
         } else {
@@ -182,11 +195,11 @@ impl RateLimiterManager {
     /// Get status for all rate limiters
     pub async fn get_all_status(&self) -> HashMap<String, RateLimiterStatus> {
         let mut status_map = HashMap::new();
-        
+
         for (provider, limiter) in &self.limiters {
             status_map.insert(provider.clone(), limiter.get_status().await);
         }
-        
+
         status_map
     }
 
@@ -201,7 +214,8 @@ impl RateLimiterManager {
 
     /// Add or update a rate limiter for a provider
     pub fn add_provider(&mut self, provider: String, config: RateLimitConfig) {
-        self.limiters.insert(provider, TokenBucketLimiter::new(&config));
+        self.limiters
+            .insert(provider, TokenBucketLimiter::new(&config));
     }
 
     /// Remove a rate limiter for a provider
@@ -241,7 +255,7 @@ mod tests {
         assert!(limiter.try_acquire(1.0).await);
         assert!(limiter.try_acquire(2.0).await);
         assert!(limiter.try_acquire(2.0).await);
-        
+
         // Should fail when burst is exhausted
         assert!(!limiter.try_acquire(1.0).await);
     }
@@ -258,7 +272,7 @@ mod tests {
 
         // Wait for refill
         sleep(Duration::from_millis(2100)).await; // Wait 2.1 seconds
-        
+
         // Should have ~2 tokens refilled
         assert!(limiter.try_acquire(1.0).await);
         assert!(limiter.try_acquire(1.0).await);
@@ -275,7 +289,7 @@ mod tests {
         // Should be able to make 2 requests
         assert!(limiter.try_acquire(1.0).await);
         assert!(limiter.try_acquire(1.0).await);
-        
+
         // Third request should fail due to rate limit
         assert!(!limiter.try_acquire(1.0).await);
     }
@@ -284,12 +298,12 @@ mod tests {
     async fn test_rate_limiter_manager() {
         let mut configs = HashMap::new();
         configs.insert("provider1".to_string(), create_test_config());
-        
+
         let manager = RateLimiterManager::new(configs);
-        
+
         // Should work for configured provider
         assert!(manager.try_acquire("provider1", 1.0).await);
-        
+
         // Should allow for unconfigured provider
         assert!(manager.try_acquire("provider2", 1.0).await);
     }
@@ -298,7 +312,7 @@ mod tests {
     async fn test_status_reporting() {
         let config = create_test_config();
         let limiter = TokenBucketLimiter::new(&config);
-        
+
         let status = limiter.get_status().await;
         assert_eq!(status.max_tokens, config.burst_size as f64);
         assert!(status.current_tokens <= config.burst_size as f64);
@@ -309,7 +323,7 @@ mod tests {
     fn test_token_estimation() {
         let text = "This is a test text with approximately twenty words to test token estimation";
         let tokens = estimate_tokens(text);
-        
+
         // Should estimate around 120 tokens (80 chars / 4 + 100 overhead)
         assert!(tokens > 100.0);
         assert!(tokens < 200.0);
@@ -323,12 +337,12 @@ mod tests {
 
         // Exhaust the bucket
         assert!(limiter.try_acquire(5.0).await);
-        
+
         // This should block and then succeed
         let start = Instant::now();
         limiter.acquire(1.0).await.unwrap();
         let elapsed = start.elapsed();
-        
+
         // Should have waited at least 1 second
         assert!(elapsed >= Duration::from_secs(1));
     }

@@ -39,8 +39,8 @@
     try {
       if ($is_tauri) {
         console.log("Loading rolegraph from Tauri");
-        const response = await invoke<RoleGraphResponse>('get_rolegraph', { 
-          role_name: $role || undefined 
+        const response = await invoke<RoleGraphResponse>('get_rolegraph', {
+          role_name: $role || undefined
         });
         if (response && response.status === 'success') {
           nodes = response.nodes;
@@ -94,7 +94,7 @@
     selectedNode = nodeToDocument(nodeData);
     startInEditMode = true;
     showModal = true;
-    
+
     // Clear debug message after 2 seconds
     setTimeout(() => {
       debugMessage = '';
@@ -109,7 +109,7 @@
 
   async function handleModalSave() {
     if (!selectedNode) return;
-    
+
     try {
       const response = await fetch('/documents', {
         method: 'POST',
@@ -118,7 +118,7 @@
         },
         body: JSON.stringify(selectedNode),
       });
-      
+
       if (response.ok) {
         console.log('Successfully saved KG record:', selectedNode.id);
       } else {
@@ -136,7 +136,7 @@
   function renderGraph() {
     if (!container) return;
     container.innerHTML = '';
-    
+
     const svg = d3.select(container)
       .append('svg')
       .attr('width', width)
@@ -245,11 +245,11 @@
         .attr('y1', (d: any) => d.source.y)
         .attr('x2', (d: any) => d.target.x)
         .attr('y2', (d: any) => d.target.y);
-      
+
       node
         .attr('cx', (d: any) => d.x)
         .attr('cy', (d: any) => d.y);
-      
+
       label
         .attr('x', (d: any) => d.x)
         .attr('y', (d: any) => d.y);
@@ -260,12 +260,12 @@
       d.fx = d.x;
       d.fy = d.y;
     }
-    
+
     function dragged(event: any, d: any) {
       d.fx = event.x;
       d.fy = event.y;
     }
-    
+
     function dragended(event: any, d: any) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
@@ -277,18 +277,18 @@
     fetchGraph().then(() => {
       if (!error) renderGraph();
     });
-    
+
     // Prevent browser context menu on the graph container
     const preventContextMenu = (e: Event) => {
       e.preventDefault();
     };
-    
+
     if (container) {
       container.addEventListener('contextmenu', preventContextMenu);
     }
-    
+
     window.addEventListener('resize', updateDimensions);
-    
+
     return () => {
       if (container) {
         container.removeEventListener('contextmenu', preventContextMenu);
@@ -303,8 +303,8 @@
 <svelte:window bind:innerWidth={width} bind:innerHeight={height} />
 
 <!-- Graph container -->
-<div 
-  bind:this={container} 
+<div
+  bind:this={container}
   class="graph-container"
   class:fullscreen
   style="width: {fullscreen ? '100vw' : '600px'}; height: {fullscreen ? '100vh' : '400px'};"
@@ -351,8 +351,8 @@
 <!-- Modal for viewing/editing KG records -->
 {#if selectedNode}
   {#key selectedNode.id}
-    <ArticleModal 
-      bind:active={showModal} 
+    <ArticleModal
+      bind:active={showModal}
       item={selectedNode}
       initialEdit={startInEditMode}
       on:close={handleModalClose}
@@ -504,4 +504,4 @@
   :global(.modal-content) {
     z-index: 2010 !important;
   }
-</style> 
+</style>

@@ -1,9 +1,6 @@
-use serde_json;
 use std::collections::HashMap;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
-use terraphim_middleware::{
-    command::ripgrep::RipgrepCommand, indexer::IndexMiddleware, RipgrepIndexer,
-};
+use terraphim_middleware::command::ripgrep::RipgrepCommand;
 use terraphim_types::RelevanceFunction;
 
 /// Test that demonstrates the security improvement: atomic_server_secret is not serialized for Ripgrep haystacks
@@ -197,7 +194,7 @@ async fn test_haystack_builder_methods() {
 
     assert_eq!(haystack.location, "fixtures/haystack");
     assert_eq!(haystack.service, ServiceType::Ripgrep);
-    assert_eq!(haystack.read_only, true);
+    assert!(haystack.read_only);
     assert_eq!(haystack.atomic_server_secret, None);
     assert_eq!(
         haystack.extra_parameters.get("tag"),
@@ -257,7 +254,7 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
             atomic_server_secret: None,
             extra_parameters: extra_params,
         }],
-        extra: ahash::AHashMap::new(),
+        ..Default::default()
     };
 
     let config = ConfigBuilder::new()

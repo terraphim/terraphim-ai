@@ -220,4 +220,4 @@ The WebDriver tests are designed for CI/CD integration:
 
 ## Conclusion
 
-The WebDriver tests provide the most accurate validation of KG graph functionality in the Tauri application context, ensuring that all features work correctly in the native application environment. 
+The WebDriver tests provide the most accurate validation of KG graph functionality in the Tauri application context, ensuring that all features work correctly in the native application environment.
