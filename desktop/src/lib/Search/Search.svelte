@@ -7,13 +7,49 @@
   import logo from "/assets/terraphim_gray.png";
   import { thesaurus,typeahead } from "../stores";
   import BackButton from "../BackButton.svelte";
+  import { parseSearchInput, buildSearchQuery } from "./searchUtils";
 
   let results: Document[] = [];
   let error: string | null = null;
   let suggestions: string[] = [];
   let suggestionIndex = -1;
+  let selectedOperator: 'none' | 'and' | 'or' = 'none';
 
   $: thesaurusEntries = Object.entries($thesaurus);
+
+  // Helper function to get term suggestions for autocomplete
+  async function getTermSuggestions(query: string): Promise<string[]> {
+    try {
+      if ($is_tauri) {
+        const response = await invoke("get_autocomplete_suggestions", {
+          query: query,
+          roleName: $role,
+          limit: 8
+        });
+
+        if (response.status === 'success' && response.suggestions) {
+          return response.suggestions.map((suggestion: any) => suggestion.term);
+        }
+      } else {
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success' && data.suggestions) {
+            return data.suggestions.map((suggestion: any) => suggestion.term);
+          }
+        }
+      }
+
+      // Fallback to thesaurus matching
+      return thesaurusEntries
+        .filter(([key]) => key.toLowerCase().includes(query.toLowerCase()))
+        .map(([key]) => key)
+        .slice(0, 8);
+    } catch (error) {
+      console.warn('Error fetching term suggestions:', error);
+      return [];
+    }
+  }
 
   async function getSuggestions(value: string): Promise<string[]> {
     const inputValue = value.trim();
@@ -24,12 +60,25 @@
       return [];
     }
 
+    // If user has selected an operator from UI, don't suggest text operators
+    if (selectedOperator !== 'none') {
+      // For UI operator selection, suggest terms for any word in input
+      const words = inputValue.split(/\s+/);
+      const lastWord = words[words.length - 1].toLowerCase();
+
+      if (lastWord.length < 2) {
+        return [];
+      }
+
+      return getTermSuggestions(lastWord);
+    }
+
     // Check if user is typing after a term that could be followed by AND/OR
     const words = inputValue.split(/\s+/);
     const lastWord = words[words.length - 1].toLowerCase();
 
     // If the last word is a partial "and" or "or", suggest these operators
-    if (words.length > 1) {
+    if (words.length > 1 && selectedOperator === 'none') {
       const operatorSuggestions = [];
       if ("and".startsWith(lastWord)) {
         operatorSuggestions.push("AND");
@@ -51,113 +100,19 @@
         return [];
       }
 
-      try {
-        if ($is_tauri) {
-          const response = await invoke("get_autocomplete_suggestions", {
-            query: termAfterOperator,
-            roleName: $role,
-            limit: 8
-          });
-
-          if (response.status === 'success' && response.suggestions) {
-            return response.suggestions.map((suggestion: any) => suggestion.term);
-          }
-        } else {
-          const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(termAfterOperator)}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.status === 'success' && data.suggestions) {
-              return data.suggestions.map((suggestion: any) => suggestion.term);
-            }
-          }
-        }
-
-        // Fallback to thesaurus matching for term after operator
-        return thesaurusEntries
-          .filter(([key]) => key.toLowerCase().includes(termAfterOperator.toLowerCase()))
-          .map(([key]) => key)
-          .slice(0, 8);
-      } catch (error) {
-        console.warn('Error fetching autocomplete suggestions:', error);
-        return [];
-      }
+      return getTermSuggestions(termAfterOperator);
     }
 
     // Regular single-term autocomplete
     try {
-      if ($is_tauri) {
-        // In Tauri mode, use the native Tauri autocomplete command
-        const response = await invoke("get_autocomplete_suggestions", {
-          query: inputValue,
-          roleName: $role,
-          limit: 6  // Reduced to make room for operator suggestions
-        });
+      const termSuggestions = await getTermSuggestions(inputValue);
 
-        if (response.status === 'success' && response.suggestions) {
-          const termSuggestions = response.suggestions.map((suggestion: any) => suggestion.term);
-
-          // Add operator suggestions if we have a term
-          if (words.length === 1 && words[0].length > 2) {
-            return [...termSuggestions, "AND", "OR"];
-          }
-
-          return termSuggestions;
-        } else {
-          // Fall back to thesaurus-based matching on error
-          console.warn('Tauri autocomplete failed, falling back to thesaurus matching');
-          const termSuggestions = thesaurusEntries
-            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
-            .map(([key]) => key)
-            .slice(0, 6);
-
-          if (words.length === 1 && words[0].length > 2) {
-            return [...termSuggestions, "AND", "OR"];
-          }
-
-          return termSuggestions;
-        }
-      } else {
-        // Web mode: Use FST-based autocomplete endpoint
-        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(inputValue)}`);
-        if (!response.ok) {
-          // Fall back to thesaurus-based matching on error
-          console.warn('FST autocomplete failed, falling back to thesaurus matching');
-          const termSuggestions = thesaurusEntries
-            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
-            .map(([key]) => key)
-            .slice(0, 6);
-
-          if (words.length === 1 && words[0].length > 2) {
-            return [...termSuggestions, "AND", "OR"];
-          }
-
-          return termSuggestions;
-        }
-
-        const data = await response.json();
-        if (data.status === 'success' && data.suggestions) {
-          const termSuggestions = data.suggestions.map((suggestion: any) => suggestion.term);
-
-          // Add operator suggestions if we have a term
-          if (words.length === 1 && words[0].length > 2) {
-            return [...termSuggestions, "AND", "OR"];
-          }
-
-          return termSuggestions;
-        } else {
-          // Fall back to thesaurus-based matching
-          const termSuggestions = thesaurusEntries
-            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
-            .map(([key]) => key)
-            .slice(0, 6);
-
-          if (words.length === 1 && words[0].length > 2) {
-            return [...termSuggestions, "AND", "OR"];
-          }
-
-          return termSuggestions;
-        }
+      // Add operator suggestions if we have a single term and no UI operator selected
+      if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
+        return [...termSuggestions.slice(0, 6), "AND", "OR"];
       }
+
+      return termSuggestions;
     } catch (error) {
       console.warn('Error fetching autocomplete suggestions:', error);
       // Fall back to thesaurus-based matching
@@ -166,7 +121,7 @@
         .map(([key]) => key)
         .slice(0, 6);
 
-      if (words.length === 1 && words[0].length > 2) {
+      if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
         return [...termSuggestions, "AND", "OR"];
       }
 
@@ -239,44 +194,43 @@
     suggestionIndex = -1;
   }
 
-  // Parse input for logical operators and create appropriate SearchQuery
-  function parseSearchInput(inputText: string) {
-    const trimmedInput = inputText.trim();
+  // Create SearchQuery using shared utilities and UI operator selection
+  function buildSearchQueryFromInput(): any {
+    const inputText = $input.trim();
+    if (!inputText) return null;
 
-    // Check for AND operator (case insensitive)
-    const andMatch = trimmedInput.match(/^(.+?)\s+and\s+(.+)$/i);
-    if (andMatch) {
-      const [, firstTerm, secondTerm] = andMatch;
-      return {
-        search_term: firstTerm.trim(),
-        search_terms: [secondTerm.trim()],
-        operator: "and",
-        skip: 0,
-        limit: 10,
-        role: $role,
-      };
+    // If user has selected an operator from UI, enforce it
+    if (selectedOperator !== 'none') {
+      // Split on spaces to get multiple terms
+      const terms = inputText.split(/\s+/).filter(term => term.length > 0);
+      if (terms.length > 1) {
+        return {
+          search_term: terms[0],
+          search_terms: terms,
+          operator: selectedOperator,
+          skip: 0,
+          limit: 10,
+          role: $role,
+        };
+      } else {
+        // Single term with operator selected - just search single term
+        return {
+          search_term: inputText,
+          skip: 0,
+          limit: 10,
+          role: $role,
+        };
+      }
     }
 
-    // Check for OR operator (case insensitive)
-    const orMatch = trimmedInput.match(/^(.+?)\s+or\s+(.+)$/i);
-    if (orMatch) {
-      const [, firstTerm, secondTerm] = orMatch;
-      return {
-        search_term: firstTerm.trim(),
-        search_terms: [secondTerm.trim()],
-        operator: "or",
-        skip: 0,
-        limit: 10,
-        role: $role,
-      };
-    }
+    // Use parseSearchInput to detect operators in text
+    const parsed = parseSearchInput(inputText);
+    const searchQuery = buildSearchQuery(parsed, $role);
 
-    // Single term query (backward compatibility)
     return {
-      search_term: trimmedInput,
+      ...searchQuery,
       skip: 0,
       limit: 10,
-      role: $role,
     };
   }
 
@@ -287,7 +241,9 @@
       if (!$input.trim()) return; // Skip if input is empty
 
       try {
-        const searchQuery = parseSearchInput($input);
+        const searchQuery = buildSearchQueryFromInput();
+        if (!searchQuery) return;
+
         const response: SearchResponse = await invoke("search", {
           searchQuery,
         });
@@ -306,7 +262,9 @@
     } else {
       if (!$input.trim()) return; // Skip if input is empty
 
-      const searchQuery = parseSearchInput($input);
+      const searchQuery = buildSearchQueryFromInput();
+      if (!searchQuery) return;
+
       const json_body = JSON.stringify(searchQuery);
 
       try {
@@ -335,19 +293,20 @@
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
   <Field>
-    <div class="input-wrapper">
-      <Input
-        type="search"
-        bind:value={$input}
-        placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-        icon="search"
-        expanded
-        autofocus
-        on:click={handleSearchInputEvent}
-        on:submit={handleSearchInputEvent}
-        on:keydown={handleKeydown}
-        on:input={updateSuggestions}
-      />
+    <div class="search-row">
+      <div class="input-wrapper">
+        <Input
+          type="search"
+          bind:value={$input}
+          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
+          icon="search"
+          expanded
+          autofocus
+          on:click={handleSearchInputEvent}
+          on:submit={handleSearchInputEvent}
+          on:keydown={handleKeydown}
+          on:input={updateSuggestions}
+        />
       {#if suggestions.length > 0}
         <ul class="suggestions">
           {#each suggestions as suggestion, index}
@@ -370,6 +329,24 @@
           {/each}
         </ul>
       {/if}
+      </div>
+
+      <div class="operator-controls">
+        <div class="control">
+          <label class="radio">
+            <input type="radio" bind:group={selectedOperator} value="none" />
+            Exact
+          </label>
+          <label class="radio">
+            <input type="radio" bind:group={selectedOperator} value="and" />
+            All (AND)
+          </label>
+          <label class="radio">
+            <input type="radio" bind:group={selectedOperator} value="or" />
+            Any (OR)
+          </label>
+        </div>
+      </div>
     </div>
   </Field>
 </form>
@@ -402,8 +379,39 @@
   .error {
     color: red;
   }
+  .search-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    width: 100%;
+  }
+
   .input-wrapper {
     position: relative;
+    flex: 1;
+  }
+
+  .operator-controls {
+    flex-shrink: 0;
+    min-width: 200px;
+  }
+
+  .operator-controls .control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .operator-controls .radio {
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .operator-controls input[type="radio"] {
+    margin: 0;
   }
   .suggestions {
     position: absolute;
