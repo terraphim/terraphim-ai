@@ -511,11 +511,13 @@ pub struct SearchQuery {
 impl SearchQuery {
     /// Get all search terms (both single and multiple)
     pub fn get_all_terms(&self) -> Vec<&NormalizedTermValue> {
-        let mut terms = vec![&self.search_term];
         if let Some(ref multiple_terms) = self.search_terms {
-            terms.extend(multiple_terms.iter());
+            // For multi-term queries, use search_terms (which should contain all terms)
+            multiple_terms.iter().collect()
+        } else {
+            // For single-term queries, use search_term
+            vec![&self.search_term]
         }
-        terms
     }
 
     /// Check if this is a multi-term query with logical operators

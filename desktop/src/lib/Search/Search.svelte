@@ -204,13 +204,18 @@
       // Split on spaces to get multiple terms
       const terms = inputText.split(/\s+/).filter(term => term.length > 0);
       if (terms.length > 1) {
+        // Use shared utility with UI operator override
+        const fakeParser = {
+          hasOperator: true,
+          operator: selectedOperator === 'and' ? 'AND' : 'OR',
+          terms: terms,
+          originalQuery: inputText,
+        };
+        const searchQuery = buildSearchQuery(fakeParser, $role);
         return {
-          search_term: terms[0],
-          search_terms: terms,
-          operator: selectedOperator,
+          ...searchQuery,
           skip: 0,
           limit: 10,
-          role: $role,
         };
       } else {
         // Single term with operator selected - just search single term

@@ -1,4 +1,5 @@
 use ahash::AHashMap;
+use regex::Regex;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::{replace_matches, LinkType};
@@ -1049,6 +1050,17 @@ impl TerraphimService {
         Ok(role)
     }
 
+    /// Check if a term matches in text using word boundaries to avoid partial word matches
+    fn term_matches_with_word_boundaries(term: &str, text: &str) -> bool {
+        // Create regex pattern with word boundaries
+        if let Ok(regex) = Regex::new(&format!(r"\b{}\b", regex::escape(term))) {
+            regex.is_match(text)
+        } else {
+            // Fallback to simple contains if regex compilation fails
+            text.contains(term)
+        }
+    }
+
     /// Apply logical operators (AND/OR) to filter documents based on multiple search terms
     pub async fn apply_logical_operators_to_documents(
         &mut self,
@@ -1086,15 +1098,21 @@ impl TerraphimService {
                 match operator {
                     LogicalOperator::And => {
                         // Document must contain ALL terms
-                        all_terms
-                            .iter()
-                            .all(|term| searchable_text.contains(&term.as_str().to_lowercase()))
+                        all_terms.iter().all(|term| {
+                            Self::term_matches_with_word_boundaries(
+                                &term.as_str().to_lowercase(),
+                                &searchable_text,
+                            )
+                        })
                     }
                     LogicalOperator::Or => {
                         // Document must contain ANY term
-                        all_terms
-                            .iter()
-                            .any(|term| searchable_text.contains(&term.as_str().to_lowercase()))
+                        all_terms.iter().any(|term| {
+                            Self::term_matches_with_word_boundaries(
+                                &term.as_str().to_lowercase(),
+                                &searchable_text,
+                            )
+                        })
                     }
                 }
             })
