@@ -167,17 +167,113 @@ impl Default for RipgrepCommand {
 }
 
 impl RipgrepCommand {
+    /// Validates that a needle parameter is safe for use with ripgrep
+    fn validate_needle(needle: &str) -> Result<()> {
+        // Check for shell metacharacters and dangerous patterns
+        if needle.is_empty() {
+            return Err(crate::Error::Validation(
+                "Search needle cannot be empty".to_string(),
+            ));
+        }
+
+        // Reject needles that could be interpreted as command line options
+        if needle.starts_with('-') {
+            return Err(crate::Error::Validation(
+                "Search needle cannot start with dash (potential flag injection)".to_string(),
+            ));
+        }
+
+        // Check for excessive length (prevent DoS)
+        if needle.len() > 1000 {
+            return Err(crate::Error::Validation(
+                "Search needle too long (max 1000 characters)".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Runs ripgrep to find `needle` in `haystack`
     ///
     /// Returns a Vec of Messages, which correspond to ripgrep's internal
     /// JSON output. Learn more about ripgrep's JSON output here:
     /// https://docs.rs/grep-printer/0.2.1/grep_printer/struct.JSON.html
     pub async fn run(&self, needle: &str, haystack: &Path) -> Result<Vec<Message>> {
-        // Merge the default arguments with the needle and haystack
-        let args: Vec<String> = vec![needle.to_string(), haystack.to_string_lossy().to_string()]
+        Self::validate_needle(needle)?;
+        self.run_with_extra_args(needle, haystack, &[]).await
+    }
+
+    /// Runs ripgrep to find `needle` in `haystack` with additional command-line arguments
+    ///
+    /// This method allows passing extra ripgrep arguments like filtering by tags.
+    /// For example, to search only in files containing the tag #rust, you could pass
+    /// extra_args like ["--glob", "*#rust*"] or use ripgrep patterns.
+    ///
+    /// Returns a Vec of Messages, which correspond to ripgrep's internal JSON output.
+    /// Checks if a flag is a safe, known ripgrep option
+    fn is_safe_ripgrep_flag(&self, flag: &str) -> bool {
+        // Whitelist of safe ripgrep flags
+        matches!(
+            flag,
+            "--all-match"
+                | "-e"
+                | "--glob"
+                | "-t"
+                | "--max-count"
+                | "-C"
+                | "--case-sensitive"
+                | "--ignore-case"
+                | "-i"
+                | "--line-number"
+                | "-n"
+                | "--with-filename"
+                | "-H"
+                | "--no-heading"
+                | "--color=never"
+                | "--json"
+                | "--heading"
+                | "--trim"
+                | "--context"
+                | "--after-context"
+                | "--before-context"
+                | "-A"
+                | "-B"
+        )
+    }
+
+    pub async fn run_with_extra_args(
+        &self,
+        needle: &str,
+        haystack: &Path,
+        extra_args: &[String],
+    ) -> Result<Vec<Message>> {
+        Self::validate_needle(needle)?;
+
+        // Validate extra_args to prevent command injection
+        for arg in extra_args {
+            if arg.starts_with('-') && !self.is_safe_ripgrep_flag(arg) {
+                log::warn!("Potentially unsafe ripgrep argument rejected: {}", arg);
+                return Err(crate::Error::Validation(format!(
+                    "Unsafe ripgrep argument: {}",
+                    arg
+                )));
+            }
+        }
+
+        // Put options first, then extra args, then needle, then haystack (correct ripgrep argument order)
+        let args: Vec<String> = self
+            .default_args
+            .clone()
             .into_iter()
-            .chain(self.default_args.clone())
+            .chain(extra_args.iter().cloned())
+            .chain(vec![
+                needle.to_string(),
+                haystack.to_string_lossy().to_string(),
+            ])
             .collect();
+
+        log::debug!("Running ripgrep with args: {:?}", args);
+        log::info!("🚀 Executing: {} {}", &self.command, args.join(" "));
 
         let mut child = Command::new(&self.command)
             .args(args)
@@ -190,6 +286,150 @@ impl RipgrepCommand {
             stdout.read_to_string(&mut data).await.map(|_| data)
         };
         let output = read.await?;
-        json_decode(&output)
+        log::debug!(
+            "Raw ripgrep output ({} bytes): {}",
+            output.len(),
+            &output[..std::cmp::min(500, output.len())]
+        );
+        let messages = json_decode(&output)?;
+        log::debug!("JSON decode produced {} messages", messages.len());
+        Ok(messages)
+    }
+
+    /// Validates that a parameter value is safe
+    fn validate_parameter_value(key: &str, value: &str) -> Result<()> {
+        // Check for excessive length
+        if value.len() > 200 {
+            return Err(crate::Error::Validation(format!(
+                "Parameter value too long for {}: max 200 characters",
+                key
+            )));
+        }
+
+        // Reject values that could be interpreted as options
+        if value.starts_with('-') {
+            return Err(crate::Error::Validation(format!(
+                "Parameter value cannot start with dash for {}",
+                key
+            )));
+        }
+
+        // For numeric parameters, validate they're actually numbers
+        match key {
+            "max_count" | "context" => {
+                if value.parse::<u32>().is_err() {
+                    return Err(crate::Error::Validation(format!(
+                        "Parameter {} must be a positive integer",
+                        key
+                    )));
+                }
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// Parse extra parameters from haystack configuration into ripgrep arguments
+    ///
+    /// This method converts key-value pairs from the haystack extra_parameters
+    /// into ripgrep command-line arguments.
+    ///
+    /// Supported parameters:
+    /// - `tag`: Filter files containing specific tags (e.g., "#rust")
+    /// - `glob`: Use glob patterns for file filtering
+    /// - `type`: File type filters (e.g., "md", "rs")
+    /// - `max_count`: Maximum number of matches per file
+    /// - `context`: Number of context lines around matches
+    pub fn parse_extra_parameters(
+        &self,
+        extra_params: &std::collections::HashMap<String, String>,
+    ) -> Vec<String> {
+        let mut args = Vec::new();
+
+        if extra_params.is_empty() {
+            log::debug!("No extra parameters to process");
+            return args;
+        }
+
+        log::debug!(
+            "Processing {} extra parameters: {:?}",
+            extra_params.len(),
+            extra_params
+        );
+
+        for (key, value) in extra_params {
+            // Validate each parameter value before processing
+            if let Err(e) = Self::validate_parameter_value(key, value) {
+                log::warn!("Invalid parameter {}: {}", key, e);
+                continue;
+            }
+
+            match key.as_str() {
+                "tag" => {
+                    log::info!("🏷️ Processing tag filter: '{}'", value);
+                    // Require lines to match both the search needle and the tag(s)
+                    // Example: rg -tmarkdown --all-match -e needle -e "#rust"
+                    if !args.contains(&"--all-match".to_string()) {
+                        args.push("--all-match".to_string());
+                        log::debug!("Added --all-match flag for tag filtering");
+                    }
+                    // Support comma or space separated tags
+                    let tags: Vec<&str> = value
+                        .split(|c: char| c == ',' || c.is_whitespace())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if tags.is_empty() {
+                        // Fallback: single value as provided
+                        args.push("-e".to_string());
+                        args.push(value.clone());
+                        log::info!("Added tag pattern: {}", value);
+                    } else {
+                        for t in tags {
+                            args.push("-e".to_string());
+                            args.push(t.to_string());
+                            log::info!("Added tag pattern: {}", t);
+                        }
+                    }
+                    log::info!("🔍 Tag filtering will require search results to contain ALL specified patterns");
+                }
+                "glob" => {
+                    // Direct glob pattern
+                    args.push("--glob".to_string());
+                    args.push(value.clone());
+                    log::debug!("Added glob pattern: {}", value);
+                }
+                "type" => {
+                    // File type filter (e.g., "md", "rs")
+                    args.push("-t".to_string());
+                    args.push(value.clone());
+                    log::debug!("Added type filter: {}", value);
+                }
+                "max_count" => {
+                    // Maximum number of matches per file
+                    args.push("--max-count".to_string());
+                    args.push(value.clone());
+                    log::debug!("Added max count: {}", value);
+                }
+                "context" => {
+                    // Number of context lines (overrides default -C3)
+                    args.push("-C".to_string());
+                    args.push(value.clone());
+                    log::debug!("Added context lines: {}", value);
+                }
+                "case_sensitive" => {
+                    // Override case sensitivity
+                    if value.to_lowercase() == "true" {
+                        args.push("--case-sensitive".to_string());
+                        log::debug!("Enabled case-sensitive search");
+                    }
+                }
+                _ => {
+                    log::warn!("Unknown ripgrep parameter: {} = {}", key, value);
+                }
+            }
+        }
+
+        args
     }
 }

@@ -1,19 +1,91 @@
 VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
-FROM ghcr.io/terraphim/terraphim_builder_native:latest
+# Build from base OS instead of pre-built Node image
+FROM ubuntu:24.04
 
 WORKDIR /code/desktop
 
+# Install Node.js and dependencies from base OS
+node-setup:
+    ENV DEBIAN_FRONTEND=noninteractive
+    ENV DEBCONF_NONINTERACTIVE_SEEN=true
+    RUN apt-get update -qq
+    RUN apt-get install -yqq --no-install-recommends curl ca-certificates gnupg
+    # Install Node.js 20 from NodeSource official repository
+    RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    RUN apt-get install -yqq nodejs
+    # Install Yarn
+    RUN npm install -g yarn
+    RUN node --version && npm --version && yarn --version
+
 deps:
-    # COPY package.json tsconfig.json yarn.lock vite.config.ts tsconfig.node.json index.html ./
+    FROM +node-setup
     COPY --keep-ts . .
-    # COPY --dir src src
-    # COPY --dir public public
-    RUN oro apply -q || true
-    RUN /code/desktop/scripts/yarn_and_build.sh
+    RUN yarn install --frozen-lockfile
 
 build:
     FROM +deps
-    # RUN pkgx +yarnpkg.com yarn run build
-
+    RUN yarn build
     SAVE ARTIFACT dist /dist AS LOCAL dist
+
+# Install dependencies and Playwright browsers for testing
+test-deps:
+    FROM +deps
+    RUN npx playwright install --with-deps
+    RUN npx playwright install-deps
+
+# Run unit tests (Vitest)
+test-unit:
+    FROM +test-deps
+    RUN yarn test --reporter=verbose --run
+
+# Run E2E tests (Playwright) in CI mode
+test-e2e:
+    FROM +test-deps
+    RUN yarn build
+    RUN CI=true yarn e2e --reporter=line --bail=1
+
+# Run specific config wizard tests
+test-wizard:
+    FROM +test-deps
+    RUN yarn build
+    RUN CI=true npx playwright test tests/e2e/config-wizard.spec.ts --reporter=line
+
+# Run all tests in CI mode
+test-ci:
+    FROM +test-deps
+    RUN yarn build
+    RUN CI=true yarn test --reporter=verbose --run
+    RUN CI=true yarn e2e --reporter=line --bail=1
+
+# Run comprehensive test suite with server integration
+test-full:
+    FROM +test-deps
+    RUN yarn build
+    # Start server in background for integration tests
+    RUN cd ../../terraphim_server && TERRAPHIM_SERVER_HOSTNAME="127.0.0.1:8000" cargo run --quiet &
+    RUN sleep 10  # Wait for server to start
+    RUN CI=true yarn test --reporter=verbose --run
+    RUN CI=true yarn e2e --reporter=line --bail=1
+
+# Run tests with coverage
+test-coverage:
+    FROM +test-deps
+    RUN yarn build
+    RUN yarn test:coverage
+    RUN CI=true yarn e2e --reporter=line --bail=1
+    SAVE ARTIFACT coverage /coverage AS LOCAL coverage
+
+# Demonstrate test execution with detailed output
+demo-tests:
+    FROM +test-deps
+    RUN echo "=== Terraphim Desktop App Test Demonstration ==="
+    RUN echo "1. Building application..."
+    RUN yarn build
+    RUN echo "2. Running unit tests..."
+    RUN yarn test --reporter=verbose --run
+    RUN echo "3. Running E2E tests (CI mode)..."
+    RUN CI=true yarn e2e --reporter=line --bail=1
+    RUN echo "4. Running config wizard tests specifically..."
+    RUN CI=true npx playwright test tests/e2e/config-wizard.spec.ts --reporter=line
+    RUN echo "=== All tests completed successfully! ==="

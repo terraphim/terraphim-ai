@@ -6,6 +6,7 @@
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
   import { thesaurus,typeahead } from "../stores";
+  import BackButton from "../BackButton.svelte";
 
   let results: Document[] = [];
   let error: string | null = null;
@@ -14,26 +15,186 @@
 
   $: thesaurusEntries = Object.entries($thesaurus);
 
-  function getSuggestions(value: string) {
-    const inputValue = value.trim().toLowerCase();
+  async function getSuggestions(value: string): Promise<string[]> {
+    const inputValue = value.trim();
     const inputLength = inputValue.length;
-    
-    return inputLength === 0
-      ? []
-      : thesaurusEntries
-          .filter(([key]) => key.toLowerCase().includes(inputValue))
+
+    // Return empty suggestions for very short inputs
+    if (inputLength === 0) {
+      return [];
+    }
+
+    // Check if user is typing after a term that could be followed by AND/OR
+    const words = inputValue.split(/\s+/);
+    const lastWord = words[words.length - 1].toLowerCase();
+
+    // If the last word is a partial "and" or "or", suggest these operators
+    if (words.length > 1) {
+      const operatorSuggestions = [];
+      if ("and".startsWith(lastWord)) {
+        operatorSuggestions.push("AND");
+      }
+      if ("or".startsWith(lastWord)) {
+        operatorSuggestions.push("OR");
+      }
+      if (operatorSuggestions.length > 0) {
+        return operatorSuggestions;
+      }
+    }
+
+    // If the input ends with "AND" or "OR", suggest terms but don't include operators
+    const inputLower = inputValue.toLowerCase();
+    if (inputLower.includes(" and ") || inputLower.includes(" or ")) {
+      // For multi-term queries, only suggest terms after the operator
+      const termAfterOperator = lastWord;
+      if (termAfterOperator.length < 2) {
+        return [];
+      }
+
+      try {
+        if ($is_tauri) {
+          const response = await invoke("get_autocomplete_suggestions", {
+            query: termAfterOperator,
+            roleName: $role,
+            limit: 8
+          });
+
+          if (response.status === 'success' && response.suggestions) {
+            return response.suggestions.map((suggestion: any) => suggestion.term);
+          }
+        } else {
+          const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(termAfterOperator)}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'success' && data.suggestions) {
+              return data.suggestions.map((suggestion: any) => suggestion.term);
+            }
+          }
+        }
+
+        // Fallback to thesaurus matching for term after operator
+        return thesaurusEntries
+          .filter(([key]) => key.toLowerCase().includes(termAfterOperator.toLowerCase()))
           .map(([key]) => key)
-          .slice(0, 5);
+          .slice(0, 8);
+      } catch (error) {
+        console.warn('Error fetching autocomplete suggestions:', error);
+        return [];
+      }
+    }
+
+    // Regular single-term autocomplete
+    try {
+      if ($is_tauri) {
+        // In Tauri mode, use the native Tauri autocomplete command
+        const response = await invoke("get_autocomplete_suggestions", {
+          query: inputValue,
+          roleName: $role,
+          limit: 6  // Reduced to make room for operator suggestions
+        });
+
+        if (response.status === 'success' && response.suggestions) {
+          const termSuggestions = response.suggestions.map((suggestion: any) => suggestion.term);
+
+          // Add operator suggestions if we have a term
+          if (words.length === 1 && words[0].length > 2) {
+            return [...termSuggestions, "AND", "OR"];
+          }
+
+          return termSuggestions;
+        } else {
+          // Fall back to thesaurus-based matching on error
+          console.warn('Tauri autocomplete failed, falling back to thesaurus matching');
+          const termSuggestions = thesaurusEntries
+            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+            .map(([key]) => key)
+            .slice(0, 6);
+
+          if (words.length === 1 && words[0].length > 2) {
+            return [...termSuggestions, "AND", "OR"];
+          }
+
+          return termSuggestions;
+        }
+      } else {
+        // Web mode: Use FST-based autocomplete endpoint
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(inputValue)}`);
+        if (!response.ok) {
+          // Fall back to thesaurus-based matching on error
+          console.warn('FST autocomplete failed, falling back to thesaurus matching');
+          const termSuggestions = thesaurusEntries
+            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+            .map(([key]) => key)
+            .slice(0, 6);
+
+          if (words.length === 1 && words[0].length > 2) {
+            return [...termSuggestions, "AND", "OR"];
+          }
+
+          return termSuggestions;
+        }
+
+        const data = await response.json();
+        if (data.status === 'success' && data.suggestions) {
+          const termSuggestions = data.suggestions.map((suggestion: any) => suggestion.term);
+
+          // Add operator suggestions if we have a term
+          if (words.length === 1 && words[0].length > 2) {
+            return [...termSuggestions, "AND", "OR"];
+          }
+
+          return termSuggestions;
+        } else {
+          // Fall back to thesaurus-based matching
+          const termSuggestions = thesaurusEntries
+            .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+            .map(([key]) => key)
+            .slice(0, 6);
+
+          if (words.length === 1 && words[0].length > 2) {
+            return [...termSuggestions, "AND", "OR"];
+          }
+
+          return termSuggestions;
+        }
+      }
+    } catch (error) {
+      console.warn('Error fetching autocomplete suggestions:', error);
+      // Fall back to thesaurus-based matching
+      const termSuggestions = thesaurusEntries
+        .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+        .map(([key]) => key)
+        .slice(0, 6);
+
+      if (words.length === 1 && words[0].length > 2) {
+        return [...termSuggestions, "AND", "OR"];
+      }
+
+      return termSuggestions;
+    }
   }
 
-  function updateSuggestions(event: Event) {
-    const inputElement = event.target as HTMLInputElement;
+  async function updateSuggestions(event: Event) {
+    const inputElement = event.target as HTMLInputElement | null;
+    if (!inputElement || inputElement.selectionStart == null) {
+      return;
+    }
     const cursorPosition = inputElement.selectionStart;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
     const currentWord = words[words.length - 1];
 
-    suggestions = getSuggestions(currentWord);
+    // Only fetch suggestions if the current word has at least 2 characters
+    if (currentWord.length >= 2) {
+      try {
+        suggestions = await getSuggestions(currentWord);
+      } catch (error) {
+        console.warn('Failed to get suggestions:', error);
+        suggestions = [];
+      }
+    } else {
+      suggestions = [];
+    }
     suggestionIndex = -1;
   }
 
@@ -54,30 +215,81 @@
 
   function applySuggestion(suggestion: string) {
     const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
-    const cursorPosition = inputElement.selectionStart;
+    const cursorPosition = inputElement?.selectionStart ?? 0;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const textAfterCursor = $input.slice(cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
-    words[words.length - 1] = suggestion;
-    
-    $input = [...words, textAfterCursor].join(" ");
-    inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
+
+    // Handle logical operators specially
+    if (suggestion === "AND" || suggestion === "OR") {
+      // If the last word is being replaced by an operator, add space after
+      words[words.length - 1] = suggestion;
+      $input = [...words, "", textAfterCursor].join(" ");
+      const newPosition = cursorPosition + suggestion.length + 1;
+      inputElement?.setSelectionRange?.(newPosition, newPosition);
+    } else {
+      // Regular term suggestion
+      words[words.length - 1] = suggestion;
+      $input = [...words, textAfterCursor].join(" ");
+      const newPosition = cursorPosition + suggestion.length;
+      inputElement?.setSelectionRange?.(newPosition, newPosition);
+    }
+
     suggestions = [];
     suggestionIndex = -1;
+  }
+
+  // Parse input for logical operators and create appropriate SearchQuery
+  function parseSearchInput(inputText: string) {
+    const trimmedInput = inputText.trim();
+
+    // Check for AND operator (case insensitive)
+    const andMatch = trimmedInput.match(/^(.+?)\s+and\s+(.+)$/i);
+    if (andMatch) {
+      const [, firstTerm, secondTerm] = andMatch;
+      return {
+        search_term: firstTerm.trim(),
+        search_terms: [secondTerm.trim()],
+        operator: "and",
+        skip: 0,
+        limit: 10,
+        role: $role,
+      };
+    }
+
+    // Check for OR operator (case insensitive)
+    const orMatch = trimmedInput.match(/^(.+?)\s+or\s+(.+)$/i);
+    if (orMatch) {
+      const [, firstTerm, secondTerm] = orMatch;
+      return {
+        search_term: firstTerm.trim(),
+        search_terms: [secondTerm.trim()],
+        operator: "or",
+        skip: 0,
+        limit: 10,
+        role: $role,
+      };
+    }
+
+    // Single term query (backward compatibility)
+    return {
+      search_term: trimmedInput,
+      skip: 0,
+      limit: 10,
+      role: $role,
+    };
   }
 
   async function handleSearchInputEvent() {
     error = null; // Clear previous errors
 
     if ($is_tauri) {
+      if (!$input.trim()) return; // Skip if input is empty
+
       try {
+        const searchQuery = parseSearchInput($input);
         const response: SearchResponse = await invoke("search", {
-          searchQuery: {
-            search_term: $input,
-            skip: 0,
-            limit: 10,
-            role: $role,
-          },
+          searchQuery,
         });
         if (response.status === "success") {
           results = response.results;
@@ -94,12 +306,8 @@
     } else {
       if (!$input.trim()) return; // Skip if input is empty
 
-      const json_body = JSON.stringify({
-        search_term: $input,
-        skip: 0,
-        limit: 10,
-        role: $role,
-      });
+      const searchQuery = parseSearchInput($input);
+      const json_body = JSON.stringify(searchQuery);
 
       try {
         const response = await fetch($serverUrl, {
@@ -115,13 +323,15 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        this.error = `Error fetching data: ${error}`;
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        error = `Error fetching data: ${err}`;
       }
     }
   }
 </script>
+
+<BackButton fallbackPath="/" />
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
   <Field>
@@ -144,6 +354,16 @@
             <li
               class:active={index === suggestionIndex}
               on:click={() => applySuggestion(suggestion)}
+              on:keydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  applySuggestion(suggestion);
+                }
+              }}
+              tabindex="0"
+              role="option"
+              aria-selected={index === suggestionIndex}
+              aria-label={`Apply suggestion: ${suggestion}`}
             >
               {suggestion}
             </li>
@@ -165,6 +385,12 @@
     <div class="content has-text-grey has-text-centered">
       <img src={logo} alt="Terraphim Logo" />
       <p>I am Terraphim, your personal assistant.</p>
+      <button class="button is-primary" data-testid="wizard-start" on:click={() => window.location.href = '/config/wizard'}>
+        <span class="icon">
+          <i class="fas fa-magic"></i>
+        </span>
+        <span>Configuration Wizard</span>
+      </button>
     </div>
   </section>
 {/if}
@@ -201,5 +427,13 @@
   .suggestions li:hover,
   .suggestions li.active {
     background-color: #f5f5f5;
+  }
+  /* Center logo and text on empty state */
+  .has-text-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
   }
 </style>

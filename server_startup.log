@@ -1,0 +1,475 @@
+warning: method `path` is never used
+   --> crates/terraphim_automata/src/builder.rs:219:19
+    |
+218 | impl Match {
+    | ---------- method in this implementation
+219 |     pub(crate) fn path(&self) -> Option<String> {
+    |                   ^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: method `path` is never used
+   --> crates/terraphim_automata/src/builder.rs:234:19
+    |
+233 | impl Context {
+    | ------------ method in this implementation
+234 |     pub(crate) fn path(&self) -> Option<String> {
+    |                   ^^^^
+
+warning: `terraphim_automata` (lib) generated 2 warnings
+warning: function `build_search_url` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:597:4
+    |
+597 | fn build_search_url(server_url: &str, query: &str, opts: &SearchOpts) -> Result<String> {
+    |    ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `build_query_url` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:631:4
+    |
+631 | fn build_query_url(collection_subject: &str, opts: &QueryOpts) -> Result<String> {
+    |    ^^^^^^^^^^^^^^^
+
+warning: function `build_filter_string` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:667:4
+    |
+667 | fn build_filter_string(filters: &HashMap<String, String>) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `escape_tantivy_key` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:682:4
+    |
+682 | fn escape_tantivy_key(key: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: `terraphim_atomic_client` (lib) generated 4 warnings
+warning: terraphim_server@0.1.0: No changes in JS source files, skipping JS build.
+warning: terraphim_server@0.1.0: Found ./dist, skipping copy
+warning: methods `len`, `is_empty`, and `as_slice` are never used
+  --> crates/terraphim_service/src/score/scored.rs:64:12
+   |
+9  | impl<T> SearchResults<T> {
+   | ------------------------ methods in this implementation
+...
+64 |     pub fn len(&self) -> usize {
+   |            ^^^
+...
+69 |     pub fn is_empty(&self) -> bool {
+   |            ^^^^^^^^
+...
+74 |     pub fn as_slice(&self) -> &[Scored<T>] {
+   |            ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: methods `with_score`, `map`, `map_score`, and `into_pair` are never used
+   --> crates/terraphim_service/src/score/scored.rs:133:12
+    |
+105 | impl<T> Scored<T> {
+    | ----------------- methods in this implementation
+...
+133 |     pub fn with_score(mut self, score: f64) -> Scored<T> {
+    |            ^^^^^^^^^^
+...
+141 |     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Scored<U> {
+    |            ^^^
+...
+152 |     pub fn map_score<F: FnOnce(f64) -> f64>(self, f: F) -> Scored<T> {
+    |            ^^^^^^^^^
+...
+170 |     pub fn into_pair(self) -> (f64, T) {
+    |            ^^^^^^^^^
+
+warning: `terraphim_service` (lib) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.98s
+     Running `target/debug/terraphim_server`
+[2025-07-17T08:41:37Z INFO  terraphim_settings] Loading device settings...
+[2025-07-17T08:41:37Z DEBUG terraphim_settings] Settings path: "/home/alex/.config/terraphim"
+[2025-07-17T08:41:37Z DEBUG terraphim_settings] Config file exists at: "/home/alex/.config/terraphim/settings.toml"
+[2025-07-17T08:41:37Z DEBUG terraphim_settings] Loading config_file: "/home/alex/.config/terraphim/settings.toml"
+[2025-07-17T08:41:37Z DEBUG twelf] configuration:
+[2025-07-17T08:41:37Z DEBUG twelf] initialized=true
+[2025-07-17T08:41:37Z DEBUG twelf] default_data_path="/home/alex/projects/terraphim/terraphim-ai/docs/src"
+[2025-07-17T08:41:37Z DEBUG twelf] profiles={"dash":{"root":"/tmp/dashmaptest","type":"dashmap"}}
+[2025-07-17T08:41:37Z DEBUG twelf] api_endpoint="http://localhost:8000/api"
+[2025-07-17T08:41:37Z DEBUG twelf] server_hostname="127.0.0.1:8000"
+[2025-07-17T08:41:37Z INFO  terraphim_server] Device settings hostname: "127.0.0.1:8000"
+[2025-07-17T08:41:37Z INFO  terraphim_server] Loading Terraphim Engineer configuration from "terraphim_server/default/terraphim_engineer_config.json"
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Successfully loaded Terraphim Engineer configuration
+[2025-07-17T08:41:37Z INFO  terraphim_settings] Loading device settings...
+[2025-07-17T08:41:37Z DEBUG terraphim_settings] Settings path: "/home/alex/.config/terraphim"
+[2025-07-17T08:41:37Z DEBUG terraphim_settings] Config file exists at: "/home/alex/.config/terraphim/settings.toml"
+[2025-07-17T08:41:37Z DEBUG terraphim_settings] Loading config_file: "/home/alex/.config/terraphim/settings.toml"
+[2025-07-17T08:41:37Z DEBUG twelf] configuration:
+[2025-07-17T08:41:37Z DEBUG twelf] server_hostname="127.0.0.1:8000"
+[2025-07-17T08:41:37Z DEBUG twelf] profiles={"dash":{"root":"/tmp/dashmaptest","type":"dashmap"}}
+[2025-07-17T08:41:37Z DEBUG twelf] api_endpoint="http://localhost:8000/api"
+[2025-07-17T08:41:37Z DEBUG twelf] initialized=true
+[2025-07-17T08:41:37Z DEBUG twelf] default_data_path="/home/alex/projects/terraphim/terraphim-ai/docs/src"
+[2025-07-17T08:41:37Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/home/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"dash": {"root": "/tmp/dashmaptest", "type": "dashmap"}} }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=metadata -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=metadata -> finished: AccessorInfo { scheme: Dashmap, root: "/", name: "0x5c67b801c940", native_capability: { Stat | Read | Write | Delete | List | Blocking }, full_capability: { Stat | Read | Write | CreateDir | Delete | List | Blocking } }
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence::settings] operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 0, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=test -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=test -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=test written=9B -> data written finished
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=stat path=test -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=stat path=test -> finished: RpStat { meta: Metadata { metakey: FlagSet(Complete | Mode | ContentLength), mode: FILE, cache_control: None, content_disposition: None, content_length: Some(9), content_md5: None, content_range: None, content_type: None, etag: None, last_modified: None, version: None } }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=read path=test range=0-8 -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=read path=test range=0-8 -> got reader
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=read path=test read=9 -> data read finished
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=stat path=server_config.json -> started
+[2025-07-17T08:41:37Z WARN  opendal::services] service=dashmap operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: dashmap, path: server_config.json } => kv doesn't have this path
+[2025-07-17T08:41:37Z INFO  terraphim_server] No saved config found, using Terraphim Engineer config: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+
+    Context:
+       service: dashmap
+       path: server_config.json
+    )
+[2025-07-17T08:41:37Z INFO  terraphim_config] Creating role Terraphim Engineer
+[2025-07-17T08:41:37Z INFO  terraphim_config] Role Terraphim Engineer has no automata_path, building thesaurus from local KG files at "docs/src/kg"
+[2025-07-17T08:41:37Z DEBUG terraphim_automata::builder] Running logseq with needle `::` and haystack `docs/src/kg`
+[2025-07-17T08:41:37Z INFO  terraphim_config] Successfully built thesaurus from local KG for role Terraphim Engineer
+[2025-07-17T08:41:37Z INFO  terraphim_config] Creating role Engineer
+[2025-07-17T08:41:37Z INFO  terraphim_config] Role Engineer has no automata_path, building thesaurus from local KG files at "docs/src/kg"
+[2025-07-17T08:41:37Z DEBUG terraphim_automata::builder] Running logseq with needle `::` and haystack `docs/src/kg`
+[2025-07-17T08:41:37Z INFO  terraphim_config] Successfully built thesaurus from local KG for role Engineer
+[2025-07-17T08:41:37Z INFO  terraphim_config] Creating role Default
+[2025-07-17T08:41:37Z INFO  terraphim_server] Server started with 3 roles:
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - Role: Terraphim Engineer (relevance: TerraphimGraph, kg: true)
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - Role: Engineer (relevance: TerraphimGraph, kg: true)
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - Role: Default (relevance: TitleScorer, kg: false)
+[2025-07-17T08:41:37Z INFO  terraphim_server] Starting axum server
+[2025-07-17T08:41:37Z INFO  terraphim_server] Building rolegraph for role 'Terraphim Engineer' from local files
+[2025-07-17T08:41:37Z INFO  terraphim_server] Knowledge graph path: "docs/src/kg"
+[2025-07-17T08:41:37Z INFO  terraphim_server] Found 4 markdown files in "docs/src/kg"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/service.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/haystack.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/terraphim-graph.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/knowledge-graph-system.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server] Created Logseq builder for path: "docs/src/kg"
+[2025-07-17T08:41:37Z DEBUG terraphim_automata::builder] Running logseq with needle `::` and haystack `docs/src/kg`
+[2025-07-17T08:41:37Z INFO  terraphim_server] Successfully built and indexed rolegraph for role 'Terraphim Engineer' with 15 terms and 4 documents
+[2025-07-17T08:41:37Z INFO  terraphim_server] Successfully created rolegraph for role 'Terraphim Engineer'
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 1, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_servicemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_servicemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_servicemd.json written=237B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'servicemd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'service.md' into rolegraph
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 2, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackmd.json written=233B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'haystackmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'haystack.md' into rolegraph
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 3, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_terraphimgraphmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_terraphimgraphmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_terraphimgraphmd.json written=842B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'terraphimgraphmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'terraphim-graph.md' into rolegraph
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 4, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_knowledgegraphsystemmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_knowledgegraphsystemmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_knowledgegraphsystemmd.json written=12790B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'knowledgegraphsystemmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'knowledge-graph-system.md' into rolegraph
+[2025-07-17T08:41:37Z INFO  terraphim_server] Processing haystack documents from: docs/src
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 5, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_contributemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_contributemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_contributemd.json written=1302B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'contributemd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 6, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_testchatmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_testchatmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_testchatmd.json written=3041B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'testchatmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 7, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_summarymd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_summarymd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_summarymd.json written=535B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'summarymd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 8, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_usecasesmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_usecasesmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_usecasesmd.json written=2131B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'usecasesmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 9, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_claudedesktopmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_claudedesktopmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_claudedesktopmd.json written=5796B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'claudedesktopmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 10, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_architecturemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_architecturemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_architecturemd.json written=323B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'architecturemd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 11, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_designdecisionsmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_designdecisionsmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_designdecisionsmd.json written=190B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'designdecisionsmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 12, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_introductionmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_introductionmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_introductionmd.json written=8307B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'introductionmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 13, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_codeofconductmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_codeofconductmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_codeofconductmd.json written=3747B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'codeofconductmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 14, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_tsifyimplementationmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_tsifyimplementationmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_tsifyimplementationmd.json written=8437B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'tsifyimplementationmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 15, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_readmemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_readmemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_readmemd.json written=1370B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'readmemd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 16, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackextraparametersmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackextraparametersmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackextraparametersmd.json written=8578B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'haystackextraparametersmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Processed 12 documents from haystack: docs/src
+[2025-07-17T08:41:37Z INFO  terraphim_server] Stored rolegraph in local map for role 'Terraphim Engineer'
+[2025-07-17T08:41:37Z INFO  terraphim_server] Building rolegraph for role 'Engineer' from local files
+[2025-07-17T08:41:37Z INFO  terraphim_server] Knowledge graph path: "docs/src/kg"
+[2025-07-17T08:41:37Z INFO  terraphim_server] Found 4 markdown files in "docs/src/kg"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/service.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/haystack.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/terraphim-graph.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server]   - "docs/src/kg/knowledge-graph-system.md"
+[2025-07-17T08:41:37Z INFO  terraphim_server] Created Logseq builder for path: "docs/src/kg"
+[2025-07-17T08:41:37Z DEBUG terraphim_automata::builder] Running logseq with needle `::` and haystack `docs/src/kg`
+[2025-07-17T08:41:37Z INFO  terraphim_server] Successfully built and indexed rolegraph for role 'Engineer' with 15 terms and 4 documents
+[2025-07-17T08:41:37Z INFO  terraphim_server] Successfully created rolegraph for role 'Engineer'
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_servicemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_servicemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_servicemd.json written=237B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'servicemd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'service.md' into rolegraph
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackmd.json written=233B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'haystackmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'haystack.md' into rolegraph
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_terraphimgraphmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_terraphimgraphmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_terraphimgraphmd.json written=842B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'terraphimgraphmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'terraphim-graph.md' into rolegraph
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_knowledgegraphsystemmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_knowledgegraphsystemmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_knowledgegraphsystemmd.json written=12790B -> data written finished
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Saved document 'knowledgegraphsystemmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Indexed document 'knowledge-graph-system.md' into rolegraph
+[2025-07-17T08:41:37Z INFO  terraphim_server] Processing haystack documents from: docs/src
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_contributemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_contributemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_contributemd.json written=1302B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'contributemd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_testchatmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_testchatmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_testchatmd.json written=3041B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'testchatmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_summarymd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_summarymd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_summarymd.json written=535B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'summarymd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_usecasesmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_usecasesmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_usecasesmd.json written=2131B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'usecasesmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_claudedesktopmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_claudedesktopmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_claudedesktopmd.json written=5796B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'claudedesktopmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_architecturemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_architecturemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_architecturemd.json written=323B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'architecturemd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_designdecisionsmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_designdecisionsmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_designdecisionsmd.json written=190B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'designdecisionsmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_introductionmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_introductionmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_introductionmd.json written=8307B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'introductionmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_codeofconductmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_codeofconductmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_codeofconductmd.json written=3747B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'codeofconductmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_tsifyimplementationmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_tsifyimplementationmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_tsifyimplementationmd.json written=8437B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'tsifyimplementationmd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_readmemd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_readmemd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_readmemd.json written=1370B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'readmemd' to persistence layer
+[2025-07-17T08:41:37Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackextraparametersmd.json -> started
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackextraparametersmd.json -> start writing
+[2025-07-17T08:41:37Z DEBUG opendal::services] service=dashmap operation=write path=document_haystackextraparametersmd.json written=8578B -> data written finished
+[2025-07-17T08:41:37Z DEBUG terraphim_server] ✅ Saved haystack document 'haystackextraparametersmd' to persistence layer
+[2025-07-17T08:41:37Z INFO  terraphim_server] ✅ Processed 12 documents from haystack: docs/src
+[2025-07-17T08:41:37Z INFO  terraphim_server] Stored rolegraph in local map for role 'Engineer'
+listening on http://127.0.0.1:8000
+[2025-07-17T08:42:25Z DEBUG hyper::proto::h1::io] parsed 3 headers
+[2025-07-17T08:42:25Z DEBUG hyper::proto::h1::conn] incoming body is empty
+[2025-07-17T08:42:25Z DEBUG hyper::proto::h1::io] flushed 239 bytes
+[2025-07-17T08:42:25Z DEBUG hyper::proto::h1::conn] read eof
+[2025-07-17T08:42:52Z DEBUG hyper::proto::h1::io] parsed 5 headers
+[2025-07-17T08:42:52Z DEBUG hyper::proto::h1::conn] incoming body is content-length (68 bytes)
+[2025-07-17T08:42:52Z DEBUG hyper::proto::h1::conn] incoming body completed
+[2025-07-17T08:42:52Z DEBUG terraphim_server::api] POST Searching documents with query: Json(SearchQuery { search_term: NormalizedTermValue("testing"), skip: None, limit: Some(2), role: Some(RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }) })
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Role for searching: Some(RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" })
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Searching for role: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-07-17T08:42:52Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "docs/src",
+        service: Ripgrep,
+        read_only: true,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] RipgrepIndexer::index called with needle: 'testing' haystack: "docs/src"
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Found 12 markdown files in haystack: ["docs/src/CONTRIBUTE.md", "docs/src/test_chat.md", "docs/src/SUMMARY.md", "docs/src/Use-cases.md", "docs/src/ClaudeDesktop.md", "docs/src/Architecture.md", "docs/src/DesignDecisions.md", "docs/src/Introduction.md", "docs/src/CODE_OF_CONDUCT.md", "docs/src/tsify-implementation.md", "docs/src/README.md", "docs/src/haystack-extra-parameters.md"]
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::command::ripgrep] Running ripgrep with args: ["--json", "--trim", "-C3", "--ignore-case", "-tmarkdown", "testing", "docs/src"]
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::command::ripgrep] Raw ripgrep output (45243 bytes): {"type":"begin","data":{"path":{"text":"docs/src/haystack-extra-parameters.md"}}}
+    {"type":"context","data":{"path":{"text":"docs/src/haystack-extra-parameters.md"},"lines":{"text":"- Defaulting `extra_parameters` to `{}`\n"},"line_number":242,"absolute_offset":6440,"submatches":[]}}
+    {"type":"context","data":{"path":{"text":"docs/src/haystack-extra-parameters.md"},"lines":{"text":"- Setting `service` to `\"Ripgrep\"` if missing\n"},"line_number":243,"absolute_offset":6480,"submatches":[]}}
+    {"type
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::command::ripgrep] JSON decode produced 209 messages
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Ripgrep returned 209 messages
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] RipgrepIndexer got 209 messages
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Message 0: Begin(Begin { path: Some(Text { text: "docs/src/haystack-extra-parameters.md" }) })
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Message 1: Context(Context { path: Some(Text { text: "docs/src/haystack-extra-parameters.md" }), lines: Text { text: "- Defaulting `extra_parameters` to `{}`\n" }, line_number: Some(242), absolute_offset: 6440, submatches: [] })
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Message 2: Context(Context { path: Some(Text { text: "docs/src/haystack-extra-parameters.md" }), lines: Text { text: "- Setting `service` to `\"Ripgrep\"` if missing\n" }, line_number: Some(243), absolute_offset: 6480, submatches: [] })
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] index_inner called with 209 messages
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 1: haystack-extra-parameters (25a36fb84f895819)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: haystack-extra-parameters (25a36fb84f895819)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 2: Use-cases (a0ff4ff686d5c74e)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: Use-cases (a0ff4ff686d5c74e)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 3: tsify-implementation (d8c05f714e6633bc)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: tsify-implementation (d8c05f714e6633bc)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 4: README (57c2659617e6696f)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: README (57c2659617e6696f)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 5: knowledge-graph-ranking-expansion (39a6c1c2fe46470a)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: knowledge-graph-ranking-expansion (39a6c1c2fe46470a)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 6: knowledge-graph-system (6dd2a15e1d73080c)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: knowledge-graph-system (6dd2a15e1d73080c)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Creating document 7: comprehensive-testing-strategies (2c58e4615ab9226a)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Inserting document into index: comprehensive-testing-strategies (2c58e4615ab9226a)
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Index_inner completed: 7 documents processed, 39 matches found, 7 documents in final index
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::indexer::ripgrep] Index_inner created 7 documents
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::thesaurus] Building thesaurus from haystack
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::thesaurus] Role name: Terraphim Engineer
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::thesaurus] Role: Role { shortname: Some("TerraEng"), name: RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }, relevance_function: TerraphimGraph, theme: "lumen", kg: Some(KnowledgeGraph { automata_path: None, knowledge_graph_local: Some(KnowledgeGraphLocal { input_type: Markdown, path: "docs/src/kg" }), public: true, publish: true }), haystacks: [Haystack { location: "docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None, extra_parameters: {} }], extra: {"extra": Object {}} }
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::thesaurus] Updating thesaurus for haystack: Haystack { location: "docs/src", service: Ripgrep, read_only: true, atomic_server_secret: None, extra_parameters: {} }
+[2025-07-17T08:42:52Z DEBUG terraphim_automata::builder] Running logseq with needle `::` and haystack `docs/src`
+[2025-07-17T08:42:52Z DEBUG terraphim_persistence] Saving to operator: Operator { accessor: LoggingAccessor { inner: Backend { kv: DashmapAdapter { size: 17, .. }, root: "/" }, ctx: LoggingContext { scheme: Dashmap, error_level: Some(Warn), failure_level: Some(Error), backtrace_output: false } }, limit: 1000 }
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=write path=thesaurus_terraphimengineer.json -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=write path=thesaurus_terraphimengineer.json -> start writing
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=write path=thesaurus_terraphimengineer.json written=1339B -> data written finished
+[2025-07-17T08:42:52Z INFO  terraphim_middleware::thesaurus] Thesaurus for role `Terraphim Engineer` saved to persistence
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=thesaurus_terraphimengineer.json -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=thesaurus_terraphimengineer.json -> finished: RpStat { meta: Metadata { metakey: FlagSet(Complete | Mode | ContentLength), mode: FILE, cache_control: None, content_disposition: None, content_length: Some(1339), content_md5: None, content_range: None, content_type: None, etag: None, last_modified: None, version: None } }
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=thesaurus_terraphimengineer.json range=0-1338 -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=thesaurus_terraphimengineer.json range=0-1338 -> got reader
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=thesaurus_terraphimengineer.json read=1339 -> data read finished
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::thesaurus] Make sure thesaurus updated in a role Terraphim Engineer
+[2025-07-17T08:42:52Z DEBUG terraphim_middleware::thesaurus] Updating thesaurus for role: Terraphim Engineer
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Loading thesaurus for role: Terraphim Engineer
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Role keys [RoleName { original: "Engineer", lowercase: "engineer" }, RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }]
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=thesaurus_terraphimengineer.json -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=thesaurus_terraphimengineer.json -> finished: RpStat { meta: Metadata { metakey: FlagSet(Complete | Mode | ContentLength), mode: FILE, cache_control: None, content_disposition: None, content_length: Some(1339), content_md5: None, content_range: None, content_type: None, etag: None, last_modified: None, version: None } }
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=thesaurus_terraphimengineer.json range=0-1338 -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=thesaurus_terraphimengineer.json range=0-1338 -> got reader
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=thesaurus_terraphimengineer.json read=1339 -> data read finished
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Thesaurus loaded: Thesaurus { name: "terraphim engineer", data: {NormalizedTermValue("knowledge-graph-ranking-expansion"): NormalizedTerm { id: 21, value: NormalizedTermValue("knowledge-graph-ranking-expansion"), url: None }, NormalizedTermValue("datasource"): NormalizedTerm { id: 24, value: NormalizedTermValue("haystack"), url: None }, NormalizedTermValue("middleware"): NormalizedTerm { id: 20, value: NormalizedTermValue("service"), url: None }, NormalizedTermValue("connectivity analysis"): NormalizedTerm { id: 21, value: NormalizedTermValue("knowledge-graph-ranking-expansion"), url: None }, NormalizedTermValue("provider"): NormalizedTerm { id: 20, value: NormalizedTermValue("service"), url: None }, NormalizedTermValue(""): NormalizedTerm { id: 22, value: NormalizedTermValue("knowledge-graph-system"), url: None }, NormalizedTermValue("knowledge-graph-system"): NormalizedTerm { id: 22, value: NormalizedTermValue("knowledge-graph-system"), url: None }, NormalizedTermValue("data analysis"): NormalizedTerm { id: 22, value: NormalizedTermValue("knowledge-graph-system"), url: None }, NormalizedTermValue("terraphim-graph"): NormalizedTerm { id: 25, value: NormalizedTermValue("terraphim-graph"), url: None }, NormalizedTermValue("haystack"): NormalizedTerm { id: 24, value: NormalizedTermValue("haystack"), url: None }, NormalizedTermValue("graph"): NormalizedTerm { id: 25, value: NormalizedTermValue("terraphim-graph"), url: None }, NormalizedTermValue("comprehensive-testing-strategies"): NormalizedTerm { id: 19, value: NormalizedTermValue("comprehensive-testing-strategies"), url: None }, NormalizedTermValue("service"): NormalizedTerm { id: 24, value: NormalizedTermValue("haystack"), url: None }, NormalizedTermValue("graph embeddings"): NormalizedTerm { id: 25, value: NormalizedTermValue("terraphim-graph"), url: None }, NormalizedTermValue("agent"): NormalizedTerm { id: 24, value: NormalizedTermValue("haystack"), url: None }, NormalizedTermValue("relationship mapping"): NormalizedTerm { id: 21, value: NormalizedTermValue("knowledge-graph-ranking-expansion"), url: None }, NormalizedTermValue("graph processing"): NormalizedTerm { id: 22, value: NormalizedTermValue("knowledge-graph-system"), url: None }, NormalizedTermValue("network analysis"): NormalizedTerm { id: 22, value: NormalizedTermValue("knowledge-graph-system"), url: None }, NormalizedTermValue("knowledge graph based embeddings"): NormalizedTerm { id: 25, value: NormalizedTermValue("terraphim-graph"), url: None }} }
+[2025-07-17T08:42:52Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-07-17T08:42:52Z DEBUG terraphim_config] search_documents: SearchQuery { search_term: NormalizedTermValue("testing"), skip: None, limit: Some(2), role: Some(RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }) }
+[2025-07-17T08:42:52Z DEBUG terraphim_config] Role for search_documents: Role {
+        shortname: Some(
+            "TerraEng",
+        ),
+        name: RoleName {
+            original: "Terraphim Engineer",
+            lowercase: "terraphim engineer",
+        },
+        relevance_function: TerraphimGraph,
+        theme: "lumen",
+        kg: Some(
+            KnowledgeGraph {
+                automata_path: None,
+                knowledge_graph_local: Some(
+                    KnowledgeGraphLocal {
+                        input_type: Markdown,
+                        path: "docs/src/kg",
+                    },
+                ),
+                public: true,
+                publish: true,
+            },
+        ),
+        haystacks: [
+            Haystack {
+                location: "docs/src",
+                service: Ripgrep,
+                read_only: true,
+                atomic_server_secret: None,
+                extra_parameters: {},
+            },
+        ],
+        extra: {
+            "extra": Object {},
+        },
+    }
+[2025-07-17T08:42:52Z DEBUG terraphim_config] Role name for searching Terraphim Engineer
+[2025-07-17T08:42:52Z DEBUG terraphim_config] All roles defined  [RoleName { original: "Engineer", lowercase: "engineer" }, RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }]
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Performing graph query with string: 'testing'
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Processing node ID: 10 with rank: 102661
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Processing node ID: 10 with rank: 102661
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Processing node ID: 10 with rank: 102661
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Processing node ID: 10 with rank: 102661
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Processing node ID: 10 with rank: 102661
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Processing node ID: 10 with rank: 102661
+[2025-07-17T08:42:52Z DEBUG terraphim_rolegraph] Query resulted in 2 documents
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Ranking documents with thesaurus
+[2025-07-17T08:42:52Z WARN  terraphim_types] Document not found in cache. Cannot convert.
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=document_6dd2a15e1d73080c.json -> started
+[2025-07-17T08:42:52Z WARN  opendal::services] service=dashmap operation=stat path=document_6dd2a15e1d73080c.json -> NotFound (permanent) at stat, context: { service: dashmap, path: document_6dd2a15e1d73080c.json } => kv doesn't have this path
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=document_knowledgegraphsystem.json -> started
+[2025-07-17T08:42:52Z WARN  opendal::services] service=dashmap operation=stat path=document_knowledgegraphsystem.json -> NotFound (permanent) at stat, context: { service: dashmap, path: document_knowledgegraphsystem.json } => kv doesn't have this path
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=document_knowledgegraphsystemmd.json -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=stat path=document_knowledgegraphsystemmd.json -> finished: RpStat { meta: Metadata { metakey: FlagSet(Complete | Mode | ContentLength), mode: FILE, cache_control: None, content_disposition: None, content_length: Some(12790), content_md5: None, content_range: None, content_type: None, etag: None, last_modified: None, version: None } }
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=document_knowledgegraphsystemmd.json range=0-12789 -> started
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=document_knowledgegraphsystemmd.json range=0-12789 -> got reader
+[2025-07-17T08:42:52Z DEBUG opendal::services] service=dashmap operation=read path=document_knowledgegraphsystemmd.json read=12790 -> data read finished
+[2025-07-17T08:42:52Z DEBUG terraphim_service] Replaced ripgrep description for 'knowledge-graph-system' with persistence description (normalized with md: knowledgegraphsystemmd)
+[2025-07-17T08:42:52Z DEBUG terraphim_server::api] Found 1 documents
+[2025-07-17T08:42:52Z DEBUG hyper::proto::h1::io] flushed 13081 bytes
+[2025-07-17T08:42:52Z DEBUG hyper::proto::h1::conn] read eof

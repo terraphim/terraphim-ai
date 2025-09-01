@@ -5,4 +5,6 @@
 
 export declare function sum(a: number, b: number): number
 export declare function replaceLinks(content: string, thesaurus: string): Promise<string>
+export declare function getTestConfig(): Promise<string>
+export declare function getConfig(): Promise<string>
 export declare function searchDocumentsSelectedRole(query: string): Promise<string>

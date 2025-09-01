@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ############################################################################################
 # Linux Kernel Commandline Parsing Shellscript Functions
-# 
+#
 # These functions have been written in a way that they should be compatible
 # with almost any "standard" UNIX/Linux shell, including: sh, bash, ash, dash, zsh
 #
@@ -12,22 +12,22 @@
 ############################################################################################
 #
 # Function Index:
-# 
-#    - get_cmd [key]   - Parses /proc/cmdline - looking for KEY=VALUE, then outputs VALUE 
-#                        to stdout after extracting it with regex. Supports quoted value's 
-#                        containing spaces. 
 #
-#    - has_cmd [key]   - Similar to get_cmd except it doesn't output anything. It returns 
-#                        boolean 0 or 1 return codes depending on whether or not 'key=?' 
+#    - get_cmd [key]   - Parses /proc/cmdline - looking for KEY=VALUE, then outputs VALUE
+#                        to stdout after extracting it with regex. Supports quoted value's
+#                        containing spaces.
+#
+#    - has_cmd [key]   - Similar to get_cmd except it doesn't output anything. It returns
+#                        boolean 0 or 1 return codes depending on whether or not 'key=?'
 #                        is present in /proc/cmdline
 #
-#    - has_cmd_word [key]    - Similar to 'has_cmd', except only detects "words", 
+#    - has_cmd_word [key]    - Similar to 'has_cmd', except only detects "words",
 #                              i.e. standalone strings inside of /proc/cmdline without
 #                              an '=VALUE' - e.g. 'ro', 'quiet', 'safemode'
 #
-#    - extractpr        - This is the lower level function that powers get_cmd/has_cmd - 
-#                         it handles running sed regex against piped stdin, and running 
-#                         a second-layer regex to handle quoted values if it detects 
+#    - extractpr        - This is the lower level function that powers get_cmd/has_cmd -
+#                         it handles running sed regex against piped stdin, and running
+#                         a second-layer regex to handle quoted values if it detects
 #                         the first search starts with a "
 #
 #############################################################################################
@@ -70,7 +70,7 @@ extractpr() {
 # e.g.
 #
 #   $ cat /proc/cmdline
-#   BOOT_IMAGE=/boot/vmlinuz-4.15.0-122-generic root=UUID=abcd1-2487-4cc1-bc38-11fd08ba1a0a 
+#   BOOT_IMAGE=/boot/vmlinuz-4.15.0-122-generic root=UUID=abcd1-2487-4cc1-bc38-11fd08ba1a0a
 #   URLS="http://example.com http://lorem.ipsum" ro safe quiet
 #   $ get_cmd BOOT_IMAGE
 #   /boot/vmlinuz-4.15.0-122-generic
@@ -146,21 +146,21 @@ has_cmd_word() {
 #                                                                                           #
 #############################################################################################
 #
-#    Permission is hereby granted, free of charge, to any person obtaining a copy of 
-#    this software and associated documentation files (the "Software"), to deal in 
-#    the Software without restriction, including without limitation the rights to use, 
-#    copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the 
-#    Software, and to permit persons to whom the Software is furnished to do so, 
+#    Permission is hereby granted, free of charge, to any person obtaining a copy of
+#    this software and associated documentation files (the "Software"), to deal in
+#    the Software without restriction, including without limitation the rights to use,
+#    copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+#    Software, and to permit persons to whom the Software is furnished to do so,
 #    subject to the following conditions:
 #
-#    The above copyright notice and this permission notice shall be included in all 
+#    The above copyright notice and this permission notice shall be included in all
 #    copies or substantial portions of the Software.
 #
-#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
-#    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
-#    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-#    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
-#    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+#    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+#    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 #    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 #############################################################################################

@@ -1,5 +1,5 @@
-server_hostname = "${TERRAPHIM_SERVER_HOSTNAME}-127.0.0.1:8000"
-api_endpoint="${TERRAPHIM_SERVER_API_ENDPOINT}-http://localhost:8000/api"
+server_hostname = "${TERRAPHIM_SERVER_HOSTNAME:-127.0.0.1:8000}"
+api_endpoint="${TERRAPHIM_SERVER_API_ENDPOINT:-http://localhost:8000/api}"
 initialized = "${TERRAPHIM_INITIALIZED:-false}"
 
 [profiles.s3]
@@ -18,9 +18,14 @@ datadir= "/tmp/opendal/sled"
 type = "dashmap"
 root = "/tmp/dashmaptest"
 
-[profiles.rock]
-type = "rocksdb"
-datadir = "/tmp/opendal/rocksdb" 
+# Optional database backends - uncomment if RocksDB feature is enabled
+# [profiles.rock]
+# type = "rocksdb"
+# datadir = "/tmp/opendal/rocksdb"
+
+# Memory backend for desktop (lightweight)
+[profiles.memory]
+type = "memory"
 
 [profiles.atomicserver]
 endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"
@@ -28,3 +33,77 @@ type = "atomicserver"
 private_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PRIVATE_KEY}"
 public_key = "${TERRAPHIM_PROFILE_ATOMICSERVER_PUBLIC_KEY}"
 parent_resource_id="${TERRAPHIM_PROFILE_ATOMICSERVER}"
+
+# Default role configuration - basic settings for simple usage
+[roles.Default]
+shortname = "Default"
+name = "Default"
+relevance_function = "title-scorer"
+terraphim_it = false
+theme = "spacelab"
+
+[[roles.Default.haystacks]]
+location = "docs/src"
+service = "Ripgrep"
+read_only = true
+
+[roles.Default.haystacks.extra_parameters]
+
+# Rust Engineer role configuration - specialized for Rust development
+[roles.RustEngineer]
+shortname = "rust-engineer"
+name = "Rust Engineer"
+relevance_function = "title-scorer"
+terraphim_it = false
+theme = "cosmo"
+
+[[roles.RustEngineer.haystacks]]
+location = "https://query.rs"
+service = "QueryRs"
+read_only = true
+
+[roles.RustEngineer.haystacks.extra_parameters]
+
+# Terraphim Engineer role configuration - full KG features
+[roles.TerraphimEngineer]
+shortname = "TerraEng"
+name = "Terraphim Engineer"
+relevance_function = "terraphim-graph"
+terraphim_it = true
+theme = "lumen"
+
+[[roles.TerraphimEngineer.haystacks]]
+location = "docs/src"
+service = "Ripgrep"
+read_only = true
+
+[roles.TerraphimEngineer.haystacks.extra_parameters]
+
+# KG configuration for Terraphim Engineer role
+[roles.TerraphimEngineer.kg]
+automata_path = ""
+public = true
+publish = true
+
+[roles.TerraphimEngineer.kg.knowledge_graph_local]
+input_type = "markdown"
+path = "docs/src/kg"
+
+# Example ClickUp role (requires env CLICKUP_API_TOKEN and CLICKUP_TEAM_ID). This is consumed by the app UI.
+[roles.ClickUp]
+shortname = "ClickUp"
+name = "ClickUp"
+relevance_function = "title-scorer"
+terraphim_it = false
+theme = "lumen"
+
+[[roles.ClickUp.haystacks]]
+location = "clickup"
+service = "ClickUp"
+read_only = true
+
+[roles.ClickUp.haystacks.extra_parameters]
+team_id = "${CLICKUP_TEAM_ID}"
+include_closed = "true"
+subtasks = "true"
+page = "0"

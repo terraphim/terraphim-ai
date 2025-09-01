@@ -1,0 +1,60 @@
+[package]
+name = "terraphim_onepassword_cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim Team <info@terraphim.com>"]
+description = "1Password CLI integration for secure secret management in Terraphim AI"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+readme = "README.md"
+
+[features]
+default = ["native"]
+native = ["tokio", "reqwest"]
+async = ["tokio"]
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "process", "time"], optional = true }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# JSON handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Base64 encoding for secrets
+base64 = "0.22"
+
+# Logging
+log = "0.4"
+tracing = "0.1"
+
+# HTTP client for secure transmission (optional)
+reqwest = { workspace = true, features = ["json"], optional = true }
+
+# Environment variable handling
+env = "1.0"
+
+# Process handling for op CLI
+which = "6.0"
+
+# Jiff for time handling (as per rules)
+jiff = "0.2"
+
+# Cache and storage
+directories = "5.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+uuid = "1.0"
+
+[lib]
+name = "terraphim_onepassword_cli"
+path = "src/lib.rs"
+
+# Binary and examples are currently not implemented
+# They will be added in future iterations

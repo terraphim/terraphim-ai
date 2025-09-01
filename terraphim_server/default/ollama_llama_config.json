@@ -1,0 +1,106 @@
+{
+  "id": "OllamaLlama",
+  "global_shortcut": "Ctrl+Shift+L",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "Llama Rust Engineer": {
+      "shortname": "LlamaRust",
+      "name": "Llama Rust Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Local Ollama instance with llama3.2:3b for Rust-focused development and documentation"
+      }
+    },
+    "Llama AI Assistant": {
+      "shortname": "LlamaAI",
+      "name": "Llama AI Assistant",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "AI-powered assistant using local llama3.2:3b with knowledge graph integration"
+      }
+    },
+    "Llama Developer": {
+      "shortname": "LlamaDev",
+      "name": "Llama Developer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Developer-focused role with BM25 scoring and llama3.2:3b summarization"
+      }
+    }
+  },
+  "default_role": "Llama Rust Engineer",
+  "selected_role": "Llama Rust Engineer"
+}

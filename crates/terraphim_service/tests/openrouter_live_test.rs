@@ -1,0 +1,31 @@
+#![cfg(feature = "openrouter")]
+
+use std::env;
+use terraphim_service::openrouter::OpenRouterService;
+
+// Run only when OPENROUTER_API_KEY is present in env.
+#[tokio::test]
+async fn live_chat_completion_smoke() {
+    let api_key = match env::var("OPENROUTER_API_KEY") {
+        Ok(v) if v.starts_with("sk-or-") => v,
+        _ => {
+            eprintln!("OPENROUTER_API_KEY not set; skipping live test");
+            return;
+        }
+    };
+
+    let model =
+        std::env::var("OPENROUTER_MODEL").unwrap_or_else(|_| "openai/gpt-4-turbo".to_string());
+    let client = OpenRouterService::new(&api_key, &model).expect("client init");
+
+    let reply = client
+        .chat_completion(
+            vec![serde_json::json!({"role":"user","content":"Say 'pong'"})],
+            Some(64),
+            Some(0.2),
+        )
+        .await
+        .expect("live chat call should succeed");
+
+    assert!(!reply.trim().is_empty());
+}

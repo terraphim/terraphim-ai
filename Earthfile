@@ -2,7 +2,7 @@ VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -28,7 +28,7 @@ pipeline:
 
 rustlib:
   BUILD +install
-  BUILD +build 
+  BUILD +build
 
 native:
   BUILD +install-native
@@ -49,13 +49,18 @@ docker-all:
   BUILD --platform=linux/arm/v7 +docker-musl --TARGET=armv7-unknown-linux-musleabihf
   BUILD --platform=linux/arm64/v8 +docker-musl --TARGET=aarch64-unknown-linux-musl
 
-# this install uses rust lib and Earthly cache
+# this install builds from base OS without registry dependencies
 install:
-  FROM rust:1.75.0-buster
+  FROM ubuntu:24.04
+  ENV DEBIAN_FRONTEND=noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt install -y musl-tools musl-dev 
-  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
+  # Install Rust from official installer
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.75.0
+  ENV PATH="/root/.cargo/bin:$PATH"
+  ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   DO rust+INIT --keep_fingerprints=true
@@ -64,17 +69,21 @@ install:
   RUN cargo install ripgrep
   RUN curl https://pkgx.sh | sh
   RUN pkgx install yarnpkg.com
-  SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder:latest
+  # Save locally instead of pushing to registry
+  SAVE IMAGE terraphim_builder:local
 
 # this install doesn't use rust lib and Earthly cache
 install-native:
-  FROM rust:1.75.0-buster
-  ENV DEBIAN_FRONTEND noninteractive
-  ENV DEBCONF_NONINTERACTIVE_SEEN true
+  FROM ubuntu:24.04
+  ENV DEBIAN_FRONTEND=noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
-  RUN apt install -y musl-tools musl-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
+  # Install Rust from official installer
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82.0
+  ENV PATH="/root/.cargo/bin:$PATH"
+  ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   RUN cargo install ripgrep
@@ -82,10 +91,11 @@ install-native:
   RUN cargo install orogene
   RUN curl https://pkgx.sh | sh
   RUN pkgx install yarnpkg.com
-  SAVE IMAGE --push ghcr.io/terraphim/terraphim_builder_native:latest
+  # Save locally instead of pushing to registry
+  SAVE IMAGE terraphim_builder_native:local
 
 source-native:
-  FROM ghcr.io/terraphim/terraphim_builder_native:latest
+  FROM +install-native
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
@@ -109,12 +119,12 @@ build-debug-native:
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
 
 source:
-  FROM ghcr.io/terraphim/terraphim_builder:latest
+  FROM +install
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
-  DO rust+CARGO --args=fetch  
+  DO rust+CARGO --args=fetch
 
 cross-build:
   FROM +source
@@ -154,14 +164,14 @@ test:
 
 fmt:
   FROM +build-debug-native
-  RUN cargo fmt --check 
+  RUN cargo fmt --check
 
 lint:
   FROM +build-debug-native
   RUN cargo clippy --no-deps --all-features --all-targets
 
 build-focal:
-  FROM ubuntu:20.04
+  FROM ubuntu:24.04
   ENV DEBIAN_FRONTEND noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN true
   RUN apt-get update -qq
@@ -174,8 +184,8 @@ build-focal:
   RUN pkgx +openssl cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_focal
 
-build-bionic:
-  FROM ubuntu:18.04
+build-jammy:
+  FROM ubuntu:22.04
   ENV DEBIAN_FRONTEND noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN true
   RUN apt-get update -qq
@@ -195,7 +205,7 @@ build-bionic:
   RUN ./desktop/scripts/yarn_and_build.sh
   # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN cargo build --release
-  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_bionic
+  SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_jammy
 
 docker-musl:
   FROM alpine:3.18
@@ -212,11 +222,15 @@ docker-musl:
   SAVE IMAGE --push ${tags}
 
 docker-aarch64:
-  FROM rust:latest
-  RUN apt update && apt upgrade -y
-  RUN apt install -y libssl-dev g++-aarch64-linux-gnu libc6-dev-arm64-cross
-  RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
-  RUN apt install -y 
+  FROM ubuntu:24.04
+  ENV DEBIAN_FRONTEND=noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN=true
+  RUN apt-get update && apt-get upgrade -y
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config libssl-dev g++-aarch64-linux-gnu libc6-dev-arm64-cross
+  # Install Rust from official installer
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.75.0
+  ENV PATH="/root/.cargo/bin:$PATH"
+  ENV CARGO_HOME="/root/.cargo"
   RUN rustup target add aarch64-unknown-linux-gnu
   RUN rustup toolchain install stable-aarch64-unknown-linux-gnu
 
@@ -226,7 +240,7 @@ docker-aarch64:
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ 
+      CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
   ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
   RUN cargo build --release --target aarch64-unknown-linux-gnu
   SAVE ARTIFACT /code/target/aarch64-unknown-linux-gnu/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_linux-aarch64
@@ -247,12 +261,12 @@ docker-scratch:
     SAVE IMAGE aks/terraphim_server:scratch
 
 docs-deps:
-  FROM +install-native 
+  FROM +install-native
   RUN cargo install mdbook
   RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
-  # RUN cargo install --git https://github.com/typst/typst typst-cli 
+  # RUN cargo install --git https://github.com/typst/typst typst-cli
   # RUN cargo install --git https://github.com/terraphim/mdbook-typst.git
   RUN cargo install mdbook-mermaid
   RUN cargo install mdbook-alerts
@@ -261,7 +275,7 @@ docs-deps:
   RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
 
 
-  
+
 docs-pages:
   FROM +docs-deps
   COPY --keep-ts docs /docs

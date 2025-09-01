@@ -1,0 +1,2385 @@
+[
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "defaultOntology/class/card"
+    ],
+    "https://atomicdata.dev/properties/description": "Default ontology for this drive",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/properties": [
+      "defaultOntology/property/content",
+      "defaultOntology/property/section",
+      "defaultOntology/property/title"
+    ],
+    "https://atomicdata.dev/properties/shortname": "ontology"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once. If you, for whatever reason, need a new `/setup` invite, you can pass the `--initialize` flag to `atomic-server`.",
+    "https://atomicdata.dev/properties/invite/target": "http://localhost:9883",
+    "https://atomicdata.dev/properties/invite/usagesLeft": 0,
+    "https://atomicdata.dev/properties/invite/write": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Invite"
+    ],
+    "https://atomicdata.dev/properties/localId": "setup",
+    "https://atomicdata.dev/properties/name": "Setup",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Imports one or more Resources to some parent. POST your JSON-AD and add a `parent` query param to the URL. See https://docs.atomicdata.dev/create-json-ad.html",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/importer/overwrite-outside",
+      "https://atomicdata.dev/properties/importer/parent",
+      "https://atomicdata.dev/properties/importer/url"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "import",
+    "https://atomicdata.dev/properties/name": "Import",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "path"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/sortBy": "https://atomicdata.dev/properties/collection/value",
+    "https://atomicdata.dev/properties/collection/totalMembers": 47,
+    "https://atomicdata.dev/properties/collection/totalPages": 2,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Collection",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "collections",
+    "https://atomicdata.dev/properties/name": "collections",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883"
+  },
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "01jfjpg5fvc97rse14qcg2c5n6/class/test-class"
+    ],
+    "https://atomicdata.dev/properties/description": "description",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jfjpg5fvc97rse14qcg2c5n6",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/properties": [],
+    "https://atomicdata.dev/properties/shortname": "progresscards"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "This is a test article",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Article"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jfxr6bkfsbf2fchsvzpsc68s",
+    "https://atomicdata.dev/properties/name": "Test Article",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883"
+  },
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "borrower-portal/class/loan-application",
+      "borrower-portal/class/borrower-profile",
+      "borrower-portal/class/document",
+      "borrower-portal/class/application-status",
+      "borrower-portal/class/loan-product",
+      "borrower-portal/class/financial-info",
+      "borrower-portal/class/employment-info"
+    ],
+    "https://atomicdata.dev/properties/description": "Ontology for the borrower portal application, defining classes and properties for loan applications, borrower profiles, documents, and status tracking.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal",
+    "https://atomicdata.dev/properties/name": "Borrower Portal Ontology",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/properties": [
+      "borrower-portal/property/loan-amount",
+      "borrower-portal/property/interest-rate",
+      "borrower-portal/property/loan-term",
+      "borrower-portal/property/credit-score",
+      "borrower-portal/property/annual-income",
+      "borrower-portal/property/employment-status",
+      "borrower-portal/property/document-type",
+      "borrower-portal/property/document-url",
+      "borrower-portal/property/status-type",
+      "borrower-portal/property/status-timestamp",
+      "borrower-portal/property/borrower-profile",
+      "borrower-portal/property/documents",
+      "borrower-portal/property/application-history",
+      "borrower-portal/property/phone-number",
+      "borrower-portal/property/address",
+      "borrower-portal/property/date-of-birth",
+      "borrower-portal/property/ssn-last-four",
+      "borrower-portal/property/employer-name",
+      "borrower-portal/property/employment-duration",
+      "borrower-portal/property/monthly-expenses",
+      "borrower-portal/property/debt-to-income-ratio",
+      "borrower-portal/property/loan-purpose"
+    ],
+    "https://atomicdata.dev/properties/shortname": "borrower-portal"
+  },
+  {
+    "https://atomicdata.dev/properties/isA": [
+      "classes/ProgressCard"
+    ],
+    "https://atomicdata.dev/properties/localId": "cards/api-development",
+    "https://atomicdata.dev/properties/name": "API Development",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "api-development",
+    "properties/color": "green",
+    "properties/date": "March 15, 2021",
+    "properties/progress": 75,
+    "properties/subtitle": "Backend Services",
+    "properties/timeLeft": "1 week left",
+    "properties/users": [
+      "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg",
+      "https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/isA": [
+      "classes/ProgressCard"
+    ],
+    "https://atomicdata.dev/properties/localId": "cards/dashboard-medical",
+    "https://atomicdata.dev/properties/name": "Dashboard",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "dashboard-medical",
+    "properties/color": "red",
+    "properties/date": "March 03, 2021",
+    "properties/progress": 50,
+    "properties/subtitle": "Medical",
+    "properties/timeLeft": "4 days left",
+    "properties/users": [
+      "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg",
+      "https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/isA": [
+      "classes/ProgressCard"
+    ],
+    "https://atomicdata.dev/properties/localId": "cards/mobile-app",
+    "https://atomicdata.dev/properties/name": "Mobile App",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "mobile-app",
+    "properties/color": "orange",
+    "properties/date": "Feb 05, 2021",
+    "properties/progress": 30,
+    "properties/subtitle": "Shopping",
+    "properties/timeLeft": "3 weeks left",
+    "properties/users": [
+      "https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg",
+      "https://images.pexels.com/photos/874158/pexels-photo-874158.jpeg"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/isA": [
+      "classes/ProgressCard"
+    ],
+    "https://atomicdata.dev/properties/localId": "cards/user-research",
+    "https://atomicdata.dev/properties/name": "User Research",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "user-research",
+    "properties/color": "orange",
+    "properties/date": "March 20, 2021",
+    "properties/progress": 15,
+    "properties/subtitle": "UX Design",
+    "properties/timeLeft": "5 weeks left",
+    "properties/users": [
+      "https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg",
+      "https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/isA": [
+      "classes/ProgressCard"
+    ],
+    "https://atomicdata.dev/properties/localId": "cards/web-designing",
+    "https://atomicdata.dev/properties/name": "Web Designing",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "web-designing",
+    "properties/color": "green",
+    "properties/date": "Feb 2, 2021",
+    "properties/progress": 90,
+    "properties/subtitle": "Prototyping",
+    "properties/timeLeft": "2 days left",
+    "properties/users": [
+      "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg",
+      "https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A project card showing progress and team members",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "classes/ProgressCard",
+    "https://atomicdata.dev/properties/name": "Card",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "properties/subtitle",
+      "properties/date",
+      "properties/progress",
+      "properties/color",
+      "properties/timeLeft",
+      "properties/users"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  },
+  {
+    "https://atomicdata.dev/ontology/server/property/default-ontology": "defaultOntology",
+    "https://atomicdata.dev/properties/children": [],
+    "https://atomicdata.dev/properties/description": "## Welcome to your Atomic-Server!\n### Getting started\nStart by registering your Agent by visiting [`/setup`](http://localhost:9883/setup).\n\nNote that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.\n\nOnce you've setup an agent you should start editing your schema using ontologies.\nWe've created a [default ontology](http://localhost:9883/defaultOntology) for you but you can create more if you want.\n\nNext create some resources by clicking on the plus button in the sidebar.\nYou can create folders to organise your resources.\n\nTo use the data in your web apps checkout our client libraries: [@tomic/lib](https://docs.atomicdata.dev/js), [@tomic/react](https://docs.atomicdata.dev/usecases/react) and [@tomic/svelte](https://docs.atomicdata.dev/svelte)\nUse [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologies inside your code.\n",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Drive"
+    ],
+    "https://atomicdata.dev/properties/localId": "http://localhost:9883",
+    "https://atomicdata.dev/properties/name": "localhost",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/subresources": [
+      "defaultOntology",
+      "setup",
+      "import",
+      "collections",
+      "01jfjpg5fvc97rse14qcg2c5n6"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The color theme of the card",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "properties/color",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "color"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The date associated with the card",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "properties/date",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "date"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Progress percentage of the card's task",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "properties/progress",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "progress"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "A subtitle describing the card's context",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "properties/subtitle",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "subtitle"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Time remaining for the task",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "properties/timeLeft",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "timeleft"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of user avatar URLs",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "properties/users",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "users"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A comprehensive guide to Rust programming language covering ownership, borrowing, and memory safety",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Article"
+    ],
+    "https://atomicdata.dev/properties/localId": "rust-guide",
+    "https://atomicdata.dev/properties/name": "Rust Programming Guide",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "rust-guide"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Learn how to build fast web applications using Rust and WebAssembly",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Article"
+    ],
+    "https://atomicdata.dev/properties/localId": "wasm-tutorial",
+    "https://atomicdata.dev/properties/name": "WebAssembly Tutorial",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "wasm-tutorial"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/class/card",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/tags"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "defaultOntology/defaultOntology/property/title",
+      "defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/property/section"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/property/content",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "content"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/property/section",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "section"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/property/title",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 5,
+    "https://atomicdata.dev/properties/collection/totalPages": 1,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Agent",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "agents",
+    "https://atomicdata.dev/properties/name": "agents",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/application-status",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "application-statuss",
+    "https://atomicdata.dev/properties/name": "application-statuss",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [
+      {
+        "@id": "http://localhost:9883/01jfxr6bkfsbf2fchsvzpsc68s",
+        "https://atomicdata.dev/properties/description": "This is a test article",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Article"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/AAL/OQyJWsPD/XfXs2gewwVMWUOPDCsOMrJ8abhaiXWtLZW/xBO71ypqHtTZdluo0AHf8VG0CRITA9X+YYeWBw==",
+        "https://atomicdata.dev/properties/localId": "01jfxr6bkfsbf2fchsvzpsc68s",
+        "https://atomicdata.dev/properties/name": "Test Article",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883"
+      },
+      {
+        "@id": "http://localhost:9883/articles/test-article",
+        "https://atomicdata.dev/properties/description": "Test Message \n# Test from UI\n\nHit save\n\nRemove save\n\nJoep",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Article"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/zJy57UAYulVDFuAMysrLvkfsrDbzL/Euv+CJAecEw/5nVN14ireEFwF3w3dJZxveAFHq8UNPoA1hsN04LT0QAA==",
+        "https://atomicdata.dev/properties/localId": "articles/test-article",
+        "https://atomicdata.dev/properties/name": "Test Article",
+        "https://atomicdata.dev/properties/parent": "articles"
+      },
+      {
+        "@id": "http://localhost:9883/rust-guide",
+        "https://atomicdata.dev/properties/description": "A comprehensive guide to Rust programming language covering ownership, borrowing, and memory safety",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Article"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/hRMUY28T3WF6UEIRlB6PMNh4HysLnWTzFrxzLrWq/O9E5qCg6xMuqTbszM3gwH4sM4rWkzgjgbi2TR+5vaQcDg==",
+        "https://atomicdata.dev/properties/localId": "rust-guide",
+        "https://atomicdata.dev/properties/name": "Rust Programming Guide",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/shortname": "rust-guide"
+      },
+      {
+        "@id": "http://localhost:9883/wasm-tutorial",
+        "https://atomicdata.dev/properties/description": "Learn how to build fast web applications using Rust and WebAssembly",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Article"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/RBOPedLebbDnrqC/4FLQjpIPe0ghSRWUUIz0TapA58aPLbz5uhu7sl+BXUZJeKiHBNAaOyUIVY509q1eolgkCQ==",
+        "https://atomicdata.dev/properties/localId": "wasm-tutorial",
+        "https://atomicdata.dev/properties/name": "WebAssembly Tutorial",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/shortname": "wasm-tutorial"
+      }
+    ],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 4,
+    "https://atomicdata.dev/properties/collection/totalPages": 1,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Article",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "articles",
+    "https://atomicdata.dev/properties/name": "articles",
+    "https://atomicdata.dev/properties/parent": "collections",
+    "https://atomicdata.dev/properties/subresources": [
+      "articles/test-article"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Test Message \n# Test from UI\n\nHit save\n\nRemove save\n\nJoep",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Article"
+    ],
+    "https://atomicdata.dev/properties/localId": "articles/test-article",
+    "https://atomicdata.dev/properties/name": "Test Article",
+    "https://atomicdata.dev/properties/parent": "articles"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Atom",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "atoms",
+    "https://atomicdata.dev/properties/name": "atoms",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/class/Bookmark",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "bookmarks",
+    "https://atomicdata.dev/properties/name": "bookmarks",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portals",
+    "https://atomicdata.dev/properties/name": "borrower-portals",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/borrower-profile",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-profiles",
+    "https://atomicdata.dev/properties/name": "borrower-profiles",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://localhost:9883/classes/Card",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "cards",
+    "https://atomicdata.dev/properties/name": "cards",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/ChatRoom",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "chatrooms",
+    "https://atomicdata.dev/properties/name": "chatrooms",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [
+      {
+        "@id": "http://localhost:9883/01jfjpg5fvc97rse14qcg2c5n6/class/test-class",
+        "https://atomicdata.dev/properties/description": "Change me",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/TJkUYuSL9JxFSWB5ClyM6W3eR9v3I0iskXjp+dg/Ooq9whQoxV3A2hPevq6f7Y0kPcoJcnFgQiZTpr2IUjXUDg==",
+        "https://atomicdata.dev/properties/localId": "01jfjpg5fvc97rse14qcg2c5n6/class/test-class",
+        "https://atomicdata.dev/properties/parent": "01jfjpg5fvc97rse14qcg2c5n6",
+        "https://atomicdata.dev/properties/requires": [
+          "defaultOntology/property/title"
+        ],
+        "https://atomicdata.dev/properties/shortname": "test-class"
+      },
+      {
+        "@id": "http://localhost:9883/01jfjpg5fvc97rse14qcg2c5n6/classes/ProgressCard",
+        "https://atomicdata.dev/properties/description": "A project card showing progress and team members",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/CUFjzRpghFbPF6DKaEllIhH5xwVVl6/3D9kqHIy/9bTLhmi62GSxE/hG2Awg+h0TDidDzfq2mFsLbfqoVVXiBA==",
+        "https://atomicdata.dev/properties/localId": "01jfjpg5fvc97rse14qcg2c5n6/classes/ProgressCard",
+        "https://atomicdata.dev/properties/name": "Card",
+        "https://atomicdata.dev/properties/parent": "01jfjpg5fvc97rse14qcg2c5n6",
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "properties/subtitle",
+          "properties/date",
+          "properties/progress",
+          "properties/color",
+          "properties/timeLeft",
+          "properties/users"
+        ],
+        "https://atomicdata.dev/properties/shortname": "card"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal",
+        "https://atomicdata.dev/properties/classes": [
+          "borrower-portal/class/loan-application",
+          "borrower-portal/class/borrower-profile",
+          "borrower-portal/class/document",
+          "borrower-portal/class/application-status",
+          "borrower-portal/class/loan-product",
+          "borrower-portal/class/financial-info",
+          "borrower-portal/class/employment-info"
+        ],
+        "https://atomicdata.dev/properties/description": "Ontology for the borrower portal application, defining classes and properties for loan applications, borrower profiles, documents, and status tracking.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/KVZCj/MKQ3DA0tDjELnAt4aCQrcf80Nefd7bAcPQnwcSWMbGpA3wPz03ThAxwYOEmsYgLwvK0lodRhdkRpNaDg==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal",
+        "https://atomicdata.dev/properties/name": "Borrower Portal Ontology",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/properties": [
+          "borrower-portal/property/loan-amount",
+          "borrower-portal/property/interest-rate",
+          "borrower-portal/property/loan-term",
+          "borrower-portal/property/credit-score",
+          "borrower-portal/property/annual-income",
+          "borrower-portal/property/employment-status",
+          "borrower-portal/property/document-type",
+          "borrower-portal/property/document-url",
+          "borrower-portal/property/status-type",
+          "borrower-portal/property/status-timestamp",
+          "borrower-portal/property/borrower-profile",
+          "borrower-portal/property/documents",
+          "borrower-portal/property/application-history",
+          "borrower-portal/property/phone-number",
+          "borrower-portal/property/address",
+          "borrower-portal/property/date-of-birth",
+          "borrower-portal/property/ssn-last-four",
+          "borrower-portal/property/employer-name",
+          "borrower-portal/property/employment-duration",
+          "borrower-portal/property/monthly-expenses",
+          "borrower-portal/property/debt-to-income-ratio",
+          "borrower-portal/property/loan-purpose"
+        ],
+        "https://atomicdata.dev/properties/shortname": "borrower-portal"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/application-status",
+        "https://atomicdata.dev/properties/description": "Status tracking entry for a loan application showing progression through the approval process.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/Rx0rWgPPrtFCqWB3yjtAbIjtXhrFaGugSYRnDl9jmDVzmTX4Z/HUmG9Y0ZwppUl84r7OLR4MH6mG6mUfpUnmCw==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/application-status",
+        "https://atomicdata.dev/properties/name": "Application Status",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/recommends": [
+          "https://atomicdata.dev/properties/description"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "borrower-portal/property/status-type",
+          "borrower-portal/property/status-timestamp"
+        ],
+        "https://atomicdata.dev/properties/shortname": "application-status"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/borrower-profile",
+        "https://atomicdata.dev/properties/description": "A borrower's personal and financial profile containing identity and financial information.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/in1HlI0EP4jzcVoi/cH/zZj5GP41wHKDZe2pzByr0UT78PL+zEPNwoJ5msUbcprJk3+15vxMEq+fuSfj2JuIDQ==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/borrower-profile",
+        "https://atomicdata.dev/properties/name": "Borrower Profile",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/recommends": [
+          "borrower-portal/property/credit-score",
+          "borrower-portal/property/annual-income",
+          "borrower-portal/property/employment-status"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "https://atomicdata.dev/properties/email",
+          "borrower-portal/property/phone-number",
+          "borrower-portal/property/address",
+          "borrower-portal/property/date-of-birth",
+          "borrower-portal/property/ssn-last-four"
+        ],
+        "https://atomicdata.dev/properties/shortname": "borrower-profile"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/document",
+        "https://atomicdata.dev/properties/description": "A document uploaded by the borrower as part of the loan application process.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/z2XCR41lAs8Ia+hn9XGLr5uK5gMm3fVJLO9Bf2WHjovPJ0g5GXKFlrmLQ1IUs9XUSgGXMi8yoY7sWaJXxvD2Bg==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/document",
+        "https://atomicdata.dev/properties/name": "Document",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/recommends": [
+          "https://atomicdata.dev/properties/description"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "borrower-portal/property/document-type",
+          "borrower-portal/property/document-url",
+          "https://atomicdata.dev/properties/createdAt"
+        ],
+        "https://atomicdata.dev/properties/shortname": "document"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/document-requirement",
+        "https://atomicdata.dev/properties/description": "A requirement for a specific document to be uploaded",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/TYSg0f4/DD9EqUkeaXqFpFArkEIMHgqafaFQUK55Fx0sS9nRmtdfjX2q6e1M4qDGqJa1yl4Bvo2zxj574dMyDg==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/document-requirement",
+        "https://atomicdata.dev/properties/name": "Document Requirement",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "https://atomicdata.dev/properties/description",
+          "borrower-portal/property/document-name",
+          "borrower-portal/property/document-description",
+          "borrower-portal/property/document-category",
+          "borrower-portal/property/document-required",
+          "borrower-portal/property/document-max-size"
+        ],
+        "https://atomicdata.dev/properties/shortname": "document-requirement"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/document-upload-component",
+        "https://atomicdata.dev/properties/description": "A component that manages document upload requirements",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/GZZYB/NJIvzLhZIDOXBmiTOsmkgGxLS5hcAmKoiZy06LAjBwBWgtXfEtwzoxuSneVJD52Ji8V9gxk4OYhdXgBg==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/document-upload-component",
+        "https://atomicdata.dev/properties/name": "Document Upload Component",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "https://atomicdata.dev/properties/description",
+          "borrower-portal/property/document-requirements"
+        ],
+        "https://atomicdata.dev/properties/shortname": "document-upload-component"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/employment-info",
+        "https://atomicdata.dev/properties/description": "Employment information for a borrower including employer details and employment duration.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/oTYQiAkN7h+TwuEiTnpD8OKc1nUdkR7xgArVpz99YCHvRIy+8peWg4WgJbWJ+81OEo4Ypo20nzuM3CqtTU6DBA==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/employment-info",
+        "https://atomicdata.dev/properties/name": "Employment Information",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/recommends": [
+          "borrower-portal/property/employment-duration"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "borrower-portal/property/employer-name",
+          "borrower-portal/property/employment-status"
+        ],
+        "https://atomicdata.dev/properties/shortname": "employment-info"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/financial-info",
+        "https://atomicdata.dev/properties/description": "Financial information associated with a borrower including income, expenses, and debt ratios.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/MGQGTcc116buY9+NQsoNk2vZH8fg6Lnv52fWz+jeT6AR2Ta5qUZQdIMK2iL6p60uQ1CDKPbXlcFJtUTOmtloBQ==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/financial-info",
+        "https://atomicdata.dev/properties/name": "Financial Information",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/recommends": [
+          "borrower-portal/property/debt-to-income-ratio"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "borrower-portal/property/annual-income",
+          "borrower-portal/property/monthly-expenses"
+        ],
+        "https://atomicdata.dev/properties/shortname": "financial-info"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/form-field",
+        "https://atomicdata.dev/properties/description": "A field in a form with type, label, and validation",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/Blndh8S2Mpek3B6ok1iFteJgpWSerEsxQY33HkDTKM8xGPBFgNmN1KlAEWYihtW8XPajTOYm8DjBz3T8dsZtCg==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/form-field",
+        "https://atomicdata.dev/properties/name": "FormField",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/shortname": "form-field"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/form-step",
+        "https://atomicdata.dev/properties/description": "A step in a multi-step form",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/L1WSZaT+RsxLuRtXVZQaE9aYNIzbhg3DQpoOfw6Pyf5L2FwtlPP73bsEVjp6qZzru69KmZyhwLUbRZ3bznOXAA==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/form-step",
+        "https://atomicdata.dev/properties/name": "FormStep",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/shortname": "form-step"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/layout",
+        "https://atomicdata.dev/properties/description": "A layout configuration for pages",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits//r8RMFg1m8RqTdZ5aDLjSiTguybdeR+xV7ryfw9wXc8qqh8SV8mK+YySvxyYRo7Qn63TnFCnU+ZiWPgLQrMRCQ==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/layout",
+        "https://atomicdata.dev/properties/name": "Layout",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/shortname": "layout"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/loan-application",
+        "https://atomicdata.dev/properties/description": "A loan application submitted by a borrower, containing all necessary information for loan processing.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/YhcOSH6H1+K14C8aWX9mimy5nGr6kkpzH4FRm6gyguD2NF2Tdvs7AX4jM0m3tR6Szn4vH890nQ2LE3naPXslDQ==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/loan-application",
+        "https://atomicdata.dev/properties/name": "Loan Application",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/recommends": [
+          "borrower-portal/property/interest-rate",
+          "borrower-portal/property/documents",
+          "borrower-portal/property/application-history"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "https://atomicdata.dev/properties/description",
+          "borrower-portal/property/loan-amount",
+          "borrower-portal/property/loan-term",
+          "borrower-portal/property/loan-purpose",
+          "borrower-portal/property/borrower-profile",
+          "https://atomicdata.dev/properties/createdAt"
+        ],
+        "https://atomicdata.dev/properties/shortname": "loan-application"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/loan-product",
+        "https://atomicdata.dev/properties/description": "A loan product offered by the lender with specific terms and conditions.",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/gCe7LUvq/uu5hUQby0wMJfPLWuFbEA0cbZVdQAdNqkbaGSxssUNJVZ5AkAKQBxYG9e5FU6PVOzv35+CaeKNkCA==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/loan-product",
+        "https://atomicdata.dev/properties/name": "Loan Product",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "https://atomicdata.dev/properties/description",
+          "borrower-portal/property/interest-rate",
+          "borrower-portal/property/loan-term"
+        ],
+        "https://atomicdata.dev/properties/shortname": "loan-product"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/menu-item",
+        "https://atomicdata.dev/properties/description": "A menu item with path, icon, and state",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/+BLdsd35XIe94E9N0tDhGvK7FoRmEbPoFk58+z+g0VtfNnbco+7mG4Z9sfeE3ubc+Tw6FBtvNKrFpRdl4lP5BQ==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/menu-item",
+        "https://atomicdata.dev/properties/name": "MenuItem",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/shortname": "menu-item"
+      },
+      {
+        "@id": "http://localhost:9883/borrower-portal/class/navigation-menu",
+        "https://atomicdata.dev/properties/description": "A navigation menu component with menu items",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/BvZSZAL+H32bwchcIZ/uGAftG8v0oJ2ZnoohhfCxP7a7E9QBdNLLAtfxFxzGERFTJiHHWC9MbvAuLcNbrZhMAA==",
+        "https://atomicdata.dev/properties/localId": "borrower-portal/class/navigation-menu",
+        "https://atomicdata.dev/properties/name": "NavigationMenu",
+        "https://atomicdata.dev/properties/parent": "borrower-portal",
+        "https://atomicdata.dev/properties/shortname": "navigation-menu"
+      },
+      {
+        "@id": "http://localhost:9883/classes/ProgressCard",
+        "https://atomicdata.dev/properties/description": "A project card showing progress and team members",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/ukkYUTiZ3JVbfC8KKvoFlG7/fL1ZskG9UdYGXYDvH4cBL6lJoqQTIRy4O/SlTwHnlz0JnBOUpW5zyhvLMfgXBQ==",
+        "https://atomicdata.dev/properties/localId": "classes/ProgressCard",
+        "https://atomicdata.dev/properties/name": "Card",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/name",
+          "properties/subtitle",
+          "properties/date",
+          "properties/progress",
+          "properties/color",
+          "properties/timeLeft",
+          "properties/users"
+        ],
+        "https://atomicdata.dev/properties/shortname": "card"
+      },
+      {
+        "@id": "http://localhost:9883/defaultOntology/class/card",
+        "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/WjzQa9lNTlHnj+uauUkK8tPI4wRos+TkvQV3KbrvSd25T5SIYlkrClIV4DxuPujIBF6sX4PgXOM2EznF1CkeCg==",
+        "https://atomicdata.dev/properties/localId": "defaultOntology/class/card",
+        "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+        "https://atomicdata.dev/properties/recommends": [
+          "https://atomicdata.dev/properties/tags"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "defaultOntology/defaultOntology/property/title",
+          "defaultOntology/defaultOntology/property/content",
+          "defaultOntology/defaultOntology/property/section"
+        ],
+        "https://atomicdata.dev/properties/shortname": "card"
+      },
+      {
+        "@id": "http://localhost:9883/defaultOntology/defaultOntology/class/card",
+        "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/lFd4D9bErah+/f08AS+cpK6wDarlHgsLwMoTrU1/v5prRD0+0OvDw09jvPqSPB/LToVJ+CHYQ9krJ4ssEguGCQ==",
+        "https://atomicdata.dev/properties/localId": "defaultOntology/class/card",
+        "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+        "https://atomicdata.dev/properties/recommends": [
+          "https://atomicdata.dev/properties/tags"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+          "defaultOntology/defaultOntology/property/title",
+          "defaultOntology/defaultOntology/property/content",
+          "defaultOntology/defaultOntology/property/section"
+        ],
+        "https://atomicdata.dev/properties/shortname": "card"
+      }
+    ],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/sortBy": "https://atomicdata.dev/properties/shortname",
+    "https://atomicdata.dev/properties/collection/totalMembers": 20,
+    "https://atomicdata.dev/properties/collection/totalPages": 1,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Class",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "classes",
+    "https://atomicdata.dev/properties/name": "classes",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Change me",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jfjpg5fvc97rse14qcg2c5n6/class/test-class",
+    "https://atomicdata.dev/properties/parent": "01jfjpg5fvc97rse14qcg2c5n6",
+    "https://atomicdata.dev/properties/requires": [
+      "defaultOntology/property/title"
+    ],
+    "https://atomicdata.dev/properties/shortname": "test-class"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A project card showing progress and team members",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jfjpg5fvc97rse14qcg2c5n6/classes/ProgressCard",
+    "https://atomicdata.dev/properties/name": "Card",
+    "https://atomicdata.dev/properties/parent": "01jfjpg5fvc97rse14qcg2c5n6",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "properties/subtitle",
+      "properties/date",
+      "properties/progress",
+      "properties/color",
+      "properties/timeLeft",
+      "properties/users"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A loan application submitted by a borrower, containing all necessary information for loan processing.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/loan-application",
+    "https://atomicdata.dev/properties/name": "Loan Application",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/interest-rate",
+      "borrower-portal/property/documents",
+      "borrower-portal/property/application-history"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/loan-amount",
+      "borrower-portal/property/loan-term",
+      "borrower-portal/property/loan-purpose",
+      "borrower-portal/property/borrower-profile",
+      "https://atomicdata.dev/properties/createdAt"
+    ],
+    "https://atomicdata.dev/properties/shortname": "loan-application"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A borrower's personal and financial profile containing identity and financial information.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/borrower-profile",
+    "https://atomicdata.dev/properties/name": "Borrower Profile",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/credit-score",
+      "borrower-portal/property/annual-income",
+      "borrower-portal/property/employment-status"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/email",
+      "borrower-portal/property/phone-number",
+      "borrower-portal/property/address",
+      "borrower-portal/property/date-of-birth",
+      "borrower-portal/property/ssn-last-four"
+    ],
+    "https://atomicdata.dev/properties/shortname": "borrower-profile"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A document uploaded by the borrower as part of the loan application process.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/document",
+    "https://atomicdata.dev/properties/name": "Document",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "borrower-portal/property/document-type",
+      "borrower-portal/property/document-url",
+      "https://atomicdata.dev/properties/createdAt"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Status tracking entry for a loan application showing progression through the approval process.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/application-status",
+    "https://atomicdata.dev/properties/name": "Application Status",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "borrower-portal/property/status-type",
+      "borrower-portal/property/status-timestamp"
+    ],
+    "https://atomicdata.dev/properties/shortname": "application-status"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A loan product offered by the lender with specific terms and conditions.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/loan-product",
+    "https://atomicdata.dev/properties/name": "Loan Product",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/interest-rate",
+      "borrower-portal/property/loan-term"
+    ],
+    "https://atomicdata.dev/properties/shortname": "loan-product"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Financial information associated with a borrower including income, expenses, and debt ratios.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/financial-info",
+    "https://atomicdata.dev/properties/name": "Financial Information",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/debt-to-income-ratio"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "borrower-portal/property/annual-income",
+      "borrower-portal/property/monthly-expenses"
+    ],
+    "https://atomicdata.dev/properties/shortname": "financial-info"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Employment information for a borrower including employer details and employment duration.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/employment-info",
+    "https://atomicdata.dev/properties/name": "Employment Information",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/employment-duration"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "borrower-portal/property/employer-name",
+      "borrower-portal/property/employment-status"
+    ],
+    "https://atomicdata.dev/properties/shortname": "employment-info"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The amount of money requested in the loan application, in USD.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/loan-amount",
+    "https://atomicdata.dev/properties/name": "Loan Amount",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "loan-amount"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/description": "The annual percentage rate (APR) for the loan.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/interest-rate",
+    "https://atomicdata.dev/properties/name": "Interest Rate",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "interest-rate"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The duration of the loan in months.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/loan-term",
+    "https://atomicdata.dev/properties/name": "Loan Term",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "loan-term"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The borrower's credit score (typically FICO score).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/credit-score",
+    "https://atomicdata.dev/properties/name": "Credit Score",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "credit-score"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The borrower's gross annual income in USD.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/annual-income",
+    "https://atomicdata.dev/properties/name": "Annual Income",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "annual-income"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The borrower's current employment status (e.g., employed, self-employed, unemployed, retired).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/employment-status",
+    "https://atomicdata.dev/properties/name": "Employment Status",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "employment-status"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The type of document (e.g., pay stub, tax return, bank statement, ID).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-type",
+    "https://atomicdata.dev/properties/name": "Document Type",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-type"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The URL where the uploaded document can be accessed.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-url",
+    "https://atomicdata.dev/properties/name": "Document URL",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-url"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The current status of the application (e.g., submitted, under review, approved, denied).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/status-type",
+    "https://atomicdata.dev/properties/name": "Status Type",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "status-type"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The date and time when this status was set.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/status-timestamp",
+    "https://atomicdata.dev/properties/name": "Status Timestamp",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "status-timestamp"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "Reference to the borrower's profile.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/borrower-profile",
+    "https://atomicdata.dev/properties/name": "Borrower Profile",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "borrower-profile"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of documents associated with the loan application.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/documents",
+    "https://atomicdata.dev/properties/name": "Documents",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "documents"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of status entries tracking the application progression.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/application-history",
+    "https://atomicdata.dev/properties/name": "Application History",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "application-history"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The borrower's primary phone number.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/phone-number",
+    "https://atomicdata.dev/properties/name": "Phone Number",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "phone-number"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The borrower's primary residential address.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/address",
+    "https://atomicdata.dev/properties/name": "Address",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "address"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/date",
+    "https://atomicdata.dev/properties/description": "The borrower's date of birth.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/date-of-birth",
+    "https://atomicdata.dev/properties/name": "Date of Birth",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "date-of-birth"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The last four digits of the borrower's Social Security Number.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/ssn-last-four",
+    "https://atomicdata.dev/properties/name": "SSN Last Four",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "ssn-last-four"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The name of the borrower's current employer.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/employer-name",
+    "https://atomicdata.dev/properties/name": "Employer Name",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "employer-name"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "How long the borrower has been employed at their current job, in months.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/employment-duration",
+    "https://atomicdata.dev/properties/name": "Employment Duration",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "employment-duration"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The borrower's total monthly expenses in USD.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/monthly-expenses",
+    "https://atomicdata.dev/properties/name": "Monthly Expenses",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "monthly-expenses"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/description": "The borrower's debt-to-income ratio as a percentage.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/debt-to-income-ratio",
+    "https://atomicdata.dev/properties/name": "Debt-to-Income Ratio",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "debt-to-income-ratio"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The purpose for which the loan is being requested (e.g., home purchase, refinance, debt consolidation).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/loan-purpose",
+    "https://atomicdata.dev/properties/name": "Loan Purpose",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "loan-purpose"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A requirement for a specific document to be uploaded",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/document-requirement",
+    "https://atomicdata.dev/properties/name": "Document Requirement",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/document-name",
+      "borrower-portal/property/document-description",
+      "borrower-portal/property/document-category",
+      "borrower-portal/property/document-required",
+      "borrower-portal/property/document-max-size"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document-requirement"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Name of the document requirement",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-name",
+    "https://atomicdata.dev/properties/name": "document-name",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-name"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Description of what the document should contain",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-description",
+    "https://atomicdata.dev/properties/name": "document-description",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-description"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Category or type of document (e.g., pay-stub, tax-return)",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-category",
+    "https://atomicdata.dev/properties/name": "document-category",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-category"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether this document is required for the application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-required",
+    "https://atomicdata.dev/properties/name": "document-required",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-required"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Maximum file size allowed in bytes",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-max-size",
+    "https://atomicdata.dev/properties/name": "document-max-size",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-max-size"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A component that manages document upload requirements",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/document-upload-component",
+    "https://atomicdata.dev/properties/name": "Document Upload Component",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/document-requirements"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document-upload-component"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of document requirements for a loan application or demo",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-requirements",
+    "https://atomicdata.dev/properties/name": "document-requirements",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-requirements"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A field in a form with type, label, and validation",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/form-field",
+    "https://atomicdata.dev/properties/name": "FormField",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "form-field"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A step in a multi-step form",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/form-step",
+    "https://atomicdata.dev/properties/name": "FormStep",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "form-step"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A layout configuration for pages",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/layout",
+    "https://atomicdata.dev/properties/name": "Layout",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "layout"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A menu item with path, icon, and state",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/menu-item",
+    "https://atomicdata.dev/properties/name": "MenuItem",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "menu-item"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A navigation menu component with menu items",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/navigation-menu",
+    "https://atomicdata.dev/properties/name": "NavigationMenu",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "navigation-menu"
+  },
+  {
+    "https://atomicdata.dev/properties/classes": [
+      "defaultOntology/defaultOntology/class/card"
+    ],
+    "https://atomicdata.dev/properties/description": "Default ontology for this drive",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/parent": "defaultOntology",
+    "https://atomicdata.dev/properties/properties": [
+      "defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/property/section",
+      "defaultOntology/defaultOntology/property/title"
+    ],
+    "https://atomicdata.dev/properties/shortname": "ontology"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/property/title",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "title"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/property/content",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "content"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "a property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/property/section",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/shortname": "section"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/sortBy": "https://atomicdata.dev/properties/createdAt",
+    "https://atomicdata.dev/properties/collection/sortDesc": true,
+    "https://atomicdata.dev/properties/collection/totalMembers": 2167,
+    "https://atomicdata.dev/properties/collection/totalPages": 73,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Commit",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "commits",
+    "https://atomicdata.dev/properties/name": "commits",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Datatype",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "datatypes",
+    "https://atomicdata.dev/properties/name": "datatypes",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/DateFormat",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "date-formats",
+    "https://atomicdata.dev/properties/name": "date-formats",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/document-requirement",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "document-requirements",
+    "https://atomicdata.dev/properties/name": "document-requirements",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/document-upload-component",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "document-upload-components",
+    "https://atomicdata.dev/properties/name": "document-upload-components",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Document",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "documents",
+    "https://atomicdata.dev/properties/name": "documents",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [
+      {
+        "https://atomicdata.dev/ontology/server/property/default-ontology": "defaultOntology",
+        "https://atomicdata.dev/properties/description": "## Welcome to your Atomic-Server!\n### Getting started\nStart by registering your Agent by visiting [`/setup`](http://localhost:9883/setup).\n\nNote that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.\n\nOnce you've setup an agent you should start editing your schema using ontologies.\nWe've created a [default ontology](http://localhost:9883/defaultOntology) for you but you can create more if you want.\n\nNext create some resources by clicking on the plus button in the sidebar.\nYou can create folders to organise your resources.\n\nTo use the data in your web apps checkout our client libraries: [@tomic/lib](https://docs.atomicdata.dev/js), [@tomic/react](https://docs.atomicdata.dev/usecases/react) and [@tomic/svelte](https://docs.atomicdata.dev/svelte)\nUse [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologies inside your code.\n",
+        "https://atomicdata.dev/properties/incomplete": true,
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Drive"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/b+SmF5p8bcxtOL0e5R1pI89SG2ZImt0LoFSv4O5bDAVtxUHmpYDRrYL0PbR4K+ITn+AO87KrdktrUJwsDuB0DQ==",
+        "https://atomicdata.dev/properties/name": "localhost",
+        "https://atomicdata.dev/properties/read": [
+          "http://localhost:9883/agents/9LLahxij6fydjc1TTayUbIII4HroixfmhCbRGMQ64Zo=",
+          "https://atomicdata.dev/agents/publicAgent",
+          "http://localhost:9883/agents/TCO6wlU/SenEaOkwoXLXIscMKR86XU3IYH9r+uzljRw=",
+          "http://localhost:9883/agents/95dOG2yjC/FzwVWDTEfe4X2mu7BRw9Ja6PAwsNcH1fY=",
+          "http://localhost:9883/agents/Tb5KqoT/3lle8m+VCvjM62IAzJyxUFHohgaNwyLVxRE="
+        ],
+        "https://atomicdata.dev/properties/subresources": [
+          "defaultOntology",
+          "setup",
+          "import",
+          "collections",
+          "01jfjpg5fvc97rse14qcg2c5n6"
+        ],
+        "https://atomicdata.dev/properties/write": [
+          "http://localhost:9883/agents/9LLahxij6fydjc1TTayUbIII4HroixfmhCbRGMQ64Zo=",
+          "http://localhost:9883/agents/TCO6wlU/SenEaOkwoXLXIscMKR86XU3IYH9r+uzljRw=",
+          "http://localhost:9883/agents/95dOG2yjC/FzwVWDTEfe4X2mu7BRw9Ja6PAwsNcH1fY=",
+          "http://localhost:9883/agents/Tb5KqoT/3lle8m+VCvjM62IAzJyxUFHohgaNwyLVxRE="
+        ]
+      },
+      {
+        "@id": "http://localhost:9883/01jy8xsvn1sjdd5tqajsm855x8",
+        "https://atomicdata.dev/ontology/server/property/default-ontology": "01jy8xsvn1sjdd5tqajsm855x8/defaultontology",
+        "https://atomicdata.dev/properties/incomplete": true,
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Drive"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/yVarEd4T12CqcarF5m8akMAiHHvC8dOgKZcr3tkwORR1dDLs+VQOh+RyfTHU5JG61ICV6h2hzjE1Lqx9mWtTCw==",
+        "https://atomicdata.dev/properties/name": "TestDrive",
+        "https://atomicdata.dev/properties/read": [
+          "http://localhost:9883/agents/Tb5KqoT/3lle8m+VCvjM62IAzJyxUFHohgaNwyLVxRE="
+        ],
+        "https://atomicdata.dev/properties/subresources": [
+          "01jy8xsvn1sjdd5tqajsm855x8/defaultontology"
+        ],
+        "https://atomicdata.dev/properties/write": [
+          "http://localhost:9883/agents/Tb5KqoT/3lle8m+VCvjM62IAzJyxUFHohgaNwyLVxRE="
+        ]
+      },
+      {
+        "@id": "http://localhost:9883/http://localhost:9883",
+        "https://atomicdata.dev/ontology/server/property/default-ontology": "defaultOntology",
+        "https://atomicdata.dev/properties/children": [],
+        "https://atomicdata.dev/properties/description": "## Welcome to your Atomic-Server!\n### Getting started\nStart by registering your Agent by visiting [`/setup`](http://localhost:9883/setup).\n\nNote that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.\n\nOnce you've setup an agent you should start editing your schema using ontologies.\nWe've created a [default ontology](http://localhost:9883/defaultOntology) for you but you can create more if you want.\n\nNext create some resources by clicking on the plus button in the sidebar.\nYou can create folders to organise your resources.\n\nTo use the data in your web apps checkout our client libraries: [@tomic/lib](https://docs.atomicdata.dev/js), [@tomic/react](https://docs.atomicdata.dev/usecases/react) and [@tomic/svelte](https://docs.atomicdata.dev/svelte)\nUse [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologies inside your code.\n",
+        "https://atomicdata.dev/properties/incomplete": true,
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Drive"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/OucH/Dd9wkW5ragj3pKyqaNN0Zu7KxsqjSD4qS6fZYNUOWmnofbTQABXiZM4hksmITunVFmAkFsbx8nHFB/8CA==",
+        "https://atomicdata.dev/properties/localId": "http://localhost:9883",
+        "https://atomicdata.dev/properties/name": "localhost",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/read": [
+          "http://localhost:9883/agents/9LLahxij6fydjc1TTayUbIII4HroixfmhCbRGMQ64Zo=",
+          "https://atomicdata.dev/agents/publicAgent",
+          "http://localhost:9883/agents/TCO6wlU/SenEaOkwoXLXIscMKR86XU3IYH9r+uzljRw=",
+          "http://localhost:9883/agents/95dOG2yjC/FzwVWDTEfe4X2mu7BRw9Ja6PAwsNcH1fY=",
+          "http://localhost:9883/agents/Tb5KqoT/3lle8m+VCvjM62IAzJyxUFHohgaNwyLVxRE="
+        ],
+        "https://atomicdata.dev/properties/subresources": [
+          "defaultOntology",
+          "setup",
+          "import",
+          "collections",
+          "01jfjpg5fvc97rse14qcg2c5n6"
+        ],
+        "https://atomicdata.dev/properties/write": [
+          "http://localhost:9883/agents/9LLahxij6fydjc1TTayUbIII4HroixfmhCbRGMQ64Zo=",
+          "http://localhost:9883/agents/TCO6wlU/SenEaOkwoXLXIscMKR86XU3IYH9r+uzljRw=",
+          "http://localhost:9883/agents/95dOG2yjC/FzwVWDTEfe4X2mu7BRw9Ja6PAwsNcH1fY=",
+          "http://localhost:9883/agents/Tb5KqoT/3lle8m+VCvjM62IAzJyxUFHohgaNwyLVxRE="
+        ]
+      }
+    ],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 3,
+    "https://atomicdata.dev/properties/collection/totalPages": 1,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Drive",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "drives",
+    "https://atomicdata.dev/properties/name": "drives",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/employment-info",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "employment-infos",
+    "https://atomicdata.dev/properties/name": "employment-infos",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [
+      {
+        "@id": "http://localhost:9883/all-versions",
+        "https://atomicdata.dev/properties/description": "Shows all versions for some resource. Constructs these using Commits.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/subject"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/7C6cszY1013F5ybk+5s5ckUxh+OWFw0ffJ6oLJvJ0Z8EE4N8pnfMT8emvfbDsHDko3vd1hlpM5CvyAcZ+BY0Ag==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "all-versions"
+      },
+      {
+        "@id": "http://localhost:9883/download",
+        "https://atomicdata.dev/properties/description": "Downloads a file referenced by a file resource.\nUsualy you will interact with this endpoint by following the `download-url` property on a file resource.\nIf the file is an image you can set a few query paremeters to make the server compress and scale the image for you.\nThe following query parameters are available:\n- **f**: Format of the file, can be `webp` or `avif`.\n- **w**: The width the image should be scaled to.\n- **q**: Quality setting used during encoding. Must be a number between 0 - 100.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/l8H5+i+axgkb19AOjtFG3z20qUjCcPGfsvu4so7A3RMNBMXDV44s2ms9iU+BaTMMF58VU46zeI06wNFb01ktDQ==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "download"
+      },
+      {
+        "@id": "http://localhost:9883/export",
+        "https://atomicdata.dev/properties/description": "Export table data\n\nUse with the following parameters\n- **subject**: Subject of the resource to export.\n- **format**: Format of the export, currently only supports `csv`.\n- **display_refs_as_name**: If true, it will display referenced resources by their name instead of subject.\n",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "subject",
+          "format",
+          "display_refs_as_name"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/t/NSktMTncOvXD4LdJM8O1k97xJlPDJIC0jSgp302qYiyRBdOQxvZjqspEQThH7dYiR4V6rOMM1fLvGMXkxCAQ==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "export"
+      },
+      {
+        "@id": "http://localhost:9883/fetch-bookmark",
+        "https://atomicdata.dev/properties/description": "The website will be fetched and parsed. The main content of the page is identified, and the rest is stripped. Returns the Markdown.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/property/url",
+          "https://atomicdata.dev/properties/name"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/ZfRXGrOxV5MCY0v//u5BQwCmIEDynPmBMyHe9XUn2GyWe9fIBsPGuApAgg2MWHDdxwMCt0xiQ6ZD4nJND8RTBg==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "bookmark"
+      },
+      {
+        "@id": "http://localhost:9883/import",
+        "https://atomicdata.dev/properties/description": "Imports one or more Resources to some parent. POST your JSON-AD and add a `parent` query param to the URL. See https://docs.atomicdata.dev/create-json-ad.html",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/importer/overwrite-outside",
+          "https://atomicdata.dev/properties/importer/parent",
+          "https://atomicdata.dev/properties/importer/url"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/iPDH+7hD5f3xvQlI6sgN7WGDpJLTMMk6Cpp13gNxaIjsXYngNL0zvVIUsj3cHlxcbk3lmOce7tz6aFE9fKHKDg==",
+        "https://atomicdata.dev/properties/localId": "import",
+        "https://atomicdata.dev/properties/name": "Import",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/shortname": "path"
+      },
+      {
+        "@id": "http://localhost:9883/path",
+        "https://atomicdata.dev/properties/description": "An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value. At this moment, Values are not yet supported.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/path"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/+ib55i9NjqxSuLzaQsSn0KblTT21jlHAdxRzrrtM0RTWtnVy+ZLc2sphOoz25Gd0oteTUnz/a+YU4vzh5pWBCg==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "path"
+      },
+      {
+        "@id": "http://localhost:9883/prunetests",
+        "https://atomicdata.dev/properties/description": "Deletes all drives with 'testdrive-' in their name.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/SnlEZjduKwYdBSmQDv9oWMorA0Q0DYjmSCvawjtskAc2zyNByYYqTr3KB8lxAZpePy8nE72pZ8ziY9umXkaRAQ==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "prunetests"
+      },
+      {
+        "@id": "http://localhost:9883/query",
+        "https://atomicdata.dev/properties/description": "Query the server for resources matching the query filter.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/collection/property",
+          "https://atomicdata.dev/properties/collection/value",
+          "https://atomicdata.dev/properties/collection/pageSize",
+          "https://atomicdata.dev/properties/collection/currentPage",
+          "https://atomicdata.dev/properties/collection/includeExternal",
+          "https://atomicdata.dev/properties/collection/includeNested",
+          "https://atomicdata.dev/properties/collection/sortBy",
+          "https://atomicdata.dev/properties/collection/sortDesc"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/EVzr/Q6qEtjPIQ7vX+Li8tZi07qUaSlIviENuYjEPprhoL+6sYTY6/4X6bS5MhKfFPlAMmrVRR+jRwcghZJFAA==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "query"
+      },
+      {
+        "@id": "http://localhost:9883/search",
+        "https://atomicdata.dev/properties/description": "Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. ",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/search/query",
+          "https://atomicdata.dev/properties/search/limit",
+          "https://atomicdata.dev/properties/search/property"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/VJ8YBF+Syn/M7nDH+EXJ7rUR+jZzvAPud5neGK8V2902ZKLNilNCYoYndXvip0ZzFT5FiGNtHmqiBWTuBwS7DA==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "search"
+      },
+      {
+        "@id": "http://localhost:9883/upload",
+        "https://atomicdata.dev/properties/description": "In `atomic-server`, a `/upload` endpoint exists for uploading a file.\n\n- Decide where you want to add the file in the [hierarchy](hierarchy.md) of your server. You can add a file to any resource - your file will refer to this resource as its [`parent`](https://atomicdata.dev/properties/parent). Make sure you have `write` rights on this parent.\nUse that parent to add a query parameter to the server's `/upload` endpoint, e.g. `/upload?parent=https%3A%2F%2Fatomicdata.dev%2Ffiles`.\n- Send an HTTP `POST` request to the server's `/upload` endpoint containing [`multi-part-form-data`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/Using_FormData_Objects). You can upload multiple files in one request. Add [authentication](https://docs.atomicdata.dev/authentication.html) headers, and sign the HTTP request.\n- The server will check your authentication headers, your permissions, and will persist your uploaded file(s). It will now create File resources.\n- The server will reply with an array of created Atomic Data Files",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/parent"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/46NYrQtcQgHAodoX8De14OEK4/MpBQ+jQPNx6bQONQ3b5f07sPvn0ccZ9S8OVKB3cqHAZwgqIHD1ybJIq+IsCA==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "upload"
+      },
+      {
+        "@id": "http://localhost:9883/version",
+        "https://atomicdata.dev/properties/description": "Constructs a version of a resource from a Commit URL.",
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+          "https://atomicdata.dev/properties/subject"
+        ],
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Endpoint"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits//MBtgZLZZtsKBSq8nk1FhSQTn96pghggQq5hA+AecyXC1bnZmMAbtQTE6pO/udRF6xFAZp0ZxuOJuJYaqyTBAg==",
+        "https://atomicdata.dev/properties/parent": "endpoints",
+        "https://atomicdata.dev/properties/shortname": "versions"
+      }
+    ],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 11,
+    "https://atomicdata.dev/properties/collection/totalPages": 1,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Endpoint",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "endpoints",
+    "https://atomicdata.dev/properties/name": "endpoints",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/File",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "files",
+    "https://atomicdata.dev/properties/name": "files",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/financial-info",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "financial-infos",
+    "https://atomicdata.dev/properties/name": "financial-infos",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/FloatRangeProperty",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "float-range-propertys",
+    "https://atomicdata.dev/properties/name": "float-range-propertys",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Folder",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "folders",
+    "https://atomicdata.dev/properties/name": "folders",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/form-field",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "form-fields",
+    "https://atomicdata.dev/properties/name": "form-fields",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "borrower-portal/class/form-step",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "form-steps",
+    "https://atomicdata.dev/properties/name": "form-steps",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/FormattedDate",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "formatted-dates",
+    "https://atomicdata.dev/properties/name": "formatted-dates",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/FormattedNumber",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "formatted-numbers",
+    "https://atomicdata.dev/properties/name": "formatted-numbers",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 0,
+    "https://atomicdata.dev/properties/collection/totalPages": 0,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Importer",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "importers",
+    "https://atomicdata.dev/properties/name": "importers",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/properties/collection/currentPage": 0,
+    "https://atomicdata.dev/properties/collection/includeNested": true,
+    "https://atomicdata.dev/properties/collection/members": [
+      {
+        "@id": "http://localhost:9883/setup",
+        "https://atomicdata.dev/properties/description": "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once. If you, for whatever reason, need a new `/setup` invite, you can pass the `--initialize` flag to `atomic-server`.",
+        "https://atomicdata.dev/properties/incomplete": true,
+        "https://atomicdata.dev/properties/invite/target": "http://localhost:9883",
+        "https://atomicdata.dev/properties/invite/usagesLeft": 0,
+        "https://atomicdata.dev/properties/invite/write": true,
+        "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Invite"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "http://localhost:9883/commits/8haGtCAAtAHFrSgQR09FSWJVOpffUfFVU5uFN06b54Ie3WWjCo1jBKhjLaIV/uDCwI8+dnk5rKHYEi09pe1DDQ==",
+        "https://atomicdata.dev/properties/localId": "setup",
+        "https://atomicdata.dev/properties/name": "Setup",
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883"
+      }
+    ],
+    "https://atomicdata.dev/properties/collection/pageSize": 30,
+    "https://atomicdata.dev/properties/collection/property": "https://atomicdata.dev/properties/isA",
+    "https://atomicdata.dev/properties/collection/totalMembers": 1,
+    "https://atomicdata.dev/properties/collection/totalPages": 1,
+    "https://atomicdata.dev/properties/collection/value": "https://atomicdata.dev/classes/Invite",
+    "https://atomicdata.dev/properties/incomplete": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Collection"
+    ],
+    "https://atomicdata.dev/properties/localId": "invites",
+    "https://atomicdata.dev/properties/name": "invites",
+    "https://atomicdata.dev/properties/parent": "collections"
+  },
+  {
+    "https://atomicdata.dev/ontology/server/property/default-ontology": "01jy8xsvn1sjdd5tqajsm855x8/defaultontology",
+    "https://atomicdata.dev/properties/children": [
+      "01jy8xsvn1sjdd5tqajsm855x8/defaultontology"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Drive"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jy8xsvn1sjdd5tqajsm855x8",
+    "https://atomicdata.dev/properties/name": "TestDrive",
+    "https://atomicdata.dev/properties/subresources": [
+      "01jy8xsvn1sjdd5tqajsm855x8/defaultontology"
+    ]
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Card for Business Model Canvas Sample application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "defaultOntology/defaultOntology/class/card",
+    "https://atomicdata.dev/properties/parent": "defaultOntology/defaultOntology",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/tags"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "defaultOntology/defaultOntology/property/title",
+      "defaultOntology/defaultOntology/property/content",
+      "defaultOntology/defaultOntology/property/section"
+    ],
+    "https://atomicdata.dev/properties/shortname": "card"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether form field is required",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/field-required",
+    "https://atomicdata.dev/properties/name": "field-required",
+    "https://atomicdata.dev/properties/parent": "borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "menu-path"
+  },
+  {
+    "borrower-portal/property/field-required": true,
+    "http://localhost:9883/borrower-portal/property/field-label": "Address",
+    "http://localhost:9883/borrower-portal/property/field-placeholder": "Enter company address",
+    "http://localhost:9883/borrower-portal/property/field-type": "text",
+    "https://atomicdata.dev/properties/isA": [
+      "borrower-portal/class/form-field"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/form-field/address",
+    "https://atomicdata.dev/properties/name": "Address Field",
+    "https://atomicdata.dev/properties/parent": "borrower-portal"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value. At this moment, Values are not yet supported.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/path"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "path",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "path"
+  },
+  {
+    "borrower-portal/property/field-required": true,
+    "http://localhost:9883/borrower-portal/property/data-type": "string",
+    "http://localhost:9883/borrower-portal/property/display-order": 1,
+    "http://localhost:9883/borrower-portal/property/field-key": "companyName",
+    "http://localhost:9883/borrower-portal/property/field-label": "Company Name (Legal Name)",
+    "http://localhost:9883/borrower-portal/property/field-placeholder": "Enter legal company name",
+    "http://localhost:9883/borrower-portal/property/field-section": "basic-info",
+    "http://localhost:9883/borrower-portal/property/field-type": "text",
+    "http://localhost:9883/borrower-portal/property/input-type": "text",
+    "http://localhost:9883/borrower-portal/property/is-required": true,
+    "http://localhost:9883/borrower-portal/property/placeholder-text": "Enter your company name",
+    "https://atomicdata.dev/properties/isA": [
+      "borrower-portal/class/form-field"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/form-field/company-name",
+    "https://atomicdata.dev/properties/name": "Company Name Field",
+    "https://atomicdata.dev/properties/parent": "borrower-portal"
+  },
+  {
+    "https://atomicdata.dev/properties/classes": [],
+    "https://atomicdata.dev/properties/description": "Default ontology for the TestDrive drive",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/localId": "01jy8xsvn1sjdd5tqajsm855x8/defaultontology",
+    "https://atomicdata.dev/properties/parent": "01jy8xsvn1sjdd5tqajsm855x8",
+    "https://atomicdata.dev/properties/properties": [],
+    "https://atomicdata.dev/properties/shortname": "testdrive"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Shows all versions for some resource. Constructs these using Commits.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/subject"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "all-versions",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "all-versions"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Downloads a file referenced by a file resource.\nUsualy you will interact with this endpoint by following the `download-url` property on a file resource.\nIf the file is an image you can set a few query paremeters to make the server compress and scale the image for you.\nThe following query parameters are available:\n- **f**: Format of the file, can be `webp` or `avif`.\n- **w**: The width the image should be scaled to.\n- **q**: Quality setting used during encoding. Must be a number between 0 - 100.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "download",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "download"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "The website will be fetched and parsed. The main content of the page is identified, and the rest is stripped. Returns the Markdown.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/property/url",
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "fetch-bookmark",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "bookmark"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Deletes all drives with 'testdrive-' in their name.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "prunetests",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "prunetests"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Query the server for resources matching the query filter.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/collection/property",
+      "https://atomicdata.dev/properties/collection/value",
+      "https://atomicdata.dev/properties/collection/pageSize",
+      "https://atomicdata.dev/properties/collection/currentPage",
+      "https://atomicdata.dev/properties/collection/includeExternal",
+      "https://atomicdata.dev/properties/collection/includeNested",
+      "https://atomicdata.dev/properties/collection/sortBy",
+      "https://atomicdata.dev/properties/collection/sortDesc"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "query",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "query"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. ",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/search/query",
+      "https://atomicdata.dev/properties/search/limit",
+      "https://atomicdata.dev/properties/search/property"
+    ],
+    "https://atomicdata.dev/properties/endpoint/results": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "search",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "search"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "In `atomic-server`, a `/upload` endpoint exists for uploading a file.\n\n- Decide where you want to add the file in the [hierarchy](hierarchy.md) of your server. You can add a file to any resource - your file will refer to this resource as its [`parent`](https://atomicdata.dev/properties/parent). Make sure you have `write` rights on this parent.\nUse that parent to add a query parameter to the server's `/upload` endpoint, e.g. `/upload?parent=https%3A%2F%2Fatomicdata.dev%2Ffiles`.\n- Send an HTTP `POST` request to the server's `/upload` endpoint containing [`multi-part-form-data`](https://developer.mozilla.org/en-US/docs/Web/API/FormData/Using_FormData_Objects). You can upload multiple files in one request. Add [authentication](https://docs.atomicdata.dev/authentication.html) headers, and sign the HTTP request.\n- The server will check your authentication headers, your permissions, and will persist your uploaded file(s). It will now create File resources.\n- The server will reply with an array of created Atomic Data Files",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/parent"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "upload",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "upload"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Constructs a version of a resource from a Commit URL.",
+    "https://atomicdata.dev/properties/endpoint/parameters": [
+      "https://atomicdata.dev/properties/subject"
+    ],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Endpoint"
+    ],
+    "https://atomicdata.dev/properties/localId": "version",
+    "https://atomicdata.dev/properties/parent": "endpoints",
+    "https://atomicdata.dev/properties/shortname": "versions"
+  }
+]
