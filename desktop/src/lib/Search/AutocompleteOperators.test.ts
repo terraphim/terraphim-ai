@@ -8,10 +8,15 @@ vi.mock('@tauri-apps/api/tauri', () => ({
 
 // Mock the autocomplete service
 vi.mock('../services/novelAutocompleteService', () => ({
-  getSuggestions: vi.fn()
+  novelAutocompleteService: {
+    getSuggestions: vi.fn(),
+    setRole: vi.fn(),
+    buildAutocompleteIndex: vi.fn()
+  }
 }));
 
-import { getSuggestions } from '../services/novelAutocompleteService';
+import { novelAutocompleteService } from '../services/novelAutocompleteService';
+import { getSuggestions } from './searchUtils';
 
 describe('Autocomplete with Logical Operators', () => {
   beforeEach(() => {

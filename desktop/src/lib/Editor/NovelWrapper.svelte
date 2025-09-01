@@ -3,6 +3,7 @@
   import { Markdown } from 'tiptap-markdown';
   import { onMount } from 'svelte';
   import { novelAutocompleteService } from '../services/novelAutocompleteService';
+  import { is_tauri, role } from '../stores';
 
   export let html: any = '';          // initial content in HTML/JSON
   export let readOnly: boolean = false;
@@ -18,13 +19,24 @@
   onMount(async () => {
     if (enableAutocomplete) {
       try {
+        // Set the current role in the autocomplete service
+        novelAutocompleteService.setRole($role);
+
         // Initialize the autocomplete service
         const success = await novelAutocompleteService.buildAutocompleteIndex();
         if (success) {
-          autocompleteStatus = '✅ Ready - Type to trigger autocomplete';
+          if ($is_tauri) {
+            autocompleteStatus = '✅ Ready - Using Tauri backend';
+          } else {
+            autocompleteStatus = '✅ Ready - Using MCP server backend';
+          }
           autocompleteReady = true;
         } else {
-          autocompleteStatus = '⚠️ Using mock autocomplete (MCP server not responding)';
+          if ($is_tauri) {
+            autocompleteStatus = '⚠️ Tauri autocomplete failed - using mock suggestions';
+          } else {
+            autocompleteStatus = '⚠️ Using mock autocomplete (MCP server not responding)';
+          }
           autocompleteReady = true;
           // Load mock suggestions for demonstration
           mockSuggestions = [
@@ -42,7 +54,11 @@
         }
       } catch (error) {
         console.error('Error initializing autocomplete:', error);
-        autocompleteStatus = '⚠️ Using mock autocomplete (MCP server error)';
+        if ($is_tauri) {
+          autocompleteStatus = '⚠️ Tauri autocomplete error - using mock suggestions';
+        } else {
+          autocompleteStatus = '⚠️ Using mock autocomplete (MCP server error)';
+        }
         autocompleteReady = true;
         // Load mock suggestions for demonstration
         mockSuggestions = [
@@ -102,17 +118,32 @@
   const rebuildIndex = async () => {
     autocompleteStatus = '⏳ Rebuilding index...';
     try {
+      // Update the role in case it changed
+      novelAutocompleteService.setRole($role);
+
       const success = await novelAutocompleteService.buildAutocompleteIndex();
       if (success) {
-        autocompleteStatus = '✅ Ready - Index rebuilt successfully';
+        if ($is_tauri) {
+          autocompleteStatus = '✅ Ready - Tauri index rebuilt successfully';
+        } else {
+          autocompleteStatus = '✅ Ready - MCP server index rebuilt successfully';
+        }
         autocompleteReady = true;
       } else {
-        autocompleteStatus = '⚠️ Using mock autocomplete (MCP server not responding)';
+        if ($is_tauri) {
+          autocompleteStatus = '⚠️ Tauri autocomplete failed - using mock suggestions';
+        } else {
+          autocompleteStatus = '⚠️ Using mock autocomplete (MCP server not responding)';
+        }
         autocompleteReady = true;
       }
     } catch (error) {
       console.error('Error rebuilding index:', error);
-      autocompleteStatus = '⚠️ Using mock autocomplete (MCP server error)';
+      if ($is_tauri) {
+        autocompleteStatus = '⚠️ Tauri autocomplete error - using mock suggestions';
+      } else {
+        autocompleteStatus = '⚠️ Using mock autocomplete (MCP server error)';
+      }
       autocompleteReady = true;
     }
   };
@@ -206,13 +237,21 @@ The autocomplete system provides suggestions based on your knowledge graph and d
 
     <div style="font-size: 12px; color: #6c757d;">
       <strong>Features:</strong>
-      {#if showSnippets}
-        <br>• Local autocomplete with snippets from MCP server
+      {#if $is_tauri}
+        {#if showSnippets}
+          <br>• Local autocomplete with snippets from Tauri backend
+        {:else}
+          <br>• Local autocomplete from Tauri backend
+        {/if}
       {:else}
-        <br>• Local autocomplete from MCP server
+        {#if showSnippets}
+          <br>• Local autocomplete with snippets from MCP server
+        {:else}
+          <br>• Local autocomplete from MCP server
+        {/if}
       {/if}
       <br>• Type at least 2 characters to trigger
-      <br>• Uses role-based knowledge graph for suggestions
+      <br>• Uses role-based knowledge graph for suggestions (Role: {$role})
       {#if mockSuggestions.length > 0}
         <br>• <strong>Demo Mode:</strong> Using mock suggestions for demonstration
       {/if}
