@@ -1326,6 +1326,86 @@ cargo run --bin terraphim_tui
 
 **Current Status**: Implementation complete, documentation updates in progress
 
+## 🚨 COMPLETED: AND/OR Search Operators Critical Bug Fix (2025-01-31)
+
+**Task**: Fix critical bugs in AND/OR search operators implementation that prevented them from working as specified in documentation.
+
+**Status**: ✅ **COMPLETED SUCCESSFULLY**
+
+**Problem Identified**:
+- **Term Duplication Issue**: `get_all_terms()` method in `terraphim_types` duplicated the first search term, making AND queries require first term twice and OR queries always match if first term present
+- **Inconsistent Frontend Query Building**: Two different paths for operator selection created inconsistent data structures
+- **Poor String Matching**: Simple `contains()` matching caused false positives on partial words
+
+**Implementation Details**:
+1. **Fixed `get_all_terms()` Method** in `crates/terraphim_types/src/lib.rs:513-521`
+   - **Before**: Always included `search_term` plus all `search_terms` (duplication)
+   - **After**: Use `search_terms` for multi-term queries, `search_term` for single-term queries
+   - **Impact**: Eliminates duplication that broke logical operator filtering
+
+2. **Implemented Word Boundary Matching** in `crates/terraphim_service/src/lib.rs`
+   - **Added**: `term_matches_with_word_boundaries()` helper function using regex word boundaries
+   - **Pattern**: `\b{}\b` regex with `regex::escape()` for safety, fallback to `contains()` if regex fails
+   - **Benefit**: Prevents "java" matching "javascript", improves precision
+
+3. **Standardized Frontend Query Building** in `desktop/src/lib/Search/Search.svelte:198-240`
+   - **Before**: UI operator path and text operator path used different logic
+   - **After**: Both paths use shared `buildSearchQuery()` function for consistency
+   - **Implementation**: Created fake parser object to unify UI and text-based operator selection
+
+4. **Enhanced Backend Logic** in `crates/terraphim_service/src/lib.rs:1054-1114`
+   - **Updated**: `apply_logical_operators_to_documents()` now uses word boundary matching
+   - **Verified**: AND logic requires ALL terms present, OR logic requires AT LEAST ONE term present
+   - **Added**: Comprehensive debug logging for troubleshooting
+
+**Comprehensive Test Suite**:
+- **Backend Tests**: `crates/terraphim_service/tests/logical_operators_fix_validation_test.rs` (6 tests)
+  - ✅ AND operator without term duplication (validates exact term matching)
+  - ✅ OR operator without term duplication (validates inclusive matching)
+  - ✅ Word boundary matching precision (java vs javascript)
+  - ✅ Multi-term AND strict matching (all terms required)
+  - ✅ Multi-term OR inclusive matching (any term sufficient)
+  - ✅ Single-term backward compatibility
+
+- **Frontend Tests**: `desktop/src/lib/Search/LogicalOperatorsFix.test.ts` (14 tests)
+  - ✅ parseSearchInput functions without duplication
+  - ✅ buildSearchQuery creates backend-compatible structures
+  - ✅ Integration tests for frontend-to-backend query flow
+  - ✅ Edge case handling (empty terms, mixed operators)
+
+**Key Files Modified**:
+1. `crates/terraphim_types/src/lib.rs` - Fixed core `get_all_terms()` method
+2. `crates/terraphim_service/src/lib.rs` - Added word boundary matching, updated imports
+3. `desktop/src/lib/Search/Search.svelte` - Unified query building logic
+4. Created comprehensive test suites validating all fixes
+
+**Technical Achievements**:
+- **Root Cause Elimination**: Fixed fundamental term duplication bug affecting all logical operations
+- **Precision Improvement**: Word boundary matching prevents false positive matches
+- **Frontend Consistency**: Unified logic eliminates data structure inconsistencies
+- **Comprehensive Validation**: 20 tests total covering all scenarios and edge cases
+- **Backward Compatibility**: Single-term searches continue working unchanged
+
+**Build Verification**:
+- ✅ All backend tests passing (6/6)
+- ✅ All frontend tests passing (14/14)
+- ✅ Integration with existing AND/OR visual controls
+- ✅ No breaking changes to API or user interface
+
+**User Impact**:
+- **AND searches** now correctly require ALL terms to be present in documents
+- **OR searches** now correctly return documents with ANY of the specified terms
+- **Search precision** improved with word boundary matching (no more "java" matching "javascript")
+- **Consistent behavior** regardless of whether operators selected via UI controls or typed in search box
+
+**Architecture Impact**:
+- **Single Source of Truth**: Eliminated duplicate search logic across frontend components
+- **Better Error Handling**: Regex compilation failures fall back gracefully to simple matching
+- **Enhanced Debugging**: Added comprehensive logging for search operation troubleshooting
+- **Maintainability**: Centralized search utilities make future enhancements easier
+
+This fix resolves the core search functionality issues identified by the rust-wasm-code-reviewer, making AND/OR operators work as intended for the first time.
+
 ---
 
-*Last Updated: 2025-08-28*
+*Last Updated: 2025-01-31*
