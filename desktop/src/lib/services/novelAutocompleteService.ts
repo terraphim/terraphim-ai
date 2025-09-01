@@ -1,4 +1,7 @@
 import { CONFIG } from '../../config';
+import { invoke } from '@tauri-apps/api/tauri';
+import { is_tauri } from '../stores';
+import { get } from 'svelte/store';
 
 export interface NovelAutocompleteSuggestion {
   text: string;
@@ -29,6 +32,7 @@ export class NovelAutocompleteService {
   private baseUrl: string;
   private autocompleteIndexBuilt: boolean = false;
   private sessionId: string;
+  private currentRole: string = 'Default';
 
   constructor() {
     // Use the MCP server URL - update config to point to port 8001
@@ -37,38 +41,54 @@ export class NovelAutocompleteService {
   }
 
   /**
+   * Set the current role for autocomplete queries
+   */
+  setRole(role: string): void {
+    this.currentRole = role;
+  }
+
+  /**
    * Build the autocomplete index for the current role
    */
   async buildAutocompleteIndex(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'tools/call',
-          params: {
-            name: 'build_autocomplete_index',
-            arguments: {}
+      if (get(is_tauri)) {
+        // In Tauri mode, autocomplete index is built automatically with the role
+        // Just verify that we can get suggestions
+        console.log('Using Tauri autocomplete - index is built automatically');
+        this.autocompleteIndexBuilt = true;
+        return true;
+      } else {
+        // Try MCP server
+        const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: {
+              name: 'build_autocomplete_index',
+              arguments: {}
+            }
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Build index response:', result);
+          if (result.result && !result.result.is_error) {
+            this.autocompleteIndexBuilt = true;
+            console.log('Novel autocomplete index built successfully');
+            return true;
           }
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Build index response:', result);
-        if (result.result && !result.result.is_error) {
-          this.autocompleteIndexBuilt = true;
-          console.log('Novel autocomplete index built successfully');
-          return true;
         }
-      }
 
-      console.warn('Failed to build Novel autocomplete index');
-      return false;
+        console.warn('Failed to build Novel autocomplete index');
+        return false;
+      }
     } catch (error) {
       console.error('Error building Novel autocomplete index:', error);
       return false;
@@ -137,30 +157,49 @@ export class NovelAutocompleteService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'tools/call',
-          params: {
-            name: 'autocomplete_terms',
-            arguments: {
-              query,
-              limit
-            }
-          }
-        })
-      });
+      if (get(is_tauri)) {
+        // Use Tauri command for autocomplete
+        const response = await invoke('get_autocomplete_suggestions', {
+          query: query,
+          roleName: this.currentRole,
+          limit: limit
+        }) as any;
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Get suggestions response:', result);
-        if (result.result && !result.result.is_error && result.result.content) {
-          return this.parseAutocompleteContent(result.result.content);
+        console.log('Tauri autocomplete response:', response);
+        if (response.status === 'success' && response.suggestions) {
+          return response.suggestions.map((suggestion: any) => ({
+            text: suggestion.term,
+            snippet: suggestion.url,
+            score: suggestion.score
+          }));
+        }
+      } else {
+        // Try MCP server
+        const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: {
+              name: 'autocomplete_terms',
+              arguments: {
+                query,
+                limit
+              }
+            }
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Get suggestions response:', result);
+          if (result.result && !result.result.is_error && result.result.content) {
+            return this.parseAutocompleteContent(result.result.content);
+          }
         }
       }
 
@@ -183,30 +222,49 @@ export class NovelAutocompleteService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'tools/call',
-          params: {
-            name: 'autocomplete_with_snippets',
-            arguments: {
-              query,
-              limit
-            }
-          }
-        })
-      });
+      if (get(is_tauri)) {
+        // Use Tauri command for autocomplete with snippets
+        const response = await invoke('get_autocomplete_suggestions', {
+          query: query,
+          roleName: this.currentRole,
+          limit: limit
+        }) as any;
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Get suggestions with snippets response:', result);
-        if (result.result && !result.result.is_error && result.result.content) {
-          return this.parseAutocompleteWithSnippetsContent(result.result.content);
+        console.log('Tauri autocomplete with snippets response:', response);
+        if (response.status === 'success' && response.suggestions) {
+          return response.suggestions.map((suggestion: any) => ({
+            text: suggestion.term,
+            snippet: suggestion.url, // Use URL as snippet for now
+            score: suggestion.score
+          }));
+        }
+      } else {
+        // Try MCP server
+        const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: {
+              name: 'autocomplete_with_snippets',
+              arguments: {
+                query,
+                limit
+              }
+            }
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Get suggestions with snippets response:', result);
+          if (result.result && !result.result.is_error && result.result.content) {
+            return this.parseAutocompleteWithSnippetsContent(result.result.content);
+          }
         }
       }
 
@@ -292,11 +350,13 @@ export class NovelAutocompleteService {
   /**
    * Get service status for debugging
    */
-  getStatus(): { ready: boolean; baseUrl: string; sessionId: string } {
+  getStatus(): { ready: boolean; baseUrl: string; sessionId: string; usingTauri: boolean; currentRole: string } {
     return {
       ready: this.autocompleteIndexBuilt,
       baseUrl: this.baseUrl,
-      sessionId: this.sessionId
+      sessionId: this.sessionId,
+      usingTauri: get(is_tauri),
+      currentRole: this.currentRole
     };
   }
 }
