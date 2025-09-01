@@ -154,8 +154,8 @@ async fn test_desktop_mcp_integration_fixed() -> Result<()> {
     if !desktop_binary.exists() {
         println!("🔨 Building desktop binary...");
         let build_status = Command::new("cargo")
-            .args(&["build", "--package", "terraphim-ai-desktop"])
-            .current_dir(&workspace_root)
+            .args(["build", "--package", "terraphim-ai-desktop"])
+            .current_dir(workspace_root)
             .status()
             .await?;
 

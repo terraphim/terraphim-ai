@@ -1,11 +1,11 @@
 #![cfg(feature = "openrouter")]
 
-use std::env;
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
-
-use axum::routing::post;
-use axum::Router;
+// TODO: Uncomment imports when test implementation is complete
+// use std::env;
+// use wiremock::matchers::{method, path};
+// use wiremock::{Mock, MockServer, ResponseTemplate};
+// use axum::routing::post;
+// use axum::Router;
 
 // TODO: This test is incomplete - Router doesn't have base_url field
 // Need to implement proper test server setup

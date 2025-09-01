@@ -92,8 +92,8 @@ impl FromStr for ReplCommand {
         }
 
         // Handle commands without leading slash
-        let input = if input.starts_with('/') {
-            &input[1..]
+        let input = if let Some(stripped) = input.strip_prefix('/') {
+            stripped
         } else {
             input
         };

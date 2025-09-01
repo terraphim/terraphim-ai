@@ -161,7 +161,7 @@ async fn test_role_switching_persistence() -> Result<()> {
     cleanup_test_persistence()?;
 
     // Test switching between different roles and verifying persistence
-    let roles_to_test = vec!["Role1", "Role2", "Role3", "Final Role"];
+    let roles_to_test = ["Role1", "Role2", "Role3", "Final Role"];
 
     for (i, role) in roles_to_test.iter().enumerate() {
         println!("Testing role switch #{}: '{}'", i + 1, role);

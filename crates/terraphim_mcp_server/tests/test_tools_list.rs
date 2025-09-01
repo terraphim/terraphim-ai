@@ -82,7 +82,7 @@ fn test_tools_list_only() {
         // Try to read more lines to see if there's a delayed response
         for i in 0..5 {
             response.clear();
-            if let Ok(_) = reader.read_line(&mut response) {
+            if reader.read_line(&mut response).is_ok() {
                 println!("Additional response line {}: '{}'", i, response.trim());
             }
         }

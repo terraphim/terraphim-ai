@@ -90,6 +90,13 @@ async fn create_autocomplete_test_config() -> Result<String> {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
+        openrouter_enabled: false,
+        openrouter_api_key: None,
+        openrouter_model: None,
+        openrouter_auto_summarize: false,
+        openrouter_chat_enabled: false,
+        openrouter_chat_system_prompt: None,
+        openrouter_chat_model: None,
     };
 
     let mut config = ConfigBuilder::new()
@@ -106,7 +113,7 @@ async fn create_autocomplete_test_config() -> Result<String> {
 /// Start the MCP server as a subprocess and return the transport
 async fn start_mcp_server() -> Result<TokioChildProcess> {
     let mut cmd = Command::new("cargo");
-    cmd.args(&["run", "--bin", "terraphim_mcp_server"])
+    cmd.args(["run", "--bin", "terraphim_mcp_server"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -527,7 +534,7 @@ async fn test_autocomplete_with_snippets_tool() -> Result<()> {
         .await?;
     assert!(ac_result.is_error != Some(true));
     // Should contain a summary and then several text items with " — " separator sometimes
-    assert!(ac_result.content.len() >= 1);
+    assert!(!ac_result.content.is_empty());
     let has_snippetish = ac_result
         .content
         .iter()
@@ -558,6 +565,13 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         kg: None, // No knowledge graph
         haystacks: vec![],
         extra: ahash::AHashMap::new(),
+        openrouter_enabled: false,
+        openrouter_api_key: None,
+        openrouter_model: None,
+        openrouter_auto_summarize: false,
+        openrouter_chat_enabled: false,
+        openrouter_chat_system_prompt: None,
+        openrouter_chat_model: None,
     };
 
     let invalid_config = ConfigBuilder::new()

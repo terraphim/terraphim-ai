@@ -20,11 +20,7 @@ async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
     // Locate the compiled binary: same logic as other integration tests
     let crate_dir = std::env::current_dir()?;
     let binary_name = if cfg!(target_os = "windows") {
-        if cfg!(debug_assertions) {
-            "terraphim-ai-desktop.exe"
-        } else {
-            "terraphim-ai-desktop.exe"
-        }
+        "terraphim-ai-desktop.exe"
     } else {
         "terraphim-ai-desktop"
     };

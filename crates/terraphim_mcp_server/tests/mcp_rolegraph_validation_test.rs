@@ -99,6 +99,13 @@ async fn create_terraphim_engineer_config() -> Result<String> {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
+        openrouter_enabled: false,
+        openrouter_api_key: None,
+        openrouter_model: None,
+        openrouter_auto_summarize: false,
+        openrouter_chat_enabled: false,
+        openrouter_chat_system_prompt: None,
+        openrouter_chat_model: None,
     };
 
     let mut config = ConfigBuilder::new()
@@ -224,7 +231,7 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
                 // Let's test ripgrep directly on the haystack to compare
                 println!("🔍 Testing manual ripgrep on haystack directory...");
                 let output = std::process::Command::new("rg")
-                    .args(&[query, &docs_src_path.to_string_lossy(), "--count"])
+                    .args([query, &docs_src_path.to_string_lossy(), "--count"])
                     .output();
 
                 match output {
@@ -270,8 +277,8 @@ async fn test_desktop_cli_mcp_search() -> Result<()> {
     if !desktop_binary.exists() {
         println!("Building desktop binary...");
         let build_status = std::process::Command::new("cargo")
-            .args(&["build", "-p", "terraphim-ai-desktop"])
-            .current_dir(&project_root)
+            .args(["build", "-p", "terraphim-ai-desktop"])
+            .current_dir(project_root)
             .status()?;
 
         if !build_status.success() {
