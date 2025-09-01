@@ -102,7 +102,7 @@ fn create_test_config() -> String {
 
         // Try to find docs directory
         let workspace_root = std::env::current_dir().expect("Failed to get current directory");
-        let possible_paths = vec![
+        let possible_paths = [
             workspace_root.join("docs/src"),
             workspace_root.join("..").join("docs/src"),
             workspace_root.join("..").join("..").join("docs/src"),
@@ -493,7 +493,7 @@ async fn test_search_pagination() -> Result<()> {
     // Expect at most 3 items (heading + up to 2 resources)
     assert!(first_page.content.len() <= 3);
 
-    let first_batch_count = first_page
+    let _first_batch_count = first_page
         .content
         .iter()
         .filter(|c| c.as_resource().is_some())
@@ -542,7 +542,7 @@ async fn test_search_invalid_pagination_params() -> Result<()> {
             .cloned(),
         })
         .await?;
-    assert!(res.is_error.unwrap_or(false) || res.content.first().is_some());
+    assert!(res.is_error.unwrap_or(false) || !res.content.is_empty());
 
     // Excessive limit should error
     let res2 = service
@@ -556,7 +556,7 @@ async fn test_search_invalid_pagination_params() -> Result<()> {
             .cloned(),
         })
         .await?;
-    assert!(res2.is_error.unwrap_or(false) || res2.content.first().is_some());
+    assert!(res2.is_error.unwrap_or(false) || !res2.content.is_empty());
 
     Ok(())
 }
