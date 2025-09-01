@@ -27,12 +27,11 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
 
   // Handle AND operator
   if (hasAnd && !hasOr) {
-    const parts = trimmedInput.split(andRegex);
-    const terms = [];
-    for (let i = 0; i < parts.length; i += 2) { // Skip the 'and' parts
-      const term = parts[i]?.trim() || '';
-      terms.push(term);
-    }
+    const terms = trimmedInput.split(andRegex)
+      .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+      .map(term => term.trim())
+      .filter(term => term.length > 0); // Remove empty terms
+
     return {
       hasOperator: true,
       operator: 'AND',
@@ -43,12 +42,11 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
 
   // Handle OR operator
   if (hasOr && !hasAnd) {
-    const parts = trimmedInput.split(orRegex);
-    const terms = [];
-    for (let i = 0; i < parts.length; i += 2) { // Skip the 'or' parts
-      const term = parts[i]?.trim() || '';
-      terms.push(term);
-    }
+    const terms = trimmedInput.split(orRegex)
+      .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+      .map(term => term.trim())
+      .filter(term => term.length > 0); // Remove empty terms
+
     return {
       hasOperator: true,
       operator: 'OR',
@@ -59,29 +57,27 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
 
   // Handle mixed operators - use the first one found
   if (hasAnd && hasOr) {
-    const andIndex = trimmedInput.toLowerCase().indexOf('and');
-    const orIndex = trimmedInput.toLowerCase().indexOf('or');
+    const andIndex = trimmedInput.toLowerCase().indexOf(' and ');
+    const orIndex = trimmedInput.toLowerCase().indexOf(' or ');
 
-    if (andIndex < orIndex) {
-      const parts = trimmedInput.split(andRegex);
-      const terms = [];
-      for (let i = 0; i < parts.length; i += 2) {
-        const term = parts[i]?.trim() || '';
-        terms.push(term);
-      }
+    if (andIndex !== -1 && (orIndex === -1 || andIndex < orIndex)) {
+      const terms = trimmedInput.split(andRegex)
+        .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+        .map(term => term.trim())
+        .filter(term => term.length > 0); // Remove empty terms
+
       return {
         hasOperator: true,
         operator: 'AND',
         terms,
         originalQuery: inputText,
       };
-    } else {
-      const parts = trimmedInput.split(orRegex);
-      const terms = [];
-      for (let i = 0; i < parts.length; i += 2) {
-        const term = parts[i]?.trim() || '';
-        terms.push(term);
-      }
+    } else if (orIndex !== -1) {
+      const terms = trimmedInput.split(orRegex)
+        .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+        .map(term => term.trim())
+        .filter(term => term.length > 0); // Remove empty terms
+
       return {
         hasOperator: true,
         operator: 'OR',
@@ -111,18 +107,25 @@ export interface SearchQuery {
 
 export function buildSearchQuery(parsed: ParsedSearchInput, role?: string): SearchQuery {
   if (parsed.hasOperator && parsed.terms.length > 1) {
-    return {
-      search_term: parsed.terms[0],
-      search_terms: parsed.terms,
-      operator: parsed.operator?.toLowerCase() as 'and' | 'or',
-      skip: 0,
-      limit: 50,
-      role: role || null,
-    };
+    // Filter out empty terms
+    const validTerms = parsed.terms.filter(term => term.trim().length > 0);
+
+    if (validTerms.length > 1) {
+      return {
+        search_term: validTerms[0],
+        search_terms: validTerms,
+        operator: parsed.operator?.toLowerCase() as 'and' | 'or',
+        skip: 0,
+        limit: 50,
+        role: role || null,
+      };
+    }
   }
 
+  // Single term or no valid multi-term query
+  const singleTerm = parsed.terms[0]?.trim() || '';
   return {
-    search_term: parsed.terms[0] || '',
+    search_term: singleTerm,
     search_terms: undefined,
     operator: undefined,
     skip: 0,

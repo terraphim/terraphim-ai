@@ -47,6 +47,49 @@ describe('Search Component - Real API Integration', () => {
     expect(searchInput).toHaveAttribute('placeholder', expect.stringContaining('Search'));
   });
 
+  it('renders operator control radio buttons', () => {
+    render(Search);
+
+    const exactRadio = screen.getByRole('radio', { name: /exact/i });
+    const andRadio = screen.getByRole('radio', { name: /all \(and\)/i });
+    const orRadio = screen.getByRole('radio', { name: /any \(or\)/i });
+
+    expect(exactRadio).toBeInTheDocument();
+    expect(andRadio).toBeInTheDocument();
+    expect(orRadio).toBeInTheDocument();
+
+    // Default should be 'none' (Exact)
+    expect(exactRadio).toBeChecked();
+    expect(andRadio).not.toBeChecked();
+    expect(orRadio).not.toBeChecked();
+  });
+
+  it('allows selecting different operators', async () => {
+    render(Search);
+
+    const exactRadio = screen.getByRole('radio', { name: /exact/i });
+    const andRadio = screen.getByRole('radio', { name: /all \(and\)/i });
+    const orRadio = screen.getByRole('radio', { name: /any \(or\)/i });
+
+    // Select AND operator
+    await fireEvent.click(andRadio);
+    expect(andRadio).toBeChecked();
+    expect(exactRadio).not.toBeChecked();
+    expect(orRadio).not.toBeChecked();
+
+    // Select OR operator
+    await fireEvent.click(orRadio);
+    expect(orRadio).toBeChecked();
+    expect(andRadio).not.toBeChecked();
+    expect(exactRadio).not.toBeChecked();
+
+    // Back to Exact
+    await fireEvent.click(exactRadio);
+    expect(exactRadio).toBeChecked();
+    expect(andRadio).not.toBeChecked();
+    expect(orRadio).not.toBeChecked();
+  });
+
   it('renders logo when no results', () => {
     render(Search);
 
