@@ -103,6 +103,8 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
 
         let search_query = SearchQuery {
             search_term: search_term.into(),
+            search_terms: None,
+            operator: None,
             role: Some(role_name.clone()),
             skip: None,
             limit: Some(10),
@@ -254,6 +256,8 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
 
     let default_search = SearchQuery {
         search_term: "haystack".into(), // Use the same term we tested above
+        search_terms: None,
+        operator: None,
         role: Some(default_role.clone()),
         skip: None,
         limit: Some(5),
@@ -273,7 +277,7 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
         default_result.len()
     );
 
-    if default_result.len() > 0 {
+    if !default_result.is_empty() {
         println!("    ✅ Default role CAN find documents - TerraphimGraph may have scoring issues");
         for (i, doc) in default_result.iter().enumerate() {
             println!("      {}. '{}' (ID: '{}')", i + 1, doc.title, doc.id);
@@ -299,6 +303,8 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
     println!("  🔎 Testing Terraphim Engineer role again with 'haystack'");
     let engineer_search = SearchQuery {
         search_term: "haystack".into(), // Same term as Default role
+        search_terms: None,
+        operator: None,
         role: Some(role_name.clone()),
         skip: None,
         limit: Some(5),
@@ -317,7 +323,7 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
         engineer_result.len()
     );
 
-    if engineer_result.len() > 0 {
+    if !engineer_result.is_empty() {
         println!("    ✅ TerraphimGraph working correctly");
         for (i, doc) in engineer_result.iter().enumerate() {
             println!("      {}. '{}' (ID: '{}')", i + 1, doc.title, doc.id);
@@ -466,6 +472,8 @@ async fn test_desktop_persistence_layer_functionality() {
     // Test a simple search to ensure the persistence layer is working
     let search_query = SearchQuery {
         search_term: "test".into(),
+        search_terms: None,
+        operator: None,
         role: Some(RoleName::new("Default")),
         skip: None,
         limit: Some(1),

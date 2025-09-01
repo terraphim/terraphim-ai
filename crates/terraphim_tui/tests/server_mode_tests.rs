@@ -413,7 +413,7 @@ async fn test_server_vs_offline_mode_comparison() -> Result<()> {
     // Run offline command
     let mut cmd = Command::new("cargo");
     cmd.args(["run", "-p", "terraphim_tui", "--"])
-        .args(&["config", "show"]);
+        .args(["config", "show"]);
 
     let offline_output = cmd.output()?;
     let offline_stdout = String::from_utf8_lossy(&offline_output.stdout);

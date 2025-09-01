@@ -82,7 +82,7 @@ fn test_all_mcp_tools() {
         // Try to read more lines to see if there's a delayed response
         for i in 0..5 {
             response.clear();
-            if let Ok(_) = reader.read_line(&mut response) {
+            if reader.read_line(&mut response).is_ok() {
                 println!("Additional response line {}: '{}'", i, response.trim());
             }
         }
@@ -101,7 +101,7 @@ fn test_all_mcp_tools() {
                         }
 
                         // If we have tools, test a few of them
-                        if tools_array.len() > 0 {
+                        if !tools_array.is_empty() {
                             test_specific_tools(&mut stdin, &mut reader);
                         }
                     }

@@ -15,6 +15,8 @@ async fn test_search_command() {
     let config_state = create_test_config_state().await;
     let search_query = SearchQuery {
         search_term: "test".into(),
+        search_terms: None,
+        operator: None,
         role: Some("Default".into()),
         skip: None,
         limit: Some(10),

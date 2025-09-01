@@ -71,8 +71,8 @@ impl ReplHandler {
                 let line = &line[..pos];
 
                 if line.starts_with('/') || line.is_empty() {
-                    let prefix = if line.starts_with('/') {
-                        &line[1..]
+                    let prefix = if let Some(stripped) = line.strip_prefix('/') {
+                        stripped
                     } else {
                         line
                     };
@@ -575,7 +575,7 @@ impl ReplHandler {
                     match api_client.chat(&self.current_role, &msg, None).await {
                         Ok(response) => {
                             println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
-                            println!("{}", response.message.unwrap_or_else(|| response.status));
+                            println!("{}", response.message.unwrap_or(response.status));
                         }
                         Err(e) => {
                             println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());

@@ -15,7 +15,7 @@ async fn start_test_server() -> Result<(Child, String)> {
     println!("Starting test server on {}", server_url);
 
     let mut server = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "-p",
             "terraphim_server",
@@ -66,7 +66,7 @@ async fn start_test_server() -> Result<(Child, String)> {
 /// Run TUI command in offline mode
 fn run_offline_command(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
-    cmd.args(&["run", "-p", "terraphim_tui", "--"]).args(args);
+    cmd.args(["run", "-p", "terraphim_tui", "--"]).args(args);
 
     let output = cmd.output()?;
 
@@ -83,7 +83,7 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
     cmd_args.extend_from_slice(args);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(&["run", "-p", "terraphim_tui", "--"])
+    cmd.args(["run", "-p", "terraphim_tui", "--"])
         .args(&cmd_args);
 
     let output = cmd.output()?;
@@ -451,7 +451,7 @@ async fn test_role_consistency_across_commands() -> Result<()> {
 
     // Test role override works consistently
     let override_role = "OverrideTestRole";
-    for (cmd_name, cmd_args) in vec![
+    for (cmd_name, cmd_args) in [
         (
             "search",
             vec!["search", "test", "--role", override_role, "--limit", "1"],

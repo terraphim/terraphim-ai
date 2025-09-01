@@ -7,6 +7,7 @@ use terraphim_tui::client::{ApiClient, ChatResponse, ConfigResponse, SearchRespo
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";
+#[allow(dead_code)]
 const TEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Test helper to check if server is running
@@ -16,6 +17,7 @@ async fn is_server_running() -> bool {
 }
 
 /// Test helper to wait for server startup
+#[allow(dead_code)]
 async fn wait_for_server() -> Result<()> {
     let max_attempts = 30;
     for _ in 0..max_attempts {
@@ -51,6 +53,8 @@ async fn test_api_client_search() {
     let client = ApiClient::new(TEST_SERVER_URL);
     let query = SearchQuery {
         search_term: NormalizedTermValue::from("test"),
+        search_terms: None,
+        operator: None,
         skip: Some(0),
         limit: Some(5),
         role: Some(RoleName::new("Default")),
@@ -183,6 +187,8 @@ async fn test_search_with_different_roles() {
     for role_name in role_names {
         let query = SearchQuery {
             search_term: NormalizedTermValue::from("test"),
+            search_terms: None,
+            operator: None,
             skip: Some(0),
             limit: Some(3),
             role: Some(RoleName::new(&role_name)),
@@ -214,6 +220,8 @@ async fn test_search_pagination() {
     // Search first page
     let query1 = SearchQuery {
         search_term: NormalizedTermValue::from("test"),
+        search_terms: None,
+        operator: None,
         skip: Some(0),
         limit: Some(2),
         role: Some(RoleName::new("Default")),
@@ -225,6 +233,8 @@ async fn test_search_pagination() {
     // Search second page
     let query2 = SearchQuery {
         search_term: NormalizedTermValue::from("test"),
+        search_terms: None,
+        operator: None,
         skip: Some(2),
         limit: Some(2),
         role: Some(RoleName::new("Default")),
@@ -237,7 +247,7 @@ async fn test_search_pagination() {
     let response2: SearchResponse = result2.unwrap();
 
     // If there are enough results, pages should be different
-    if response1.results.len() == 2 && response2.results.len() > 0 {
+    if response1.results.len() == 2 && !response2.results.is_empty() {
         // Results should be different (assuming different documents)
         let ids1: Vec<String> = response1.results.iter().map(|d| d.id.clone()).collect();
         let ids2: Vec<String> = response2.results.iter().map(|d| d.id.clone()).collect();
@@ -253,7 +263,7 @@ async fn test_search_pagination() {
 #[serial]
 fn test_tui_cli_search_command() {
     if !std::process::Command::new("cargo")
-        .args(&["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim_tui"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -263,7 +273,7 @@ fn test_tui_cli_search_command() {
     }
 
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "terraphim_tui",
@@ -294,7 +304,7 @@ fn test_tui_cli_search_command() {
 #[serial]
 fn test_tui_cli_roles_list_command() {
     if !std::process::Command::new("cargo")
-        .args(&["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim_tui"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -304,7 +314,7 @@ fn test_tui_cli_roles_list_command() {
     }
 
     let output = Command::new("cargo")
-        .args(&["run", "--bin", "terraphim_tui", "--", "roles", "list"])
+        .args(["run", "--bin", "terraphim_tui", "--", "roles", "list"])
         .env("TERRAPHIM_SERVER", TEST_SERVER_URL)
         .output();
 
@@ -324,7 +334,7 @@ fn test_tui_cli_roles_list_command() {
 #[serial]
 fn test_tui_cli_config_show_command() {
     if !std::process::Command::new("cargo")
-        .args(&["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim_tui"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -334,7 +344,7 @@ fn test_tui_cli_config_show_command() {
     }
 
     let output = Command::new("cargo")
-        .args(&["run", "--bin", "terraphim_tui", "--", "config", "show"])
+        .args(["run", "--bin", "terraphim_tui", "--", "config", "show"])
         .env("TERRAPHIM_SERVER", TEST_SERVER_URL)
         .output();
 
@@ -363,7 +373,7 @@ fn test_tui_cli_config_show_command() {
 #[serial]
 fn test_tui_cli_graph_command() {
     if !std::process::Command::new("cargo")
-        .args(&["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim_tui"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -373,7 +383,7 @@ fn test_tui_cli_graph_command() {
     }
 
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--bin",
             "terraphim_tui",
@@ -414,6 +424,8 @@ async fn test_api_error_handling() {
     // Test search with invalid parameters
     let query = SearchQuery {
         search_term: NormalizedTermValue::from(""), // Empty search
+        search_terms: None,
+        operator: None,
         skip: Some(0),
         limit: Some(0), // Invalid limit
         role: Some(RoleName::new("NonExistentRole")),
