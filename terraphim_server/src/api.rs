@@ -623,13 +623,18 @@ pub(crate) async fn chat_completion(
                     context_content.push_str("The following information provides relevant context for this conversation:\n\n");
 
                     for (index, context_item) in conversation.global_context.iter().enumerate() {
-                        context_content.push_str(&format!("Context Item {}: {}\n", index + 1, context_item.title));
+                        context_content.push_str(&format!(
+                            "Context Item {}: {}\n",
+                            index + 1,
+                            context_item.title
+                        ));
                         if let Some(score) = context_item.relevance_score {
                             context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
                         }
                         context_content.push_str(&format!("Content: {}\n", context_item.content));
                         if !context_item.metadata.is_empty() {
-                            context_content.push_str(&format!("Metadata: {:?}\n", context_item.metadata));
+                            context_content
+                                .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
                         }
                         context_content.push_str("\n---\n\n");
                     }
@@ -638,7 +643,8 @@ pub(crate) async fn chat_completion(
                     context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
 
                     // Add context as a system message after the main system prompt
-                    messages_json.push(serde_json::json!({"role": "system", "content": context_content}));
+                    messages_json
+                        .push(serde_json::json!({"role": "system", "content": context_content}));
                 }
             }
         }
@@ -1894,10 +1900,12 @@ pub(crate) async fn add_context_to_conversation(
         "user_input" => terraphim_types::ContextType::UserInput,
         "system" => terraphim_types::ContextType::System,
         "external" => terraphim_types::ContextType::External,
-        _ => return Ok(Json(AddContextResponse {
-            status: Status::Error,
-            error: Some(format!("Invalid context type: {}", request.context_type)),
-        })),
+        _ => {
+            return Ok(Json(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Invalid context type: {}", request.context_type)),
+            }))
+        }
     };
 
     let context_item = terraphim_types::ContextItem {
@@ -1931,11 +1939,8 @@ pub(crate) async fn add_search_context_to_conversation(
     let conv_id = ConversationId::from_string(conversation_id);
 
     let mut manager = CONTEXT_MANAGER.lock().await;
-    let context_item = manager.create_search_context(
-        &request.query,
-        &request.documents,
-        request.limit,
-    );
+    let context_item =
+        manager.create_search_context(&request.query, &request.documents, request.limit);
 
     match manager.add_context(&conv_id, context_item) {
         Ok(()) => Ok(Json(AddContextResponse {

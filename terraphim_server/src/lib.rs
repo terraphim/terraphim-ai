@@ -459,12 +459,30 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/conversations/", get(api::list_conversations))
         .route("/conversations/:id", get(api::get_conversation))
         .route("/conversations/:id/", get(api::get_conversation))
-        .route("/conversations/:id/messages", post(api::add_message_to_conversation))
-        .route("/conversations/:id/messages/", post(api::add_message_to_conversation))
-        .route("/conversations/:id/context", post(api::add_context_to_conversation))
-        .route("/conversations/:id/context/", post(api::add_context_to_conversation))
-        .route("/conversations/:id/search-context", post(api::add_search_context_to_conversation))
-        .route("/conversations/:id/search-context/", post(api::add_search_context_to_conversation))
+        .route(
+            "/conversations/:id/messages",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/messages/",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context/",
+            post(api::add_search_context_to_conversation),
+        )
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
@@ -619,12 +637,30 @@ pub async fn build_router_for_tests() -> Router {
         .route("/conversations/", get(api::list_conversations))
         .route("/conversations/:id", get(api::get_conversation))
         .route("/conversations/:id/", get(api::get_conversation))
-        .route("/conversations/:id/messages", post(api::add_message_to_conversation))
-        .route("/conversations/:id/messages/", post(api::add_message_to_conversation))
-        .route("/conversations/:id/context", post(api::add_context_to_conversation))
-        .route("/conversations/:id/context/", post(api::add_context_to_conversation))
-        .route("/conversations/:id/search-context", post(api::add_search_context_to_conversation))
-        .route("/conversations/:id/search-context/", post(api::add_search_context_to_conversation))
+        .route(
+            "/conversations/:id/messages",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/messages/",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context/",
+            post(api::add_search_context_to_conversation),
+        )
         .with_state(config_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))

@@ -15,9 +15,7 @@ use terraphim_server::{
 };
 use terraphim_service::http_client;
 use terraphim_settings::DeviceSettings;
-use terraphim_types::{
-    ContextType, Document, RelevanceFunction,
-};
+use terraphim_types::{ContextType, Document, RelevanceFunction};
 
 /// Sample configuration for testing context management
 fn create_test_config() -> Config {
@@ -56,8 +54,8 @@ fn create_test_config() -> Config {
 
 /// Start a test server with context management API
 async fn start_test_server() -> SocketAddr {
-    let server_settings = DeviceSettings::load_from_env_and_file(None)
-        .expect("Failed to load settings");
+    let server_settings =
+        DeviceSettings::load_from_env_and_file(None).expect("Failed to load settings");
     let server_hostname = server_settings
         .server_hostname
         .parse::<SocketAddr>()
@@ -105,7 +103,9 @@ fn create_test_documents() -> Vec<Document> {
             id: "doc-1".to_string(),
             url: "https://example.com/doc1".to_string(),
             title: "First Test Document".to_string(),
-            body: "This is the first test document with important information about rust programming.".to_string(),
+            body:
+                "This is the first test document with important information about rust programming."
+                    .to_string(),
             description: Some("A document about Rust programming".to_string()),
             summarization: None,
             stub: None,
@@ -116,7 +116,8 @@ fn create_test_documents() -> Vec<Document> {
             id: "doc-2".to_string(),
             url: "https://example.com/doc2".to_string(),
             title: "Second Test Document".to_string(),
-            body: "This document contains information about async programming and tokio.".to_string(),
+            body: "This document contains information about async programming and tokio."
+                .to_string(),
             description: Some("A document about async Rust".to_string()),
             summarization: None,
             stub: None,
@@ -158,10 +159,8 @@ async fn test_create_conversation() {
 
     assert_eq!(response.status(), 200);
 
-    let response: CreateConversationResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: CreateConversationResponse =
+        response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     assert!(response.conversation_id.is_some());
@@ -192,10 +191,8 @@ async fn test_create_conversation_invalid_role() {
 
     assert_eq!(response.status(), 200);
 
-    let response: CreateConversationResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: CreateConversationResponse =
+        response.json().await.expect("Failed to parse response");
 
     // Should still succeed but with the provided role name
     assert!(matches!(response.status, Status::Success));
@@ -216,10 +213,8 @@ async fn test_list_conversations_empty() {
 
     assert_eq!(response.status(), 200);
 
-    let response: ListConversationsResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: ListConversationsResponse =
+        response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     // Note: May not be empty due to shared global context manager across tests
@@ -275,16 +270,18 @@ async fn test_list_conversations_with_data() {
 
     assert_eq!(response.status(), 200);
 
-    let response: ListConversationsResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: ListConversationsResponse =
+        response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     // Should have at least our 2 conversations, but may have more from other tests
     assert!(response.conversations.len() >= 2);
 
-    let titles: Vec<String> = response.conversations.iter().map(|c| c.title.clone()).collect();
+    let titles: Vec<String> = response
+        .conversations
+        .iter()
+        .map(|c| c.title.clone())
+        .collect();
     assert!(titles.contains(&"First Conversation".to_string()));
     assert!(titles.contains(&"Second Conversation".to_string()));
 }
@@ -322,10 +319,8 @@ async fn test_list_conversations_with_limit() {
 
     assert_eq!(response.status(), 200);
 
-    let response: ListConversationsResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: ListConversationsResponse =
+        response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     assert_eq!(response.conversations.len(), 2);
@@ -357,17 +352,18 @@ async fn test_get_conversation() {
 
     // Now get the conversation
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
 
     assert_eq!(response.status(), 200);
 
-    let response: GetConversationResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: GetConversationResponse =
+        response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     assert!(response.conversation.is_some());
@@ -394,10 +390,8 @@ async fn test_get_conversation_not_found() {
 
     assert_eq!(response.status(), 200);
 
-    let response: GetConversationResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: GetConversationResponse =
+        response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Error));
     assert!(response.conversation.is_none());
@@ -435,7 +429,10 @@ async fn test_add_message_to_conversation() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/messages", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/messages",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&message_request).unwrap())
         .send()
@@ -444,10 +441,7 @@ async fn test_add_message_to_conversation() {
 
     assert_eq!(response.status(), 200);
 
-    let response: AddMessageResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: AddMessageResponse = response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     assert!(response.message_id.is_some());
@@ -455,7 +449,10 @@ async fn test_add_message_to_conversation() {
 
     // Verify the message was added by getting the conversation
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -463,7 +460,10 @@ async fn test_add_message_to_conversation() {
     let conv_response: GetConversationResponse = response.json().await.unwrap();
     let conversation = conv_response.conversation.unwrap();
     assert_eq!(conversation.messages.len(), 1);
-    assert_eq!(conversation.messages[0].content, "Hello, this is a test message!");
+    assert_eq!(
+        conversation.messages[0].content,
+        "Hello, this is a test message!"
+    );
     assert_eq!(conversation.messages[0].role, "user");
 }
 
@@ -504,7 +504,10 @@ async fn test_add_message_different_roles() {
         };
 
         let response = client
-            .post(format!("http://{}/conversations/{}/messages", server, conversation_id))
+            .post(format!(
+                "http://{}/conversations/{}/messages",
+                server, conversation_id
+            ))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&message_request).unwrap())
             .send()
@@ -517,7 +520,10 @@ async fn test_add_message_different_roles() {
 
     // Verify all messages were added
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -557,7 +563,10 @@ async fn test_add_message_default_role() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/messages", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/messages",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&message_request).unwrap())
         .send()
@@ -569,7 +578,10 @@ async fn test_add_message_default_role() {
 
     // Verify the role defaulted to "user"
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -610,7 +622,10 @@ async fn test_add_message_invalid_role() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/messages", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/messages",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&message_request).unwrap())
         .send()
@@ -651,11 +666,18 @@ async fn test_add_context_to_conversation() {
         context_type: "document".to_string(),
         title: "Test Document Context".to_string(),
         content: "This is a test document that provides context for the conversation.".to_string(),
-        metadata: Some([("source".to_string(), "test".to_string())].into_iter().collect()),
+        metadata: Some(
+            [("source".to_string(), "test".to_string())]
+                .into_iter()
+                .collect(),
+        ),
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/context", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/context",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&context_request).unwrap())
         .send()
@@ -664,17 +686,17 @@ async fn test_add_context_to_conversation() {
 
     assert_eq!(response.status(), 200);
 
-    let response: AddContextResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: AddContextResponse = response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     assert!(response.error.is_none());
 
     // Verify the context was added
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -685,7 +707,10 @@ async fn test_add_context_to_conversation() {
 
     let context = &conversation.global_context[0];
     assert_eq!(context.title, "Test Document Context");
-    assert_eq!(context.content, "This is a test document that provides context for the conversation.");
+    assert_eq!(
+        context.content,
+        "This is a test document that provides context for the conversation."
+    );
     assert!(matches!(context.context_type, ContextType::Document));
     assert!(context.metadata.contains_key("source"));
 }
@@ -716,7 +741,11 @@ async fn test_add_context_different_types() {
     // Test different context types
     let context_types = vec![
         ("document", "Document Context", "Document content"),
-        ("search_result", "Search Result Context", "Search result content"),
+        (
+            "search_result",
+            "Search Result Context",
+            "Search result content",
+        ),
         ("user_input", "User Input Context", "User input content"),
         ("system", "System Context", "System content"),
         ("external", "External Context", "External content"),
@@ -731,7 +760,10 @@ async fn test_add_context_different_types() {
         };
 
         let response = client
-            .post(format!("http://{}/conversations/{}/context", server, conversation_id))
+            .post(format!(
+                "http://{}/conversations/{}/context",
+                server, conversation_id
+            ))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&context_request).unwrap())
             .send()
@@ -744,7 +776,10 @@ async fn test_add_context_different_types() {
 
     // Verify all context items were added
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -786,7 +821,10 @@ async fn test_add_context_invalid_type() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/context", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/context",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&context_request).unwrap())
         .send()
@@ -830,7 +868,10 @@ async fn test_add_search_context_to_conversation() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/search-context", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/search-context",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&search_context_request).unwrap())
         .send()
@@ -839,17 +880,17 @@ async fn test_add_search_context_to_conversation() {
 
     assert_eq!(response.status(), 200);
 
-    let response: AddContextResponse = response
-        .json()
-        .await
-        .expect("Failed to parse response");
+    let response: AddContextResponse = response.json().await.expect("Failed to parse response");
 
     assert!(matches!(response.status, Status::Success));
     assert!(response.error.is_none());
 
     // Verify the search context was added
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -898,7 +939,10 @@ async fn test_add_search_context_no_limit() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/search-context", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/search-context",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&search_context_request).unwrap())
         .send()
@@ -910,7 +954,10 @@ async fn test_add_search_context_no_limit() {
 
     // Verify all documents are included (default limit applies)
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -955,7 +1002,10 @@ async fn test_conversation_context_workflow() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/messages", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/messages",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&message_request).unwrap())
         .send()
@@ -973,7 +1023,10 @@ async fn test_conversation_context_workflow() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/search-context", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/search-context",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&search_context_request).unwrap())
         .send()
@@ -988,11 +1041,18 @@ async fn test_conversation_context_workflow() {
         context_type: "user_input".to_string(),
         title: "User's Background".to_string(),
         content: "I'm a beginner programmer learning Rust for systems programming.".to_string(),
-        metadata: Some([("skill_level".to_string(), "beginner".to_string())].into_iter().collect()),
+        metadata: Some(
+            [("skill_level".to_string(), "beginner".to_string())]
+                .into_iter()
+                .collect(),
+        ),
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/context", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/context",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&context_request).unwrap())
         .send()
@@ -1009,7 +1069,10 @@ async fn test_conversation_context_workflow() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/{}/messages", server, conversation_id))
+        .post(format!(
+            "http://{}/conversations/{}/messages",
+            server, conversation_id
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&assistant_message).unwrap())
         .send()
@@ -1021,7 +1084,10 @@ async fn test_conversation_context_workflow() {
 
     // 6. Verify the complete conversation state
     let response = client
-        .get(format!("http://{}/conversations/{}", server, conversation_id))
+        .get(format!(
+            "http://{}/conversations/{}",
+            server, conversation_id
+        ))
         .send()
         .await
         .expect("Failed to get conversation");
@@ -1038,22 +1104,31 @@ async fn test_conversation_context_workflow() {
     // Check messages
     assert_eq!(conversation.messages.len(), 2);
     assert_eq!(conversation.messages[0].role, "user");
-    assert_eq!(conversation.messages[0].content, "I need help with Rust programming");
+    assert_eq!(
+        conversation.messages[0].content,
+        "I need help with Rust programming"
+    );
     assert_eq!(conversation.messages[1].role, "assistant");
-    assert!(conversation.messages[1].content.contains("async programming"));
+    assert!(conversation.messages[1]
+        .content
+        .contains("async programming"));
 
     // Check global context
     assert_eq!(conversation.global_context.len(), 2);
 
     // Find search context
-    let search_context = conversation.global_context.iter()
+    let search_context = conversation
+        .global_context
+        .iter()
         .find(|ctx| matches!(ctx.context_type, ContextType::SearchResult))
         .expect("Search context not found");
     assert!(search_context.title.contains("rust programming help"));
     assert!(search_context.content.contains("First Test Document"));
 
     // Find user input context
-    let user_context = conversation.global_context.iter()
+    let user_context = conversation
+        .global_context
+        .iter()
         .find(|ctx| matches!(ctx.context_type, ContextType::UserInput))
         .expect("User input context not found");
     assert_eq!(user_context.title, "User's Background");
@@ -1087,7 +1162,8 @@ async fn test_context_limits() {
     let mut success_count = 0;
     let mut error_count = 0;
 
-    for i in 0..60 {  // Try to add more than the limit
+    for i in 0..60 {
+        // Try to add more than the limit
         let context_request = AddContextRequest {
             context_type: "document".to_string(),
             title: format!("Test Document {}", i),
@@ -1096,7 +1172,10 @@ async fn test_context_limits() {
         };
 
         let response = client
-            .post(format!("http://{}/conversations/{}/context", server, conversation_id))
+            .post(format!(
+                "http://{}/conversations/{}/context",
+                server, conversation_id
+            ))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&context_request).unwrap())
             .send()
@@ -1122,8 +1201,8 @@ async fn test_context_limits() {
 
     // Should succeed up to the limit, then start failing
     assert!(success_count > 0);
-    assert!(success_count <= 50);  // Shouldn't exceed configured limit
-    assert!(error_count > 0);      // Should have some failures
+    assert!(success_count <= 50); // Shouldn't exceed configured limit
+    assert!(error_count > 0); // Should have some failures
     assert_eq!(success_count + error_count, 60);
 }
 
@@ -1142,7 +1221,10 @@ async fn test_context_nonexistent_conversation() {
     };
 
     let response = client
-        .post(format!("http://{}/conversations/nonexistent-id/context", server))
+        .post(format!(
+            "http://{}/conversations/nonexistent-id/context",
+            server
+        ))
         .header("Content-Type", "application/json")
         .body(serde_json::to_string(&context_request).unwrap())
         .send()
