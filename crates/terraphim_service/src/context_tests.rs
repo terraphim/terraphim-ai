@@ -133,7 +133,10 @@ mod tests {
     #[test]
     async fn test_get_conversation() {
         let mut manager = ContextManager::new(create_test_config());
-        let conversation_id = manager.create_conversation("Test".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conversation_id = manager
+            .create_conversation("Test".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         // Test getting existing conversation
         let result = manager.get_conversation(&conversation_id);
@@ -148,7 +151,10 @@ mod tests {
     #[test]
     async fn test_add_message_to_conversation() {
         let mut manager = ContextManager::new(create_test_config());
-        let conversation_id = manager.create_conversation("Test".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conversation_id = manager
+            .create_conversation("Test".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         let message = ChatMessage::user("Hello, test message!".to_string());
 
@@ -165,7 +171,10 @@ mod tests {
     #[test]
     async fn test_add_context_to_conversation() {
         let mut manager = ContextManager::new(create_test_config());
-        let conversation_id = manager.create_conversation("Test".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conversation_id = manager
+            .create_conversation("Test".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         let context_item = ContextItem {
             id: "test-context".to_string(),
@@ -202,7 +211,10 @@ mod tests {
         assert!(context_item.content.contains("Test Document 1"));
         // Should only include 2 documents due to limit
         assert!(!context_item.content.contains("Test Document 2"));
-        assert_eq!(context_item.metadata.get("source_type").unwrap(), "search_result");
+        assert_eq!(
+            context_item.metadata.get("source_type").unwrap(),
+            "search_result"
+        );
         assert_eq!(context_item.metadata.get("query").unwrap(), query);
         assert_eq!(context_item.metadata.get("result_count").unwrap(), "2");
     }
@@ -230,8 +242,14 @@ mod tests {
         assert_eq!(context_item.context_type, ContextType::Document);
         assert_eq!(context_item.title, document.title);
         assert!(context_item.content.contains(&document.body));
-        assert_eq!(context_item.metadata.get("source_type").unwrap(), "document");
-        assert_eq!(context_item.metadata.get("document_id").unwrap(), &document.id);
+        assert_eq!(
+            context_item.metadata.get("source_type").unwrap(),
+            "document"
+        );
+        assert_eq!(
+            context_item.metadata.get("document_id").unwrap(),
+            &document.id
+        );
         assert_eq!(context_item.metadata.get("url").unwrap(), &document.url);
     }
 
@@ -244,7 +262,10 @@ mod tests {
         assert_eq!(context_item.title, document.title);
         assert!(context_item.content.contains(&document.title));
         assert!(context_item.content.contains(&document.body));
-        assert_eq!(context_item.metadata.get("document_id").unwrap(), &document.id);
+        assert_eq!(
+            context_item.metadata.get("document_id").unwrap(),
+            &document.id
+        );
         assert!(context_item.relevance_score.is_some());
     }
 
@@ -308,11 +329,20 @@ mod tests {
         let mut manager = ContextManager::new(config);
 
         // Create max conversations
-        let _conv1 = manager.create_conversation("Conv 1".to_string(), RoleName::new("engineer")).await.unwrap();
-        let _conv2 = manager.create_conversation("Conv 2".to_string(), RoleName::new("engineer")).await.unwrap();
+        let _conv1 = manager
+            .create_conversation("Conv 1".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
+        let _conv2 = manager
+            .create_conversation("Conv 2".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         // Creating a third should still work (will remove oldest)
-        let conv3 = manager.create_conversation("Conv 3".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conv3 = manager
+            .create_conversation("Conv 3".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         // Should only have 2 conversations now
         let conversations = manager.list_conversations(None);
@@ -334,7 +364,10 @@ mod tests {
             enable_auto_suggestions: false,
         };
         let mut manager = ContextManager::new(config);
-        let conversation_id = manager.create_conversation("Test".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conversation_id = manager
+            .create_conversation("Test".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         // Add contexts up to limit
         let context1 = ContextItem {
@@ -383,7 +416,10 @@ mod tests {
             enable_auto_suggestions: false,
         };
         let mut manager = ContextManager::new(config);
-        let conversation_id = manager.create_conversation("Test".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conversation_id = manager
+            .create_conversation("Test".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         let large_context = ContextItem {
             id: "large".to_string(),
@@ -411,9 +447,18 @@ mod tests {
         let mut manager = ContextManager::new(config);
 
         // Create conversations up to limit
-        let conv1 = manager.create_conversation("Conv 1".to_string(), RoleName::new("engineer")).await.unwrap();
-        let conv2 = manager.create_conversation("Conv 2".to_string(), RoleName::new("engineer")).await.unwrap();
-        let conv3 = manager.create_conversation("Conv 3".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conv1 = manager
+            .create_conversation("Conv 1".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
+        let conv2 = manager
+            .create_conversation("Conv 2".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
+        let conv3 = manager
+            .create_conversation("Conv 3".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         // All conversations should exist
         assert!(manager.get_conversation(&conv1).is_some());
@@ -421,7 +466,10 @@ mod tests {
         assert!(manager.get_conversation(&conv3).is_some());
 
         // Create a 4th conversation (should either work or remove oldest)
-        let conv4 = manager.create_conversation("Conv 4".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conv4 = manager
+            .create_conversation("Conv 4".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         // The new conversation should exist
         assert!(manager.get_conversation(&conv4).is_some());
@@ -444,10 +492,8 @@ mod tests {
             let manager_clone = Arc::clone(&manager);
             let handle = tokio::spawn(async move {
                 let mut mgr = manager_clone.lock().await;
-                mgr.create_conversation(
-                    format!("Concurrent Conv {}", i),
-                    RoleName::new("engineer")
-                ).await
+                mgr.create_conversation(format!("Concurrent Conv {}", i), RoleName::new("engineer"))
+                    .await
             });
             handles.push(handle);
         }
@@ -498,7 +544,10 @@ mod tests {
 
         let context_item = ContextItem::from_document(&document);
 
-        assert_eq!(context_item.metadata.get("document_id").unwrap(), &document.id);
+        assert_eq!(
+            context_item.metadata.get("document_id").unwrap(),
+            &document.id
+        );
         assert_eq!(context_item.metadata.get("url").unwrap(), &document.url);
         assert_eq!(context_item.metadata.get("tags").unwrap(), "rust, test");
         assert_eq!(context_item.metadata.get("rank").unwrap(), "42");
@@ -509,8 +558,14 @@ mod tests {
         let mut manager = ContextManager::new(create_test_config());
 
         // Test different role assignments
-        let engineer_conv = manager.create_conversation("Engineer".to_string(), RoleName::new("engineer")).await.unwrap();
-        let researcher_conv = manager.create_conversation("Researcher".to_string(), RoleName::new("researcher")).await.unwrap();
+        let engineer_conv = manager
+            .create_conversation("Engineer".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
+        let researcher_conv = manager
+            .create_conversation("Researcher".to_string(), RoleName::new("researcher"))
+            .await
+            .unwrap();
 
         let eng_conversation = manager.get_conversation(&engineer_conv).unwrap();
         let res_conversation = manager.get_conversation(&researcher_conv).unwrap();
@@ -524,11 +579,20 @@ mod tests {
         let mut manager = ContextManager::new(create_test_config());
 
         // Create conversations with small delays to ensure different timestamps
-        let conv1 = manager.create_conversation("First".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conv1 = manager
+            .create_conversation("First".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        let conv2 = manager.create_conversation("Second".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conv2 = manager
+            .create_conversation("Second".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        let conv3 = manager.create_conversation("Third".to_string(), RoleName::new("engineer")).await.unwrap();
+        let conv3 = manager
+            .create_conversation("Third".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
 
         let conversations = manager.list_conversations(None);
 
