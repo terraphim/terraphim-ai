@@ -11,7 +11,7 @@
   export let outputFormat: 'html' | 'markdown' = 'html';  // New prop to control output format
   export let enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
   export let showSnippets: boolean = true; // New prop to show snippets in autocomplete
-  export let suggestionTrigger: string = '/'; // Character that triggers autocomplete
+  export let suggestionTrigger: string = '++'; // Character that triggers autocomplete
   export let maxSuggestions: number = 8; // Maximum number of suggestions to show
   export let minQueryLength: number = 1; // Minimum query length before showing suggestions
   export let debounceDelay: number = 300; // Debounce delay in milliseconds
