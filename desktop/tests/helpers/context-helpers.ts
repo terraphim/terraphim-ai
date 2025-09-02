@@ -1,6 +1,6 @@
 /**
  * Helper functions for Context Management UI tests
- * 
+ *
  * This module provides reusable helper functions for testing context management
  * functionality, including conversation operations, context manipulation, and
  * UI interaction utilities.
@@ -60,7 +60,7 @@ export class ContextTestHelpers {
     await expect(this.page.locator('[data-testid="app-container"]')).toBeVisible({ timeout: 30000 });
     await expect(this.page.locator('[data-testid="sidebar"]')).toBeVisible();
     await expect(this.page.locator('[data-testid="main-content"]')).toBeVisible();
-    
+
     // Wait for any initial loading to complete
     await this.page.waitForLoadState('networkidle');
     await this.page.waitForTimeout(1000); // Brief stabilization delay
@@ -75,16 +75,16 @@ export class ContextTestHelpers {
       await this.page.evaluate(() => {
         // Clear localStorage
         localStorage.clear();
-        
+
         // Clear sessionStorage
         sessionStorage.clear();
-        
+
         // Reset any global application state if available
         if ((window as any).clearAppState) {
           (window as any).clearAppState();
         }
       });
-      
+
       // Reload page to ensure clean state
       await this.page.reload();
       await this.waitForApplicationReady();
@@ -99,7 +99,7 @@ export class ContextTestHelpers {
   async selectConversation(conversationId: string): Promise<void> {
     await this.page.click(`[data-testid="conversation-${conversationId}"]`);
     await this.page.waitForLoadState('networkidle');
-    
+
     // Verify conversation selected
     await expect(this.page.locator('[data-testid="current-conversation"]')).toBeVisible();
   }
@@ -110,13 +110,13 @@ export class ContextTestHelpers {
   async deleteConversation(conversationId: string): Promise<void> {
     // Right-click on conversation to open context menu
     await this.page.click(`[data-testid="conversation-${conversationId}"]`, { button: 'right' });
-    
+
     // Click delete option
     await this.page.click('[data-testid="delete-conversation"]');
-    
+
     // Confirm deletion
     await this.page.click('[data-testid="confirm-delete"]');
-    
+
     // Wait for deletion to complete
     await expect(this.page.locator(`[data-testid="conversation-${conversationId}"]`)).not.toBeVisible();
   }
@@ -128,27 +128,27 @@ export class ContextTestHelpers {
    */
   async createConversation(data: ConversationData): Promise<string> {
     await this.navigateToConversations();
-    
+
     // Click new conversation button
     await this.page.click('[data-testid="new-conversation-button"]');
-    
+
     // Fill conversation details
     await this.page.fill('[data-testid="conversation-title-input"]', data.title);
     await this.page.selectOption('[data-testid="conversation-role-select"]', data.role);
-    
+
     // Create conversation
     await this.page.click('[data-testid="create-conversation-confirm"]');
-    
+
     // Wait for creation and get ID from URL or element
     await this.page.waitForSelector('[data-testid="active-conversation-title"]');
-    
+
     // Return the conversation ID (this may need adjustment based on actual implementation)
     const conversationId = await this.page.getAttribute('[data-testid="conversation-details"]', 'data-conversation-id');
-    
+
     if (!conversationId) {
       throw new Error('Failed to get conversation ID after creation');
     }
-    
+
     return conversationId;
   }
 
@@ -161,18 +161,18 @@ export class ContextTestHelpers {
   async getConversationList(): Promise<ConversationData[]> {
     await this.navigateToConversations();
     await this.page.waitForSelector('[data-testid="conversation-list"]');
-    
+
     const conversations: ConversationData[] = [];
     const conversationItems = this.page.locator('[data-testid="conversation-item"]');
-    
+
     const count = await conversationItems.count();
-    
+
     for (let i = 0; i < count; i++) {
       const item = conversationItems.nth(i);
       const title = await item.locator('[data-testid="conversation-title"]').textContent();
       const role = await item.locator('[data-testid="conversation-role"]').textContent();
       const id = await item.getAttribute('data-conversation-id');
-      
+
       if (title && role) {
         conversations.push({
           title: title.trim(),
@@ -181,20 +181,20 @@ export class ContextTestHelpers {
         });
       }
     }
-    
+
     return conversations;
   }
 
   async deleteConversation(conversationTitle: string): Promise<void> {
     await this.openConversation(conversationTitle);
-    
+
     // Open conversation menu
     await this.page.click('[data-testid="conversation-menu-button"]');
     await this.page.click('[data-testid="delete-conversation-button"]');
-    
+
     // Confirm deletion
     await this.page.click('[data-testid="confirm-delete-conversation"]');
-    
+
     // Wait for redirect to conversations list
     await this.page.waitForSelector('[data-testid="conversation-list"]');
   }
@@ -205,15 +205,15 @@ export class ContextTestHelpers {
   async addMessage(data: MessageData): Promise<void> {
     // Fill message content
     await this.page.fill('[data-testid="message-input"]', data.content);
-    
+
     // Select role if not default user
     if (data.role !== 'user') {
       await this.page.selectOption('[data-testid="message-role-select"]', data.role);
     }
-    
+
     // Send message
     await this.page.click('[data-testid="send-message-button"]');
-    
+
     // Wait for message to appear
     await this.page.waitForSelector(`[data-testid="message-item"]:has-text("${data.content}")`);
   }
@@ -221,14 +221,14 @@ export class ContextTestHelpers {
   async getMessages(): Promise<MessageData[]> {
     const messages: MessageData[] = [];
     const messageItems = this.page.locator('[data-testid="message-item"]');
-    
+
     const count = await messageItems.count();
-    
+
     for (let i = 0; i < count; i++) {
       const item = messageItems.nth(i);
       const role = await item.getAttribute('data-role') as 'user' | 'assistant' | 'system';
       const content = await item.locator('[data-testid="message-content"]').textContent();
-      
+
       if (role && content) {
         messages.push({
           role,
@@ -236,28 +236,28 @@ export class ContextTestHelpers {
         });
       }
     }
-    
+
     return messages;
   }
 
   async waitForAssistantResponse(timeoutMs: number = 30000): Promise<string> {
     // Wait for thinking indicator to appear and disappear
     await this.page.waitForSelector('[data-testid="assistant-thinking"]', { timeout: 5000 });
-    await this.page.waitForSelector('[data-testid="assistant-thinking"]', { 
-      state: 'detached', 
-      timeout: timeoutMs 
+    await this.page.waitForSelector('[data-testid="assistant-thinking"]', {
+      state: 'detached',
+      timeout: timeoutMs
     });
-    
+
     // Get the latest assistant message
     const assistantMessages = this.page.locator('[data-testid="message-item"][data-role="assistant"]');
     const lastMessage = assistantMessages.last();
-    
+
     const content = await lastMessage.locator('[data-testid="message-content"]').textContent();
-    
+
     if (!content) {
       throw new Error('No assistant response received');
     }
-    
+
     return content.trim();
   }
 
@@ -267,29 +267,29 @@ export class ContextTestHelpers {
   async addManualContext(data: ContextData): Promise<void> {
     // Open add context dialog
     await this.page.click('[data-testid="add-manual-context-button"]');
-    
+
     // Fill context details
     await this.page.selectOption('[data-testid="context-type-select"]', data.type);
     await this.page.fill('[data-testid="context-title-input"]', data.title);
     await this.page.fill('[data-testid="context-content-textarea"]', data.content);
-    
+
     // Add metadata if provided
     if (data.metadata) {
       for (const [key, value] of Object.entries(data.metadata)) {
         await this.page.click('[data-testid="add-metadata-button"]');
-        
+
         // Fill the last metadata key-value pair
         const metadataItems = this.page.locator('[data-testid="metadata-item"]');
         const lastItem = metadataItems.last();
-        
+
         await lastItem.locator('[data-testid="metadata-key-input"]').fill(key);
         await lastItem.locator('[data-testid="metadata-value-input"]').fill(value);
       }
     }
-    
+
     // Save context
     await this.page.click('[data-testid="save-context-button"]');
-    
+
     // Wait for context to appear in the list
     await this.page.waitForSelector(`[data-testid="context-item"]:has-text("${data.title}")`);
   }
@@ -297,34 +297,34 @@ export class ContextTestHelpers {
   async addSearchContext(query: string, documents: Document[], limit?: number): Promise<void> {
     // Navigate to search first
     await this.navigateToSearch();
-    
+
     // Perform search (mock or real depending on test setup)
     await this.page.fill('[data-testid="search-input"]', query);
     await this.page.click('[data-testid="search-button"]');
-    
+
     // Wait for results
     await this.page.waitForSelector('[data-testid="search-results"]');
-    
+
     // Select documents (limit to specified number)
     const documentsToSelect = limit ? documents.slice(0, limit) : documents;
-    
+
     for (const doc of documentsToSelect) {
       // Find and select the document checkbox
       const docItem = this.page.locator(`[data-testid="search-result-item"]:has-text("${doc.title}")`);
       await docItem.locator('[data-testid="search-result-checkbox"]').check();
     }
-    
+
     // Add selected results as context
     await this.page.click('[data-testid="add-to-context-button"]');
-    
+
     // Select target conversation (assumes we're in a conversation context)
     const activeConversationTitle = await this.page.locator('[data-testid="active-conversation-title"]').textContent();
     if (activeConversationTitle) {
       await this.page.selectOption('[data-testid="target-conversation-select"]', activeConversationTitle);
     }
-    
+
     await this.page.click('[data-testid="confirm-add-context"]');
-    
+
     // Navigate back to conversation to see the added context
     await this.navigateToConversations();
     if (activeConversationTitle) {
@@ -335,31 +335,31 @@ export class ContextTestHelpers {
   async getContextItems(): Promise<ContextData[]> {
     const contexts: ContextData[] = [];
     const contextItems = this.page.locator('[data-testid="context-item"]');
-    
+
     const count = await contextItems.count();
-    
+
     for (let i = 0; i < count; i++) {
       const item = contextItems.nth(i);
       const type = await item.getAttribute('data-context-type') as ContextData['type'];
       const title = await item.locator('[data-testid="context-title"]').textContent();
       const content = await item.locator('[data-testid="context-content"]').textContent();
-      
+
       if (type && title && content) {
         // Get metadata if available
         const metadata: Record<string, string> = {};
         const metadataItems = item.locator('[data-testid="context-metadata-item"]');
         const metadataCount = await metadataItems.count();
-        
+
         for (let j = 0; j < metadataCount; j++) {
           const metadataItem = metadataItems.nth(j);
           const key = await metadataItem.getAttribute('data-key');
           const value = await metadataItem.getAttribute('data-value');
-          
+
           if (key && value) {
             metadata[key] = value;
           }
         }
-        
+
         contexts.push({
           type,
           title: title.trim(),
@@ -368,55 +368,55 @@ export class ContextTestHelpers {
         });
       }
     }
-    
+
     return contexts;
   }
 
   async editContext(originalTitle: string, newData: Partial<ContextData>): Promise<void> {
     const contextItem = this.page.locator(`[data-testid="context-item"]:has-text("${originalTitle}")`);
-    
+
     // Hover to show edit button
     await contextItem.hover();
     await contextItem.locator('[data-testid="edit-context-button"]').click();
-    
+
     // Update fields
     if (newData.title) {
       await this.page.fill('[data-testid="context-title-input"]', newData.title);
     }
-    
+
     if (newData.content) {
       await this.page.fill('[data-testid="context-content-textarea"]', newData.content);
     }
-    
+
     if (newData.type) {
       await this.page.selectOption('[data-testid="context-type-select"]', newData.type);
     }
-    
+
     // Update metadata if provided
     if (newData.metadata) {
       // Clear existing metadata first
       const removeButtons = this.page.locator('[data-testid="remove-metadata-button"]');
       const removeCount = await removeButtons.count();
-      
+
       for (let i = 0; i < removeCount; i++) {
         await removeButtons.first().click();
       }
-      
+
       // Add new metadata
       for (const [key, value] of Object.entries(newData.metadata)) {
         await this.page.click('[data-testid="add-metadata-button"]');
-        
+
         const metadataItems = this.page.locator('[data-testid="metadata-item"]');
         const lastItem = metadataItems.last();
-        
+
         await lastItem.locator('[data-testid="metadata-key-input"]').fill(key);
         await lastItem.locator('[data-testid="metadata-value-input"]').fill(value);
       }
     }
-    
+
     // Save changes
     await this.page.click('[data-testid="save-context-button"]');
-    
+
     // Wait for updated context to appear
     const expectedTitle = newData.title || originalTitle;
     await this.page.waitForSelector(`[data-testid="context-item"]:has-text("${expectedTitle}")`);
@@ -424,17 +424,17 @@ export class ContextTestHelpers {
 
   async removeContext(contextTitle: string): Promise<void> {
     const contextItem = this.page.locator(`[data-testid="context-item"]:has-text("${contextTitle}")`);
-    
+
     // Hover to show remove button
     await contextItem.hover();
     await contextItem.locator('[data-testid="remove-context-button"]').click();
-    
+
     // Confirm removal
     await this.page.click('[data-testid="confirm-remove-context"]');
-    
+
     // Wait for context to be removed
-    await this.page.waitForSelector(`[data-testid="context-item"]:has-text("${contextTitle}")`, { 
-      state: 'detached' 
+    await this.page.waitForSelector(`[data-testid="context-item"]:has-text("${contextTitle}")`, {
+      state: 'detached'
     });
   }
 
@@ -447,18 +447,18 @@ export class ContextTestHelpers {
   }
 
   async assertMessageExists(content: string, role?: MessageData['role']): Promise<void> {
-    const messageSelector = role 
+    const messageSelector = role
       ? `[data-testid="message-item"][data-role="${role}"]:has-text("${content}")`
       : `[data-testid="message-item"]:has-text("${content}")`;
-    
+
     await expect(this.page.locator(messageSelector)).toBeVisible();
   }
 
   async assertContextExists(title: string, type?: ContextData['type']): Promise<void> {
-    const contextSelector = type 
+    const contextSelector = type
       ? `[data-testid="context-item"][data-context-type="${type}"]:has-text("${title}")`
       : `[data-testid="context-item"]:has-text("${title}")`;
-    
+
     await expect(this.page.locator(contextSelector)).toBeVisible();
   }
 
@@ -525,7 +525,7 @@ export class ContextTestHelpers {
       if (await element.count() > 0) {
         const ariaLabel = await element.getAttribute('aria-label');
         const hasAriaLabelledBy = await element.getAttribute('aria-labelledby');
-        
+
         expect(ariaLabel || hasAriaLabelledBy).toBeTruthy();
       }
     }
@@ -542,18 +542,18 @@ export class ContextTestHelpers {
           // Mock Tauri invoke responses for testing
           switch (command) {
             case 'create_conversation':
-              return { 
-                status: 'Success', 
-                conversation_id: `mock-conv-${Date.now()}`, 
-                error: null 
+              return {
+                status: 'Success',
+                conversation_id: `mock-conv-${Date.now()}`,
+                error: null
               };
             case 'add_context_to_conversation':
               return { status: 'Success', error: null };
             case 'add_message_to_conversation':
-              return { 
-                status: 'Success', 
-                message_id: `mock-msg-${Date.now()}`, 
-                error: null 
+              return {
+                status: 'Success',
+                message_id: `mock-msg-${Date.now()}`,
+                error: null
               };
             case 'get_conversation':
               return {

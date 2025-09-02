@@ -134,9 +134,9 @@ impl ContextManager {
             .ok_or_else(|| ServiceError::Config(format!("Conversation {} not found", conversation_id)))?;
 
         // Check context limits
-        let total_context_count = conversation.global_context.len() + 
+        let total_context_count = conversation.global_context.len() +
             conversation.messages.iter().map(|m| m.context_items.len()).sum::<usize>();
-        
+
         if total_context_count >= self.config.max_context_items {
             return Err(ServiceError::Config(
                 "Maximum context items reached for this conversation".to_string(),
@@ -231,7 +231,7 @@ impl ContextManager {
             }
 
             to_remove.sort_by_key(|(_, updated_at)| *updated_at);
-            
+
             for (id, _) in to_remove.iter().take(excess) {
                 self.conversations_cache.remove(id);
             }
@@ -434,7 +434,7 @@ mod tests {
         let messages = build_llm_messages_with_context(&conversation, true);
 
         assert_eq!(messages.len(), 2); // System message + user message
-        
+
         // Check system message with global context
         assert_eq!(messages[0]["role"], "system");
         assert!(messages[0]["content"].as_str().unwrap().contains("This is system information"));
