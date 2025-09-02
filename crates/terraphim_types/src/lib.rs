@@ -898,12 +898,19 @@ impl Conversation {
 
     /// Get the total context length (approximation)
     pub fn estimated_context_length(&self) -> usize {
-        let message_length: usize = self.messages.iter()
-            .map(|m| m.content.len() + m.context_items.iter().map(|c| c.content.len()).sum::<usize>())
+        let message_length: usize = self
+            .messages
+            .iter()
+            .map(|m| {
+                m.content.len()
+                    + m.context_items
+                        .iter()
+                        .map(|c| c.content.len())
+                        .sum::<usize>()
+            })
             .sum();
-        let global_context_length: usize = self.global_context.iter()
-            .map(|c| c.content.len())
-            .sum();
+        let global_context_length: usize =
+            self.global_context.iter().map(|c| c.content.len()).sum();
         message_length + global_context_length
     }
 }
@@ -936,12 +943,16 @@ pub struct ConversationSummary {
 
 impl From<&Conversation> for ConversationSummary {
     fn from(conversation: &Conversation) -> Self {
-        let context_count = conversation.global_context.len() +
-            conversation.messages.iter()
+        let context_count = conversation.global_context.len()
+            + conversation
+                .messages
+                .iter()
                 .map(|m| m.context_items.len())
                 .sum::<usize>();
 
-        let preview = conversation.messages.iter()
+        let preview = conversation
+            .messages
+            .iter()
             .find(|m| m.role == "user")
             .map(|m| {
                 if m.content.len() > 100 {
@@ -984,7 +995,12 @@ impl ContextHistory {
     }
 
     /// Record that a context item was used
-    pub fn record_usage(&mut self, context_id: &str, conversation_id: &ConversationId, usage_type: ContextUsageType) {
+    pub fn record_usage(
+        &mut self,
+        context_id: &str,
+        conversation_id: &ConversationId,
+        usage_type: ContextUsageType,
+    ) {
         let entry = ContextHistoryEntry {
             context_id: context_id.to_string(),
             conversation_id: conversation_id.clone(),
@@ -994,8 +1010,11 @@ impl ContextHistory {
         };
 
         // Check if we already have this context for this conversation
-        if let Some(existing) = self.used_contexts.iter_mut()
-            .find(|e| e.context_id == context_id && e.conversation_id == *conversation_id) {
+        if let Some(existing) = self
+            .used_contexts
+            .iter_mut()
+            .find(|e| e.context_id == context_id && e.conversation_id == *conversation_id)
+        {
             existing.usage_count += 1;
             existing.used_at = chrono::Utc::now();
         } else {
@@ -1005,7 +1024,8 @@ impl ContextHistory {
         // Trim to max entries if needed
         if self.used_contexts.len() > self.max_entries {
             self.used_contexts.sort_by_key(|e| e.used_at);
-            self.used_contexts.drain(0..self.used_contexts.len() - self.max_entries);
+            self.used_contexts
+                .drain(0..self.used_contexts.len() - self.max_entries);
         }
     }
 
@@ -1100,7 +1120,12 @@ impl MultiAgentContext {
     }
 
     /// Record communication between agents
-    pub fn record_communication(&mut self, from_agent: &str, to_agent: Option<&str>, message: String) {
+    pub fn record_communication(
+        &mut self,
+        from_agent: &str,
+        to_agent: Option<&str>,
+        message: String,
+    ) {
         let communication = AgentCommunication {
             from_agent: from_agent.to_string(),
             to_agent: to_agent.map(|s| s.to_string()),
