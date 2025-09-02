@@ -1,6 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from 'prosemirror-state';
-import { Suggestion, SuggestionOptions } from '@tiptap/suggestion';
+import { Suggestion } from '@tiptap/suggestion';
+import type { SuggestionOptions } from '@tiptap/suggestion';
 import { novelAutocompleteService, type NovelAutocompleteSuggestion } from '../services/novelAutocompleteService';
 import tippy, { type Instance, type Props } from 'tippy.js';
 
