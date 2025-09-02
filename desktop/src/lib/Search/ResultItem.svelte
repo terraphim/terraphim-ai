@@ -27,6 +27,11 @@
   let showAiSummary = false;
   let summaryFromCache = false;
 
+  // Context addition state
+  let addingToContext = false;
+  let contextAdded = false;
+  let contextError: string | null = null;
+
   // Check if current role has atomic server configuration
   $: hasAtomicServer = checkAtomicServerAvailable();
 
@@ -88,12 +93,12 @@
     // Add to context for LLM conversation
     items.push({
       id: 'add-context',
-      label: 'Add to Context',
-      icon: 'fas fa-plus',
+      label: contextAdded ? 'Added to Context' : (addingToContext ? 'Adding...' : 'Add to Context'),
+      icon: contextAdded ? 'fas fa-check' : (addingToContext ? 'fas fa-spinner fa-spin' : 'fas fa-plus'),
       action: () => addToContext(),
       visible: true,
-      title: 'Add document to LLM conversation context',
-      disabled: false
+      title: contextAdded ? 'Document added to context' : 'Add document to LLM conversation context',
+      disabled: addingToContext || contextAdded
     });
 
     return items;
@@ -422,6 +427,11 @@
   async function addToContext() {
     console.log('📝 Adding document to LLM context:', document.title);
 
+    // Reset state and show loading
+    addingToContext = true;
+    contextAdded = false;
+    contextError = null;
+
     try {
       let conversationId = null;
 
@@ -549,18 +559,27 @@
 
       console.log('✅ Successfully added document to LLM context');
 
-    } catch (error) {
-      console.error('❌ Error adding document to context:');
-      console.error('  Error type:', error.constructor.name);
-      console.error('  Error message:', error.message || error);
-      console.error('  Document details:', {
-        id: document.id,
-        title: document.title,
-        isTauri: $is_tauri,
-        timestamp: new Date().toISOString()
-      });
+      // Show success state
+      contextAdded = true;
 
-      // Could show error notification to user
+      // Reset success state after a delay to allow re-adding if needed
+      setTimeout(() => {
+        contextAdded = false;
+      }, 3000);
+
+    } catch (error) {
+      console.error('❌ Error adding document to context:', error);
+
+      // Show error state
+      contextError = error.message || 'Failed to add document to context';
+
+      // Clear error after a delay
+      setTimeout(() => {
+        contextError = null;
+      }, 5000);
+
+    } finally {
+      addingToContext = false;
     }
   }
 
@@ -753,6 +772,14 @@
       </div>
     </div>
   </article>
+
+  <!-- Context addition feedback -->
+  {#if contextError}
+    <div class="notification is-danger is-light mt-2">
+      <button class="delete" on:click={() => contextError = null}></button>
+      {contextError}
+    </div>
+  {/if}
 </div>
 
 <!-- Original document modal -->
