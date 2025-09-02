@@ -7,11 +7,10 @@
 #[cfg(test)]
 mod tests {
     use super::super::context::{ContextConfig, ContextManager};
-    use terraphim_types::{
-        ConversationId, ContextItem, ContextType, ChatMessage,
-        Document, RoleName
-    };
     use ahash::AHashMap;
+    use terraphim_types::{
+        ChatMessage, ContextItem, ContextType, ConversationId, Document, RoleName,
+    };
     use tokio::test;
 
     // Test fixtures
@@ -30,7 +29,8 @@ mod tests {
             id: "test-doc-1".to_string(),
             url: "https://example.com/test".to_string(),
             title: "Test Document".to_string(),
-            body: "This is a test document with some content for testing context management.".to_string(),
+            body: "This is a test document with some content for testing context management."
+                .to_string(),
             description: Some("A test document".to_string()),
             summarization: None,
             stub: None,
@@ -40,17 +40,19 @@ mod tests {
     }
 
     fn create_test_documents(count: usize) -> Vec<Document> {
-        (0..count).map(|i| Document {
-            id: format!("doc-{}", i),
-            url: format!("https://example.com/doc-{}", i),
-            title: format!("Test Document {}", i),
-            body: format!("Content of document {} for testing.", i),
-            description: Some(format!("Description for document {}", i)),
-            summarization: None,
-            stub: None,
-            tags: Some(vec![format!("tag-{}", i), "test".to_string()]),
-            rank: Some(i as u64),
-        }).collect()
+        (0..count)
+            .map(|i| Document {
+                id: format!("doc-{}", i),
+                url: format!("https://example.com/doc-{}", i),
+                title: format!("Test Document {}", i),
+                body: format!("Content of document {} for testing.", i),
+                description: Some(format!("Description for document {}", i)),
+                summarization: None,
+                stub: None,
+                tags: Some(vec![format!("tag-{}", i), "test".to_string()]),
+                rank: Some(i as u64),
+            })
+            .collect()
     }
 
     // Core functionality tests
@@ -100,9 +102,18 @@ mod tests {
         let mut manager = ContextManager::new(create_test_config());
 
         // Create multiple conversations
-        let conv1 = manager.create_conversation("Conv 1".to_string(), RoleName::new("engineer")).await.unwrap();
-        let conv2 = manager.create_conversation("Conv 2".to_string(), RoleName::new("researcher")).await.unwrap();
-        let conv3 = manager.create_conversation("Conv 3".to_string(), RoleName::new("writer")).await.unwrap();
+        let conv1 = manager
+            .create_conversation("Conv 1".to_string(), RoleName::new("engineer"))
+            .await
+            .unwrap();
+        let conv2 = manager
+            .create_conversation("Conv 2".to_string(), RoleName::new("researcher"))
+            .await
+            .unwrap();
+        let conv3 = manager
+            .create_conversation("Conv 3".to_string(), RoleName::new("writer"))
+            .await
+            .unwrap();
 
         // Test listing without limit
         let all_conversations = manager.list_conversations(None);

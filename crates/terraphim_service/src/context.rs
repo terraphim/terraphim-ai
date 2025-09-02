@@ -68,7 +68,8 @@ impl ContextManager {
         let id = conversation.id.clone();
 
         // Add to cache (for now we'll only use in-memory storage)
-        self.conversations_cache.insert(id.clone(), Arc::new(conversation));
+        self.conversations_cache
+            .insert(id.clone(), Arc::new(conversation));
 
         // Clean cache if needed
         self.clean_cache();
@@ -109,16 +110,17 @@ impl ContextManager {
         let message_id = message.id.clone();
 
         // Get conversation from cache
-        let conversation = self
-            .get_conversation(conversation_id)
-            .ok_or_else(|| ServiceError::Config(format!("Conversation {} not found", conversation_id)))?;
+        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
+            ServiceError::Config(format!("Conversation {} not found", conversation_id))
+        })?;
 
         // Create a mutable copy and add message
         let mut updated_conversation = (*conversation).clone();
         updated_conversation.add_message(message);
 
         // Update cache
-        self.conversations_cache.insert(conversation_id.clone(), Arc::new(updated_conversation));
+        self.conversations_cache
+            .insert(conversation_id.clone(), Arc::new(updated_conversation));
 
         Ok(message_id)
     }
@@ -129,13 +131,17 @@ impl ContextManager {
         conversation_id: &ConversationId,
         context: ContextItem,
     ) -> ServiceResult<()> {
-        let conversation = self
-            .get_conversation(conversation_id)
-            .ok_or_else(|| ServiceError::Config(format!("Conversation {} not found", conversation_id)))?;
+        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
+            ServiceError::Config(format!("Conversation {} not found", conversation_id))
+        })?;
 
         // Check context limits
-        let total_context_count = conversation.global_context.len() +
-            conversation.messages.iter().map(|m| m.context_items.len()).sum::<usize>();
+        let total_context_count = conversation.global_context.len()
+            + conversation
+                .messages
+                .iter()
+                .map(|m| m.context_items.len())
+                .sum::<usize>();
 
         if total_context_count >= self.config.max_context_items {
             return Err(ServiceError::Config(
@@ -156,7 +162,8 @@ impl ContextManager {
         updated_conversation.add_global_context(context);
 
         // Update cache
-        self.conversations_cache.insert(conversation_id.clone(), Arc::new(updated_conversation));
+        self.conversations_cache
+            .insert(conversation_id.clone(), Arc::new(updated_conversation));
 
         Ok(())
     }
@@ -304,9 +311,7 @@ mod tests {
             .await
             .unwrap();
 
-        let conversation = context_manager
-            .get_conversation(&conversation_id)
-            .unwrap();
+        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
 
         assert_eq!(conversation.title, "Test Conversation");
         assert_eq!(conversation.role.as_str(), "Test");
@@ -327,9 +332,7 @@ mod tests {
             .add_message(&conversation_id, message)
             .unwrap();
 
-        let conversation = context_manager
-            .get_conversation(&conversation_id)
-            .unwrap();
+        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
 
         assert_eq!(conversation.messages.len(), 1);
         assert_eq!(conversation.messages[0].id, message_id);
@@ -437,7 +440,10 @@ mod tests {
 
         // Check system message with global context
         assert_eq!(messages[0]["role"], "system");
-        assert!(messages[0]["content"].as_str().unwrap().contains("This is system information"));
+        assert!(messages[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("This is system information"));
 
         // Check user message with message context
         assert_eq!(messages[1]["role"], "user");
