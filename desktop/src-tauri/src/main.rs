@@ -376,7 +376,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::get_rolegraph,
             cmd::find_documents_for_kg_term,
             cmd::save_article_to_atomic,
-            cmd::get_autocomplete_suggestions
+            cmd::get_autocomplete_suggestions,
+            // Conversation management commands
+            cmd::create_conversation,
+            cmd::list_conversations,
+            cmd::get_conversation,
+            cmd::add_message_to_conversation,
+            cmd::add_context_to_conversation,
+            cmd::add_search_context_to_conversation
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();

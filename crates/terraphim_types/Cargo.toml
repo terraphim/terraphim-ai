@@ -22,6 +22,8 @@ schemars = { version = "0.8", features = ["derive"] }
 tsify = { version = "0.4", features = ["js"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [features]
 typescript = ["tsify", "wasm-bindgen"]
