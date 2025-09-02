@@ -460,14 +460,30 @@ pub struct AtomicSaveResponse {
     pub message: String,
 }
 
-/// Autocomplete suggestion data structure
+/// Autocomplete suggestion data structure compatible with TipTap
 #[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct AutocompleteSuggestion {
+    /// The suggested term/text to insert
     pub term: String,
+    /// Alternative text property for TipTap compatibility
+    #[serde(alias = "text")]
+    pub text: Option<String>,
+    /// Normalized term value for search
     pub normalized_term: Option<String>,
+    /// URL or snippet information
     pub url: Option<String>,
+    /// Alternative snippet property
+    #[serde(alias = "snippet")]
+    pub snippet: Option<String>,
+    /// Confidence score (0.0 to 1.0)
     pub score: f64,
+    /// Suggestion type for UI categorization
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestion_type: Option<String>,
+    /// Icon identifier for UI display
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// Response type for autocomplete operations
@@ -715,14 +731,23 @@ pub async fn get_autocomplete_suggestions(
         }
     };
 
-    // Convert results to autocomplete suggestions
+    // Convert results to autocomplete suggestions with TipTap compatibility
     let suggestions: Vec<AutocompleteSuggestion> = results
         .into_iter()
-        .map(|result| AutocompleteSuggestion {
-            term: result.term,
-            normalized_term: Some(result.normalized_term.to_string()),
-            url: result.url,
-            score: result.score,
+        .map(|result| {
+            let term = result.term.clone();
+            let url = result.url.clone();
+
+            AutocompleteSuggestion {
+                term: term.clone(),
+                text: Some(term.clone()), // For TipTap compatibility
+                normalized_term: Some(result.normalized_term.to_string()),
+                url: url.clone(),
+                snippet: url.clone(), // Use URL as snippet for now
+                score: result.score,
+                suggestion_type: Some("knowledge-graph".to_string()),
+                icon: Some("🔗".to_string()), // Default icon for KG terms
+            }
         })
         .collect();
 

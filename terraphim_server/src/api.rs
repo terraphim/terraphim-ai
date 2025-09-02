@@ -1485,12 +1485,24 @@ pub struct AutocompleteResponse {
 pub struct AutocompleteSuggestion {
     /// The suggested term
     pub term: String,
-    /// Normalized term value
+    /// Alternative text property for TipTap compatibility
+    #[serde(alias = "text")]
+    pub text: String,
+    /// Normalized term value for search
     pub normalized_term: String,
-    /// URL if available
+    /// URL associated with the term
     pub url: Option<String>,
-    /// Relevance score from FST
+    /// Snippet/description for the term
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<String>,
+    /// Confidence score (0.0 to 1.0)
     pub score: f64,
+    /// Suggestion type for UI categorization
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestion_type: Option<String>,
+    /// Icon identifier for UI display
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// Get thesaurus for a specific role
@@ -1617,14 +1629,23 @@ pub(crate) async fn get_autocomplete(
         }
     };
 
-    // Convert FST results to API response format
+    // Convert FST results to API response format with TipTap compatibility
     let suggestions: Vec<AutocompleteSuggestion> = results
         .into_iter()
-        .map(|result| AutocompleteSuggestion {
-            term: result.term,
-            normalized_term: result.normalized_term.as_str().to_string(),
-            url: result.url,
-            score: result.score,
+        .map(|result| {
+            let term = result.term.clone();
+            let url = result.url.clone();
+
+            AutocompleteSuggestion {
+                term: term.clone(),
+                text: term.clone(), // For TipTap compatibility
+                normalized_term: result.normalized_term.as_str().to_string(),
+                url: url.clone(),
+                snippet: url.clone(), // Use URL as snippet for now
+                score: result.score,
+                suggestion_type: Some("knowledge-graph".to_string()),
+                icon: Some("🔗".to_string()), // Default icon for KG terms
+            }
         })
         .collect();
 
