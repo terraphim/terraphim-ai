@@ -43,7 +43,6 @@ async fn clickup_live_search_returns_documents() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
-        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()
@@ -92,7 +91,6 @@ async fn clickup_live_search_work_term() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
-        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()

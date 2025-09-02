@@ -99,12 +99,19 @@ async fn create_terraphim_engineer_config() -> Result<String> {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
+        #[cfg(feature = "openrouter")]
         openrouter_enabled: false,
+        #[cfg(feature = "openrouter")]
         openrouter_api_key: None,
+        #[cfg(feature = "openrouter")]
         openrouter_model: None,
+        #[cfg(feature = "openrouter")]
         openrouter_auto_summarize: false,
+        #[cfg(feature = "openrouter")]
         openrouter_chat_enabled: false,
+        #[cfg(feature = "openrouter")]
         openrouter_chat_system_prompt: None,
+        #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
     };
 

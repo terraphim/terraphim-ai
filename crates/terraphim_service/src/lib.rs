@@ -509,13 +509,16 @@ impl TerraphimService {
         // Filter thesaurus to only include meaningful terms and avoid over-linking
         let mut kg_thesaurus = Thesaurus::new(format!("kg_links_{}", role.name));
 
-        // Very selective KG term filtering to avoid clutter:
-        // Only include highly specific, domain-relevant terms
+        // Prioritize important KG terms while excluding overly generic ones
+        // Key KG concepts should always be included even if they're common
+        let important_kg_terms = [
+            "graph", "haystack", "service", "terraphim", "knowledge", 
+            "embedding", "search", "automata", "thesaurus", "rolegraph"
+        ];
+        
+        // Exclude only very generic programming/technical terms that don't add value
         let excluded_common_terms = [
-            "service",
-            "haystack",
-            "system",
-            "config",
+            "system", "config",
             "configuration",
             "type",
             "method",
@@ -610,26 +613,47 @@ impl TerraphimService {
             .filter(|(key, _)| {
                 let term = key.as_str();
 
-                // Exclude empty terms, very short terms, and common technical terms
-                if term.is_empty() || term.len() < 3 || excluded_common_terms.contains(&term) {
+                // Always exclude empty or very short terms
+                if term.is_empty() || term.len() < 3 {
+                    return false;
+                }
+                
+                // Always include important KG terms, even if they're short
+                if important_kg_terms.contains(&term) {
+                    return true;
+                }
+
+                // Exclude generic technical terms
+                if excluded_common_terms.contains(&term) {
                     return false;
                 }
 
                 // Include terms that are:
-                // 1. Moderately long (>6 chars) OR
-                // 2. Hyphenated compound terms OR
+                // 1. Moderately long (>5 chars) OR
+                // 2. Hyphenated compound terms OR  
                 // 3. Underscore-separated compound terms OR
                 // 4. Capitalized terms (likely proper nouns or important concepts)
-                term.len() > 6
+                term.len() > 5
                     || term.contains('-')
                     || term.contains('_')
                     || term.chars().next().is_some_and(|c| c.is_uppercase())
             })
             .collect();
-        sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id)); // Sort by relevance (ID)
+        
+        // Sort by relevance, but prioritize important KG terms
+        sorted_terms.sort_by(|a, b| {
+            let a_important = important_kg_terms.contains(&a.0.as_str());
+            let b_important = important_kg_terms.contains(&b.0.as_str());
+            
+            match (a_important, b_important) {
+                (true, false) => std::cmp::Ordering::Less,    // a comes first
+                (false, true) => std::cmp::Ordering::Greater, // b comes first
+                _ => b.1.id.cmp(&a.1.id), // Both or neither important, sort by ID
+            }
+        });
 
-        // Take only the top 3 most specific terms to minimize clutter
-        let max_kg_terms = 3;
+        // Take more terms since we're being more selective about quality
+        let max_kg_terms = 8;
         for (key, value) in sorted_terms.into_iter().take(max_kg_terms) {
             let mut kg_value = value.clone();
             // IMPORTANT: Keep the original term (key) as visible text, link to root concept (value.value)
@@ -642,9 +666,10 @@ impl TerraphimService {
 
         let kg_terms_count = kg_thesaurus.len();
         log::info!(
-            "📋 KG thesaurus filtering: {} → {} terms (filters: len>12, hyphenated, or contains graph/terraphim/knowledge/embedding)",
+            "📋 KG thesaurus filtering: {} → {} terms (prioritizing: {}, filters: len>5, hyphenated, or important KG terms)",
             thesaurus.len(),
-            kg_terms_count
+            kg_terms_count,
+            important_kg_terms.join(", ")
         );
 
         // Log the actual terms that passed filtering for debugging
@@ -885,15 +910,23 @@ impl TerraphimService {
     /// and applies KG term preprocessing accordingly. It prevents double processing
     /// by checking if KG links already exist in the document.
     async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
+        log::debug!("🔍 [KG-DEBUG] apply_kg_preprocessing_if_needed called for document: '{}'", document.title);
+        log::debug!("🔍 [KG-DEBUG] Document body preview: {}", document.body.chars().take(100).collect::<String>());
+        
         let role = {
             let config = self.config_state.config.lock().await;
             let selected_role = &config.selected_role;
 
+            log::debug!("🔍 [KG-DEBUG] Selected role: '{}'", selected_role);
+
             match config.roles.get(selected_role) {
-                Some(role) => role.clone(), // Clone to avoid borrowing issues
+                Some(role) => {
+                    log::debug!("🔍 [KG-DEBUG] Role found: '{}', terraphim_it: {}", role.name, role.terraphim_it);
+                    role.clone() // Clone to avoid borrowing issues
+                }
                 None => {
-                    log::debug!(
-                        "Selected role '{}' not found, skipping KG preprocessing",
+                    log::warn!(
+                        "❌ [KG-DEBUG] Selected role '{}' not found in config, skipping KG preprocessing",
                         selected_role
                     );
                     return Ok(document);
@@ -903,35 +936,50 @@ impl TerraphimService {
 
         // Only apply preprocessing if role has terraphim_it enabled
         if !role.terraphim_it {
-            log::debug!(
-                "terraphim_it disabled for role '{}', skipping KG preprocessing",
+            log::info!(
+                "🔍 [KG-DEBUG] terraphim_it disabled for role '{}', skipping KG preprocessing",
                 role.name
             );
             return Ok(document);
         }
 
         // Check if document already has KG links to prevent double processing
-        if document.body.contains("](kg:") {
-            log::debug!(
-                "Document '{}' already has KG links, skipping preprocessing to prevent double processing",
+        let has_existing_kg_links = document.body.contains("](kg:");
+        log::debug!("🔍 [KG-DEBUG] Document already has KG links: {}", has_existing_kg_links);
+        if has_existing_kg_links {
+            log::info!(
+                "🔍 [KG-DEBUG] Document '{}' already has KG links, skipping preprocessing to prevent double processing",
                 document.title
             );
             return Ok(document);
         }
 
         log::info!(
-            "🧠 Applying KG preprocessing to document '{}' for role '{}' (terraphim_it enabled)",
+            "🧠 [KG-DEBUG] Starting KG preprocessing for document '{}' with role '{}' (terraphim_it enabled)",
             document.title,
             role.name
         );
 
         // Apply KG preprocessing
-        let processed_doc = self.preprocess_document_content(document, &role).await?;
-
-        log::debug!(
-            "✅ KG preprocessing completed for document '{}'",
-            processed_doc.title
-        );
+        let document_title = document.title.clone(); // Save title before moving document
+        let processed_doc = match self.preprocess_document_content(document, &role).await {
+            Ok(doc) => {
+                let links_added = doc.body.contains("](kg:");
+                log::info!(
+                    "✅ [KG-DEBUG] KG preprocessing completed for document '{}'. Links added: {}",
+                    doc.title,
+                    links_added
+                );
+                if links_added {
+                    log::debug!("🔍 [KG-DEBUG] Processed body preview: {}", doc.body.chars().take(200).collect::<String>());
+                }
+                doc
+            }
+            Err(e) => {
+                log::error!("❌ [KG-DEBUG] KG preprocessing failed for document '{}': {:?}", document_title, e);
+                return Err(e);
+            }
+        };
 
         Ok(processed_doc)
     }
@@ -2375,6 +2423,15 @@ impl TerraphimService {
     pub async fn fetch_config(&self) -> terraphim_config::Config {
         let current_config = self.config_state.config.lock().await;
         current_config.clone()
+    }
+
+    // Test helper methods
+    #[cfg(test)]
+    pub async fn get_role(&self, role_name: &RoleName) -> Result<Role> {
+        let config = self.config_state.config.lock().await;
+        config.roles.get(role_name)
+            .cloned()
+            .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found", role_name)))
     }
 
     /// Update the config

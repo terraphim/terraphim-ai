@@ -151,7 +151,6 @@ async fn test_atomic_haystack_with_terraphim_config() {
                 )
                 .with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -467,7 +466,6 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
                 kg: None,
                 haystacks,
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()

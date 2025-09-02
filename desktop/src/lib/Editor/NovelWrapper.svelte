@@ -81,7 +81,7 @@
         if ($is_tauri) {
           autocompleteStatus = '❌ Tauri backend not available';
         } else {
-          autocompleteStatus = '❌ MCP server not responding';
+          autocompleteStatus = '❌ REST API server not responding';
         }
       }
     } catch (error) {
@@ -135,7 +135,7 @@
         if ($is_tauri) {
           autocompleteStatus = '✅ Ready - Using Tauri backend';
         } else {
-          autocompleteStatus = '✅ Ready - Using MCP server backend';
+          autocompleteStatus = '✅ Ready - Using REST API backend';
         }
       } else {
         alert(`⚠️ No suggestions found for '${testQuery}'. This might be normal if the term isn't in your knowledge graph.`);
@@ -159,7 +159,7 @@
         if ($is_tauri) {
           autocompleteStatus = '✅ Ready - Tauri index rebuilt successfully';
         } else {
-          autocompleteStatus = '✅ Ready - MCP server index rebuilt successfully';
+          autocompleteStatus = '✅ Ready - REST API connection verified';
         }
         autocompleteReady = true;
       } else {
@@ -296,14 +296,14 @@ Start typing below:`;
         {#if $is_tauri}
           Tauri backend connection failed. Ensure the application has proper permissions.
         {:else}
-          MCP server not responding. Ensure the server is running on {novelAutocompleteService.getStatus().baseUrl}
+          REST API server not responding. Ensure the server is running on {novelAutocompleteService.getStatus().baseUrl}
         {/if}
       </div>
     {/if}
 
     <div style="font-size: 12px; color: #6c757d;">
       <strong>Configuration:</strong>
-      <br>• <strong>Backend:</strong> {$is_tauri ? 'Tauri (native)' : `MCP Server (${novelAutocompleteService.getStatus().baseUrl})`}
+      <br>• <strong>Backend:</strong> {$is_tauri ? 'Tauri (native)' : `REST API (${novelAutocompleteService.getStatus().baseUrl})`}
       <br>• <strong>Role:</strong> {$role}
       <br>• <strong>Trigger:</strong> "{suggestionTrigger}" + text
       <br>• <strong>Min Length:</strong> {minQueryLength} character{minQueryLength !== 1 ? 's' : ''}

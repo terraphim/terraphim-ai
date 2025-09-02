@@ -32,7 +32,6 @@ async fn atlassian_ripgrep_haystack_smoke() {
             true,
         )],
         extra: ahash::AHashMap::new(),
-        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()

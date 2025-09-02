@@ -27,6 +27,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio-util = { version = "0.7" }
 axum = { version = "0.8" }
 
+[features]
+openrouter = ["terraphim_config/openrouter"]
+
 [dev-dependencies]
 ahash = "0.8"
 anyhow = "1.0"

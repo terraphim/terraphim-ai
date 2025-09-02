@@ -156,7 +156,6 @@ async fn test_atomic_haystack_title_scorer_role() {
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -503,7 +502,6 @@ async fn test_atomic_haystack_graph_embeddings_role() {
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -770,7 +768,6 @@ async fn test_atomic_haystack_role_comparison() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -803,7 +800,6 @@ async fn test_atomic_haystack_role_comparison() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -973,7 +969,6 @@ async fn test_atomic_roles_config_validation() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1023,7 +1018,6 @@ async fn test_atomic_roles_config_validation() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1193,7 +1187,6 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1227,7 +1220,6 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1262,7 +1254,6 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     },
                 ],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1305,7 +1296,6 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     },
                 ],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1524,7 +1514,6 @@ async fn test_atomic_haystack_error_handling() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -1567,7 +1556,6 @@ async fn test_atomic_haystack_error_handling() {
                     extra_parameters: std::collections::HashMap::new(),
                 }],
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()

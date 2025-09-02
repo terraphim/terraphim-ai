@@ -19,7 +19,6 @@ fn create_test_role() -> Role {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
-        ..Default::default()
     }
 }
 
