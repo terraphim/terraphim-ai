@@ -35,6 +35,12 @@ pub mod summarization_worker;
 // Centralized error handling patterns and utilities
 pub mod error;
 
+// Context management for LLM conversations
+pub mod context;
+
+#[cfg(test)]
+mod context_tests;
+
 /// Normalize a filename to be used as a document ID
 ///
 /// This ensures consistent ID generation between server startup and edit API

@@ -536,6 +536,8 @@ pub struct ChatRequest {
     pub messages: Vec<ChatMessage>,
     /// Optional model override
     pub model: Option<String>,
+    /// Optional conversation ID to include context from
+    pub conversation_id: Option<String>,
 }
 
 /// Chat response payload
@@ -599,11 +601,49 @@ pub(crate) async fn chat_completion(
 
         drop(config);
 
-        // Build messages array; optionally inject system prompt
+        // Build messages array; optionally inject system prompt and context
         let mut messages_json: Vec<serde_json::Value> = Vec::new();
+
+        // Start with system prompt if available
         if let Some(system) = &role.openrouter_chat_system_prompt {
             messages_json.push(serde_json::json!({"role":"system","content":system}));
         }
+
+        // Inject context from conversation if provided
+        if let Some(conversation_id) = &request.conversation_id {
+            let conv_id = ConversationId::from_string(conversation_id.clone());
+            let manager = CONTEXT_MANAGER.lock().await;
+
+            if let Some(conversation) = manager.get_conversation(&conv_id) {
+                // Build context content from all context items
+                let mut context_content = String::new();
+
+                if !conversation.context_items.is_empty() {
+                    context_content.push_str("=== CONTEXT INFORMATION ===\n");
+                    context_content.push_str("The following information provides relevant context for this conversation:\n\n");
+
+                    for (index, context_item) in conversation.context_items.iter().enumerate() {
+                        context_content.push_str(&format!("Context Item {}: {}\n", index + 1, context_item.title));
+                        if let Some(score) = context_item.relevance_score {
+                            context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
+                        }
+                        context_content.push_str(&format!("Content: {}\n", context_item.content));
+                        if !context_item.metadata.is_empty() {
+                            context_content.push_str(&format!("Metadata: {:?}\n", context_item.metadata));
+                        }
+                        context_content.push_str("\n---\n\n");
+                    }
+
+                    context_content.push_str("=== END CONTEXT ===\n\n");
+                    context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
+
+                    // Add context as a system message after the main system prompt
+                    messages_json.push(serde_json::json!({"role": "system", "content": context_content}));
+                }
+            }
+        }
+
+        // Add user messages from the request
         for m in request.messages.iter() {
             messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
         }
@@ -1660,4 +1700,251 @@ pub(crate) async fn get_autocomplete(
         suggestions,
         error: None,
     }))
+}
+
+// =================== CONVERSATION MANAGEMENT API ===================
+
+use terraphim_service::context::{ContextConfig, ContextManager};
+use terraphim_types::{ConversationId, ConversationSummary};
+
+/// Global context manager instance
+pub static CONTEXT_MANAGER: std::sync::LazyLock<tokio::sync::Mutex<ContextManager>> =
+    std::sync::LazyLock::new(|| {
+        tokio::sync::Mutex::new(ContextManager::new(ContextConfig::default()))
+    });
+
+/// Request to create a new conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateConversationRequest {
+    pub title: String,
+    pub role: String,
+}
+
+/// Response for conversation creation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateConversationResponse {
+    pub status: Status,
+    pub conversation_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Request to list conversations
+#[derive(Debug, Deserialize)]
+pub struct ListConversationsQuery {
+    pub limit: Option<usize>,
+}
+
+/// Response for listing conversations
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListConversationsResponse {
+    pub status: Status,
+    pub conversations: Vec<ConversationSummary>,
+    pub error: Option<String>,
+}
+
+/// Response for getting a single conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GetConversationResponse {
+    pub status: Status,
+    pub conversation: Option<terraphim_types::Conversation>,
+    pub error: Option<String>,
+}
+
+/// Request to add a message to a conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddMessageRequest {
+    pub content: String,
+    pub role: Option<String>, // Default to "user"
+}
+
+/// Response for adding a message
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddMessageResponse {
+    pub status: Status,
+    pub message_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Request to add context to a conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddContextRequest {
+    pub context_type: String, // "document" | "search_result" | "user_input"
+    pub title: String,
+    pub content: String,
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Response for adding context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Request to add search results as context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddSearchContextRequest {
+    pub query: String,
+    pub documents: Vec<Document>,
+    pub limit: Option<usize>,
+}
+
+/// Create a new conversation
+pub(crate) async fn create_conversation(
+    Json(request): Json<CreateConversationRequest>,
+) -> Result<Json<CreateConversationResponse>> {
+    let role_name = RoleName::new(&request.role);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.create_conversation(request.title, role_name).await {
+        Ok(conversation_id) => Ok(Json(CreateConversationResponse {
+            status: Status::Success,
+            conversation_id: Some(conversation_id.as_str().to_string()),
+            error: None,
+        })),
+        Err(e) => Ok(Json(CreateConversationResponse {
+            status: Status::Error,
+            conversation_id: None,
+            error: Some(format!("Failed to create conversation: {}", e)),
+        })),
+    }
+}
+
+/// List conversations
+pub(crate) async fn list_conversations(
+    Query(params): Query<ListConversationsQuery>,
+) -> Result<Json<ListConversationsResponse>> {
+    let manager = CONTEXT_MANAGER.lock().await;
+    let conversations = manager.list_conversations(params.limit);
+    Ok(Json(ListConversationsResponse {
+        status: Status::Success,
+        conversations,
+        error: None,
+    }))
+}
+
+/// Get a specific conversation
+pub(crate) async fn get_conversation(
+    Path(conversation_id): Path<String>,
+) -> Result<Json<GetConversationResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let manager = CONTEXT_MANAGER.lock().await;
+    match manager.get_conversation(&conv_id) {
+        Some(conversation) => Ok(Json(GetConversationResponse {
+            status: Status::Success,
+            conversation: Some((*conversation).clone()),
+            error: None,
+        })),
+        None => Ok(Json(GetConversationResponse {
+            status: Status::Error,
+            conversation: None,
+            error: Some("Conversation not found".to_string()),
+        })),
+    }
+}
+
+/// Add a message to a conversation
+pub(crate) async fn add_message_to_conversation(
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddMessageRequest>,
+) -> Result<Json<AddMessageResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+    let role = request.role.unwrap_or_else(|| "user".to_string());
+
+    let message = if role == "user" {
+        terraphim_types::ChatMessage::user(request.content)
+    } else if role == "assistant" {
+        terraphim_types::ChatMessage::assistant(request.content, None)
+    } else if role == "system" {
+        terraphim_types::ChatMessage::system(request.content)
+    } else {
+        return Ok(Json(AddMessageResponse {
+            status: Status::Error,
+            message_id: None,
+            error: Some(format!("Invalid role: {}", role)),
+        }));
+    };
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.add_message(&conv_id, message) {
+        Ok(message_id) => Ok(Json(AddMessageResponse {
+            status: Status::Success,
+            message_id: Some(message_id.as_str().to_string()),
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddMessageResponse {
+            status: Status::Error,
+            message_id: None,
+            error: Some(format!("Failed to add message: {}", e)),
+        })),
+    }
+}
+
+/// Add context to a conversation
+pub(crate) async fn add_context_to_conversation(
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddContextRequest>,
+) -> Result<Json<AddContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let context_type = match request.context_type.as_str() {
+        "document" => terraphim_types::ContextType::Document,
+        "search_result" => terraphim_types::ContextType::SearchResult,
+        "user_input" => terraphim_types::ContextType::UserInput,
+        "system" => terraphim_types::ContextType::System,
+        "external" => terraphim_types::ContextType::External,
+        _ => return Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Invalid context type: {}", request.context_type)),
+        })),
+    };
+
+    let context_item = terraphim_types::ContextItem {
+        id: ulid::Ulid::new().to_string(),
+        context_type,
+        title: request.title,
+        content: request.content,
+        metadata: request.metadata.unwrap_or_default().into_iter().collect(),
+        created_at: chrono::Utc::now(),
+        relevance_score: None,
+    };
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => Ok(Json(AddContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to add context: {}", e)),
+        })),
+    }
+}
+
+/// Add search results as context to a conversation
+pub(crate) async fn add_search_context_to_conversation(
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddSearchContextRequest>,
+) -> Result<Json<AddContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    let context_item = manager.create_search_context(
+        &request.query,
+        &request.documents,
+        request.limit,
+    );
+
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => Ok(Json(AddContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to add search context: {}", e)),
+        })),
+    }
 }

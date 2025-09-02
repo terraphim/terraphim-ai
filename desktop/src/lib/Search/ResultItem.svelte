@@ -85,15 +85,15 @@
       href: `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`
     });
 
-    // TODO: Add to favorites (placeholder for future implementation)
+    // Add to context for LLM conversation
     items.push({
-      id: 'add-favorites',
-      label: 'Add to Favorites',
+      id: 'add-context',
+      label: 'Add to Context',
       icon: 'fas fa-plus',
-      action: () => {/* TODO: Implement add to favorites */},
+      action: () => addToContext(),
       visible: true,
-      title: 'Add to favorites (coming soon)',
-      disabled: true
+      title: 'Add document to LLM conversation context',
+      disabled: false
     });
 
     return items;
@@ -417,6 +417,151 @@
   function openInVSCode() {
     const vscodeUrl = `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`;
     window.open(vscodeUrl, '_blank');
+  }
+
+  async function addToContext() {
+    console.log('📝 Adding document to LLM context:', document.title);
+
+    try {
+      let conversationId = null;
+
+      if ($is_tauri) {
+        // First, try to get or create a conversation
+        try {
+          const conversations = await invoke('list_conversations');
+          console.log('📋 Available conversations:', conversations);
+
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+            console.log('🎯 Using existing conversation:', conversationId);
+          } else {
+            // Create a new conversation
+            const newConv = await invoke('create_conversation', {
+              title: 'Search Context',
+              role: $role || 'default'
+            });
+            if (newConv.status === 'Success' && newConv.conversationId) {
+              conversationId = newConv.conversationId;
+              console.log('🆕 Created new conversation:', conversationId);
+            } else {
+              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
+            }
+          }
+        } catch (convError) {
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+        // Use Tauri command for desktop app
+        const metadata = {
+          source_type: 'document',
+          document_id: document.id,
+        };
+
+        if (document.url) metadata.url = document.url;
+        if (document.tags && document.tags.length > 0) metadata.tags = document.tags.join(', ');
+        if (document.rank !== undefined) metadata.rank = document.rank.toString();
+
+        const contextResult = await invoke('add_context_to_conversation', {
+          conversationId: conversationId,
+          contextType: 'document',
+          title: document.title,
+          content: document.body,
+          metadata: metadata
+        });
+
+        console.log('✅ Document added to context via Tauri:', contextResult);
+
+      } else {
+        // Web mode - use HTTP API
+        const baseUrl = CONFIG.ServerURL;
+
+        // First, try to get or create a conversation
+        try {
+          const conversationsResponse = await fetch(`${baseUrl}/conversations`);
+          if (conversationsResponse.ok) {
+            const conversationsData = await conversationsResponse.json();
+            if (conversationsData.conversations && conversationsData.conversations.length > 0) {
+              conversationId = conversationsData.conversations[0].id;
+              console.log('🎯 Using existing conversation:', conversationId);
+            } else {
+              // Create a new conversation
+              const newConvResponse = await fetch(`${baseUrl}/conversations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: 'Search Context',
+                  role: $role || 'default'
+                })
+              });
+              if (newConvResponse.ok) {
+                const newConvData = await newConvResponse.json();
+                if (newConvData.status === 'Success' && newConvData.conversation_id) {
+                  conversationId = newConvData.conversation_id;
+                  console.log('🆕 Created new conversation:', conversationId);
+                } else {
+                  throw new Error('Failed to create conversation: ' + (newConvData.error || 'Unknown error'));
+                }
+              } else {
+                throw new Error(`Failed to create conversation: ${newConvResponse.status} ${newConvResponse.statusText}`);
+              }
+            }
+          } else {
+            throw new Error(`Failed to list conversations: ${conversationsResponse.status} ${conversationsResponse.statusText}`);
+          }
+        } catch (convError) {
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+        // Add document context to conversation
+        const url = `${baseUrl}/conversations/${conversationId}/context`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context_item: {
+              id: '', // Will be generated on the backend
+              context_type: 'Document',
+              title: document.title,
+              content: document.body,
+              metadata: {
+                source_type: 'document',
+                document_id: document.id,
+                url: document.url || '',
+                tags: document.tags ? document.tags.join(', ') : '',
+                rank: document.rank ? document.rank.toString() : '0'
+              },
+              created_at: new Date().toISOString(),
+              relevance_score: document.rank
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Document added to context via HTTP:', data);
+      }
+
+      console.log('✅ Successfully added document to LLM context');
+
+    } catch (error) {
+      console.error('❌ Error adding document to context:');
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+      console.error('  Document details:', {
+        id: document.id,
+        title: document.title,
+        isTauri: $is_tauri,
+        timestamp: new Date().toISOString()
+      });
+
+      // Could show error notification to user
+    }
   }
 
   if (configStore[$role] !== undefined) {

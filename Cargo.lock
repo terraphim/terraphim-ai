@@ -7091,6 +7091,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "chrono",
  "env_logger 0.11.8",
  "log",
  "mockall 0.13.1",
@@ -7122,6 +7123,7 @@ dependencies = [
  "tracing-log 0.1.4",
  "tracing-subscriber",
  "tsify",
+ "ulid",
  "wasm-bindgen",
 ]
 
@@ -7512,6 +7514,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "chrono",
  "log",
  "schemars 0.8.22",
  "serde",
@@ -7519,6 +7522,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tsify",
  "ulid",
+ "uuid",
  "wasm-bindgen",
 ]
 
