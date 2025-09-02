@@ -54,7 +54,7 @@ export const TerraphimSuggestion = Extension.create<TerraphimSuggestionOptions>(
 
   addOptions() {
     return {
-      trigger: '/',
+      trigger: '++',
       pluginKey: new PluginKey('terraphimSuggestion'),
       allowSpaces: false,
       limit: 8,
@@ -239,7 +239,8 @@ class TerraphimSuggestionRenderer {
   selectItem(index: number) {
     const item = this.items[index];
     if (item) {
-      this.command(item);
+      // Pass the item as props object with id property as expected by TipTap
+      this.command({ id: item.text, ...item });
     }
   }
 

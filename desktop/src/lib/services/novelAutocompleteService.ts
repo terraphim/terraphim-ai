@@ -3,6 +3,12 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { is_tauri } from '../stores';
 import { get } from 'svelte/store';
 
+// Helper function to check if we're in Tauri mode
+function isTauriMode(): boolean {
+  // Check both the store value and the global window object for reliability
+  return get(is_tauri) || (typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined);
+}
+
 export interface NovelAutocompleteSuggestion {
   text: string;
   snippet?: string;
@@ -45,8 +51,10 @@ export class NovelAutocompleteService {
       : 'http://localhost:8001';
     this.sessionId = `novel-${Date.now()}`;
 
-    // Try to detect if we're running on a different port
-    this.detectServerPort();
+    // Only try to detect server port if not in Tauri mode
+    if (typeof window !== 'undefined' && !isTauriMode()) {
+      this.detectServerPort();
+    }
   }
 
   /**
@@ -62,7 +70,7 @@ export class NovelAutocompleteService {
    * Detect the correct server port by checking common ports
    */
   private async detectServerPort(): Promise<void> {
-    if (get(is_tauri)) {
+    if (isTauriMode()) {
       // In Tauri mode, no need for MCP server detection
       return;
     }
@@ -115,24 +123,13 @@ export class NovelAutocompleteService {
     this.isConnecting = true;
 
     try {
-      if (get(is_tauri)) {
-        // In Tauri mode, test the autocomplete command directly
-        console.log('Using Tauri autocomplete - testing connection');
-        const testResponse = await invoke('get_autocomplete_suggestions', {
-          query: 'test',
-          roleName: this.currentRole,
-          limit: 1
-        }) as any;
-
-        if (testResponse && testResponse.status === 'success') {
-          this.autocompleteIndexBuilt = true;
-          this.connectionRetries = 0;
-          console.log('Tauri autocomplete connection verified');
-          return true;
-        }
-
-        console.warn('Tauri autocomplete test failed:', testResponse);
-        return false;
+      if (isTauriMode()) {
+        // In Tauri mode, no index building needed - the backend has the thesaurus
+        console.log('Using Tauri backend - no index building required');
+        this.autocompleteIndexBuilt = true;
+        this.connectionRetries = 0;
+        console.log('Tauri autocomplete ready');
+        return true;
       } else {
         return await this.buildMCPIndex();
       }
@@ -277,7 +274,7 @@ export class NovelAutocompleteService {
     }
 
     try {
-      if (get(is_tauri)) {
+      if (isTauriMode()) {
         return await this.getTauriSuggestions(query, limit);
       } else {
         return await this.getMCPSuggestions(query, limit, 'autocomplete_terms');
@@ -294,7 +291,7 @@ export class NovelAutocompleteService {
   private async getTauriSuggestions(query: string, limit: number): Promise<NovelAutocompleteSuggestion[]> {
     const response = await invoke('get_autocomplete_suggestions', {
       query: query.trim(),
-      roleName: this.currentRole,
+      role_name: this.currentRole,
       limit: limit
     }) as any;
 
@@ -383,7 +380,7 @@ export class NovelAutocompleteService {
     }
 
     try {
-      if (get(is_tauri)) {
+      if (isTauriMode()) {
         // Tauri doesn't have separate snippets endpoint, use regular suggestions
         return await this.getTauriSuggestions(query, limit);
       } else {
@@ -483,7 +480,7 @@ export class NovelAutocompleteService {
       ready: this.autocompleteIndexBuilt,
       baseUrl: this.baseUrl,
       sessionId: this.sessionId,
-      usingTauri: get(is_tauri),
+      usingTauri: isTauriMode(),
       currentRole: this.currentRole,
       connectionRetries: this.connectionRetries,
       isConnecting: this.isConnecting
@@ -504,9 +501,16 @@ export class NovelAutocompleteService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      if (get(is_tauri)) {
-        const response = await invoke('get_config') as any;
-        return response && response.status === 'success';
+      if (isTauriMode()) {
+        // In Tauri mode, test the autocomplete command directly
+        const response = await invoke('get_autocomplete_suggestions', {
+          query: 'test',
+          role_name: this.currentRole,
+          limit: 1
+        }) as any;
+
+        // Check if we got a valid response structure (success or error)
+        return response && (response.status === 'success' || response.status === 'error');
       } else {
         const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
           method: 'POST',
