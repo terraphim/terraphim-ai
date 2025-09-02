@@ -1,6 +1,6 @@
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_middleware::indexer::search_haystacks;
-use terraphim_types::{RelevanceFunction, SearchQuery};
+use terraphim_types::SearchQuery;
 
 /// Live MCP haystack test using SSE server-everything
 ///
@@ -17,18 +17,12 @@ async fn mcp_live_haystack_smoke() {
         }
     };
 
-    let role = Role {
-        shortname: Some("MCP".to_string()),
-        name: "MCP".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "lumen".to_string(),
-        kg: None,
-        haystacks: vec![Haystack::new(base_url.clone(), ServiceType::Mcp, true)
-            .with_extra_parameter("base_url".into(), base_url.clone())
-            .with_extra_parameter("transport".into(), "sse".into())],
-        extra: ahash::AHashMap::new(),
-    };
+    let mut role = Role::new("MCP");
+    role.shortname = Some("MCP".to_string());
+    role.theme = "lumen".to_string();
+    role.haystacks = vec![Haystack::new(base_url.clone(), ServiceType::Mcp, true)
+        .with_extra_parameter("base_url".into(), base_url.clone())
+        .with_extra_parameter("transport".into(), "sse".into())];
 
     let mut config = ConfigBuilder::new()
         .add_role("MCP", role)

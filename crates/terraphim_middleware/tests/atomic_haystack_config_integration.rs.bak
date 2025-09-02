@@ -135,19 +135,24 @@ async fn test_atomic_haystack_with_terraphim_config() {
     // 2. Create Terraphim config with atomic server haystack
     let config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
-        .add_role("AtomicUser", {
-            let mut role = Role::new("AtomicUser");
-            role.shortname = Some("AtomicUser".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "spacelab".to_string();
-            role.haystacks = vec![Haystack::new(
-                server_url.clone(), // Use server URL directly as location
-                ServiceType::Atomic,
-                true,
-            )
-            .with_atomic_secret(atomic_secret.clone())];
-            role
-        })
+        .add_role(
+            "AtomicUser",
+            Role {
+                shortname: Some("AtomicUser".to_string()),
+                name: "AtomicUser".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks: vec![Haystack::new(
+                    server_url.clone(), // Use server URL directly as location
+                    ServiceType::Atomic,
+                    true,
+                )
+                .with_atomic_secret(atomic_secret.clone())],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build config");
 
@@ -450,14 +455,19 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
 
     let config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
-        .add_role("MixedAccessUser", {
-            let mut role = Role::new("MixedAccessUser");
-            role.shortname = Some("MixedAccessUser".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "spacelab".to_string();
-            role.haystacks = haystacks;
-            role
-        })
+        .add_role(
+            "MixedAccessUser",
+            Role {
+                shortname: Some("MixedAccessUser".to_string()),
+                name: "MixedAccessUser".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks,
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build mixed access config");
 

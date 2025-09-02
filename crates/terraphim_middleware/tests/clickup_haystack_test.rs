@@ -3,7 +3,7 @@ use terraphim_middleware::{
     haystack::ClickUpHaystackIndexer,
     indexer::{search_haystacks, IndexMiddleware},
 };
-use terraphim_types::{RelevanceFunction, SearchQuery};
+use terraphim_types::SearchQuery;
 
 #[tokio::test]
 async fn clickup_mapping_handles_missing_token() {
@@ -29,21 +29,15 @@ async fn clickup_live_search_returns_documents() {
         return;
     }
 
-    let role = Role {
-        shortname: Some("ClickUp".to_string()),
-        name: "ClickUp".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "lumen".to_string(),
-        kg: None,
-        haystacks: vec![
-            Haystack::new("clickup".to_string(), ServiceType::ClickUp, true)
-                .with_extra_parameter("team_id".into(), std::env::var("CLICKUP_TEAM_ID").unwrap())
-                .with_extra_parameter("include_closed".into(), "true".into())
-                .with_extra_parameter("subtasks".into(), "true".into()),
-        ],
-        extra: ahash::AHashMap::new(),
-    };
+    let mut role = Role::new("ClickUp");
+    role.shortname = Some("ClickUp".to_string());
+    role.theme = "lumen".to_string();
+    role.haystacks = vec![
+        Haystack::new("clickup".to_string(), ServiceType::ClickUp, true)
+            .with_extra_parameter("team_id".into(), std::env::var("CLICKUP_TEAM_ID").unwrap())
+            .with_extra_parameter("include_closed".into(), "true".into())
+            .with_extra_parameter("subtasks".into(), "true".into()),
+    ];
 
     let mut config = ConfigBuilder::new()
         .add_role("ClickUp", role)
@@ -77,21 +71,15 @@ async fn clickup_live_search_work_term() {
         return;
     }
 
-    let role = Role {
-        shortname: Some("ClickUp".to_string()),
-        name: "ClickUp".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "lumen".to_string(),
-        kg: None,
-        haystacks: vec![
-            Haystack::new("clickup".to_string(), ServiceType::ClickUp, true)
-                .with_extra_parameter("team_id".into(), std::env::var("CLICKUP_TEAM_ID").unwrap())
-                .with_extra_parameter("include_closed".into(), "true".into())
-                .with_extra_parameter("subtasks".into(), "true".into()),
-        ],
-        extra: ahash::AHashMap::new(),
-    };
+    let mut role = Role::new("ClickUp");
+    role.shortname = Some("ClickUp".to_string());
+    role.theme = "lumen".to_string();
+    role.haystacks = vec![
+        Haystack::new("clickup".to_string(), ServiceType::ClickUp, true)
+            .with_extra_parameter("team_id".into(), std::env::var("CLICKUP_TEAM_ID").unwrap())
+            .with_extra_parameter("include_closed".into(), "true".into())
+            .with_extra_parameter("subtasks".into(), "true".into()),
+    ];
 
     let mut config = ConfigBuilder::new()
         .add_role("ClickUp", role)

@@ -144,15 +144,20 @@ async fn test_atomic_haystack_title_scorer_role() {
     // 2. Create Terraphim config with atomic server haystack and TitleScorer
     let config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
-        .add_role("AtomicTitleScorer", {
-            let mut role = Role::new("Atomic Title Scorer");
-            role.shortname = Some("title-scorer".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "cerulean".to_string();
-            role.haystacks = vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
-                .with_atomic_secret(atomic_secret.clone())];
-            role
-        })
+        .add_role(
+            "AtomicTitleScorer",
+            Role {
+                shortname: Some("title-scorer".to_string()),
+                name: "Atomic Title Scorer".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cerulean".to_string(),
+                kg: None, // No knowledge graph for title scorer
+                haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
+                    .with_atomic_secret(atomic_secret.clone())],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build config");
 
@@ -477,25 +482,28 @@ async fn test_atomic_haystack_graph_embeddings_role() {
     // 2. Create Terraphim config with atomic server haystack and TerraphimGraph
     let config = ConfigBuilder::new()
         .global_shortcut("Ctrl+G")
-        .add_role("AtomicGraphEmbeddings", {
-            let mut role = Role::new("Atomic Graph Embeddings");
-            role.shortname = Some("graph-embeddings".to_string());
-            role.relevance_function = RelevanceFunction::TerraphimGraph;
-            role.terraphim_it = true;
-            role.theme = "superhero".to_string();
-            role.kg = Some(terraphim_config::KnowledgeGraph {
-                automata_path: None, // Will be built from local files
-                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
-                    input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("docs/src"),
+        .add_role(
+            "AtomicGraphEmbeddings",
+            Role {
+                shortname: Some("graph-embeddings".to_string()),
+                name: "Atomic Graph Embeddings".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
+                theme: "superhero".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None, // Will be built from local files
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
                 }),
-                public: true,
-                publish: true,
-            });
-            role.haystacks = vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
-                .with_atomic_secret(atomic_secret.clone())];
-            role
-        })
+                haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
+                    .with_atomic_secret(atomic_secret.clone())],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build config");
 
@@ -743,49 +751,57 @@ async fn test_atomic_haystack_role_comparison() {
     // 2. Create both role configurations
     let title_scorer_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
-        .add_role("TitleScorer", {
-            let mut role = Role::new("Title Scorer");
-            role.shortname = Some("title-scorer".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "cerulean".to_string();
-            role.haystacks = vec![Haystack {
-                location: server_url.clone(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: atomic_secret.clone(),
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+        .add_role(
+            "TitleScorer",
+            Role {
+                shortname: Some("title-scorer".to_string()),
+                name: "Title Scorer".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: server_url.clone(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: atomic_secret.clone(),
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build title scorer config");
 
     let graph_embeddings_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+G")
-        .add_role("GraphEmbeddings", {
-            let mut role = Role::new("Graph Embeddings");
-            role.shortname = Some("graph-embeddings".to_string());
-            role.relevance_function = RelevanceFunction::TerraphimGraph;
-            role.terraphim_it = true;
-            role.theme = "superhero".to_string();
-            role.kg = Some(terraphim_config::KnowledgeGraph {
-                automata_path: None,
-                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
-                    input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("docs/src"),
+        .add_role(
+            "GraphEmbeddings",
+            Role {
+                shortname: Some("graph-embeddings".to_string()),
+                name: "Graph Embeddings".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
+                theme: "superhero".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
                 }),
-                public: true,
-                publish: true,
-            });
-            role.haystacks = vec![Haystack {
-                location: server_url.clone(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: atomic_secret.clone(),
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+                haystacks: vec![Haystack {
+                    location: server_url.clone(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: atomic_secret.clone(),
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build graph embeddings config");
 
@@ -936,20 +952,25 @@ async fn test_atomic_roles_config_validation() {
     // Test Title Scorer role configuration
     let title_scorer_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
-        .add_role("TitleScorer", {
-            let mut role = Role::new("Title Scorer");
-            role.shortname = Some("title-scorer".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "cerulean".to_string();
-            role.haystacks = vec![Haystack {
-                location: "http://localhost:9883".to_string(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: None,
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+        .add_role(
+            "TitleScorer",
+            Role {
+                shortname: Some("title-scorer".to_string()),
+                name: "Title Scorer".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cerulean".to_string(),
+                kg: None, // Title scorer doesn't need knowledge graph
+                haystacks: vec![Haystack {
+                    location: "http://localhost:9883".to_string(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build title scorer config");
 
@@ -972,30 +993,33 @@ async fn test_atomic_roles_config_validation() {
     // Test Graph Embeddings role configuration
     let graph_embeddings_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+G")
-        .add_role("GraphEmbeddings", {
-            let mut role = Role::new("Graph Embeddings");
-            role.shortname = Some("graph-embeddings".to_string());
-            role.relevance_function = RelevanceFunction::TerraphimGraph;
-            role.terraphim_it = true;
-            role.theme = "superhero".to_string();
-            role.kg = Some(terraphim_config::KnowledgeGraph {
-                automata_path: None,
-                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
-                    input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("docs/src"),
+        .add_role(
+            "GraphEmbeddings",
+            Role {
+                shortname: Some("graph-embeddings".to_string()),
+                name: "Graph Embeddings".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
+                theme: "superhero".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
                 }),
-                public: true,
-                publish: true,
-            });
-            role.haystacks = vec![Haystack {
-                location: "http://localhost:9883".to_string(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: None,
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+                haystacks: vec![Haystack {
+                    location: "http://localhost:9883".to_string(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build graph embeddings config");
 
@@ -1146,118 +1170,134 @@ async fn test_comprehensive_atomic_haystack_roles() {
     // Pure Atomic Title Scorer Role
     let pure_atomic_title_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+1")
-        .add_role("PureAtomicTitle", {
-            let mut role = Role::new("Pure Atomic Title");
-            role.shortname = Some("pure-atomic-title".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "cerulean".to_string();
-            role.haystacks = vec![Haystack {
-                location: server_url.clone(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: atomic_secret.clone(),
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+        .add_role(
+            "PureAtomicTitle",
+            Role {
+                shortname: Some("pure-atomic-title".to_string()),
+                name: "Pure Atomic Title".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: server_url.clone(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: atomic_secret.clone(),
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build pure atomic title config");
 
     // Pure Atomic Graph Embeddings Role
     let pure_atomic_graph_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+2")
-        .add_role("PureAtomicGraph", {
-            let mut role = Role::new("Pure Atomic Graph");
-            role.shortname = Some("pure-atomic-graph".to_string());
-            role.relevance_function = RelevanceFunction::TerraphimGraph;
-            role.terraphim_it = true;
-            role.theme = "superhero".to_string();
-            role.kg = Some(terraphim_config::KnowledgeGraph {
-                automata_path: None,
-                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
-                    input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("docs/src"),
+        .add_role(
+            "PureAtomicGraph",
+            Role {
+                shortname: Some("pure-atomic-graph".to_string()),
+                name: "Pure Atomic Graph".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
+                theme: "superhero".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
                 }),
-                public: true,
-                publish: true,
-            });
-            role.haystacks = vec![Haystack {
-                location: server_url.clone(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: atomic_secret.clone(),
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+                haystacks: vec![Haystack {
+                    location: server_url.clone(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: atomic_secret.clone(),
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build pure atomic graph config");
 
     // Hybrid Role: Atomic + Ripgrep with Title Scorer
     let hybrid_title_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+3")
-        .add_role("HybridTitle", {
-            let mut role = Role::new("Hybrid Title");
-            role.shortname = Some("hybrid-title".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "lumen".to_string();
-            role.haystacks = vec![
-                Haystack {
-                    location: server_url.clone(),
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: atomic_secret.clone(),
-                    extra_parameters: std::collections::HashMap::new(),
-                },
-                Haystack {
-                    location: "docs/src".to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: true,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                },
-            ];
-            role
-        })
+        .add_role(
+            "HybridTitle",
+            Role {
+                shortname: Some("hybrid-title".to_string()),
+                name: "Hybrid Title".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "lumen".to_string(),
+                kg: None,
+                haystacks: vec![
+                    Haystack {
+                        location: server_url.clone(),
+                        service: ServiceType::Atomic,
+                        read_only: true,
+                        atomic_server_secret: atomic_secret.clone(),
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                    Haystack {
+                        location: "docs/src".to_string(),
+                        service: ServiceType::Ripgrep,
+                        read_only: true,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                ],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build hybrid title config");
 
     // Hybrid Role: Atomic + Ripgrep with Graph Embeddings
     let hybrid_graph_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+4")
-        .add_role("HybridGraph", {
-            let mut role = Role::new("Hybrid Graph");
-            role.shortname = Some("hybrid-graph".to_string());
-            role.relevance_function = RelevanceFunction::TerraphimGraph;
-            role.terraphim_it = true;
-            role.theme = "darkly".to_string();
-            role.kg = Some(terraphim_config::KnowledgeGraph {
-                automata_path: None,
-                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
-                    input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                    path: PathBuf::from("docs/src"),
+        .add_role(
+            "HybridGraph",
+            Role {
+                shortname: Some("hybrid-graph".to_string()),
+                name: "Hybrid Graph".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                terraphim_it: true,
+                theme: "darkly".to_string(),
+                kg: Some(terraphim_config::KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                        input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("docs/src"),
+                    }),
+                    public: true,
+                    publish: true,
                 }),
-                public: true,
-                publish: true,
-            });
-            role.haystacks = vec![
-                Haystack {
-                    location: server_url.clone(),
-                    service: ServiceType::Atomic,
-                    read_only: true,
-                    atomic_server_secret: atomic_secret.clone(),
-                    extra_parameters: std::collections::HashMap::new(),
-                },
-                Haystack {
-                    location: "docs/src".to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: true,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                },
-            ];
-            role
-        })
+                haystacks: vec![
+                    Haystack {
+                        location: server_url.clone(),
+                        service: ServiceType::Atomic,
+                        read_only: true,
+                        atomic_server_secret: atomic_secret.clone(),
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                    Haystack {
+                        location: "docs/src".to_string(),
+                        service: ServiceType::Ripgrep,
+                        read_only: true,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                ],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build hybrid graph config");
 
@@ -1457,20 +1497,25 @@ async fn test_atomic_haystack_error_handling() {
     // Test with invalid atomic server URL
     let invalid_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+E")
-        .add_role("InvalidAtomic", {
-            let mut role = Role::new("Invalid Atomic");
-            role.shortname = Some("invalid-atomic".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "cerulean".to_string();
-            role.haystacks = vec![Haystack {
-                location: "http://localhost:9999".to_string(), // Non-existent server
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: Some("invalid_secret".to_string()),
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+        .add_role(
+            "InvalidAtomic",
+            Role {
+                shortname: Some("invalid-atomic".to_string()),
+                name: "Invalid Atomic".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: "http://localhost:9999".to_string(), // Non-existent server
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: Some("invalid_secret".to_string()),
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build invalid config");
 
@@ -1494,20 +1539,25 @@ async fn test_atomic_haystack_error_handling() {
     // Test with missing secret
     let no_secret_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+N")
-        .add_role("NoSecretAtomic", {
-            let mut role = Role::new("No Secret Atomic");
-            role.shortname = Some("no-secret-atomic".to_string());
-            role.relevance_function = RelevanceFunction::TitleScorer;
-            role.theme = "cerulean".to_string();
-            role.haystacks = vec![Haystack {
-                location: "http://localhost:9883".to_string(),
-                service: ServiceType::Atomic,
-                read_only: true,
-                atomic_server_secret: None, // No authentication secret
-                extra_parameters: std::collections::HashMap::new(),
-            }];
-            role
-        })
+        .add_role(
+            "NoSecretAtomic",
+            Role {
+                shortname: Some("no-secret-atomic".to_string()),
+                name: "No Secret Atomic".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "cerulean".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: "http://localhost:9883".to_string(),
+                    service: ServiceType::Atomic,
+                    read_only: true,
+                    atomic_server_secret: None, // No authentication secret
+                    extra_parameters: std::collections::HashMap::new(),
+                }],
+                extra: ahash::AHashMap::new(),
+            },
+        )
         .build()
         .expect("Failed to build no-secret config");
 

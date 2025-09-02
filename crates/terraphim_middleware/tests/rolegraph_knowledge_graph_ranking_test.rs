@@ -37,24 +37,19 @@ async fn test_rolegraph_knowledge_graph_ranking() {
     );
 
     // 2. Create a test role configuration that uses local KG
-    let terraphim_engineer_role = Role {
-        shortname: Some("terraphim-engineer".to_string()),
-        name: "Terraphim Engineer".into(),
-        relevance_function: RelevanceFunction::TerraphimGraph,
-        theme: "superhero".to_string(),
-        kg: Some(KnowledgeGraph {
-            automata_path: None, // Will be set after building thesaurus
-            knowledge_graph_local: Some(KnowledgeGraphLocal {
-                input_type: KnowledgeGraphInputType::Markdown,
-                path: format!("{}/kg", docs_src_path.display()).into(),
-            }),
-            public: true,
-            publish: true,
+    let mut terraphim_engineer_role = Role::new("Terraphim Engineer");
+    terraphim_engineer_role.shortname = Some("terraphim-engineer".to_string());
+    terraphim_engineer_role.relevance_function = RelevanceFunction::TerraphimGraph;
+    terraphim_engineer_role.theme = "superhero".to_string();
+    terraphim_engineer_role.kg = Some(KnowledgeGraph {
+        automata_path: None, // Will be set after building thesaurus
+        knowledge_graph_local: Some(KnowledgeGraphLocal {
+            input_type: KnowledgeGraphInputType::Markdown,
+            path: format!("{}/kg", docs_src_path.display()).into(),
         }),
-        haystacks: vec![],
-        extra: ahash::AHashMap::new(),
-        terraphim_it: false,
-    };
+        public: true,
+        publish: true,
+    });
 
     // 3. Build thesaurus from local markdown files in kg directory
     let logseq_builder = Logseq::default();
