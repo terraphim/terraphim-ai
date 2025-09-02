@@ -33,11 +33,20 @@ export class NovelAutocompleteService {
   private autocompleteIndexBuilt: boolean = false;
   private sessionId: string;
   private currentRole: string = 'Default';
+  private connectionRetries: number = 0;
+  private maxRetries: number = 3;
+  private retryDelay: number = 1000;
+  private isConnecting: boolean = false;
 
   constructor() {
-    // Use the MCP server URL - update config to point to port 8001
-    this.baseUrl = 'http://localhost:8001';
+    // Use the MCP server URL - check environment or default to port 8001
+    this.baseUrl = typeof window !== 'undefined'
+      ? (window.location.protocol === 'https:' ? 'https://' : 'http://') + window.location.hostname + ':8001'
+      : 'http://localhost:8001';
     this.sessionId = `novel-${Date.now()}`;
+
+    // Try to detect if we're running on a different port
+    this.detectServerPort();
   }
 
   /**
@@ -45,21 +54,102 @@ export class NovelAutocompleteService {
    */
   setRole(role: string): void {
     this.currentRole = role;
+    // Reset index when role changes
+    this.autocompleteIndexBuilt = false;
   }
 
   /**
-   * Build the autocomplete index for the current role
+   * Detect the correct server port by checking common ports
+   */
+  private async detectServerPort(): Promise<void> {
+    if (get(is_tauri)) {
+      // In Tauri mode, no need for MCP server detection
+      return;
+    }
+
+    const commonPorts = [8001, 3000, 8000, 8080];
+
+    for (const port of commonPorts) {
+      try {
+        const testUrl = typeof window !== 'undefined'
+          ? (window.location.protocol === 'https:' ? 'https://' : 'http://') + window.location.hostname + ':' + port
+          : 'http://localhost:' + port;
+
+        const response = await fetch(`${testUrl}/message?sessionId=health-check`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 0,
+            method: 'ping',
+            params: {}
+          }),
+          signal: AbortSignal.timeout(2000) // 2 second timeout
+        });
+
+        if (response.ok || response.status === 404) {
+          // Server is responding, even if endpoint doesn't exist
+          this.baseUrl = testUrl;
+          console.log(`NovelAutocompleteService: Detected server at ${testUrl}`);
+          return;
+        }
+      } catch (error) {
+        // Continue trying other ports
+        continue;
+      }
+    }
+
+    console.warn('NovelAutocompleteService: Could not detect running server, using default:', this.baseUrl);
+  }
+
+  /**
+   * Build the autocomplete index for the current role with retry logic
    */
   async buildAutocompleteIndex(): Promise<boolean> {
+    if (this.isConnecting) {
+      // Wait for existing connection attempt
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return this.autocompleteIndexBuilt;
+    }
+
+    this.isConnecting = true;
+
     try {
       if (get(is_tauri)) {
-        // In Tauri mode, autocomplete index is built automatically with the role
-        // Just verify that we can get suggestions
-        console.log('Using Tauri autocomplete - index is built automatically');
-        this.autocompleteIndexBuilt = true;
-        return true;
+        // In Tauri mode, test the autocomplete command directly
+        console.log('Using Tauri autocomplete - testing connection');
+        const testResponse = await invoke('get_autocomplete_suggestions', {
+          query: 'test',
+          roleName: this.currentRole,
+          limit: 1
+        }) as any;
+
+        if (testResponse && testResponse.status === 'success') {
+          this.autocompleteIndexBuilt = true;
+          this.connectionRetries = 0;
+          console.log('Tauri autocomplete connection verified');
+          return true;
+        }
+
+        console.warn('Tauri autocomplete test failed:', testResponse);
+        return false;
       } else {
-        // Try MCP server
+        return await this.buildMCPIndex();
+      }
+    } catch (error) {
+      console.error('Error building Novel autocomplete index:', error);
+      return false;
+    } finally {
+      this.isConnecting = false;
+    }
+  }
+
+  /**
+   * Build MCP index with retry logic
+   */
+  private async buildMCPIndex(): Promise<boolean> {
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
         const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
           method: 'POST',
           headers: {
@@ -67,32 +157,50 @@ export class NovelAutocompleteService {
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
-            id: 1,
+            id: Date.now(),
             method: 'tools/call',
             params: {
               name: 'build_autocomplete_index',
               arguments: {}
             }
-          })
+          }),
+          signal: AbortSignal.timeout(10000) // 10 second timeout
         });
 
         if (response.ok) {
           const result = await response.json();
-          console.log('Build index response:', result);
+          console.log(`MCP build index response (attempt ${attempt + 1}):`, result);
+
           if (result.result && !result.result.is_error) {
             this.autocompleteIndexBuilt = true;
-            console.log('Novel autocomplete index built successfully');
+            this.connectionRetries = 0;
+            console.log('MCP autocomplete index built successfully');
             return true;
           }
+        } else if (response.status >= 500 && attempt < this.maxRetries) {
+          // Server error, retry
+          console.warn(`MCP server error ${response.status}, retrying in ${this.retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * (attempt + 1)));
+          continue;
         }
 
-        console.warn('Failed to build Novel autocomplete index');
-        return false;
+        console.warn(`MCP build index failed (attempt ${attempt + 1}):`, response.status, response.statusText);
+
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn(`MCP request timeout (attempt ${attempt + 1})`);
+        } else {
+          console.warn(`MCP connection error (attempt ${attempt + 1}):`, error);
+        }
+
+        if (attempt < this.maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * (attempt + 1)));
+        }
       }
-    } catch (error) {
-      console.error('Error building Novel autocomplete index:', error);
-      return false;
     }
+
+    console.error('Failed to build MCP autocomplete index after all retries');
+    return false;
   }
 
   /**
@@ -112,7 +220,7 @@ export class NovelAutocompleteService {
       // Extract the last word or phrase from the prompt for autocomplete
       const lastWord = this.extractLastWord(request.prompt);
 
-      if (!lastWord || lastWord.length < 2) {
+      if (!lastWord || lastWord.length < 1) {
         return { text: '' };
       }
 
@@ -125,7 +233,12 @@ export class NovelAutocompleteService {
 
       // Return the best suggestion as completion text
       const bestSuggestion = suggestions[0];
-      const completionText = bestSuggestion.text;
+      let completionText = bestSuggestion.text;
+
+      // Remove the query prefix if the suggestion starts with it
+      if (completionText.toLowerCase().startsWith(lastWord.toLowerCase())) {
+        completionText = completionText.substring(lastWord.length);
+      }
 
       // Calculate token usage (approximate)
       const promptTokens = request.prompt.length / 4; // Rough estimate
@@ -149,61 +262,26 @@ export class NovelAutocompleteService {
    * Get basic autocomplete suggestions
    */
   async getSuggestions(query: string, limit: number = 10): Promise<NovelAutocompleteSuggestion[]> {
+    // Early return for empty queries
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+
     if (!this.autocompleteIndexBuilt) {
       const built = await this.buildAutocompleteIndex();
       if (!built) {
+        // Return empty array instead of mock suggestions
+        console.warn('Autocomplete index not built, returning empty suggestions');
         return [];
       }
     }
 
     try {
       if (get(is_tauri)) {
-        // Use Tauri command for autocomplete
-        const response = await invoke('get_autocomplete_suggestions', {
-          query: query,
-          roleName: this.currentRole,
-          limit: limit
-        }) as any;
-
-        console.log('Tauri autocomplete response:', response);
-        if (response.status === 'success' && response.suggestions) {
-          return response.suggestions.map((suggestion: any) => ({
-            text: suggestion.term,
-            snippet: suggestion.url,
-            score: suggestion.score
-          }));
-        }
+        return await this.getTauriSuggestions(query, limit);
       } else {
-        // Try MCP server
-        const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'tools/call',
-            params: {
-              name: 'autocomplete_terms',
-              arguments: {
-                query,
-                limit
-              }
-            }
-          })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Get suggestions response:', result);
-          if (result.result && !result.result.is_error && result.result.content) {
-            return this.parseAutocompleteContent(result.result.content);
-          }
-        }
+        return await this.getMCPSuggestions(query, limit, 'autocomplete_terms');
       }
-
-      return [];
     } catch (error) {
       console.error('Error getting autocomplete suggestions:', error);
       return [];
@@ -211,64 +289,106 @@ export class NovelAutocompleteService {
   }
 
   /**
+   * Get suggestions from Tauri backend
+   */
+  private async getTauriSuggestions(query: string, limit: number): Promise<NovelAutocompleteSuggestion[]> {
+    const response = await invoke('get_autocomplete_suggestions', {
+      query: query.trim(),
+      roleName: this.currentRole,
+      limit: limit
+    }) as any;
+
+    console.log('Tauri autocomplete response:', response);
+
+    if (response && response.status === 'success' && response.suggestions) {
+      return response.suggestions.map((suggestion: any) => ({
+        text: suggestion.term || suggestion.text || '',
+        snippet: suggestion.url || suggestion.snippet || '',
+        score: suggestion.score || 1.0
+      })).filter((s: NovelAutocompleteSuggestion) => s.text.length > 0);
+    }
+
+    if (response && response.error) {
+      console.error('Tauri autocomplete error:', response.error);
+    }
+
+    return [];
+  }
+
+  /**
+   * Get suggestions from MCP server
+   */
+  private async getMCPSuggestions(query: string, limit: number, method: string): Promise<NovelAutocompleteSuggestion[]> {
+    const requestId = Date.now();
+
+    const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: requestId,
+        method: 'tools/call',
+        params: {
+          name: method,
+          arguments: {
+            query: query.trim(),
+            limit,
+            role: this.currentRole
+          }
+        }
+      }),
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+
+    if (!response.ok) {
+      console.error(`MCP ${method} request failed:`, response.status, response.statusText);
+      return [];
+    }
+
+    const result = await response.json();
+    console.log(`MCP ${method} response:`, result);
+
+    if (result.result && !result.result.is_error && result.result.content) {
+      if (method === 'autocomplete_with_snippets') {
+        return this.parseAutocompleteWithSnippetsContent(result.result.content);
+      } else {
+        return this.parseAutocompleteContent(result.result.content);
+      }
+    }
+
+    if (result.error) {
+      console.error(`MCP ${method} error:`, result.error);
+    }
+
+    return [];
+  }
+
+  /**
    * Get autocomplete suggestions with snippets
    */
   async getSuggestionsWithSnippets(query: string, limit: number = 10): Promise<NovelAutocompleteSuggestion[]> {
+    // Early return for empty queries
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+
     if (!this.autocompleteIndexBuilt) {
       const built = await this.buildAutocompleteIndex();
       if (!built) {
+        console.warn('Autocomplete index not built, returning empty suggestions with snippets');
         return [];
       }
     }
 
     try {
       if (get(is_tauri)) {
-        // Use Tauri command for autocomplete with snippets
-        const response = await invoke('get_autocomplete_suggestions', {
-          query: query,
-          roleName: this.currentRole,
-          limit: limit
-        }) as any;
-
-        console.log('Tauri autocomplete with snippets response:', response);
-        if (response.status === 'success' && response.suggestions) {
-          return response.suggestions.map((suggestion: any) => ({
-            text: suggestion.term,
-            snippet: suggestion.url, // Use URL as snippet for now
-            score: suggestion.score
-          }));
-        }
+        // Tauri doesn't have separate snippets endpoint, use regular suggestions
+        return await this.getTauriSuggestions(query, limit);
       } else {
-        // Try MCP server
-        const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'tools/call',
-            params: {
-              name: 'autocomplete_with_snippets',
-              arguments: {
-                query,
-                limit
-              }
-            }
-          })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Get suggestions with snippets response:', result);
-          if (result.result && !result.result.is_error && result.result.content) {
-            return this.parseAutocompleteWithSnippetsContent(result.result.content);
-          }
-        }
+        return await this.getMCPSuggestions(query, limit, 'autocomplete_with_snippets');
       }
-
-      return [];
     } catch (error) {
       console.error('Error getting autocomplete suggestions with snippets:', error);
       return [];
@@ -350,14 +470,61 @@ export class NovelAutocompleteService {
   /**
    * Get service status for debugging
    */
-  getStatus(): { ready: boolean; baseUrl: string; sessionId: string; usingTauri: boolean; currentRole: string } {
+  getStatus(): {
+    ready: boolean;
+    baseUrl: string;
+    sessionId: string;
+    usingTauri: boolean;
+    currentRole: string;
+    connectionRetries: number;
+    isConnecting: boolean;
+  } {
     return {
       ready: this.autocompleteIndexBuilt,
       baseUrl: this.baseUrl,
       sessionId: this.sessionId,
       usingTauri: get(is_tauri),
-      currentRole: this.currentRole
+      currentRole: this.currentRole,
+      connectionRetries: this.connectionRetries,
+      isConnecting: this.isConnecting
     };
+  }
+
+  /**
+   * Force refresh the autocomplete index
+   */
+  async refreshIndex(): Promise<boolean> {
+    this.autocompleteIndexBuilt = false;
+    this.connectionRetries = 0;
+    return await this.buildAutocompleteIndex();
+  }
+
+  /**
+   * Test the connection without building index
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      if (get(is_tauri)) {
+        const response = await invoke('get_config') as any;
+        return response && response.status === 'success';
+      } else {
+        const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/list',
+            params: {}
+          }),
+          signal: AbortSignal.timeout(3000)
+        });
+        return response.ok;
+      }
+    } catch (error) {
+      console.warn('Connection test failed:', error);
+      return false;
+    }
   }
 }
 

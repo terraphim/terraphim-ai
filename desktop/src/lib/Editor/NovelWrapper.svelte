@@ -1,8 +1,9 @@
 <script lang="ts">
   import { Editor as NovelEditor } from '@paralect/novel-svelte';
   import { Markdown } from 'tiptap-markdown';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { novelAutocompleteService } from '../services/novelAutocompleteService';
+  import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
   import { is_tauri, role } from '../stores';
 
   export let html: any = '';          // initial content in HTML/JSON
@@ -10,20 +11,62 @@
   export let outputFormat: 'html' | 'markdown' = 'html';  // New prop to control output format
   export let enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
   export let showSnippets: boolean = true; // New prop to show snippets in autocomplete
+  export let suggestionTrigger: string = '/'; // Character that triggers autocomplete
+  export let maxSuggestions: number = 8; // Maximum number of suggestions to show
+  export let minQueryLength: number = 1; // Minimum query length before showing suggestions
+  export let debounceDelay: number = 300; // Debounce delay in milliseconds
 
   let editor: any = null;
   let autocompleteStatus = '⏳ Initializing...';
   let autocompleteReady = false;
-  let mockSuggestions: string[] = [];
+  let connectionTested = false;
+  let styleElement: HTMLStyleElement | null = null;
 
   onMount(async () => {
     if (enableAutocomplete) {
-      try {
-        // Set the current role in the autocomplete service
-        novelAutocompleteService.setRole($role);
+      await initializeAutocomplete();
+    }
 
-        // Initialize the autocomplete service
+    // Inject CSS styles for suggestions
+    if (typeof document !== 'undefined') {
+      styleElement = document.createElement('style');
+      styleElement.textContent = terraphimSuggestionStyles;
+      document.head.appendChild(styleElement);
+    }
+  });
+
+  onDestroy(() => {
+    // Cleanup styles
+    if (styleElement && styleElement.parentNode) {
+      styleElement.parentNode.removeChild(styleElement);
+    }
+  });
+
+  // Watch for role changes and reinitialize
+  $: if ($role && enableAutocomplete && autocompleteReady) {
+    novelAutocompleteService.setRole($role);
+    initializeAutocomplete();
+  }
+
+  async function initializeAutocomplete() {
+    autocompleteStatus = '⏳ Initializing autocomplete...';
+    autocompleteReady = false;
+    connectionTested = false;
+
+    try {
+      // Set the current role in the autocomplete service
+      novelAutocompleteService.setRole($role);
+
+      // Test connection first
+      autocompleteStatus = '🔗 Testing connection...';
+      const connectionOk = await novelAutocompleteService.testConnection();
+      connectionTested = true;
+
+      if (connectionOk) {
+        // Build the autocomplete index
+        autocompleteStatus = '🔨 Building autocomplete index...';
         const success = await novelAutocompleteService.buildAutocompleteIndex();
+
         if (success) {
           if ($is_tauri) {
             autocompleteStatus = '✅ Ready - Using Tauri backend';
@@ -32,50 +75,20 @@
           }
           autocompleteReady = true;
         } else {
-          if ($is_tauri) {
-            autocompleteStatus = '⚠️ Tauri autocomplete failed - using mock suggestions';
-          } else {
-            autocompleteStatus = '⚠️ Using mock autocomplete (MCP server not responding)';
-          }
-          autocompleteReady = true;
-          // Load mock suggestions for demonstration
-          mockSuggestions = [
-            'terraphim-graph',
-            'terraphim-automata',
-            'terraphim-service',
-            'terraphim-types',
-            'terraphim-config',
-            'knowledge-graph',
-            'role-based-search',
-            'haystack-integration',
-            'atomic-server',
-            'mcp-protocol'
-          ];
+          autocompleteStatus = '❌ Failed to build autocomplete index';
         }
-      } catch (error) {
-        console.error('Error initializing autocomplete:', error);
+      } else {
         if ($is_tauri) {
-          autocompleteStatus = '⚠️ Tauri autocomplete error - using mock suggestions';
+          autocompleteStatus = '❌ Tauri backend not available';
         } else {
-          autocompleteStatus = '⚠️ Using mock autocomplete (MCP server error)';
+          autocompleteStatus = '❌ MCP server not responding';
         }
-        autocompleteReady = true;
-        // Load mock suggestions for demonstration
-        mockSuggestions = [
-          'terraphim-graph',
-          'terraphim-automata',
-          'terraphim-service',
-          'terraphim-types',
-          'terraphim-config',
-          'knowledge-graph',
-          'role-based-search',
-          'haystack-integration',
-          'atomic-server',
-          'mcp-protocol'
-        ];
       }
+    } catch (error) {
+      console.error('Error initializing autocomplete:', error);
+      autocompleteStatus = '❌ Autocomplete initialization error';
     }
-  });
+  }
 
   /** Handler called by Novel editor on every update; we translate it to the
    *  wrapper's `html` variable so the parent can bind to it. */
@@ -94,34 +107,54 @@
 
   // Function to manually test autocomplete
   const testAutocomplete = async () => {
-    if (autocompleteReady) {
-      try {
-        if (mockSuggestions.length > 0) {
-          // Use mock suggestions for demonstration
-          console.log('Mock autocomplete suggestions:', mockSuggestions);
-          alert(`Found ${mockSuggestions.length} mock suggestions:\n${mockSuggestions.slice(0, 5).join('\n')}`);
+    if (!connectionTested) {
+      alert('Please wait for connection test to complete');
+      return;
+    }
+
+    if (!autocompleteReady) {
+      alert('Autocomplete service not ready. Check the status above.');
+      return;
+    }
+
+    try {
+      autocompleteStatus = '🧪 Testing autocomplete...';
+
+      const testQuery = 'terraphim';
+      const suggestions = await novelAutocompleteService.getSuggestions(testQuery, 5);
+
+      console.log('Autocomplete test results:', suggestions);
+
+      if (suggestions.length > 0) {
+        const suggestionText = suggestions
+          .map((s, i) => `${i + 1}. ${s.text}${s.snippet ? ` (${s.snippet})` : ''}`)
+          .join('\n');
+
+        alert(`✅ Found ${suggestions.length} suggestions for '${testQuery}':\n\n${suggestionText}`);
+
+        if ($is_tauri) {
+          autocompleteStatus = '✅ Ready - Using Tauri backend';
         } else {
-          const suggestions = await novelAutocompleteService.getSuggestions('terraphim', 5);
-          console.log('Autocomplete test results:', suggestions);
-          alert(`Found ${suggestions.length} suggestions for 'terraphim'`);
+          autocompleteStatus = '✅ Ready - Using MCP server backend';
         }
-      } catch (error) {
-        console.error('Autocomplete test failed:', error);
-        alert('Autocomplete test failed - check console for details');
+      } else {
+        alert(`⚠️ No suggestions found for '${testQuery}'. This might be normal if the term isn't in your knowledge graph.`);
       }
-    } else {
-      alert('Autocomplete service not ready yet');
+    } catch (error) {
+      console.error('Autocomplete test failed:', error);
+      alert(`❌ Autocomplete test failed: ${error.message}`);
+      autocompleteStatus = '❌ Test failed - check console for details';
     }
   };
 
   // Function to rebuild autocomplete index
   const rebuildIndex = async () => {
     autocompleteStatus = '⏳ Rebuilding index...';
-    try {
-      // Update the role in case it changed
-      novelAutocompleteService.setRole($role);
+    autocompleteReady = false;
 
-      const success = await novelAutocompleteService.buildAutocompleteIndex();
+    try {
+      const success = await novelAutocompleteService.refreshIndex();
+
       if (success) {
         if ($is_tauri) {
           autocompleteStatus = '✅ Ready - Tauri index rebuilt successfully';
@@ -130,43 +163,54 @@
         }
         autocompleteReady = true;
       } else {
-        if ($is_tauri) {
-          autocompleteStatus = '⚠️ Tauri autocomplete failed - using mock suggestions';
-        } else {
-          autocompleteStatus = '⚠️ Using mock autocomplete (MCP server not responding)';
-        }
-        autocompleteReady = true;
+        autocompleteStatus = '❌ Failed to rebuild index';
       }
     } catch (error) {
       console.error('Error rebuilding index:', error);
-      if ($is_tauri) {
-        autocompleteStatus = '⚠️ Tauri autocomplete error - using mock suggestions';
-      } else {
-        autocompleteStatus = '⚠️ Using mock autocomplete (MCP server error)';
-      }
-      autocompleteReady = true;
+      autocompleteStatus = '❌ Index rebuild failed - check console for details';
     }
   };
 
   // Function to demonstrate autocomplete in action
   const demonstrateAutocomplete = () => {
-    if (editor && mockSuggestions.length > 0) {
-      // Insert some text to demonstrate autocomplete
-      const demoText = `# Terraphim Autocomplete Demo
-
-This is a demonstration of how autocomplete would work in the Novel editor.
-
-Try typing these terms to see autocomplete suggestions:
-- terraphim
-- graph
-- service
-- automata
-
-The autocomplete system provides suggestions based on your knowledge graph and document content.`;
-
-      editor.commands.setContent(demoText);
-      alert('Demo content inserted! Type "terraphim" or "graph" to see autocomplete suggestions.');
+    if (!editor) {
+      alert('Editor not ready yet');
+      return;
     }
+
+    // Insert demo text that explains the new autocomplete system
+    const demoText = `# Terraphim Autocomplete Demo
+
+This is a demonstration of the integrated Terraphim autocomplete system.
+
+## How to Use:
+1. Type "${suggestionTrigger}" to trigger autocomplete
+2. Start typing any term (e.g., "${suggestionTrigger}terraphim", "${suggestionTrigger}graph")
+3. Use ↑↓ arrows to navigate suggestions
+4. Press Tab or Enter to select
+5. Press Esc to cancel
+
+## Try these queries:
+- ${suggestionTrigger}terraphim
+- ${suggestionTrigger}graph
+- ${suggestionTrigger}service
+- ${suggestionTrigger}automata
+- ${suggestionTrigger}role
+
+The autocomplete system uses your local knowledge graph to provide intelligent suggestions based on your selected role: **${$role}**.
+
+---
+
+Start typing below:`;
+
+    editor.commands.setContent(demoText);
+
+    // Focus the editor and position cursor at the end
+    setTimeout(() => {
+      editor.commands.focus('end');
+    }, 100);
+
+    alert(`Demo content inserted!\n\nType "${suggestionTrigger}" followed by any term to see autocomplete suggestions.\n\nExample: "${suggestionTrigger}terraphim"`);
   };
 </script>
 
@@ -175,7 +219,18 @@ The autocomplete system provides suggestions based on your knowledge graph and d
   isEditable={!readOnly}
   disableLocalStorage={true}
   onUpdate={handleUpdate}
-  extensions={[Markdown]}
+  extensions={[
+    Markdown,
+    ...(enableAutocomplete ? [
+      TerraphimSuggestion.configure({
+        trigger: suggestionTrigger,
+        allowSpaces: false,
+        limit: maxSuggestions,
+        minLength: minQueryLength,
+        debounce: debounceDelay,
+      })
+    ] : [])
+  ]}
 />
 
 <!-- Autocomplete Status and Controls -->
@@ -231,40 +286,45 @@ The autocomplete system provides suggestions based on your knowledge graph and d
       </div>
     </div>
 
-    <div style="font-size: 13px; color: #6c757d; margin-bottom: 8px;">
+    <div style="font-size: 13px; color: #6c757d; margin-bottom: 8px; font-family: monospace;">
       {autocompleteStatus}
     </div>
 
+    {#if connectionTested && !autocompleteReady}
+      <div style="font-size: 12px; color: #dc3545; margin-bottom: 8px; padding: 6px; background: #f8d7da; border-radius: 4px;">
+        <strong>⚠️ Autocomplete Not Available</strong><br>
+        {#if $is_tauri}
+          Tauri backend connection failed. Ensure the application has proper permissions.
+        {:else}
+          MCP server not responding. Ensure the server is running on {novelAutocompleteService.getStatus().baseUrl}
+        {/if}
+      </div>
+    {/if}
+
     <div style="font-size: 12px; color: #6c757d;">
-      <strong>Features:</strong>
-      {#if $is_tauri}
-        {#if showSnippets}
-          <br>• Local autocomplete with snippets from Tauri backend
-        {:else}
-          <br>• Local autocomplete from Tauri backend
-        {/if}
-      {:else}
-        {#if showSnippets}
-          <br>• Local autocomplete with snippets from MCP server
-        {:else}
-          <br>• Local autocomplete from MCP server
-        {/if}
-      {/if}
-      <br>• Type at least 2 characters to trigger
-      <br>• Uses role-based knowledge graph for suggestions (Role: {$role})
-      {#if mockSuggestions.length > 0}
-        <br>• <strong>Demo Mode:</strong> Using mock suggestions for demonstration
-      {/if}
+      <strong>Configuration:</strong>
+      <br>• <strong>Backend:</strong> {$is_tauri ? 'Tauri (native)' : `MCP Server (${novelAutocompleteService.getStatus().baseUrl})`}
+      <br>• <strong>Role:</strong> {$role}
+      <br>• <strong>Trigger:</strong> "{suggestionTrigger}" + text
+      <br>• <strong>Min Length:</strong> {minQueryLength} character{minQueryLength !== 1 ? 's' : ''}
+      <br>• <strong>Max Results:</strong> {maxSuggestions}
+      <br>• <strong>Debounce:</strong> {debounceDelay}ms
+      <br>• <strong>Snippets:</strong> {showSnippets ? 'Enabled' : 'Disabled'}
     </div>
 
-    {#if mockSuggestions.length > 0}
-      <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
-        <strong>🎯 Mock Autocomplete Suggestions:</strong>
-        <div style="font-size: 11px; margin-top: 4px;">
-          {mockSuggestions.slice(0, 6).join(' • ')}
-          {#if mockSuggestions.length > 6}
-            <br>... and {mockSuggestions.length - 6} more
-          {/if}
+    {#if autocompleteReady}
+      <div style="margin-top: 8px; padding: 8px; background: #d1edff; border: 1px solid #b3d9ff; border-radius: 4px;">
+        <strong>🎯 Autocomplete Active</strong>
+        <div style="font-size: 11px; margin-top: 4px; color: #0056b3;">
+          Type <code>{suggestionTrigger}</code> in the editor above to trigger suggestions.<br>
+          Example: <code>{suggestionTrigger}terraphim</code> or <code>{suggestionTrigger}graph</code>
+        </div>
+      </div>
+    {:else if connectionTested}
+      <div style="margin-top: 8px; padding: 8px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+        <strong>❌ Autocomplete Unavailable</strong>
+        <div style="font-size: 11px; margin-top: 4px; color: #721c24;">
+          Click "Rebuild Index" to retry or check server/backend status.
         </div>
       </div>
     {/if}

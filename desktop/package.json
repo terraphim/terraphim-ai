@@ -70,6 +70,7 @@
     "@paralect/novel-svelte": "0.0.7",
     "@tauri-apps/api": "^1.2.0",
     "@tiptap/core": "^2.22.1",
+    "@tiptap/extension-mention": "^2.22.1",
     "@tiptap/starter-kit": "^2.22.1",
     "@tomic/lib": "^0.36.0",
     "@tomic/svelte": "^0.35.2",
