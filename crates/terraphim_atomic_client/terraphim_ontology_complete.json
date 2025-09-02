@@ -1,0 +1,36 @@
+[
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/classes": [
+      "http://localhost:9883/terraphim-drive/terraphim/class/document",
+      "http://localhost:9883/terraphim-drive/terraphim/class/node",
+      "http://localhost:9883/terraphim-drive/terraphim/class/edge",
+      "http://localhost:9883/terraphim-drive/terraphim/class/thesaurus",
+      "http://localhost:9883/terraphim-drive/terraphim/class/role",
+      "http://localhost:9883/terraphim-drive/terraphim/class/indexed-document",
+      "http://localhost:9883/terraphim-drive/terraphim/class/search-query",
+      "http://localhost:9883/terraphim-drive/terraphim/class/config",
+      "http://localhost:9883/terraphim-drive/terraphim/class/haystack",
+      "http://localhost:9883/terraphim-drive/terraphim/class/knowledge-graph"
+    ],
+    "https://atomicdata.dev/properties/description": "Ontology for Terraphim AI system, defining classes and properties for documents, knowledge graphs, roles, and search functionality.",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/properties": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/url",
+      "http://localhost:9883/terraphim-drive/terraphim/property/title",
+      "http://localhost:9883/terraphim-drive/terraphim/property/body",
+      "http://localhost:9883/terraphim-drive/terraphim/property/rank",
+      "http://localhost:9883/terraphim-drive/terraphim/property/role-name",
+      "http://localhost:9883/terraphim-drive/terraphim/property/theme",
+      "http://localhost:9883/terraphim-drive/terraphim/property/tags",
+      "http://localhost:9883/terraphim-drive/terraphim/property/search-term",
+      "http://localhost:9883/terraphim-drive/terraphim/property/path"
+    ],
+    "https://atomicdata.dev/properties/shortname": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive"
+  }
+]

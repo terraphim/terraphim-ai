@@ -1,0 +1,213 @@
+Trim trailing whitespace.................................................Failed
+- hook id: trailing-whitespace
+- exit code: 1
+- files were modified by this hook
+
+Fixing terraphim_server/dist/splashscreen.html
+Fixing terraphim_server/dist/index.html
+Fixing terraphim_server/dist/assets/vendor-ui-cd3d2b6a.js
+Fixing terraphim_server/dist/assets/vendor-editor-992829d3.js
+Fixing terraphim_server/dist/assets/index-9ad8b7ea.js
+
+Fix end of files.........................................................Failed
+- hook id: end-of-file-fixer
+- exit code: 1
+- files were modified by this hook
+
+Fixing terraphim_server/dist/splashscreen.js
+
+Check YAML syntax........................................................Passed
+Check TOML syntax........................................................Passed
+Check JSON syntax........................................................Passed
+Check for case conflicts.................................................Passed
+Check for merge conflicts................................................Passed
+Check for debug statements...............................................Passed
+Detect private keys......................................................Passed
+Check for large files....................................................Passed
+Cargo format check.......................................................Passed
+Cargo clippy.............................................................Failed
+- hook id: cargo-clippy
+- exit code: 101
+
+Checking terraphim_types v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_types)
+    Checking terraphim_settings v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_settings)
+    Checking terraphim_atomic_client v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_atomic_client)
+   Compiling terraphim_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/terraphim_server)
+   Compiling terraphim-ai-desktop v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/desktop/src-tauri)
+    Checking terraphim_build_args v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_build_args)
+    Checking terraphim-markdown-parser v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim-markdown-parser)
+    Checking terraphim_onepassword_cli v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_onepassword_cli)
+    Checking terraphim_automata v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_automata)
+    Checking terraphim_persistence v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence)
+warning: terraphim-ai-desktop@0.1.0: Successfully copied config files to build
+    Checking terraphim_rolegraph v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rolegraph)
+    Checking terraphim_config v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_config)
+warning: terraphim_server@0.1.0: No changes in JS source files, skipping JS build.
+warning: terraphim_server@0.1.0: Found ./dist, skipping copy
+    Checking terraphim_middleware v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware)
+    Checking terraphim_service v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_service)
+    Checking terraphim_mcp_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server)
+    Checking terraphim_tui v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_tui)
+error: useless use of `vec!`
+   --> crates/terraphim_tui/tests/persistence_tests.rs:164:25
+    |
+164 |     let roles_to_test = vec!["Role1", "Role2", "Role3", "Final Role"];
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: you can use an array directly: `["Role1", "Role2", "Role3", "Final Role"]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
+    = note: `-D clippy::useless-vec` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
+
+error: could not compile `terraphim_tui` (test "persistence_tests") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: the borrowed expression implements the required traits
+   --> crates/terraphim_tui/tests/server_mode_tests.rs:416:15
+    |
+416 |         .args(&["config", "show"]);
+    |               ^^^^^^^^^^^^^^^^^^^ help: change this to: `["config", "show"]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: could not compile `terraphim_tui` (test "server_mode_tests") due to 1 previous error
+error: unused variable: `limit`
+  --> crates/terraphim_tui/src/repl/mcp_tools.rs:18:9
+   |
+18 |         limit: Option<usize>,
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
+   |
+   = note: `-D unused-variables` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: unused variable: `exclude_term`
+  --> crates/terraphim_tui/src/repl/mcp_tools.rs:27:9
+   |
+27 |         exclude_term: bool,
+   |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_exclude_term`
+
+error: unused variable: `text`
+  --> crates/terraphim_tui/src/repl/mcp_tools.rs:33:38
+   |
+33 |     pub async fn find_matches(&self, text: &str) -> anyhow::Result<Vec<String>> {
+   |                                      ^^^^ help: if this is intentional, prefix it with an underscore: `_text`
+
+error: unused variable: `format`
+  --> crates/terraphim_tui/src/repl/mcp_tools.rs:41:9
+   |
+41 |         format: Option<String>,
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_format`
+
+error: unused variable: `role`
+  --> crates/terraphim_tui/src/repl/mcp_tools.rs:49:9
+   |
+49 |         role: Option<String>,
+   |         ^^^^ help: if this is intentional, prefix it with an underscore: `_role`
+
+error: struct `ChatHandler` is never constructed
+ --> crates/terraphim_tui/src/repl/chat.rs:5:12
+  |
+5 | pub struct ChatHandler {
+  |            ^^^^^^^^^^^
+  |
+  = note: `-D dead-code` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(dead_code)]`
+
+error: associated items `new` and `send_message` are never used
+  --> crates/terraphim_tui/src/repl/chat.rs:11:12
+   |
+10 | impl ChatHandler {
+   | ---------------- associated items in this implementation
+11 |     pub fn new() -> Self {
+   |            ^^^
+...
+15 |     pub async fn send_message(&self, message: &str) -> anyhow::Result<String> {
+   |                  ^^^^^^^^^^^^
+
+error: struct `McpToolsHandler` is never constructed
+ --> crates/terraphim_tui/src/repl/mcp_tools.rs:5:12
+  |
+5 | pub struct McpToolsHandler {
+  |            ^^^^^^^^^^^^^^^
+
+error: associated items `new`, `autocomplete_terms`, `extract_paragraphs`, `find_matches`, `replace_matches`, and `get_thesaurus` are never used
+  --> crates/terraphim_tui/src/repl/mcp_tools.rs:11:12
+   |
+10 | impl McpToolsHandler {
+   | -------------------- associated items in this implementation
+11 |     pub fn new() -> Self {
+   |            ^^^
+...
+15 |     pub async fn autocomplete_terms(
+   |                  ^^^^^^^^^^^^^^^^^^
+...
+24 |     pub async fn extract_paragraphs(
+   |                  ^^^^^^^^^^^^^^^^^^
+...
+33 |     pub async fn find_matches(&self, text: &str) -> anyhow::Result<Vec<String>> {
+   |                  ^^^^^^^^^^^^
+...
+38 |     pub async fn replace_matches(
+   |                  ^^^^^^^^^^^^^^^
+...
+47 |     pub async fn get_thesaurus(
+   |                  ^^^^^^^^^^^^^
+
+error: stripping a prefix manually
+  --> crates/terraphim_tui/src/repl/commands.rs:96:13
+   |
+96 |             &input[1..]
+   |             ^^^^^^^^^^^
+   |
+note: the prefix was tested here
+  --> crates/terraphim_tui/src/repl/commands.rs:95:21
+   |
+95 |         let input = if input.starts_with('/') {
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_strip
+   = note: `-D clippy::manual-strip` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_strip)]`
+help: try using the `strip_prefix` method
+   |
+95 ~         let input = if let Some(<stripped>) = input.strip_prefix('/') {
+96 ~             <stripped>
+   |
+
+error: stripping a prefix manually
+  --> crates/terraphim_tui/src/repl/handler.rs:75:25
+   |
+75 |                         &line[1..]
+   |                         ^^^^^^^^^^
+   |
+note: the prefix was tested here
+  --> crates/terraphim_tui/src/repl/handler.rs:74:34
+   |
+74 |                     let prefix = if line.starts_with('/') {
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_strip
+help: try using the `strip_prefix` method
+   |
+74 ~                     let prefix = if let Some(<stripped>) = line.strip_prefix('/') {
+75 ~                         <stripped>
+   |
+
+error: unnecessary closure used to substitute value for `Option::None`
+   --> crates/terraphim_tui/src/repl/handler.rs:578:44
+    |
+578 | ...                   println!("{}", response.message.unwrap_or_else(|| response.status));
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_lazy_evaluations
+    = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `unwrap_or` instead
+    |
+578 -                             println!("{}", response.message.unwrap_or_else(|| response.status));
+578 +                             println!("{}", response.message.unwrap_or(response.status));
+    |
+
+error: could not compile `terraphim_tui` (bin "terraphim-tui") due to 12 previous errors
+error: could not compile `terraphim_tui` (bin "terraphim-tui" test) due to 12 previous errors
+
+Biome lint and format check..............................................Passed
+Detect secrets...........................................................Passed

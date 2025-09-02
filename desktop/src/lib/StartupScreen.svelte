@@ -130,12 +130,12 @@
     <div class="field">
       <label class="label" for="global-shortcut">Global Shortcut:</label>
       <div class="control">
-        <input 
-          class="input" 
-          id="global-shortcut" 
-          type="text" 
-          bind:value={globalShortcut} 
-          readonly 
+        <input
+          class="input"
+          id="global-shortcut"
+          type="text"
+          bind:value={globalShortcut}
+          readonly
           placeholder="Click to set shortcut"
           on:click={startCapturingShortcut}
         />

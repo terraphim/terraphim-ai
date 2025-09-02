@@ -1,0 +1,569 @@
+[
+  {
+    "https://atomicdata.dev/properties/description": "A loan application submitted by a borrower, containing all necessary information for loan processing.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/loan-application",
+    "https://atomicdata.dev/properties/name": "Loan Application",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/interest-rate",
+      "borrower-portal/property/documents",
+      "borrower-portal/property/application-history"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/loan-amount",
+      "borrower-portal/property/loan-term",
+      "borrower-portal/property/loan-purpose",
+      "borrower-portal/property/borrower-profile",
+      "https://atomicdata.dev/properties/createdAt"
+    ],
+    "https://atomicdata.dev/properties/shortname": "loan-application"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A borrower's personal and financial profile containing identity and financial information.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/borrower-profile",
+    "https://atomicdata.dev/properties/name": "Borrower Profile",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/credit-score",
+      "borrower-portal/property/annual-income",
+      "borrower-portal/property/employment-status"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/email",
+      "borrower-portal/property/phone-number",
+      "borrower-portal/property/address",
+      "borrower-portal/property/date-of-birth",
+      "borrower-portal/property/ssn-last-four"
+    ],
+    "https://atomicdata.dev/properties/shortname": "borrower-profile"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A document uploaded by the borrower as part of the loan application process.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/document",
+    "https://atomicdata.dev/properties/name": "Document",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "borrower-portal/property/document-type",
+      "borrower-portal/property/document-url",
+      "https://atomicdata.dev/properties/createdAt"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Status tracking entry for a loan application showing progression through the approval process.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/application-status",
+    "https://atomicdata.dev/properties/name": "Application Status",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "borrower-portal/property/status-type",
+      "borrower-portal/property/status-timestamp"
+    ],
+    "https://atomicdata.dev/properties/shortname": "application-status"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A loan product offered by the lender with specific terms and conditions.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/loan-product",
+    "https://atomicdata.dev/properties/name": "Loan Product",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/interest-rate",
+      "borrower-portal/property/loan-term"
+    ],
+    "https://atomicdata.dev/properties/shortname": "loan-product"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Financial information associated with a borrower including income, expenses, and debt ratios.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/financial-info",
+    "https://atomicdata.dev/properties/name": "Financial Information",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/debt-to-income-ratio"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "borrower-portal/property/annual-income",
+      "borrower-portal/property/monthly-expenses"
+    ],
+    "https://atomicdata.dev/properties/shortname": "financial-info"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "Employment information for a borrower including employer details and employment duration.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/employment-info",
+    "https://atomicdata.dev/properties/name": "Employment Information",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/recommends": [
+      "borrower-portal/property/employment-duration"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "borrower-portal/property/employer-name",
+      "borrower-portal/property/employment-status"
+    ],
+    "https://atomicdata.dev/properties/shortname": "employment-info"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The amount of money requested in the loan application, in USD.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/loan-amount",
+    "https://atomicdata.dev/properties/name": "Loan Amount",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "loan-amount"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/description": "The annual percentage rate (APR) for the loan.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/interest-rate",
+    "https://atomicdata.dev/properties/name": "Interest Rate",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "interest-rate"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The duration of the loan in months.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/loan-term",
+    "https://atomicdata.dev/properties/name": "Loan Term",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "loan-term"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The borrower's credit score (typically FICO score).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/credit-score",
+    "https://atomicdata.dev/properties/name": "Credit Score",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "credit-score"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The borrower's gross annual income in USD.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/annual-income",
+    "https://atomicdata.dev/properties/name": "Annual Income",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "annual-income"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The borrower's current employment status (e.g., employed, self-employed, unemployed, retired).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/employment-status",
+    "https://atomicdata.dev/properties/name": "Employment Status",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "employment-status"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The type of document (e.g., pay stub, tax return, bank statement, ID).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-type",
+    "https://atomicdata.dev/properties/name": "Document Type",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-type"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The URL where the uploaded document can be accessed.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-url",
+    "https://atomicdata.dev/properties/name": "Document URL",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-url"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The current status of the application (e.g., submitted, under review, approved, denied).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/status-type",
+    "https://atomicdata.dev/properties/name": "Status Type",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "status-type"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The date and time when this status was set.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/status-timestamp",
+    "https://atomicdata.dev/properties/name": "Status Timestamp",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "status-timestamp"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "Reference to the borrower's profile.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/borrower-profile",
+    "https://atomicdata.dev/properties/name": "Borrower Profile",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "borrower-profile"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of documents associated with the loan application.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/documents",
+    "https://atomicdata.dev/properties/name": "Documents",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "documents"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of status entries tracking the application progression.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/application-history",
+    "https://atomicdata.dev/properties/name": "Application History",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "application-history"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The borrower's primary phone number.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/phone-number",
+    "https://atomicdata.dev/properties/name": "Phone Number",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "phone-number"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The borrower's primary residential address.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/address",
+    "https://atomicdata.dev/properties/name": "Address",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "address"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/date",
+    "https://atomicdata.dev/properties/description": "The borrower's date of birth.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/date-of-birth",
+    "https://atomicdata.dev/properties/name": "Date of Birth",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "date-of-birth"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The last four digits of the borrower's Social Security Number.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/ssn-last-four",
+    "https://atomicdata.dev/properties/name": "SSN Last Four",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "ssn-last-four"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The name of the borrower's current employer.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/employer-name",
+    "https://atomicdata.dev/properties/name": "Employer Name",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "employer-name"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "How long the borrower has been employed at their current job, in months.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/employment-duration",
+    "https://atomicdata.dev/properties/name": "Employment Duration",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "employment-duration"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The borrower's total monthly expenses in USD.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/monthly-expenses",
+    "https://atomicdata.dev/properties/name": "Monthly Expenses",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "monthly-expenses"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/description": "The borrower's debt-to-income ratio as a percentage.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/debt-to-income-ratio",
+    "https://atomicdata.dev/properties/name": "Debt-to-Income Ratio",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "debt-to-income-ratio"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The purpose for which the loan is being requested (e.g., home purchase, refinance, debt consolidation).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/loan-purpose",
+    "https://atomicdata.dev/properties/name": "Loan Purpose",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "loan-purpose"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A requirement for a specific document to be uploaded",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/document-requirement",
+    "https://atomicdata.dev/properties/name": "Document Requirement",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/document-name",
+      "borrower-portal/property/document-description",
+      "borrower-portal/property/document-category",
+      "borrower-portal/property/document-required",
+      "borrower-portal/property/document-max-size"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document-requirement"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Name of the document requirement",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-name",
+    "https://atomicdata.dev/properties/name": "document-name",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-name"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Description of what the document should contain",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-description",
+    "https://atomicdata.dev/properties/name": "document-description",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-description"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Category or type of document (e.g., pay-stub, tax-return)",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-category",
+    "https://atomicdata.dev/properties/name": "document-category",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-category"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether this document is required for the application",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-required",
+    "https://atomicdata.dev/properties/name": "document-required",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-required"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "Maximum file size allowed in bytes",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-max-size",
+    "https://atomicdata.dev/properties/name": "document-max-size",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-max-size"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A component that manages document upload requirements",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/document-upload-component",
+    "https://atomicdata.dev/properties/name": "Document Upload Component",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/description",
+      "borrower-portal/property/document-requirements"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document-upload-component"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Array of document requirements for a loan application or demo",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/document-requirements",
+    "https://atomicdata.dev/properties/name": "document-requirements",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "document-requirements"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A field in a form with type, label, and validation",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/form-field",
+    "https://atomicdata.dev/properties/name": "FormField",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "form-field"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A step in a multi-step form",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/form-step",
+    "https://atomicdata.dev/properties/name": "FormStep",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "form-step"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A layout configuration for pages",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/layout",
+    "https://atomicdata.dev/properties/name": "Layout",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "layout"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A menu item with path, icon, and state",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/menu-item",
+    "https://atomicdata.dev/properties/name": "MenuItem",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "menu-item"
+  },
+  {
+    "https://atomicdata.dev/properties/description": "A navigation menu component with menu items",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/class/navigation-menu",
+    "https://atomicdata.dev/properties/name": "NavigationMenu",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "navigation-menu"
+  },
+  {
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether form field is required",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/property/field-required",
+    "https://atomicdata.dev/properties/name": "field-required",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal",
+    "https://atomicdata.dev/properties/shortname": "menu-path"
+  },
+  {
+    "borrower-portal/property/field-required": true,
+    "http://localhost:9883/borrower-portal/property/field-label": "Address",
+    "http://localhost:9883/borrower-portal/property/field-placeholder": "Enter company address",
+    "http://localhost:9883/borrower-portal/property/field-type": "text",
+    "https://atomicdata.dev/properties/isA": [
+      "borrower-portal/class/form-field"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/form-field/address",
+    "https://atomicdata.dev/properties/name": "Address Field",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal"
+  },
+  {
+    "borrower-portal/property/field-required": true,
+    "http://localhost:9883/borrower-portal/property/data-type": "string",
+    "http://localhost:9883/borrower-portal/property/display-order": 1,
+    "http://localhost:9883/borrower-portal/property/field-key": "companyName",
+    "http://localhost:9883/borrower-portal/property/field-label": "Company Name (Legal Name)",
+    "http://localhost:9883/borrower-portal/property/field-placeholder": "Enter legal company name",
+    "http://localhost:9883/borrower-portal/property/field-section": "basic-info",
+    "http://localhost:9883/borrower-portal/property/field-type": "text",
+    "http://localhost:9883/borrower-portal/property/input-type": "text",
+    "http://localhost:9883/borrower-portal/property/is-required": true,
+    "http://localhost:9883/borrower-portal/property/placeholder-text": "Enter your company name",
+    "https://atomicdata.dev/properties/isA": [
+      "borrower-portal/class/form-field"
+    ],
+    "https://atomicdata.dev/properties/localId": "borrower-portal/form-field/company-name",
+    "https://atomicdata.dev/properties/name": "Company Name Field",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/borrower-portal"
+  }
+]

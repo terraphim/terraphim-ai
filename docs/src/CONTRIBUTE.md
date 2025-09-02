@@ -33,7 +33,7 @@ git clone https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /
 ## Run the backend
 
 ```sh
-cargo run 
+cargo run
 ```
 
 ## Run the frontend in development mode:
@@ -46,5 +46,5 @@ from ./desktop folder
 to compile tauri in dev mode run:
 
 ```
-yarn run tauri dev 
+yarn run tauri dev
 ```

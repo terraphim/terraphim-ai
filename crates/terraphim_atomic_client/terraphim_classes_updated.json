@@ -1,0 +1,233 @@
+[
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/document",
+    "https://atomicdata.dev/properties/description": "A document is the central piece of content that gets indexed and searched. It holds the title, body, description, tags, and rank.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/url",
+      "http://localhost:9883/terraphim-drive/terraphim/property/title",
+      "http://localhost:9883/terraphim-drive/terraphim/property/body"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/description",
+      "http://localhost:9883/terraphim-drive/terraphim/property/stub",
+      "http://localhost:9883/terraphim-drive/terraphim/property/tags",
+      "http://localhost:9883/terraphim-drive/terraphim/property/rank"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/node",
+    "https://atomicdata.dev/properties/description": "A node represents a single concept and its connections to other concepts in the knowledge graph. Each node can have multiple edges to other nodes.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/rank",
+      "http://localhost:9883/terraphim-drive/terraphim/property/connected-with"
+    ],
+    "https://atomicdata.dev/properties/shortname": "node"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/edge",
+    "https://atomicdata.dev/properties/description": "An edge represents a relationship between two nodes in the knowledge graph. It contains a rank and a hashmap of document IDs to ranks.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/rank",
+      "http://localhost:9883/terraphim-drive/terraphim/property/doc-hash"
+    ],
+    "https://atomicdata.dev/properties/shortname": "edge"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/thesaurus",
+    "https://atomicdata.dev/properties/description": "A thesaurus is a dictionary with synonyms which map to higher-level concepts.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "thesaurus"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/role",
+    "https://atomicdata.dev/properties/description": "A role is a collection of settings for a specific user. It contains a user's knowledge graph, a list of haystacks, as well as preferences for the relevance function and theme.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/role-name",
+      "http://localhost:9883/terraphim-drive/terraphim/property/relevance-function",
+      "http://localhost:9883/terraphim-drive/terraphim/property/theme",
+      "http://localhost:9883/terraphim-drive/terraphim/property/haystacks"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/shortname",
+      "http://localhost:9883/terraphim-drive/terraphim/property/knowledge-graph"
+    ],
+    "https://atomicdata.dev/properties/shortname": "role"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/indexed-document",
+    "https://atomicdata.dev/properties/description": "Reference to external storage of documents. Contains matched edges, graph rank, tags, and node IDs for validation.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/rank",
+      "http://localhost:9883/terraphim-drive/terraphim/property/tags",
+      "http://localhost:9883/terraphim-drive/terraphim/property/matched-edges",
+      "http://localhost:9883/terraphim-drive/terraphim/property/nodes"
+    ],
+    "https://atomicdata.dev/properties/shortname": "indexed-document"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/search-query",
+    "https://atomicdata.dev/properties/description": "Query type for searching documents in the RoleGraph. It contains the search term, skip and limit parameters.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/search-term"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/skip",
+      "http://localhost:9883/terraphim-drive/terraphim/property/limit",
+      "http://localhost:9883/terraphim-drive/terraphim/property/role"
+    ],
+    "https://atomicdata.dev/properties/shortname": "search-query"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/config",
+    "https://atomicdata.dev/properties/description": "The Terraphim config is the main configuration for terraphim. It contains the global shortcut, roles, and the default role.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/config-id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/global-shortcut",
+      "http://localhost:9883/terraphim-drive/terraphim/property/roles",
+      "http://localhost:9883/terraphim-drive/terraphim/property/default-role",
+      "http://localhost:9883/terraphim-drive/terraphim/property/selected-role"
+    ],
+    "https://atomicdata.dev/properties/shortname": "config"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/haystack",
+    "https://atomicdata.dev/properties/description": "A haystack is a collection of documents that can be indexed and searched. One user can have multiple haystacks. Each haystack is indexed using a specific service.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/path",
+      "http://localhost:9883/terraphim-drive/terraphim/property/service-type"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/read-only",
+      "http://localhost:9883/terraphim-drive/terraphim/property/atomic-server-secret"
+    ],
+    "https://atomicdata.dev/properties/shortname": "haystack"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/knowledge-graph",
+    "https://atomicdata.dev/properties/description": "A knowledge graph is the collection of documents which were indexed using a specific service. It contains automata path and local settings.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/public",
+      "http://localhost:9883/terraphim-drive/terraphim/property/publish"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/automata-path",
+      "http://localhost:9883/terraphim-drive/terraphim/property/knowledge-graph-local"
+    ],
+    "https://atomicdata.dev/properties/shortname": "knowledge-graph"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/role-name",
+    "https://atomicdata.dev/properties/description": "A role name that maintains both original and lowercase versions for case-insensitive comparisons.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/original",
+      "http://localhost:9883/terraphim-drive/terraphim/property/lowercase"
+    ],
+    "https://atomicdata.dev/properties/shortname": "role-name"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/normalized-term",
+    "https://atomicdata.dev/properties/description": "A normalized term is a higher-level term that has been normalized. It holds a unique identifier and the normalized value.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/nterm"
+    ],
+    "https://atomicdata.dev/properties/recommends": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/url"
+    ],
+    "https://atomicdata.dev/properties/shortname": "normalized-term"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/concept",
+    "https://atomicdata.dev/properties/description": "A concept is a higher-level, normalized term. It describes a unique, abstract idea in a machine-readable format.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/id",
+      "http://localhost:9883/terraphim-drive/terraphim/property/value"
+    ],
+    "https://atomicdata.dev/properties/shortname": "concept"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/knowledge-graph-local",
+    "https://atomicdata.dev/properties/description": "Local knowledge graph configuration specifying input type and path for rebuilding from local files.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/input-type",
+      "http://localhost:9883/terraphim-drive/terraphim/property/path"
+    ],
+    "https://atomicdata.dev/properties/shortname": "knowledge-graph-local"
+  },
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim/class/config-state",
+    "https://atomicdata.dev/properties/description": "Configuration state that holds the terraphim config and role graphs for runtime operations.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/requires": [
+      "http://localhost:9883/terraphim-drive/terraphim/property/config",
+      "http://localhost:9883/terraphim-drive/terraphim/property/roles"
+    ],
+    "https://atomicdata.dev/properties/shortname": "config-state"
+  }
+]
