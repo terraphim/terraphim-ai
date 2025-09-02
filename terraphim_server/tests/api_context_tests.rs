@@ -283,7 +283,7 @@ async fn test_list_conversations_with_data() {
     assert!(matches!(response.status, Status::Success));
     // Should have at least our 2 conversations, but may have more from other tests
     assert!(response.conversations.len() >= 2);
-    
+
     let titles: Vec<String> = response.conversations.iter().map(|c| c.title.clone()).collect();
     assert!(titles.contains(&"First Conversation".to_string()));
     assert!(titles.contains(&"Second Conversation".to_string()));
@@ -682,7 +682,7 @@ async fn test_add_context_to_conversation() {
     let conv_response: GetConversationResponse = response.json().await.unwrap();
     let conversation = conv_response.conversation.unwrap();
     assert_eq!(conversation.global_context.len(), 1);
-    
+
     let context = &conversation.global_context[0];
     assert_eq!(context.title, "Test Document Context");
     assert_eq!(context.content, "This is a test document that provides context for the conversation.");
@@ -857,7 +857,7 @@ async fn test_add_search_context_to_conversation() {
     let conv_response: GetConversationResponse = response.json().await.unwrap();
     let conversation = conv_response.conversation.unwrap();
     assert_eq!(conversation.global_context.len(), 1);
-    
+
     let context = &conversation.global_context[0];
     assert!(context.title.contains("rust programming"));
     assert!(matches!(context.context_type, ContextType::SearchResult));
@@ -918,7 +918,7 @@ async fn test_add_search_context_no_limit() {
     let conv_response: GetConversationResponse = response.json().await.unwrap();
     let conversation = conv_response.conversation.unwrap();
     assert_eq!(conversation.global_context.len(), 1);
-    
+
     let context = &conversation.global_context[0];
     assert!(context.content.contains("First Test Document"));
     assert!(context.content.contains("Second Test Document"));
@@ -1028,30 +1028,30 @@ async fn test_conversation_context_workflow() {
 
     let conv_response: GetConversationResponse = response.json().await.unwrap();
     assert!(matches!(conv_response.status, Status::Success));
-    
+
     let conversation = conv_response.conversation.unwrap();
-    
+
     // Check conversation metadata
     assert_eq!(conversation.title, "Complete Context Workflow Test");
     assert_eq!(conversation.role.as_str(), "TestRole");
-    
+
     // Check messages
     assert_eq!(conversation.messages.len(), 2);
     assert_eq!(conversation.messages[0].role, "user");
     assert_eq!(conversation.messages[0].content, "I need help with Rust programming");
     assert_eq!(conversation.messages[1].role, "assistant");
     assert!(conversation.messages[1].content.contains("async programming"));
-    
+
     // Check global context
     assert_eq!(conversation.global_context.len(), 2);
-    
+
     // Find search context
     let search_context = conversation.global_context.iter()
         .find(|ctx| matches!(ctx.context_type, ContextType::SearchResult))
         .expect("Search context not found");
     assert!(search_context.title.contains("rust programming help"));
     assert!(search_context.content.contains("First Test Document"));
-    
+
     // Find user input context
     let user_context = conversation.global_context.iter()
         .find(|ctx| matches!(ctx.context_type, ContextType::UserInput))
@@ -1104,7 +1104,7 @@ async fn test_context_limits() {
             .expect("Failed to send request");
 
         let response: AddContextResponse = response.json().await.unwrap();
-        
+
         match response.status {
             Status::Success => success_count += 1,
             Status::Error => {

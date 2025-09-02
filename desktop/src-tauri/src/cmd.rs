@@ -818,12 +818,19 @@ pub struct AddContextResponse {
 }
 
 /// Global context manager instance for Tauri commands
-use std::sync::OnceLock;
-static CONTEXT_MANAGER: OnceLock<tokio::sync::Mutex<ContextManager>> = OnceLock::new();
+use tokio::sync::Mutex as TokioMutex;
 
-fn get_context_manager() -> &'static tokio::sync::Mutex<ContextManager> {
-    CONTEXT_MANAGER
-        .get_or_init(|| tokio::sync::Mutex::new(ContextManager::new(ContextConfig::default())))
+#[allow(clippy::incompatible_msrv)]
+static CONTEXT_MANAGER: std::sync::OnceLock<Arc<TokioMutex<ContextManager>>> =
+    std::sync::OnceLock::new();
+
+#[allow(clippy::incompatible_msrv)]
+fn get_context_manager() -> &'static Arc<TokioMutex<ContextManager>> {
+    CONTEXT_MANAGER.get_or_init(|| {
+        Arc::new(TokioMutex::new(ContextManager::new(
+            ContextConfig::default(),
+        )))
+    })
 }
 
 /// Create a new conversation

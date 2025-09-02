@@ -1,6 +1,6 @@
 /**
  * Global teardown for Context Management UI tests
- * 
+ *
  * This file handles cleanup after context management tests complete,
  * including service shutdown, artifact collection, and test reporting.
  */
@@ -36,19 +36,19 @@ async function shutdownServices(): Promise<void> {
   try {
     // Find and terminate backend server processes
     console.log('🔍 Finding backend server processes...');
-    
+
     // Kill processes listening on our test ports
     const portsToKill = [BACKEND_PORT, MCP_SERVER_PORT];
-    
+
     for (const port of portsToKill) {
       try {
         // Find processes using the port
         const { stdout } = await execAsync(`lsof -ti:${port} 2>/dev/null || true`);
         const pids = stdout.trim().split('\n').filter(pid => pid);
-        
+
         if (pids.length > 0) {
           console.log(`🔪 Terminating processes on port ${port}: ${pids.join(', ')}`);
-          
+
           // Try graceful shutdown first
           for (const pid of pids) {
             if (pid) {
@@ -60,10 +60,10 @@ async function shutdownServices(): Promise<void> {
               }
             }
           }
-          
+
           // Wait a moment for graceful shutdown
           await new Promise(resolve => setTimeout(resolve, 3000));
-          
+
           // Force kill if still running
           for (const pid of pids) {
             if (pid) {
@@ -107,7 +107,7 @@ async function collectTestArtifacts(): Promise<string[]> {
   const artifacts: string[] = [];
   const artifactDirs = [
     'test-results/context-artifacts',
-    'test-results/screenshots', 
+    'test-results/screenshots',
     'test-results/videos',
     'test-results/traces',
   ];
@@ -122,12 +122,12 @@ async function collectTestArtifacts(): Promise<string[]> {
         const files = await fs.readdir(dir);
         if (files.length > 0) {
           console.log(`📁 Found ${files.length} files in ${dir}`);
-          
+
           // Copy files to archive
           for (const file of files) {
             const sourcePath = path.join(dir, file);
             const destPath = path.join(archiveDir, path.basename(dir) + '_' + file);
-            
+
             try {
               await fs.copyFile(sourcePath, destPath);
               artifacts.push(destPath);
@@ -190,7 +190,7 @@ async function generateTestReport(result: FullResult, artifacts: string[]): Prom
       for (const suite of result.suites) {
         for (const spec of suite.specs) {
           summary.total++;
-          
+
           let specPassed = false;
           let specFailed = false;
           let specSkipped = false;
@@ -268,7 +268,7 @@ ${summary.failed === 0 ? '🎉 **ALL TESTS PASSED!**' : `⚠️ **${summary.fail
  */
 async function cleanupTemporaryFiles(): Promise<void> {
   const CI = process.env.CI === 'true';
-  
+
   if (!CI) {
     console.log('🏠 Keeping temporary files for local development');
     return;
@@ -326,7 +326,7 @@ async function validateEnvironmentHealth(): Promise<void> {
       try {
         const { stdout } = await execAsync(`lsof -ti:${port} 2>/dev/null || echo ""`);
         const pids = stdout.trim().split('\n').filter(pid => pid);
-        
+
         if (pids.length > 0) {
           console.warn(`⚠️ Port ${port} still has processes running: ${pids.join(', ')}`);
         } else {

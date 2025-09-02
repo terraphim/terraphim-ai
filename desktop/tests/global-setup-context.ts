@@ -1,6 +1,6 @@
 /**
  * Global setup for Context Management UI tests
- * 
+ *
  * This file handles the initialization required for context management tests,
  * including backend services, test data preparation, and environment validation.
  */
@@ -83,12 +83,12 @@ async function buildComponents(): Promise<void> {
   console.log('🔨 Building required components...');
 
   const currentDir = process.cwd();
-  
+
   try {
     // Build the main Terraphim server (backend API)
     console.log('🏗️ Building Terraphim server...');
     process.chdir(path.resolve(__dirname, '../..'));
-    
+
     const { stdout, stderr } = await execAsync('cargo build --bin terraphim_server --release');
     if (stderr && !stderr.includes('warning')) {
       console.error('Backend build errors:', stderr);
@@ -98,7 +98,7 @@ async function buildComponents(): Promise<void> {
     // Build MCP server for context integration
     console.log('🏗️ Building MCP server...');
     process.chdir(path.resolve(__dirname, '../../crates/terraphim_mcp_server'));
-    
+
     const mcpBuild = await execAsync('cargo build --release');
     if (mcpBuild.stderr && !mcpBuild.stderr.includes('warning')) {
       console.error('MCP server build errors:', mcpBuild.stderr);
@@ -149,10 +149,10 @@ async function startBackendServices(): Promise<TestEnvironment> {
   try {
     const currentDir = process.cwd();
     process.chdir(path.resolve(__dirname, '../..'));
-    
+
     const backendProcess = exec(`./target/release/terraphim_server --port ${BACKEND_PORT}`, {
-      env: { 
-        ...process.env, 
+      env: {
+        ...process.env,
         RUST_LOG: 'info',
         TERRAPHIM_TEST_MODE: 'true'
       }
@@ -171,13 +171,13 @@ async function startBackendServices(): Promise<TestEnvironment> {
     console.warn('⚠️ Backend server might already be running or failed to start');
   }
 
-  // Start MCP server (if not already running)  
+  // Start MCP server (if not already running)
   console.log(`🚀 Starting MCP server on port ${MCP_SERVER_PORT}...`);
   try {
     const mcpProcess = exec(`./target/release/terraphim_mcp_server --sse --bind 127.0.0.1:${MCP_SERVER_PORT}`, {
       cwd: path.resolve(__dirname, '../../crates/terraphim_mcp_server'),
-      env: { 
-        ...process.env, 
+      env: {
+        ...process.env,
         RUST_LOG: 'info'
       }
     });
@@ -195,7 +195,7 @@ async function startBackendServices(): Promise<TestEnvironment> {
 
   // Wait for services to be ready
   console.log('⏳ Waiting for backend services to be ready...');
-  
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     console.log(`🔄 Health check attempt ${attempt}/${MAX_RETRIES}`);
 
@@ -304,7 +304,7 @@ async function performFunctionalTests(environment: TestEnvironment): Promise<voi
     // Test conversation retrieval
     console.log('🧪 Testing conversation retrieval...');
     const getResponse = await fetch(`${baseUrl}/conversations/${conversationId}`);
-    
+
     if (!getResponse.ok) {
       throw new Error(`Conversation retrieval failed: ${getResponse.status}`);
     }
@@ -365,7 +365,7 @@ async function setupTestData(): Promise<void> {
 
   try {
     await fs.writeFile(
-      'test-results/test-data.json', 
+      'test-results/test-data.json',
       JSON.stringify(testConfig, null, 2)
     );
     console.log('✅ Test data configuration written');

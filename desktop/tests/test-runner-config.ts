@@ -1,6 +1,6 @@
 /**
  * Test Runner Configuration for Context Management System
- * 
+ *
  * Orchestrates the execution of all test suites including unit tests,
  * integration tests, E2E tests, and performance tests. Provides
  * comprehensive test coverage validation and reporting.
@@ -58,7 +58,7 @@ const TEST_SUITES: TestSuite[] = [
     required: true,
     tags: ['backend', 'unit', 'context']
   },
-  
+
   // API integration tests
   {
     name: 'api-integration-context',
@@ -69,7 +69,7 @@ const TEST_SUITES: TestSuite[] = [
     required: true,
     tags: ['api', 'integration', 'context']
   },
-  
+
   // Tauri command tests
   {
     name: 'tauri-command-context',
@@ -80,7 +80,7 @@ const TEST_SUITES: TestSuite[] = [
     required: true,
     tags: ['tauri', 'desktop', 'commands']
   },
-  
+
   // Frontend unit tests
   {
     name: 'frontend-unit',
@@ -91,7 +91,7 @@ const TEST_SUITES: TestSuite[] = [
     required: false,
     tags: ['frontend', 'unit', 'svelte']
   },
-  
+
   // E2E context management tests
   {
     name: 'e2e-context-management',
@@ -102,7 +102,7 @@ const TEST_SUITES: TestSuite[] = [
     required: true,
     tags: ['e2e', 'context', 'ui']
   },
-  
+
   // E2E workflow integration tests
   {
     name: 'e2e-workflow-integration',
@@ -113,7 +113,7 @@ const TEST_SUITES: TestSuite[] = [
     required: true,
     tags: ['e2e', 'workflow', 'integration']
   },
-  
+
   // Performance tests
   {
     name: 'performance-stress',
@@ -124,7 +124,7 @@ const TEST_SUITES: TestSuite[] = [
     required: false,
     tags: ['performance', 'stress', 'benchmark']
   },
-  
+
   // Accessibility tests
   {
     name: 'accessibility',
@@ -135,7 +135,7 @@ const TEST_SUITES: TestSuite[] = [
     required: false,
     tags: ['accessibility', 'a11y', 'compliance']
   },
-  
+
   // Visual regression tests
   {
     name: 'visual-regression',
@@ -165,7 +165,7 @@ function filterTestSuites(suites: TestSuite[], config: TestRunConfig): TestSuite
   if (config.tags.length === 0) {
     return suites;
   }
-  
+
   return suites.filter(suite => {
     if (!suite.tags) return false;
     return config.tags.some(tag => suite.tags?.includes(tag));
@@ -177,9 +177,9 @@ function filterTestSuites(suites: TestSuite[], config: TestRunConfig): TestSuite
  */
 async function runTestSuite(suite: TestSuite): Promise<TestResult> {
   console.log(`🚀 Running ${suite.name}: ${suite.description}`);
-  
+
   const startTime = Date.now();
-  
+
   try {
     const { stdout, stderr } = await execAsync(suite.command, {
       cwd: suite.workingDirectory,
@@ -190,26 +190,26 @@ async function runTestSuite(suite: TestSuite): Promise<TestResult> {
         NODE_ENV: 'test'
       }
     });
-    
+
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     console.log(`✅ ${suite.name} passed (${duration}ms)`);
-    
+
     return {
       suite: suite.name,
       status: 'passed',
       duration,
       output: stdout
     };
-    
+
   } catch (error: any) {
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     console.log(`❌ ${suite.name} failed (${duration}ms)`);
     console.log(`Error: ${error.message}`);
-    
+
     return {
       suite: suite.name,
       status: 'failed',
@@ -225,7 +225,7 @@ async function runTestSuite(suite: TestSuite): Promise<TestResult> {
  */
 async function runTestSuitesParallel(suites: TestSuite[]): Promise<TestResult[]> {
   console.log(`🔄 Running ${suites.length} test suites in parallel...`);
-  
+
   const promises = suites.map(suite => runTestSuite(suite));
   return Promise.all(promises);
 }
@@ -235,20 +235,20 @@ async function runTestSuitesParallel(suites: TestSuite[]): Promise<TestResult[]>
  */
 async function runTestSuitesSequential(suites: TestSuite[], config: TestRunConfig): Promise<TestResult[]> {
   console.log(`🔄 Running ${suites.length} test suites sequentially...`);
-  
+
   const results: TestResult[] = [];
-  
+
   for (const suite of suites) {
     const result = await runTestSuite(suite);
     results.push(result);
-    
+
     // Stop on first failure if not continuing on failure
     if (!config.continueOnFailure && result.status === 'failed' && suite.required) {
       console.log(`🛑 Stopping test execution due to required test failure: ${suite.name}`);
       break;
     }
   }
-  
+
   return results;
 }
 
@@ -257,19 +257,19 @@ async function runTestSuitesSequential(suites: TestSuite[], config: TestRunConfi
  */
 async function generateTestReport(results: TestResult[], config: TestRunConfig): Promise<void> {
   console.log('📊 Generating comprehensive test report...');
-  
+
   // Create output directory
   await fs.mkdir(config.outputDir, { recursive: true });
-  
+
   // Calculate summary statistics
   const totalTests = results.length;
   const passedTests = results.filter(r => r.status === 'passed').length;
   const failedTests = results.filter(r => r.status === 'failed').length;
   const skippedTests = results.filter(r => r.status === 'skipped').length;
-  
+
   const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
   const averageDuration = totalDuration / totalTests;
-  
+
   // Generate JSON report
   const jsonReport = {
     timestamp: new Date().toISOString(),
@@ -285,12 +285,12 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
     },
     results
   };
-  
+
   await fs.writeFile(
     path.join(config.outputDir, 'comprehensive-test-report.json'),
     JSON.stringify(jsonReport, null, 2)
   );
-  
+
   // Generate HTML report
   const htmlReport = `
 <!DOCTYPE html>
@@ -328,7 +328,7 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
             <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
             <p><strong>Configuration:</strong> ${JSON.stringify(config, null, 2)}</p>
         </div>
-        
+
         <div class="summary">
             <div class="metric">
                 <div class="metric-value">${totalTests}</div>
@@ -355,13 +355,13 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
                 <div>Total Duration</div>
             </div>
         </div>
-        
+
         <div class="results">
             <h2>Detailed Results</h2>
             ${results.map(result => `
                 <div class="suite-result">
                     <div class="suite-header">
-                        <h3>${result.suite} 
+                        <h3>${result.suite}
                             <span class="status-badge status-${result.status}">${result.status.toUpperCase()}</span>
                         </h3>
                         <p><strong>Duration:</strong> ${(result.duration / 1000).toFixed(2)}s</p>
@@ -386,12 +386,12 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
     </div>
 </body>
 </html>`;
-  
+
   await fs.writeFile(
     path.join(config.outputDir, 'comprehensive-test-report.html'),
     htmlReport
   );
-  
+
   // Generate summary report
   const summaryReport = `
 # Context Management System - Test Summary
@@ -421,12 +421,12 @@ ${failedTests === 0 ? '🎉 **ALL TESTS PASSED!**' : `⚠️ **${failedTests} TE
 ---
 *Generated by Context Management Test Runner*
 `;
-  
+
   await fs.writeFile(
     path.join(config.outputDir, 'test-summary.md'),
     summaryReport
   );
-  
+
   console.log(`✅ Test reports generated in ${config.outputDir}/`);
 }
 
@@ -435,54 +435,54 @@ ${failedTests === 0 ? '🎉 **ALL TESTS PASSED!**' : `⚠️ **${failedTests} TE
  */
 async function runComprehensiveTests(userConfig: Partial<TestRunConfig> = {}): Promise<void> {
   const config: TestRunConfig = { ...DEFAULT_CONFIG, ...userConfig };
-  
+
   console.log('🚀 Starting Comprehensive Context Management Test Suite');
   console.log(`📋 Configuration:`, config);
-  
+
   // Filter test suites based on configuration
   const filteredSuites = filterTestSuites(TEST_SUITES, config);
-  
+
   console.log(`📝 Running ${filteredSuites.length} test suites:`);
   filteredSuites.forEach(suite => {
     console.log(`  - ${suite.name}: ${suite.description} ${suite.required ? '(required)' : '(optional)'}`);
   });
-  
+
   // Run tests
   const startTime = Date.now();
   let results: TestResult[];
-  
+
   if (config.parallel && filteredSuites.length > 1) {
     results = await runTestSuitesParallel(filteredSuites);
   } else {
     results = await runTestSuitesSequential(filteredSuites, config);
   }
-  
+
   const endTime = Date.now();
   const totalDuration = endTime - startTime;
-  
+
   // Generate reports
   if (config.generateReport) {
     await generateTestReport(results, config);
   }
-  
+
   // Print summary
   const passedCount = results.filter(r => r.status === 'passed').length;
   const failedCount = results.filter(r => r.status === 'failed').length;
   const skippedCount = results.filter(r => r.status === 'skipped').length;
-  
+
   console.log('\n📊 Test Execution Summary:');
   console.log(`⏱️  Total Duration: ${(totalDuration / 1000).toFixed(1)}s`);
   console.log(`✅ Passed: ${passedCount}/${results.length}`);
   console.log(`❌ Failed: ${failedCount}/${results.length}`);
   console.log(`⏭️  Skipped: ${skippedCount}/${results.length}`);
   console.log(`📈 Success Rate: ${((passedCount / results.length) * 100).toFixed(1)}%`);
-  
+
   // Check for required test failures
-  const requiredFailures = results.filter(r => 
-    r.status === 'failed' && 
+  const requiredFailures = results.filter(r =>
+    r.status === 'failed' &&
     filteredSuites.find(s => s.name === r.suite)?.required
   );
-  
+
   if (requiredFailures.length > 0) {
     console.log(`\n❌ CRITICAL: ${requiredFailures.length} required test(s) failed:`);
     requiredFailures.forEach(failure => {
@@ -499,9 +499,9 @@ async function runComprehensiveTests(userConfig: Partial<TestRunConfig> = {}): P
 // CLI interface
 if (require.main === module) {
   const args = process.argv.slice(2);
-  
+
   const config: Partial<TestRunConfig> = {};
-  
+
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -560,7 +560,7 @@ Examples:
         process.exit(0);
     }
   }
-  
+
   // Run tests
   runComprehensiveTests(config).catch(error => {
     console.error('❌ Test runner failed:', error);

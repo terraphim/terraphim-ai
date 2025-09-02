@@ -1,5 +1,5 @@
 //! Unit tests for the LLM Context Management service
-//! 
+//!
 //! This module provides comprehensive testing coverage for the ContextManager
 //! and related functionality including conversation management, context items,
 //! and all the factory methods.
@@ -54,7 +54,7 @@ mod tests {
     }
 
     // Core functionality tests
-    
+
     #[test]
     async fn test_create_conversation() {
         let mut manager = ContextManager::new(create_test_config());
@@ -62,7 +62,7 @@ mod tests {
         let role = RoleName::new("engineer");
 
         let result = manager.create_conversation(title.clone(), role).await;
-        
+
         assert!(result.is_ok());
         let conversation_id = result.unwrap();
         assert!(!conversation_id.as_str().is_empty());
@@ -70,7 +70,7 @@ mod tests {
         // Verify conversation exists
         let conversation = manager.get_conversation(&conversation_id);
         assert!(conversation.is_some());
-        
+
         let conv = conversation.unwrap();
         assert_eq!(conv.title, title);
         assert_eq!(conv.role, RoleName::new("engineer"));
@@ -85,10 +85,10 @@ mod tests {
         let role = RoleName::new("engineer");
 
         let result = manager.create_conversation(title.clone(), role).await;
-        
+
         assert!(result.is_ok());
         let conversation_id = result.unwrap();
-        
+
         let conversation = manager.get_conversation(&conversation_id);
         assert!(conversation.is_some());
         // Should accept empty title
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     async fn test_list_conversations() {
         let mut manager = ContextManager::new(create_test_config());
-        
+
         // Create multiple conversations
         let conv1 = manager.create_conversation("Conv 1".to_string(), RoleName::new("engineer")).await.unwrap();
         let conv2 = manager.create_conversation("Conv 2".to_string(), RoleName::new("researcher")).await.unwrap();
@@ -306,7 +306,7 @@ mod tests {
         // Should only have 2 conversations now
         let conversations = manager.list_conversations(None);
         assert_eq!(conversations.len(), 2);
-        
+
         // Most recent should be available
         let latest = manager.get_conversation(&conv3);
         assert!(latest.is_some());
@@ -356,7 +356,7 @@ mod tests {
 
         assert!(manager.add_context(&conversation_id, context1).is_ok());
         assert!(manager.add_context(&conversation_id, context2).is_ok());
-        
+
         // Third should exceed limit
         let result = manager.add_context(&conversation_id, context3);
         assert!(result.is_err());
@@ -411,10 +411,10 @@ mod tests {
 
         // Create a 4th conversation (should either work or remove oldest)
         let conv4 = manager.create_conversation("Conv 4".to_string(), RoleName::new("engineer")).await.unwrap();
-        
+
         // The new conversation should exist
         assert!(manager.get_conversation(&conv4).is_some());
-        
+
         // At most 3 should exist (cache limit), but exact behavior depends on implementation
         let all_conversations = manager.list_conversations(None);
         assert!(all_conversations.len() <= 3);
@@ -434,7 +434,7 @@ mod tests {
             let handle = tokio::spawn(async move {
                 let mut mgr = manager_clone.lock().await;
                 mgr.create_conversation(
-                    format!("Concurrent Conv {}", i), 
+                    format!("Concurrent Conv {}", i),
                     RoleName::new("engineer")
                 ).await
             });
@@ -472,7 +472,7 @@ mod tests {
 
         // Test with no explicit limit (should use default)
         let context_item = manager.create_search_context("test", &documents, None);
-        
+
         // Should only include 2 documents (the default limit)
         assert!(context_item.content.contains("Test Document 0"));
         assert!(context_item.content.contains("Test Document 1"));
@@ -496,7 +496,7 @@ mod tests {
     #[test]
     async fn test_conversation_role_assignment() {
         let mut manager = ContextManager::new(create_test_config());
-        
+
         // Test different role assignments
         let engineer_conv = manager.create_conversation("Engineer".to_string(), RoleName::new("engineer")).await.unwrap();
         let researcher_conv = manager.create_conversation("Researcher".to_string(), RoleName::new("researcher")).await.unwrap();
@@ -511,7 +511,7 @@ mod tests {
     #[test]
     async fn test_timestamp_ordering() {
         let mut manager = ContextManager::new(create_test_config());
-        
+
         // Create conversations with small delays to ensure different timestamps
         let conv1 = manager.create_conversation("First".to_string(), RoleName::new("engineer")).await.unwrap();
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -520,7 +520,7 @@ mod tests {
         let conv3 = manager.create_conversation("Third".to_string(), RoleName::new("engineer")).await.unwrap();
 
         let conversations = manager.list_conversations(None);
-        
+
         // Should be ordered by creation time, most recent first
         assert_eq!(conversations[0].id, conv3);
         assert_eq!(conversations[0].title, "Third");

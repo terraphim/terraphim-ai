@@ -618,11 +618,11 @@ pub(crate) async fn chat_completion(
                 // Build context content from all context items
                 let mut context_content = String::new();
 
-                if !conversation.context_items.is_empty() {
+                if !conversation.global_context.is_empty() {
                     context_content.push_str("=== CONTEXT INFORMATION ===\n");
                     context_content.push_str("The following information provides relevant context for this conversation:\n\n");
 
-                    for (index, context_item) in conversation.context_items.iter().enumerate() {
+                    for (index, context_item) in conversation.global_context.iter().enumerate() {
                         context_content.push_str(&format!("Context Item {}: {}\n", index + 1, context_item.title));
                         if let Some(score) = context_item.relevance_score {
                             context_content.push_str(&format!("Relevance Score: {:.2}\n", score));

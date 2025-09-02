@@ -1,6 +1,6 @@
 /**
  * Playwright configuration for Context Management UI tests
- * 
+ *
  * This configuration is specifically tailored for testing the conversation and context
  * management functionality in Terraphim AI. It includes setup for the desktop application,
  * backend services, and appropriate test environments.
@@ -23,34 +23,34 @@ const MCP_SERVER_PORT = process.env.MCP_SERVER_PORT || '8001';
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/context-management.spec.ts',
-  
+
   // Global configuration
   timeout: CI ? 120_000 : 60_000, // 2 min in CI, 1 min locally
   globalTimeout: CI ? 900_000 : 600_000, // 15 min in CI, 10 min locally
   expect: {
     timeout: CI ? 30_000 : 15_000,
   },
-  
+
   // Test execution settings
   fullyParallel: !CI, // Run in parallel locally, serial in CI for reliability
   forbidOnly: CI,
   retries: CI ? 2 : 1,
   workers: CI ? 1 : undefined,
-  
+
   // Test artifacts
   use: {
     // Base URL for the frontend application
     baseURL: `http://localhost:${FRONTEND_PORT}`,
-    
+
     // Global test configuration
     actionTimeout: CI ? 60_000 : 30_000,
     navigationTimeout: CI ? 60_000 : 30_000,
-    
+
     // Capture screenshots and videos on failure
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
-    
+
     // Browser configuration
     ignoreHTTPSErrors: true,
     colorScheme: 'light',
@@ -147,7 +147,7 @@ export default defineConfig({
   // Reporters
   reporter: [
     ['list', { printSteps: DEBUG }],
-    ['html', { 
+    ['html', {
       outputFolder: 'test-results/context-report',
       open: DEBUG ? 'always' : 'never'
     }],
@@ -176,7 +176,7 @@ export default defineConfig({
       },
       reuseExistingServer: !CI,
     },
-    
+
     // Backend server (optional - may be started in global setup)
     {
       command: `cargo run --bin terraphim_server -- --port ${BACKEND_PORT}`,
