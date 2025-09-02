@@ -11,9 +11,7 @@ use terraphim_types::Document;
 // Import the command functions and types directly from the cmd module
 use terraphim_ai_desktop::cmd::{
     add_context_to_conversation, add_message_to_conversation, add_search_context_to_conversation,
-    create_conversation, get_conversation, list_conversations, AddContextResponse,
-    AddMessageResponse, CreateConversationResponse, GetConversationResponse,
-    ListConversationsResponse, Status,
+    create_conversation, get_conversation, list_conversations, Status,
 };
 
 /// Create test documents for use in search context tests

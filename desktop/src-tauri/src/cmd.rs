@@ -766,7 +766,6 @@ pub async fn get_autocomplete_suggestions(
 
 // =================== CONVERSATION MANAGEMENT COMMANDS ===================
 
-use chrono;
 use terraphim_service::context::{ContextConfig, ContextManager};
 use terraphim_types::{
     ChatMessage as TerraphimChatMessage, ContextItem, ContextType, ConversationId,
