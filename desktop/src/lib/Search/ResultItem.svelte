@@ -360,7 +360,7 @@
       const data = await response.json();
       console.log('  📄 Summary response data:', data);
 
-      if (data.status === 'Success' && data.summary) {
+      if (data.status === 'success' && data.summary) {
         aiSummary = data.summary;
         summaryFromCache = data.from_cache || false;
         showAiSummary = true;
@@ -471,8 +471,8 @@
               title: 'Search Context',
               role: $role || 'default'
             });
-            if (newConv.status === 'Success' && newConv.conversationId) {
-              conversationId = newConv.conversationId;
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
               console.log('🆕 Created new conversation:', conversationId);
             } else {
               throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
@@ -527,7 +527,7 @@
               });
               if (newConvResponse.ok) {
                 const newConvData = await newConvResponse.json();
-                if (newConvData.status === 'Success' && newConvData.conversation_id) {
+                if (newConvData.status === 'success' && newConvData.conversation_id) {
                   conversationId = newConvData.conversation_id;
                   console.log('🆕 Created new conversation:', conversationId);
                 } else {
@@ -578,7 +578,7 @@
       contextAdded = true;
 
       // Show success notification with navigation hint
-      const notification = document.createElement('div');
+      const notification = window.document.createElement('div');
       notification.className = 'notification is-success is-light';
       notification.innerHTML = `
         <button class="delete" onclick="this.parentElement.remove()"></button>
@@ -586,7 +586,7 @@
         <small>Document added successfully. <a href="/chat" class="has-text-success has-text-weight-bold">Go to Chat →</a> to see it in the context panel.</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
-      document.body.appendChild(notification);
+      window.document.body.appendChild(notification);
 
       // Auto-remove notification after 8 seconds
       setTimeout(() => {
@@ -605,7 +605,7 @@
       contextError = error.message || 'Failed to add document to context';
 
       // Show error notification
-      const notification = document.createElement('div');
+      const notification = window.document.createElement('div');
       notification.className = 'notification is-danger is-light';
       notification.innerHTML = `
         <button class="delete" onclick="this.parentElement.remove()"></button>
@@ -613,7 +613,7 @@
         <small>${contextError}</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
-      document.body.appendChild(notification);
+      window.document.body.appendChild(notification);
 
       // Auto-remove notification after 8 seconds
       setTimeout(() => {
@@ -657,8 +657,8 @@
               title: 'Chat with Documents',
               role: $role || 'default'
             });
-            if (newConv.status === 'Success' && newConv.conversationId) {
-              conversationId = newConv.conversationId;
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
               console.log('🆕 Created new conversation:', conversationId);
             } else {
               throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
@@ -713,7 +713,7 @@
               });
               if (newConvResponse.ok) {
                 const newConvData = await newConvResponse.json();
-                if (newConvData.status === 'Success' && newConvData.conversation_id) {
+                if (newConvData.status === 'success' && newConvData.conversation_id) {
                   conversationId = newConvData.conversation_id;
                   console.log('🆕 Created new conversation:', conversationId);
                 } else {
@@ -764,14 +764,14 @@
       chatStarted = true;
 
       // Show brief success notification before navigation
-      const notification = document.createElement('div');
+      const notification = window.document.createElement('div');
       notification.className = 'notification is-success is-light';
       notification.innerHTML = `
         <strong>💬 Opening Chat with Document</strong><br>
         <small>Context added successfully. Redirecting to chat...</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
-      document.body.appendChild(notification);
+      window.document.body.appendChild(notification);
 
       // Navigate to chat after a brief delay
       setTimeout(() => {
@@ -791,7 +791,7 @@
       contextError = error.message || 'Failed to add document to context';
 
       // Show error notification
-      const notification = document.createElement('div');
+      const notification = window.document.createElement('div');
       notification.className = 'notification is-danger is-light';
       notification.innerHTML = `
         <button class="delete" onclick="this.parentElement.remove()"></button>
@@ -799,7 +799,7 @@
         <small>${contextError}</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
-      document.body.appendChild(notification);
+      window.document.body.appendChild(notification);
 
       // Auto-remove notification after 8 seconds
       setTimeout(() => {
