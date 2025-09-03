@@ -95,8 +95,8 @@
           title: 'Chat Conversation',
           role: currentRole
         });
-        if (result.status === 'Success' && result.conversationId) {
-          conversationId = result.conversationId;
+        if (result.status === 'success' && result.conversation_id) {
+          conversationId = result.conversation_id;
           console.log('🆕 Created new conversation:', conversationId);
         }
       } else {
@@ -123,28 +123,63 @@
 
   // Load context for the current conversation
   async function loadConversationContext() {
-    if (!conversationId) return;
+    if (!conversationId) {
+      console.warn('⚠️ Cannot load context: no conversation ID available');
+      return;
+    }
 
     loadingContext = true;
+    console.log('🔄 Loading conversation context for:', conversationId);
+
     try {
       if ($is_tauri) {
+        console.log('📱 Loading context via Tauri...');
         const result = await invoke('get_conversation', { conversationId });
-        if (result.status === 'Success' && result.conversation) {
-          contextItems = result.conversation.global_context || [];
+
+        console.log('📥 Tauri response:', result);
+
+        if (result.status === 'success' && result.conversation) {
+          const newContextItems = result.conversation.global_context || [];
+          contextItems = newContextItems;
+          console.log(`✅ Loaded ${newContextItems.length} context items via Tauri`);
+        } else {
+          console.error('❌ Failed to get conversation via Tauri:', result.error || 'Unknown error');
+          contextItems = [];
         }
       } else {
+        console.log('🌐 Loading context via HTTP...');
         const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}`);
+
+        console.log('📥 HTTP response status:', response.status, response.statusText);
+
         if (response.ok) {
           const data = await response.json();
-          if (data.status === 'Success' && data.conversation) {
-            contextItems = data.conversation.global_context || [];
+          console.log('📄 HTTP response data:', data);
+
+          if (data.status === 'success' && data.conversation) {
+            const newContextItems = data.conversation.global_context || [];
+            contextItems = newContextItems;
+            console.log(`✅ Loaded ${newContextItems.length} context items via HTTP`);
+          } else {
+            console.error('❌ Failed to get conversation via HTTP:', data.error || 'Unknown error');
+            contextItems = [];
           }
+        } else {
+          console.error('❌ HTTP request failed:', response.status, response.statusText);
+          contextItems = [];
         }
       }
     } catch (error) {
-      console.error('❌ Error loading conversation context:', error);
+      console.error('❌ Error loading conversation context:', {
+        error: error.message || error,
+        conversationId,
+        isTauri: $is_tauri,
+        timestamp: new Date().toISOString()
+      });
+      contextItems = [];
     } finally {
       loadingContext = false;
+      console.log('🏁 Context loading completed. Items count:', contextItems.length);
     }
   }
 
@@ -176,9 +211,14 @@
           conversationId,
           contextData
         });
-        if (result.status === 'Success') {
+        if (result.status === 'success') {
           await loadConversationContext();
           toggleAddContextForm();
+
+          // Show success notification
+          console.log('✅ Context added successfully via Tauri');
+        } else {
+          console.error('❌ Failed to add context via Tauri:', result.error);
         }
       } else {
         const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context`, {
@@ -188,10 +228,17 @@
         });
         if (response.ok) {
           const data = await response.json();
-          if (data.status === 'Success') {
+          if (data.status === 'success') {
             await loadConversationContext();
             toggleAddContextForm();
+
+            // Show success notification
+            console.log('✅ Context added successfully via HTTP');
+          } else {
+            console.error('❌ Failed to add context via HTTP:', data.error);
           }
+        } else {
+          console.error('❌ HTTP request failed:', response.status, response.statusText);
         }
       }
     } catch (error) {
@@ -260,6 +307,23 @@
 
     // Initialize conversation and load context
     initializeConversation();
+
+    // Refresh context when navigating to chat page
+    if (typeof window !== 'undefined') {
+      const handleFocus = () => {
+        // Refresh context when window regains focus (user comes back to chat)
+        if (conversationId) {
+          loadConversationContext();
+        }
+      };
+
+      window.addEventListener('focus', handleFocus);
+
+      // Cleanup
+      return () => {
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
   });
 </script>
 
@@ -320,7 +384,7 @@
             <div class="level-left">
               <div class="level-item">
   <h4 class="title is-5">Context</h4>
-                <button class="button is-small is-primary" data-testid="add-manual-context-button" on:click={toggleAddContextForm}>
+                <button class="button is-small is-primary" data-testid="show-add-context-button" on:click={toggleAddContextForm}>
                   <span class="icon is-small">
                     <i class="fas fa-plus"></i>
                   </span>
@@ -383,7 +447,7 @@
 
               <div class="field is-grouped">
                 <div class="control">
-                  <button class="button is-primary is-small" on:click={addManualContext} disabled={savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="save-context-button">
+                  <button class="button is-primary is-small" on:click={addManualContext} disabled={savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
                     {#if savingContext}
                       <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
                     {:else}
