@@ -13,15 +13,27 @@ secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 
 [profiles.sled]
 type = "sled"
-datadir= "/tmp/opendal/sled"
+datadir= "/tmp/terraphim/sled"
 
-[profiles.dash]
+[profiles.memory]
+type = "memory"
+
+[profiles.dashmap]
 type = "dashmap"
 root = "/tmp/dashmaptest"
 
 [profiles.rock]
 type = "rocksdb"
-datadir = "/tmp/opendal/rocksdb" 
+datadir = "/tmp/opendal/rocksdb"
+
+[profiles.redb]
+type = "redb"
+datadir = "/tmp/terraphim_redb/terraphim.redb"
+table = "terraphim"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"
 
 [profiles.atomicserver]
 endpoint = "${TERRAPHIM_PROFILE_ATOMICSERVER}"

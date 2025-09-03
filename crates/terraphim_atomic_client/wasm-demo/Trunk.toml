@@ -1,0 +1,10 @@
+[build]
+release = true
+
+[serve]
+open = true
+port = 8080
+
+[watch]
+# watch these extra source files for rebuilds
+ignore = ["README.md"]

@@ -4,10 +4,10 @@ See [Poem discussion](https://github.com/poem-web/poem/discussions/219)
 
 
 
-TODO 
+TODO
 =====
 
-[x] Wrap relegraph.parse_document_to_pair into poem open api 
+[x] Wrap relegraph.parse_document_to_pair into poem open api
 [x] Add poem api for query
 [x] Convert unwrap to errors
 [x] Error handling for api

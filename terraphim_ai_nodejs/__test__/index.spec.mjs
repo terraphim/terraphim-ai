@@ -1,13 +1,13 @@
 import test from 'ava'
 
-import { sum, replaceLinks,getConfig } from '../index.js'
+import { sum, replaceLinks, getTestConfig } from '../index.js'
 
 test('sum from native', (t) => {
   t.is(sum(1, 2), 3)
 })
 
 test('replace links', async (t) => {
-  const content = 'Hello operation life cycle constraints'
+  const content = 'Hello monitor system performance and verification constraint'
   const thesaurus = `{
     "name": "Engineering",
     "data": {
@@ -25,12 +25,12 @@ test('replace links', async (t) => {
   }`
 
   const replaced = await replaceLinks(content, thesaurus)
-  console.log('replaced')
-  console.log(replaced)
-  t.is(replaced, 'Hello [operation](https://example.com/operation) [life cycle constraints](https://example.com/life-cycle-constraints)')
+  t.is(replaced, 'Hello [operation](https://example.com/operation) and [life cycle constraints](https://example.com/life-cycle-constraints)')
 })
 
 test('get config', async (t) => {
-  const config = await getConfig()
+  const configRaw = await getTestConfig()
+  const config = JSON.parse(configRaw)
   console.log(config)
+  t.truthy(config)
 })

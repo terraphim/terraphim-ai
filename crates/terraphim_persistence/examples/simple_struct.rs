@@ -29,7 +29,7 @@ impl Persistable for MyStruct {
     async fn load(&mut self) -> Result<Self> {
         let op = &self.load_config().await?.1;
         let key = self.get_key();
-        let obj = self.load_from_operator(&key, &op).await?;
+        let obj = self.load_from_operator(&key, op).await?;
         Ok(obj)
     }
 

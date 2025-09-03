@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terraphim.ai Wardley Map</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .map-container {
+            position: relative;
+            height: 800px;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+
+        .axis-labels {
+            position: absolute;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .y-axis-label {
+            left: 20px;
+            top: 50%;
+            transform: rotate(-90deg) translateX(-50%);
+            transform-origin: left;
+            font-size: 16px;
+        }
+
+        .x-axis-label {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+        }
+
+        .evolution-stages {
+            position: absolute;
+            bottom: 50px;
+            left: 120px;
+            right: 40px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stage {
+            text-align: center;
+            flex: 1;
+            padding: 5px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 5px;
+            margin: 0 2px;
+        }
+
+        .stage-title {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .grid {
+            position: absolute;
+            top: 80px;
+            left: 120px;
+            right: 40px;
+            bottom: 100px;
+        }
+
+        .grid-line {
+            position: absolute;
+            border: 1px dashed #ddd;
+        }
+
+        .vertical {
+            height: 100%;
+            border-top: none;
+            border-bottom: none;
+        }
+
+        .horizontal {
+            width: 100%;
+            border-left: none;
+            border-right: none;
+        }
+
+        .component {
+            position: absolute;
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 50px;
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 120px;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .component:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            z-index: 100;
+        }
+
+        .user-need {
+            background: #e74c3c;
+            color: white;
+            border-color: #c0392b;
+        }
+
+        .custom-built {
+            background: #f39c12;
+            color: white;
+            border-color: #e67e22;
+        }
+
+        .product {
+            background: #27ae60;
+            color: white;
+            border-color: #229954;
+        }
+
+        .commodity {
+            background: #9b59b6;
+            color: white;
+            border-color: #8e44ad;
+        }
+
+        .dependency-line {
+            position: absolute;
+            height: 2px;
+            background: #7f8c8d;
+            transform-origin: left center;
+            opacity: 0.6;
+            z-index: 1;
+        }
+
+        .evolution-arrow {
+            position: absolute;
+            color: #e74c3c;
+            font-size: 20px;
+            z-index: 50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            margin-right: 8px;
+        }
+
+        .info-panel {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+        }
+
+        .insights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .insight-card {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        .insight-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Terraphim.ai Wardley Map</h1>
+            <p>Strategic positioning of privacy-preserving AI assistant components</p>
+        </div>
+
+        <div class="map-container">
+            <div class="axis-labels">
+                <div class="y-axis-label">Value Chain (Visibility)</div>
+                <div class="x-axis-label">Evolution</div>
+            </div>
+
+            <div class="evolution-stages">
+                <div class="stage">
+                    <div class="stage-title">Genesis</div>
+                    <div>Novel, uncertain</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-title">Custom Built</div>
+                    <div>Tailored solutions</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-title">Product</div>
+                    <div>Standardized</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-title">Commodity</div>
+                    <div>Utility/Standard</div>
+                </div>
+            </div>
+
+            <div class="grid">
+                <!-- Grid lines -->
+                <div class="grid-line vertical" style="left: 25%;"></div>
+                <div class="grid-line vertical" style="left: 50%;"></div>
+                <div class="grid-line vertical" style="left: 75%;"></div>
+                <div class="grid-line horizontal" style="top: 25%;"></div>
+                <div class="grid-line horizontal" style="top: 50%;"></div>
+                <div class="grid-line horizontal" style="top: 75%;"></div>
+
+                <!-- Dependency lines -->
+                <div class="dependency-line" style="top: 50px; left: 200px; width: 150px; transform: rotate(15deg);"></div>
+                <div class="dependency-line" style="top: 120px; left: 180px; width: 200px; transform: rotate(25deg);"></div>
+                <div class="dependency-line" style="top: 200px; left: 300px; width: 100px; transform: rotate(-10deg);"></div>
+                <div class="dependency-line" style="top: 280px; left: 250px; width: 180px; transform: rotate(20deg);"></div>
+                <div class="dependency-line" style="top: 350px; left: 400px; width: 120px; transform: rotate(-5deg);"></div>
+                <div class="dependency-line" style="top: 420px; left: 350px; width: 200px; transform: rotate(15deg);"></div>
+
+                <!-- User Needs -->
+                <div class="component user-need" style="top: 30px; left: 180px;">
+                    Privacy-Preserving AI Assistant
+                </div>
+
+                <!-- High Value Chain Components -->
+                <div class="component custom-built" style="top: 100px; left: 160px;">
+                    Personal Knowledge Search
+                </div>
+
+                <div class="component custom-built" style="top: 100px; left: 320px;">
+                    Role-Based Personas
+                </div>
+
+                <div class="component custom-built" style="top: 180px; left: 280px;">
+                    Knowledge Graph Integration
+                </div>
+
+                <div class="component product" style="top: 180px; left: 450px;">
+                    Local Search Engine
+                </div>
+
+                <!-- Mid Value Chain Components -->
+                <div class="component custom-built" style="top: 260px; left: 220px;">
+                    Terraphim Graph Ranking
+                </div>
+
+                <div class="component product" style="top: 260px; left: 380px;">
+                    Obsidian/Logseq Integration
+                </div>
+
+                <div class="component product" style="top: 260px; left: 520px;">
+                    Markdown File Processing
+                </div>
+
+                <!-- Lower Value Chain Components -->
+                <div class="component custom-built" style="top: 340px; left: 380px;">
+                    Atomic Server Integration
+                </div>
+
+                <div class="component product" style="top: 340px; left: 500px;">
+                    Desktop Application
+                </div>
+
+                <div class="component commodity" style="top: 340px; left: 620px;">
+                    File System Access
+                </div>
+
+                <!-- Infrastructure Components -->
+                <div class="component product" style="top: 420px; left: 330px;">
+                    NLP Algorithms
+                </div>
+
+                <div class="component commodity" style="top: 420px; left: 480px;">
+                    Redis Database
+                </div>
+
+                <div class="component commodity" style="top: 420px; left: 580px;">
+                    Local Hardware
+                </div>
+
+                <div class="component commodity" style="top: 500px; left: 400px;">
+                    Operating System
+                </div>
+
+                <div class="component commodity" style="top: 500px; left: 520px;">
+                    Storage Systems
+                </div>
+
+                <!-- Evolution arrows -->
+                <div class="evolution-arrow" style="top: 180px; left: 500px;">→</div>
+                <div class="evolution-arrow" style="top: 260px; left: 270px;">→</div>
+                <div class="evolution-arrow" style="top: 340px; left: 430px;">→</div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e74c3c;"></div>
+                    <span>User Needs</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f39c12;"></div>
+                    <span>Custom Built</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #27ae60;"></div>
+                    <span>Product/Service</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9b59b6;"></div>
+                    <span>Commodity/Utility</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="insights">
+                <div class="insight-card">
+                    <div class="insight-title">Strategic Opportunities</div>
+                    <p>Terraphim Graph Ranking is a key differentiator in custom-built stage. Focus on evolving this to product stage for competitive advantage.</p>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-title">Market Position</div>
+                    <p>Privacy-first positioning exploits weakness in cloud-based AI assistants. Local processing addresses growing privacy concerns.</p>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-title">Evolution Pressure</div>
+                    <p>Knowledge graph integration and role-based personas are evolving toward standardization. Consider productization strategy.</p>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-title">Dependencies</div>
+                    <p>Heavy reliance on existing tools (Obsidian, Logseq) creates both opportunity and risk. Integration quality is critical.</p>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-title">Competitive Moats</div>
+                    <p>Local execution, privacy preservation, and personalized knowledge graphs create defensible positioning.</p>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-title">Investment Focus</div>
+                    <p>Prioritize Terraphim Graph evolution and seamless PKM integrations to maintain differentiation.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add interactivity
+        document.querySelectorAll('.component').forEach(component => {
+            component.addEventListener('click', function() {
+                const name = this.textContent.trim();
+                const rect = this.getBoundingClientRect();
+
+                // Create tooltip
+                const tooltip = document.createElement('div');
+                tooltip.style.cssText = `
+                    position: fixed;
+                    top: ${rect.bottom + 10}px;
+                    left: ${rect.left}px;
+                    background: #2c3e50;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 5px;
+                    font-size: 12px;
+                    max-width: 200px;
+                    z-index: 1000;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                `;
+
+                // Add component-specific information
+                const info = getComponentInfo(name);
+                tooltip.innerHTML = `<strong>${name}</strong><br>${info}`;
+
+                document.body.appendChild(tooltip);
+
+                // Remove tooltip after 3 seconds
+                setTimeout(() => {
+                    if (document.body.contains(tooltip)) {
+                        document.body.removeChild(tooltip);
+                    }
+                }, 3000);
+            });
+        });
+
+        function getComponentInfo(name) {
+            const info = {
+                'Privacy-Preserving AI Assistant': 'Core user need - AI assistance without data sharing',
+                'Personal Knowledge Search': 'Search through user\'s personal knowledge base',
+                'Role-Based Personas': 'Different AI behaviors for Developer, Engineer, etc.',
+                'Knowledge Graph Integration': 'Connects with Obsidian/Logseq knowledge graphs',
+                'Local Search Engine': 'Searches local files and content',
+                'Terraphim Graph Ranking': 'Proprietary relevance ranking algorithm',
+                'Obsidian/Logseq Integration': 'Integration with popular PKM tools',
+                'Markdown File Processing': 'Processing of markdown documents',
+                'Atomic Server Integration': 'Integration with Atomic data storage',
+                'Desktop Application': 'Native desktop application interface',
+                'File System Access': 'Access to local file system',
+                'NLP Algorithms': 'Natural language processing capabilities',
+                'Redis Database': 'In-memory data structure store',
+                'Local Hardware': 'User\'s local computing resources',
+                'Operating System': 'Underlying OS platform',
+                'Storage Systems': 'Local storage infrastructure'
+            };
+
+            return info[name] || 'Component in the Terraphim.ai ecosystem';
+        }
+    </script>
+</body>
+</html>

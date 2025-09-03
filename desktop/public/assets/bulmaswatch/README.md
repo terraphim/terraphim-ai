@@ -15,7 +15,7 @@ Assuming you already have Node.js (v10), [Yarn](https://yarnpkg.com/) and [Bundl
 ```
 yarn install # or npm install
 bundler install
-yarn start 
+yarn start
 ```
 
 Credits

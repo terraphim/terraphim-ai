@@ -1,0 +1,91 @@
+[workspace]
+# Don't release on every commit, only when merging release PRs
+release_always = false
+
+# Update all dependencies
+dependencies_update = true
+
+# Enable changelog generation
+changelog_update = true
+changelog_path = "./CHANGELOG.md"
+
+# Git configuration
+git_release_enable = true
+git_tag_enable = true
+pr_branch_prefix = "release-plz-"
+pr_labels = ["release", "automated"]
+
+# Publishing configuration
+publish = false  # We'll handle publishing through GitHub Actions
+publish_allow_dirty = false
+
+# Enable semver checking for breaking changes
+semver_check = true
+
+# Only release packages that have changes
+release = true
+
+# Configuration for packages in workspace
+[[package]]
+name = "terraphim_server"
+changelog_path = "./terraphim_server/CHANGELOG.md"
+changelog_update = true
+
+[[package]]
+name = "terraphim-ai-desktop"
+changelog_path = "./desktop/CHANGELOG.md"
+changelog_update = true
+
+[[package]]
+name = "terraphim_tui"
+changelog_path = "./crates/terraphim_tui/CHANGELOG.md"
+changelog_update = true
+
+# Don't release internal crates automatically
+[[package]]
+name = "terraphim_automata"
+release = false
+
+[[package]]
+name = "terraphim_config"
+release = false
+
+[[package]]
+name = "terraphim_middleware"
+release = false
+
+[[package]]
+name = "terraphim_persistence"
+release = false
+
+[[package]]
+name = "terraphim_rolegraph"
+release = false
+
+[[package]]
+name = "terraphim_service"
+release = false
+
+[[package]]
+name = "terraphim_settings"
+release = false
+
+[[package]]
+name = "terraphim_types"
+release = false
+
+[[package]]
+name = "terraphim_atomic_client"
+release = false
+
+[[package]]
+name = "terraphim_mcp_server"
+release = false
+
+[[package]]
+name = "terraphim_onepassword_cli"
+release = false
+
+[[package]]
+name = "terraphim-markdown-parser"
+release = false

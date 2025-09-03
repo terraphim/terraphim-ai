@@ -88,7 +88,7 @@ mod tests {
             r#"
             server_url = "127.0.0.1:3000"
             api_endpoint="http://localhost:3000/api"
-            
+
             [profiles.s3]
             type = "s3"
             bucket = "test"
@@ -96,15 +96,15 @@ mod tests {
             endpoint = "http://rpi4node3:8333/"
             access_key_id = ""
             secret_access_key = ""
-            
+
             [profiles.sled]
             type = "sled"
             datadir= "/tmp/opendal/sled"
-            
+
             [profiles.dash]
             type = "dashmap"
             root = "/tmp/dashmaptest"
-            
+
             [profiles.rock]
             type = "rocksdb"
             datadir = "/tmp/opendal/rocksdb"
@@ -132,7 +132,7 @@ mod tests {
             r#"
             server_url = "127.0.0.1:3000"
             api_endpoint="http://localhost:3000/api"
-            
+
             [profiles.s3]
             type = "s3"
             bucket = "test"
@@ -140,15 +140,15 @@ mod tests {
             endpoint = "http://rpi4node3:8333/"
             access_key_id = ""
             secret_access_key = ""
-            
+
             [profiles.sled]
             type = "sled"
             datadir= "/tmp/opendal/sled"
-            
+
             [profiles.dash]
             type = "dashmap"
             root = "/tmp/dashmaptest"
-            
+
             [profiles.rock]
             type = "rocksdb"
             datadir = "/tmp/opendal/rocksdb"

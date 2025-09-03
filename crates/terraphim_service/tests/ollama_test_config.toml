@@ -1,0 +1,35 @@
+# Ollama Integration Test Configuration
+# This file contains test-specific configuration for Ollama LLM integration
+
+[test]
+# Test environment settings
+environment = "local"
+timeout_seconds = 30
+max_retries = 3
+
+[ollama]
+# Ollama instance configuration
+base_url = "http://127.0.0.1:11434"
+model = "llama3.2:3b"
+timeout_seconds = 15
+max_tokens = 512
+temperature = 0.3
+
+[test_roles]
+# Test role configurations for different scenarios
+llama_rust_engineer = { name = "Llama Rust Engineer", relevance_function = "title-scorer", theme = "cosmo" }
+llama_ai_assistant = { name = "Llama AI Assistant", relevance_function = "terraphim-graph", theme = "lumen" }
+llama_developer = { name = "Llama Developer", relevance_function = "bm25", theme = "spacelab" }
+
+[test_content]
+# Test content for summarization tests
+rust_description = "Rust is a systems programming language that emphasizes safety, speed, and concurrency. It prevents segfaults and guarantees thread safety."
+rust_features = "Zero-cost abstractions, memory safety without garbage collection, thread safety without data races, modern tooling with Cargo, excellent documentation and community."
+rust_guide = "Rust's ownership system ensures memory safety without garbage collection. The compiler enforces rules at compile time that prevent common memory-related bugs."
+
+[test_expectations]
+# Expected test outcomes
+min_summary_length = 10
+max_summary_length = 250
+success_rate_threshold = 0.5
+max_response_time_ms = 30000

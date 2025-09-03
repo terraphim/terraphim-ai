@@ -23,16 +23,15 @@ tracing-subscriber = { version = "0.3", features = [
 async-once-cell = "0.5.3"
 async-trait = "0.1.74"
 log = "0.4"
-opendal = { version = "0.44.2", features = [
-    "services-dashmap",
-    "services-redis",
-    "services-sled",
+opendal = { version = "0.44.2", default-features = false, features = [
+    "services-memory",  # Always needed
 ] }
 serde = { version = "1.0.182", features = ["derive"] }
 serde_json = "1.0.104"
 thiserror = "1.0.56"
 tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
 regex = "1.11.0"
+rusqlite = { version = "0.29", optional = true }
 
 
 [dev-dependencies]
@@ -44,16 +43,34 @@ tokio = { version = "1", features = ["full"] }
 test-env-log = "0.2"
 
 [features]
-default = ["services-dashmap", "services-sled", "services-atomicserver"]
-# Enable services dashmap support
-services-dashmap = ["opendal/services-dashmap"]
-# Enable services ipfs support
-services-ipfs = ["opendal/services-ipfs"]
-# Enable services redis support
-services-redis = ["opendal/services-redis"]
-# Enable services rocksdb support
-services-rocksdb = ["opendal/services-rocksdb"]
-# Enable services sled support
-services-sled = ["opendal/services-sled"]
-# Enable services atomic server
-services-atomicserver = ["opendal/services-atomicserver"]
+# Default features for TUI and Desktop (NO S3/cloud services)
+default = ["sqlite", "dashmap", "memory"]
+
+# Core backends (always available for TUI/Desktop)
+memory = []  # Built into OpenDAL core
+sqlite = ["opendal/services-sqlite", "rusqlite"]
+dashmap = ["opendal/services-dashmap"]
+
+# Optional cloud backends (NOT in default - server only)
+s3 = ["opendal/services-s3"]  # Only for server deployments
+atomicserver = ["opendal/services-atomicserver"]
+
+# Optional local backends
+redis = ["opendal/services-redis"]
+rocksdb = ["opendal/services-rocksdb"]
+redb = ["opendal/services-redb"]
+ipfs = ["opendal/services-ipfs"]
+
+# Server profile with cloud support
+server = ["s3", "atomicserver"]
+all-backends = ["server", "redis", "rocksdb", "redb", "ipfs"]
+
+# Legacy feature names for backwards compatibility
+services-dashmap = ["dashmap"]
+services-sqlite = ["sqlite"]
+services-atomicserver = ["atomicserver"]
+services-s3 = ["s3"]
+services-redis = ["redis"]
+services-rocksdb = ["rocksdb"]
+services-redb = ["redb"]
+services-ipfs = ["ipfs"]

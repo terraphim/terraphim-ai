@@ -13,7 +13,7 @@ The current focus is on perfecting overall end-to-end human usable flow:
 
 - Terraphim desktop is used to search over local markdown files using Terraphim Graph for ranking (Feature done, alpha testing)
 
-- Terraphim desktop search automatically populates Atomic server with search results (first attempt and approach didn't work, required changes in Atomic Rust client, atomic 
+- Terraphim desktop search automatically populates Atomic server with search results (first attempt and approach didn't work, required changes in Atomic Rust client, atomic
 server-side updated with new client fetch, Terraphim feature for automatic cache population WIP https://github.com/terraphim/terraphim-ai/issues/12)
 
 - User works with search results forming blogs or articles in Atomic server using Atomic as standard CMS (all features done)

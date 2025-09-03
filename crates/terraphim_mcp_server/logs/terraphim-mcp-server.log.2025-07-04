@@ -1,0 +1,965 @@
+[2m2025-07-04T08:20:38.408705Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
+[2m2025-07-04T08:20:38.409261Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:20:38.410356Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:20:38.410479Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:20:38.410867Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:20:38.410907Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:20:38.410912Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:20:38.562511Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:20:38.730140Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:20:38.730185Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:20:38.730190Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:20:38.895753Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:20:39.058577Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:20:39.060121Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:20:39.060389Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:20:39.060618Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m MCP server initialised – awaiting shutdown
+[2m2025-07-04T08:20:39.061862Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:20:39.061872Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:20:39.061876Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:20:39.196696Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:20:39.356928Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:20:39.356966Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:20:39.356971Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:20:39.481960Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:20:39.640592Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:20:39.640767Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:20:39.640890Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-07-04T08:21:41.206569Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:21:41.206955Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:21:41.207679Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:21:41.207717Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:21:41.207886Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:21:41.207926Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:21:41.207931Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:21:41.360825Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:21:41.521971Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:21:41.522007Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:21:41.522011Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:21:41.522014Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:21:41.677347Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:21:41.844068Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:21:41.845743Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:21:41.845904Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:21:41.846051Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:21:41.877911Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:21:41.877986Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:21:41.878393Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:21:41.878411Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:21:41.878463Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:21:41.878471Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:21:41.878474Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:21:42.005315Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:21:42.168547Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:21:42.168593Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:21:42.168596Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:21:42.291681Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:21:42.452977Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:21:42.453062Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:21:42.453602Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:21:42.453676Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:21:42.453733Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:21:42.453925Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:21:42.453939Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:21:42.453942Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:21:42.619828Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:21:42.783577Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:21:42.783627Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:21:42.783632Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:21:42.906146Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:21:43.065678Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:21:43.065815Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:21:43.065936Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-07-04T08:35:02.580266Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:35:02.580702Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:35:02.581523Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:35:02.581560Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:35:02.581678Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:35:02.581701Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:35:02.581704Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:35:02.581706Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:35:02.732288Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:35:02.899511Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:35:02.899544Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:35:02.899548Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:35:03.028368Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:35:03.185277Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:35:03.186694Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:35:03.186843Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:35:03.186967Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:35:03.741203Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:35:03.741288Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:35:03.741810Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:35:03.741831Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:35:03.741889Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:35:03.741901Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:35:03.741906Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:35:03.741910Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:35:03.868012Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:35:04.030182Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:35:04.030239Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:35:04.030242Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:35:04.153745Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:35:04.313830Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:35:04.314422Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:35:04.314502Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:35:04.314577Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:35:04.314828Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:35:04.314842Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:35:04.314846Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:35:04.314849Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:35:04.427553Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:35:04.583267Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:35:04.583304Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:35:04.583309Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:35:04.720636Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:35:04.880357Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:35:04.880527Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-07-04T08:36:51.059627Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:36:51.060197Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:36:51.061698Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:36:51.061752Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:36:51.061880Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:36:51.061903Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:36:51.061906Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:36:51.061909Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:51.257878Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:51.416833Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:36:51.416861Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:36:51.416865Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:51.559625Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:51.727354Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:36:51.728708Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:36:51.728872Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:36:51.729023Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:36:51.729330Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:36:51.729344Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:36:51.729348Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:36:51.729350Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:51.848794Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:52.009913Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:36:52.009956Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:36:52.009962Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:52.123014Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:52.284149Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:36:52.284337Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-07-04T08:36:52.793614Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:36:52.793717Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:36:52.794214Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:36:52.794234Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:36:52.794307Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:36:52.794318Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:36:52.794322Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:36:52.794325Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:52.938410Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:53.102804Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:36:53.102841Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:36:53.102845Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:53.236010Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:53.395611Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:36:53.396011Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:36:53.396075Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:36:53.396124Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:36:54.243911Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
+[2m2025-07-04T08:36:54.244568Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:36:54.246146Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:36:54.246308Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:36:54.246763Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:36:54.246811Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:36:54.246817Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:36:54.246822Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:54.398366Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:54.566861Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:36:54.566909Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:36:54.566913Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:36:54.693425Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:36:54.855082Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:36:54.855286Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:36:54.855436Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m MCP server initialised – awaiting shutdown
+[2m2025-07-04T08:37:52.709869Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
+[2m2025-07-04T08:37:52.709961Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:52.710517Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:37:52.710544Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:37:52.710610Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:37:52.710622Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:52.710627Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:37:52.867920Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:53.036837Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:37:53.036882Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:37:53.036887Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:37:53.177135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:53.336528Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:37:53.337787Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:37:53.337892Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:37:53.337979Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m MCP server initialised – awaiting shutdown
+[2m2025-07-04T08:37:54.327977Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:54.328029Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:54.328038Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:54.328187Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:54.330807Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:54.351208Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:54.351700Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "type": "s3", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}} }
+[2m2025-07-04T08:37:54.352994Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:54.354737Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:54.355017Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "region": "us-east-1"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:37:54.859312Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:54.859416Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:54.859609Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:55.929322Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:37:55.929759Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:55.930863Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:37:55.930924Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:37:55.931120Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:37:55.931159Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:37:55.931164Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:37:56.064718Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:56.222445Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:37:56.222477Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:37:56.222481Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:56.222484Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:37:56.365048Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:56.521477Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:37:56.522384Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:37:56.522556Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:37:56.522670Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:37:56.523437Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:56.523451Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:56.523454Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:56.523552Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:56.524828Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:56.539373Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:56.539677Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}} }
+[2m2025-07-04T08:37:56.540413Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:56.541835Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:56.542046Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:37:56.998810Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:56.998954Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:56.999135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:57.002613Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:57.002637Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:57.002643Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:57.002779Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:57.004800Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:57.024242Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:57.024640Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "bucket": "staging-system-operator", "region": "us-east-1"}} }
+[2m2025-07-04T08:37:57.024874Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:57.026540Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:57.026780Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}} }
+[2m2025-07-04T08:37:57.026882Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:57.026899Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:57.026972Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:57.030056Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:57.030079Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:57.030083Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:57.030201Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:57.031647Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:57.050568Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:57.050938Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:37:57.517579Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:57.519227Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:57.519700Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:37:58.042771Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:58.042955Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:58.043293Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:58.048688Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:58.048719Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:58.048726Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:58.048937Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:58.051796Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:58.072799Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:58.073237Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:37:58.524390Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:58.526629Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:58.527164Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "type": "s3"}} }
+[2m2025-07-04T08:37:58.527384Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:58.527429Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:58.527556Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:58.531125Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:58.531165Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:58.531169Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:58.531279Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:58.533420Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:58.552213Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:58.552704Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }
+[2m2025-07-04T08:37:58.553056Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:58.554617Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:58.554922Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:37:58.999232Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:58.999324Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:58.999454Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:59.008565Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:37:59.008699Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:59.009203Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:37:59.009220Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:37:59.009266Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:37:59.009274Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:37:59.009277Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:59.009279Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:37:59.136452Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:59.296897Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:37:59.296920Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:37:59.296924Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:37:59.416435Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:59.572020Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:37:59.572523Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:37:59.572602Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:37:59.572667Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:37:59.876468Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:37:59.876522Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:37:59.876529Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:37:59.876682Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:37:59.878997Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:37:59.898941Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:59.899415Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3"}} }
+[2m2025-07-04T08:37:59.899865Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:37:59.901729Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:37:59.902092Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:00.406541Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:00.406619Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:00.406774Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:00.410929Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:38:00.410953Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:38:00.410960Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:00.411104Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:00.413501Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:00.437569Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:00.437992Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:00.983301Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:00.986329Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:00.986914Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:01.453572Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:01.453646Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:01.453802Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:01.456635Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:01.479720Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:01.480261Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}} }
+[2m2025-07-04T08:38:01.480555Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:01.482453Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:01.482726Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:02.019782Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:02.019849Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:02.019969Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:02.022124Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:02.041214Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:02.041631Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"bucket": "staging-system-operator", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}} }
+[2m2025-07-04T08:38:02.041893Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:02.043614Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:02.043885Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1"}} }
+[2m2025-07-04T08:38:02.044004Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:02.044030Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:02.044121Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:02.045707Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:02.063970Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:02.064312Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "bucket": "staging-system-operator", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:02.532719Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:02.535500Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:02.536090Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:03.019120Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:03.019216Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:03.019363Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:03.021795Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.022332Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }
+[2m2025-07-04T08:38:03.022573Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:03.041673Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.042147Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "type": "s3", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:03.568013Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:03.570592Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.571048Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"type": "s3", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}} }
+[2m2025-07-04T08:38:03.571226Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:03.571257Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:03.571367Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:03.573735Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.574238Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "type": "s3", "region": "us-east-1"}} }
+[2m2025-07-04T08:38:03.574431Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:03.594413Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.594839Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}} }
+[2m2025-07-04T08:38:03.595024Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:03.596850Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.597179Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator"}} }
+[2m2025-07-04T08:38:03.597308Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:03.597333Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:03.597419Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:03.599372Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:03.599796Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:04.054141Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:04.075765Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:04.076245Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:04.520732Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:04.524080Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:04.524676Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:04.961079Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:04.961207Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:04.961420Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:04.964398Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:04.964896Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator"}} }
+[2m2025-07-04T08:38:04.965108Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:04.986589Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:04.986959Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }
+[2m2025-07-04T08:38:04.987146Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:04.988992Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:04.989261Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "region": "us-east-1"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:05.409528Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:05.409622Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:05.409813Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:05.413011Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:05.413548Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:05.844138Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:05.867335Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:05.867825Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "type": "s3", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }
+[2m2025-07-04T08:38:05.868075Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:05.870089Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:05.870353Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:06.298129Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:06.298216Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:06.298381Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:06.301439Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:06.302031Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "type": "s3", "bucket": "staging-system-operator"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:06.748555Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:06.769760Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:06.770276Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"datadir": "/tmp/sled", "type": "sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "region": "us-east-1"}} }
+[2m2025-07-04T08:38:06.770468Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:06.772458Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:06.772738Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "type": "s3", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }
+[2m2025-07-04T08:38:06.772838Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:06.772859Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:06.772950Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:06.774924Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:06.775211Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:07.335570Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:07.357947Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:07.358463Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:07.791637Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:07.794507Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:07.795077Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "type": "s3"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:08.234192Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:08.234291Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:08.234470Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:08.237257Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:08.237926Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"region": "us-east-1", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "bucket": "staging-system-operator", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}} }
+[2m2025-07-04T08:38:08.238155Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:08.257348Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:08.257760Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "bucket": "staging-system-operator", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "region": "us-east-1", "type": "s3"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:08.933016Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:08.936289Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:08.936951Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:09.399391Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:09.399493Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:09.399657Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:09.402694Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:09.403302Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"type": "s3", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:09.968821Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:09.992596Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:09.993190Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"bucket": "staging-system-operator", "region": "us-east-1", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "type": "s3", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:10.418320Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:10.419736Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:10.420057Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "bucket": "staging-system-operator", "region": "us-east-1", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"datadir": "/tmp/sled", "type": "sled"}} }
+[2m2025-07-04T08:38:10.882383Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:10.882473Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:10.882624Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:10.897439Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-07-04T08:38:10.897547Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:10.898127Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-07-04T08:38:10.898148Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-07-04T08:38:10.898205Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:38:10.898217Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:38:10.898221Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:38:11.040610Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:11.205726Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:38:11.205765Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:38:11.205769Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:38:11.326418Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:11.485463Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:38:11.485525Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-07-04T08:38:11.486011Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-07-04T08:38:11.486098Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-07-04T08:38:11.486213Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-07-04T08:38:11.486415Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-07-04T08:38:11.486431Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly with automata_path
+[2m2025-07-04T08:38:11.486435Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:38:11.631297Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:11.790002Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-07-04T08:38:11.790067Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly with automata_path
+[2m2025-07-04T08:38:11.790072Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-07-04T08:38:11.913226Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:12.073588Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-07-04T08:38:12.073681Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:12.073737Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-07-04T08:38:12.390095Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Terraphim Engineer
+[2m2025-07-04T08:38:12.390161Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Terraphim Engineer is configured correctly with automata_path
+[2m2025-07-04T08:38:12.390167Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:12.390334Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path
+[2m2025-07-04T08:38:12.392654Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    location: "/Users/alex/projects/terraphim/terraphim-ai/docs/src",
+    service: Ripgrep,
+    read_only: true,
+    atomic_server_secret: None,
+}
+[2m2025-07-04T08:38:12.411133Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:12.411580Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"sled": {"type": "sled", "datadir": "/tmp/sled"}, "s3": {"access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "region": "us-east-1"}} }
+[2m2025-07-04T08:38:12.411973Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to save thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:12.413879Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-07-04T08:38:12.414175Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/Users/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"s3": {"region": "us-east-1", "secret_access_key": "b8d9936c0801742e4563f2213596aa92bfad0131540d84883bcb4cf1324bfad7", "type": "s3", "access_key_id": "f52d1ae7104bb2f627e76a3be74a1fd7", "bucket": "staging-system-operator", "endpoint": "https://4a345f44f6a673abdaf28eea80da7588.r2.cloudflarestorage.com"}, "sled": {"type": "sled", "datadir": "/tmp/sled"}} }
+[2m2025-07-04T08:38:12.935531Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(ConfigInvalid (permanent) at  => open db
+
+Context:
+   service: sled
+   datadir: /tmp/sled
+
+Source:
+   IO error: could not acquire lock on "/tmp/sled/db": Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+)
+[2m2025-07-04T08:38:12.935644Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Terraphim Engineer` - URL: Local("/var/folders/rb/l4_6j2nx0lnfhysk974ldpg40000gn/T/terraphim_engineer_thesaurus.json")
+[2m2025-07-04T08:38:12.935828Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Successfully loaded thesaurus from automata path

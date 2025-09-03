@@ -1,13 +1,11 @@
 use ahash::AHashMap;
-use std::path::PathBuf;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Result, Role, ServiceType,
-    TerraphimConfigError,
+    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
-use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
+use terraphim_types::RelevanceFunction;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,6 +21,7 @@ async fn main() -> Result<()> {
                 shortname: Some("Engineer".to_string()),
                 name: "Engineer".into(),
                 relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
                 theme: "lumen".to_string(),
                 kg: Some(KnowledgeGraph {
                     automata_path: Some(AutomataPath::local_example()),
@@ -31,9 +30,26 @@ async fn main() -> Result<()> {
                     publish: false,
                 }),
                 haystacks: vec![Haystack {
-                    path: PathBuf::from("localsearch"),
+                    location: "localsearch".to_string(),
                     service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
                 }],
+                #[cfg(feature = "openrouter")]
+                openrouter_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_api_key: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_model: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_auto_summarize: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_enabled: false,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_system_prompt: None,
+                #[cfg(feature = "openrouter")]
+                openrouter_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -44,7 +60,7 @@ async fn main() -> Result<()> {
 
     println!("key: {}", config.get_key());
     config.save().await?;
-    config.save_to_one("dash").await?;
+    config.save_to_one("dashmap").await?;
 
     println!("saved obj: {:?} to all", config);
     let (_ops, fastest_op) = config.load_config().await?;

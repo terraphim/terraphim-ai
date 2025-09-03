@@ -1,0 +1,38 @@
+[package]
+name = "terraphim_atomic_client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12.5", features = ["json"], default-features = false, optional = true }
+web-sys = { version = "0.3.69", features = ["Request", "RequestInit", "RequestMode", "Response", "Headers", "Window"], optional = true }
+hex = "0.4"
+base64 = "0.22.1"
+jiff = { version = "0.2", features = ["serde"] }
+wasm-bindgen = { version = "0.2.92", optional = true }
+wasm-bindgen-futures = { version = "0.4.42", optional = true }
+dotenvy = "0.15.7"
+url = { version = "2.5.4", features = ["serde"] }
+ed25519-dalek = "1.0"
+thiserror = "2.0.12"
+rand_core = "0.5"
+serde_jcs = "0.1.0"
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }
+cfg-if = "1"
+js-sys = { version = "0.3", optional = true }
+urlencoding = "2.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js", "wasm-bindgen"] }
+
+[features]
+default = ["native"]
+native = ["reqwest", "tokio"]
+wasm = ["web-sys", "wasm-bindgen", "wasm-bindgen-futures", "serde-wasm-bindgen", "reqwest", "js-sys"]
+export_store = []
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

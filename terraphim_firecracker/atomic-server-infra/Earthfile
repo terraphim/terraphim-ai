@@ -1,5 +1,5 @@
 VERSION 0.7
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 ARG TARGETARCH
 ARG TARGETOS
 ARG TARGETPLATFORM
@@ -20,10 +20,17 @@ all:
         +build-atomic
 
 build-atomic:
-  FROM rust:1.67
-  RUN rustup target add $ARCH-unknown-linux-musl
-  RUN apt update && apt install -y musl-tools musl-dev
+  FROM ubuntu:24.04
+  ENV DEBIAN_FRONTEND=noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN=true
+  RUN apt-get update -qq
+  RUN apt-get install -yqq --no-install-recommends build-essential ca-certificates curl musl-tools musl-dev git
   RUN update-ca-certificates
+  # Install Rust from official installer
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.76.0
+  ENV PATH="/root/.cargo/bin:$PATH"
+  ENV CARGO_HOME="/root/.cargo"
+  RUN rustup target add $ARCH-unknown-linux-musl
   WORKDIR /app
   #COPY --dir server lib cli desktop Cargo.lock Cargo.toml .
   GIT CLONE --branch master https://github.com/applied-knowledge-systems/atomic-data-rust.git .
@@ -57,7 +64,8 @@ build:
   END
 
 tar2ext4:
-    FROM golang:alpine
+    FROM alpine:3.20
+    RUN apk add --no-cache go git
     WORKDIR src
     GIT CLONE https://github.com/microsoft/hcsshim .
     RUN go build ./cmd/tar2ext4
@@ -65,7 +73,7 @@ tar2ext4:
     SAVE ARTIFACT tar2ext4
 
 kernel:
-    FROM alpine:3.16
+    FROM alpine:3.20
     RUN wget https://s3.amazonaws.com/spec.ccfc.min/img/hello/kernel/hello-vmlinux.bin -O kernel.bin
     SAVE ARTIFACT kernel.bin
 
@@ -75,7 +83,7 @@ rootfs:
     COPY +tar2ext4/tar2ext4 /usr/bin/tar2ext4
 
     WORKDIR imgbuild
-    
+
     WITH DOCKER --load my-build:latest=+test-image
         RUN docker save my-build:latest > image.tar
     END
@@ -89,7 +97,7 @@ rootfs:
     WORKDIR rootfs
     RUN mkdir -pv rootfs/{sbin,dev,proc,run,sys,var} && \
         tar -cf ../rootfs.tar *
-    
+
     WORKDIR /imgbuild
 
     RUN tar2ext4 -i rootfs.tar -o rootfs.ext4 && \
@@ -109,7 +117,7 @@ test-image2:
 
 
 test-image:
-    FROM ubuntu:20.04
+    FROM ubuntu:24.04
     ENV DEBIAN_FRONTEND noninteractive
     ENV DEBCONF_NONINTERACTIVE_SEEN true
     RUN apt-get update

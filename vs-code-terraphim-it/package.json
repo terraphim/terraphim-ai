@@ -37,6 +37,14 @@
       {
         "command": "extension.terraphimNapiAutocomplete",
         "title": "Terraphim Napi Autocomplete"
+      },
+      {
+        "command": "extension.terraphimServerAutocomplete",
+        "title": "Terraphim Server Autocomplete"
+      },
+      {
+        "command": "extension.terraphimHealthCheck",
+        "title": "Terraphim Server Health Check"
       }
     ],
     "configuration": {
@@ -46,6 +54,26 @@
           "type": "string",
           "default": "",
           "description": "The agent to use for Terraphim IT"
+        },
+        "terraphimIt.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Main Terraphim server URL for search and autocomplete"
+        },
+        "terraphimIt.atomicServerUrl": {
+          "type": "string",
+          "default": "https://common.terraphim.io/drive/h6grD0ID",
+          "description": "Atomic server URL for accessing knowledge base resources"
+        },
+        "terraphimIt.enableLocalServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use local Terraphim server instead of remote servers"
+        },
+        "terraphimIt.selectedRole": {
+          "type": "string",
+          "default": "Terraphim Engineer",
+          "description": "Default role to use for searches and autocomplete"
         }
       }
     }
