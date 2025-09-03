@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Route } from "tinro";
+  import { Route, router } from "tinro";
   import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
   import Search from "./lib/Search/Search.svelte";
   import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
@@ -13,6 +13,10 @@
   function toggleVissible() {
     visible = "";
   }
+
+  function navigateTo(path: string) {
+    router.goto(path);
+  }
 </script>
 
 <svelte:head>
@@ -23,20 +27,44 @@
 <div class="is-full-height">
   <main class="main-content">
     <div class="top-controls">
+      <div class="main-navigation">
+        <div class="tabs is-boxed">
+          <ul>
+            <li class={router.location === '/' ? 'is-active' : ''}>
+              <a href="/" data-testid="search-tab">
+                <span class="icon is-small"><i class="fas fa-search"></i></span>
+                <span>Search</span>
+              </a>
+            </li>
+            <li class={router.location === '/chat' ? 'is-active' : ''}>
+              <a href="/chat" data-testid="chat-tab">
+                <span class="icon is-small"><i class="fas fa-comments"></i></span>
+                <span>Chat</span>
+              </a>
+            </li>
+            <li class={router.location.startsWith('/graph') ? 'is-active' : ''}>
+              <a href="/graph" data-testid="graph-tab">
+                <span class="icon is-small"><i class="fas fa-project-diagram"></i></span>
+                <span>Graph</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
       <div class="role-selector">
         <ThemeSwitcher />
       </div>
     </div>
-    <div class="search-area">
+    <div class="main-area">
       <Route path="/"><Search /></Route>
+      <Route path="/chat"><Chat /></Route>
+      <Route path="/graph"><RoleGraphVisualization /></Route>
     </div>
     <br />
 
     <Route path="/fetch/*"><FetchTabs /></Route>
     <Route path="/config/wizard"><ConfigWizard /></Route>
     <Route path="/config/json"><ConfigJsonEditor /></Route>
-    <Route path="/graph"><RoleGraphVisualization /></Route>
-    <Route path="/chat"><Chat /></Route>
   </main>
 
   <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>
@@ -78,14 +106,19 @@
   }
   .top-controls {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 1rem;
     padding-top: 0.5rem;
   }
+  .main-navigation {
+    flex: 1;
+  }
   .role-selector {
     min-width: 200px;
+    margin-left: 1rem;
   }
-  .search-area {
+  .main-area {
     margin-top: 0;
   }
   footer {
