@@ -551,20 +551,15 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            context_item: {
-              id: '', // Will be generated on the backend
-              context_type: 'Document',
-              title: document.title,
-              content: document.body,
-              metadata: {
-                source_type: 'document',
-                document_id: document.id,
-                url: document.url || '',
-                tags: document.tags ? document.tags.join(', ') : '',
-                rank: document.rank ? document.rank.toString() : '0'
-              },
-              created_at: new Date().toISOString(),
-              relevance_score: document.rank
+            context_type: 'document',
+            title: document.title,
+            content: document.body,
+            metadata: {
+              source_type: 'document',
+              document_id: document.id,
+              url: document.url || '',
+              tags: document.tags ? document.tags.join(', ') : '',
+              rank: document.rank ? document.rank.toString() : '0'
             }
           })
         });
@@ -742,20 +737,15 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            context_item: {
-              id: '', // Will be generated on the backend
-              context_type: 'Document',
-              title: document.title,
-              content: document.body,
-              metadata: {
-                source_type: 'document',
-                document_id: document.id,
-                url: document.url || '',
-                tags: document.tags ? document.tags.join(', ') : '',
-                rank: document.rank ? document.rank.toString() : '0'
-              },
-              created_at: new Date().toISOString(),
-              relevance_score: document.rank
+            context_type: 'document',
+            title: document.title,
+            content: document.body,
+            metadata: {
+              source_type: 'document',
+              document_id: document.id,
+              url: document.url || '',
+              tags: document.tags ? document.tags.join(', ') : '',
+              rank: document.rank ? document.rank.toString() : '0'
             }
           })
         });
