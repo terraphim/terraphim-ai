@@ -2,7 +2,7 @@ VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
-FROM ubuntu:24.04
+FROM ubuntu:20.04
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -51,46 +51,44 @@ docker-all:
 
 # this install builds from base OS without registry dependencies
 install:
-  FROM ubuntu:24.04
+  FROM ubuntu:20.04
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.75.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   DO rust+INIT --keep_fingerprints=true
   RUN cargo install cross
-  RUN cargo install orogene
+  RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
   RUN cargo install ripgrep
-  RUN curl https://pkgx.sh | sh
-  RUN pkgx install yarnpkg.com
+  RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 16.15.1"
+  RUN bash -c "source $HOME/.nvm/nvm.sh && npm install -g yarn"
   # Save locally instead of pushing to registry
   SAVE IMAGE terraphim_builder:local
 
 # this install doesn't use rust lib and Earthly cache
 install-native:
-  FROM ubuntu:24.04
+  FROM ubuntu:20.04
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.82
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   RUN cargo install ripgrep
   RUN cargo install cross
-  RUN cargo install orogene
-  RUN curl https://pkgx.sh | sh
-  RUN pkgx install yarnpkg.com
+  RUN ./scripts/yarn_and_build.sh
   # Save locally instead of pushing to registry
   SAVE IMAGE terraphim_builder_native:local
 
@@ -171,7 +169,7 @@ lint:
   RUN cargo clippy --no-deps --all-features --all-targets
 
 build-focal:
-  FROM ubuntu:24.04
+  FROM ubuntu:20.04
   ENV DEBIAN_FRONTEND noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN true
   RUN apt-get update -qq
@@ -185,7 +183,7 @@ build-focal:
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_focal
 
 build-jammy:
-  FROM ubuntu:22.04
+  FROM ubuntu:20.04
   ENV DEBIAN_FRONTEND noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN true
   RUN apt-get update -qq
