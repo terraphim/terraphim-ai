@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Terraphim AI Parse Extension - Options</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        .header {
+            border-bottom: 1px solid #e1e5e9;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #1a73e8;
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .header p {
+            color: #5f6368;
+            margin: 10px 0 0 0;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #202124;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #202124;
+            font-weight: 500;
+        }
+
+        input[type="url"], select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        input[type="url"]:focus, select:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background: white;
+            color: #1a73e8;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #f8f9fa;
+        }
+
+        button.primary {
+            background: #1a73e8;
+            color: white;
+            border-color: #1a73e8;
+        }
+
+        button.primary:hover {
+            background: #1557b0;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            color: #137333;
+        }
+
+        .status.error {
+            background: #fce8e6;
+            border: 1px solid #f9ab9d;
+            color: #d93025;
+        }
+
+        .status.info {
+            background: #e8f0fe;
+            border: 1px solid #aecbfa;
+            color: #1a73e8;
+        }
+
+        .server-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+
+        .server-info h3 {
+            margin: 0 0 10px 0;
+            color: #202124;
+        }
+
+        .server-info p {
+            margin: 5px 0;
+            color: #5f6368;
+        }
+
+        .role-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            padding: 10px;
+            background: #f8f9fa;
+        }
+
+        .role-item {
+            padding: 5px 0;
+            color: #202124;
+        }
+
+        .help-text {
+            color: #5f6368;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Terraphim AI Parse Extension</h1>
+        <p>Configure your connection to the Terraphim server and knowledge graph settings.</p>
+    </div>
+
+    <div class="section">
+        <h2>Server Configuration</h2>
+
+        <div class="form-group">
+            <label for="serverUrl">Terraphim Server URL:</label>
+            <input type="url" id="serverUrl" placeholder="http://localhost:3000">
+            <div class="help-text">Enter the URL of your Terraphim server. Leave empty to auto-discover local server.</div>
+
+            <div class="button-group">
+                <button id="testConnection">Test Connection</button>
+                <button id="autoDiscover">Auto-Discover</button>
+            </div>
+        </div>
+
+        <div id="connectionStatus" class="status"></div>
+
+        <div id="serverInfo" class="server-info" style="display: none;">
+            <h3>Connected Server Information</h3>
+            <p><strong>Status:</strong> <span id="serverStatus">-</span></p>
+            <p><strong>Available Roles:</strong> <span id="roleCount">-</span></p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Role & Knowledge Graph Settings</h2>
+
+        <div class="form-group">
+            <label for="currentRole">Active Role:</label>
+            <select id="currentRole">
+                <option value="">Loading roles...</option>
+            </select>
+            <div class="help-text">Select the role to use for parsing and knowledge graph generation.</div>
+        </div>
+
+        <div class="form-group">
+            <label>Parsing Options:</label>
+            <div style="margin-top: 10px;">
+                <label style="display: flex; align-items: center; font-weight: normal;">
+                    <input type="radio" name="wikiLinkMode" value="0" style="margin-right: 8px;">
+                    Generate HTML links to knowledge graph
+                </label>
+                <label style="display: flex; align-items: center; font-weight: normal; margin-top: 8px;">
+                    <input type="radio" name="wikiLinkMode" value="1" style="margin-right: 8px;">
+                    Generate wiki links with normalized terms [[concept]]
+                </label>
+                <label style="display: flex; align-items: center; font-weight: normal; margin-top: 8px;">
+                    <input type="radio" name="wikiLinkMode" value="2" style="margin-right: 8px;">
+                    Generate simple wiki links [[matched text]]
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Available Roles</h2>
+        <div id="rolesList" class="role-list">
+            <p>Connect to server to see available roles...</p>
+        </div>
+    </div>
+
+    <div class="button-group" style="margin-top: 30px;">
+        <button id="saveSettings" class="primary">Save Settings</button>
+        <button id="resetSettings">Reset to Defaults</button>
+    </div>
+
+    <div id="saveStatus" class="status"></div>
+
+    <script src="api.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>
