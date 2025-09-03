@@ -38,6 +38,13 @@
   let loadingContext = false;
   let showContextPanel = false;
 
+  // Manual context addition
+  let showAddContextForm = false;
+  let newContextTitle = '';
+  let newContextContent = '';
+  let newContextType = 'document';
+  let savingContext = false;
+
   function addUserMessage(text: string) {
     messages = [...messages, { role: 'user', content: text }];
   }
@@ -141,6 +148,59 @@
     }
   }
 
+  // Toggle manual context form
+  function toggleAddContextForm() {
+    showAddContextForm = !showAddContextForm;
+    if (!showAddContextForm) {
+      // Reset form
+      newContextTitle = '';
+      newContextContent = '';
+      newContextType = 'document';
+    }
+  }
+
+  // Add manual context
+  async function addManualContext() {
+    if (!conversationId || !newContextTitle.trim() || !newContextContent.trim()) return;
+
+    savingContext = true;
+    try {
+      const contextData = {
+        title: newContextTitle.trim(),
+        content: newContextContent.trim(),
+        context_type: newContextType
+      };
+
+      if ($is_tauri) {
+        const result = await invoke('add_context_to_conversation', {
+          conversationId,
+          contextData
+        });
+        if (result.status === 'Success') {
+          await loadConversationContext();
+          toggleAddContextForm();
+        }
+      } else {
+        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contextData)
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'Success') {
+            await loadConversationContext();
+            toggleAddContextForm();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error adding manual context:', error);
+    } finally {
+      savingContext = false;
+    }
+  }
+
   async function sendMessage() {
     if (!input.trim() || sending) return;
     error = null;
@@ -205,7 +265,7 @@
 
 <BackButton fallbackPath="/" />
 
-<section class="section">
+<section class="section" data-testid="chat-interface">
   <div class="container">
     <div class="columns">
       <!-- Main Chat Area -->
@@ -216,7 +276,7 @@
           <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
         {/if}
 
-        <div class="chat-window">
+        <div class="chat-window" data-testid="chat-messages">
       {#each messages as m, i}
         <div class={`msg ${m.role}`}>
           <div class="bubble">
@@ -243,10 +303,10 @@
 
         <div class="field has-addons chat-input">
           <div class="control is-expanded">
-            <textarea class="textarea" rows="3" bind:value={input} on:keydown={handleKeydown} placeholder="Type your message and press Enter..." />
+            <textarea class="textarea" rows="3" bind:value={input} on:keydown={handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
           </div>
           <div class="control">
-            <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()}>
+            <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button">
               <span class="icon"><i class="fas fa-paper-plane"></i></span>
             </button>
           </div>
@@ -255,11 +315,17 @@
 
       <!-- Context Panel -->
       <div class="column is-4">
-        <div class="box context-panel">
+        <div class="box context-panel" data-testid="context-panel">
           <div class="level is-mobile">
             <div class="level-left">
               <div class="level-item">
-                <h4 class="title is-5">Context</h4>
+  <h4 class="title is-5">Context</h4>
+                <button class="button is-small is-primary" data-testid="add-manual-context-button" on:click={toggleAddContextForm}>
+                  <span class="icon is-small">
+                    <i class="fas fa-plus"></i>
+                  </span>
+                  <span>Add Context</span>
+                </button>
               </div>
             </div>
             <div class="level-right">
@@ -268,6 +334,7 @@
                   class="button is-small is-light"
                   on:click={loadConversationContext}
                   disabled={loadingContext}
+                  data-testid="refresh-context-button"
                 >
                   {#if loadingContext}
                     <span class="icon is-small">
@@ -283,8 +350,60 @@
             </div>
           </div>
 
+          <!-- Manual Context Addition Form -->
+          {#if showAddContextForm}
+            <div class="box has-background-light mb-4" data-testid="add-context-form">
+              <div class="field">
+                <label class="label is-small">Context Type</label>
+                <div class="control">
+                  <div class="select is-small is-fullwidth">
+                    <select bind:value={newContextType} data-testid="context-type-select">
+                      <option value="document">Document</option>
+                      <option value="search_result">Search Result</option>
+                      <option value="user_input">User Input</option>
+                      <option value="note">Note</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label is-small">Title</label>
+                <div class="control">
+                  <input class="input is-small" type="text" placeholder="Enter context title" bind:value={newContextTitle} data-testid="context-title-input" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label is-small">Content</label>
+                <div class="control">
+                  <textarea class="textarea is-small" rows="4" placeholder="Enter context content" bind:value={newContextContent} data-testid="context-content-textarea"></textarea>
+                </div>
+              </div>
+
+              <div class="field is-grouped">
+                <div class="control">
+                  <button class="button is-primary is-small" on:click={addManualContext} disabled={savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="save-context-button">
+                    {#if savingContext}
+                      <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
+                    {:else}
+                      <span class="icon is-small"><i class="fas fa-save"></i></span>
+                    {/if}
+                    <span>Save Context</span>
+                  </button>
+                </div>
+                <div class="control">
+                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={savingContext}>
+                    <span class="icon is-small"><i class="fas fa-times"></i></span>
+                    <span>Cancel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          {/if}
+
           {#if contextItems.length === 0}
-            <div class="has-text-centered has-text-grey-light">
+            <div class="has-text-centered has-text-grey-light" data-testid="empty-context-message">
               <span class="icon is-large">
                 <i class="fas fa-inbox fa-2x"></i>
               </span>
@@ -292,9 +411,9 @@
               <p class="is-size-7">Add documents from search results to provide context for your chat.</p>
             </div>
           {:else}
-            <div class="context-items">
+            <div class="context-items" data-testid="conversation-context">
               {#each contextItems as item, index}
-                <div class="context-item" data-context-id={item.id}>
+                <div class="context-item" data-context-id={item.id} data-testid={`context-item-${index}`} data-context-type={item.context_type}>
                   <div class="level is-mobile">
                     <div class="level-left">
                       <div class="level-item">
@@ -302,7 +421,7 @@
                           item.context_type === 'Document' ? 'is-info' :
                           item.context_type === 'SearchResult' ? 'is-primary' :
                           item.context_type === 'UserInput' ? 'is-warning' : 'is-light'
-                        }">
+                        }" data-testid={`context-type-${index}`}>
                           {item.context_type.replace(/([A-Z])/g, ' $1').trim()}
                         </span>
                       </div>
@@ -318,10 +437,10 @@
                     </div>
                   </div>
 
-                  <h6 class="title is-6 has-text-dark">{item.title}</h6>
+                  <h6 class="title is-6 has-text-dark" data-testid={`context-title-${index}`}>{item.title}</h6>
 
                   <div class="content is-small">
-                    <p class="context-preview">
+                    <p class="context-preview" data-testid={`context-content-${index}`}>
                       {item.content.substring(0, 150)}{item.content.length > 150 ? '...' : ''}
                     </p>
                   </div>
@@ -341,7 +460,7 @@
             <div class="level is-mobile">
               <div class="level-left">
                 <div class="level-item">
-                  <span class="tag is-light is-small">
+                  <span class="tag is-light is-small" data-testid="context-summary">
                     {contextItems.length} context items
                   </span>
                 </div>
