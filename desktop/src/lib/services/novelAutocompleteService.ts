@@ -75,7 +75,15 @@ export class NovelAutocompleteService {
       return;
     }
 
-    const commonPorts = [8001, 3000, 8000, 8080];
+    // Skip health checks entirely if we're not using autocomplete features
+    // This prevents unnecessary connection attempts
+    const shouldSkipHealthCheck = !this.shouldPerformHealthCheck();
+    if (shouldSkipHealthCheck) {
+      console.log('NovelAutocompleteService: Skipping health check - service not needed');
+      return;
+    }
+
+    const commonPorts = [8001, 3000]; // Reduced from 4 to 2 most likely ports
 
     for (const port of commonPorts) {
       try {
@@ -92,7 +100,7 @@ export class NovelAutocompleteService {
             method: 'ping',
             params: {}
           }),
-          signal: AbortSignal.timeout(2000) // 2 second timeout
+          signal: AbortSignal.timeout(1000) // Reduced from 2s to 1s timeout
         });
 
         if (response.ok || response.status === 404) {
@@ -102,12 +110,29 @@ export class NovelAutocompleteService {
           return;
         }
       } catch (error) {
-        // Continue trying other ports
+        // Silently continue to next port to reduce console spam
         continue;
       }
     }
 
     console.warn('NovelAutocompleteService: Could not detect running server, using default:', this.baseUrl);
+  }
+
+  /**
+   * Determine if health checks should be performed based on current context
+   */
+  private shouldPerformHealthCheck(): boolean {
+    // Skip health checks if we're on specific pages that don't need autocomplete
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const skipPaths = ['/config', '/graph', '/fetch'];
+      if (skipPaths.some(skipPath => path.startsWith(skipPath))) {
+        return false;
+      }
+    }
+
+    // Always perform health check if we might need autocomplete
+    return true;
   }
 
   /**

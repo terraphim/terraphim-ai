@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Route, router } from "tinro";
+  import { Route, router, meta } from "tinro";
   import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
   import Search from "./lib/Search/Search.svelte";
   import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
@@ -17,6 +17,9 @@
   function navigateTo(path: string) {
     router.goto(path);
   }
+
+  // Create reactive route store for current location
+  const route = meta();
 </script>
 
 <svelte:head>
@@ -30,19 +33,19 @@
       <div class="main-navigation">
         <div class="tabs is-boxed">
           <ul>
-            <li class={router.location === '/' ? 'is-active' : ''}>
+            <li class={$route.url === '/' ? 'is-active' : ''}>
               <a href="/" data-testid="search-tab">
                 <span class="icon is-small"><i class="fas fa-search"></i></span>
                 <span>Search</span>
               </a>
             </li>
-            <li class={router.location === '/chat' ? 'is-active' : ''}>
+            <li class={$route.url === '/chat' ? 'is-active' : ''}>
               <a href="/chat" data-testid="chat-tab">
                 <span class="icon is-small"><i class="fas fa-comments"></i></span>
                 <span>Chat</span>
               </a>
             </li>
-            <li class={router.location.startsWith('/graph') ? 'is-active' : ''}>
+            <li class={$route.url.startsWith('/graph') ? 'is-active' : ''}>
               <a href="/graph" data-testid="graph-tab">
                 <span class="icon is-small"><i class="fas fa-project-diagram"></i></span>
                 <span>Graph</span>
