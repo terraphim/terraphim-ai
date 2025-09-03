@@ -9,7 +9,6 @@ repos:
     hooks:
       - id: trailing-whitespace
         name: Trim trailing whitespace
-        args: ['--fix=yes']
       - id: end-of-file-fixer
         name: Fix end of files
       - id: check-yaml
