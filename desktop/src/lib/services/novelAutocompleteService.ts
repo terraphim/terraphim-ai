@@ -127,13 +127,23 @@ export class NovelAutocompleteService {
     // Skip health checks if we're on specific pages that don't need autocomplete
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
-      const skipPaths = ['/config', '/graph', '/fetch'];
-      if (skipPaths.some(skipPath => path.startsWith(skipPath))) {
+
+      // Only perform health checks on the chat page where autocomplete is actually needed
+      if (!path.startsWith('/chat')) {
+        return false;
+      }
+
+      // Additionally check if there's actually a text editor on the page
+      const hasEditor = document.querySelector('[contenteditable="true"]') ||
+                       document.querySelector('textarea') ||
+                       document.querySelector('input[type="text"]');
+
+      if (!hasEditor) {
         return false;
       }
     }
 
-    // Always perform health check if we might need autocomplete
+    // Only perform health check if we're specifically on the chat page with an editor
     return true;
   }
 
