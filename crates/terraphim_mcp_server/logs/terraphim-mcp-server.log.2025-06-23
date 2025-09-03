@@ -1,0 +1,1332 @@
+[2m2025-06-23T11:00:49.977440Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
+[2m2025-06-23T11:00:49.977608Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:00:49.978588Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:00:49.978663Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:00:49.978767Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:00:49.978786Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:00:49.978794Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:00:49.978801Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:00:50.582190Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:00:50.582233Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:00:50.582242Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:00:51.164637Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:00:51.164769Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:00:51.164877Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m MCP server initialised – awaiting shutdown
+[2m2025-06-23T11:00:51.166218Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:00:51.166281Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-06-23T11:01:59.447921Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.448198Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.448882Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.448927Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.449024Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:01:59.449056Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:01:59.449070Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:01:59.449082Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:01:59.489251Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.489487Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.490075Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.490134Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.490247Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:01:59.490271Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:01:59.490281Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:01:59.490288Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:01:59.531658Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.531917Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.532380Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.532420Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.532501Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:01:59.532526Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:01:59.532535Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:01:59.579960Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.580213Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.580875Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.580938Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.581064Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:01:59.581108Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:01:59.581119Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:01:59.581125Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:01:59.627032Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.627135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.627564Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.627597Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.627677Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:01:59.627699Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:01:59.627708Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:01:59.627714Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:01:59.677949Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.678059Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.678458Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.678486Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.678543Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:01:59.678562Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:01:59.678570Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:01:59.715896Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:01:59.716000Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:01:59.716421Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:01:59.716460Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:01:59.716535Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:01:59.716559Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:01:59.716567Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.162131Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:02:00.162220Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:02:00.162233Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.170446Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:02:00.170508Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:02:00.170518Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.216271Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:02:00.216323Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:02:00.216334Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.287432Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:02:00.287487Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:02:00.287498Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.299615Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:02:00.299664Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:02:00.299674Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.368154Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:02:00.368218Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:02:00.368229Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.398968Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:02:00.399062Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:02:00.399075Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:02:00.846170Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:00.847264Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:00.847389Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:00.847519Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:00.847951Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.848029Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-06-23T11:02:00.848902Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.848941Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-06-23T11:02:00.902047Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:00.902875Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:00.903004Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:00.903134Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:00.905063Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.921867Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:02:00.922055Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:00.923397Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:00.923582Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:00.923759Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:00.928388Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.940493Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.961558Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.962645Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:02:00.963266Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/home/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"dash": {"type": "dashmap", "root": "/tmp/dashmaptest"}} }
+[2m2025-06-23T11:02:00.966470Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Thesaurus for role `Engineer` saved to persistence
+[2m2025-06-23T11:02:00.974835Z[0m [33m WARN[0m [2mlog[0m[2m:[0m service=dashmap operation=stat path=thesaurus_engineering.json -> NotFound (permanent) at stat, context: { service: dashmap, path: thesaurus_engineering.json } => kv doesn't have this path
+[2m2025-06-23T11:02:00.986984Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.999673Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:01.000308Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:01.000418Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:01.000525Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:01.003424Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.004343Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.029912Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.072026Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.074428Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:02:01.074508Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:01.075226Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:01.075344Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:01.075467Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:01.077435Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.080244Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:01.081684Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:01.082013Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:01.082272Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:01.085115Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.090290Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.109065Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:00.975381Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+
+Context:
+   service: dashmap
+   path: thesaurus_engineering.json
+
+Backtrace:
+   0: opendal::types::error::Error::new
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/error.rs:338:24
+   1: <opendal::raw::adapters::typed_kv::backend::Backend<S> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/adapters/typed_kv/backend.rs:157:29
+   2: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+   3: <F as futures_core::future::TryFuture>::try_poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-core-0.3.31/src/future.rs:92:9
+   4: <futures_util::future::try_future::into_future::IntoFuture<Fut> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/try_future/into_future.rs:34:9
+   5: <futures_util::future::future::map::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/map.rs:55:37
+   6: <futures_util::future::future::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   7: <futures_util::future::try_future::MapErr<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   8: <opendal::layers::error_context::ErrorContextAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/error_context.rs:173:14
+   9: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  10: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  11: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  12: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  13: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  14: opendal::layers::complete::CompleteAccessor<A>::complete_stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:226:37
+  15: <opendal::layers::complete::CompleteAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:566:40
+  16: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  17: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  18: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  19: <opendal::layers::logging::LoggingAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/logging.rs:464:14
+  20: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  21: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  22: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  23: opendal::raw::layer::LayeredAccessor::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:167:39
+  24: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  25: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  26: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  27: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  28: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  29: opendal::types::operator::operator::Operator::read_with::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:437:30
+  30: <opendal::types::operator::operator_futures::OperatorFuture<T,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:103:56
+  31: futures_util::future::future::FutureExt::poll_unpin
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/mod.rs:558:9
+  32: <opendal::types::operator::operator_futures::FutureRead as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:361:9
+  33: opendal::types::operator::operator::Operator::read::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:391:30
+  34: terraphim_persistence::Persistable::load_from_operator::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/lib.rs:144:39
+  35: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  36: terraphim_persistence::thesaurus::<impl terraphim_persistence::Persistable for terraphim_types::Thesaurus>::load::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/thesaurus.rs:30:53
+  37: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  38: terraphim_service::TerraphimService::ensure_thesaurus_loaded::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:70:90
+  39: terraphim_service::TerraphimService::search::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:218:74
+  40: terraphim_mcp_server::McpService::search::{{closure}}
+             at ./src/lib.rs:87:45
+  41: <terraphim_mcp_server::McpService as rmcp::handler::server::ServerHandler>::call_tool::{{closure}}
+             at ./src/lib.rs:234:59
+  42: rmcp::handler::server::<impl rmcp::service::Service<rmcp::service::server::RoleServer> for H>::handle_request::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/handler/server.rs:62:18
+  43: rmcp::service::serve_inner::{{closure}}::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/service.rs:758:83
+  44: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  45: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  46: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  47: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  48: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  49: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  50: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  51: __rust_try
+  52: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  53: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  54: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  55: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  56: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  57: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  58: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  59: tokio::runtime::task::LocalNotified<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:463:9
+  60: tokio::runtime::scheduler::multi_thread::worker::Context::run_task::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:600:13
+  61: tokio::task::coop::with_budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:167:5
+  62: tokio::task::coop::budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:133:5
+  63: tokio::runtime::scheduler::multi_thread::worker::Context::run_task
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:594:9
+  64: tokio::runtime::scheduler::multi_thread::worker::Context::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:542:24
+  65: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:507:21
+  66: tokio::runtime::context::scoped::Scoped<T>::set
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/scoped.rs:40:9
+  67: tokio::runtime::context::set_scheduler::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:26
+  68: std::thread::local::LocalKey<T>::try_with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:311:12
+  69: std::thread::local::LocalKey<T>::with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:275:15
+  70: tokio::runtime::context::set_scheduler
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:9
+  71: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:502:9
+  72: tokio::runtime::context::runtime::enter_runtime
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/runtime.rs:65:16
+  73: tokio::runtime::scheduler::multi_thread::worker::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:494:5
+  74: tokio::runtime::scheduler::multi_thread::worker::Launch::launch::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:460:45
+  75: <tokio::runtime::blocking::task::BlockingTask<T> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/task.rs:42:21
+  76: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  77: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  78: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  79: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  80: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  81: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  82: __rust_try
+  83: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  84: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  85: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  86: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  87: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  88: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  89: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  90: tokio::runtime::task::UnownedTask<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:500:9
+  91: tokio::runtime::blocking::pool::Task::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:161:9
+  92: tokio::runtime::blocking::pool::Inner::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:511:17
+  93: tokio::runtime::blocking::pool::Spawner::spawn_thread::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:469:13
+  94: std::sys::backtrace::__rust_begin_short_backtrace
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/backtrace.rs:152:18
+  95: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:559:17
+  96: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  97: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  98: __rust_try
+  99: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+ 100: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+ 101: std::thread::Builder::spawn_unchecked_::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:557:30
+ 102: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+ 103: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 104: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 105: std::sys::pal::unix::thread::Thread::new::thread_start
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/pal/unix/thread.rs:109:17
+ 106: <unknown>
+ 107: <unknown>
+
+)
+[2m2025-06-23T11:02:01.143228Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:02:01.143330Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:02:01.144271Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:02:01.144477Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:02:01.144643Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:02:01.146775Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.170775Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.202619Z[0m [33m WARN[0m [2mrmcp::service[0m[2m:[0m response error [3mid[0m[2m=[0m3 [3merror[0m[2m=[0mErrorData { code: ErrorCode(-32603), message: "Anyhow error: Invalid URI: invalid://resource/uri", data: None }
+[2m2025-06-23T11:02:01.753129Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Error while searching graph for documents: NodeIdNotFound
+[2m2025-06-23T11:02:01.757747Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:02:01.780864Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Thesaurus for role `System Operator` saved to persistence
+[2m2025-06-23T11:02:01.788161Z[0m [33m WARN[0m [2mlog[0m[2m:[0m service=dashmap operation=stat path=thesaurus_engineering.json -> NotFound (permanent) at stat, context: { service: dashmap, path: thesaurus_engineering.json } => kv doesn't have this path
+[2m2025-06-23T11:02:01.788411Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+
+Context:
+   service: dashmap
+   path: thesaurus_engineering.json
+
+Backtrace:
+   0: opendal::types::error::Error::new
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/error.rs:338:24
+   1: <opendal::raw::adapters::typed_kv::backend::Backend<S> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/adapters/typed_kv/backend.rs:157:29
+   2: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+   3: <F as futures_core::future::TryFuture>::try_poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-core-0.3.31/src/future.rs:92:9
+   4: <futures_util::future::try_future::into_future::IntoFuture<Fut> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/try_future/into_future.rs:34:9
+   5: <futures_util::future::future::map::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/map.rs:55:37
+   6: <futures_util::future::future::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   7: <futures_util::future::try_future::MapErr<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   8: <opendal::layers::error_context::ErrorContextAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/error_context.rs:173:14
+   9: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  10: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  11: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  12: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  13: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  14: opendal::layers::complete::CompleteAccessor<A>::complete_stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:226:37
+  15: <opendal::layers::complete::CompleteAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:566:40
+  16: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  17: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  18: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  19: <opendal::layers::logging::LoggingAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/logging.rs:464:14
+  20: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  21: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  22: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  23: opendal::raw::layer::LayeredAccessor::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:167:39
+  24: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  25: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  26: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  27: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  28: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  29: opendal::types::operator::operator::Operator::read_with::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:437:30
+  30: <opendal::types::operator::operator_futures::OperatorFuture<T,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:103:56
+  31: futures_util::future::future::FutureExt::poll_unpin
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/mod.rs:558:9
+  32: <opendal::types::operator::operator_futures::FutureRead as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:361:9
+  33: opendal::types::operator::operator::Operator::read::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:391:30
+  34: terraphim_persistence::Persistable::load_from_operator::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/lib.rs:144:39
+  35: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  36: terraphim_persistence::thesaurus::<impl terraphim_persistence::Persistable for terraphim_types::Thesaurus>::load::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/thesaurus.rs:30:53
+  37: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  38: terraphim_service::TerraphimService::ensure_thesaurus_loaded::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:70:90
+  39: terraphim_service::TerraphimService::search::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:218:74
+  40: terraphim_mcp_server::McpService::search::{{closure}}
+             at ./src/lib.rs:87:45
+  41: <terraphim_mcp_server::McpService as rmcp::handler::server::ServerHandler>::call_tool::{{closure}}
+             at ./src/lib.rs:234:59
+  42: rmcp::handler::server::<impl rmcp::service::Service<rmcp::service::server::RoleServer> for H>::handle_request::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/handler/server.rs:62:18
+  43: rmcp::service::serve_inner::{{closure}}::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/service.rs:758:83
+  44: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  45: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  46: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  47: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  48: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  49: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  50: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  51: __rust_try
+  52: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  53: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  54: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  55: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  56: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  57: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  58: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  59: tokio::runtime::task::LocalNotified<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:463:9
+  60: tokio::runtime::scheduler::multi_thread::worker::Context::run_task::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:600:13
+  61: tokio::task::coop::with_budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:167:5
+  62: tokio::task::coop::budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:133:5
+  63: tokio::runtime::scheduler::multi_thread::worker::Context::run_task
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:594:9
+  64: tokio::runtime::scheduler::multi_thread::worker::Context::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:542:24
+  65: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:507:21
+  66: tokio::runtime::context::scoped::Scoped<T>::set
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/scoped.rs:40:9
+  67: tokio::runtime::context::set_scheduler::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:26
+  68: std::thread::local::LocalKey<T>::try_with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:311:12
+  69: std::thread::local::LocalKey<T>::with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:275:15
+  70: tokio::runtime::context::set_scheduler
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:9
+  71: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:502:9
+  72: tokio::runtime::context::runtime::enter_runtime
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/runtime.rs:65:16
+  73: tokio::runtime::scheduler::multi_thread::worker::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:494:5
+  74: tokio::runtime::scheduler::multi_thread::worker::Launch::launch::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:460:45
+  75: <tokio::runtime::blocking::task::BlockingTask<T> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/task.rs:42:21
+  76: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  77: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  78: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  79: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  80: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  81: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  82: __rust_try
+  83: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  84: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  85: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  86: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  87: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  88: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  89: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  90: tokio::runtime::task::UnownedTask<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:500:9
+  91: tokio::runtime::blocking::pool::Task::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:161:9
+  92: tokio::runtime::blocking::pool::Inner::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:511:17
+  93: tokio::runtime::blocking::pool::Spawner::spawn_thread::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:469:13
+  94: std::sys::backtrace::__rust_begin_short_backtrace
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/backtrace.rs:152:18
+  95: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:559:17
+  96: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  97: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  98: __rust_try
+  99: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+ 100: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+ 101: std::thread::Builder::spawn_unchecked_::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:557:30
+ 102: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+ 103: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 104: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 105: std::sys::pal::unix::thread::Thread::new::thread_start
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/pal/unix/thread.rs:109:17
+ 106: <unknown>
+ 107: <unknown>
+
+)
+[2m2025-06-23T11:02:02.460421Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Error while searching graph for documents: NodeIdNotFound
+[2m2025-06-23T11:09:48.431047Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m Starting Terraphim MCP server (embedded in desktop binary)
+[2m2025-06-23T11:09:48.431142Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:09:48.431527Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:09:48.431558Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:09:48.431633Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:09:48.431650Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:09:48.431657Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:09:48.431664Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:09:48.985797Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:09:48.985840Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:09:48.985848Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:09:49.524166Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:09:49.524319Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:09:49.524457Z[0m [32m INFO[0m [2mterraphim_ai_desktop[0m[2m:[0m MCP server initialised – awaiting shutdown
+[2m2025-06-23T11:09:49.525822Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:09:49.525889Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-06-23T11:10:37.332986Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.333091Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.333522Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.333558Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.333624Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:37.333653Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:37.333663Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:37.358477Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.358694Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.359114Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.359140Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.359203Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:37.359222Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:37.359230Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:37.390519Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.390618Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.390934Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.390962Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.391020Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:37.391036Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:37.391043Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:37.391049Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:37.434094Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.434203Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.434583Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.434620Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.434693Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:37.434730Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:37.434745Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:37.474708Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.474831Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.475383Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.475425Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.475510Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:37.475536Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:37.475544Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:37.513928Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.514118Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.514625Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.514653Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.514705Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:37.514725Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:37.514733Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:37.560571Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Starting Terraphim MCP server
+[2m2025-06-23T11:10:37.560681Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:37.561106Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Current working directory: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server
+[2m2025-06-23T11:10:37.561145Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2m2025-06-23T11:10:37.561254Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:37.561286Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:37.561301Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.109342Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:38.109392Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:38.109403Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:38.109410Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.136050Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:38.136108Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:38.136123Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:38.136135Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.170934Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:38.170982Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:38.170992Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:38.171000Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.250857Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:38.250904Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:38.250914Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.274317Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:38.274371Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:38.274386Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.311188Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:38.311235Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Engineer
+[2m2025-06-23T11:10:38.311245Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role Engineer is configured correctly
+[2m2025-06-23T11:10:38.311253Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.329969Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role System Operator
+[2m2025-06-23T11:10:38.330016Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Role System Operator is configured correctly
+[2m2025-06-23T11:10:38.330026Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2m2025-06-23T11:10:38.771563Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:38.772324Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:38.772442Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:38.772546Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:38.772951Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.773027Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-06-23T11:10:38.773935Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.773975Z[0m [33m WARN[0m [2mlog[0m[2m:[0m Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/terraphim_server/fixtures/haystack/"
+[2m2025-06-23T11:10:38.789759Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:38.790565Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:38.790674Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:38.790782Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:38.792822Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.820688Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.839477Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loading device settings...
+[2m2025-06-23T11:10:38.840029Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: true, default_data_path: "/home/alex/projects/terraphim/terraphim-ai/docs/src", profiles: {"dash": {"root": "/tmp/dashmaptest", "type": "dashmap"}} }
+[2m2025-06-23T11:10:38.843392Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Thesaurus for role `Engineer` saved to persistence
+[2m2025-06-23T11:10:38.854526Z[0m [33m WARN[0m [2mlog[0m[2m:[0m service=dashmap operation=stat path=thesaurus_engineering.json -> NotFound (permanent) at stat, context: { service: dashmap, path: thesaurus_engineering.json } => kv doesn't have this path
+[2m2025-06-23T11:10:38.905046Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:38.906270Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:38.906410Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:38.906547Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:38.909861Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.944904Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.965294Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.975616Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:38.976215Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:38.976343Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:38.976462Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:38.978366Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.978854Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.980377Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:38.980451Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:38.981038Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:38.981155Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:38.981290Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:38.982792Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:38.854869Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+
+Context:
+   service: dashmap
+   path: thesaurus_engineering.json
+
+Backtrace:
+   0: opendal::types::error::Error::new
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/error.rs:338:24
+   1: <opendal::raw::adapters::typed_kv::backend::Backend<S> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/adapters/typed_kv/backend.rs:157:29
+   2: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+   3: <F as futures_core::future::TryFuture>::try_poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-core-0.3.31/src/future.rs:92:9
+   4: <futures_util::future::try_future::into_future::IntoFuture<Fut> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/try_future/into_future.rs:34:9
+   5: <futures_util::future::future::map::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/map.rs:55:37
+   6: <futures_util::future::future::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   7: <futures_util::future::try_future::MapErr<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   8: <opendal::layers::error_context::ErrorContextAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/error_context.rs:173:14
+   9: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  10: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  11: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  12: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  13: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  14: opendal::layers::complete::CompleteAccessor<A>::complete_stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:226:37
+  15: <opendal::layers::complete::CompleteAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:566:40
+  16: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  17: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  18: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  19: <opendal::layers::logging::LoggingAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/logging.rs:464:14
+  20: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  21: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  22: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  23: opendal::raw::layer::LayeredAccessor::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:167:39
+  24: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  25: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  26: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  27: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  28: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  29: opendal::types::operator::operator::Operator::read_with::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:437:30
+  30: <opendal::types::operator::operator_futures::OperatorFuture<T,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:103:56
+  31: futures_util::future::future::FutureExt::poll_unpin
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/mod.rs:558:9
+  32: <opendal::types::operator::operator_futures::FutureRead as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:361:9
+  33: opendal::types::operator::operator::Operator::read::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:391:30
+  34: terraphim_persistence::Persistable::load_from_operator::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/lib.rs:144:39
+  35: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  36: terraphim_persistence::thesaurus::<impl terraphim_persistence::Persistable for terraphim_types::Thesaurus>::load::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/thesaurus.rs:30:53
+  37: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  38: terraphim_service::TerraphimService::ensure_thesaurus_loaded::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:70:90
+  39: terraphim_service::TerraphimService::search::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:218:74
+  40: terraphim_mcp_server::McpService::search::{{closure}}
+             at ./src/lib.rs:87:45
+  41: <terraphim_mcp_server::McpService as rmcp::handler::server::ServerHandler>::call_tool::{{closure}}
+             at ./src/lib.rs:234:59
+  42: rmcp::handler::server::<impl rmcp::service::Service<rmcp::service::server::RoleServer> for H>::handle_request::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/handler/server.rs:62:18
+  43: rmcp::service::serve_inner::{{closure}}::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/service.rs:758:83
+  44: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  45: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  46: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  47: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  48: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  49: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  50: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  51: __rust_try
+  52: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  53: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  54: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  55: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  56: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  57: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  58: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  59: tokio::runtime::task::LocalNotified<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:463:9
+  60: tokio::runtime::scheduler::multi_thread::worker::Context::run_task::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:600:13
+  61: tokio::task::coop::with_budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:167:5
+  62: tokio::task::coop::budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:133:5
+  63: tokio::runtime::scheduler::multi_thread::worker::Context::run_task
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:594:9
+  64: tokio::runtime::scheduler::multi_thread::worker::Context::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:542:24
+  65: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:507:21
+  66: tokio::runtime::context::scoped::Scoped<T>::set
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/scoped.rs:40:9
+  67: tokio::runtime::context::set_scheduler::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:26
+  68: std::thread::local::LocalKey<T>::try_with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:311:12
+  69: std::thread::local::LocalKey<T>::with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:275:15
+  70: tokio::runtime::context::set_scheduler
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:9
+  71: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:502:9
+  72: tokio::runtime::context::runtime::enter_runtime
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/runtime.rs:65:16
+  73: tokio::runtime::scheduler::multi_thread::worker::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:494:5
+  74: tokio::runtime::scheduler::multi_thread::worker::Launch::launch::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:460:45
+  75: <tokio::runtime::blocking::task::BlockingTask<T> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/task.rs:42:21
+  76: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  77: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  78: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  79: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  80: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  81: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  82: __rust_try
+  83: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  84: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  85: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  86: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  87: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  88: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  89: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  90: tokio::runtime::task::UnownedTask<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:500:9
+  91: tokio::runtime::blocking::pool::Task::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:161:9
+  92: tokio::runtime::blocking::pool::Inner::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:511:17
+  93: tokio::runtime::blocking::pool::Spawner::spawn_thread::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:469:13
+  94: std::sys::backtrace::__rust_begin_short_backtrace
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/backtrace.rs:152:18
+  95: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:559:17
+  96: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  97: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  98: __rust_try
+  99: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+ 100: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+ 101: std::thread::Builder::spawn_unchecked_::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:557:30
+ 102: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+ 103: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 104: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 105: std::sys::pal::unix::thread::Thread::new::thread_start
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/pal/unix/thread.rs:109:17
+ 106: <unknown>
+ 107: <unknown>
+
+)
+[2m2025-06-23T11:10:39.001740Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.009594Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.021038Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:39.021629Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:39.021729Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:39.021825Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:39.023300Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.026665Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.039399Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.047669Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.065996Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Creating role Default
+[2m2025-06-23T11:10:39.066066Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m Initialized Terraphim MCP service
+[2m2025-06-23T11:10:39.066643Z[0m [32m INFO[0m [2mrmcp::handler::server[0m[2m:[0m client initialized
+[2m2025-06-23T11:10:39.066776Z[0m [32m INFO[0m [1mserve_inner[0m[2m:[0m [2mrmcp::service[0m[2m:[0m Service initialized as server [3mpeer_info[0m[2m=[0mSome(InitializeRequestParam { protocol_version: ProtocolVersion("2025-03-26"), capabilities: ClientCapabilities { experimental: None, roots: None, sampling: None }, client_info: Implementation { name: "rmcp", version: "0.1.5" } })
+[2m2025-06-23T11:10:39.066884Z[0m [32m INFO[0m [2mterraphim_mcp_server[0m[2m:[0m MCP server initialized and ready to handle requests
+[2m2025-06-23T11:10:39.068558Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.161760Z[0m [33m WARN[0m [2mrmcp::service[0m[2m:[0m response error [3mid[0m[2m=[0m3 [3merror[0m[2m=[0mErrorData { code: ErrorCode(-32603), message: "Anyhow error: Invalid URI: invalid://resource/uri", data: None }
+[2m2025-06-23T11:10:39.583296Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Error while searching graph for documents: NodeIdNotFound
+[2m2025-06-23T11:10:39.587864Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Finding documents in haystack: Haystack {
+    path: "/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server/../../docs/src",
+    service: Ripgrep,
+    read_only: false,
+}
+[2m2025-06-23T11:10:39.605097Z[0m [32m INFO[0m [2mlog[0m[2m:[0m Thesaurus for role `System Operator` saved to persistence
+[2m2025-06-23T11:10:39.610521Z[0m [33m WARN[0m [2mlog[0m[2m:[0m service=dashmap operation=stat path=thesaurus_engineering.json -> NotFound (permanent) at stat, context: { service: dashmap, path: thesaurus_engineering.json } => kv doesn't have this path
+[2m2025-06-23T11:10:39.610714Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Failed to load thesaurus: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+
+Context:
+   service: dashmap
+   path: thesaurus_engineering.json
+
+Backtrace:
+   0: opendal::types::error::Error::new
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/error.rs:338:24
+   1: <opendal::raw::adapters::typed_kv::backend::Backend<S> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/adapters/typed_kv/backend.rs:157:29
+   2: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+   3: <F as futures_core::future::TryFuture>::try_poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-core-0.3.31/src/future.rs:92:9
+   4: <futures_util::future::try_future::into_future::IntoFuture<Fut> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/try_future/into_future.rs:34:9
+   5: <futures_util::future::future::map::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/map.rs:55:37
+   6: <futures_util::future::future::Map<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   7: <futures_util::future::try_future::MapErr<Fut,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/lib.rs:86:13
+   8: <opendal::layers::error_context::ErrorContextAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/error_context.rs:173:14
+   9: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  10: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  11: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  12: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  13: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  14: opendal::layers::complete::CompleteAccessor<A>::complete_stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:226:37
+  15: <opendal::layers::complete::CompleteAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/complete.rs:566:40
+  16: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  17: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  18: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  19: <opendal::layers::logging::LoggingAccessor<A> as opendal::raw::layer::LayeredAccessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/layers/logging.rs:464:14
+  20: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  21: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  22: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  23: opendal::raw::layer::LayeredAccessor::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:167:39
+  24: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  25: opendal::raw::layer::<impl opendal::raw::accessor::Accessor for L>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/layer.rs:246:39
+  26: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  27: <alloc::sync::Arc<T> as opendal::raw::accessor::Accessor>::stat::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/raw/accessor.rs:408:40
+  28: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  29: opendal::types::operator::operator::Operator::read_with::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:437:30
+  30: <opendal::types::operator::operator_futures::OperatorFuture<T,F> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:103:56
+  31: futures_util::future::future::FutureExt::poll_unpin
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-util-0.3.31/src/future/future/mod.rs:558:9
+  32: <opendal::types::operator::operator_futures::FutureRead as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator_futures.rs:361:9
+  33: opendal::types::operator::operator::Operator::read::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/opendal-0.44.2/src/types/operator/operator.rs:391:30
+  34: terraphim_persistence::Persistable::load_from_operator::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/lib.rs:144:39
+  35: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  36: terraphim_persistence::thesaurus::<impl terraphim_persistence::Persistable for terraphim_types::Thesaurus>::load::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence/src/thesaurus.rs:30:53
+  37: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  38: terraphim_service::TerraphimService::ensure_thesaurus_loaded::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:70:90
+  39: terraphim_service::TerraphimService::search::{{closure}}
+             at /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service/src/lib.rs:218:74
+  40: terraphim_mcp_server::McpService::search::{{closure}}
+             at ./src/lib.rs:87:45
+  41: <terraphim_mcp_server::McpService as rmcp::handler::server::ServerHandler>::call_tool::{{closure}}
+             at ./src/lib.rs:234:59
+  42: rmcp::handler::server::<impl rmcp::service::Service<rmcp::service::server::RoleServer> for H>::handle_request::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/handler/server.rs:62:18
+  43: rmcp::service::serve_inner::{{closure}}::{{closure}}
+             at /home/alex/.cargo/git/checkouts/rust-sdk-773cd6d57c4837f3/a62c6d1/crates/rmcp/src/service.rs:758:83
+  44: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:124:9
+  45: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  46: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  47: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  48: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  49: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  50: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  51: __rust_try
+  52: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  53: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  54: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  55: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  56: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  57: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  58: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  59: tokio::runtime::task::LocalNotified<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:463:9
+  60: tokio::runtime::scheduler::multi_thread::worker::Context::run_task::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:600:13
+  61: tokio::task::coop::with_budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:167:5
+  62: tokio::task::coop::budget
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/task/coop/mod.rs:133:5
+  63: tokio::runtime::scheduler::multi_thread::worker::Context::run_task
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:594:9
+  64: tokio::runtime::scheduler::multi_thread::worker::Context::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:542:24
+  65: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:507:21
+  66: tokio::runtime::context::scoped::Scoped<T>::set
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/scoped.rs:40:9
+  67: tokio::runtime::context::set_scheduler::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:26
+  68: std::thread::local::LocalKey<T>::try_with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:311:12
+  69: std::thread::local::LocalKey<T>::with
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:275:15
+  70: tokio::runtime::context::set_scheduler
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context.rs:176:9
+  71: tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:502:9
+  72: tokio::runtime::context::runtime::enter_runtime
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/context/runtime.rs:65:16
+  73: tokio::runtime::scheduler::multi_thread::worker::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:494:5
+  74: tokio::runtime::scheduler::multi_thread::worker::Launch::launch::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/scheduler/multi_thread/worker.rs:460:45
+  75: <tokio::runtime::blocking::task::BlockingTask<T> as core::future::future::Future>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/task.rs:42:21
+  76: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:331:17
+  77: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/loom/std/unsafe_cell.rs:16:9
+  78: tokio::runtime::task::core::Core<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/core.rs:320:13
+  79: tokio::runtime::task::harness::poll_future::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:532:19
+  80: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  81: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  82: __rust_try
+  83: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  84: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  85: tokio::runtime::task::harness::poll_future
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:520:18
+  86: tokio::runtime::task::harness::Harness<T,S>::poll_inner
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:209:27
+  87: tokio::runtime::task::harness::Harness<T,S>::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/harness.rs:154:15
+  88: tokio::runtime::task::raw::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:271:5
+  89: tokio::runtime::task::raw::RawTask::poll
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/raw.rs:201:18
+  90: tokio::runtime::task::UnownedTask<S>::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/task/mod.rs:500:9
+  91: tokio::runtime::blocking::pool::Task::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:161:9
+  92: tokio::runtime::blocking::pool::Inner::run
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:511:17
+  93: tokio::runtime::blocking::pool::Spawner::spawn_thread::{{closure}}
+             at /home/alex/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.45.1/src/runtime/blocking/pool.rs:469:13
+  94: std::sys::backtrace::__rust_begin_short_backtrace
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/backtrace.rs:152:18
+  95: std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:559:17
+  96: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9
+  97: std::panicking::try::do_call
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  98: __rust_try
+  99: std::panicking::try
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+ 100: std::panic::catch_unwind
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+ 101: std::thread::Builder::spawn_unchecked_::{{closure}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:557:30
+ 102: core::ops::function::FnOnce::call_once{{vtable.shim}}
+             at /home/alex/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+ 103: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 104: <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/alloc/src/boxed.rs:1966:9
+ 105: std::sys::pal::unix::thread::Thread::new::thread_start
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/pal/unix/thread.rs:109:17
+ 106: <unknown>
+ 107: <unknown>
+
+)
+[2m2025-06-23T11:10:40.117292Z[0m [31mERROR[0m [2mlog[0m[2m:[0m Error while searching graph for documents: NodeIdNotFound

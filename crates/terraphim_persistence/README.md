@@ -1,19 +1,19 @@
-The goal of persistence crate is to crate a layer of abstraction using OpenDAL. 
+The goal of persistence crate is to crate a layer of abstraction using OpenDAL.
 The idea is that writes will go everywhere in async mode, but all reads will be from fastest operator.
-see ./examples/simple_struct.rs 
+see ./examples/simple_struct.rs
 
-save_to_one will save to single profile 
+save_to_one will save to single profile
 save to all will save to all available profile
 load will load from fastest profile
 
 
 Config file here is to define available services for persistence layer.
-It is taken from: 
+It is taken from:
 https://github.com/apache/incubator-opendal/tree/main/bin/oli with minor modifications:
 prefix for env variables shall be TERRAPHIM_PROFILE instead of OLI_PROFILE
 profile name can't have spaces
 
-it will parse all profiles and then measure load speed for each operator, current profile config: 
+it will parse all profiles and then measure load speed for each operator, current profile config:
 ```
 [profiles.s3]
 type = "s3"
@@ -35,4 +35,3 @@ root = "/tmp/dashmaptest"
 type = "rocksdb"
 datadir = "/tmp/opendal/rocksdb"
 ```
-

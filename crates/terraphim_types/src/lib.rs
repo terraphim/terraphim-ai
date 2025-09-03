@@ -6,9 +6,14 @@ use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 
+use schemars::JsonSchema;
 use std::str::FromStr;
+#[cfg(feature = "typescript")]
+use tsify::Tsify;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RoleName {
     pub original: String,
     pub lowercase: String,
@@ -24,6 +29,10 @@ impl RoleName {
 
     pub fn as_lowercase(&self) -> &str {
         &self.lowercase
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.original
     }
 }
 
@@ -75,6 +84,8 @@ impl<'de> Deserialize<'de> for RoleName {
 ///
 /// This is a string that has been normalized to lowercase and trimmed.
 #[derive(Default, Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NormalizedTermValue(String);
 
 impl NormalizedTermValue {
@@ -131,12 +142,16 @@ pub struct NormalizedTerm {
     #[serde(rename = "nterm")]
     pub value: NormalizedTermValue,
     /// The URL of the normalized term
-    pub url: Option<String>
+    pub url: Option<String>,
 }
 
 impl NormalizedTerm {
     pub fn new(id: u64, value: NormalizedTermValue) -> Self {
-        Self { id, value, url: None }
+        Self {
+            id,
+            value,
+            url: None,
+        }
     }
 }
 
@@ -181,6 +196,8 @@ impl Display for Concept {
 /// It holds the title, body, description, tags, and rank.
 /// The `id` is a unique identifier for the document.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Document {
     /// Unique identifier for the document
     pub id: String,
@@ -191,8 +208,10 @@ pub struct Document {
     /// The document body
     pub body: String,
 
-    /// A short description of the document
+    /// A short description of the document (extracted from content)
     pub description: Option<String>,
+    /// AI-generated summarization of the document content
+    pub summarization: Option<String>,
     /// A short excerpt of the document
     pub stub: Option<String>,
     /// Tags for the document
@@ -209,6 +228,13 @@ impl fmt::Display for Document {
         // Append description if it exists
         if let Some(ref description) = self.description {
             write!(f, " {}", description)?;
+        }
+
+        // Append summarization if it exists and is different from description
+        if let Some(ref summarization) = self.summarization {
+            if Some(summarization) != self.description.as_ref() {
+                write!(f, " {}", summarization)?;
+            }
         }
 
         Ok(())
@@ -441,21 +467,95 @@ impl IndexedDocument {
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self)
     }
+    pub fn from_document(document: Document) -> Self {
+        IndexedDocument {
+            id: document.id,
+            matched_edges: Vec::new(),
+            rank: 0,
+            tags: document.tags.unwrap_or_default(),
+            nodes: Vec::new(),
+        }
+    }
+}
+
+/// Logical operators for combining multiple search terms
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum LogicalOperator {
+    /// AND operator - documents must contain all terms
+    #[serde(rename = "and")]
+    And,
+    /// OR operator - documents may contain any of the terms
+    #[serde(rename = "or")]
+    Or,
 }
 
 /// Query type for searching documents in the `RoleGraph`.
-/// It contains the search term, skip and limit parameters.
+/// It contains the search term(s), logical operators, skip and limit parameters.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SearchQuery {
+    /// Primary search term for backward compatibility
     pub search_term: NormalizedTermValue,
+    /// Multiple search terms for logical operations
+    pub search_terms: Option<Vec<NormalizedTermValue>>,
+    /// Logical operator for combining multiple terms (defaults to OR if not specified)
+    pub operator: Option<LogicalOperator>,
     pub skip: Option<usize>,
     pub limit: Option<usize>,
     pub role: Option<RoleName>,
 }
 
+impl SearchQuery {
+    /// Get all search terms (both single and multiple)
+    pub fn get_all_terms(&self) -> Vec<&NormalizedTermValue> {
+        if let Some(ref multiple_terms) = self.search_terms {
+            // For multi-term queries, use search_terms (which should contain all terms)
+            multiple_terms.iter().collect()
+        } else {
+            // For single-term queries, use search_term
+            vec![&self.search_term]
+        }
+    }
+
+    /// Check if this is a multi-term query with logical operators
+    pub fn is_multi_term_query(&self) -> bool {
+        self.search_terms.is_some() && !self.search_terms.as_ref().unwrap().is_empty()
+    }
+
+    /// Get the effective logical operator (defaults to Or for multi-term queries)
+    pub fn get_operator(&self) -> LogicalOperator {
+        self.operator
+            .as_ref()
+            .unwrap_or(&LogicalOperator::Or)
+            .clone()
+    }
+
+    /// Create a new SearchQuery with multiple terms and an operator
+    pub fn with_terms_and_operator(
+        primary_term: NormalizedTermValue,
+        additional_terms: Vec<NormalizedTermValue>,
+        operator: LogicalOperator,
+        role: Option<RoleName>,
+    ) -> Self {
+        Self {
+            search_term: primary_term,
+            search_terms: Some(additional_terms),
+            operator: Some(operator),
+            skip: None,
+            limit: None,
+            role,
+        }
+    }
+}
+
 /// Defines the relevance function (scorer) to be used for ranking search
 /// results for the `Role`.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy, JsonSchema, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum RelevanceFunction {
     /// Scorer for ranking search results based on the Terraphim graph
     ///
@@ -465,15 +565,27 @@ pub enum RelevanceFunction {
     #[serde(rename = "terraphim-graph")]
     TerraphimGraph,
     /// Scorer for ranking search results based on the title of a document
+    #[default]
     #[serde(rename = "title-scorer")]
     TitleScorer,
+    /// BM25 (Okapi BM25) relevance function for probabilistic ranking
+    #[serde(rename = "bm25")]
+    BM25,
+    /// BM25F relevance function with field-specific weights (title, body, description, tags)
+    #[serde(rename = "bm25f")]
+    BM25F,
+    /// BM25Plus relevance function with enhanced parameters for fine-tuning
+    #[serde(rename = "bm25plus")]
+    BM25Plus,
 }
 
 /// Defines all supported inputs for the knowledge graph.
 ///
 /// Every knowledge graph is built from a specific input, such as Markdown files
 /// or JSON files.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum KnowledgeGraphInputType {
     /// A set of Markdown files
     #[serde(rename = "markdown")]
@@ -481,4 +593,95 @@ pub enum KnowledgeGraphInputType {
     /// A JSON files
     #[serde(rename = "json")]
     Json,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_search_query_logical_operators() {
+        // Test single term query (backward compatibility)
+        let single_query = SearchQuery {
+            search_term: NormalizedTermValue::new("rust".to_string()),
+            search_terms: None,
+            operator: None,
+            skip: None,
+            limit: Some(10),
+            role: Some(RoleName::new("test")),
+        };
+
+        assert!(!single_query.is_multi_term_query());
+        assert_eq!(single_query.get_all_terms().len(), 1);
+        assert_eq!(single_query.get_operator(), LogicalOperator::Or); // Default
+
+        // Test multi-term query with AND operator
+        let and_query = SearchQuery::with_terms_and_operator(
+            NormalizedTermValue::new("machine".to_string()),
+            vec![NormalizedTermValue::new("learning".to_string())],
+            LogicalOperator::And,
+            Some(RoleName::new("test")),
+        );
+
+        assert!(and_query.is_multi_term_query());
+        assert_eq!(and_query.get_all_terms().len(), 2);
+        assert_eq!(and_query.get_operator(), LogicalOperator::And);
+
+        // Test multi-term query with OR operator
+        let or_query = SearchQuery::with_terms_and_operator(
+            NormalizedTermValue::new("neural".to_string()),
+            vec![NormalizedTermValue::new("networks".to_string())],
+            LogicalOperator::Or,
+            Some(RoleName::new("test")),
+        );
+
+        assert!(or_query.is_multi_term_query());
+        assert_eq!(or_query.get_all_terms().len(), 2);
+        assert_eq!(or_query.get_operator(), LogicalOperator::Or);
+    }
+
+    #[test]
+    fn test_logical_operator_serialization() {
+        // Test LogicalOperator serialization
+        let and_op = LogicalOperator::And;
+        let or_op = LogicalOperator::Or;
+
+        let and_json = serde_json::to_string(&and_op).unwrap();
+        let or_json = serde_json::to_string(&or_op).unwrap();
+
+        assert_eq!(and_json, "\"and\"");
+        assert_eq!(or_json, "\"or\"");
+
+        // Test deserialization
+        let and_deser: LogicalOperator = serde_json::from_str("\"and\"").unwrap();
+        let or_deser: LogicalOperator = serde_json::from_str("\"or\"").unwrap();
+
+        assert_eq!(and_deser, LogicalOperator::And);
+        assert_eq!(or_deser, LogicalOperator::Or);
+    }
+
+    #[test]
+    fn test_search_query_serialization() {
+        let query = SearchQuery {
+            search_term: NormalizedTermValue::new("test".to_string()),
+            search_terms: Some(vec![
+                NormalizedTermValue::new("additional".to_string()),
+                NormalizedTermValue::new("terms".to_string()),
+            ]),
+            operator: Some(LogicalOperator::And),
+            skip: Some(0),
+            limit: Some(10),
+            role: Some(RoleName::new("test_role")),
+        };
+
+        let json = serde_json::to_string(&query).unwrap();
+        let deserialized: SearchQuery = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(query.search_term, deserialized.search_term);
+        assert_eq!(query.search_terms, deserialized.search_terms);
+        assert_eq!(query.operator, deserialized.operator);
+        assert_eq!(query.skip, deserialized.skip);
+        assert_eq!(query.limit, deserialized.limit);
+        assert_eq!(query.role, deserialized.role);
+    }
 }
