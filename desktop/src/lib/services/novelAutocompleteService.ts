@@ -51,9 +51,11 @@ export class NovelAutocompleteService {
       : 'http://localhost:8001';
     this.sessionId = `novel-${Date.now()}`;
 
-    // Only try to detect server port if not in Tauri mode
-    if (typeof window !== 'undefined' && !isTauriMode()) {
+    // Only try to detect server port if not in Tauri mode and health checks are needed
+    if (typeof window !== 'undefined' && !isTauriMode() && this.shouldPerformHealthCheck()) {
       this.detectServerPort();
+    } else if (typeof window !== 'undefined' && !isTauriMode()) {
+      console.log('NovelAutocompleteService: Skipping server detection - not needed for current page');
     }
   }
 

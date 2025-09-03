@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Route, router, meta } from "tinro";
+  import { Route, router, active } from "tinro";
   import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
   import Search from "./lib/Search/Search.svelte";
   import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
@@ -17,9 +17,6 @@
   function navigateTo(path: string) {
     router.goto(path);
   }
-
-  // Create reactive route store for current location
-  const route = meta();
 </script>
 
 <svelte:head>
@@ -33,20 +30,20 @@
       <div class="main-navigation">
         <div class="tabs is-boxed">
           <ul>
-            <li class={$route.url === '/' ? 'is-active' : ''}>
-              <a href="/" data-testid="search-tab">
+            <li>
+              <a href="/" use:active data-exact data-testid="search-tab">
                 <span class="icon is-small"><i class="fas fa-search"></i></span>
                 <span>Search</span>
               </a>
             </li>
-            <li class={$route.url === '/chat' ? 'is-active' : ''}>
-              <a href="/chat" data-testid="chat-tab">
+            <li>
+              <a href="/chat" use:active data-testid="chat-tab">
                 <span class="icon is-small"><i class="fas fa-comments"></i></span>
                 <span>Chat</span>
               </a>
             </li>
-            <li class={$route.url.startsWith('/graph') ? 'is-active' : ''}>
-              <a href="/graph" data-testid="graph-tab">
+            <li>
+              <a href="/graph" use:active data-testid="graph-tab">
                 <span class="icon is-small"><i class="fas fa-project-diagram"></i></span>
                 <span>Graph</span>
               </a>
@@ -123,6 +120,23 @@
   }
   .main-area {
     margin-top: 0;
+  }
+
+  /* Active navigation tab styles */
+  .tabs li:has(a.active) {
+    border-bottom-color: #3273dc;
+  }
+  .tabs a.active {
+    color: #3273dc !important;
+    border-bottom-color: #3273dc !important;
+  }
+
+  /* Fallback for browsers that don't support :has() selector */
+  @supports not (selector(:has(*))) {
+    .tabs a.active {
+      background-color: #f5f5f5;
+      border-bottom: 3px solid #3273dc;
+    }
   }
   footer {
     flex-shrink: 0;
