@@ -20,7 +20,7 @@ name = "terraphim-config"
 [dependencies]
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
 terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "0.1.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "0.1.0", features = ["remote-loading"] }
 terraphim_persistence = { path = "../terraphim_persistence", version = "0.1.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
 
@@ -52,7 +52,15 @@ url = { version = "2.3.1", features = ["serde"] }
 async-once-cell = "0.5.3"
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 thiserror = "1.0.53"
-serde_json_any_key = "2.0.0"
+schemars = { version = "0.8", features = ["derive"] }
+tsify = { version = "0.4", features = ["js"], optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+default = ["typescript"]
+typescript = ["tsify", "wasm-bindgen"]
+openrouter = []
 
 [dev-dependencies]
 tempfile = "3.10.1"
+env_logger = "0.10"
