@@ -13,7 +13,7 @@ importScripts('api.js');
 // https://sebokwiki.org/wiki/Maintainability_(glossary)
 importScripts('./pkg/terrraphim_automata_wasm_worker.js');
 
-// Global API instance
+// Use the singleton API instance from api.js
 let api = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -26,8 +26,8 @@ chrome.runtime.onStartup.addListener(async () => {
 
 async function initializeExtension() {
     try {
-        // Initialize API
-        api = new TerraphimAPI();
+        // Use the singleton instance instead of creating a new one
+        api = terraphimAPI;
         await api.initialize();
 
         // Load WASM
@@ -62,11 +62,25 @@ function setupContextMenu() {
 chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) {
     (async () => {
         try {
-            if (!api || !api.isConfigured()) {
-                senderResponse({
-                    error: "Extension not configured. Please configure server settings in options."
-                });
-                return;
+            // Check if API is initialized and configured
+            if (!api) {
+                api = terraphimAPI; // Fallback to singleton if not set
+            }
+
+            if (!api.isConfigured()) {
+                // Try to re-initialize if not configured
+                try {
+                    await api.initialize();
+                } catch (initError) {
+                    console.error('Failed to initialize API:', initError);
+                }
+
+                if (!api.isConfigured()) {
+                    senderResponse({
+                        error: "Extension not configured. Please configure server settings in options page (right-click extension icon → Options)."
+                    });
+                    return;
+                }
             }
 
             await wasm_bindgen('./pkg/terrraphim_automata_wasm_bg.wasm');
@@ -80,6 +94,22 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
             try {
                 // Get thesaurus from API instead of hardcoded URL
                 const thesaurus = await api.getThesaurus();
+
+                // Check if thesaurus is empty - this might indicate missing dependencies
+                if (!thesaurus || Object.keys(thesaurus).length === 0) {
+                    const stored = await chrome.storage.sync.get(['cloudflareAccountId', 'cloudflareApiToken']);
+                    if (!stored.cloudflareAccountId || !stored.cloudflareApiToken) {
+                        senderResponse({
+                            error: "Concept mapping requires Cloudflare API credentials. Please configure Cloudflare Account ID and API Token in the extension options."
+                        });
+                        return;
+                    } else {
+                        senderResponse({
+                            error: "No thesaurus data available for concept mapping. Check your role configuration and server connection."
+                        });
+                        return;
+                    }
+                }
 
                 // Get wiki link mode from storage
                 const stored = await chrome.storage.sync.get(['wikiLinkMode']);

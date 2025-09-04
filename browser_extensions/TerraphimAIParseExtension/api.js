@@ -14,16 +14,26 @@ class TerraphimAPI {
      * Initialize API with stored configuration
      */
     async initialize() {
-        const stored = await chrome.storage.sync.get(['serverUrl', 'currentRole']);
-        this.serverUrl = stored.serverUrl;
-        this.currentRole = stored.currentRole;
+        try {
+            const stored = await chrome.storage.sync.get(['serverUrl', 'currentRole']);
+            this.serverUrl = stored.serverUrl;
+            this.currentRole = stored.currentRole;
 
-        if (!this.serverUrl) {
-            await this.discoverServer();
-        }
+            if (!this.serverUrl) {
+                console.log('No server URL configured, attempting auto-discovery...');
+                await this.discoverServer();
+            }
 
-        if (this.serverUrl) {
-            await this.loadConfig();
+            if (this.serverUrl) {
+                console.log(`Initializing with server: ${this.serverUrl}`);
+                await this.loadConfig();
+                console.log(`Initialized successfully with role: ${this.currentRole}`);
+            } else {
+                console.warn('No Terraphim server found. Please configure manually.');
+            }
+        } catch (error) {
+            console.error('Failed to initialize TerraphimAPI:', error);
+            throw error;
         }
     }
 
@@ -300,14 +310,44 @@ class TerraphimAPI {
      * Check if API is properly configured
      */
     isConfigured() {
-        return !!(this.serverUrl && this.config && this.currentRole);
+        const configured = !!(this.serverUrl && this.config && this.currentRole);
+        if (!configured) {
+            console.debug('API configuration check:', {
+                hasServerUrl: !!this.serverUrl,
+                hasConfig: !!this.config,
+                hasCurrentRole: !!this.currentRole,
+                serverUrl: this.serverUrl,
+                currentRole: this.currentRole
+            });
+        }
+        return configured;
     }
 }
 
 // Create singleton instance
 const terraphimAPI = new TerraphimAPI();
 
-// Auto-initialize when script loads
-terraphimAPI.initialize().catch(error => {
-    console.error('Failed to initialize TerraphimAPI:', error);
-});
+// Auto-initialize when script loads (with retry capability)
+let initializationAttempts = 0;
+const maxInitAttempts = 3;
+
+async function autoInitialize() {
+    try {
+        initializationAttempts++;
+        console.log(`TerraphimAPI initialization attempt ${initializationAttempts}/${maxInitAttempts}`);
+        await terraphimAPI.initialize();
+        console.log('TerraphimAPI auto-initialization completed successfully');
+    } catch (error) {
+        console.error(`TerraphimAPI initialization attempt ${initializationAttempts} failed:`, error);
+
+        if (initializationAttempts < maxInitAttempts) {
+            console.log(`Retrying in 2 seconds...`);
+            setTimeout(autoInitialize, 2000);
+        } else {
+            console.error('TerraphimAPI auto-initialization failed after all attempts');
+        }
+    }
+}
+
+// Start auto-initialization
+autoInitialize();
