@@ -46,7 +46,7 @@ serde_json = "1.0.104"
 toml = "0.8.6"
 async-trait = "0.1.74"
 ahash = { version = "0.8.8", features = ["serde"] }
-dirs = "5.0.0"
+dirs = "6.0.0"
 anyhow = "1"
 url = { version = "2.3.1", features = ["serde"] }
 async-once-cell = "0.5.3"

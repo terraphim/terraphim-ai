@@ -1625,15 +1625,6 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "5.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
-dependencies = [
- "dirs-sys 0.4.1",
-]
-
-[[package]]
-name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
@@ -6436,7 +6427,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b1fdf65dd6331831494dd616b30351c38e96e45921a27745cf98490458b90bb"
 dependencies = [
- "dirs 6.0.0",
+ "dirs",
 ]
 
 [[package]]
@@ -7301,7 +7292,7 @@ dependencies = [
  "anyhow",
  "async-once-cell",
  "async-trait",
- "dirs 5.0.1",
+ "dirs",
  "env_logger 0.10.2",
  "log",
  "opendal",
@@ -7564,7 +7555,7 @@ dependencies = [
  "colored",
  "comfy-table",
  "crossterm 0.27.0",
- "dirs 5.0.1",
+ "dirs",
  "futures",
  "indicatif",
  "jiff 0.1.29",
