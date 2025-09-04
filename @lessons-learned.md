@@ -1,5 +1,72 @@
 # Terraphim AI Lessons Learned
 
+## CI/CD Migration and WebKit Dependency Management (2025-09-04)
+
+### 🔧 GitHub Actions Ubuntu Package Dependencies
+
+**Critical Lesson**: Ubuntu package names change between LTS versions, requiring careful tracking of system dependencies in CI workflows.
+
+**Problem Encountered**: All GitHub Actions workflows failing with "E: Unable to locate package libwebkit2gtk-4.0-dev" on Ubuntu 24.04 runners.
+
+**Root Cause Analysis**:
+- Ubuntu 24.04 (Noble) deprecated `libwebkit2gtk-4.0-dev` in favor of `libwebkit2gtk-4.1-dev`
+- WebKit 2.4.0 → WebKit 2.4.1 major version change
+- CI workflows written for older Ubuntu versions (20.04, 22.04) broke on 24.04
+
+**Solution Pattern**:
+```yaml
+# ❌ Fails on Ubuntu 24.04
+- name: Install system dependencies
+  run: |
+    sudo apt-get install -y libwebkit2gtk-4.0-dev
+
+# ✅ Works on Ubuntu 24.04
+- name: Install system dependencies
+  run: |
+    sudo apt-get install -y libwebkit2gtk-4.1-dev
+```
+
+**Prevention Strategy**:
+1. **Version Matrix Testing**: Include Ubuntu 24.04 in CI matrix to catch package changes early
+2. **Conditional Package Installation**: Use Ubuntu version detection for version-specific packages
+3. **Regular Dependency Audits**: Quarterly review of system dependencies for deprecations
+4. **Package Alternatives**: Document fallback packages for cross-version compatibility
+
+**Impact**: Fixed 7 workflow files across the entire CI/CD pipeline, restoring comprehensive build functionality.
+
+### 🚀 GitHub Actions Workflow Architecture Patterns
+
+**Key Learning**: Reusable workflows with matrix strategies require careful separation of concerns.
+
+**Effective Architecture**:
+```yaml
+# Main orchestration workflow
+jobs:
+  build-rust:
+    uses: ./.github/workflows/rust-build.yml
+    with:
+      rust-targets: ${{ needs.setup.outputs.rust-targets }}
+
+# Reusable workflow with internal matrix
+# rust-build.yml
+jobs:
+  build:
+    strategy:
+      matrix:
+        target: ${{ fromJSON(inputs.rust-targets) }}
+```
+
+**Anti-pattern Avoided**:
+```yaml
+# ❌ Cannot use both uses: and strategy: in same job
+jobs:
+  build-rust:
+    uses: ./.github/workflows/rust-build.yml
+    strategy:  # This causes syntax error
+      matrix:
+        target: [x86_64, aarch64]
+```
+
 ## Comprehensive Clippy Warnings Resolution (2025-01-31)
 
 ### 🎯 Code Quality and Performance Optimization Strategies
