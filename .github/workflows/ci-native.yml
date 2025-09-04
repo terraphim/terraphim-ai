@@ -110,17 +110,17 @@ jobs:
 
   build-docker:
     needs: [setup, build-rust]
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'docker')
+    if: github.event_name != 'pull_request'
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: 'linux/amd64,linux/arm64,linux/arm/v7'
       ubuntu-versions: ${{ needs.setup.outputs.ubuntu-versions }}
-      push: ${{ github.event_name != 'pull_request' }}
+      push: true
       tag: ${{ github.ref_name }}
 
   build-tauri:
     needs: [setup, build-frontend]
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'tauri')
+    if: github.event_name != 'pull_request'
     uses: ./.github/workflows/tauri-build.yml
     with:
       cache-key: ${{ needs.setup.outputs.cache-key }}
