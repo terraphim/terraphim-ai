@@ -11,7 +11,7 @@ importScripts('api.js');
 // https://sebokwiki.org/wiki/Procurement_and_Acquisition
 // https://sebokwiki.org/wiki/System_Maintenance
 // https://sebokwiki.org/wiki/Maintainability_(glossary)
-importScripts('./wasm/pkg/terrraphim_automata_wasm.js');
+importScripts('./pkg/terrraphim_automata_wasm_worker.js');
 
 // Global API instance
 let api = null;
@@ -44,7 +44,7 @@ async function initializeExtension() {
 
 async function loadWasm() {
     // Initialize the WASM module
-    await wasm_bindgen('/wasm/pkg/terrraphim_automata_wasm_bg.wasm');
+    await wasm_bindgen('./pkg/terrraphim_automata_wasm_bg.wasm');
     // Call the exported functions from the WASM module
     wasm_bindgen.print_with_value('Wasm Works!');
 }
@@ -68,7 +68,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
             return;
         }
 
-        await wasm_bindgen('/wasm/pkg/terrraphim_automata_wasm_bg.wasm');
+        await wasm_bindgen('./pkg/terrraphim_automata_wasm_bg.wasm');
         var replacer_config = { patterns: [], replace_with: [], rdr: String };
 
         if (message === true) {

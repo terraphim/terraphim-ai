@@ -70,7 +70,14 @@ class TerraphimAPI {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            this.config = await response.json();
+            const data = await response.json();
+
+            // Extract the nested config from the server response
+            if (data.status === 'success' && data.config) {
+                this.config = data.config;
+            } else {
+                throw new Error('Invalid config response from server: ' + (data.error || 'Missing config data'));
+            }
 
             // Set default role if none selected
             if (!this.currentRole && this.config.roles) {
