@@ -1,8 +1,8 @@
+use axum::http::StatusCode;
 use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use terraphim_service::error::TerraphimError;
 
