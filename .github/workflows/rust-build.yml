@@ -1,0 +1,177 @@
+name: Rust Build
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: 'Rust target triple'
+        required: true
+        type: string
+      ubuntu-version:
+        description: 'Ubuntu version for build'
+        required: false
+        type: string
+        default: '22.04'
+      frontend-dist:
+        description: 'Path to frontend dist folder'
+        required: false
+        type: string
+      cache-key:
+        description: 'Cache key for dependencies'
+        required: false
+        type: string
+    outputs:
+      binary-path:
+        description: 'Path to built binary'
+        value: ${{ jobs.build.outputs.binary-path }}
+      deb-package:
+        description: 'Path to .deb package'
+        value: ${{ jobs.build.outputs.deb-package }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ubuntu:${{ inputs.ubuntu-version }}
+    outputs:
+      binary-path: ${{ steps.build.outputs.binary-path }}
+      deb-package: ${{ steps.package.outputs.deb-package }}
+
+    steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -yqq --no-install-recommends \
+            build-essential \
+            bison \
+            flex \
+            ca-certificates \
+            openssl \
+            libssl-dev \
+            bc \
+            wget \
+            git \
+            curl \
+            cmake \
+            pkg-config \
+            musl-tools \
+            musl-dev \
+            software-properties-common \
+            gpg-agent
+
+      - name: Setup cross-compilation toolchain
+        if: inputs.target != 'x86_64-unknown-linux-gnu'
+        run: |  # pragma: allowlist secret
+          case "${{ inputs.target }}" in
+            "aarch64-unknown-linux-gnu")
+              apt-get install -yqq gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+              echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
+              echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV  # pragma: allowlist secret
+              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+              ;;
+            "armv7-unknown-linux-musleabihf"|"armv7-unknown-linux-gnueabihf")
+              apt-get install -yqq gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
+              echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
+              echo "CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++" >> $GITHUB_ENV  # pragma: allowlist secret
+              echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+              ;;
+            "x86_64-unknown-linux-musl")
+              # musl-tools already installed above
+              echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
+              ;;
+          esac
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "CARGO_HOME=$HOME/.cargo" >> $GITHUB_ENV
+
+      - name: Add Rust target
+        run: |
+          rustup target add ${{ inputs.target }}
+          rustup component add clippy rustfmt
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ inputs.cache-key }}-${{ inputs.target }}-${{ inputs.ubuntu-version }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ inputs.cache-key }}-${{ inputs.target }}-${{ inputs.ubuntu-version }}-
+            ${{ inputs.cache-key }}-${{ inputs.target }}-
+
+      - name: Copy frontend dist
+        if: inputs.frontend-dist != ''
+        run: |
+          mkdir -p terraphim_server/dist
+          cp -r ${{ inputs.frontend-dist }}/* terraphim_server/dist/
+
+      - name: Build Rust project
+        id: build
+        run: |
+          # Build all main binaries
+          cargo build --release --target ${{ inputs.target }} \
+            --package terraphim_server \
+            --package terraphim_mcp_server \
+            --package terraphim_tui
+
+          # Test binaries
+          ./target/${{ inputs.target }}/release/terraphim_server --version
+          ./target/${{ inputs.target }}/release/terraphim_mcp_server --version
+          ./target/${{ inputs.target }}/release/terraphim-tui --version
+
+          echo "binary-path=target/${{ inputs.target }}/release" >> $GITHUB_OUTPUT
+
+      - name: Install cargo-deb
+        if: contains(inputs.target, 'linux') && !contains(inputs.target, 'musl')
+        run: cargo install cargo-deb
+
+      - name: Create .deb package
+        if: contains(inputs.target, 'linux') && !contains(inputs.target, 'musl')
+        id: package
+        run: |
+          # Create .deb package for terraphim_server
+          cargo deb --target ${{ inputs.target }} --package terraphim_server --no-build
+
+          # Find the generated .deb file
+          DEB_FILE=$(find target/${{ inputs.target }}/debian -name "*.deb" | head -1)
+          DEB_NAME=$(basename "$DEB_FILE")
+
+          # Create versioned filename with ubuntu version and architecture
+          ARCH=$(echo ${{ inputs.target }} | cut -d'-' -f1)
+          NEW_NAME="terraphim-server_$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "terraphim_server") | .version')_ubuntu${{ inputs.ubuntu-version }}_${ARCH}.deb"
+
+          mv "$DEB_FILE" "target/$NEW_NAME"
+
+          echo "deb-package=target/$NEW_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ inputs.target }}-ubuntu${{ inputs.ubuntu-version }}
+          path: |
+            target/${{ inputs.target }}/release/terraphim_server
+            target/${{ inputs.target }}/release/terraphim_mcp_server
+            target/${{ inputs.target }}/release/terraphim-tui
+          retention-days: 30
+
+      - name: Upload .deb package
+        if: contains(inputs.target, 'linux') && !contains(inputs.target, 'musl')
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package-${{ inputs.target }}-ubuntu${{ inputs.ubuntu-version }}
+          path: target/*.deb
+          retention-days: 30
+
+      - name: Run basic tests
+        run: |
+          cargo test --target ${{ inputs.target }} --workspace --exclude terraphim_tui
