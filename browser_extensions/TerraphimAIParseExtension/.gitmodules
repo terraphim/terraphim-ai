@@ -1,3 +1,0 @@
-[submodule "wasm"]
-	path = wasm
-	url = https://github.com/terraphim/terraphim-automata-wasm.git
