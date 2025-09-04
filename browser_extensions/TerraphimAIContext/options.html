@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Terraphim AI Context Extension - Options</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        .header {
+            border-bottom: 1px solid #e1e5e9;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #1a73e8;
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .header p {
+            color: #5f6368;
+            margin: 10px 0 0 0;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #202124;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #202124;
+            font-weight: 500;
+        }
+
+        input[type="url"], select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        input[type="url"]:focus, select:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background: white;
+            color: #1a73e8;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #f8f9fa;
+        }
+
+        button.primary {
+            background: #1a73e8;
+            color: white;
+            border-color: #1a73e8;
+        }
+
+        button.primary:hover {
+            background: #1557b0;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            color: #137333;
+        }
+
+        .status.error {
+            background: #fce8e6;
+            border: 1px solid #f9ab9d;
+            color: #d93025;
+        }
+
+        .status.info {
+            background: #e8f0fe;
+            border: 1px solid #aecbfa;
+            color: #1a73e8;
+        }
+
+        .server-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+
+        .server-info h3 {
+            margin: 0 0 10px 0;
+            color: #202124;
+        }
+
+        .server-info p {
+            margin: 5px 0;
+            color: #5f6368;
+        }
+
+        .help-text {
+            color: #5f6368;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .url-input {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Terraphim AI Context Extension</h1>
+        <p>Configure your connection to the Terraphim server for context menu search and integration features.</p>
+    </div>
+
+    <div class="section">
+        <h2>Server Configuration</h2>
+
+        <div class="form-group">
+            <label for="serverUrl">Terraphim Server URL:</label>
+            <input type="url" id="serverUrl" placeholder="http://localhost:3000">
+            <div class="help-text">Enter the URL of your Terraphim server. Leave empty to auto-discover local server.</div>
+
+            <div class="button-group">
+                <button id="testConnection">Test Connection</button>
+                <button id="autoDiscover">Auto-Discover</button>
+            </div>
+        </div>
+
+        <div id="connectionStatus" class="status"></div>
+
+        <div id="serverInfo" class="server-info" style="display: none;">
+            <h3>Connected Server Information</h3>
+            <p><strong>Status:</strong> <span id="serverStatus">-</span></p>
+            <p><strong>Available Roles:</strong> <span id="roleCount">-</span></p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Integration Settings</h2>
+
+        <div class="form-group">
+            <label for="currentRole">Active Role:</label>
+            <select id="currentRole">
+                <option value="">Loading roles...</option>
+            </select>
+            <div class="help-text">Select the role to use for searches and context menu actions.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="atomicServerUrl">Custom Atomic Server URL (optional):</label>
+            <input type="url" id="atomicServerUrl" placeholder="https://atomicserver.com" class="url-input">
+            <div class="help-text">Custom Atomic Server URL. Leave empty to use default.</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Context Menu Actions</h2>
+        <p style="color: #5f6368; font-size: 14px;">The extension provides the following context menu actions when you right-click on selected text:</p>
+        <ul style="color: #5f6368; font-size: 14px;">
+            <li><strong>Search in Terraphim AI:</strong> Search for the selected text using your configured server</li>
+            <li><strong>Add Selection to LogSeq:</strong> Quick capture to LogSeq's daily notes</li>
+            <li><strong>Add to Atomic Server:</strong> Add selected text to your Atomic Server instance</li>
+            <li><strong>Concept Refactoring:</strong> Analyze concepts (coming soon)</li>
+        </ul>
+    </div>
+
+    <div class="button-group" style="margin-top: 30px;">
+        <button id="saveSettings" class="primary">Save Settings</button>
+        <button id="resetSettings">Reset to Defaults</button>
+    </div>
+
+    <div id="saveStatus" class="status"></div>
+
+    <script src="api.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>
