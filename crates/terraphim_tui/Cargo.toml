@@ -44,7 +44,7 @@ terraphim_middleware = { path = "../terraphim_middleware" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 
 [dev-dependencies]
-serial_test = "3.0"
+serial_test = "3.2"
 futures = "0.3"
 portpicker = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
