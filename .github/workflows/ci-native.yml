@@ -81,17 +81,15 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   build-frontend:
-    runs-on: ubuntu-latest
     needs: setup
-
-    steps:
-      - uses: ./.github/workflows/frontend-build.yml
-        with:
-          node-version: '20'
-          cache-key: ${{ needs.setup.outputs.cache-key }}
+    uses: ./.github/workflows/frontend-build.yml
+    with:
+      node-version: '20'
+      cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
     needs: [setup, build-frontend, lint-and-format]
+    uses: ./.github/workflows/rust-build.yml
     strategy:
       fail-fast: false
       matrix:
@@ -103,8 +101,6 @@ jobs:
             target: "armv7-unknown-linux-gnueabihf"
           - ubuntu-version: "24.04"
             target: "x86_64-unknown-linux-musl"
-
-    uses: ./.github/workflows/rust-build.yml
     with:
       target: ${{ matrix.target }}
       ubuntu-version: ${{ matrix.ubuntu-version }}
