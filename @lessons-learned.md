@@ -21,6 +21,8 @@
 4. **Config Extraction**: Fixed API client to extract nested config: `this.config = data.config`
 5. **Dynamic URLs**: Replaced hardcoded URLs with configurable knowledge graph domains
 6. **Async Error Handling**: Added global try-catch wrapper around async message handler to prevent channel closure
+7. **API Instance Management**: Fixed duplicate API instance creation causing configuration mismatches
+8. **Dependency-Specific Error Messages**: Added clear error messages for missing Cloudflare credentials in concept mapping
 
 **Key Technical Insights**:
 - Chrome extensions have strict message size limits (~1MB)
@@ -28,6 +30,8 @@
 - DOM processing should happen client-side for large content
 - Always implement fallback mechanisms for WASM functionality
 - Async message handlers must handle all errors to prevent channel closure
+- Singleton pattern critical for consistent state across extension components
+- Configuration dependencies should have specific error messages for user guidance
 
 **Architecture Pattern**:
 ```
@@ -40,6 +44,13 @@ Content Script: Apply rules directly to DOM using TreeWalker
 chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) {
     (async () => {
         try {
+            // Check if API is initialized and configured
+            if (!api) {
+                api = terraphimAPI; // Fallback to singleton if not set
+            }
+            if (!api.isConfigured()) {
+                await api.initialize(); // Try to re-initialize
+            }
             // ... message handling code
         } catch (globalError) {
             console.error("Global message handler error:", globalError);
@@ -48,6 +59,24 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
     })();
     return true;
 });
+```
+
+**Singleton Pattern for Extensions**:
+```javascript
+// Create singleton instance
+const terraphimAPI = new TerraphimAPI();
+
+// Auto-initialize with retry logic
+async function autoInitialize() {
+    try {
+        await terraphimAPI.initialize();
+        console.log('TerraphimAPI auto-initialization completed successfully');
+    } catch (error) {
+        if (initializationAttempts < maxInitAttempts) {
+            setTimeout(autoInitialize, 2000); // Retry after 2 seconds
+        }
+    }
+}
 ```
 
 This pattern avoids large message passing, provides better performance, ensures functionality regardless of WASM compatibility issues, and prevents message channel closure errors.
