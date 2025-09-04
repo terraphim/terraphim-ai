@@ -27,7 +27,7 @@ axum-extra = "0.8.0"
 clap = { version = "4.4.18", features = ["derive"] }
 log = "0.4.14"
 portpicker = "0.1"
-reqwest = { version = "0.11.24", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 serde = { version = "1.0.149", features = ["derive"] }
 serde_json = "1.0.108"
 tokio = { version = "1.35.1", features = ["full"] }
