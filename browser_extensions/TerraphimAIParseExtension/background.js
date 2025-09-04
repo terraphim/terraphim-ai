@@ -120,9 +120,10 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
 
                 console.log("Thesaurus loaded:", Object.keys(thesaurus).length, "terms");
 
-                // Build replacement map instead of processing full content
-                const replacementMap = {};
-                for (const [key, nterm] of Object.entries(thesaurus)) {
+                // Prepare WASM replacer config with input content
+                const patterns = Object.keys(thesaurus);
+                const replace_with = patterns.map(key => {
+                    const nterm = thesaurus[key];
                     let link_string;
                     if (wikiLinkMode === 1) {
                         link_string = `${key} [[${nterm}]]`;
@@ -133,18 +134,50 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
                         const termId = btoa(nterm).replace(/[+/=]/g, '').substring(0, 8);
                         link_string = `<a id="${termId}" href="${kgDomain}${encodeURIComponent(nterm)}" target="_blank">${key}</a>`;
                     }
-                    replacementMap[key] = link_string;
-                }
-
-                console.log("Replacement map prepared with", Object.keys(replacementMap).length, "patterns");
-
-                // Send replacement map to content script instead of processed HTML
-                senderResponse({
-                    data: {
-                        replacementMap: replacementMap,
-                        wikiLinkMode: wikiLinkMode
-                    }
+                    return link_string;
                 });
+
+                // Get the HTML content to process
+                const htmlContent = message.tab_html;
+                console.log("Processing content with WASM using", patterns.length, "patterns");
+
+                try {
+                    // Prepare config for WASM processing
+                    const wasmConfig = {
+                        patterns: patterns,
+                        replace_with: replace_with,
+                        content: htmlContent
+                    };
+
+                    // Use WASM to process the HTML content
+                    const processedContent = wasm_bindgen.replace_all_stream(wasmConfig);
+
+                    console.log("WASM processing completed successfully");
+
+                    // Send processed content to client
+                    senderResponse({
+                        data: {
+                            processedContent: processedContent,
+                            wikiLinkMode: wikiLinkMode
+                        }
+                    });
+                } catch (wasmError) {
+                    console.error("WASM processing failed:", wasmError);
+                    console.log("Falling back to replacement map method");
+
+                    // Fallback to replacement map if WASM fails
+                    const replacementMap = {};
+                    patterns.forEach((pattern, index) => {
+                        replacementMap[pattern] = replace_with[index];
+                    });
+
+                    senderResponse({
+                        data: {
+                            replacementMap: replacementMap,
+                            wikiLinkMode: wikiLinkMode
+                        }
+                    });
+                }
 
             } catch (error) {
                 console.error("Parse error:", error);

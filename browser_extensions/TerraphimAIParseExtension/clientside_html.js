@@ -12,14 +12,24 @@
             tab_html: tab_html
         });
 
-        if (response && response.data && response.data.replacementMap) {
-            console.log('Terraphim: Applying replacements to page...');
+        if (response && response.data) {
+            if (response.data.processedContent) {
+                console.log('Terraphim: Applying WASM-processed content to page...');
 
-            // Apply replacements directly to DOM
-            const replacementMap = response.data.replacementMap;
-            applyReplacements(replacementMap);
+                // Replace the entire body content with WASM-processed HTML
+                document.body.innerHTML = response.data.processedContent;
 
-            console.log('Terraphim: Page parsing completed successfully');
+                console.log('Terraphim: Page parsing completed successfully with WASM processing');
+            } else if (response.data.replacementMap) {
+                console.log('Terraphim: WASM processing failed, using fallback replacement method...');
+
+                // Apply replacements using the fallback JavaScript method
+                applyReplacements(response.data.replacementMap);
+
+                console.log('Terraphim: Page parsing completed with fallback method');
+            } else {
+                console.warn('Terraphim: No valid data in response');
+            }
         } else if (response && response.error) {
             console.error('Terraphim: Parse error:', response.error);
         } else {
@@ -30,6 +40,9 @@
     }
 
     function applyReplacements(replacementMap) {
+        console.log('Applying replacements with', Object.keys(replacementMap).length, 'patterns');
+        console.log('Sample patterns:', Object.keys(replacementMap).slice(0, 5));
+
         // Create a TreeWalker to process text nodes
         const walker = document.createTreeWalker(
             document.body,
@@ -52,24 +65,72 @@
             textNodes.push(node);
         }
 
-        // Process each text node
+        // Process each text node individually to avoid recursive replacements
         textNodes.forEach(textNode => {
-            let content = textNode.textContent;
-            let modified = false;
+            // Skip already processed nodes (marked with terraphim-processed class)
+            if (textNode.parentNode.classList && textNode.parentNode.classList.contains('terraphim-processed')) {
+                return;
+            }
 
-            // Apply each replacement
+            const originalContent = textNode.textContent;
+            let content = originalContent;
+            let replacements = [];
+
+            // First, find all matches without applying replacements yet
             for (const [pattern, replacement] of Object.entries(replacementMap)) {
-                const regex = new RegExp(escapeRegExp(pattern), 'g');
-                if (regex.test(content)) {
-                    content = content.replace(regex, replacement);
-                    modified = true;
+                try {
+                    const regexPattern = `\\b${escapeRegExp(pattern)}\\b`;
+                    const regex = new RegExp(regexPattern, 'gi');
+                    let match;
+
+                    while ((match = regex.exec(originalContent)) !== null) {
+                        replacements.push({
+                            start: match.index,
+                            end: match.index + match[0].length,
+                            original: match[0],
+                            replacement: replacement,
+                            pattern: pattern
+                        });
+                    }
+                } catch (regexError) {
+                    console.warn('Regex failed for pattern:', pattern, regexError);
                 }
             }
 
-            // If content was modified, replace the text node with HTML
-            if (modified) {
+            // Sort replacements by position (earliest first) and remove overlaps
+            replacements.sort((a, b) => a.start - b.start);
+            const filteredReplacements = [];
+            let lastEnd = -1;
+
+            for (const replacement of replacements) {
+                if (replacement.start >= lastEnd) {
+                    filteredReplacements.push(replacement);
+                    lastEnd = replacement.end;
+                }
+            }
+
+            // Apply replacements if any were found
+            if (filteredReplacements.length > 0) {
+                console.log('Applying', filteredReplacements.length, 'replacements to text node');
+
+                // Build new content with replacements
+                let newContent = '';
+                let lastPos = 0;
+
+                for (const repl of filteredReplacements) {
+                    // Add text before replacement
+                    newContent += originalContent.substring(lastPos, repl.start);
+                    // Add replacement
+                    newContent += repl.replacement;
+                    lastPos = repl.end;
+                }
+                // Add remaining text
+                newContent += originalContent.substring(lastPos);
+
+                // Create wrapper and mark as processed
                 const wrapper = document.createElement('span');
-                wrapper.innerHTML = content;
+                wrapper.className = 'terraphim-processed';
+                wrapper.innerHTML = newContent;
                 textNode.parentNode.replaceChild(wrapper, textNode);
             }
         });
