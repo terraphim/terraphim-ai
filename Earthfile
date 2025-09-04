@@ -40,7 +40,7 @@ build-all:
   BUILD +build # x86_64-unknown-linux-gnu (main build working ✅)
   # TODO: Fix OpenSSL cross-compilation issues for musl targets
   # BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
-  # BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf  
+  # BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
   # BUILD +cross-build --TARGET=aarch64-unknown-linux-musl
   # Errors
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
@@ -278,7 +278,7 @@ docker-native:
 
 docker-musl:
   FROM alpine:3.18
-  # You can pass multiple tags, space separated  
+  # You can pass multiple tags, space separated
   # TODO: Re-enable once OpenDAL->reqsign OpenSSL issue is resolved
   # ARG tags="ghcr.io/applied-knowledge-systems/terraphim-server:latest"
   # ARG --required TARGET

@@ -128,12 +128,12 @@ export class NovelAutocompleteService {
       } else {
         // Ensure server port is detected before testing REST API
         await this.detectServerPort();
-        
+
         // Test the REST API autocomplete endpoint
         const testQuery = 'test';
         const encodedRole = encodeURIComponent(this.currentRole);
         const encodedQuery = encodeURIComponent(testQuery);
-        
+
         const response = await fetch(`${this.baseUrl}/autocomplete/${encodedRole}/${encodedQuery}`, {
           method: 'GET',
           signal: AbortSignal.timeout(5000) // 5 second timeout
@@ -142,7 +142,7 @@ export class NovelAutocompleteService {
         if (response.ok) {
           const result = await response.json();
           console.log('REST API autocomplete test response:', result);
-          
+
           if (result.status === 'success') {
             this.autocompleteIndexBuilt = true;
             this.connectionRetries = 0;
@@ -150,7 +150,7 @@ export class NovelAutocompleteService {
             return true;
           }
         }
-        
+
         console.warn('REST API autocomplete test failed:', response.status, response.statusText);
         return false;
       }
@@ -281,7 +281,7 @@ export class NovelAutocompleteService {
   private async getRestApiSuggestions(query: string, limit: number): Promise<NovelAutocompleteSuggestion[]> {
     // Ensure server port is detected before making REST API requests
     await this.detectServerPort();
-    
+
     const encodedRole = encodeURIComponent(this.currentRole);
     const encodedQuery = encodeURIComponent(query.trim());
 
@@ -407,7 +407,7 @@ export class NovelAutocompleteService {
       } else {
         // Ensure server port is detected before testing connection
         await this.detectServerPort();
-        
+
         const response = await fetch(`${this.baseUrl}/health`, {
           method: 'GET',
           signal: AbortSignal.timeout(3000)
