@@ -64,7 +64,7 @@ tokio = { version = "1.35.1", features = ["full"] }
 terraphim_tui = { path = "../crates/terraphim_tui", version = "0.1.0" }
 
 [build-dependencies]
-static-files = "0.2"
+static-files = "0.3"
 walkdir = "2"
 dircpy = "0.3.15"
 
