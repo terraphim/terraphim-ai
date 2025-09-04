@@ -12,9 +12,13 @@
             tab_html: tab_html
         });
 
-        if (response && response.data && response.data.return_text) {
-            // Replace the body content with processed HTML
-            document.body.innerHTML = response.data.return_text;
+        if (response && response.data && response.data.replacementMap) {
+            console.log('Terraphim: Applying replacements to page...');
+
+            // Apply replacements directly to DOM
+            const replacementMap = response.data.replacementMap;
+            applyReplacements(replacementMap);
+
             console.log('Terraphim: Page parsing completed successfully');
         } else if (response && response.error) {
             console.error('Terraphim: Parse error:', response.error);
@@ -23,6 +27,56 @@
         }
     } catch (error) {
         console.error('Terraphim: Client-side error:', error);
+    }
+
+    function applyReplacements(replacementMap) {
+        // Create a TreeWalker to process text nodes
+        const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: function(node) {
+                    // Skip script and style elements
+                    if (node.parentNode.tagName === 'SCRIPT' ||
+                        node.parentNode.tagName === 'STYLE') {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            }
+        );
+
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+            textNodes.push(node);
+        }
+
+        // Process each text node
+        textNodes.forEach(textNode => {
+            let content = textNode.textContent;
+            let modified = false;
+
+            // Apply each replacement
+            for (const [pattern, replacement] of Object.entries(replacementMap)) {
+                const regex = new RegExp(escapeRegExp(pattern), 'g');
+                if (regex.test(content)) {
+                    content = content.replace(regex, replacement);
+                    modified = true;
+                }
+            }
+
+            // If content was modified, replace the text node with HTML
+            if (modified) {
+                const wrapper = document.createElement('span');
+                wrapper.innerHTML = content;
+                textNode.parentNode.replaceChild(wrapper, textNode);
+            }
+        });
+    }
+
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 }
 )();

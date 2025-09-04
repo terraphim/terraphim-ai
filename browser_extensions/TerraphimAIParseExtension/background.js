@@ -61,15 +61,16 @@ function setupContextMenu() {
 
 chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) {
     (async () => {
-        if (!api || !api.isConfigured()) {
-            senderResponse({
-                error: "Extension not configured. Please configure server settings in options."
-            });
-            return;
-        }
+        try {
+            if (!api || !api.isConfigured()) {
+                senderResponse({
+                    error: "Extension not configured. Please configure server settings in options."
+                });
+                return;
+            }
 
-        await wasm_bindgen('./pkg/terrraphim_automata_wasm_bg.wasm');
-        var replacer_config = { patterns: [], replace_with: [], rdr: String };
+            await wasm_bindgen('./pkg/terrraphim_automata_wasm_bg.wasm');
+            var replacer_config = { patterns: [], replace_with: [], rdr: String };
 
         if (message === true) {
             console.log("Received message from clientside.js");
@@ -89,9 +90,9 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
 
                 console.log("Thesaurus loaded:", Object.keys(thesaurus).length, "terms");
 
+                // Build replacement map instead of processing full content
+                const replacementMap = {};
                 for (const [key, nterm] of Object.entries(thesaurus)) {
-                    replacer_config.patterns.push(key);
-
                     let link_string;
                     if (wikiLinkMode === 1) {
                         link_string = `${key} [[${nterm}]]`;
@@ -102,16 +103,18 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
                         const termId = btoa(nterm).replace(/[+/=]/g, '').substring(0, 8);
                         link_string = `<a id="${termId}" href="${kgDomain}${encodeURIComponent(nterm)}" target="_blank">${key}</a>`;
                     }
-
-                    replacer_config.replace_with.push(link_string);
+                    replacementMap[key] = link_string;
                 }
 
-                replacer_config.rdr = message.tab_html;
-                console.log("Replacer config prepared with", replacer_config.patterns.length, "patterns");
+                console.log("Replacement map prepared with", Object.keys(replacementMap).length, "patterns");
 
-                var return_text = wasm_bindgen.replace_all_stream(replacer_config);
-                console.log("Text processing complete");
-                senderResponse({ data: { "replacer_config": replacer_config, return_text: return_text } });
+                // Send replacement map to content script instead of processed HTML
+                senderResponse({
+                    data: {
+                        replacementMap: replacementMap,
+                        wikiLinkMode: wikiLinkMode
+                    }
+                });
 
             } catch (error) {
                 console.error("Parse error:", error);
@@ -138,6 +141,10 @@ chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) 
         } else {
             senderResponse({ data: "No data" });
         }
+    } catch (globalError) {
+        console.error("Global message handler error:", globalError);
+        senderResponse({ error: "Message handler failed: " + globalError.message });
+    }
     })();
     return true;
 });
