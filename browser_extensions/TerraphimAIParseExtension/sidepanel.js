@@ -19,21 +19,37 @@ const words = {
     "A UI surface which appears when an extension's action icon is clicked."
 };
 
-const ACCOUNT_ID= "4a345f44f6a673abdaf28eea80da7588";
-const API_TOKEN = "9bESRMSddpZngQ2QDGtHInEm522ITD1XPT9bAVBg"
-async function run(model, input) {
-  const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/${model}`;
-  console.log("URL", url);
-  const response = await fetch(
-  url,
-  {
-  headers: { Authorization: `Bearer ${API_TOKEN}` },
-  method: "POST",
-  body: JSON.stringify(input),
+async function getCloudflareCredentials() {
+  const stored = await chrome.storage.sync.get(['cloudflareAccountId', 'cloudflareApiToken']);
+
+  if (!stored.cloudflareAccountId || !stored.cloudflareApiToken) {
+    throw new Error('Cloudflare credentials not configured. Please set them in the extension options.');
   }
-);
-  const result = await response.json();
-return result;
+
+  return {
+    accountId: stored.cloudflareAccountId,
+    apiToken: stored.cloudflareApiToken
+  };
+}
+
+async function run(model, input) {
+  try {
+    const credentials = await getCloudflareCredentials();
+    const url = `https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/ai/run/${model}`;
+    console.log("URL", url);
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${credentials.apiToken}` },
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Cloudflare API error:', error);
+    throw error;
+  }
 }
 
 

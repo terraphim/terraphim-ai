@@ -30,7 +30,12 @@ class OptionsPage {
             saveSettings: document.getElementById('saveSettings'),
             resetSettings: document.getElementById('resetSettings'),
             saveStatus: document.getElementById('saveStatus'),
-            wikiLinkModes: document.querySelectorAll('input[name="wikiLinkMode"]')
+            wikiLinkModes: document.querySelectorAll('input[name="wikiLinkMode"]'),
+            cloudflareAccountId: document.getElementById('cloudflareAccountId'),
+            cloudflareApiToken: document.getElementById('cloudflareApiToken'),
+            testCloudflareConnection: document.getElementById('testCloudflareConnection'),
+            clearCloudflareCredentials: document.getElementById('clearCloudflareCredentials'),
+            cloudflareStatus: document.getElementById('cloudflareStatus')
         };
     }
 
@@ -40,6 +45,8 @@ class OptionsPage {
         this.elements.saveSettings.addEventListener('click', () => this.saveSettings());
         this.elements.resetSettings.addEventListener('click', () => this.resetSettings());
         this.elements.currentRole.addEventListener('change', () => this.onRoleChanged());
+        this.elements.testCloudflareConnection.addEventListener('click', () => this.testCloudflareConnection());
+        this.elements.clearCloudflareCredentials.addEventListener('click', () => this.clearCloudflareCredentials());
 
         // Auto-test connection when URL changes
         this.elements.serverUrl.addEventListener('blur', () => {
@@ -55,12 +62,22 @@ class OptionsPage {
             const stored = await chrome.storage.sync.get([
                 'serverUrl',
                 'currentRole',
-                'wikiLinkMode'
+                'wikiLinkMode',
+                'cloudflareAccountId',
+                'cloudflareApiToken'
             ]);
 
             // Set form values
             if (stored.serverUrl) {
                 this.elements.serverUrl.value = stored.serverUrl;
+            }
+
+            // Set Cloudflare credentials
+            if (stored.cloudflareAccountId) {
+                this.elements.cloudflareAccountId.value = stored.cloudflareAccountId;
+            }
+            if (stored.cloudflareApiToken) {
+                this.elements.cloudflareApiToken.value = stored.cloudflareApiToken;
             }
 
             // Set wiki link mode (default to 0)
@@ -221,7 +238,9 @@ class OptionsPage {
             const settings = {
                 serverUrl: this.elements.serverUrl.value.trim(),
                 currentRole: this.elements.currentRole.value,
-                wikiLinkMode: document.querySelector('input[name="wikiLinkMode"]:checked')?.value || '0'
+                wikiLinkMode: document.querySelector('input[name="wikiLinkMode"]:checked')?.value || '0',
+                cloudflareAccountId: this.elements.cloudflareAccountId.value.trim(),
+                cloudflareApiToken: this.elements.cloudflareApiToken.value.trim()
             };
 
             // Save to Chrome storage
@@ -259,6 +278,8 @@ class OptionsPage {
                 // Reset form
                 this.elements.serverUrl.value = '';
                 this.elements.currentRole.value = '';
+                this.elements.cloudflareAccountId.value = '';
+                this.elements.cloudflareApiToken.value = '';
                 document.querySelector('input[name="wikiLinkMode"][value="0"]').checked = true;
 
                 // Reset API
@@ -277,6 +298,82 @@ class OptionsPage {
                 console.error('Failed to reset settings:', error);
                 this.showStatus('error', 'Failed to reset settings: ' + error.message);
             }
+        }
+    }
+
+    async testCloudflareConnection() {
+        const accountId = this.elements.cloudflareAccountId.value.trim();
+        const apiToken = this.elements.cloudflareApiToken.value.trim();
+
+        if (!accountId || !apiToken) {
+            this.showCloudflareStatus('error', 'Please enter both Account ID and API Token');
+            return;
+        }
+
+        this.showCloudflareStatus('info', 'Testing Cloudflare API connection...');
+        this.elements.testCloudflareConnection.disabled = true;
+
+        try {
+            // Test with a simple AI model call
+            const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/m2m100-1.2b`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: "test",
+                    source_lang: "english",
+                    target_lang: "spanish"
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    this.showCloudflareStatus('success', 'Cloudflare API connection successful!');
+                } else {
+                    this.showCloudflareStatus('error', 'API call failed: ' + (result.errors?.[0]?.message || 'Unknown error'));
+                }
+            } else {
+                this.showCloudflareStatus('error', `HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Cloudflare API test failed:', error);
+            this.showCloudflareStatus('error', 'Connection failed: ' + error.message);
+        } finally {
+            this.elements.testCloudflareConnection.disabled = false;
+        }
+    }
+
+    async clearCloudflareCredentials() {
+        if (confirm('Are you sure you want to clear your Cloudflare credentials?')) {
+            try {
+                // Clear from storage
+                await chrome.storage.sync.remove(['cloudflareAccountId', 'cloudflareApiToken']);
+
+                // Clear form fields
+                this.elements.cloudflareAccountId.value = '';
+                this.elements.cloudflareApiToken.value = '';
+
+                this.showCloudflareStatus('success', 'Cloudflare credentials cleared');
+            } catch (error) {
+                console.error('Failed to clear credentials:', error);
+                this.showCloudflareStatus('error', 'Failed to clear credentials: ' + error.message);
+            }
+        }
+    }
+
+    showCloudflareStatus(type, message) {
+        this.elements.cloudflareStatus.className = `status ${type}`;
+        this.elements.cloudflareStatus.textContent = message;
+        this.elements.cloudflareStatus.style.display = 'block';
+
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                this.elements.cloudflareStatus.style.display = 'none';
+            }, 5000);
         }
     }
 

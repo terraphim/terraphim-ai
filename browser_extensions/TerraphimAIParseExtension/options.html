@@ -49,7 +49,7 @@
             font-weight: 500;
         }
 
-        input[type="url"], select {
+        input[type="url"], input[type="password"], select {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid #dadce0;
@@ -58,7 +58,7 @@
             box-sizing: border-box;
         }
 
-        input[type="url"]:focus, select:focus {
+        input[type="url"]:focus, input[type="password"]:focus, select:focus {
             outline: none;
             border-color: #1a73e8;
             box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
@@ -189,6 +189,29 @@
             <p><strong>Status:</strong> <span id="serverStatus">-</span></p>
             <p><strong>Available Roles:</strong> <span id="roleCount">-</span></p>
         </div>
+    </div>
+
+    <div class="section">
+        <h2>Cloudflare API Settings</h2>
+
+        <div class="form-group">
+            <label for="cloudflareAccountId">Cloudflare Account ID:</label>
+            <input type="password" id="cloudflareAccountId" placeholder="Enter your Cloudflare Account ID">
+            <div class="help-text">Your Cloudflare Account ID for AI API access. This will be stored securely in your browser.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="cloudflareApiToken">Cloudflare API Token:</label>
+            <input type="password" id="cloudflareApiToken" placeholder="Enter your Cloudflare API Token">
+            <div class="help-text">Your Cloudflare API Token with AI:Read permissions. This will be stored securely in your browser.</div>
+        </div>
+
+        <div class="button-group">
+            <button id="testCloudflareConnection">Test Cloudflare API</button>
+            <button id="clearCloudflareCredentials" style="background: #d93025; color: white; border-color: #d93025;">Clear Credentials</button>
+        </div>
+
+        <div id="cloudflareStatus" class="status"></div>
     </div>
 
     <div class="section">
