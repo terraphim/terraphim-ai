@@ -173,6 +173,7 @@ jobs:
       ubuntu-versions: ${{ needs.setup.outputs.ubuntu-versions }}
       push: ${{ github.event_name != 'pull_request' }}
       tag: ${{ github.ref_name }}
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
     secrets: inherit  # pragma: allowlist secret
 
   package-debs:
