@@ -12,7 +12,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
+        include:
+          - platform: macos-latest
+            webkit-package: ""
+          - platform: ubuntu-20.04
+            webkit-package: "libwebkit2gtk-4.0-dev"
+          - platform: ubuntu-22.04
+            webkit-package: "libwebkit2gtk-4.1-dev"
+          - platform: ubuntu-24.04
+            webkit-package: "libwebkit2gtk-4.1-dev"
+          - platform: windows-latest
+            webkit-package: ""
     env:
       working-directory: ./desktop
 
@@ -29,10 +39,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-20.04'
+        if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} libayatana-appindicator3-dev librsvg2-dev pkg-config
 
       - name: install frontend dependencies
         run: yarn install # change this to npm or pnpm depending on which one you use
