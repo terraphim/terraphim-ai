@@ -17,7 +17,7 @@ dotenvy = "0.15.7"
 url = { version = "2.5.4", features = ["serde"] }
 ed25519-dalek = "1.0"
 thiserror = "2.0.12"
-rand_core = "0.5"
+rand_core = "0.9"
 serde_jcs = "0.1.0"
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }

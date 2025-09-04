@@ -7229,7 +7229,7 @@ dependencies = [
  "hex",
  "jiff 0.2.15",
  "js-sys",
- "rand_core 0.5.1",
+ "rand_core 0.9.3",
  "reqwest 0.12.23",
  "serde",
  "serde-wasm-bindgen 0.6.5",
