@@ -19,7 +19,7 @@ ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"
 itertools = "0.11.0"
 lazy_static = "1.4.0"
-log = "0.4.20"
+log = "0.4.28"
 memoize = "0.4.0"
 regex = "1.8.3"
 serde = { version = "1.0.192", features = ["derive"] }
