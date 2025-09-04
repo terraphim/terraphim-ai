@@ -198,46 +198,47 @@ jobs:
             desktop/src-tauri/target/release/bundle/msi/*.msi
             desktop/src-tauri/target/release/bundle/nsis/*.exe
 
-  build-docker:
-    name: Build and push Docker images
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Earthly
-        run: |
-          sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract version from tag
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          else
-            echo "version=latest" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build and push Docker images
-        run: |
-          earthly --push +docker-all
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+  # Disabled: Earthly-based Docker build - replaced by docker-multiarch.yml
+  # build-docker:
+  #   name: Build and push Docker images
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install Earthly
+  #       run: |
+  #         sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
+  #
+  #     - name: Login to GitHub Container Registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #
+  #     - name: Extract version from tag
+  #       id: version
+  #       run: |
+  #         if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+  #           VERSION=${GITHUB_REF#refs/tags/}
+  #           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+  #         else
+  #           echo "version=latest" >> $GITHUB_OUTPUT
+  #         fi
+  #
+  #     - name: Build and push Docker images
+  #       run: |
+  #         earthly --push +docker-all
+  #       env:
+  #         VERSION: ${{ steps.version.outputs.version }}
 
   create-release:
     name: Create GitHub release
-    needs: [build-binaries, build-debian-packages, build-tauri-desktop, build-docker]
+    needs: [build-binaries, build-debian-packages, build-tauri-desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: write
