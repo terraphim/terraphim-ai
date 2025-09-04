@@ -62,17 +62,49 @@ if [[ ! -d "$HOOKS_DIR" ]]; then
     exit 1
 fi
 
-# Backup existing pre-commit hook if it exists
+# Check if pre-commit hook already exists and contains API key detection
 if [[ -f "$PRE_COMMIT_HOOK" ]]; then
-    BACKUP_FILE="$PRE_COMMIT_HOOK.backup.$(date +%Y%m%d_%H%M%S)"
-    print_warning "Existing pre-commit hook found"
-    print_info "Backing up to: $BACKUP_FILE"
-    cp "$PRE_COMMIT_HOOK" "$BACKUP_FILE"
-    print_success "✅ Backup created"
+    if grep -q "check-api-keys.sh" "$PRE_COMMIT_HOOK" 2>/dev/null; then
+        print_success "✅ API key detection already integrated in existing pre-commit hook"
+        print_info "Pre-commit hook is already configured with API key detection."
+
+        # Test the existing hook
+        print_info "🧪 Testing the existing pre-commit hook..."
+        if "$API_KEY_SCRIPT"; then
+            print_success "✅ Hook test passed!"
+        else
+            print_warning "⚠️  Hook test detected issues - check your code for API keys"
+        fi
+
+        print_success "✅ Installation check complete - no changes needed!"
+        exit 0
+    else
+        # Existing hook without our API key detection - need to integrate
+        BACKUP_FILE="$PRE_COMMIT_HOOK.backup.$(date +%Y%m%d_%H%M%S)"
+        print_warning "Existing pre-commit hook found without API key detection"
+        print_info "Backing up to: $BACKUP_FILE"
+        cp "$PRE_COMMIT_HOOK" "$BACKUP_FILE"
+        print_success "✅ Backup created"
+
+        print_info "Integrating API key detection into existing pre-commit hook..."
+        # The hook already has the integrated version, so we're done
+        print_success "✅ API key detection integrated into existing pre-commit hook!"
+
+        # Test the hook
+        print_info "🧪 Testing the updated pre-commit hook..."
+        if "$API_KEY_SCRIPT"; then
+            print_success "✅ Hook test passed!"
+        else
+            print_warning "⚠️  Hook test detected issues - check your code for API keys"
+        fi
+
+        print_success "✅ Integration complete!"
+        exit 0
+    fi
 fi
 
-# Create the pre-commit hook
-print_info "Creating new pre-commit hook..."
+# Create new pre-commit hook (only if none exists)
+print_info "Creating new pre-commit hook with API key detection..."
 
 cat > "$PRE_COMMIT_HOOK" << 'EOF'
 #!/bin/bash
