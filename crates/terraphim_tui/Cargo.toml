@@ -12,7 +12,7 @@ repl-mcp = ["repl"]   # MCP tools integration
 
 [dependencies]
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 ratatui = "0.28"

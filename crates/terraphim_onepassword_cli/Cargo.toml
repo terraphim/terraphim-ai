@@ -18,7 +18,7 @@ async = ["tokio"]
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "process", "time"], optional = true }
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 anyhow = "1.0"
 
 # JSON handling
