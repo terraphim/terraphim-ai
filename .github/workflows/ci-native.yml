@@ -90,20 +90,9 @@ jobs:
   build-rust:
     needs: [setup, build-frontend, lint-and-format]
     uses: ./.github/workflows/rust-build.yml
-    strategy:
-      fail-fast: false
-      matrix:
-        target: ${{ fromJSON(needs.setup.outputs.rust-targets) }}
-        ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
-        # Exclude some combinations to reduce CI time for non-release builds
-        exclude:
-          - ubuntu-version: "18.04"
-            target: "armv7-unknown-linux-gnueabihf"
-          - ubuntu-version: "24.04"
-            target: "x86_64-unknown-linux-musl"
     with:
-      target: ${{ matrix.target }}
-      ubuntu-version: ${{ matrix.ubuntu-version }}
+      rust-targets: ${{ needs.setup.outputs.rust-targets }}
+      ubuntu-versions: ${{ needs.setup.outputs.ubuntu-versions }}
       frontend-dist: desktop/dist
       cache-key: ${{ needs.setup.outputs.cache-key }}
 

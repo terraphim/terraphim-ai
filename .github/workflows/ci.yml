@@ -1,13 +1,14 @@
-name: CI
+name: CI (Earthly - DISABLED)
 
-on:
-  push:
-    branches: [main]
-    tags:
-      - "*.*.*"
-  pull_request:
-    types: [opened, synchronize]
-  workflow_dispatch:
+# Temporarily disabled during CI migration to GitHub Actions
+# on:
+#   push:
+#     branches: [main]
+#     tags:
+#       - "*.*.*"
+#   pull_request:
+#     types: [opened, synchronize]
+#   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
