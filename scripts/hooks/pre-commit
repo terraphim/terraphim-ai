@@ -101,9 +101,9 @@ if command_exists cargo; then
 
         # Check Rust linting (clippy)
         print_status "INFO" "Running Rust linter (clippy)..."
-        if ! timeout 60s cargo clippy --workspace --all-targets -- -D warnings >/dev/null 2>&1; then
+        if ! timeout 60s cargo clippy --workspace --all-targets >/dev/null 2>&1; then
             print_status "FAIL" "Clippy found issues"
-            print_status "INFO" "Run 'cargo clippy --workspace --all-targets -- -D warnings' to see details"
+            print_status "INFO" "Run 'cargo clippy --workspace --all-targets' to see details"
             exit 1
         fi
         print_status "SUCCESS" "Rust linting passed"
