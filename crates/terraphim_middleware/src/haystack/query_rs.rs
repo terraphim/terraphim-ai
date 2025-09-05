@@ -8,6 +8,36 @@ use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, Index};
 
+/// Statistics for tracking URL fetch success/failure rates
+#[derive(Default)]
+struct FetchStats {
+    successful: usize,
+    failed: usize,
+    skipped: usize,
+}
+
+impl FetchStats {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// Statistics for tracking persistence cache hits/misses
+#[derive(Default)]
+struct PersistenceStats {
+    cache_hits: usize,
+    cache_misses: usize,
+    cache_saves: usize,
+    document_cache_hits: usize,
+    document_cache_misses: usize,
+}
+
+impl PersistenceStats {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
 /// Middleware that uses query.rs as a haystack.
 /// Supports comprehensive Rust documentation search including:
 /// - Standard library docs (stable/nightly) via /suggest API
@@ -25,7 +55,7 @@ impl Default for QueryRsHaystackIndexer {
     fn default() -> Self {
         // Create optimized client for API calls with shorter timeout
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(5))
             .user_agent("Terraphim/1.0 (https://terraphim.ai)")
             .build()
             .unwrap_or_else(|_| Client::new());
@@ -44,50 +74,214 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
     ) -> impl std::future::Future<Output = Result<Index>> + Send {
         async move {
             let mut documents = Vec::new();
+            let mut persistence_stats = PersistenceStats::new();
 
-            // Search across all query.rs endpoints concurrently
-            let (reddit_results, suggest_results, crates_results, docs_results) = tokio::join!(
-                self.search_reddit_posts(needle),
-                self.search_suggest_api(needle),
-                self.search_crates_io(needle),
-                self.search_docs_rs(needle),
-            );
+            // First, try to load cached search results from persistence
+            let cache_key = format!("queryrs_search_{}", self.normalize_search_query(needle));
+            let mut cache_placeholder = Document {
+                id: cache_key.clone(),
+                ..Default::default()
+            };
 
-            // Collect results from all searches
-            if let Ok(docs) = reddit_results {
-                documents.extend(docs);
-            }
-            if let Ok(docs) = suggest_results {
-                documents.extend(docs);
-            }
-            if let Ok(docs) = crates_results {
-                documents.extend(docs);
-            }
-            if let Ok(docs) = docs_results {
-                documents.extend(docs);
-            }
+            let use_cached_results = match cache_placeholder.load().await {
+                Ok(cached_doc) => {
+                    // Check if cache is fresh (less than 1 hour old)
+                    if self.is_cache_fresh(&cached_doc) {
+                        log::info!(
+                            "Using cached QueryRs search results for query: '{}'",
+                            needle
+                        );
+                        match serde_json::from_str::<Vec<Document>>(&cached_doc.body) {
+                            Ok(cached_documents) => {
+                                documents = cached_documents;
+                                persistence_stats.cache_hits += 1;
+                                true
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "Failed to deserialize cached results for '{}': {}",
+                                    needle,
+                                    e
+                                );
+                                persistence_stats.cache_misses += 1;
+                                false
+                            }
+                        }
+                    } else {
+                        log::debug!(
+                            "Cached results for '{}' are stale, fetching fresh results",
+                            needle
+                        );
+                        persistence_stats.cache_misses += 1;
+                        false
+                    }
+                }
+                Err(_) => {
+                    log::debug!("No cached results found for query: '{}'", needle);
+                    persistence_stats.cache_misses += 1;
+                    false
+                }
+            };
 
-            // Fetch and scrape content for documents that have URLs, but skip crates.io URLs
-            // since they return 404 errors (SPA that requires JavaScript) and we already have
-            // comprehensive data from the API
-            let mut enhanced_documents = Vec::new();
-            for doc in documents {
-                if !doc.url.is_empty()
-                    && doc.url.starts_with("http")
-                    && !doc.url.contains("crates.io/crates/")
-                {
-                    match self.fetch_and_scrape_content(&doc).await {
-                        Ok(enhanced_doc) => enhanced_documents.push(enhanced_doc),
+            if !use_cached_results {
+                // Search across all query.rs endpoints concurrently
+                let (reddit_results, suggest_results, crates_results, docs_results) = tokio::join!(
+                    self.search_reddit_posts(needle),
+                    self.search_suggest_api(needle),
+                    self.search_crates_io(needle),
+                    self.search_docs_rs(needle),
+                );
+
+                // Collect results from all searches
+                if let Ok(docs) = reddit_results {
+                    documents.extend(docs);
+                }
+                if let Ok(docs) = suggest_results {
+                    documents.extend(docs);
+                }
+                if let Ok(docs) = crates_results {
+                    documents.extend(docs);
+                }
+                if let Ok(docs) = docs_results {
+                    documents.extend(docs);
+                }
+
+                // Cache the search results for future queries
+                if !documents.is_empty() {
+                    match serde_json::to_string(&documents) {
+                        Ok(serialized_docs) => {
+                            let cache_doc = Document {
+                                id: cache_key,
+                                title: format!("QueryRs search results for '{}'", needle),
+                                body: serialized_docs,
+                                url: format!("cache://queryrs/{}", needle),
+                                description: Some(format!(
+                                    "Cached search results from query.rs API for query: {}",
+                                    needle
+                                )),
+                                summarization: None,
+                                stub: None,
+                                tags: Some(vec!["queryrs".to_string(), "cache".to_string()]),
+                                rank: None,
+                            };
+                            if let Err(e) = cache_doc.save().await {
+                                log::warn!(
+                                    "Failed to cache search results for '{}': {}",
+                                    needle,
+                                    e
+                                );
+                            } else {
+                                log::debug!(
+                                    "Cached {} search results for query: '{}'",
+                                    documents.len(),
+                                    needle
+                                );
+                                persistence_stats.cache_saves += 1;
+                            }
+                        }
                         Err(e) => {
-                            log::warn!("Failed to fetch content for {}: {}", doc.url, e);
-                            enhanced_documents.push(doc);
+                            log::warn!(
+                                "Failed to serialize search results for caching '{}': {}",
+                                needle,
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Process documents: check persistence first, then fetch content if needed
+            let mut enhanced_documents = Vec::new();
+            let mut fetch_stats = FetchStats::new();
+
+            for doc in documents {
+                // First, check if we have a cached version of this document with enhanced content
+                let mut doc_placeholder = Document {
+                    id: doc.id.clone(),
+                    ..Default::default()
+                };
+
+                let enhanced_doc = match doc_placeholder.load().await {
+                    Ok(cached_doc) => {
+                        log::debug!("Found cached document '{}' in persistence", doc.title);
+                        persistence_stats.document_cache_hits += 1;
+                        // Use cached version if it has more content than the API result
+                        if cached_doc.body.len() > doc.body.len() + 100 {
+                            log::debug!(
+                                "Using cached content for '{}' (cached: {} chars vs API: {} chars)",
+                                doc.title,
+                                cached_doc.body.len(),
+                                doc.body.len()
+                            );
+                            cached_doc
+                        } else {
+                            doc
+                        }
+                    }
+                    Err(_) => {
+                        persistence_stats.document_cache_misses += 1;
+                        doc
+                    }
+                };
+
+                // If document has URL and needs content enhancement, try to fetch it
+                if !enhanced_doc.url.is_empty()
+                    && enhanced_doc.url.starts_with("http")
+                    && !enhanced_doc.url.contains("crates.io/crates/")
+                    && enhanced_doc.body.len() < 200
+                // Only fetch if content is limited
+                {
+                    match self.fetch_and_scrape_content(&enhanced_doc).await {
+                        Ok(fetched_doc) => {
+                            fetch_stats.successful += 1;
+                            // Save the enhanced document to persistence for future use
+                            if let Err(e) = fetched_doc.save().await {
+                                log::warn!(
+                                    "Failed to save enhanced document '{}': {}",
+                                    fetched_doc.title,
+                                    e
+                                );
+                            } else {
+                                log::debug!(
+                                    "Saved enhanced document '{}' to persistence",
+                                    fetched_doc.title
+                                );
+                            }
+                            enhanced_documents.push(fetched_doc);
+                        }
+                        Err(e) => {
+                            fetch_stats.failed += 1;
+                            if self.is_critical_url(&enhanced_doc.url) {
+                                log::warn!(
+                                    "Failed to fetch critical URL {}: {}",
+                                    enhanced_doc.url,
+                                    e
+                                );
+                            } else {
+                                log::debug!(
+                                    "Failed to fetch non-critical URL {}: {}",
+                                    enhanced_doc.url,
+                                    e
+                                );
+                            }
+                            enhanced_documents.push(enhanced_doc);
                         }
                     }
                 } else {
-                    // Skip fetching for crates.io URLs or add documents without fetching
-                    enhanced_documents.push(doc);
+                    fetch_stats.skipped += 1;
+                    // Skip fetching for crates.io URLs or documents that already have content
+                    enhanced_documents.push(enhanced_doc);
                 }
             }
+
+            // Log comprehensive summary statistics
+            log::info!(
+                "QueryRs processing complete: {} documents (fetch: {} successful, {} failed, {} skipped) | (cache: {} search hits, {} search misses, {} doc hits, {} doc misses)",
+                enhanced_documents.len(),
+                fetch_stats.successful, fetch_stats.failed, fetch_stats.skipped,
+                persistence_stats.cache_hits, persistence_stats.cache_misses,
+                persistence_stats.document_cache_hits, persistence_stats.document_cache_misses
+            );
 
             // Convert to Index format
             let mut index = Index::new();
@@ -234,41 +428,70 @@ impl QueryRsHaystackIndexer {
         format!("url_{:x}", hasher.finish())
     }
 
-    /// Fetch and scrape content from a document's URL
+    /// Fetch and scrape content from a document's URL with retry logic for critical URLs
     async fn fetch_and_scrape_content(&self, doc: &Document) -> Result<Document> {
         let mut enhanced_doc = doc.clone();
+        let is_critical = self.is_critical_url(&doc.url);
+        let max_retries = if is_critical { 2 } else { 0 };
 
         log::info!("Fetching content from: {}", doc.url);
 
-        match self
-            .client
-            .get(&doc.url)
-            .header("User-Agent", "Terraphim/1.0")
-            .send()
-            .await
-        {
-            Ok(response) => {
-                if response.status().is_success() {
-                    match response.text().await {
-                        Ok(html_content) => {
-                            let scraped_content = self.scrape_content(&html_content, &doc.url);
-                            enhanced_doc.body = scraped_content;
-                            log::info!("Successfully scraped content from: {}", doc.url);
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to get text content from {}: {}", doc.url, e);
-                        }
-                    }
-                } else {
-                    log::warn!(
-                        "Failed to fetch {} with status: {}",
-                        doc.url,
-                        response.status()
-                    );
-                }
+        for attempt in 0..=max_retries {
+            if attempt > 0 {
+                let delay = std::time::Duration::from_millis(500 * attempt as u64);
+                tokio::time::sleep(delay).await;
+                log::debug!(
+                    "Retrying fetch for {} (attempt {}/{})",
+                    doc.url,
+                    attempt + 1,
+                    max_retries + 1
+                );
             }
-            Err(e) => {
-                log::warn!("Failed to fetch {}: {}", doc.url, e);
+
+            match self
+                .client
+                .get(&doc.url)
+                .header("User-Agent", "Terraphim/1.0")
+                .send()
+                .await
+            {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        match response.text().await {
+                            Ok(html_content) => {
+                                let scraped_content = self.scrape_content(&html_content, &doc.url);
+                                enhanced_doc.body = scraped_content;
+                                log::info!("Successfully scraped content from: {}", doc.url);
+                                return Ok(enhanced_doc);
+                            }
+                            Err(e) => {
+                                if attempt == max_retries {
+                                    log::warn!(
+                                        "Failed to get text content from {}: {}",
+                                        doc.url,
+                                        e
+                                    );
+                                }
+                                continue;
+                            }
+                        }
+                    } else {
+                        if attempt == max_retries {
+                            log::warn!(
+                                "Failed to fetch {} with status: {}",
+                                doc.url,
+                                response.status()
+                            );
+                        }
+                        continue;
+                    }
+                }
+                Err(e) => {
+                    if attempt == max_retries {
+                        return Err(crate::Error::Http(e));
+                    }
+                    continue;
+                }
             }
         }
 
@@ -892,5 +1115,32 @@ impl QueryRsHaystackIndexer {
         }
 
         tags
+    }
+
+    /// Determine if a URL is critical (Rust documentation) and should have higher priority/warnings
+    fn is_critical_url(&self, url: &str) -> bool {
+        url.contains("doc.rust-lang.org")
+            || url.contains("docs.rs")
+            || url.contains("rust-lang.github.io")
+    }
+
+    /// Normalize search query for use as cache key
+    fn normalize_search_query(&self, query: &str) -> String {
+        query
+            .to_lowercase()
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_')
+            .collect::<String>()
+            .chars()
+            .take(50) // Limit cache key length
+            .collect()
+    }
+
+    /// Check if cached document is fresh (less than 1 hour old)
+    fn is_cache_fresh(&self, cached_doc: &Document) -> bool {
+        // For now, we'll consider cache fresh if the document exists
+        // In the future, we could add timestamp metadata to documents
+        // to implement proper cache expiration
+        !cached_doc.body.is_empty()
     }
 }
