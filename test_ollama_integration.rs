@@ -1,9 +1,9 @@
 #!/usr/bin/env rust-script
 
 //! Test script to demonstrate Ollama integration for summarization and chat
-//! 
+//!
 //! Usage: rust-script test_ollama_integration.rs
-//! 
+//!
 //! This script tests:
 //! 1. Direct LLM client functionality with Ollama
 //! 2. Chat completion with conversation history
@@ -87,7 +87,7 @@ impl OllamaTestClient {
 
     pub async fn test_chat(&self, messages: Vec<ChatMessage>, opts: ChatOptions) -> Result<String, Box<dyn std::error::Error>> {
         let url = format!("{}/api/chat", self.base_url.trim_end_matches('/'));
-        
+
         let ollama_messages: Vec<serde_json::Value> = messages.into_iter()
             .map(|msg| serde_json::json!({
                 "role": msg.role,
@@ -141,7 +141,7 @@ impl OllamaTestClient {
 
         let json: serde_json::Value = resp.json().await?;
         let mut models = Vec::new();
-        
+
         if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
             for m in arr {
                 if let Some(name) = m.get("name").and_then(|n| n.as_str()) {
@@ -149,7 +149,7 @@ impl OllamaTestClient {
                 }
             }
         }
-        
+
         Ok(models)
     }
 }
@@ -161,10 +161,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
-    
+
     // Use one of the available models from our investigation
     let model = "qwen2.5-coder:latest".to_string();
-    
+
     println!("📡 Connecting to Ollama at: {}", base_url);
     println!("🤖 Using model: {}", model);
     println!();
@@ -227,9 +227,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     ];
 
-    match client.test_chat(chat_messages, ChatOptions { 
-        max_tokens: Some(300), 
-        temperature: Some(0.7) 
+    match client.test_chat(chat_messages, ChatOptions {
+        max_tokens: Some(300),
+        temperature: Some(0.7)
     }).await {
         Ok(response) => {
             println!("✅ Chat successful!");
@@ -258,9 +258,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     ];
 
-    match client.test_chat(multi_turn_messages, ChatOptions { 
-        max_tokens: Some(200), 
-        temperature: Some(0.5) 
+    match client.test_chat(multi_turn_messages, ChatOptions {
+        max_tokens: Some(200),
+        temperature: Some(0.5)
     }).await {
         Ok(response) => {
             println!("✅ Multi-turn chat successful!");
