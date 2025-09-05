@@ -248,13 +248,13 @@ async fn test_thesaurus_functionality() {
             Ok(Ok(thesaurus)) => {
                 println!(
                     "    ✅ Thesaurus loaded successfully: {} terms",
-                    thesaurus.count()
+                    thesaurus.len()
                 );
 
                 // Basic validation
-                assert!(!thesaurus.id().is_empty(), "Thesaurus should have an ID");
+                assert!(!thesaurus.name().is_empty(), "Thesaurus should have a name");
 
-                if thesaurus.count() > 0 {
+                if !thesaurus.is_empty() {
                     println!("    ✅ Thesaurus has content");
                 } else {
                     println!("    ⚠️ Thesaurus is empty - may need initialization");
@@ -414,9 +414,9 @@ async fn test_concurrent_operations() {
     let config_state = create_test_config_state().await;
 
     // Create multiple service instances
-    let service1 = TerraphimService::new(config_state.clone());
-    let service2 = TerraphimService::new(config_state.clone());
-    let service3 = TerraphimService::new(config_state.clone());
+    let mut service1 = TerraphimService::new(config_state.clone());
+    let mut service2 = TerraphimService::new(config_state.clone());
+    let mut service3 = TerraphimService::new(config_state.clone());
 
     // Test concurrent searches
     let query1 = SearchQuery {
@@ -447,14 +447,13 @@ async fn test_concurrent_operations() {
     };
 
     // Run concurrent searches
-    let (result1, result2, result3) = timeout(
-        Duration::from_secs(60),
+    let (result1, result2, result3) = timeout(Duration::from_secs(60), async {
         tokio::join!(
             service1.search(&query1),
             service2.search(&query2),
             service3.search(&query3)
-        ),
-    )
+        )
+    })
     .await
     .expect("Concurrent searches timed out");
 
@@ -469,10 +468,9 @@ async fn test_concurrent_operations() {
     let config2 = service2.fetch_config();
     let config3 = service3.fetch_config();
 
-    let (cfg1, cfg2, cfg3) = timeout(
-        Duration::from_secs(30),
-        tokio::join!(config1, config2, config3),
-    )
+    let (cfg1, cfg2, cfg3) = timeout(Duration::from_secs(30), async {
+        tokio::join!(config1, config2, config3)
+    })
     .await
     .expect("Concurrent config fetches timed out");
 
@@ -496,7 +494,7 @@ async fn test_service_resilience() {
     let initial_role = initial_config.selected_role.clone();
 
     // Perform multiple operations
-    let queries = vec!["test1", "test2", "test3", "test4", "test5"];
+    let queries = ["test1", "test2", "test3", "test4", "test5"];
 
     for (i, query_term) in queries.iter().enumerate() {
         let query = SearchQuery {
