@@ -2448,6 +2448,59 @@ impl TerraphimService {
         ))
     }
 
+    /// Generate a summary for a document using configured LLM provider (OpenRouter or Ollama)
+    ///
+    /// This method uses the role's configured LLM provider to generate a concise summary of the document's content.
+    /// It works with both OpenRouter and Ollama providers based on the role configuration.
+    ///
+    /// # Arguments
+    /// * `document` - The document to summarize
+    /// * `role` - Role configuration that determines which LLM provider to use
+    /// * `max_length` - Maximum length of the generated summary in characters
+    ///
+    /// Returns a `Result<String>` containing the generated summary or an error if summarization fails.
+    pub async fn generate_document_summary_with_role(
+        &self,
+        document: &Document,
+        role: &Role,
+        max_length: usize,
+    ) -> Result<String> {
+        let llm_client = crate::llm::build_llm_from_role(role)
+            .ok_or_else(|| {
+                ServiceError::Config(
+                    "No LLM provider configured for this role. Please configure either OpenRouter or Ollama.".to_string(),
+                )
+            })?;
+
+        log::debug!(
+            "Generating summary for document '{}' using provider '{}'",
+            document.id,
+            llm_client.name()
+        );
+
+        let content = &document.body;
+
+        if content.trim().is_empty() {
+            return Err(ServiceError::Config(
+                "Document body is empty, cannot generate summary".to_string(),
+            ));
+        }
+
+        // Generate the summary using the generic LLM client
+        let summary = llm_client
+            .summarize(content, crate::llm::SummarizeOptions { max_length })
+            .await?;
+
+        log::info!(
+            "Generated {}-character summary for document '{}' using provider '{}'",
+            summary.len(),
+            document.id,
+            llm_client.name()
+        );
+
+        Ok(summary)
+    }
+
     /// Fetch the current config
     pub async fn fetch_config(&self) -> terraphim_config::Config {
         let current_config = self.config_state.config.lock().await;
