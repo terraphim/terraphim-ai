@@ -547,7 +547,7 @@ pub struct ChatResponse {
     pub error: Option<String>,
 }
 
-/// Handle chat completion via OpenRouter
+/// Handle chat completion via generic LLM interface (OpenRouter or Ollama)
 pub(crate) async fn chat_completion(
     State(config_state): State<ConfigState>,
     Json(request): Json<ChatRequest>,
@@ -564,95 +564,68 @@ pub(crate) async fn chat_completion(
         }));
     };
 
-    #[cfg(feature = "openrouter")]
-    {
-        if !role_ref.has_openrouter_config() || !role_ref.openrouter_chat_enabled {
+    // Clone role data to use after releasing the lock
+    let role = role_ref.clone();
+
+    drop(config);
+
+    // Try to build LLM client from role configuration
+    let llm_client = match terraphim_service::llm::build_llm_from_role(&role) {
+        Some(client) => client,
+        None => {
             return Ok(Json(ChatResponse {
                 status: Status::Error,
                 message: None,
                 model_used: None,
-                error: Some(
-                    "OpenRouter chat not enabled or not configured for this role".to_string(),
-                ),
+                error: Some("No LLM provider configured for this role. Please configure either OpenRouter or Ollama.".to_string()),
             }));
         }
+    };
 
-        // Clone role data to use after releasing the lock
-        let role = role_ref.clone();
+    let model_name = llm_client.name();
 
-        let api_key = if let Some(key) = &role.openrouter_api_key {
-            key.clone()
-        } else {
-            std::env::var("OPENROUTER_KEY").map_err(|_| {
-                crate::error::ApiError(
-                    StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("OpenRouter API key not found in role configuration or OPENROUTER_KEY environment variable"),
-                )
-            })?
-        };
+    // Convert API messages to LLM client format
+    let mut messages: Vec<terraphim_service::llm::ChatMessage> = Vec::new();
 
-        let model = request
-            .model
-            .or_else(|| role.openrouter_chat_model.clone())
-            .or_else(|| role.openrouter_model.clone())
-            .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
-
-        drop(config);
-
-        // Build messages array; optionally inject system prompt
-        let mut messages_json: Vec<serde_json::Value> = Vec::new();
+    // Add system prompt if configured (for OpenRouter compatibility)
+    #[cfg(feature = "openrouter")]
+    {
         if let Some(system) = &role.openrouter_chat_system_prompt {
-            messages_json.push(serde_json::json!({"role":"system","content":system}));
-        }
-        for m in request.messages.iter() {
-            messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
-        }
-
-        #[allow(unused_mut)]
-        let mut used_model = model.clone();
-
-        // Call OpenRouter via service module
-        #[cfg(feature = "openrouter")]
-        {
-            use terraphim_service::openrouter::OpenRouterService;
-            match OpenRouterService::new(&api_key, &model) {
-                Ok(client) => {
-                    match client
-                        .chat_completion(messages_json, Some(1024), Some(0.2))
-                        .await
-                    {
-                        Ok(reply) => Ok(Json(ChatResponse {
-                            status: Status::Success,
-                            message: Some(reply),
-                            model_used: Some(used_model),
-                            error: None,
-                        })),
-                        Err(e) => Ok(Json(ChatResponse {
-                            status: Status::Error,
-                            message: None,
-                            model_used: Some(used_model),
-                            error: Some(format!("Chat failed: {}", e)),
-                        })),
-                    }
-                }
-                Err(e) => Ok(Json(ChatResponse {
-                    status: Status::Error,
-                    message: None,
-                    model_used: None,
-                    error: Some(format!("Failed to initialize OpenRouter: {}", e)),
-                })),
-            }
+            messages.push(terraphim_service::llm::ChatMessage {
+                role: "system".to_string(),
+                content: system.clone(),
+            });
         }
     }
 
-    #[cfg(not(feature = "openrouter"))]
-    {
-        Ok(Json(ChatResponse {
+    // Add request messages
+    for m in request.messages.iter() {
+        messages.push(terraphim_service::llm::ChatMessage {
+            role: m.role.clone(),
+            content: m.content.clone(),
+        });
+    }
+
+    // Set up chat options
+    let chat_opts = terraphim_service::llm::ChatOptions {
+        max_tokens: Some(1024),
+        temperature: Some(0.7),
+    };
+
+    // Call the generic LLM client
+    match llm_client.chat_completion(messages, chat_opts).await {
+        Ok(reply) => Ok(Json(ChatResponse {
+            status: Status::Success,
+            message: Some(reply),
+            model_used: Some(model_name.to_string()),
+            error: None,
+        })),
+        Err(e) => Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
-            model_used: None,
-            error: Some("OpenRouter feature not enabled during compilation".to_string()),
-        }))
+            model_used: Some(model_name.to_string()),
+            error: Some(format!("Chat completion failed: {}", e)),
+        })),
     }
 }
 
@@ -775,156 +748,132 @@ pub(crate) async fn summarize_document(
         }));
     };
 
-    // Check if OpenRouter is enabled and configured for this role
-    #[cfg(feature = "openrouter")]
-    {
-        if !role_ref.has_openrouter_config() {
+    // Clone role to use after dropping lock
+    let role = role_ref.clone();
+    let max_length = request.max_length.unwrap_or(250);
+    let force_regenerate = request.force_regenerate.unwrap_or(false);
+
+    drop(config); // Release the lock before async operations
+
+    // Try to build LLM client from role configuration
+    let llm_client = match terraphim_service::llm::build_llm_from_role(&role) {
+        Some(client) => client,
+        None => {
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
                 summary: None,
                 model_used: None,
                 from_cache: false,
-                error: Some("OpenRouter not properly configured for this role".to_string()),
+                error: Some("No LLM provider configured for this role. Please configure either OpenRouter or Ollama.".to_string()),
             }));
         }
+    };
 
-        // Clone role to use after dropping lock
-        let role = role_ref.clone();
+    let model_name = llm_client.name();
 
-        // Get the API key from environment variable if not set in role
-        let api_key = if let Some(key) = &role.openrouter_api_key {
-            key.clone()
-        } else {
-            std::env::var("OPENROUTER_KEY").map_err(|_| {
-                crate::error::ApiError(
-                    StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("OpenRouter API key not found in role configuration or OPENROUTER_KEY environment variable"),
-                )
-            })?
-        };
+    let mut terraphim_service = TerraphimService::new(config_state);
 
-        let model = role
-            .openrouter_model
-            .as_deref()
-            .unwrap_or("openai/gpt-3.5-turbo");
-        let max_length = request.max_length.unwrap_or(250);
-        let force_regenerate = request.force_regenerate.unwrap_or(false);
-
-        drop(config); // Release the lock before async operations
-
-        let mut terraphim_service = TerraphimService::new(config_state);
-
-        // Try to load existing document first
-        let document_opt = match terraphim_service
-            .get_document_by_id(&request.document_id)
-            .await
-        {
-            Ok(doc_opt) => doc_opt,
-            Err(e) => {
-                log::error!("Failed to load document '{}': {:?}", request.document_id, e);
-                return Ok(Json(SummarizeDocumentResponse {
-                    status: Status::Error,
-                    document_id: request.document_id,
-                    summary: None,
-                    model_used: None,
-                    from_cache: false,
-                    error: Some(format!("Document not found: {}", e)),
-                }));
-            }
-        };
-        let Some(document) = document_opt else {
+    // Try to load existing document first
+    let document_opt = match terraphim_service
+        .get_document_by_id(&request.document_id)
+        .await
+    {
+        Ok(doc_opt) => doc_opt,
+        Err(e) => {
+            log::error!("Failed to load document '{}': {:?}", request.document_id, e);
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
                 summary: None,
                 model_used: None,
                 from_cache: false,
-                error: Some("Document not found".to_string()),
+                error: Some(format!("Document not found: {}", e)),
             }));
-        };
-
-        // Check if we already have a summary and don't need to regenerate
-        if !force_regenerate {
-            if let Some(existing_summary) = &document.description {
-                if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
-                    log::debug!(
-                        "Using cached summary for document '{}'",
-                        request.document_id
-                    );
-                    return Ok(Json(SummarizeDocumentResponse {
-                        status: Status::Success,
-                        document_id: request.document_id,
-                        summary: Some(existing_summary.clone()),
-                        model_used: Some(model.to_string()),
-                        from_cache: true,
-                        error: None,
-                    }));
-                }
-            }
         }
-
-        // Generate new summary using OpenRouter
-        match terraphim_service
-            .generate_document_summary(&document, &api_key, model, max_length)
-            .await
-        {
-            Ok(summary) => {
-                log::info!(
-                    "Generated summary for document '{}' using model '{}'",
-                    request.document_id,
-                    model
-                );
-
-                // Save the updated document with the new summary
-                let mut updated_doc = document.clone();
-                updated_doc.description = Some(summary.clone());
-
-                if let Err(e) = updated_doc.save().await {
-                    log::error!(
-                        "Failed to save summary for document '{}': {:?}",
-                        request.document_id,
-                        e
-                    );
-                }
-
-                Ok(Json(SummarizeDocumentResponse {
-                    status: Status::Success,
-                    document_id: request.document_id,
-                    summary: Some(summary),
-                    model_used: Some(model.to_string()),
-                    from_cache: false,
-                    error: None,
-                }))
-            }
-            Err(e) => {
-                log::error!(
-                    "Failed to generate summary for document '{}': {:?}",
-                    request.document_id,
-                    e
-                );
-                Ok(Json(SummarizeDocumentResponse {
-                    status: Status::Error,
-                    document_id: request.document_id,
-                    summary: None,
-                    model_used: Some(model.to_string()),
-                    from_cache: false,
-                    error: Some(format!("Summarization failed: {}", e)),
-                }))
-            }
-        }
-    }
-
-    #[cfg(not(feature = "openrouter"))]
-    {
-        Ok(Json(SummarizeDocumentResponse {
+    };
+    let Some(document) = document_opt else {
+        return Ok(Json(SummarizeDocumentResponse {
             status: Status::Error,
             document_id: request.document_id,
             summary: None,
             model_used: None,
             from_cache: false,
-            error: Some("OpenRouter feature not enabled during compilation".to_string()),
-        }))
+            error: Some("Document not found".to_string()),
+        }));
+    };
+
+    // Check if we already have a summary and don't need to regenerate
+    if !force_regenerate {
+        if let Some(existing_summary) = &document.description {
+            if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
+                log::debug!(
+                    "Using cached summary for document '{}'",
+                    request.document_id
+                );
+                return Ok(Json(SummarizeDocumentResponse {
+                    status: Status::Success,
+                    document_id: request.document_id,
+                    summary: Some(existing_summary.clone()),
+                    model_used: Some(model_name.to_string()),
+                    from_cache: true,
+                    error: None,
+                }));
+            }
+        }
+    }
+
+    // Generate new summary using the generic LLM client
+    match llm_client
+        .summarize(
+            &document.body,
+            terraphim_service::llm::SummarizeOptions { max_length },
+        )
+        .await
+    {
+        Ok(summary) => {
+            log::info!(
+                "Generated summary for document '{}' using provider '{}'",
+                request.document_id,
+                model_name
+            );
+
+            // Save the updated document with the new summary
+            let mut updated_doc = document.clone();
+            updated_doc.description = Some(summary.clone());
+
+            if let Err(e) = updated_doc.save().await {
+                log::error!(
+                    "Failed to save summary for document '{}': {:?}",
+                    request.document_id,
+                    e
+                );
+            }
+
+            Ok(Json(SummarizeDocumentResponse {
+                status: Status::Success,
+                document_id: request.document_id,
+                summary: Some(summary),
+                model_used: Some(model_name.to_string()),
+                from_cache: false,
+                error: None,
+            }))
+        }
+        Err(e) => {
+            log::error!(
+                "Failed to generate summary for document '{}': {:?}",
+                request.document_id,
+                e
+            );
+            Ok(Json(SummarizeDocumentResponse {
+                status: Status::Error,
+                document_id: request.document_id,
+                summary: None,
+                model_used: Some(model_name.to_string()),
+                from_cache: false,
+                error: Some(format!("Summarization failed: {}", e)),
+            }))
+        }
     }
 }
 
