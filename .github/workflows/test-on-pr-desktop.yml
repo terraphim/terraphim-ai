@@ -13,6 +13,8 @@ jobs:
         include:
           - platform: macos-latest
             webkit-package: ""
+          - platform: ubuntu-18.04
+            webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: ubuntu-20.04
             webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: ubuntu-22.04

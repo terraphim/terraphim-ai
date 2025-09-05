@@ -207,6 +207,16 @@ We welcome contributions! Here's how to get started:
    - Commit with conventional format: `git commit -m "feat: add amazing feature"`
    - Push and create a Pull Request
 
+### Dependency Management
+
+**Important**: Some dependencies are pinned to specific versions to ensure compatibility:
+
+- `wiremock = "0.6.4"` - Version 0.6.5 uses unstable Rust features requiring nightly compiler
+- `schemars = "0.8.22"` - Version 1.0+ introduces breaking API changes
+- `thiserror = "1.0.x"` - Version 2.0+ requires code migration for breaking changes
+
+These constraints are enforced in `.github/dependabot.yml` to prevent automatic updates that would break CI. Future upgrades require manual code migration work.
+
 ### Contributors are awesome
 <a href="https://github.com/terraphim/terraphim-ai/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=terraphim/terraphim-ai" />

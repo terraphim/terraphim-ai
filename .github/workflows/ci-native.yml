@@ -37,9 +37,9 @@ jobs:
       - name: Set Ubuntu versions
         id: ubuntu
         run: |
-          # Simplified: Focus on LTS versions only
+          # Include Ubuntu 18.04 for terraphim server compatibility
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo 'versions=["20.04", "22.04", "24.04"]' >> $GITHUB_OUTPUT
+            echo 'versions=["18.04", "20.04", "22.04", "24.04"]' >> $GITHUB_OUTPUT
           else
             echo 'versions=["22.04"]' >> $GITHUB_OUTPUT
           fi
@@ -105,6 +105,7 @@ jobs:
 
   build-rust:
     needs: [setup, build-frontend, lint-and-format]
+<<<<<<< HEAD
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -257,36 +258,57 @@ jobs:
           name: deb-packages-${{ matrix.target }}-${{ matrix.ubuntu-version }}
           path: target/${{ matrix.target }}/debian/*.deb
           retention-days: 30
+=======
+    uses: ./.github/workflows/rust-build.yml
+    with:
+      rust-targets: ${{ needs.setup.outputs.rust-targets }}
+      ubuntu-versions: ${{ needs.setup.outputs.ubuntu-versions }}
+      frontend-dist: desktop/dist
+      cache-key: ${{ needs.setup.outputs.cache-key }}
+>>>>>>> main-latest
+
+  build-docker:
+    needs: [setup, build-rust]
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/docker-multiarch.yml
+    with:
+      platforms: 'linux/amd64,linux/arm64,linux/arm/v7'
+      ubuntu-versions: ${{ needs.setup.outputs.ubuntu-versions }}
+      push: true
+      tag: ${{ github.ref_name }}
+
+  build-tauri:
+    needs: [setup, build-frontend]
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/tauri-build.yml
+    with:
+      cache-key: ${{ needs.setup.outputs.cache-key }}
 
   test-suite:
     runs-on: ubuntu-latest
-    needs: [setup, build-frontend]
-
-    services:
-      # Add test services if needed
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    needs: [setup, build-rust]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup2.4-dev \
+            pkg-config \
+            build-essential
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.85.0
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
@@ -311,6 +333,7 @@ jobs:
       - name: Run integration tests
         run: cargo test --workspace --test '*'
 
+<<<<<<< HEAD
       - name: Run doc tests
         run: cargo test --workspace --doc
 
@@ -375,10 +398,12 @@ jobs:
     secrets: inherit  # pragma: allowlist secret
 
   package-debs:
+=======
+  package-repository:
+>>>>>>> main-latest
     runs-on: ubuntu-latest
     needs: [setup, build-rust]
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'packages')
-
+    if: github.event_name != 'pull_request'
     strategy:
       matrix:
         ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
@@ -431,7 +456,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [build-rust, build-docker, test-suite, security-scan]
+    needs: [build-rust, build-docker, build-tauri, test-suite, security-scan]
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
@@ -445,7 +470,7 @@ jobs:
 
       - name: Create release structure
         run: |
-          mkdir -p release/{binaries,packages,docker-images}
+          mkdir -p release/{binaries,packages,docker-images,desktop}
 
           # Organize binaries by architecture and Ubuntu version
           find release-artifacts/ -name "binaries-*" -type d | while read dir; do
@@ -458,6 +483,11 @@ jobs:
           # Organize .deb packages
           find release-artifacts/ -name "*.deb" -exec cp {} release/packages/ \;
 
+          # Organize desktop applications
+          find release-artifacts/ -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" | while read file; do
+            cp "$file" release/desktop/
+          done
+
           # Create checksums
           cd release
           find . -type f -name "terraphim*" -exec sha256sum {} \; > SHA256SUMS
@@ -468,6 +498,7 @@ jobs:
           files: |
             release/binaries/**/*
             release/packages/*.deb
+            release/desktop/*
             release/SHA256SUMS
           body: |
             ## Release ${{ github.ref_name }}
@@ -476,6 +507,11 @@ jobs:
             - Linux x86_64 (GNU and musl)
             - Linux ARM64
             - Linux ARMv7
+
+            ### Desktop Applications
+            - macOS: .dmg installer
+            - Linux: .AppImage portable
+            - Windows: .msi and .exe installers
 
             ### Docker Images
             Available for Ubuntu 18.04, 20.04, 22.04, and 24.04:
@@ -494,7 +530,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
-    needs: [build-rust, build-docker, test-suite]
+    needs: [build-rust, build-docker, build-tauri, test-suite]
     if: always() && github.event_name == 'pull_request'
 
     steps:
@@ -505,11 +541,12 @@ jobs:
             frontend-dist
             binaries-*
             deb-package-*
+            desktop-*
         continue-on-error: true
 
   summary:
     runs-on: ubuntu-latest
-    needs: [setup, build-rust, build-docker, test-suite]
+    needs: [setup, build-frontend, build-rust, build-docker, build-tauri, test-suite]
     if: always()
 
     steps:
@@ -522,7 +559,9 @@ jobs:
           echo "| Frontend Build | ${{ needs.build-frontend.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust Build | ${{ needs.build-rust.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker Build | ${{ needs.build-docker.result == 'success' && '✅' || needs.build-docker.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tauri Build | ${{ needs.build-tauri.result == 'success' && '✅' || needs.build-tauri.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Test Suite | ${{ needs.test-suite.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Ubuntu Versions:** ${{ needs.setup.outputs.ubuntu-versions }}" >> $GITHUB_STEP_SUMMARY
           echo "**Rust Targets:** ${{ needs.setup.outputs.rust-targets }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Comprehensive CI/CD Pipeline Status:** $([ '${{ needs.build-rust.result }}' == 'success' ] && echo 'ACTIVE ✅' || echo 'FAILED ❌')" >> $GITHUB_STEP_SUMMARY

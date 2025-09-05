@@ -136,6 +136,8 @@ jobs:
         include:
           - platform: macos-latest
             webkit-package: ""
+          - platform: ubuntu-18.04
+            webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: ubuntu-20.04
             webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: ubuntu-22.04
@@ -213,7 +215,7 @@ jobs:
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64,linux/arm/v7
-      ubuntu-versions: '["20.04", "22.04", "24.04"]'
+      ubuntu-versions: '["18.04", "20.04", "22.04", "24.04"]'
       push: true
       tag: ${{ github.ref_name }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
@@ -221,7 +223,7 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [build-binaries, build-debian-packages, build-tauri-desktop, build-docker]
+    needs: [build-binaries, build-debian-packages, build-tauri-desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: write
