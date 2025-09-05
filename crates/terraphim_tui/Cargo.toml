@@ -29,7 +29,7 @@ urlencoding = "2.1"
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "14.0", optional = true }
-colored = { version = "2.0", optional = true }
+colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
 indicatif = { version = "0.17", optional = true }
 dirs = { version = "5.0", optional = true }

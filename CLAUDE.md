@@ -353,6 +353,14 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 
 ## Recent Implementations and Features
 
+### CI/CD Infrastructure (2025-01-31)
+- **Hybrid GitHub Actions**: Complete migration from Earthly to GitHub Actions + Docker Buildx
+- **Multi-Platform Builds**: Support for linux/amd64, linux/arm64, linux/arm/v7 with cross-compilation
+- **Docker Layer Optimization**: Efficient layer caching with builder.Dockerfile for faster builds
+- **Matrix Configuration**: Fixed GitHub Actions matrix incompatibility issues
+- **Local Testing**: Comprehensive nektos/act integration for local workflow validation
+- **Workflow Variants**: Multiple approaches (native, Earthly hybrid, optimized) for different use cases
+
 ### Haystack Integrations
 - **QueryRs**: Reddit API + Rust std documentation search with smart type detection
 - **MCP**: Model Context Protocol with SSE/HTTP transports
@@ -386,6 +394,12 @@ cargo test --features mcp-rust-sdk
 # Live tests (require services running)
 MCP_SERVER_URL=http://localhost:3001 cargo test mcp_haystack_test -- --ignored
 OLLAMA_BASE_URL=http://127.0.0.1:11434 cargo test ollama_live_test -- --ignored
+
+# CI/CD Testing and Validation
+./scripts/validate-all-ci.sh              # Comprehensive CI validation (15/15 tests)
+./scripts/test-matrix-fixes.sh ci-native  # Matrix-specific testing
+./scripts/validate-builds.sh              # Build consistency validation
+act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
 ```
 
 ### Configuration Examples
