@@ -75,7 +75,7 @@ fn test_search_multi_term_functionality() -> Result<()> {
     }
 
     // Test multi-term search with OR operator
-    let (stdout, stderr, code) = run_tui_command(&[
+    let (_stdout, stderr, code) = run_tui_command(&[
         "search",
         "haystack",
         "--terms",
@@ -137,7 +137,7 @@ fn test_search_with_role_and_limit() -> Result<()> {
     }
 
     // Test with Terraphim Engineer role
-    let (stdout, stderr, code) = run_tui_command(&[
+    let (_stdout, stderr, code) = run_tui_command(&[
         "search",
         "haystack",
         "--role",
@@ -316,7 +316,7 @@ fn test_graph_command() -> Result<()> {
     }
 
     // Test graph with specific role
-    let (stdout, stderr, code) =
+    let (_stdout, stderr, code) =
         run_tui_command(&["graph", "--role", "Terraphim Engineer", "--top-k", "10"])?;
 
     assert_eq!(
@@ -361,7 +361,7 @@ fn test_chat_command() -> Result<()> {
     }
 
     // Test chat with role
-    let (stdout, stderr, code) =
+    let (_stdout, stderr, code) =
         run_tui_command(&["chat", "Test message with role", "--role", "Default"])?;
 
     assert_eq!(
@@ -373,7 +373,7 @@ fn test_chat_command() -> Result<()> {
     println!("✅ Chat with role completed");
 
     // Test chat with model specification
-    let (stdout, stderr, code) =
+    let (_stdout, stderr, code) =
         run_tui_command(&["chat", "Test with model", "--model", "test-model"])?;
 
     assert_eq!(
@@ -393,7 +393,7 @@ fn test_command_help_and_usage() -> Result<()> {
     println!("📖 Testing command help and usage");
 
     // Test main help
-    let (stdout, stderr, code) = run_tui_command(&["--help"])?;
+    let (stdout, _stderr, code) = run_tui_command(&["--help"])?;
 
     assert_eq!(code, 0, "Main help should succeed");
 
@@ -460,7 +460,7 @@ fn test_error_handling_and_edge_cases() -> Result<()> {
     println!("✅ Incomplete config set properly rejected");
 
     // Test graph with invalid top-k
-    let (_, stderr, code) = run_tui_command(&["graph", "--top-k", "invalid"])?;
+    let (_, _stderr, code) = run_tui_command(&["graph", "--top-k", "invalid"])?;
     assert_ne!(code, 0, "Invalid top-k should fail");
     println!("✅ Invalid top-k properly rejected");
 
@@ -582,7 +582,7 @@ fn test_performance_and_limits() -> Result<()> {
     // Test multiple rapid commands
     println!("  Testing rapid command execution...");
 
-    let commands = vec![
+    let commands = [
         vec!["roles", "list"],
         vec!["config", "show"],
         vec!["search", "quick", "--limit", "1"],

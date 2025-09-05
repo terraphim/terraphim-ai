@@ -512,8 +512,10 @@ impl SearchQuery {
     /// Get all search terms (both single and multiple)
     pub fn get_all_terms(&self) -> Vec<&NormalizedTermValue> {
         if let Some(ref multiple_terms) = self.search_terms {
-            // For multi-term queries, use search_terms (which should contain all terms)
-            multiple_terms.iter().collect()
+            // For multi-term queries, include both search_term and search_terms
+            let mut all_terms = vec![&self.search_term];
+            all_terms.extend(multiple_terms.iter());
+            all_terms
         } else {
             // For single-term queries, use search_term
             vec![&self.search_term]

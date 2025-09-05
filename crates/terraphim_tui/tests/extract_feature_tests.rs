@@ -325,7 +325,7 @@ fn test_extract_output_format() -> Result<()> {
     let test_text =
         "This is a test paragraph with haystack and service terms for format validation.";
 
-    let (stdout, stderr, code) = run_extract_offline(&[test_text])?;
+    let (stdout, _stderr, code) = run_extract_offline(&[test_text])?;
 
     if code == 0 {
         let clean_output = extract_clean_output(&stdout);
