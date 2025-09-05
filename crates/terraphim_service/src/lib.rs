@@ -2,6 +2,7 @@ use ahash::AHashMap;
 use regex::Regex;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
+use terraphim_automata::matcher::extract_paragraphs_from_automata;
 use terraphim_automata::{replace_matches, LinkType};
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
@@ -100,6 +101,7 @@ impl crate::error::TerraphimError for ServiceError {
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
+#[derive(Clone)]
 pub struct TerraphimService {
     config_state: ConfigState,
 }
@@ -2572,6 +2574,27 @@ impl TerraphimService {
         }
 
         Ok(current_config.clone())
+    }
+
+    /// Extract paragraphs from text that contain terms from the knowledge graph
+    /// 
+    /// # Arguments
+    /// * `role_name` - The role to use for thesaurus lookup
+    /// * `text` - The text to extract paragraphs from
+    /// * `include_term` - Whether to include the matched term in the results
+    /// 
+    /// # Returns
+    /// * `Vec<(Matched, String)>` - Pairs of matched terms and their corresponding paragraphs
+    pub async fn extract_paragraphs(
+        &mut self,
+        role_name: &RoleName,
+        text: &str,
+        include_term: bool,
+    ) -> Result<Vec<(terraphim_automata::Matched, String)>> {
+        let thesaurus = self.ensure_thesaurus_loaded(role_name).await?;
+        let results = extract_paragraphs_from_automata(text, thesaurus, include_term)
+            .map_err(|e| ServiceError::Common(crate::error::CommonError::system(e.to_string())))?;
+        Ok(results)
     }
 }
 

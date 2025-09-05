@@ -8,7 +8,7 @@ use rmcp::{
         ListToolsResult, ReadResourceRequestParam, ReadResourceResult, ServerInfo, Tool,
     },
     service::RequestContext,
-    Error as McpError, RoleServer, ServerHandler,
+    ErrorData as McpError, RoleServer, ServerHandler,
 };
 use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{

@@ -13,10 +13,10 @@ mod tests {
     async fn test_ollama_connectivity() -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let base_url = std::env::var("OLLAMA_BASE_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
-        
+
         let client = reqwest::Client::new();
         let url = format!("{}/api/tags", base_url.trim_end_matches('/'));
-        
+
         let resp = client.get(&url)
             .timeout(std::time::Duration::from_secs(10))
             .send()
@@ -28,7 +28,7 @@ mod tests {
 
         let json: Value = resp.json().await?;
         let mut models = Vec::new();
-        
+
         if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
             for m in arr {
                 if let Some(name) = m.get("name").and_then(|n| n.as_str()) {
@@ -36,22 +36,22 @@ mod tests {
                 }
             }
         }
-        
+
         Ok(models)
     }
 
     async fn test_ollama_summarization(model: &str, content: &str) -> Result<String, Box<dyn std::error::Error>> {
         let base_url = std::env::var("OLLAMA_BASE_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
-        
+
         let client = reqwest::Client::new();
         let url = format!("{}/api/chat", base_url.trim_end_matches('/'));
-        
+
         let prompt = format!(
             "Please provide a concise and informative summary in EXACTLY 150 characters or less. Be brief and focused.\n\nContent:\n{}",
             content
         );
-        
+
         let body = serde_json::json!({
             "model": model,
             "messages": [
@@ -85,10 +85,10 @@ mod tests {
     async fn test_ollama_chat(model: &str, messages: Vec<TestChatMessage>) -> Result<String, Box<dyn std::error::Error>> {
         let base_url = std::env::var("OLLAMA_BASE_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
-        
+
         let client = reqwest::Client::new();
         let url = format!("{}/api/chat", base_url.trim_end_matches('/'));
-        
+
         let ollama_messages: Vec<Value> = messages.into_iter()
             .map(|msg| serde_json::json!({
                 "role": msg.role,
@@ -166,7 +166,7 @@ mod tests {
         let test_content = r#"
         Rust is a systems programming language that runs blazingly fast, prevents segfaults,
         and guarantees thread safety. It offers memory safety without garbage collection,
-        concurrency without data races, and abstraction without overhead. Rust is used in 
+        concurrency without data races, and abstraction without overhead. Rust is used in
         many domains including web backends, operating systems, blockchain, and embedded systems.
         "#;
 
