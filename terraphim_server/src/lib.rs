@@ -4,7 +4,7 @@ use std::sync::Arc;
 use axum::{
     http::{header, Method, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
     Extension, Router,
 };
 use regex::Regex;
@@ -125,8 +125,8 @@ use api::{
 pub use api::{
     AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
-    CreateDocumentResponse, GetConversationResponse, ListConversationsQuery,
-    ListConversationsResponse, SearchResponse,
+    CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
+    ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
 };
 pub use error::{Result, Status};
 
@@ -483,6 +483,10 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/:id/search-context/",
             post(api::add_search_context_to_conversation),
         )
+        .route(
+            "/conversations/:id/context/:context_id",
+            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
+        )
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
@@ -660,6 +664,10 @@ pub async fn build_router_for_tests() -> Router {
         .route(
             "/conversations/:id/search-context/",
             post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/:context_id",
+            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         .with_state(config_state)
         .layer(Extension(tx))

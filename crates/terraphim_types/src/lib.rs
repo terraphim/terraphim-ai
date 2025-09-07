@@ -343,7 +343,9 @@ impl Thesaurus {
         self.data.get(key)
     }
 
-    pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
+    pub fn keys(
+        &self,
+    ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
         self.data.keys()
     }
 }
@@ -672,6 +674,8 @@ pub struct ContextItem {
     pub context_type: ContextType,
     /// Title or summary of the context item
     pub title: String,
+    /// Brief summary of the content (separate from full content)
+    pub summary: Option<String>,
     /// The actual content to be included in the LLM context
     pub content: String,
     /// Metadata about the context (source, relevance score, etc.)
@@ -706,6 +710,7 @@ impl ContextItem {
             } else {
                 document.title.clone()
             },
+            summary: document.description.clone(),
             content: format!(
                 "Title: {}\n\n{}\n\n{}",
                 document.title,
@@ -748,6 +753,11 @@ impl ContextItem {
             id: uuid::Uuid::new_v4().to_string(),
             context_type: ContextType::SearchResult,
             title: format!("Search: {}", query),
+            summary: Some(format!(
+                "Search results for '{}' - {} documents found",
+                query,
+                documents.len()
+            )),
             content,
             metadata,
             created_at: chrono::Utc::now(),

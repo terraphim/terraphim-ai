@@ -5,16 +5,19 @@
   import { CONFIG } from '../../config';
   import BackButton from '../BackButton.svelte';
   import { invoke } from '@tauri-apps/api/tauri';
+  import ContextEditModal from './ContextEditModal.svelte';
 
   type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
   type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
   type ContextItem = {
     id: string;
     title: string;
+    summary?: string;
     content: string;
     context_type: string;
     created_at: string;
     relevance_score?: number;
+    metadata?: { [key: string]: string };
   };
   type Conversation = {
     id: string;
@@ -44,6 +47,12 @@
   let newContextContent = '';
   let newContextType = 'document';
   let savingContext = false;
+
+  // Context editing
+  let showContextEditModal = false;
+  let editingContext: ContextItem | null = null;
+  let contextEditMode: 'create' | 'edit' = 'edit';
+  let deletingContextId: string | null = null;
 
   function addUserMessage(text: string) {
     messages = [...messages, { role: 'user', content: text }];
@@ -202,6 +211,7 @@
     try {
       const contextData = {
         title: newContextTitle.trim(),
+        summary: null,
         content: newContextContent.trim(),
         context_type: newContextType
       };
@@ -245,6 +255,113 @@
       console.error('❌ Error adding manual context:', error);
     } finally {
       savingContext = false;
+    }
+  }
+
+  // Edit context functionality
+  function editContext(context: ContextItem) {
+    editingContext = context;
+    contextEditMode = 'edit';
+    showContextEditModal = true;
+  }
+
+  // Delete context with confirmation
+  function confirmDeleteContext(context: ContextItem) {
+    if (confirm(`Are you sure you want to delete "${context.title}"?`)) {
+      deleteContext(context.id);
+    }
+  }
+
+  // Delete context
+  async function deleteContext(contextId: string) {
+    if (!conversationId || deletingContextId) return;
+
+    deletingContextId = contextId;
+    console.log('🗑️ Deleting context:', contextId);
+
+    try {
+      if ($is_tauri) {
+        const result = await invoke('delete_context', {
+          conversationId,
+          contextId
+        });
+        if (result?.status === 'success') {
+          console.log('✅ Context deleted successfully via Tauri');
+          await loadConversationContext();
+        } else {
+          console.error('❌ Failed to delete context via Tauri:', result?.error);
+        }
+      } else {
+        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/${contextId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'Success') {
+            console.log('✅ Context deleted successfully via HTTP');
+            await loadConversationContext();
+          } else {
+            console.error('❌ Failed to delete context via HTTP:', data.error);
+          }
+        } else {
+          console.error('❌ HTTP delete request failed:', response.status);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error deleting context:', error);
+    } finally {
+      deletingContextId = null;
+    }
+  }
+
+  // Update context
+  async function updateContext(updatedContext: ContextItem) {
+    if (!conversationId) return;
+
+    console.log('📝 Updating context:', updatedContext.id);
+
+    try {
+      const updatePayload = {
+        context_type: updatedContext.context_type,
+        title: updatedContext.title,
+        summary: updatedContext.summary,
+        content: updatedContext.content,
+        metadata: updatedContext.metadata
+      };
+
+      if ($is_tauri) {
+        const result = await invoke('update_context', {
+          conversationId,
+          contextId: updatedContext.id,
+          request: updatePayload
+        });
+        if (result?.status === 'success') {
+          console.log('✅ Context updated successfully via Tauri');
+          await loadConversationContext();
+        } else {
+          console.error('❌ Failed to update context via Tauri:', result?.error);
+        }
+      } else {
+        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/${updatedContext.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload)
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'Success') {
+            console.log('✅ Context updated successfully via HTTP');
+            await loadConversationContext();
+          } else {
+            console.error('❌ Failed to update context via HTTP:', data.error);
+          }
+        } else {
+          console.error('❌ HTTP update request failed:', response.status);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error updating context:', error);
     }
   }
 
@@ -498,15 +615,49 @@
                           </span>
                         {/if}
                       </div>
+                      <div class="level-item context-actions">
+                        <div class="field is-grouped">
+                          <div class="control">
+                            <button
+                              class="button is-small is-light"
+                              on:click={() => editContext(item)}
+                              data-testid={`edit-context-${index}`}
+                              title="Edit context"
+                            >
+                              <span class="icon is-small">
+                                <i class="fas fa-edit"></i>
+                              </span>
+                            </button>
+                          </div>
+                          <div class="control">
+                            <button
+                              class="button is-small is-light is-danger"
+                              on:click={() => confirmDeleteContext(item)}
+                              data-testid={`delete-context-${index}`}
+                              title="Delete context"
+                            >
+                              <span class="icon is-small">
+                                <i class="fas fa-trash"></i>
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   <h6 class="title is-6 has-text-dark" data-testid={`context-title-${index}`}>{item.title}</h6>
 
                   <div class="content is-small">
-                    <p class="context-preview" data-testid={`context-content-${index}`}>
-                      {item.content.substring(0, 150)}{item.content.length > 150 ? '...' : ''}
-                    </p>
+                    {#if item.summary}
+                      <p class="context-summary" data-testid={`context-summary-${index}`}>
+                        {item.summary}
+                      </p>
+                    {:else}
+                      <p class="context-preview" data-testid={`context-content-${index}`}>
+                        {item.content.substring(0, 150)}{item.content.length > 150 ? '...' : ''}
+                      </p>
+                    {/if}
                   </div>
 
                   <div class="is-size-7 has-text-grey">
@@ -543,6 +694,19 @@
     </div>
   </div>
 </section>
+
+<!-- Context Edit Modal -->
+<ContextEditModal
+  bind:active={showContextEditModal}
+  context={editingContext}
+  mode={contextEditMode}
+  on:update={e => updateContext(e.detail)}
+  on:delete={e => deleteContext(e.detail)}
+  on:close={() => {
+    showContextEditModal = false;
+    editingContext = null;
+  }}
+/>
 
 <style>
   .chat-window {
@@ -592,6 +756,23 @@
     line-height: 1.4;
     color: #666;
     margin-bottom: 0.5rem;
+  }
+
+  .context-summary {
+    line-height: 1.4;
+    color: #333;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+  }
+
+  .context-actions {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .context-item:hover .context-actions {
+    opacity: 1;
   }
 
   .context-divider {
