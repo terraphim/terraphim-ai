@@ -665,6 +665,7 @@ async fn test_add_context_to_conversation() {
     let context_request = AddContextRequest {
         context_type: "document".to_string(),
         title: "Test Document Context".to_string(),
+        summary: Some("Brief summary of the test document".to_string()),
         content: "This is a test document that provides context for the conversation.".to_string(),
         metadata: Some(
             [("source".to_string(), "test".to_string())]
@@ -755,6 +756,7 @@ async fn test_add_context_different_types() {
         let context_request = AddContextRequest {
             context_type: ctx_type.to_string(),
             title: title.to_string(),
+            summary: Some(format!("Summary for {}", title)),
             content: content.to_string(),
             metadata: None,
         };
@@ -816,6 +818,7 @@ async fn test_add_context_invalid_type() {
     let context_request = AddContextRequest {
         context_type: "invalid_type".to_string(),
         title: "Invalid Context".to_string(),
+        summary: Some("Summary for invalid context".to_string()),
         content: "This context has an invalid type".to_string(),
         metadata: None,
     };
@@ -1040,6 +1043,7 @@ async fn test_conversation_context_workflow() {
     let context_request = AddContextRequest {
         context_type: "user_input".to_string(),
         title: "User's Background".to_string(),
+        summary: Some("User background information".to_string()),
         content: "I'm a beginner programmer learning Rust for systems programming.".to_string(),
         metadata: Some(
             [("skill_level".to_string(), "beginner".to_string())]
@@ -1167,6 +1171,7 @@ async fn test_context_limits() {
         let context_request = AddContextRequest {
             context_type: "document".to_string(),
             title: format!("Test Document {}", i),
+            summary: Some(format!("Summary for document {}", i)),
             content: format!("Content for document {}", i),
             metadata: None,
         };
@@ -1216,6 +1221,7 @@ async fn test_context_nonexistent_conversation() {
     let context_request = AddContextRequest {
         context_type: "document".to_string(),
         title: "Test Document".to_string(),
+        summary: Some("Summary of test document".to_string()),
         content: "This is a test document".to_string(),
         metadata: None,
     };

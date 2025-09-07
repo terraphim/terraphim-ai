@@ -35,11 +35,11 @@ impl TestServerInstance {
         let config_state = config.unwrap_or_else(|| {
             let mut test_role = Role::default();
             test_role.name = "Test Role".to_string();
-            
+
             let mut roles = HashMap::new();
             roles.insert(RoleName::new("test"), test_role);
-            
-            let config = terraphim_config::Config { 
+
+            let config = terraphim_config::Config {
                 roles,
                 ..Default::default()
             };
@@ -112,9 +112,9 @@ impl TestServerInstance {
 
     /// Add a test context item to a conversation
     pub async fn add_test_context(
-        &self, 
-        conversation_id: &str, 
-        title: &str, 
+        &self,
+        conversation_id: &str,
+        title: &str,
         content: &str,
         summary: Option<String>
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -397,12 +397,12 @@ impl TestConfiguration {
     /// Create a test config state with multiple roles
     pub fn create_multi_role_config() -> ConfigState {
         let mut roles = HashMap::new();
-        
+
         roles.insert(
             RoleName::new("basic"),
             Self::create_basic_role("Basic Role", "basic"),
         );
-        
+
         roles.insert(
             RoleName::new("advanced"),
             Self::create_llm_enabled_role("Advanced Role", "advanced", "http://127.0.0.1:11434"),
@@ -498,14 +498,14 @@ mod tests {
     #[tokio::test]
     async fn test_server_instance_creation() {
         let server = TestServerInstance::start(None).await.unwrap();
-        
+
         // Test health check
         server.check_health().await.unwrap();
-        
+
         // Test conversation creation
         let conversation_id = server.create_test_conversation("Test Conversation", "test").await.unwrap();
         assert!(!conversation_id.is_empty());
-        
+
         server.stop();
     }
 
