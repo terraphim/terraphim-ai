@@ -79,3 +79,144 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Search term highlighting and KG linking styles */
+/* KG term links - clickable terms that lead to knowledge graph */
+a[href^="kg:"] {
+  color: #0066cc;
+  text-decoration: underline;
+  background: rgba(0, 102, 204, 0.1);
+  padding: 1px 3px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+a[href^="kg:"]:hover {
+  background: rgba(0, 102, 204, 0.2);
+  color: #004499;
+}
+
+/* Search term highlights - visual emphasis for matched search terms */
+mark.search-highlight {
+  background: #ffeb3b;
+  color: inherit;
+  font-weight: 600;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+/* Combined: KG term that's also a search term (both linked and highlighted) */
+a[href^="kg:"] mark.search-highlight {
+  background: linear-gradient(135deg, #ffeb3b 50%, rgba(0, 102, 204, 0.15) 50%);
+  color: #0066cc;
+  font-weight: 700;
+}
+
+/* Term tags/chips for visual search builder */
+.search-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.term-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: #e0e0e0;
+  border-radius: 16px;
+  font-size: 14px;
+  color: #333;
+  border: 1px solid #ccc;
+  transition: all 0.2s ease;
+}
+
+.term-chip:hover {
+  background: #d0d0d0;
+  border-color: #bbb;
+}
+
+.term-chip.from-kg {
+  background: rgba(0, 102, 204, 0.1);
+  border-color: rgba(0, 102, 204, 0.3);
+  color: #0066cc;
+}
+
+.term-chip.from-kg::after {
+  content: "🔗";
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+.operator-chip {
+  color: #666;
+  font-weight: bold;
+  padding: 0 4px;
+  font-size: 12px;
+  align-self: center;
+}
+
+.term-chip .remove-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  margin-left: 6px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.term-chip .remove-btn:hover {
+  color: #ff4444;
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+  /* KG links in dark mode */
+  a[href^="kg:"] {
+    color: #66b3ff;
+    background: rgba(102, 179, 255, 0.15);
+  }
+
+  a[href^="kg:"]:hover {
+    background: rgba(102, 179, 255, 0.25);
+    color: #99ccff;
+  }
+
+  /* Search highlights in dark mode */
+  mark.search-highlight {
+    background: #ffc107;
+    color: #000;
+  }
+
+  /* Combined highlighting in dark mode */
+  a[href^="kg:"] mark.search-highlight {
+    background: linear-gradient(135deg, #ffc107 50%, rgba(102, 179, 255, 0.2) 50%);
+    color: #66b3ff;
+  }
+
+  /* Term chips in dark mode */
+  .term-chip {
+    background: #404040;
+    color: #e0e0e0;
+    border-color: #666;
+  }
+
+  .term-chip:hover {
+    background: #505050;
+    border-color: #777;
+  }
+
+  .term-chip.from-kg {
+    background: rgba(102, 179, 255, 0.2);
+    border-color: rgba(102, 179, 255, 0.4);
+    color: #66b3ff;
+  }
+
+  .operator-chip {
+    color: #ccc;
+  }
+}

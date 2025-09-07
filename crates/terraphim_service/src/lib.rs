@@ -757,6 +757,28 @@ impl TerraphimService {
         Ok(document)
     }
 
+    /// Preprocess document content with both KG linking and search term highlighting
+    pub async fn preprocess_document_content_with_search(
+        &mut self,
+        document: Document,
+        role: &Role,
+        search_query: Option<&SearchQuery>,
+    ) -> Result<Document> {
+        // First apply KG preprocessing if enabled
+        let mut processed_doc = self.preprocess_document_content(document, role).await?;
+
+        // Then apply search term highlighting if query is provided
+        if let Some(query) = search_query {
+            log::debug!(
+                "Applying search term highlighting to document '{}'",
+                processed_doc.title
+            );
+            processed_doc.body = Self::highlight_search_terms(&processed_doc.body, query);
+        }
+
+        Ok(processed_doc)
+    }
+
     /// Create document
     pub async fn create_document(&mut self, document: Document) -> Result<Document> {
         // Persist the document using the fastest available Operator. The document becomes
@@ -1065,6 +1087,69 @@ impl TerraphimService {
             // Fallback to simple contains if regex compilation fails
             text.contains(term)
         }
+    }
+
+    /// Check if a position in text is inside an existing HTML link tag
+    fn is_inside_link(text: &str, position: usize) -> bool {
+        // Find the most recent opening <a> tag before this position
+        let text_before = &text[..position];
+        let last_open = text_before.rfind("<a ");
+        let last_close = text_before.rfind("</a>");
+
+        match (last_open, last_close) {
+            (Some(open_pos), Some(close_pos)) => open_pos > close_pos,
+            (Some(_), None) => true,
+            _ => false,
+        }
+    }
+
+    /// Highlight search terms in text without interfering with existing KG links
+    fn highlight_search_terms(text: &str, search_query: &SearchQuery) -> String {
+        let mut result = text.to_string();
+
+        // Get all search terms from the query
+        let all_terms = search_query.get_all_terms();
+
+        for term in all_terms {
+            let term_str = term.as_str();
+            log::debug!("Highlighting search term: '{}'", term_str);
+
+            // Create regex pattern with word boundaries for better matching
+            let pattern = format!(r"\b{}\b", regex::escape(term_str));
+            if let Ok(regex) = Regex::new(&pattern) {
+                // Find all matches and their positions first to avoid borrow conflicts
+                let matches: Vec<_> = regex
+                    .find_iter(&result)
+                    .map(|m| (m.start(), m.end(), result[m.start()..m.end()].to_string()))
+                    .collect();
+
+                // Apply highlighting in reverse order to maintain positions
+                for (start, end, matched_text) in matches.into_iter().rev() {
+                    // Only highlight if not inside an existing link
+                    if !Self::is_inside_link(&result, start) {
+                        let highlighted =
+                            format!("<mark class='search-highlight'>{}</mark>", matched_text);
+                        result.replace_range(start..end, &highlighted);
+                        log::debug!(
+                            "Highlighted '{}' at position {}-{}",
+                            matched_text,
+                            start,
+                            end
+                        );
+                    } else {
+                        log::debug!(
+                            "Skipping highlight for '{}' at position {} (inside link)",
+                            matched_text,
+                            start
+                        );
+                    }
+                }
+            } else {
+                log::warn!("Failed to compile regex for term: '{}'", term_str);
+            }
+        }
+
+        result
     }
 
     /// Apply logical operators (AND/OR) to filter documents based on multiple search terms
@@ -2008,8 +2093,13 @@ impl TerraphimService {
                     );
                     let mut processed_docs = Vec::new();
                     for document in documents {
-                        let processed_doc =
-                            self.preprocess_document_content(document, &role).await?;
+                        let processed_doc = self
+                            .preprocess_document_content_with_search(
+                                document,
+                                &role,
+                                Some(search_query),
+                            )
+                            .await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
