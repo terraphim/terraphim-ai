@@ -108,9 +108,11 @@ export async function startTestServer(config: any): Promise<any> {
               id: contextId,
               context_type: (requestData as any).context_type || 'document',
               title: (requestData as any).title || 'Untitled Context',
+              summary: (requestData as any).summary || '',
               content: (requestData as any).content || '',
               created_at: new Date().toISOString(),
               metadata: (requestData as any).metadata || {},
+              relevance_score: (requestData as any).relevance_score || null,
             };
 
             // Add to conversation's context
@@ -130,6 +132,79 @@ export async function startTestServer(config: any): Promise<any> {
             }));
           }
           return;
+        }
+
+        // Delete or Update context from conversation
+        const contextItemMatch = pathname.match(/^\/conversations\/([^\/]+)\/context\/([^\/]+)$/);
+        if (contextItemMatch) {
+          const conversationId = contextItemMatch[1];
+          const contextId = contextItemMatch[2];
+          const conversation = conversations.get(conversationId);
+
+          if (!conversation) {
+            res.writeHead(404);
+            res.end(JSON.stringify({
+              status: 'Error',
+              error: 'Conversation not found',
+            }));
+            return;
+          }
+
+          const contextIndex = conversation.global_context.findIndex((ctx: any) => ctx.id === contextId);
+
+          if (method === 'DELETE') {
+            if (contextIndex !== -1) {
+              // Remove context
+              conversation.global_context.splice(contextIndex, 1);
+              conversations.set(conversationId, conversation);
+
+              res.writeHead(200);
+              res.end(JSON.stringify({
+                status: 'Success',
+                error: null,
+              }));
+            } else {
+              res.writeHead(200);
+              res.end(JSON.stringify({
+                status: 'Error',
+                error: 'Context not found',
+              }));
+            }
+            return;
+          }
+
+          if (method === 'PUT') {
+            if (contextIndex !== -1) {
+              // Update context
+              const existingContext = conversation.global_context[contextIndex];
+              const updatedContext = {
+                ...existingContext,
+                context_type: (requestData as any).context_type || existingContext.context_type,
+                title: (requestData as any).title !== undefined ? (requestData as any).title : existingContext.title,
+                summary: (requestData as any).summary !== undefined ? (requestData as any).summary : existingContext.summary,
+                content: (requestData as any).content !== undefined ? (requestData as any).content : existingContext.content,
+                metadata: (requestData as any).metadata !== undefined ? (requestData as any).metadata : existingContext.metadata,
+              };
+
+              conversation.global_context[contextIndex] = updatedContext;
+              conversations.set(conversationId, conversation);
+
+              res.writeHead(200);
+              res.end(JSON.stringify({
+                status: 'Success',
+                context: updatedContext,
+                error: null,
+              }));
+            } else {
+              res.writeHead(200);
+              res.end(JSON.stringify({
+                status: 'Error',
+                context: null,
+                error: 'Context not found',
+              }));
+            }
+            return;
+          }
         }
 
         // Health check endpoint

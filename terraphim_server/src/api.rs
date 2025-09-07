@@ -1776,6 +1776,7 @@ pub struct AddMessageResponse {
 pub struct AddContextRequest {
     pub context_type: String, // "document" | "search_result" | "user_input"
     pub title: String,
+    pub summary: Option<String>,
     pub content: String,
     pub metadata: Option<std::collections::HashMap<String, String>>,
 }
@@ -1793,6 +1794,31 @@ pub struct AddSearchContextRequest {
     pub query: String,
     pub documents: Vec<Document>,
     pub limit: Option<usize>,
+}
+
+/// Request to update context in a conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateContextRequest {
+    pub context_type: Option<String>,
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub content: Option<String>,
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Response for updating context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateContextResponse {
+    pub status: Status,
+    pub context: Option<terraphim_types::ContextItem>,
+    pub error: Option<String>,
+}
+
+/// Response for deleting context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeleteContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
 }
 
 /// Create a new conversation
@@ -1912,6 +1938,7 @@ pub(crate) async fn add_context_to_conversation(
         id: ulid::Ulid::new().to_string(),
         context_type,
         title: request.title,
+        summary: request.summary,
         content: request.content,
         metadata: request.metadata.unwrap_or_default().into_iter().collect(),
         created_at: chrono::Utc::now(),
@@ -1950,6 +1977,110 @@ pub(crate) async fn add_search_context_to_conversation(
         Err(e) => Ok(Json(AddContextResponse {
             status: Status::Error,
             error: Some(format!("Failed to add search context: {}", e)),
+        })),
+    }
+}
+
+/// Delete context from a conversation
+pub(crate) async fn delete_context_from_conversation(
+    Path((conversation_id, context_id)): Path<(String, String)>,
+) -> Result<Json<DeleteContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.delete_context(&conv_id, &context_id) {
+        Ok(()) => Ok(Json(DeleteContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(DeleteContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to delete context: {}", e)),
+        })),
+    }
+}
+
+/// Update context in a conversation
+pub(crate) async fn update_context_in_conversation(
+    Path((conversation_id, context_id)): Path<(String, String)>,
+    Json(request): Json<UpdateContextRequest>,
+) -> Result<Json<UpdateContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+
+    // Get the existing context item first
+    let manager = CONTEXT_MANAGER.lock().await;
+    let conversation = match manager.get_conversation(&conv_id) {
+        Some(conv) => conv,
+        None => {
+            return Ok(Json(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Conversation {} not found", conversation_id)),
+            }))
+        }
+    };
+
+    // Find the existing context item
+    let existing_context = conversation
+        .global_context
+        .iter()
+        .find(|item| item.id == context_id);
+
+    let existing_context = match existing_context {
+        Some(ctx) => ctx,
+        None => {
+            return Ok(Json(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Context item {} not found", context_id)),
+            }))
+        }
+    };
+
+    // Build the updated context item
+    let context_type = if let Some(ref type_str) = request.context_type {
+        match type_str.as_str() {
+            "document" => terraphim_types::ContextType::Document,
+            "search_result" => terraphim_types::ContextType::SearchResult,
+            "user_input" => terraphim_types::ContextType::UserInput,
+            "system" => terraphim_types::ContextType::System,
+            "external" => terraphim_types::ContextType::External,
+            _ => existing_context.context_type.clone(),
+        }
+    } else {
+        existing_context.context_type.clone()
+    };
+
+    let updated_context = terraphim_types::ContextItem {
+        id: context_id.clone(),
+        context_type,
+        title: request
+            .title
+            .unwrap_or_else(|| existing_context.title.clone()),
+        summary: request.summary.or_else(|| existing_context.summary.clone()),
+        content: request
+            .content
+            .unwrap_or_else(|| existing_context.content.clone()),
+        metadata: request
+            .metadata
+            .map(|m| m.into_iter().collect())
+            .unwrap_or_else(|| existing_context.metadata.clone()),
+        created_at: existing_context.created_at,
+        relevance_score: existing_context.relevance_score,
+    };
+
+    drop(manager); // Release the lock before re-acquiring it
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.update_context(&conv_id, &context_id, updated_context.clone()) {
+        Ok(context) => Ok(Json(UpdateContextResponse {
+            status: Status::Success,
+            context: Some(context),
+            error: None,
+        })),
+        Err(e) => Ok(Json(UpdateContextResponse {
+            status: Status::Error,
+            context: None,
+            error: Some(format!("Failed to update context: {}", e)),
         })),
     }
 }
