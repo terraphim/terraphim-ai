@@ -816,6 +816,14 @@ pub struct AddContextResponse {
     pub error: Option<String>,
 }
 
+/// Response for updating context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct UpdateContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
 /// Global context manager instance for Tauri commands
 use tokio::sync::Mutex as TokioMutex;
 
@@ -967,6 +975,7 @@ pub async fn add_context_to_conversation(
     conversation_id: String,
     context_type: String,
     title: String,
+    summary: Option<String>,
     content: String,
     metadata: Option<HashMap<String, String>>,
 ) -> Result<AddContextResponse> {
@@ -998,6 +1007,7 @@ pub async fn add_context_to_conversation(
         id: ulid::Ulid::new().to_string(),
         context_type: ctx_type,
         title,
+        summary,
         content,
         metadata: metadata.unwrap_or_default().into_iter().collect(),
         created_at: chrono::Utc::now(),
@@ -1056,6 +1066,137 @@ pub async fn add_search_context_to_conversation(
             Ok(AddContextResponse {
                 status: Status::Error,
                 error: Some(format!("Failed to add search context: {}", e)),
+            })
+        }
+    }
+}
+
+/// Delete context from a conversation
+#[command]
+pub async fn delete_context(
+    conversation_id: String,
+    context_id: String,
+) -> Result<DeleteContextResponse> {
+    log::debug!(
+        "Deleting context {} from conversation {}",
+        context_id,
+        conversation_id
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id);
+    let mut manager = get_context_manager().lock().await;
+
+    match manager.delete_context(&conv_id, &context_id) {
+        Ok(()) => {
+            log::debug!("Successfully deleted context from conversation");
+            Ok(DeleteContextResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to delete context: {}", e);
+            Ok(DeleteContextResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to delete context: {}", e)),
+            })
+        }
+    }
+}
+
+/// Update context in a conversation
+#[command]
+pub async fn update_context(
+    conversation_id: String,
+    context_id: String,
+    request: UpdateContextRequest,
+) -> Result<UpdateContextResponse> {
+    log::debug!(
+        "Updating context {} in conversation {}: title={:?}",
+        context_id,
+        conversation_id,
+        request.title
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    // Get the existing context first
+    let manager = get_context_manager().lock().await;
+    let conversation = match manager.get_conversation(&conv_id) {
+        Some(conv) => conv,
+        None => {
+            log::error!("Conversation {} not found", conversation_id);
+            return Ok(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Conversation {} not found", conversation_id)),
+            });
+        }
+    };
+
+    let existing_context = conversation
+        .global_context
+        .iter()
+        .find(|item| item.id == context_id);
+
+    let existing_context = match existing_context {
+        Some(ctx) => ctx.clone(),
+        None => {
+            log::error!("Context item {} not found", context_id);
+            return Ok(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Context item {} not found", context_id)),
+            });
+        }
+    };
+
+    // Build the updated context item
+    let context_type = if let Some(ref type_str) = request.context_type {
+        match type_str.as_str() {
+            "document" => ContextType::Document,
+            "search_result" => ContextType::SearchResult,
+            "user_input" => ContextType::UserInput,
+            "system" => ContextType::System,
+            "external" => ContextType::External,
+            _ => existing_context.context_type,
+        }
+    } else {
+        existing_context.context_type
+    };
+
+    let updated_context = ContextItem {
+        id: context_id.clone(),
+        context_type,
+        title: request.title.unwrap_or(existing_context.title),
+        summary: request.summary.or(existing_context.summary),
+        content: request.content.unwrap_or(existing_context.content),
+        metadata: request
+            .metadata
+            .map(|m| m.into_iter().collect())
+            .unwrap_or(existing_context.metadata),
+        created_at: existing_context.created_at,
+        relevance_score: existing_context.relevance_score,
+    };
+
+    drop(manager); // Release the lock
+    let mut manager = get_context_manager().lock().await;
+
+    match manager.update_context(&conv_id, &context_id, updated_context.clone()) {
+        Ok(context) => {
+            log::debug!("Successfully updated context in conversation");
+            Ok(UpdateContextResponse {
+                status: Status::Success,
+                context: Some(context),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to update context: {}", e);
+            Ok(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Failed to update context: {}", e)),
             })
         }
     }

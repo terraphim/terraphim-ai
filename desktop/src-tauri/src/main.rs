@@ -383,7 +383,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::get_conversation,
             cmd::add_message_to_conversation,
             cmd::add_context_to_conversation,
-            cmd::add_search_context_to_conversation
+            cmd::add_search_context_to_conversation,
+            cmd::delete_context,
+            cmd::update_context
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();

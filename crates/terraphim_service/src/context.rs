@@ -168,6 +168,88 @@ impl ContextManager {
         Ok(())
     }
 
+    /// Delete a context item from a conversation
+    pub fn delete_context(
+        &mut self,
+        conversation_id: &ConversationId,
+        context_id: &str,
+    ) -> ServiceResult<()> {
+        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
+            ServiceError::Config(format!("Conversation {} not found", conversation_id))
+        })?;
+
+        // Create a mutable copy and remove the context item
+        let mut updated_conversation = (*conversation).clone();
+
+        // Find and remove the context item from global_context
+        let initial_len = updated_conversation.global_context.len();
+        updated_conversation
+            .global_context
+            .retain(|item| item.id != context_id);
+
+        // Check if item was found and removed
+        if updated_conversation.global_context.len() == initial_len {
+            return Err(ServiceError::Config(format!(
+                "Context item {} not found in conversation {}",
+                context_id, conversation_id
+            )));
+        }
+
+        // Update timestamp
+        updated_conversation.updated_at = chrono::Utc::now();
+
+        // Update cache
+        self.conversations_cache
+            .insert(conversation_id.clone(), Arc::new(updated_conversation));
+
+        Ok(())
+    }
+
+    /// Update a context item in a conversation
+    pub fn update_context(
+        &mut self,
+        conversation_id: &ConversationId,
+        context_id: &str,
+        updated_context: ContextItem,
+    ) -> ServiceResult<ContextItem> {
+        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
+            ServiceError::Config(format!("Conversation {} not found", conversation_id))
+        })?;
+
+        // Create a mutable copy and update the context item
+        let mut updated_conversation = (*conversation).clone();
+
+        // Find and update the context item
+        let mut found = false;
+        for context_item in &mut updated_conversation.global_context {
+            if context_item.id == context_id {
+                // Preserve the original ID and created_at timestamp
+                let original_created_at = context_item.created_at;
+                *context_item = updated_context.clone();
+                context_item.id = context_id.to_string();
+                context_item.created_at = original_created_at;
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            return Err(ServiceError::Config(format!(
+                "Context item {} not found in conversation {}",
+                context_id, conversation_id
+            )));
+        }
+
+        // Update conversation timestamp
+        updated_conversation.updated_at = chrono::Utc::now();
+
+        // Update cache
+        self.conversations_cache
+            .insert(conversation_id.clone(), Arc::new(updated_conversation));
+
+        Ok(updated_context)
+    }
+
     /// Create context item from search results
     pub fn create_search_context(
         &self,
@@ -413,6 +495,7 @@ mod tests {
             id: "global-1".to_string(),
             context_type: ContextType::System,
             title: "System Info".to_string(),
+            summary: Some("System information summary".to_string()),
             content: "This is system information".to_string(),
             metadata: AHashMap::new(),
             created_at: Utc::now(),
@@ -426,6 +509,7 @@ mod tests {
             id: "msg-ctx-1".to_string(),
             context_type: ContextType::Document,
             title: "Relevant Doc".to_string(),
+            summary: Some("Document summary".to_string()),
             content: "Document content".to_string(),
             metadata: AHashMap::new(),
             created_at: Utc::now(),
@@ -450,5 +534,274 @@ mod tests {
         let user_content = messages[1]["content"].as_str().unwrap();
         assert!(user_content.contains("Hello"));
         assert!(user_content.contains("Document content"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_context_real_manager() {
+        let mut context_manager = ContextManager::new(ContextConfig::default());
+
+        // Create a real conversation
+        let conversation_id = context_manager
+            .create_conversation("Test Delete".to_string(), RoleName::new("test"))
+            .await
+            .unwrap();
+
+        // Create and add a real context item
+        let context_item = ContextItem {
+            id: "test-context-1".to_string(),
+            context_type: ContextType::UserInput,
+            title: "Test Context for Deletion".to_string(),
+            summary: Some("Test summary".to_string()),
+            content: "This is test content for deletion testing.".to_string(),
+            metadata: AHashMap::new(),
+            created_at: Utc::now(),
+            relevance_score: None,
+        };
+
+        let context_id = context_item.id.clone();
+        context_manager
+            .add_context(&conversation_id, context_item)
+            .unwrap();
+
+        // Verify context was added
+        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        assert_eq!(conversation.global_context.len(), 1);
+        assert_eq!(conversation.global_context[0].id, context_id);
+
+        // Test successful deletion
+        let result = context_manager.delete_context(&conversation_id, &context_id);
+        assert!(result.is_ok());
+
+        // Verify context was removed
+        let updated_conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        assert_eq!(updated_conversation.global_context.len(), 0);
+
+        // Test deletion of non-existent context
+        let result = context_manager.delete_context(&conversation_id, "non-existent");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+
+        // Test deletion from non-existent conversation
+        let fake_conv_id = ConversationId::from_string("fake-conversation".to_string());
+        let result = context_manager.delete_context(&fake_conv_id, &context_id);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_update_context_real_manager() {
+        let mut context_manager = ContextManager::new(ContextConfig::default());
+
+        // Create a real conversation
+        let conversation_id = context_manager
+            .create_conversation("Test Update".to_string(), RoleName::new("test"))
+            .await
+            .unwrap();
+
+        // Create and add a real context item
+        let original_context = ContextItem {
+            id: "test-context-2".to_string(),
+            context_type: ContextType::Document,
+            title: "Original Title".to_string(),
+            summary: Some("Original summary".to_string()),
+            content: "Original content".to_string(),
+            metadata: {
+                let mut map = AHashMap::new();
+                map.insert("original_key".to_string(), "original_value".to_string());
+                map
+            },
+            created_at: Utc::now(),
+            relevance_score: Some(85.5),
+        };
+
+        let context_id = original_context.id.clone();
+        let original_created_at = original_context.created_at;
+        context_manager
+            .add_context(&conversation_id, original_context)
+            .unwrap();
+
+        // Create updated context
+        let updated_context = ContextItem {
+            id: context_id.clone(),
+            context_type: ContextType::UserInput,
+            title: "Updated Title".to_string(),
+            summary: Some("Updated summary with more details".to_string()),
+            content: "Updated content with additional information".to_string(),
+            metadata: {
+                let mut map = AHashMap::new();
+                map.insert("updated_key".to_string(), "updated_value".to_string());
+                map.insert("new_key".to_string(), "new_value".to_string());
+                map
+            },
+            created_at: Utc::now(), // This should be preserved
+            relevance_score: Some(92.3),
+        };
+
+        // Test successful update
+        let result =
+            context_manager.update_context(&conversation_id, &context_id, updated_context.clone());
+        assert!(result.is_ok());
+
+        // Verify context was updated correctly
+        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        assert_eq!(conversation.global_context.len(), 1);
+
+        let updated_item = &conversation.global_context[0];
+        assert_eq!(updated_item.id, context_id);
+        assert_eq!(updated_item.title, "Updated Title");
+        assert_eq!(
+            updated_item.summary,
+            Some("Updated summary with more details".to_string())
+        );
+        assert_eq!(
+            updated_item.content,
+            "Updated content with additional information"
+        );
+        assert_eq!(updated_item.context_type, ContextType::UserInput);
+        assert_eq!(updated_item.relevance_score, Some(92.3));
+
+        // Verify original created_at is preserved
+        assert_eq!(updated_item.created_at, original_created_at);
+
+        // Verify metadata was updated
+        assert_eq!(
+            updated_item.metadata.get("updated_key"),
+            Some(&"updated_value".to_string())
+        );
+        assert_eq!(
+            updated_item.metadata.get("new_key"),
+            Some(&"new_value".to_string())
+        );
+        assert!(!updated_item.metadata.contains_key("original_key"));
+
+        // Verify conversation updated_at was updated
+        assert!(conversation.updated_at > conversation.created_at);
+
+        // Test update of non-existent context
+        let result = context_manager.update_context(
+            &conversation_id,
+            "non-existent",
+            updated_context.clone(),
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+
+        // Test update in non-existent conversation
+        let fake_conv_id = ConversationId::from_string("fake-conversation".to_string());
+        let result = context_manager.update_context(&fake_conv_id, &context_id, updated_context);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_context_with_summary_field() {
+        let context_manager = ContextManager::new(ContextConfig::default());
+
+        // Test document context with summary
+        let document = Document {
+            id: "doc-with-summary".to_string(),
+            url: "https://example.com/summary".to_string(),
+            title: "Document with Summary".to_string(),
+            body: "This is a document that should have a summary from its description.".to_string(),
+            description: Some(
+                "This is the document description that becomes the summary".to_string(),
+            ),
+            summarization: Some("AI-generated summary of the document".to_string()),
+            stub: None,
+            tags: Some(vec!["test".to_string(), "summary".to_string()]),
+            rank: Some(88),
+        };
+
+        let context_item = context_manager.create_document_context(&document);
+
+        // Verify summary field is populated from description
+        assert_eq!(
+            context_item.summary,
+            Some("This is the document description that becomes the summary".to_string())
+        );
+        assert_eq!(context_item.title, "Document with Summary");
+        assert!(context_item
+            .content
+            .contains("This is the document description that becomes the summary"));
+
+        // Test search result context with summary
+        let documents = vec![document];
+        let search_context = context_manager.create_search_context("test query", &documents, None);
+
+        // Verify search context has a summary
+        assert!(search_context.summary.is_some());
+        assert!(search_context
+            .summary
+            .as_ref()
+            .unwrap()
+            .contains("test query"));
+        assert!(search_context
+            .summary
+            .as_ref()
+            .unwrap()
+            .contains("1 documents found"));
+    }
+
+    #[tokio::test]
+    async fn test_partial_context_update() {
+        let mut context_manager = ContextManager::new(ContextConfig::default());
+
+        let conversation_id = context_manager
+            .create_conversation("Test Partial Update".to_string(), RoleName::new("test"))
+            .await
+            .unwrap();
+
+        // Create original context
+        let original_context = ContextItem {
+            id: "partial-update-test".to_string(),
+            context_type: ContextType::Document,
+            title: "Original Title".to_string(),
+            summary: Some("Original summary".to_string()),
+            content: "Original content".to_string(),
+            metadata: {
+                let mut map = AHashMap::new();
+                map.insert("preserve".to_string(), "this_value".to_string());
+                map
+            },
+            created_at: Utc::now(),
+            relevance_score: Some(75.0),
+        };
+
+        let context_id = original_context.id.clone();
+        let original_created_at = original_context.created_at;
+        context_manager
+            .add_context(&conversation_id, original_context)
+            .unwrap();
+
+        // Update only summary and title, keeping other fields
+        let mut partial_update = context_manager
+            .get_conversation(&conversation_id)
+            .unwrap()
+            .global_context[0]
+            .clone();
+
+        partial_update.title = "Updated Title Only".to_string();
+        partial_update.summary = Some("Updated summary only".to_string());
+
+        let result = context_manager.update_context(&conversation_id, &context_id, partial_update);
+        assert!(result.is_ok());
+
+        // Verify only specified fields were updated
+        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let updated_item = &conversation.global_context[0];
+
+        assert_eq!(updated_item.title, "Updated Title Only");
+        assert_eq!(
+            updated_item.summary,
+            Some("Updated summary only".to_string())
+        );
+        assert_eq!(updated_item.content, "Original content"); // Should remain unchanged
+        assert_eq!(updated_item.context_type, ContextType::Document); // Should remain unchanged
+        assert_eq!(updated_item.relevance_score, Some(75.0)); // Should remain unchanged
+        assert_eq!(updated_item.created_at, original_created_at); // Should be preserved
+        assert_eq!(
+            updated_item.metadata.get("preserve"),
+            Some(&"this_value".to_string())
+        ); // Should be preserved
     }
 }
