@@ -46,7 +46,7 @@ describe('ContextEditModal Integration Tests', () => {
   describe('Modal Rendering and UI', () => {
     it('should render edit modal with context data', () => {
       const testContext = createTestContextItem();
-      
+
       render(ContextEditModal, {
         props: {
           active: true,
@@ -57,7 +57,7 @@ describe('ContextEditModal Integration Tests', () => {
 
       // Check modal title
       expect(screen.getByText('Edit Context Item')).toBeInTheDocument();
-      
+
       // Check form fields are populated
       expect(screen.getByTestId('context-title-input')).toHaveValue('Test Document');
       expect(screen.getByTestId('context-summary-textarea')).toHaveValue('This is a test summary for the document');
@@ -75,7 +75,7 @@ describe('ContextEditModal Integration Tests', () => {
       });
 
       expect(screen.getByText('Add Context Item')).toBeInTheDocument();
-      
+
       // Check form fields are empty/default
       expect(screen.getByTestId('context-title-input')).toHaveValue('');
       expect(screen.getByTestId('context-summary-textarea')).toHaveValue('');
@@ -134,13 +134,13 @@ describe('ContextEditModal Integration Tests', () => {
       // Clear title and check validation message
       const titleInput = screen.getByTestId('context-title-input');
       fireEvent.input(titleInput, { target: { value: '' } });
-      
+
       expect(screen.getByText('Title is required')).toBeInTheDocument();
-      
-      // Clear content and check validation message  
+
+      // Clear content and check validation message
       const contentTextarea = screen.getByTestId('context-content-textarea');
       fireEvent.input(contentTextarea, { target: { value: '' } });
-      
+
       expect(screen.getByText('Content is required')).toBeInTheDocument();
     });
 
@@ -155,9 +155,9 @@ describe('ContextEditModal Integration Tests', () => {
 
       const summaryTextarea = screen.getByTestId('context-summary-textarea');
       const testSummary = 'a'.repeat(250);
-      
+
       fireEvent.input(summaryTextarea, { target: { value: testSummary } });
-      
+
       expect(screen.getByText('250/500 characters')).toBeInTheDocument();
     });
   });
@@ -165,7 +165,7 @@ describe('ContextEditModal Integration Tests', () => {
   describe('Form Interactions', () => {
     it('should handle context type selection', async () => {
       const testContext = createTestContextItem();
-      
+
       render(ContextEditModal, {
         props: {
           active: true,
@@ -176,13 +176,13 @@ describe('ContextEditModal Integration Tests', () => {
 
       const typeSelect = screen.getByTestId('context-type-select');
       fireEvent.change(typeSelect, { target: { value: 'UserInput' } });
-      
+
       expect(typeSelect).toHaveValue('UserInput');
     });
 
     it('should handle summary editing', async () => {
       const testContext = createTestContextItem();
-      
+
       render(ContextEditModal, {
         props: {
           active: true,
@@ -193,15 +193,15 @@ describe('ContextEditModal Integration Tests', () => {
 
       const summaryTextarea = screen.getByTestId('context-summary-textarea');
       const newSummary = 'Updated summary with new information';
-      
+
       fireEvent.input(summaryTextarea, { target: { value: newSummary } });
-      
+
       expect(summaryTextarea).toHaveValue(newSummary);
     });
 
     it('should handle metadata editing', async () => {
       const testContext = createTestContextItem();
-      
+
       render(ContextEditModal, {
         props: {
           active: true,
@@ -237,7 +237,7 @@ describe('ContextEditModal Integration Tests', () => {
       const testContext = createTestContextItem();
       let updateEventFired = false;
       let updateEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -271,7 +271,7 @@ describe('ContextEditModal Integration Tests', () => {
     it('should handle form submission in create mode', async () => {
       let createEventFired = false;
       let createEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -290,7 +290,7 @@ describe('ContextEditModal Integration Tests', () => {
       const titleInput = screen.getByTestId('context-title-input');
       const summaryTextarea = screen.getByTestId('context-summary-textarea');
       const contentTextarea = screen.getByTestId('context-content-textarea');
-      
+
       fireEvent.input(titleInput, { target: { value: 'New Context Item' } });
       fireEvent.input(summaryTextarea, { target: { value: 'New summary' } });
       fireEvent.input(contentTextarea, { target: { value: 'New content' } });
@@ -312,7 +312,7 @@ describe('ContextEditModal Integration Tests', () => {
       const testContext = createTestContextItem();
       let deleteEventFired = false;
       let deleteEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -337,7 +337,7 @@ describe('ContextEditModal Integration Tests', () => {
     it('should handle modal close', async () => {
       const testContext = createTestContextItem();
       let closeEventFired = false;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -362,7 +362,7 @@ describe('ContextEditModal Integration Tests', () => {
     it('should close modal on Escape key', async () => {
       const testContext = createTestContextItem();
       let closeEventFired = false;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -385,7 +385,7 @@ describe('ContextEditModal Integration Tests', () => {
       const testContext = createTestContextItem();
       let updateEventFired = false;
       let updateEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -413,7 +413,7 @@ describe('ContextEditModal Integration Tests', () => {
       const testContext = createTestContextItem();
       let updateEventFired = false;
       let updateEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -442,7 +442,7 @@ describe('ContextEditModal Integration Tests', () => {
     it('should handle optional summary field properly', async () => {
       let createEventFired = false;
       let createEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -459,7 +459,7 @@ describe('ContextEditModal Integration Tests', () => {
       // Fill required fields but leave summary empty
       const titleInput = screen.getByTestId('context-title-input');
       const contentTextarea = screen.getByTestId('context-content-textarea');
-      
+
       fireEvent.input(titleInput, { target: { value: 'Context without Summary' } });
       fireEvent.input(contentTextarea, { target: { value: 'Content without summary' } });
 
@@ -478,7 +478,7 @@ describe('ContextEditModal Integration Tests', () => {
       const testContext = createTestContextItem();
       let updateEventFired = false;
       let updateEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,
@@ -511,7 +511,7 @@ describe('ContextEditModal Integration Tests', () => {
       const testContext = createTestContextItem();
       let updateEventFired = false;
       let updateEventData: any = null;
-      
+
       const { component } = render(ContextEditModal, {
         props: {
           active: true,

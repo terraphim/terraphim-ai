@@ -46,8 +46,8 @@ describe('Context Edit Workflow E2E Tests', () => {
       const contentTextarea = screen.getByTestId('context-content-textarea');
 
       await fireEvent.input(titleInput, { target: { value: 'E2E Test Document' } });
-      await fireEvent.input(contentTextarea, { 
-        target: { value: 'This is a comprehensive test document for end-to-end testing of context management.' } 
+      await fireEvent.input(contentTextarea, {
+        target: { value: 'This is a comprehensive test document for end-to-end testing of context management.' }
       });
 
       // Submit the form
@@ -83,8 +83,8 @@ describe('Context Edit Workflow E2E Tests', () => {
         const editSummaryTextarea = screen.getByTestId('context-summary-textarea');
 
         await fireEvent.input(editTitleInput, { target: { value: 'Updated E2E Test Document' } });
-        await fireEvent.input(editSummaryTextarea, { 
-          target: { value: 'This document has been updated via E2E testing workflow' } 
+        await fireEvent.input(editSummaryTextarea, {
+          target: { value: 'This document has been updated via E2E testing workflow' }
         });
 
         // Save the changes
@@ -105,7 +105,7 @@ describe('Context Edit Workflow E2E Tests', () => {
       // Step 3: Delete the context item
       const updatedContextItem = screen.getByText('Updated E2E Test Document').closest('[data-testid*="context-item"]');
       const deleteButton = updatedContextItem?.querySelector('[data-testid*="delete-context"]');
-      
+
       if (deleteButton) {
         await fireEvent.click(deleteButton);
 
@@ -138,11 +138,11 @@ describe('Context Edit Workflow E2E Tests', () => {
       const contentTextarea = screen.getByTestId('context-content-textarea');
 
       await fireEvent.input(titleInput, { target: { value: 'Document with Summary' } });
-      await fireEvent.input(summaryTextarea, { 
-        target: { value: 'This is a concise summary of the document content' } 
+      await fireEvent.input(summaryTextarea, {
+        target: { value: 'This is a concise summary of the document content' }
       });
-      await fireEvent.input(contentTextarea, { 
-        target: { value: 'This is the full detailed content of the document that provides comprehensive information about the topic.' } 
+      await fireEvent.input(contentTextarea, {
+        target: { value: 'This is the full detailed content of the document that provides comprehensive information about the topic.' }
       });
 
       const saveButton = screen.getByTestId('add-context-submit-button');
@@ -174,8 +174,8 @@ describe('Context Edit Workflow E2E Tests', () => {
       const contentTextarea = screen.getByTestId('context-content-textarea');
 
       await fireEvent.input(titleInput, { target: { value: 'Persistent Context Test' } });
-      await fireEvent.input(contentTextarea, { 
-        target: { value: 'This context should persist across server operations' } 
+      await fireEvent.input(contentTextarea, {
+        target: { value: 'This context should persist across server operations' }
       });
 
       const saveButton = screen.getByTestId('add-context-submit-button');
@@ -188,9 +188,9 @@ describe('Context Edit Workflow E2E Tests', () => {
       // Manually verify persistence via API call
       const conversationsResponse = await fetch(`${serverUrl}/conversations`);
       const conversationsData = await conversationsResponse.json();
-      
+
       expect(conversationsData.status).toBe('Success');
-      
+
       if (conversationsData.conversations && conversationsData.conversations.length > 0) {
         const conversation = conversationsData.conversations[0];
         expect(conversation.global_context).toBeDefined();
@@ -294,7 +294,7 @@ describe('Context Edit Workflow E2E Tests', () => {
 
       // Submit without filling required fields
       const saveButton = screen.getByTestId('add-context-submit-button');
-      
+
       // Button should be disabled
       expect(saveButton).toBeDisabled();
 
@@ -309,7 +309,7 @@ describe('Context Edit Workflow E2E Tests', () => {
   describe('Real API Integration E2E', () => {
     it('should perform complete CRUD operations via real API', async () => {
       // This test directly uses the API to verify the full workflow
-      
+
       // Create conversation
       const createResponse = await fetch(`${serverUrl}/conversations`, {
         method: 'POST',

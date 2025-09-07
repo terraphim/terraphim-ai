@@ -99,6 +99,13 @@ async fn create_terraphim_engineer_config() -> Result<String> {
             extra_parameters: std::collections::HashMap::new(),
         }],
         extra: ahash::AHashMap::new(),
+        openrouter_enabled: false,
+        openrouter_api_key: None,
+        openrouter_model: None,
+        openrouter_auto_summarize: false,
+        openrouter_chat_enabled: false,
+        openrouter_chat_system_prompt: None,
+        openrouter_chat_model: None,
     };
 
     let mut config = ConfigBuilder::new()

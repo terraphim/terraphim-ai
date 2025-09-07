@@ -26,11 +26,7 @@ pub enum Status {
     Error,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ErrorResponse {
-    pub status: Status,
-    pub message: String,
-}
+// ErrorResponse removed - using specific response types instead
 
 // Everything we return from commands must implement `Serialize`.
 // This includes Errors and `anyhow`'s `Error` type doesn't implement it.
@@ -821,7 +817,27 @@ pub struct AddContextResponse {
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct UpdateContextResponse {
     pub status: Status,
+    pub context: Option<ContextItem>,
     pub error: Option<String>,
+}
+
+/// Response for deleting context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct DeleteContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Request for updating context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct UpdateContextRequest {
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub content: Option<String>,
+    pub context_type: Option<String>,
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 /// Global context manager instance for Tauri commands
@@ -893,7 +909,7 @@ pub async fn list_conversations(limit: Option<usize>) -> Result<ListConversation
 pub async fn get_conversation(conversation_id: String) -> Result<GetConversationResponse> {
     log::debug!("Getting conversation with ID: {}", conversation_id);
 
-    let conv_id = ConversationId::from_string(conversation_id);
+    let conv_id = ConversationId::from_string(conversation_id.clone());
     let manager = get_context_manager().lock().await;
 
     match manager.get_conversation(&conv_id) {
@@ -930,7 +946,7 @@ pub async fn add_message_to_conversation(
         role
     );
 
-    let conv_id = ConversationId::from_string(conversation_id);
+    let conv_id = ConversationId::from_string(conversation_id.clone());
     let message_role = role.unwrap_or_else(|| "user".to_string());
 
     let message = if message_role == "user" {
@@ -986,7 +1002,7 @@ pub async fn add_context_to_conversation(
         title
     );
 
-    let conv_id = ConversationId::from_string(conversation_id);
+    let conv_id = ConversationId::from_string(conversation_id.clone());
 
     let ctx_type = match context_type.as_str() {
         "document" => ContextType::Document,
@@ -1048,7 +1064,7 @@ pub async fn add_search_context_to_conversation(
         documents.len()
     );
 
-    let conv_id = ConversationId::from_string(conversation_id);
+    let conv_id = ConversationId::from_string(conversation_id.clone());
     let mut manager = get_context_manager().lock().await;
 
     let context_item = manager.create_search_context(&query, &documents, limit);
@@ -1083,7 +1099,7 @@ pub async fn delete_context(
         conversation_id
     );
 
-    let conv_id = ConversationId::from_string(conversation_id);
+    let conv_id = ConversationId::from_string(conversation_id.clone());
     let mut manager = get_context_manager().lock().await;
 
     match manager.delete_context(&conv_id, &context_id) {
@@ -1118,7 +1134,7 @@ pub async fn update_context(
         request.title
     );
 
-    let conv_id = ConversationId::from_string(conversation_id);
+    let conv_id = ConversationId::from_string(conversation_id.clone());
 
     // Get the existing context first
     let manager = get_context_manager().lock().await;
@@ -1152,7 +1168,7 @@ pub async fn update_context(
     };
 
     // Build the updated context item
-    let context_type = if let Some(ref type_str) = request.context_type {
+    let context_type = if let Some(type_str) = &request.context_type {
         match type_str.as_str() {
             "document" => ContextType::Document,
             "search_result" => ContextType::SearchResult,

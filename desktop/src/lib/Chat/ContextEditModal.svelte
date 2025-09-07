@@ -41,8 +41,8 @@
   }
 
   // Validation
-  $: isValid = editingContext && 
-    editingContext.title.trim() !== '' && 
+  $: isValid = editingContext &&
+    editingContext.title.trim() !== '' &&
     editingContext.content.trim() !== '';
 
   function handleClose() {
@@ -59,7 +59,7 @@
     } else {
       dispatch('create', editingContext);
     }
-    
+
     handleClose();
   }
 
@@ -98,8 +98,8 @@
           <label class="label" for="context-type">Type</label>
           <div class="control">
             <div class="select is-fullwidth">
-              <select 
-                id="context-type" 
+              <select
+                id="context-type"
                 bind:value={editingContext.context_type}
                 data-testid="context-type-select"
               >
@@ -115,10 +115,10 @@
         <div class="field">
           <label class="label" for="context-title">Title *</label>
           <div class="control">
-            <input 
+            <input
               id="context-title"
-              class="input" 
-              type="text" 
+              class="input"
+              type="text"
               placeholder="Enter title..."
               bind:value={editingContext.title}
               data-testid="context-title-input"
@@ -134,9 +134,9 @@
         <div class="field">
           <label class="label" for="context-summary">Summary</label>
           <div class="control">
-            <textarea 
+            <textarea
               id="context-summary"
-              class="textarea" 
+              class="textarea"
               placeholder="Brief summary of the content (optional)..."
               bind:value={editingContext.summary}
               data-testid="context-summary-textarea"
@@ -157,9 +157,9 @@
         <div class="field">
           <label class="label" for="context-content">Content *</label>
           <div class="control">
-            <textarea 
+            <textarea
               id="context-content"
-              class="textarea" 
+              class="textarea"
               placeholder="Enter the full content..."
               bind:value={editingContext.content}
               data-testid="context-content-textarea"
@@ -182,21 +182,21 @@
               <span>Advanced Options</span>
             </span>
           </summary>
-          
+
           <div class="field mt-4">
             <label class="label">Metadata</label>
             <div class="content">
               <p class="help">Additional key-value pairs for this context item</p>
-              
+
               {#if Object.keys(editingContext.metadata).length === 0}
                 <p class="has-text-grey-light">No metadata defined</p>
               {:else}
                 {#each Object.entries(editingContext.metadata) as [key, value], index}
                   <div class="field is-grouped">
                     <div class="control is-expanded">
-                      <input 
-                        class="input is-small" 
-                        type="text" 
+                      <input
+                        class="input is-small"
+                        type="text"
                         placeholder="Key"
                         value={key}
                         on:input={(e) => {
@@ -208,15 +208,15 @@
                       >
                     </div>
                     <div class="control is-expanded">
-                      <input 
-                        class="input is-small" 
-                        type="text" 
+                      <input
+                        class="input is-small"
+                        type="text"
                         placeholder="Value"
                         bind:value={editingContext.metadata[key]}
                       >
                     </div>
                     <div class="control">
-                      <button 
+                      <button
                         class="button is-small is-danger is-outlined"
                         on:click={() => {
                           const newMetadata = { ...editingContext.metadata };
@@ -232,13 +232,13 @@
                   </div>
                 {/each}
               {/if}
-              
-              <button 
+
+              <button
                 class="button is-small is-light"
                 on:click={() => {
-                  editingContext.metadata = { 
-                    ...editingContext.metadata, 
-                    [`key_${Date.now()}`]: '' 
+                  editingContext.metadata = {
+                    ...editingContext.metadata,
+                    [`key_${Date.now()}`]: ''
                   };
                 }}
               >
@@ -255,8 +255,8 @@
       <footer class="modal-card-foot">
         <div class="field is-grouped">
           <div class="control">
-            <button 
-              class="button is-primary" 
+            <button
+              class="button is-primary"
               on:click={handleSave}
               disabled={!isValid}
               data-testid="save-context-button"
@@ -267,10 +267,10 @@
               <span>{mode === 'edit' ? 'Save Changes' : 'Add Context'}</span>
             </button>
           </div>
-          
+
           <div class="control">
-            <button 
-              class="button is-light" 
+            <button
+              class="button is-light"
               on:click={handleClose}
               data-testid="cancel-context-button"
             >
@@ -281,8 +281,8 @@
           {#if mode === 'edit'}
             <div class="control is-expanded"></div>
             <div class="control">
-              <button 
-                class="button is-danger is-outlined" 
+              <button
+                class="button is-danger is-outlined"
                 on:click={handleDelete}
                 data-testid="delete-context-button"
               >
@@ -296,7 +296,7 @@
         </div>
 
         <div class="help">
-          <strong>Keyboard shortcuts:</strong> 
+          <strong>Keyboard shortcuts:</strong>
           Ctrl/Cmd + Enter to save, Escape to close
         </div>
       </footer>
@@ -308,7 +308,7 @@
   .details {
     margin-top: 1rem;
   }
-  
+
   .summary {
     cursor: pointer;
     padding: 0.5rem;
@@ -316,16 +316,16 @@
     border-radius: 4px;
     background-color: #f5f5f5;
   }
-  
+
   .summary:hover {
     background-color: #eeeeee;
   }
-  
+
   .textarea {
     min-height: 120px;
     resize: vertical;
   }
-  
+
   .modal-card-body {
     max-height: 70vh;
     overflow-y: auto;

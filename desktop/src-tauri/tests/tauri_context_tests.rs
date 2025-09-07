@@ -342,6 +342,7 @@ async fn test_add_context_to_conversation_command() {
         conversation_id.clone(),
         "document".to_string(),
         "Test Document Context".to_string(),
+        Some("Brief summary of the test document".to_string()),
         "This is a test document that provides context for the conversation.".to_string(),
         Some(metadata),
     )
@@ -398,6 +399,7 @@ async fn test_add_context_different_types() {
             conversation_id.clone(),
             ctx_type.to_string(),
             title.to_string(),
+            Some(format!("Summary for {}", title)),
             content.to_string(),
             None,
         )
@@ -443,6 +445,7 @@ async fn test_add_context_invalid_type() {
         conversation_id,
         "invalid_type".to_string(),
         "Invalid Context".to_string(),
+        Some("Summary for invalid context".to_string()),
         "This context has an invalid type".to_string(),
         None,
     )
@@ -571,6 +574,7 @@ async fn test_complete_conversation_workflow() {
         conversation_id.clone(),
         "user_input".to_string(),
         "User Background".to_string(),
+        Some("User background information for context".to_string()),
         "I'm a beginner programmer learning Rust for systems programming.".to_string(),
         Some(metadata),
     )
