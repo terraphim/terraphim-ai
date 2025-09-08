@@ -530,7 +530,7 @@ pub struct ChatMessage {
 /// Chat request payload
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatRequest {
-    /// Role to use for chat (determines OpenRouter configuration)
+    /// Role to use for chat (determines LLM configuration)
     pub role: String,
     /// Conversation so far
     pub messages: Vec<ChatMessage>,
@@ -538,6 +538,10 @@ pub struct ChatRequest {
     pub model: Option<String>,
     /// Optional conversation ID to include context from
     pub conversation_id: Option<String>,
+    /// Optional maximum tokens for the response
+    pub max_tokens: Option<u32>,
+    /// Optional temperature for response randomness (0.0-1.0)
+    pub temperature: Option<f32>,
 }
 
 /// Chat response payload
@@ -549,7 +553,7 @@ pub struct ChatResponse {
     pub error: Option<String>,
 }
 
-/// Handle chat completion via OpenRouter
+/// Handle chat completion via generic LLM client (OpenRouter, Ollama, etc.)
 pub(crate) async fn chat_completion(
     State(config_state): State<ConfigState>,
     Json(request): Json<ChatRequest>,
@@ -566,139 +570,144 @@ pub(crate) async fn chat_completion(
         }));
     };
 
-    #[cfg(feature = "openrouter")]
-    {
-        if !role_ref.has_openrouter_config() || !role_ref.openrouter_chat_enabled {
-            return Ok(Json(ChatResponse {
-                status: Status::Error,
-                message: None,
-                model_used: None,
-                error: Some(
-                    "OpenRouter chat not enabled or not configured for this role".to_string(),
-                ),
-            }));
-        }
+    // Clone role data to use after releasing the lock
+    let role = role_ref.clone();
+    drop(config);
 
-        // Clone role data to use after releasing the lock
-        let role = role_ref.clone();
+    // Try to build an LLM client from the role configuration
+    use terraphim_service::llm;
+    let Some(llm_client) = llm::build_llm_from_role(&role) else {
+        return Ok(Json(ChatResponse {
+            status: Status::Error,
+            message: None,
+            model_used: None,
+            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
+        }));
+    };
 
-        let api_key = if let Some(key) = &role.openrouter_api_key {
-            key.clone()
-        } else {
-            std::env::var("OPENROUTER_KEY").map_err(|_| {
-                crate::error::ApiError(
-                    StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("OpenRouter API key not found in role configuration or OPENROUTER_KEY environment variable"),
-                )
-            })?
-        };
+    // Build messages array; optionally inject system prompt and context
+    let mut messages_json: Vec<serde_json::Value> = Vec::new();
 
-        let model = request
-            .model
-            .or_else(|| role.openrouter_chat_model.clone())
-            .or_else(|| role.openrouter_model.clone())
-            .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
-
-        drop(config);
-
-        // Build messages array; optionally inject system prompt and context
-        let mut messages_json: Vec<serde_json::Value> = Vec::new();
-
-        // Start with system prompt if available
-        if let Some(system) = &role.openrouter_chat_system_prompt {
-            messages_json.push(serde_json::json!({"role":"system","content":system}));
-        }
-
-        // Inject context from conversation if provided
-        if let Some(conversation_id) = &request.conversation_id {
-            let conv_id = ConversationId::from_string(conversation_id.clone());
-            let manager = CONTEXT_MANAGER.lock().await;
-
-            if let Some(conversation) = manager.get_conversation(&conv_id) {
-                // Build context content from all context items
-                let mut context_content = String::new();
-
-                if !conversation.global_context.is_empty() {
-                    context_content.push_str("=== CONTEXT INFORMATION ===\n");
-                    context_content.push_str("The following information provides relevant context for this conversation:\n\n");
-
-                    for (index, context_item) in conversation.global_context.iter().enumerate() {
-                        context_content.push_str(&format!(
-                            "Context Item {}: {}\n",
-                            index + 1,
-                            context_item.title
-                        ));
-                        if let Some(score) = context_item.relevance_score {
-                            context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
-                        }
-                        context_content.push_str(&format!("Content: {}\n", context_item.content));
-                        if !context_item.metadata.is_empty() {
-                            context_content
-                                .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
-                        }
-                        context_content.push_str("\n---\n\n");
-                    }
-
-                    context_content.push_str("=== END CONTEXT ===\n\n");
-                    context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
-
-                    // Add context as a system message after the main system prompt
-                    messages_json
-                        .push(serde_json::json!({"role": "system", "content": context_content}));
-                }
-            }
-        }
-
-        // Add user messages from the request
-        for m in request.messages.iter() {
-            messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
-        }
-
-        #[allow(unused_mut)]
-        let mut used_model = model.clone();
-
-        // Call OpenRouter via service module
+    // Start with system prompt if available (support both OpenRouter and generic formats)
+    let system_prompt = {
         #[cfg(feature = "openrouter")]
         {
-            use terraphim_service::openrouter::OpenRouterService;
-            match OpenRouterService::new(&api_key, &model) {
-                Ok(client) => {
-                    match client
-                        .chat_completion(messages_json, Some(1024), Some(0.2))
-                        .await
-                    {
-                        Ok(reply) => Ok(Json(ChatResponse {
-                            status: Status::Success,
-                            message: Some(reply),
-                            model_used: Some(used_model),
-                            error: None,
-                        })),
-                        Err(e) => Ok(Json(ChatResponse {
-                            status: Status::Error,
-                            message: None,
-                            model_used: Some(used_model),
-                            error: Some(format!("Chat failed: {}", e)),
-                        })),
+            role.openrouter_chat_system_prompt.or_else(|| {
+                // Try generic system prompt from extra
+                role.extra
+                    .get("system_prompt")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+        }
+        #[cfg(not(feature = "openrouter"))]
+        {
+            // Try generic system prompt from extra
+            role.extra
+                .get("system_prompt")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        }
+    };
+
+    if let Some(system) = &system_prompt {
+        messages_json.push(serde_json::json!({"role":"system","content":system}));
+    }
+
+    // Inject context from conversation if provided
+    if let Some(conversation_id) = &request.conversation_id {
+        let conv_id = ConversationId::from_string(conversation_id.clone());
+        let manager = CONTEXT_MANAGER.lock().await;
+
+        if let Some(conversation) = manager.get_conversation(&conv_id) {
+            // Build context content from all context items
+            let mut context_content = String::new();
+
+            if !conversation.global_context.is_empty() {
+                context_content.push_str("=== CONTEXT INFORMATION ===\n");
+                context_content.push_str("The following information provides relevant context for this conversation:\n\n");
+
+                for (index, context_item) in conversation.global_context.iter().enumerate() {
+                    context_content.push_str(&format!(
+                        "Context Item {}: {}\n",
+                        index + 1,
+                        context_item.title
+                    ));
+                    if let Some(score) = context_item.relevance_score {
+                        context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
                     }
+                    context_content.push_str(&format!("Content: {}\n", context_item.content));
+                    if !context_item.metadata.is_empty() {
+                        context_content
+                            .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
+                    }
+                    context_content.push_str("\n---\n\n");
                 }
-                Err(e) => Ok(Json(ChatResponse {
-                    status: Status::Error,
-                    message: None,
-                    model_used: None,
-                    error: Some(format!("Failed to initialize OpenRouter: {}", e)),
-                })),
+
+                context_content.push_str("=== END CONTEXT ===\n\n");
+                context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
+
+                // Add context as a system message after the main system prompt
+                messages_json
+                    .push(serde_json::json!({"role": "system", "content": context_content}));
             }
         }
     }
 
-    #[cfg(not(feature = "openrouter"))]
-    {
-        Ok(Json(ChatResponse {
+    // Add user messages from the request
+    for m in request.messages.iter() {
+        messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
+    }
+
+    // Determine model name for response
+    let model_name = request
+        .model
+        .or_else(|| {
+            #[cfg(feature = "openrouter")]
+            {
+                role.openrouter_chat_model
+                    .clone()
+                    .or_else(|| role.openrouter_model.clone())
+            }
+            #[cfg(not(feature = "openrouter"))]
+            {
+                None
+            }
+        })
+        .or_else(|| {
+            role.extra
+                .get("llm_model")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .or_else(|| {
+            role.extra
+                .get("ollama_model")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| format!("{} (default)", llm_client.name()));
+
+    // Configure chat options
+    let chat_opts = llm::ChatOptions {
+        max_tokens: request.max_tokens.or(Some(1024)),
+        temperature: request.temperature.or(Some(0.7)),
+    };
+
+    // Call the LLM client
+    match llm_client.chat_completion(messages_json, chat_opts).await {
+        Ok(reply) => Ok(Json(ChatResponse {
+            status: Status::Success,
+            message: Some(reply),
+            model_used: Some(model_name),
+            error: None,
+        })),
+        Err(e) => Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
-            model_used: None,
-            error: Some("OpenRouter feature not enabled during compilation".to_string()),
-        }))
+            model_used: Some(model_name),
+            error: Some(format!("Chat failed: {}", e)),
+        })),
     }
 }
 
