@@ -93,7 +93,7 @@ pub struct Role {
     /// API key for OpenRouter service
     #[cfg(feature = "openrouter")]
     #[serde(default)]
-    pub openrouter_api_key: Option<String>,
+    pub openrouter_api_key: Option<String>, // pragma: allowlist secret
     /// Model to use for generating summaries (e.g., "openai/gpt-3.5-turbo")
     #[cfg(feature = "openrouter")]
     #[serde(default)]
@@ -166,6 +166,8 @@ pub enum ServiceType {
     ClickUp,
     /// Use an MCP client to query a Model Context Protocol server
     Mcp,
+    /// Use Perplexity API for AI-powered web search
+    Perplexity,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
