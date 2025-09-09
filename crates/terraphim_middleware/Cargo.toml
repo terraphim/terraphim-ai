@@ -33,6 +33,7 @@ async-trait = "0.1.73"
 url = "2.4"
 reqwest = { version = "0.11", features = ["json"] }
 scraper = "0.19.0"
+urlencoding = "2.1"
 reqwest-eventsource = { version = "0.5", optional = true }
 mcp-client = { version = "0.1", optional = true }
 mcp-spec = { version = "0.1", optional = true }
@@ -52,6 +53,8 @@ tempfile = "3.8"
 
 [features]
 default = []
+# Enable openrouter integration
+openrouter = ["terraphim_config/openrouter"]
 # Enable SSE-based MCP client probing
 mcp-sse = ["reqwest-eventsource"]
 # High-level MCP support using SSE/http-only (no rust-sdk)

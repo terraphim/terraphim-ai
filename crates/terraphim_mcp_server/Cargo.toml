@@ -40,3 +40,8 @@ terraphim_config = { path = "../terraphim_config" }
 terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
 env_logger = "0.10"
+
+[features]
+default = []
+# Enable openrouter integration
+openrouter = ["terraphim_config/openrouter"]

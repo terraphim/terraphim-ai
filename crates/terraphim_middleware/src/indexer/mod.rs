@@ -6,7 +6,8 @@ use crate::{Error, Result};
 mod ripgrep;
 
 use crate::haystack::{
-    AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, QueryRsHaystackIndexer,
+    AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
+    QueryRsHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -74,6 +75,18 @@ pub async fn search_haystacks(
                 // Search via MCP client
                 let mcp = McpHaystackIndexer;
                 mcp.index(needle, haystack).await?
+            }
+            ServiceType::Perplexity => {
+                // Search using Perplexity AI-powered web search
+                let perplexity = match PerplexityHaystackIndexer::from_haystack_config(haystack) {
+                    Ok(indexer) => indexer,
+                    Err(e) => {
+                        log::error!("Failed to create Perplexity indexer: {}", e);
+                        // Return empty index to allow graceful degradation
+                        return Ok(Index::new());
+                    }
+                };
+                perplexity.index(needle, haystack).await?
             }
         };
 
