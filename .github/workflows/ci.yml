@@ -1,14 +1,14 @@
-name: CI (Earthly - DISABLED)
+name: CI (Earthly - DEPRECATED)
 
-# Temporarily disabled during CI migration to GitHub Actions
-# on:
-#   push:
-#     branches: [main]
-#     tags:
-#       - "*.*.*"
-#   pull_request:
-#     types: [opened, synchronize]
-#   workflow_dispatch:
+on:
+  # DISABLED - Migrated to ci-native.yml with GitHub Actions + Docker Buildx
+  # push:
+  #   branches: [main]
+  #   tags:
+  #     - "*.*.*"
+  # pull_request:
+  #   types: [opened, synchronize]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
