@@ -1,0 +1,253 @@
+# Terraphim AI - Private File Patterns
+# =====================================
+# This file lists patterns for files and directories that should NOT be pushed
+# to public repositories. These patterns are used by the pre-push hook and
+# validation scripts to prevent sensitive data leaks.
+#
+# Pattern syntax:
+# - Use shell glob patterns
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - Patterns are matched against file paths relative to repository root
+#
+# DO NOT delete this file - it's essential for security
+
+# Client and Customer Data
+# ------------------------
+# Note: Exclude legitimate client libraries like terraphim_atomic_client
+client-*
+!crates/terraphim_atomic_client/
+customer-*
+customers/
+clients/
+*-client-*
+!*atomic_client*
+*-customer-*
+proprietary/
+confidential/
+
+# Private Configuration Files  
+# ---------------------------
+*private*.json
+*internal*.json
+*secret*.json
+*prod*.env
+*staging*.env
+*.private.toml
+*.internal.toml
+config/private/
+config/internal/
+config/customers/
+terraphim_server/private/
+terraphim_server/internal/
+terraphim_server/customers/
+
+# API Keys and Secrets
+# --------------------
+*api_key*
+*secret_key*
+*private_key*
+.env.local
+.env.production
+.env.staging
+secrets/
+keys/
+credentials/
+auth/private/
+
+# Database and Persistence
+# ------------------------
+*.private.db
+*.internal.db
+*customer*.db
+private_data/
+internal_data/
+customer_data/
+backups/private/
+dumps/private/
+
+# Documentation and Notes
+# -----------------------
+docs/private/
+docs/internal/
+docs/customers/
+notes/private/
+notes/internal/
+*-private.md
+*-internal.md
+*-confidential.md
+internal-*.md
+private-*.md
+customer-*.md
+PRIVATE*.md
+INTERNAL*.md
+CONFIDENTIAL*.md
+
+# Source Code Directories
+# -----------------------
+src/private/
+src/internal/
+src/customer/
+crates/private_*
+crates/internal_*
+crates/customer_*
+crates/*_private/
+crates/*_internal/
+
+# Build and Cache Directories
+# ---------------------------
+target/private/
+target/internal/
+cache/private/
+cache/internal/
+.private/
+.internal/
+
+# Logs and Reports
+# ----------------
+logs/private/
+logs/internal/
+logs/customer/
+*private*.log
+*internal*.log
+*customer*.log
+# Exclude development logs that may contain "staging" in paths
+!logs/terraphim-mcp-server.log*
+!crates/*/logs/*
+reports/private/
+reports/internal/
+
+# Test Data
+# ---------
+tests/private/
+tests/internal/
+test_data/private/
+test_data/internal/
+fixtures/private/
+fixtures/internal/
+
+# Temporary and Working Files
+# ---------------------------
+tmp/private/
+tmp/internal/
+temp/private/
+temp/internal/
+work/private/
+work/internal/
+scratch/private/
+scratch/internal/
+
+# Version Control and Git
+# -----------------------
+.git/private*
+.git/internal*
+*.private.patch
+*.internal.patch
+
+# IDE and Editor Files
+# --------------------
+.vscode/private/
+.idea/private/
+*.private.code-workspace
+
+# Platform Specific
+# -----------------
+# macOS
+._*private*
+._*internal*
+
+# Windows  
+Thumbs.private.db
+ehthumbs.private.db
+
+# Archives and Backups
+# --------------------
+*private*.zip
+*private*.tar
+*private*.tar.gz
+*internal*.zip
+*internal*.tar
+*internal*.tar.gz
+backup-private-*
+backup-internal-*
+
+# Specific to Terraphim AI
+# ------------------------
+zestic/
+zestic-*
+*-zestic*
+terraphim-private/
+terraphim-internal/
+sqlite_haystack/
+haystack/private/
+haystack/internal/
+haystacks/private/
+haystacks/internal/
+
+# Customer/Client Specific Configurations
+# ---------------------------------------
+*_customer_config.json
+*_client_config.json  
+*_private_config.json
+*_internal_config.json
+customer_*.json
+client_*.json
+
+# AI Model and Training Data
+# --------------------------
+models/private/
+models/internal/
+training/private/
+training/internal/
+datasets/private/
+datasets/internal/
+embeddings/private/
+embeddings/internal/
+
+# Legal and Compliance
+# --------------------
+legal/private/
+compliance/internal/
+contracts/
+agreements/
+licenses/private/
+
+# Financial and Business
+# ----------------------
+financial/
+business/private/
+pricing/internal/
+revenue/
+billing/private/
+
+# Development and Staging Artifacts
+# ---------------------------------
+*-dev-private*
+*-staging-private*
+*-prod-private*
+dev/private/
+staging/private/
+prod/private/
+
+# Monitoring and Analytics
+# ------------------------
+analytics/private/
+metrics/internal/
+monitoring/private/
+telemetry/internal/
+
+# Third-party Integrations
+# ------------------------
+integrations/private/
+webhooks/private/
+api_clients/private/
+
+# Research and Experiments
+# ------------------------
+research/private/
+experiments/internal/
+prototypes/private/
+poc/internal/
+
+# End of .gitprivateignore
+# Add additional patterns above this line
