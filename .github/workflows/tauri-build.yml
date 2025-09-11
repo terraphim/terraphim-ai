@@ -1,0 +1,140 @@
+name: Tauri Build
+
+on:
+  workflow_call:
+    inputs:
+      cache-key:
+        description: 'Cache key for dependencies'
+        required: false
+        type: string
+    outputs:
+      desktop-artifacts:
+        description: 'Path to desktop application artifacts'
+        value: ${{ jobs.build-tauri.outputs.desktop-artifacts }}
+
+env:
+  WORKING_DIRECTORY: ./desktop
+
+jobs:
+  build-tauri:
+    name: Build Tauri desktop app for ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-20.04, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    outputs:
+      desktop-artifacts: ${{ steps.artifacts.outputs.paths }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: ${{ inputs.cache-key }}-tauri-${{ matrix.platform }}-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ inputs.cache-key }}-tauri-${{ matrix.platform }}-
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup2.4-dev \
+            pkg-config
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: yarn run build
+
+      - name: Build Tauri app
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: yarn tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect artifact paths
+        id: artifacts
+        run: |
+          if [[ "${{ matrix.platform }}" == "macos-latest" ]]; then
+            echo "paths=desktop/src-tauri/target/release/bundle/dmg/*.dmg desktop/src-tauri/target/release/bundle/macos/*.app" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.platform }}" == "ubuntu-20.04" ]]; then
+            echo "paths=desktop/src-tauri/target/release/bundle/appimage/*.AppImage desktop/src-tauri/target/release/bundle/deb/*.deb" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
+            echo "paths=desktop/src-tauri/target/release/bundle/msi/*.msi desktop/src-tauri/target/release/bundle/nsis/*.exe" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload desktop artifacts (macOS)
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: |
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/release/bundle/macos/*.app
+          retention-days: 7
+
+      - name: Upload desktop artifacts (Linux)
+        if: matrix.platform == 'ubuntu-20.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: |
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            desktop/src-tauri/target/release/bundle/deb/*.deb
+          retention-days: 7
+
+      - name: Upload desktop artifacts (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: |
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 7
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: build-tauri
+    if: always()
+
+    steps:
+      - name: Build summary
+        run: |
+          echo "## Tauri Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | ${{ needs.build-tauri.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ubuntu | ${{ needs.build-tauri.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | ${{ needs.build-tauri.outputs.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Desktop Applications Built:** .dmg, .AppImage, .deb, .msi, .exe" >> $GITHUB_STEP_SUMMARY

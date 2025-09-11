@@ -23,7 +23,7 @@ terraphim_service = { path = "../crates/terraphim_service", version = "0.1.0" }
 
 anyhow = "1.0.40"
 axum = { version = "0.6.2", features = ["macros"] }
-axum-extra = "0.8.0"
+axum-extra = "0.10.1"
 clap = { version = "4.4.18", features = ["derive"] }
 log = "0.4.14"
 portpicker = "0.1"
@@ -37,10 +37,10 @@ ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 mime_guess = "2.0.4"
 tower = { version = "0.4", features = ["util"] }
 rust-embed = { version = "8.2.0", features = ["axum", "axum-ex", "mime-guess"] }
-env_logger = "0.11.3"
+env_logger = "0.11.8"
 url = "2.5.0"
 ahash = "0.8.11"
-schemars = "0.8"
+schemars = "0.8.22"
 regex = "1.11.0"
 walkdir = "2.4"
 chrono = { version = "0.4", features = ["serde"] }
@@ -48,6 +48,7 @@ chrono = { version = "0.4", features = ["serde"] }
 [features]
 default = []
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+ollama = ["terraphim_service/ollama"]
 # Optional database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
 rocksdb = ["terraphim_persistence/services-rocksdb"]
@@ -59,7 +60,7 @@ full-db = ["sqlite", "rocksdb", "redis"]
 serial_test = "3.0.0"
 tempfile = "3.10.1"
 urlencoding = "2.1.3"
-wiremock = "0.6"
+wiremock = "0.6.4"
 tokio = { version = "1.35.1", features = ["full"] }
 terraphim_tui = { path = "../crates/terraphim_tui", version = "0.1.0" }
 
