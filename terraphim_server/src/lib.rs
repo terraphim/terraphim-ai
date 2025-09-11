@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::{
-    http::{header, Method, StatusCode, Uri},
+    http::{header, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
     Extension, Router,
@@ -414,19 +414,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             post(api::batch_summarize_documents),
         )
         .route(
-            "/summarization/task/:task_id/status",
+            "/summarization/task/{task_id}/status",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/status/",
+            "/summarization/task/{task_id}/status/",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/cancel",
+            "/summarization/task/{task_id}/cancel",
             post(api::cancel_task),
         )
         .route(
-            "/summarization/task/:task_id/cancel/",
+            "/summarization/task/{task_id}/cancel/",
             post(api::cancel_task),
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
@@ -444,12 +444,12 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/rolegraph", get(get_rolegraph))
         .route("/rolegraph/", get(get_rolegraph))
         .route(
-            "/roles/:role_name/kg_search",
+            "/roles/{role_name}/kg_search",
             get(find_documents_by_kg_term),
         )
-        .route("/thesaurus/:role_name", get(api::get_thesaurus))
+        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
         .route(
-            "/autocomplete/:role_name/:query",
+            "/autocomplete/{role_name}/{query}",
             get(api::get_autocomplete),
         )
         // Conversation management routes
@@ -457,34 +457,34 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/conversations", get(api::list_conversations))
         .route("/conversations/", post(api::create_conversation))
         .route("/conversations/", get(api::list_conversations))
-        .route("/conversations/:id", get(api::get_conversation))
-        .route("/conversations/:id/", get(api::get_conversation))
+        .route("/conversations/{id}", get(api::get_conversation))
+        .route("/conversations/{id}/", get(api::get_conversation))
         .route(
-            "/conversations/:id/messages",
+            "/conversations/{id}/messages",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/messages/",
+            "/conversations/{id}/messages/",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/context",
+            "/conversations/{id}/context",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/",
+            "/conversations/{id}/context/",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context",
+            "/conversations/{id}/search-context",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context/",
+            "/conversations/{id}/search-context/",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/:context_id",
+            "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         .fallback(static_handler)
@@ -495,13 +495,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers(Any)
-                .allow_methods(vec![
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::PATCH,
-                    Method::DELETE,
-                ]),
+                .allow_methods(Any),
         );
 
     // Note: Prefixing the host with `http://` makes the URL clickable in some terminals
@@ -513,9 +507,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     // let listener = tokio::net::TcpListener::bind(server_hostname).await?;
     // axum::serve(listener, app).await?;
 
-    axum::Server::bind(&server_hostname)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(&server_hostname).await?;
+    axum::serve(listener, app.into_make_service()).await?;
 
     Ok(())
 }
@@ -596,19 +589,19 @@ pub async fn build_router_for_tests() -> Router {
             post(api::batch_summarize_documents),
         )
         .route(
-            "/summarization/task/:task_id/status",
+            "/summarization/task/{task_id}/status",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/status/",
+            "/summarization/task/{task_id}/status/",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/cancel",
+            "/summarization/task/{task_id}/cancel",
             post(api::cancel_task),
         )
         .route(
-            "/summarization/task/:task_id/cancel/",
+            "/summarization/task/{task_id}/cancel/",
             post(api::cancel_task),
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
@@ -626,12 +619,12 @@ pub async fn build_router_for_tests() -> Router {
         .route("/rolegraph", get(get_rolegraph))
         .route("/rolegraph/", get(get_rolegraph))
         .route(
-            "/roles/:role_name/kg_search",
+            "/roles/{role_name}/kg_search",
             get(find_documents_by_kg_term),
         )
-        .route("/thesaurus/:role_name", get(api::get_thesaurus))
+        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
         .route(
-            "/autocomplete/:role_name/:query",
+            "/autocomplete/{role_name}/{query}",
             get(api::get_autocomplete),
         )
         // Conversation management routes
@@ -639,34 +632,34 @@ pub async fn build_router_for_tests() -> Router {
         .route("/conversations", get(api::list_conversations))
         .route("/conversations/", post(api::create_conversation))
         .route("/conversations/", get(api::list_conversations))
-        .route("/conversations/:id", get(api::get_conversation))
-        .route("/conversations/:id/", get(api::get_conversation))
+        .route("/conversations/{id}", get(api::get_conversation))
+        .route("/conversations/{id}/", get(api::get_conversation))
         .route(
-            "/conversations/:id/messages",
+            "/conversations/{id}/messages",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/messages/",
+            "/conversations/{id}/messages/",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/context",
+            "/conversations/{id}/context",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/",
+            "/conversations/{id}/context/",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context",
+            "/conversations/{id}/search-context",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context/",
+            "/conversations/{id}/search-context/",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/:context_id",
+            "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         .with_state(config_state)
@@ -676,12 +669,6 @@ pub async fn build_router_for_tests() -> Router {
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers(Any)
-                .allow_methods(vec![
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::PATCH,
-                    Method::DELETE,
-                ]),
+                .allow_methods(Any),
         )
 }
