@@ -1356,16 +1356,16 @@
     cross-fetch "^3.1.4"
     fast-json-stable-stringify "^2.1.0"
 
-"@tomic/lib@^0.36.0":
-  version "0.36.1"
-  resolved "https://registry.npmjs.org/@tomic/lib/-/lib-0.36.1.tgz"
-  integrity sha512-EnGK9o4KOzwjH9HC2bT+xt7ExT89auUvgNIkgzJ2tayp96Bz8eoaVhDtZrs1YOuXwxwA0EnGmtZ3PDveBTeLWA==
+"@tomic/lib@^0.40.0":
+  version "0.40.0"
+  resolved "https://registry.yarnpkg.com/@tomic/lib/-/lib-0.40.0.tgz#58d3c870b00ca4040fc0acc7b87e57da360bcb76"
+  integrity sha512-Js8e6EEAnC0zKmk7OuHWv+fkA+2i8C/H2HI8IARD8HPBHO1t4cwnuMsNhVQght3i5d/CSdYysvg44DAiGFGgbQ==
   dependencies:
     "@noble/ed25519" "1.6.0"
     "@noble/hashes" "^0.5.7"
     base64-arraybuffer "^1.0.2"
-    cross-fetch "^3.1.4"
     fast-json-stable-stringify "^2.1.0"
+    ulidx "^2.3.0"
 
 "@tomic/svelte@^0.35.2":
   version "0.35.2"
@@ -4034,6 +4034,11 @@ kleur@^4.1.5:
   resolved "https://registry.npmjs.org/kleur/-/kleur-4.1.5.tgz"
   integrity sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==
 
+layerr@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/layerr/-/layerr-3.0.0.tgz#bc4e0e5986ffd3ab8c3c88b458f53be8dceea29e"
+  integrity sha512-tv754Ki2dXpPVApOrjTyRo4/QegVb9eVFq4mjqp4+NM5NaX7syQvN5BBNfV/ZpAHCEHV24XdUVrBAoka4jt3pA==
+
 levn@^0.4.1:
   version "0.4.1"
   resolved "https://registry.npmjs.org/levn/-/levn-0.4.1.tgz"
@@ -5927,6 +5932,13 @@ ufo@^1.5.4:
   version "1.6.1"
   resolved "https://registry.npmjs.org/ufo/-/ufo-1.6.1.tgz"
   integrity sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==
+
+ulidx@^2.3.0:
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/ulidx/-/ulidx-2.4.1.tgz#c0f60f0552f84d115d42fd52a306033f13404c55"
+  integrity sha512-xY7c8LPyzvhvew0Fn+Ek3wBC9STZAuDI/Y5andCKi9AX6/jvfaX45PhsDX8oxgPL0YFp0Jhr8qWMbS/p9375Xg==
+  dependencies:
+    layerr "^3.0.0"
 
 undici-types@~5.26.4:
   version "5.26.5"
