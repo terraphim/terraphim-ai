@@ -53,7 +53,7 @@ async-once-cell = "0.5.3"
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 thiserror = "1.0.53"
 schemars = { version = "0.8.22", features = ["derive"] }
-tsify = { version = "0.4", features = ["js"], optional = true }
+tsify = { version = "0.5", features = ["js"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
@@ -63,4 +63,4 @@ openrouter = []
 
 [dev-dependencies]
 tempfile = "3.10.1"
-env_logger = "0.10"
+env_logger = "0.11"
