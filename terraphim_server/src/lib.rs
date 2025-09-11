@@ -4,7 +4,7 @@ use std::sync::Arc;
 use axum::{
     http::{header, Method, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
     Extension, Router,
 };
 use regex::Regex;
@@ -122,7 +122,12 @@ use api::{
     create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
     search_documents_post,
 };
-pub use api::{ConfigResponse, CreateDocumentResponse, SearchResponse};
+pub use api::{
+    AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
+    AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
+    CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
+    ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
+};
 pub use error::{Result, Status};
 
 // use axum_embed::ServeEmbed;
@@ -447,6 +452,41 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/autocomplete/:role_name/:query",
             get(api::get_autocomplete),
         )
+        // Conversation management routes
+        .route("/conversations", post(api::create_conversation))
+        .route("/conversations", get(api::list_conversations))
+        .route("/conversations/", post(api::create_conversation))
+        .route("/conversations/", get(api::list_conversations))
+        .route("/conversations/:id", get(api::get_conversation))
+        .route("/conversations/:id/", get(api::get_conversation))
+        .route(
+            "/conversations/:id/messages",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/messages/",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context/",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/:context_id",
+            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
+        )
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
@@ -593,6 +633,41 @@ pub async fn build_router_for_tests() -> Router {
         .route(
             "/autocomplete/:role_name/:query",
             get(api::get_autocomplete),
+        )
+        // Conversation management routes
+        .route("/conversations", post(api::create_conversation))
+        .route("/conversations", get(api::list_conversations))
+        .route("/conversations/", post(api::create_conversation))
+        .route("/conversations/", get(api::list_conversations))
+        .route("/conversations/:id", get(api::get_conversation))
+        .route("/conversations/:id/", get(api::get_conversation))
+        .route(
+            "/conversations/:id/messages",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/messages/",
+            post(api::add_message_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/",
+            post(api::add_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/search-context/",
+            post(api::add_search_context_to_conversation),
+        )
+        .route(
+            "/conversations/:id/context/:context_id",
+            delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         .with_state(config_state)
         .layer(Extension(tx))

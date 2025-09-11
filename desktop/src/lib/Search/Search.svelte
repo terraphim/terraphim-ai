@@ -8,12 +8,21 @@
   import { thesaurus,typeahead } from "../stores";
   import BackButton from "../BackButton.svelte";
   import { parseSearchInput, buildSearchQuery } from "./searchUtils";
+  import TermChip from "./TermChip.svelte";
 
   let results: Document[] = [];
   let error: string | null = null;
   let suggestions: string[] = [];
   let suggestionIndex = -1;
   let selectedOperator: 'none' | 'and' | 'or' = 'none';
+
+  // Term chips state
+  interface SelectedTerm {
+    value: string;
+    isFromKG: boolean;
+  }
+  let selectedTerms: SelectedTerm[] = [];
+  let currentLogicalOperator: 'AND' | 'OR' | null = null;
 
   $: thesaurusEntries = Object.entries($thesaurus);
 
@@ -169,25 +178,20 @@
   }
 
   function applySuggestion(suggestion: string) {
-    const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
-    const cursorPosition = inputElement?.selectionStart ?? 0;
-    const textBeforeCursor = $input.slice(0, cursorPosition);
-    const textAfterCursor = $input.slice(cursorPosition);
-    const words = textBeforeCursor.split(/\s+/);
+    if (suggestion === 'AND' || suggestion === 'OR') {
+      // If it's an operator, set it for the next term
+      currentLogicalOperator = suggestion as 'AND' | 'OR';
 
-    // Handle logical operators specially
-    if (suggestion === "AND" || suggestion === "OR") {
-      // If the last word is being replaced by an operator, add space after
-      words[words.length - 1] = suggestion;
-      $input = [...words, "", textAfterCursor].join(" ");
-      const newPosition = cursorPosition + suggestion.length + 1;
-      inputElement?.setSelectionRange?.(newPosition, newPosition);
+      // Parse current input to add current term if not already added
+      const parsed = parseSearchInput($input);
+      if (parsed.terms.length > 0 && !selectedTerms.some(t => t.value === parsed.terms[parsed.terms.length - 1])) {
+        addSelectedTerm(parsed.terms[parsed.terms.length - 1]);
+      }
+
+      $input = $input + ` ${suggestion} `;
     } else {
-      // Regular term suggestion
-      words[words.length - 1] = suggestion;
-      $input = [...words, textAfterCursor].join(" ");
-      const newPosition = cursorPosition + suggestion.length;
-      inputElement?.setSelectionRange?.(newPosition, newPosition);
+      // It's a term suggestion - add it as a selected term
+      addSelectedTerm(suggestion, currentLogicalOperator);
     }
 
     suggestions = [];
@@ -237,6 +241,50 @@
       skip: 0,
       limit: 10,
     };
+  }
+
+  // Term chips management
+  function addSelectedTerm(term: string, operator: 'AND' | 'OR' | null = null) {
+    // Check if term is from thesaurus (KG)
+    const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
+
+    // Don't add if already selected
+    if (selectedTerms.some(t => t.value.toLowerCase() === term.toLowerCase())) {
+      return;
+    }
+
+    selectedTerms = [...selectedTerms, { value: term, isFromKG }];
+
+    if (operator && selectedTerms.length > 1) {
+      currentLogicalOperator = operator;
+    }
+
+    // Update the input to show the structured query
+    updateInputFromSelectedTerms();
+  }
+
+  function removeSelectedTerm(term: string) {
+    selectedTerms = selectedTerms.filter(t => t.value !== term);
+    updateInputFromSelectedTerms();
+  }
+
+  function updateInputFromSelectedTerms() {
+    if (selectedTerms.length === 0) {
+      $input = '';
+      currentLogicalOperator = null;
+    } else if (selectedTerms.length === 1) {
+      $input = selectedTerms[0].value;
+      currentLogicalOperator = null;
+    } else {
+      const operator = currentLogicalOperator || 'AND';
+      $input = selectedTerms.map(t => t.value).join(` ${operator} `);
+    }
+  }
+
+  function clearSelectedTerms() {
+    selectedTerms = [];
+    currentLogicalOperator = null;
+    $input = '';
   }
 
   async function handleSearchInputEvent() {
@@ -335,6 +383,27 @@
         </ul>
       {/if}
       </div>
+
+      <!-- Selected terms display -->
+      {#if selectedTerms.length > 0}
+        <div class="selected-terms-section">
+          <div class="search-terms">
+            {#each selectedTerms as term, index}
+              <TermChip
+                term={term.value}
+                isFromKG={term.isFromKG}
+                onRemove={() => removeSelectedTerm(term.value)}
+              />
+              {#if index < selectedTerms.length - 1}
+                <span class="operator-chip">{currentLogicalOperator || 'AND'}</span>
+              {/if}
+            {/each}
+          </div>
+          <button type="button" class="clear-terms-btn" on:click={clearSelectedTerms}>
+            Clear all
+          </button>
+        </div>
+      {/if}
 
       <div class="operator-controls">
         <div class="control">
@@ -448,5 +517,29 @@
     align-items: center;
     justify-content: center;
     min-height: 40vh;
+  }
+
+  /* Selected terms section */
+  .selected-terms-section {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+  }
+
+  .clear-terms-btn {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .clear-terms-btn:hover {
+    background: #e0e0e0;
   }
 </style>

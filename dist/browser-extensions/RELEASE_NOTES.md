@@ -7,14 +7,14 @@ Generated on: 2025-09-04 10:01:29
 ### TerraphimAIParseExtension
 - **Version**: 1.0.0
 - **Purpose**: Uses Knowledge Graph from Terraphim AI to parse text in a tab and replace known text with links to concepts
-- **Features**: 
+- **Features**:
   - WASM-based text processing
   - Cloudflare AI integration
   - Side panel interface
   - Context menu integration
   - Configurable wiki link modes
 
-### TerraphimAIContext  
+### TerraphimAIContext
 - **Version**: 0.0.2
 - **Purpose**: Searches for the selected text in Terraphim AI, Atomic Server or Logseq
 - **Features**:
