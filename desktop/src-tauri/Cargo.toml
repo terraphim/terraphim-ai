@@ -62,7 +62,7 @@ chrono = { version = "0.4.38", features = ["serde"] }
 tokio-test = "0.4.4"
 serial_test = "3.1.1"
 tempfile = "3.12.0"
-mockall = "0.13.0"
+mockall = "0.13.1"
 
 [features]
 # by default Tauri runs in production mode
