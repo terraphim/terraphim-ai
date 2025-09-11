@@ -73,7 +73,7 @@
     "@tiptap/extension-mention": "^2.22.1",
     "@tiptap/starter-kit": "^2.22.1",
     "@tiptap/suggestion": "^2.22.1",
-    "@tomic/lib": "^0.36.0",
+    "@tomic/lib": "^0.40.0",
     "@tomic/svelte": "^0.35.2",
     "biome": "^0.3.3",
     "bulma": "^0.9.4",
