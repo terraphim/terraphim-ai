@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Taglist, Tag } from "svelma";
   import { fade } from "svelte/transition";
+  import { router } from "tinro";
   import ArticleModal from "./ArticleModal.svelte";
   import AtomicSaveModal from "./AtomicSaveModal.svelte";
   import type { Document } from "./SearchResult";
@@ -26,6 +27,15 @@
   let summaryError: string | null = null;
   let showAiSummary = false;
   let summaryFromCache = false;
+
+  // Context addition state
+  let addingToContext = false;
+  let contextAdded = false;
+  let contextError: string | null = null;
+
+  // Chat with document state
+  let chattingWithDocument = false;
+  let chatStarted = false;
 
   // Check if current role has atomic server configuration
   $: hasAtomicServer = checkAtomicServerAvailable();
@@ -85,15 +95,30 @@
       href: `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`
     });
 
-    // TODO: Add to favorites (placeholder for future implementation)
+    // Add to context for LLM conversation
     items.push({
-      id: 'add-favorites',
-      label: 'Add to Favorites',
-      icon: 'fas fa-plus',
-      action: () => {/* TODO: Implement add to favorites */},
+      id: 'add-context',
+      label: contextAdded ? 'Added to Context ✓' : (addingToContext ? 'Adding...' : 'Add to Context'),
+      icon: contextAdded ? 'fas fa-check-circle' : (addingToContext ? 'fas fa-spinner fa-spin' : 'fas fa-plus-circle'),
+      action: () => addToContext(),
       visible: true,
-      title: 'Add to favorites (coming soon)',
-      disabled: true
+      title: contextAdded ? 'Document successfully added to chat context. Go to Chat tab to see it.' : 'Add document to LLM conversation context',
+      disabled: addingToContext || contextAdded,
+      className: contextAdded ? 'has-text-success' : (contextError ? 'has-text-danger' : ''),
+      testId: 'add-to-context-button'
+    });
+
+    // Chat with document (add to context + navigate to chat)
+    items.push({
+      id: 'chat-with-document',
+      label: chatStarted ? 'Opening Chat...' : (chattingWithDocument ? 'Adding to Chat...' : 'Chat with Document'),
+      icon: chatStarted ? 'fas fa-external-link-alt' : (chattingWithDocument ? 'fas fa-spinner fa-spin' : 'fas fa-comment-dots'),
+      action: () => addToContextAndChat(),
+      visible: true,
+      title: chatStarted ? 'Opening chat with this document' : 'Add document to context and open chat',
+      disabled: chattingWithDocument || chatStarted || addingToContext,
+      className: chatStarted ? 'has-text-info' : (contextError ? 'has-text-danger' : 'has-text-primary'),
+      testId: 'chat-with-document-button'
     });
 
     return items;
@@ -335,7 +360,7 @@
       const data = await response.json();
       console.log('  📄 Summary response data:', data);
 
-      if (data.status === 'Success' && data.summary) {
+      if (data.status === 'success' && data.summary) {
         aiSummary = data.summary;
         summaryFromCache = data.from_cache || false;
         showAiSummary = true;
@@ -417,6 +442,378 @@
   function openInVSCode() {
     const vscodeUrl = `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`;
     window.open(vscodeUrl, '_blank');
+  }
+
+  async function addToContext() {
+    console.log('📝 Adding document to LLM context:', document.title);
+
+    // Reset state and show loading
+    addingToContext = true;
+    contextAdded = false;
+    contextError = null;
+
+    try {
+      let conversationId = null;
+
+      if ($is_tauri) {
+        // First, try to get or create a conversation
+        try {
+          const conversations = await invoke('list_conversations');
+          console.log('📋 Available conversations:', conversations);
+
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+            console.log('🎯 Using existing conversation:', conversationId);
+          } else {
+            // Create a new conversation
+            const newConv = await invoke('create_conversation', {
+              title: 'Search Context',
+              role: $role || 'default'
+            });
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+              console.log('🆕 Created new conversation:', conversationId);
+            } else {
+              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
+            }
+          }
+        } catch (convError) {
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+        // Use Tauri command for desktop app
+        const metadata = {
+          source_type: 'document',
+          document_id: document.id,
+        };
+
+        if (document.url) metadata.url = document.url;
+        if (document.tags && document.tags.length > 0) metadata.tags = document.tags.join(', ');
+        if (document.rank !== undefined) metadata.rank = document.rank.toString();
+
+        const contextResult = await invoke('add_context_to_conversation', {
+          conversationId: conversationId,
+          contextType: 'document',
+          title: document.title,
+          content: document.body,
+          metadata: metadata
+        });
+
+        console.log('✅ Document added to context via Tauri:', contextResult);
+
+      } else {
+        // Web mode - use HTTP API
+        const baseUrl = CONFIG.ServerURL;
+
+        // First, try to get or create a conversation
+        try {
+          const conversationsResponse = await fetch(`${baseUrl}/conversations`);
+          if (conversationsResponse.ok) {
+            const conversationsData = await conversationsResponse.json();
+            if (conversationsData.conversations && conversationsData.conversations.length > 0) {
+              conversationId = conversationsData.conversations[0].id;
+              console.log('🎯 Using existing conversation:', conversationId);
+            } else {
+              // Create a new conversation
+              const newConvResponse = await fetch(`${baseUrl}/conversations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: 'Search Context',
+                  role: $role || 'default'
+                })
+              });
+              if (newConvResponse.ok) {
+                const newConvData = await newConvResponse.json();
+                if (newConvData.status === 'success' && newConvData.conversation_id) {
+                  conversationId = newConvData.conversation_id;
+                  console.log('🆕 Created new conversation:', conversationId);
+                } else {
+                  throw new Error('Failed to create conversation: ' + (newConvData.error || 'Unknown error'));
+                }
+              } else {
+                throw new Error(`Failed to create conversation: ${newConvResponse.status} ${newConvResponse.statusText}`);
+              }
+            }
+          } else {
+            throw new Error(`Failed to list conversations: ${conversationsResponse.status} ${conversationsResponse.statusText}`);
+          }
+        } catch (convError) {
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+        // Add document context to conversation
+        const url = `${baseUrl}/conversations/${conversationId}/context`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context_type: 'document',
+            title: document.title,
+            content: document.body,
+            metadata: {
+              source_type: 'document',
+              document_id: document.id,
+              url: document.url || '',
+              tags: document.tags ? document.tags.join(', ') : '',
+              rank: document.rank ? document.rank.toString() : '0'
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Document added to context via HTTP:', data);
+      }
+
+      console.log('✅ Successfully added document to LLM context');
+
+      // Show success state
+      contextAdded = true;
+
+      // Show success notification with navigation hint
+      const notification = window.document.createElement('div');
+      notification.className = 'notification is-success is-light';
+      notification.innerHTML = `
+        <button class="delete" onclick="this.parentElement.remove()"></button>
+        <strong>✓ Added to Chat Context</strong><br>
+        <small>Document added successfully. <a href="/chat" class="has-text-success has-text-weight-bold">Go to Chat →</a> to see it in the context panel.</small>
+      `;
+      notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
+      window.document.body.appendChild(notification);
+
+      // Auto-remove notification after 8 seconds
+      setTimeout(() => {
+        notification.remove();
+      }, 8000);
+
+      // Reset success state after a delay to allow re-adding if needed
+      setTimeout(() => {
+        contextAdded = false;
+      }, 5000);
+
+    } catch (error) {
+      console.error('❌ Error adding document to context:', error);
+
+      // Show error state
+      contextError = error.message || 'Failed to add document to context';
+
+      // Show error notification
+      const notification = window.document.createElement('div');
+      notification.className = 'notification is-danger is-light';
+      notification.innerHTML = `
+        <button class="delete" onclick="this.parentElement.remove()"></button>
+        <strong>✗ Failed to Add Context</strong><br>
+        <small>${contextError}</small>
+      `;
+      notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
+      window.document.body.appendChild(notification);
+
+      // Auto-remove notification after 8 seconds
+      setTimeout(() => {
+        notification.remove();
+      }, 8000);
+
+      // Clear error after a delay
+      setTimeout(() => {
+        contextError = null;
+      }, 5000);
+
+    } finally {
+      addingToContext = false;
+    }
+  }
+
+  async function addToContextAndChat() {
+    console.log('💬 Adding document to context and opening chat:', document.title);
+
+    // Reset state and show loading
+    chattingWithDocument = true;
+    chatStarted = false;
+    contextError = null;
+
+    try {
+      let conversationId = null;
+
+      if ($is_tauri) {
+        // First, try to get or create a conversation
+        try {
+          const conversations = await invoke('list_conversations');
+          console.log('📋 Available conversations:', conversations);
+
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+            console.log('🎯 Using existing conversation:', conversationId);
+          } else {
+            // Create a new conversation
+            const newConv = await invoke('create_conversation', {
+              title: 'Chat with Documents',
+              role: $role || 'default'
+            });
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+              console.log('🆕 Created new conversation:', conversationId);
+            } else {
+              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
+            }
+          }
+        } catch (convError) {
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+        // Use Tauri command for desktop app
+        const metadata = {
+          source_type: 'document',
+          document_id: document.id,
+        };
+
+        if (document.url) metadata.url = document.url;
+        if (document.tags && document.tags.length > 0) metadata.tags = document.tags.join(', ');
+        if (document.rank !== undefined) metadata.rank = document.rank.toString();
+
+        const contextResult = await invoke('add_context_to_conversation', {
+          conversationId: conversationId,
+          contextType: 'document',
+          title: document.title,
+          content: document.body,
+          metadata: metadata
+        });
+
+        console.log('✅ Document added to context via Tauri:', contextResult);
+
+      } else {
+        // Web mode - use HTTP API
+        const baseUrl = CONFIG.ServerURL;
+
+        // First, try to get or create a conversation
+        try {
+          const conversationsResponse = await fetch(`${baseUrl}/conversations`);
+          if (conversationsResponse.ok) {
+            const conversationsData = await conversationsResponse.json();
+            if (conversationsData.conversations && conversationsData.conversations.length > 0) {
+              conversationId = conversationsData.conversations[0].id;
+              console.log('🎯 Using existing conversation:', conversationId);
+            } else {
+              // Create a new conversation
+              const newConvResponse = await fetch(`${baseUrl}/conversations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: 'Chat with Documents',
+                  role: $role || 'default'
+                })
+              });
+              if (newConvResponse.ok) {
+                const newConvData = await newConvResponse.json();
+                if (newConvData.status === 'success' && newConvData.conversation_id) {
+                  conversationId = newConvData.conversation_id;
+                  console.log('🆕 Created new conversation:', conversationId);
+                } else {
+                  throw new Error('Failed to create conversation: ' + (newConvData.error || 'Unknown error'));
+                }
+              } else {
+                throw new Error(`Failed to create conversation: ${newConvResponse.status} ${newConvResponse.statusText}`);
+              }
+            }
+          } else {
+            throw new Error(`Failed to list conversations: ${conversationsResponse.status} ${conversationsResponse.statusText}`);
+          }
+        } catch (convError) {
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+        // Add document context to conversation
+        const url = `${baseUrl}/conversations/${conversationId}/context`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context_type: 'document',
+            title: document.title,
+            content: document.body,
+            metadata: {
+              source_type: 'document',
+              document_id: document.id,
+              url: document.url || '',
+              tags: document.tags ? document.tags.join(', ') : '',
+              rank: document.rank ? document.rank.toString() : '0'
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Document added to context via HTTP:', data);
+      }
+
+      console.log('✅ Successfully added document to chat context, navigating to chat...');
+
+      // Show success state briefly
+      chatStarted = true;
+
+      // Show brief success notification before navigation
+      const notification = window.document.createElement('div');
+      notification.className = 'notification is-success is-light';
+      notification.innerHTML = `
+        <strong>💬 Opening Chat with Document</strong><br>
+        <small>Context added successfully. Redirecting to chat...</small>
+      `;
+      notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
+      window.document.body.appendChild(notification);
+
+      // Navigate to chat after a brief delay
+      setTimeout(() => {
+        notification.remove();
+        router.goto('/chat');
+      }, 1500);
+
+      // Reset states after navigation
+      setTimeout(() => {
+        chatStarted = false;
+      }, 2000);
+
+    } catch (error) {
+      console.error('❌ Error adding document to context and opening chat:', error);
+
+      // Show error state
+      contextError = error.message || 'Failed to add document to context';
+
+      // Show error notification
+      const notification = window.document.createElement('div');
+      notification.className = 'notification is-danger is-light';
+      notification.innerHTML = `
+        <button class="delete" onclick="this.parentElement.remove()"></button>
+        <strong>✗ Failed to Open Chat with Document</strong><br>
+        <small>${contextError}</small>
+      `;
+      notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
+      window.document.body.appendChild(notification);
+
+      // Auto-remove notification after 8 seconds
+      setTimeout(() => {
+        notification.remove();
+      }, 8000);
+
+      // Clear error after a delay
+      setTimeout(() => {
+        contextError = null;
+      }, 5000);
+
+    } finally {
+      chattingWithDocument = false;
+    }
   }
 
   if (configStore[$role] !== undefined) {
@@ -595,8 +992,9 @@
                     aria-label={item.title}
                     on:click={item.action}
                     title={item.title}
+                    data-testid={item.testId || ''}
                   >
-                    <span class="icon is-medium" class:has-text-primary={item.className}>
+                    <span class="icon is-medium" class:has-text-primary={item.className?.includes('primary')} class:has-text-success={item.className?.includes('success')} class:has-text-danger={item.className?.includes('danger')}>
                       <i class={item.icon} />
                     </span>
                   </button>
@@ -608,6 +1006,14 @@
       </div>
     </div>
   </article>
+
+  <!-- Context addition feedback -->
+  {#if contextError}
+    <div class="notification is-danger is-light mt-2">
+      <button class="delete" on:click={() => contextError = null}></button>
+      {contextError}
+    </div>
+  {/if}
 </div>
 
 <!-- Original document modal -->

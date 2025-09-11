@@ -11,6 +11,9 @@ use std::str::FromStr;
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
+// Add chrono for timestamps
+use chrono::{DateTime, Utc};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -343,7 +346,9 @@ impl Thesaurus {
         self.data.get(key)
     }
 
-    pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
+    pub fn keys(
+        &self,
+    ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
         self.data.keys()
     }
 }
@@ -512,8 +517,10 @@ impl SearchQuery {
     /// Get all search terms (both single and multiple)
     pub fn get_all_terms(&self) -> Vec<&NormalizedTermValue> {
         if let Some(ref multiple_terms) = self.search_terms {
-            // For multi-term queries, use search_terms (which should contain all terms)
-            multiple_terms.iter().collect()
+            // For multi-term queries, include both primary term and additional terms
+            let mut all_terms = vec![&self.search_term];
+            all_terms.extend(multiple_terms.iter());
+            all_terms
         } else {
             // For single-term queries, use search_term
             vec![&self.search_term]
@@ -593,6 +600,355 @@ pub enum KnowledgeGraphInputType {
     /// A JSON files
     #[serde(rename = "json")]
     Json,
+}
+
+// ======================== Chat and Context Types ========================
+
+/// Unique identifier for messages in a conversation
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MessageId(pub String);
+
+impl MessageId {
+    pub fn new() -> Self {
+        Self(uuid::Uuid::new_v4().to_string())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Default for MessageId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Display for MessageId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Unique identifier for conversations
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ConversationId(pub String);
+
+impl ConversationId {
+    pub fn new() -> Self {
+        Self(uuid::Uuid::new_v4().to_string())
+    }
+
+    pub fn from_string(s: String) -> Self {
+        Self(s)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Default for ConversationId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Display for ConversationId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Types of context that can be added to conversations
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ContextType {
+    /// System-level context
+    System,
+    /// User-provided context
+    UserInput,
+    /// Document-based context
+    Document,
+    /// Search result context
+    SearchResult,
+    /// External data or API context
+    External,
+}
+
+/// Context item that can be attached to conversations or messages
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextItem {
+    /// Unique identifier for the context item
+    pub id: String,
+    /// Type of context
+    pub context_type: ContextType,
+    /// Title or summary of the context
+    pub title: String,
+    /// Optional summary of the context
+    pub summary: Option<String>,
+    /// The actual content
+    pub content: String,
+    /// Additional metadata
+    pub metadata: AHashMap<String, String>,
+    /// When the context was created
+    pub created_at: DateTime<Utc>,
+    /// Optional relevance score for ranking
+    pub relevance_score: Option<f64>,
+}
+
+impl ContextItem {
+    /// Create a new context item from a document
+    pub fn from_document(document: &Document) -> Self {
+        let content = format!(
+            "{}\n\n{}{}",
+            document.title,
+            document.body,
+            document
+                .description
+                .as_ref()
+                .map(|d| format!("\n\n{}", d))
+                .unwrap_or_default()
+        );
+
+        let mut metadata = AHashMap::new();
+        metadata.insert("source_type".to_string(), "document".to_string());
+        metadata.insert("document_id".to_string(), document.id.clone());
+        metadata.insert("url".to_string(), document.url.clone());
+
+        // Add tags if available
+        if let Some(tags) = &document.tags {
+            metadata.insert("tags".to_string(), tags.join(", "));
+        }
+
+        // Add rank if available
+        if let Some(rank) = document.rank {
+            metadata.insert("rank".to_string(), rank.to_string());
+        }
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            context_type: ContextType::Document,
+            title: document.title.clone(),
+            summary: document.description.clone(),
+            content,
+            metadata,
+            created_at: Utc::now(),
+            relevance_score: document.rank.map(|r| r as f64),
+        }
+    }
+
+    /// Create a context item from search results
+    pub fn from_search_result(query: &str, documents: &[Document]) -> Self {
+        let content = if documents.is_empty() {
+            format!(
+                "Search query: {}\n\nNo results found for this search.",
+                query
+            )
+        } else {
+            let results = documents
+                .iter()
+                .enumerate()
+                .map(|(i, doc)| {
+                    format!(
+                        "{}. {} ({})\n{}\n{}\n",
+                        i + 1,
+                        doc.title,
+                        doc.url,
+                        doc.description
+                            .as_ref()
+                            .unwrap_or(&"No description".to_string()),
+                        doc.body.chars().take(200).collect::<String>()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n---\n");
+
+            format!("Search query: {}\n\n{}", query, results)
+        };
+
+        let max_relevance = documents
+            .iter()
+            .filter_map(|d| d.rank)
+            .max()
+            .map(|r| r as f64);
+
+        let mut metadata = AHashMap::new();
+        metadata.insert("source_type".to_string(), "search_result".to_string());
+        metadata.insert("query".to_string(), query.to_string());
+        metadata.insert("result_count".to_string(), documents.len().to_string());
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            context_type: ContextType::SearchResult,
+            title: format!("Search: {}", query),
+            summary: Some(format!(
+                "Search results for '{}' - {} documents found",
+                query,
+                documents.len()
+            )),
+            content,
+            metadata,
+            created_at: Utc::now(),
+            relevance_score: max_relevance,
+        }
+    }
+}
+
+/// A message in a conversation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessage {
+    /// Unique identifier for the message
+    pub id: MessageId,
+    /// Role: "user", "assistant", or "system"
+    pub role: String,
+    /// The message content
+    pub content: String,
+    /// Context items associated with this specific message
+    pub context_items: Vec<ContextItem>,
+    /// When the message was created
+    pub created_at: DateTime<Utc>,
+    /// Optional model information for assistant messages
+    pub model_used: Option<String>,
+}
+
+impl ChatMessage {
+    /// Create a new user message
+    pub fn user(content: String) -> Self {
+        Self {
+            id: MessageId::new(),
+            role: "user".to_string(),
+            content,
+            context_items: Vec::new(),
+            created_at: Utc::now(),
+            model_used: None,
+        }
+    }
+
+    /// Create a new assistant message
+    pub fn assistant(content: String, model: Option<String>) -> Self {
+        Self {
+            id: MessageId::new(),
+            role: "assistant".to_string(),
+            content,
+            context_items: Vec::new(),
+            created_at: Utc::now(),
+            model_used: model,
+        }
+    }
+
+    /// Create a new system message
+    pub fn system(content: String) -> Self {
+        Self {
+            id: MessageId::new(),
+            role: "system".to_string(),
+            content,
+            context_items: Vec::new(),
+            created_at: Utc::now(),
+            model_used: None,
+        }
+    }
+
+    /// Add context to this message
+    pub fn add_context(&mut self, context: ContextItem) {
+        self.context_items.push(context);
+    }
+}
+
+/// A conversation containing messages and global context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Conversation {
+    /// Unique identifier for the conversation
+    pub id: ConversationId,
+    /// Title of the conversation
+    pub title: String,
+    /// Role associated with this conversation
+    pub role: RoleName,
+    /// Messages in the conversation
+    pub messages: Vec<ChatMessage>,
+    /// Global context items for the entire conversation
+    pub global_context: Vec<ContextItem>,
+    /// When the conversation was created
+    pub created_at: DateTime<Utc>,
+    /// When the conversation was last updated
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Conversation {
+    /// Create a new conversation
+    pub fn new(title: String, role: RoleName) -> Self {
+        let now = Utc::now();
+        Self {
+            id: ConversationId::new(),
+            title,
+            role,
+            messages: Vec::new(),
+            global_context: Vec::new(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Add a message to the conversation
+    pub fn add_message(&mut self, message: ChatMessage) {
+        self.messages.push(message);
+        self.updated_at = Utc::now();
+    }
+
+    /// Add global context to the conversation
+    pub fn add_global_context(&mut self, context: ContextItem) {
+        self.global_context.push(context);
+        self.updated_at = Utc::now();
+    }
+
+    /// Estimate the total context length for LLM usage
+    pub fn estimated_context_length(&self) -> usize {
+        let global_context_length: usize = self
+            .global_context
+            .iter()
+            .map(|ctx| ctx.content.len())
+            .sum();
+
+        let message_context_length: usize = self
+            .messages
+            .iter()
+            .flat_map(|msg| &msg.context_items)
+            .map(|ctx| ctx.content.len())
+            .sum();
+
+        let message_length: usize = self.messages.iter().map(|msg| msg.content.len()).sum();
+
+        global_context_length + message_context_length + message_length
+    }
+}
+
+/// Summary of a conversation for listing purposes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationSummary {
+    /// Unique identifier
+    pub id: ConversationId,
+    /// Title of the conversation
+    pub title: String,
+    /// Role associated with the conversation
+    pub role: RoleName,
+    /// Number of messages in the conversation
+    pub message_count: usize,
+    /// When the conversation was created
+    pub created_at: DateTime<Utc>,
+    /// When the conversation was last updated
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<&Conversation> for ConversationSummary {
+    fn from(conversation: &Conversation) -> Self {
+        Self {
+            id: conversation.id.clone(),
+            title: conversation.title.clone(),
+            role: conversation.role.clone(),
+            message_count: conversation.messages.len(),
+            created_at: conversation.created_at,
+            updated_at: conversation.updated_at,
+        }
+    }
 }
 
 #[cfg(test)]

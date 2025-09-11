@@ -78,17 +78,23 @@
       console.log("Setting theme to:", newTheme);
       theme.set(newTheme);
 
-      // Handle thesaurus publishing
+      // Handle thesaurus publishing with storage quota management
       if (selectedRoleSettings.kg?.publish) {
         if ($is_tauri) {
-          invoke("publish_thesaurus", { roleName: config.selected_role }).then((res) => {
-            console.log("publish_thesaurus response", res);
-            thesaurus.set(res as any);
-            typeahead.set(true);
-          });
+          invoke("publish_thesaurus", { roleName: config.selected_role })
+            .then((res) => {
+              console.log("publish_thesaurus response", res);
+              thesaurus.set(res as any);
+              typeahead.set(true);
+            })
+            .catch((error) => {
+              console.error("Error publishing thesaurus:", error);
+              typeahead.set(false);
+            });
         } else {
-          // Web mode: fetch thesaurus from HTTP endpoint
+          // Web mode: fetch thesaurus from HTTP endpoint with storage management
           console.log("Fetching thesaurus from HTTP endpoint for role", config.selected_role);
+
           fetch(`${CONFIG.ServerURL}/thesaurus/${encodeURIComponent(config.selected_role)}`)
             .then((response) => response.json())
             .then((res) => {

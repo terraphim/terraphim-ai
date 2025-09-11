@@ -26,11 +26,7 @@ pub enum Status {
     Error,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ErrorResponse {
-    pub status: Status,
-    pub message: String,
-}
+// ErrorResponse removed - using specific response types instead
 
 // Everything we return from commands must implement `Serialize`.
 // This includes Errors and `anyhow`'s `Error` type doesn't implement it.
@@ -762,4 +758,462 @@ pub async fn get_autocomplete_suggestions(
         suggestions,
         error: None,
     })
+}
+
+// =================== CONVERSATION MANAGEMENT COMMANDS ===================
+
+use terraphim_service::context::{ContextConfig, ContextManager};
+use terraphim_types::{
+    ChatMessage as TerraphimChatMessage, ContextItem, ContextType, ConversationId,
+    ConversationSummary,
+};
+
+/// Response for conversation creation
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct CreateConversationResponse {
+    pub status: Status,
+    pub conversation_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Response for listing conversations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ListConversationsResponse {
+    pub status: Status,
+    pub conversations: Vec<ConversationSummary>,
+    pub error: Option<String>,
+}
+
+/// Response for getting a single conversation
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct GetConversationResponse {
+    pub status: Status,
+    pub conversation: Option<terraphim_types::Conversation>,
+    pub error: Option<String>,
+}
+
+/// Response for adding a message
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AddMessageResponse {
+    pub status: Status,
+    pub message_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Response for adding context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AddContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Response for updating context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct UpdateContextResponse {
+    pub status: Status,
+    pub context: Option<ContextItem>,
+    pub error: Option<String>,
+}
+
+/// Response for deleting context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct DeleteContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Request for updating context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct UpdateContextRequest {
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub content: Option<String>,
+    pub context_type: Option<String>,
+    pub metadata: Option<HashMap<String, String>>,
+}
+
+/// Global context manager instance for Tauri commands
+use tokio::sync::Mutex as TokioMutex;
+
+#[allow(clippy::incompatible_msrv)]
+static CONTEXT_MANAGER: std::sync::OnceLock<Arc<TokioMutex<ContextManager>>> =
+    std::sync::OnceLock::new();
+
+#[allow(clippy::incompatible_msrv)]
+fn get_context_manager() -> &'static Arc<TokioMutex<ContextManager>> {
+    CONTEXT_MANAGER.get_or_init(|| {
+        Arc::new(TokioMutex::new(ContextManager::new(
+            ContextConfig::default(),
+        )))
+    })
+}
+
+/// Create a new conversation
+#[command]
+pub async fn create_conversation(
+    title: String,
+    role: String,
+) -> Result<CreateConversationResponse> {
+    log::debug!("Creating conversation '{}' with role '{}'", title, role);
+
+    let role_name = role.into();
+    let mut manager = get_context_manager().lock().await;
+
+    match manager.create_conversation(title, role_name).await {
+        Ok(conversation_id) => {
+            log::debug!("Created conversation with ID: {}", conversation_id.as_str());
+            Ok(CreateConversationResponse {
+                status: Status::Success,
+                conversation_id: Some(conversation_id.as_str().to_string()),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to create conversation: {}", e);
+            Ok(CreateConversationResponse {
+                status: Status::Error,
+                conversation_id: None,
+                error: Some(format!("Failed to create conversation: {}", e)),
+            })
+        }
+    }
+}
+
+/// List all conversations
+#[command]
+pub async fn list_conversations(limit: Option<usize>) -> Result<ListConversationsResponse> {
+    log::debug!("Listing conversations with limit: {:?}", limit);
+
+    let manager = get_context_manager().lock().await;
+    let conversations = manager.list_conversations(limit);
+
+    log::debug!("Found {} conversations", conversations.len());
+
+    Ok(ListConversationsResponse {
+        status: Status::Success,
+        conversations,
+        error: None,
+    })
+}
+
+/// Get a specific conversation
+#[command]
+pub async fn get_conversation(conversation_id: String) -> Result<GetConversationResponse> {
+    log::debug!("Getting conversation with ID: {}", conversation_id);
+
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+    let manager = get_context_manager().lock().await;
+
+    match manager.get_conversation(&conv_id) {
+        Some(conversation) => {
+            log::debug!("Found conversation: {}", conversation.title);
+            Ok(GetConversationResponse {
+                status: Status::Success,
+                conversation: Some((*conversation).clone()),
+                error: None,
+            })
+        }
+        None => {
+            log::warn!("Conversation not found: {}", conv_id.as_str());
+            Ok(GetConversationResponse {
+                status: Status::Error,
+                conversation: None,
+                error: Some("Conversation not found".to_string()),
+            })
+        }
+    }
+}
+
+/// Add a message to a conversation
+#[command]
+pub async fn add_message_to_conversation(
+    conversation_id: String,
+    content: String,
+    role: Option<String>,
+) -> Result<AddMessageResponse> {
+    log::debug!(
+        "Adding message to conversation {}: {} chars, role: {:?}",
+        conversation_id,
+        content.len(),
+        role
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+    let message_role = role.unwrap_or_else(|| "user".to_string());
+
+    let message = if message_role == "user" {
+        TerraphimChatMessage::user(content)
+    } else if message_role == "assistant" {
+        TerraphimChatMessage::assistant(content, None)
+    } else if message_role == "system" {
+        TerraphimChatMessage::system(content)
+    } else {
+        log::error!("Invalid role: {}", message_role);
+        return Ok(AddMessageResponse {
+            status: Status::Error,
+            message_id: None,
+            error: Some(format!("Invalid role: {}", message_role)),
+        });
+    };
+
+    let mut manager = get_context_manager().lock().await;
+    match manager.add_message(&conv_id, message) {
+        Ok(message_id) => {
+            log::debug!("Added message with ID: {}", message_id.as_str());
+            Ok(AddMessageResponse {
+                status: Status::Success,
+                message_id: Some(message_id.as_str().to_string()),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to add message: {}", e);
+            Ok(AddMessageResponse {
+                status: Status::Error,
+                message_id: None,
+                error: Some(format!("Failed to add message: {}", e)),
+            })
+        }
+    }
+}
+
+/// Add context to a conversation
+#[command]
+pub async fn add_context_to_conversation(
+    conversation_id: String,
+    context_type: String,
+    title: String,
+    summary: Option<String>,
+    content: String,
+    metadata: Option<HashMap<String, String>>,
+) -> Result<AddContextResponse> {
+    log::debug!(
+        "Adding context to conversation {}: type={}, title={}",
+        conversation_id,
+        context_type,
+        title
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+
+    let ctx_type = match context_type.as_str() {
+        "document" => ContextType::Document,
+        "search_result" => ContextType::SearchResult,
+        "user_input" => ContextType::UserInput,
+        "system" => ContextType::System,
+        "external" => ContextType::External,
+        _ => {
+            log::error!("Invalid context type: {}", context_type);
+            return Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Invalid context type: {}", context_type)),
+            });
+        }
+    };
+
+    let context_item = ContextItem {
+        id: ulid::Ulid::new().to_string(),
+        context_type: ctx_type,
+        title,
+        summary,
+        content,
+        metadata: metadata.unwrap_or_default().into_iter().collect(),
+        created_at: chrono::Utc::now(),
+        relevance_score: None,
+    };
+
+    let mut manager = get_context_manager().lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => {
+            log::debug!("Successfully added context to conversation");
+            Ok(AddContextResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to add context: {}", e);
+            Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to add context: {}", e)),
+            })
+        }
+    }
+}
+
+/// Add search results as context to a conversation
+#[command]
+pub async fn add_search_context_to_conversation(
+    conversation_id: String,
+    query: String,
+    documents: Vec<Document>,
+    limit: Option<usize>,
+) -> Result<AddContextResponse> {
+    log::debug!(
+        "Adding search context to conversation {}: query='{}', {} documents",
+        conversation_id,
+        query,
+        documents.len()
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+    let mut manager = get_context_manager().lock().await;
+
+    let context_item = manager.create_search_context(&query, &documents, limit);
+
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => {
+            log::debug!("Successfully added search context to conversation");
+            Ok(AddContextResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to add search context: {}", e);
+            Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to add search context: {}", e)),
+            })
+        }
+    }
+}
+
+/// Delete context from a conversation
+#[command]
+pub async fn delete_context(
+    conversation_id: String,
+    context_id: String,
+) -> Result<DeleteContextResponse> {
+    log::debug!(
+        "Deleting context {} from conversation {}",
+        context_id,
+        conversation_id
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+    let mut manager = get_context_manager().lock().await;
+
+    match manager.delete_context(&conv_id, &context_id) {
+        Ok(()) => {
+            log::debug!("Successfully deleted context from conversation");
+            Ok(DeleteContextResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to delete context: {}", e);
+            Ok(DeleteContextResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to delete context: {}", e)),
+            })
+        }
+    }
+}
+
+/// Update context in a conversation
+#[command]
+pub async fn update_context(
+    conversation_id: String,
+    context_id: String,
+    request: UpdateContextRequest,
+) -> Result<UpdateContextResponse> {
+    log::debug!(
+        "Updating context {} in conversation {}: title={:?}",
+        context_id,
+        conversation_id,
+        request.title
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+
+    // Get the existing context first
+    let manager = get_context_manager().lock().await;
+    let conversation = match manager.get_conversation(&conv_id) {
+        Some(conv) => conv,
+        None => {
+            log::error!("Conversation {} not found", conversation_id);
+            return Ok(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Conversation {} not found", conversation_id)),
+            });
+        }
+    };
+
+    let existing_context = conversation
+        .global_context
+        .iter()
+        .find(|item| item.id == context_id);
+
+    let existing_context = match existing_context {
+        Some(ctx) => ctx.clone(),
+        None => {
+            log::error!("Context item {} not found", context_id);
+            return Ok(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Context item {} not found", context_id)),
+            });
+        }
+    };
+
+    // Build the updated context item
+    let context_type = if let Some(type_str) = &request.context_type {
+        match type_str.as_str() {
+            "document" => ContextType::Document,
+            "search_result" => ContextType::SearchResult,
+            "user_input" => ContextType::UserInput,
+            "system" => ContextType::System,
+            "external" => ContextType::External,
+            _ => existing_context.context_type,
+        }
+    } else {
+        existing_context.context_type
+    };
+
+    let updated_context = ContextItem {
+        id: context_id.clone(),
+        context_type,
+        title: request.title.unwrap_or(existing_context.title),
+        summary: request.summary.or(existing_context.summary),
+        content: request.content.unwrap_or(existing_context.content),
+        metadata: request
+            .metadata
+            .map(|m| m.into_iter().collect())
+            .unwrap_or(existing_context.metadata),
+        created_at: existing_context.created_at,
+        relevance_score: existing_context.relevance_score,
+    };
+
+    drop(manager); // Release the lock
+    let mut manager = get_context_manager().lock().await;
+
+    match manager.update_context(&conv_id, &context_id, updated_context.clone()) {
+        Ok(context) => {
+            log::debug!("Successfully updated context in conversation");
+            Ok(UpdateContextResponse {
+                status: Status::Success,
+                context: Some(context),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to update context: {}", e);
+            Ok(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Failed to update context: {}", e)),
+            })
+        }
+    }
 }

@@ -30,6 +30,17 @@ pub trait LlmClient: Send + Sync {
         ))
     }
 
+    /// Perform a chat completion with messages
+    async fn chat_completion(
+        &self,
+        _messages: Vec<serde_json::Value>,
+        _opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        Err(crate::ServiceError::Config(
+            "Chat completion not supported by this provider".to_string(),
+        ))
+    }
+
     // Reserved for future: streaming chat
 }
 
@@ -43,6 +54,30 @@ pub fn role_wants_ai_summarize(role: &terraphim_config::Role) -> bool {
 
 /// Best-effort builder that inspects role settings and returns an LLM client if configured.
 pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    // Check if there's a nested "extra" key (this handles a serialization issue)
+    if let Some(nested_extra) = role.extra.get("extra") {
+        // Try to extract from nested extra
+        if let Some(nested_obj) = nested_extra.as_object() {
+            let nested_map: AHashMap<String, Value> = nested_obj
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+
+            if let Some(provider) = get_string_extra(&nested_map, "llm_provider") {
+                match provider.as_str() {
+                    "ollama" => {
+                        return build_ollama_from_nested_extra(&nested_map);
+                    }
+                    "openrouter" => {
+                        // Would implement similar nested extraction for OpenRouter
+                        return None;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     // Prefer explicit `llm_provider` in `extra`
     if let Some(provider) = get_string_extra(&role.extra, "llm_provider") {
         match provider.as_str() {
@@ -125,6 +160,18 @@ impl LlmClient for OpenRouterClient {
     async fn list_models(&self) -> ServiceResult<Vec<String>> {
         let models = self.inner.list_models().await?;
         Ok(models)
+    }
+
+    async fn chat_completion(
+        &self,
+        messages: Vec<serde_json::Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        let response = self
+            .inner
+            .chat_completion(messages, opts.max_tokens, opts.temperature)
+            .await?;
+        Ok(response)
     }
 }
 
@@ -299,6 +346,97 @@ impl LlmClient for OllamaClient {
         }
         Ok(models)
     }
+
+    async fn chat_completion(
+        &self,
+        messages: Vec<serde_json::Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        let max_attempts = 3;
+        let url = format!("{}/api/chat", self.base_url.trim_end_matches('/'));
+        let mut last_err: Option<crate::ServiceError> = None;
+
+        for attempt in 1..=max_attempts {
+            let body = serde_json::json!({
+                "model": self.model,
+                "messages": messages,
+                "stream": false,
+                "options": {
+                    "temperature": opts.temperature.unwrap_or(0.7),
+                    "num_predict": opts.max_tokens.unwrap_or(1024)
+                }
+            });
+
+            let req = self
+                .http
+                .post(url.clone())
+                .timeout(std::time::Duration::from_secs(60))
+                .json(&body);
+
+            match req.send().await {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        let status = resp.status();
+                        let text = resp.text().await.unwrap_or_default();
+                        last_err = Some(crate::ServiceError::Config(format!(
+                            "Ollama chat error {}: {}",
+                            status, text
+                        )));
+                        // Retry on 5xx; break on 4xx
+                        if status.is_server_error() && attempt < max_attempts {
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    match resp.json::<serde_json::Value>().await {
+                        Ok(json) => {
+                            let content = json
+                                .get("message")
+                                .and_then(|m| m.get("content"))
+                                .and_then(|c| c.as_str())
+                                .unwrap_or("")
+                                .trim()
+                                .to_string();
+
+                            if content.is_empty() {
+                                last_err = Some(crate::ServiceError::Config(
+                                    "Ollama returned empty response".to_string(),
+                                ));
+                                if attempt < max_attempts {
+                                    continue;
+                                }
+                            } else {
+                                return Ok(content);
+                            }
+                        }
+                        Err(e) => {
+                            last_err = Some(crate::ServiceError::Config(format!(
+                                "Invalid Ollama chat response: {}",
+                                e
+                            )));
+                            if attempt < max_attempts {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(crate::ServiceError::Config(format!(
+                        "Ollama chat request failed: {}",
+                        e
+                    )));
+                    if attempt < max_attempts {
+                        continue;
+                    }
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| {
+            crate::ServiceError::Config("Ollama chat request failed (unknown)".to_string())
+        }))
+    }
 }
 
 #[cfg(feature = "ollama")]
@@ -317,6 +455,32 @@ fn build_ollama_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmCl
         base_url,
         model,
     }) as Arc<dyn LlmClient>)
+}
+
+#[cfg(feature = "ollama")]
+fn build_ollama_from_nested_extra(
+    nested_extra: &AHashMap<String, Value>,
+) -> Option<Arc<dyn LlmClient>> {
+    let model = get_string_extra(nested_extra, "llm_model")
+        .or_else(|| get_string_extra(nested_extra, "ollama_model"))
+        .unwrap_or_else(|| "llama3.1".to_string());
+    let base_url = get_string_extra(nested_extra, "llm_base_url")
+        .or_else(|| get_string_extra(nested_extra, "ollama_base_url"))
+        .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
+
+    let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
+    Some(Arc::new(OllamaClient {
+        http,
+        base_url,
+        model,
+    }) as Arc<dyn LlmClient>)
+}
+
+#[cfg(not(feature = "ollama"))]
+fn build_ollama_from_nested_extra(
+    _nested_extra: &AHashMap<String, Value>,
+) -> Option<Arc<dyn LlmClient>> {
+    None
 }
 
 #[cfg(not(feature = "ollama"))]

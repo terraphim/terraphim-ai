@@ -35,6 +35,12 @@ pub mod summarization_worker;
 // Centralized error handling patterns and utilities
 pub mod error;
 
+// Context management for LLM conversations
+pub mod context;
+
+#[cfg(test)]
+mod context_tests;
+
 /// Normalize a filename to be used as a document ID
 ///
 /// This ensures consistent ID generation between server startup and edit API
@@ -783,6 +789,28 @@ impl TerraphimService {
         }
 
         Ok(document)
+    }
+
+    /// Preprocess document content with both KG linking and search term highlighting
+    pub async fn preprocess_document_content_with_search(
+        &mut self,
+        document: Document,
+        role: &Role,
+        search_query: Option<&SearchQuery>,
+    ) -> Result<Document> {
+        // First apply KG preprocessing if enabled
+        let mut processed_doc = self.preprocess_document_content(document, role).await?;
+
+        // Then apply search term highlighting if query is provided
+        if let Some(query) = search_query {
+            log::debug!(
+                "Applying search term highlighting to document '{}'",
+                processed_doc.title
+            );
+            processed_doc.body = Self::highlight_search_terms(&processed_doc.body, query);
+        }
+
+        Ok(processed_doc)
     }
 
     /// Create document
@@ -2519,6 +2547,50 @@ impl TerraphimService {
         }
 
         Ok(current_config.clone())
+    }
+
+    /// Highlight search terms in the given text content
+    ///
+    /// This method wraps matching search terms with HTML-style highlighting tags
+    /// to make them visually distinct in the frontend.
+    fn highlight_search_terms(content: &str, search_query: &SearchQuery) -> String {
+        let mut highlighted_content = content.to_string();
+
+        // Get all terms from the search query
+        let terms = search_query.get_all_terms();
+
+        // Sort terms by length (longest first) to avoid partial replacements
+        let mut sorted_terms: Vec<&str> = terms.iter().map(|t| t.as_str()).collect();
+        sorted_terms.sort_by_key(|term| std::cmp::Reverse(term.len()));
+
+        for term in sorted_terms {
+            if term.trim().is_empty() {
+                continue;
+            }
+
+            // Create case-insensitive regex for the term
+            // Escape special regex characters in the search term
+            let escaped_term = regex::escape(term);
+
+            if let Ok(regex) = regex::RegexBuilder::new(&escaped_term)
+                .case_insensitive(true)
+                .build()
+            {
+                // Replace all matches with highlighted version
+                // Use a unique delimiter to avoid conflicts with existing HTML
+                let highlight_open = "<mark class=\"search-highlight\">";
+                let highlight_close = "</mark>";
+
+                highlighted_content = regex
+                    .replace_all(
+                        &highlighted_content,
+                        format!("{}{}{}", highlight_open, "$0", highlight_close),
+                    )
+                    .to_string();
+            }
+        }
+
+        highlighted_content
     }
 }
 

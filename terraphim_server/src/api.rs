@@ -530,12 +530,18 @@ pub struct ChatMessage {
 /// Chat request payload
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatRequest {
-    /// Role to use for chat (determines OpenRouter configuration)
+    /// Role to use for chat (determines LLM configuration)
     pub role: String,
     /// Conversation so far
     pub messages: Vec<ChatMessage>,
     /// Optional model override
     pub model: Option<String>,
+    /// Optional conversation ID to include context from
+    pub conversation_id: Option<String>,
+    /// Optional maximum tokens for the response
+    pub max_tokens: Option<u32>,
+    /// Optional temperature for response randomness (0.0-1.0)
+    pub temperature: Option<f32>,
 }
 
 /// Chat response payload
@@ -547,7 +553,7 @@ pub struct ChatResponse {
     pub error: Option<String>,
 }
 
-/// Handle chat completion via OpenRouter
+/// Handle chat completion via generic LLM client (OpenRouter, Ollama, etc.)
 pub(crate) async fn chat_completion(
     State(config_state): State<ConfigState>,
     Json(request): Json<ChatRequest>,
@@ -564,95 +570,144 @@ pub(crate) async fn chat_completion(
         }));
     };
 
-    #[cfg(feature = "openrouter")]
-    {
-        if !role_ref.has_openrouter_config() || !role_ref.openrouter_chat_enabled {
-            return Ok(Json(ChatResponse {
-                status: Status::Error,
-                message: None,
-                model_used: None,
-                error: Some(
-                    "OpenRouter chat not enabled or not configured for this role".to_string(),
-                ),
-            }));
-        }
+    // Clone role data to use after releasing the lock
+    let role = role_ref.clone();
+    drop(config);
 
-        // Clone role data to use after releasing the lock
-        let role = role_ref.clone();
+    // Try to build an LLM client from the role configuration
+    use terraphim_service::llm;
+    let Some(llm_client) = llm::build_llm_from_role(&role) else {
+        return Ok(Json(ChatResponse {
+            status: Status::Error,
+            message: None,
+            model_used: None,
+            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
+        }));
+    };
 
-        let api_key = if let Some(key) = &role.openrouter_api_key {
-            key.clone()
-        } else {
-            std::env::var("OPENROUTER_KEY").map_err(|_| {
-                crate::error::ApiError(
-                    StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("OpenRouter API key not found in role configuration or OPENROUTER_KEY environment variable"),
-                )
-            })?
-        };
+    // Build messages array; optionally inject system prompt and context
+    let mut messages_json: Vec<serde_json::Value> = Vec::new();
 
-        let model = request
-            .model
-            .or_else(|| role.openrouter_chat_model.clone())
-            .or_else(|| role.openrouter_model.clone())
-            .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
-
-        drop(config);
-
-        // Build messages array; optionally inject system prompt
-        let mut messages_json: Vec<serde_json::Value> = Vec::new();
-        if let Some(system) = &role.openrouter_chat_system_prompt {
-            messages_json.push(serde_json::json!({"role":"system","content":system}));
-        }
-        for m in request.messages.iter() {
-            messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
-        }
-
-        #[allow(unused_mut)]
-        let mut used_model = model.clone();
-
-        // Call OpenRouter via service module
+    // Start with system prompt if available (support both OpenRouter and generic formats)
+    let system_prompt = {
         #[cfg(feature = "openrouter")]
         {
-            use terraphim_service::openrouter::OpenRouterService;
-            match OpenRouterService::new(&api_key, &model) {
-                Ok(client) => {
-                    match client
-                        .chat_completion(messages_json, Some(1024), Some(0.2))
-                        .await
-                    {
-                        Ok(reply) => Ok(Json(ChatResponse {
-                            status: Status::Success,
-                            message: Some(reply),
-                            model_used: Some(used_model),
-                            error: None,
-                        })),
-                        Err(e) => Ok(Json(ChatResponse {
-                            status: Status::Error,
-                            message: None,
-                            model_used: Some(used_model),
-                            error: Some(format!("Chat failed: {}", e)),
-                        })),
+            role.openrouter_chat_system_prompt.or_else(|| {
+                // Try generic system prompt from extra
+                role.extra
+                    .get("system_prompt")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+        }
+        #[cfg(not(feature = "openrouter"))]
+        {
+            // Try generic system prompt from extra
+            role.extra
+                .get("system_prompt")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        }
+    };
+
+    if let Some(system) = &system_prompt {
+        messages_json.push(serde_json::json!({"role":"system","content":system}));
+    }
+
+    // Inject context from conversation if provided
+    if let Some(conversation_id) = &request.conversation_id {
+        let conv_id = ConversationId::from_string(conversation_id.clone());
+        let manager = CONTEXT_MANAGER.lock().await;
+
+        if let Some(conversation) = manager.get_conversation(&conv_id) {
+            // Build context content from all context items
+            let mut context_content = String::new();
+
+            if !conversation.global_context.is_empty() {
+                context_content.push_str("=== CONTEXT INFORMATION ===\n");
+                context_content.push_str("The following information provides relevant context for this conversation:\n\n");
+
+                for (index, context_item) in conversation.global_context.iter().enumerate() {
+                    context_content.push_str(&format!(
+                        "Context Item {}: {}\n",
+                        index + 1,
+                        context_item.title
+                    ));
+                    if let Some(score) = context_item.relevance_score {
+                        context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
                     }
+                    context_content.push_str(&format!("Content: {}\n", context_item.content));
+                    if !context_item.metadata.is_empty() {
+                        context_content
+                            .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
+                    }
+                    context_content.push_str("\n---\n\n");
                 }
-                Err(e) => Ok(Json(ChatResponse {
-                    status: Status::Error,
-                    message: None,
-                    model_used: None,
-                    error: Some(format!("Failed to initialize OpenRouter: {}", e)),
-                })),
+
+                context_content.push_str("=== END CONTEXT ===\n\n");
+                context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
+
+                // Add context as a system message after the main system prompt
+                messages_json
+                    .push(serde_json::json!({"role": "system", "content": context_content}));
             }
         }
     }
 
-    #[cfg(not(feature = "openrouter"))]
-    {
-        Ok(Json(ChatResponse {
+    // Add user messages from the request
+    for m in request.messages.iter() {
+        messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
+    }
+
+    // Determine model name for response
+    let model_name = request
+        .model
+        .or_else(|| {
+            #[cfg(feature = "openrouter")]
+            {
+                role.openrouter_chat_model
+                    .clone()
+                    .or_else(|| role.openrouter_model.clone())
+            }
+            #[cfg(not(feature = "openrouter"))]
+            {
+                None
+            }
+        })
+        .or_else(|| {
+            role.extra
+                .get("llm_model")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .or_else(|| {
+            role.extra
+                .get("ollama_model")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| format!("{} (default)", llm_client.name()));
+
+    // Configure chat options
+    let chat_opts = llm::ChatOptions {
+        max_tokens: request.max_tokens.or(Some(1024)),
+        temperature: request.temperature.or(Some(0.7)),
+    };
+
+    // Call the LLM client
+    match llm_client.chat_completion(messages_json, chat_opts).await {
+        Ok(reply) => Ok(Json(ChatResponse {
+            status: Status::Success,
+            message: Some(reply),
+            model_used: Some(model_name),
+            error: None,
+        })),
+        Err(e) => Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
-            model_used: None,
-            error: Some("OpenRouter feature not enabled during compilation".to_string()),
-        }))
+            model_used: Some(model_name),
+            error: Some(format!("Chat failed: {}", e)),
+        })),
     }
 }
 
@@ -1660,4 +1715,381 @@ pub(crate) async fn get_autocomplete(
         suggestions,
         error: None,
     }))
+}
+
+// =================== CONVERSATION MANAGEMENT API ===================
+
+use terraphim_service::context::{ContextConfig, ContextManager};
+use terraphim_types::{ConversationId, ConversationSummary};
+
+/// Global context manager instance
+pub static CONTEXT_MANAGER: std::sync::LazyLock<tokio::sync::Mutex<ContextManager>> =
+    std::sync::LazyLock::new(|| {
+        tokio::sync::Mutex::new(ContextManager::new(ContextConfig::default()))
+    });
+
+/// Request to create a new conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateConversationRequest {
+    pub title: String,
+    pub role: String,
+}
+
+/// Response for conversation creation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateConversationResponse {
+    pub status: Status,
+    pub conversation_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Request to list conversations
+#[derive(Debug, Deserialize)]
+pub struct ListConversationsQuery {
+    pub limit: Option<usize>,
+}
+
+/// Response for listing conversations
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListConversationsResponse {
+    pub status: Status,
+    pub conversations: Vec<ConversationSummary>,
+    pub error: Option<String>,
+}
+
+/// Response for getting a single conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GetConversationResponse {
+    pub status: Status,
+    pub conversation: Option<terraphim_types::Conversation>,
+    pub error: Option<String>,
+}
+
+/// Request to add a message to a conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddMessageRequest {
+    pub content: String,
+    pub role: Option<String>, // Default to "user"
+}
+
+/// Response for adding a message
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddMessageResponse {
+    pub status: Status,
+    pub message_id: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Request to add context to a conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddContextRequest {
+    pub context_type: String, // "document" | "search_result" | "user_input"
+    pub title: String,
+    pub summary: Option<String>,
+    pub content: String,
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Response for adding context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Request to add search results as context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AddSearchContextRequest {
+    pub query: String,
+    pub documents: Vec<Document>,
+    pub limit: Option<usize>,
+}
+
+/// Request to update context in a conversation
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateContextRequest {
+    pub context_type: Option<String>,
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub content: Option<String>,
+    pub metadata: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Response for updating context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateContextResponse {
+    pub status: Status,
+    pub context: Option<terraphim_types::ContextItem>,
+    pub error: Option<String>,
+}
+
+/// Response for deleting context
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeleteContextResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Create a new conversation
+pub(crate) async fn create_conversation(
+    Json(request): Json<CreateConversationRequest>,
+) -> Result<Json<CreateConversationResponse>> {
+    let role_name = RoleName::new(&request.role);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.create_conversation(request.title, role_name).await {
+        Ok(conversation_id) => Ok(Json(CreateConversationResponse {
+            status: Status::Success,
+            conversation_id: Some(conversation_id.as_str().to_string()),
+            error: None,
+        })),
+        Err(e) => Ok(Json(CreateConversationResponse {
+            status: Status::Error,
+            conversation_id: None,
+            error: Some(format!("Failed to create conversation: {}", e)),
+        })),
+    }
+}
+
+/// List conversations
+pub(crate) async fn list_conversations(
+    Query(params): Query<ListConversationsQuery>,
+) -> Result<Json<ListConversationsResponse>> {
+    let manager = CONTEXT_MANAGER.lock().await;
+    let conversations = manager.list_conversations(params.limit);
+    Ok(Json(ListConversationsResponse {
+        status: Status::Success,
+        conversations,
+        error: None,
+    }))
+}
+
+/// Get a specific conversation
+pub(crate) async fn get_conversation(
+    Path(conversation_id): Path<String>,
+) -> Result<Json<GetConversationResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let manager = CONTEXT_MANAGER.lock().await;
+    match manager.get_conversation(&conv_id) {
+        Some(conversation) => Ok(Json(GetConversationResponse {
+            status: Status::Success,
+            conversation: Some((*conversation).clone()),
+            error: None,
+        })),
+        None => Ok(Json(GetConversationResponse {
+            status: Status::Error,
+            conversation: None,
+            error: Some("Conversation not found".to_string()),
+        })),
+    }
+}
+
+/// Add a message to a conversation
+pub(crate) async fn add_message_to_conversation(
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddMessageRequest>,
+) -> Result<Json<AddMessageResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+    let role = request.role.unwrap_or_else(|| "user".to_string());
+
+    let message = if role == "user" {
+        terraphim_types::ChatMessage::user(request.content)
+    } else if role == "assistant" {
+        terraphim_types::ChatMessage::assistant(request.content, None)
+    } else if role == "system" {
+        terraphim_types::ChatMessage::system(request.content)
+    } else {
+        return Ok(Json(AddMessageResponse {
+            status: Status::Error,
+            message_id: None,
+            error: Some(format!("Invalid role: {}", role)),
+        }));
+    };
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.add_message(&conv_id, message) {
+        Ok(message_id) => Ok(Json(AddMessageResponse {
+            status: Status::Success,
+            message_id: Some(message_id.as_str().to_string()),
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddMessageResponse {
+            status: Status::Error,
+            message_id: None,
+            error: Some(format!("Failed to add message: {}", e)),
+        })),
+    }
+}
+
+/// Add context to a conversation
+pub(crate) async fn add_context_to_conversation(
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddContextRequest>,
+) -> Result<Json<AddContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let context_type = match request.context_type.as_str() {
+        "document" => terraphim_types::ContextType::Document,
+        "search_result" => terraphim_types::ContextType::SearchResult,
+        "user_input" => terraphim_types::ContextType::UserInput,
+        "system" => terraphim_types::ContextType::System,
+        "external" => terraphim_types::ContextType::External,
+        _ => {
+            return Ok(Json(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Invalid context type: {}", request.context_type)),
+            }))
+        }
+    };
+
+    let context_item = terraphim_types::ContextItem {
+        id: ulid::Ulid::new().to_string(),
+        context_type,
+        title: request.title,
+        summary: request.summary,
+        content: request.content,
+        metadata: request.metadata.unwrap_or_default().into_iter().collect(),
+        created_at: chrono::Utc::now(),
+        relevance_score: None,
+    };
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => Ok(Json(AddContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to add context: {}", e)),
+        })),
+    }
+}
+
+/// Add search results as context to a conversation
+pub(crate) async fn add_search_context_to_conversation(
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddSearchContextRequest>,
+) -> Result<Json<AddContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    let context_item =
+        manager.create_search_context(&request.query, &request.documents, request.limit);
+
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => Ok(Json(AddContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to add search context: {}", e)),
+        })),
+    }
+}
+
+/// Delete context from a conversation
+pub(crate) async fn delete_context_from_conversation(
+    Path((conversation_id, context_id)): Path<(String, String)>,
+) -> Result<Json<DeleteContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.delete_context(&conv_id, &context_id) {
+        Ok(()) => Ok(Json(DeleteContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(DeleteContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to delete context: {}", e)),
+        })),
+    }
+}
+
+/// Update context in a conversation
+pub(crate) async fn update_context_in_conversation(
+    Path((conversation_id, context_id)): Path<(String, String)>,
+    Json(request): Json<UpdateContextRequest>,
+) -> Result<Json<UpdateContextResponse>> {
+    let conv_id = ConversationId::from_string(conversation_id.clone());
+
+    // Get the existing context item first
+    let manager = CONTEXT_MANAGER.lock().await;
+    let conversation = match manager.get_conversation(&conv_id) {
+        Some(conv) => conv,
+        None => {
+            return Ok(Json(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Conversation {} not found", conversation_id)),
+            }))
+        }
+    };
+
+    // Find the existing context item
+    let existing_context = conversation
+        .global_context
+        .iter()
+        .find(|item| item.id == context_id);
+
+    let existing_context = match existing_context {
+        Some(ctx) => ctx,
+        None => {
+            return Ok(Json(UpdateContextResponse {
+                status: Status::Error,
+                context: None,
+                error: Some(format!("Context item {} not found", context_id)),
+            }))
+        }
+    };
+
+    // Build the updated context item
+    let context_type = if let Some(ref type_str) = request.context_type {
+        match type_str.as_str() {
+            "document" => terraphim_types::ContextType::Document,
+            "search_result" => terraphim_types::ContextType::SearchResult,
+            "user_input" => terraphim_types::ContextType::UserInput,
+            "system" => terraphim_types::ContextType::System,
+            "external" => terraphim_types::ContextType::External,
+            _ => existing_context.context_type.clone(),
+        }
+    } else {
+        existing_context.context_type.clone()
+    };
+
+    let updated_context = terraphim_types::ContextItem {
+        id: context_id.clone(),
+        context_type,
+        title: request
+            .title
+            .unwrap_or_else(|| existing_context.title.clone()),
+        summary: request.summary.or_else(|| existing_context.summary.clone()),
+        content: request
+            .content
+            .unwrap_or_else(|| existing_context.content.clone()),
+        metadata: request
+            .metadata
+            .map(|m| m.into_iter().collect())
+            .unwrap_or_else(|| existing_context.metadata.clone()),
+        created_at: existing_context.created_at,
+        relevance_score: existing_context.relevance_score,
+    };
+
+    drop(manager); // Release the lock before re-acquiring it
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.update_context(&conv_id, &context_id, updated_context.clone()) {
+        Ok(context) => Ok(Json(UpdateContextResponse {
+            status: Status::Success,
+            context: Some(context),
+            error: None,
+        })),
+        Err(e) => Ok(Json(UpdateContextResponse {
+            status: Status::Error,
+            context: None,
+            error: Some(format!("Failed to update context: {}", e)),
+        })),
+    }
 }
