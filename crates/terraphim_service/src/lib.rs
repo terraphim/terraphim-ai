@@ -515,11 +515,23 @@ impl TerraphimService {
         // Filter thesaurus to only include meaningful terms and avoid over-linking
         let mut kg_thesaurus = Thesaurus::new(format!("kg_links_{}", role.name));
 
-        // Very selective KG term filtering to avoid clutter:
-        // Only include highly specific, domain-relevant terms
-        let excluded_common_terms = [
-            "service",
+        // Prioritize important KG terms while excluding overly generic ones
+        // Key KG concepts should always be included even if they're common
+        let important_kg_terms = [
+            "graph",
             "haystack",
+            "service",
+            "terraphim",
+            "knowledge",
+            "embedding",
+            "search",
+            "automata",
+            "thesaurus",
+            "rolegraph",
+        ];
+
+        // Exclude only very generic programming/technical terms that don't add value
+        let excluded_common_terms = [
             "system",
             "config",
             "configuration",
@@ -616,26 +628,47 @@ impl TerraphimService {
             .filter(|(key, _)| {
                 let term = key.as_str();
 
-                // Exclude empty terms, very short terms, and common technical terms
-                if term.is_empty() || term.len() < 3 || excluded_common_terms.contains(&term) {
+                // Always exclude empty or very short terms
+                if term.is_empty() || term.len() < 3 {
+                    return false;
+                }
+
+                // Always include important KG terms, even if they're short
+                if important_kg_terms.contains(&term) {
+                    return true;
+                }
+
+                // Exclude generic technical terms
+                if excluded_common_terms.contains(&term) {
                     return false;
                 }
 
                 // Include terms that are:
-                // 1. Moderately long (>6 chars) OR
+                // 1. Moderately long (>5 chars) OR
                 // 2. Hyphenated compound terms OR
                 // 3. Underscore-separated compound terms OR
                 // 4. Capitalized terms (likely proper nouns or important concepts)
-                term.len() > 6
+                term.len() > 5
                     || term.contains('-')
                     || term.contains('_')
                     || term.chars().next().is_some_and(|c| c.is_uppercase())
             })
             .collect();
-        sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id)); // Sort by relevance (ID)
 
-        // Take only the top 3 most specific terms to minimize clutter
-        let max_kg_terms = 3;
+        // Sort by relevance, but prioritize important KG terms
+        sorted_terms.sort_by(|a, b| {
+            let a_important = important_kg_terms.contains(&a.0.as_str());
+            let b_important = important_kg_terms.contains(&b.0.as_str());
+
+            match (a_important, b_important) {
+                (true, false) => std::cmp::Ordering::Less, // a comes first
+                (false, true) => std::cmp::Ordering::Greater, // b comes first
+                _ => b.1.id.cmp(&a.1.id),                  // Both or neither important, sort by ID
+            }
+        });
+
+        // Take more terms since we're being more selective about quality
+        let max_kg_terms = 8;
         for (key, value) in sorted_terms.into_iter().take(max_kg_terms) {
             let mut kg_value = value.clone();
             // IMPORTANT: Keep the original term (key) as visible text, link to root concept (value.value)
@@ -648,9 +681,10 @@ impl TerraphimService {
 
         let kg_terms_count = kg_thesaurus.len();
         log::info!(
-            "📋 KG thesaurus filtering: {} → {} terms (filters: len>12, hyphenated, or contains graph/terraphim/knowledge/embedding)",
+            "📋 KG thesaurus filtering: {} → {} terms (prioritizing: {}, filters: len>5, hyphenated, or important KG terms)",
             thesaurus.len(),
-            kg_terms_count
+            kg_terms_count,
+            important_kg_terms.join(", ")
         );
 
         // Log the actual terms that passed filtering for debugging
@@ -913,15 +947,33 @@ impl TerraphimService {
     /// and applies KG term preprocessing accordingly. It prevents double processing
     /// by checking if KG links already exist in the document.
     async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
+        log::debug!(
+            "🔍 [KG-DEBUG] apply_kg_preprocessing_if_needed called for document: '{}'",
+            document.title
+        );
+        log::debug!(
+            "🔍 [KG-DEBUG] Document body preview: {}",
+            document.body.chars().take(100).collect::<String>()
+        );
+
         let role = {
             let config = self.config_state.config.lock().await;
             let selected_role = &config.selected_role;
 
+            log::debug!("🔍 [KG-DEBUG] Selected role: '{}'", selected_role);
+
             match config.roles.get(selected_role) {
-                Some(role) => role.clone(), // Clone to avoid borrowing issues
-                None => {
+                Some(role) => {
                     log::debug!(
-                        "Selected role '{}' not found, skipping KG preprocessing",
+                        "🔍 [KG-DEBUG] Role found: '{}', terraphim_it: {}",
+                        role.name,
+                        role.terraphim_it
+                    );
+                    role.clone() // Clone to avoid borrowing issues
+                }
+                None => {
+                    log::warn!(
+                        "❌ [KG-DEBUG] Selected role '{}' not found in config, skipping KG preprocessing",
                         selected_role
                     );
                     return Ok(document);
@@ -931,35 +983,60 @@ impl TerraphimService {
 
         // Only apply preprocessing if role has terraphim_it enabled
         if !role.terraphim_it {
-            log::debug!(
-                "terraphim_it disabled for role '{}', skipping KG preprocessing",
+            log::info!(
+                "🔍 [KG-DEBUG] terraphim_it disabled for role '{}', skipping KG preprocessing",
                 role.name
             );
             return Ok(document);
         }
 
         // Check if document already has KG links to prevent double processing
-        if document.body.contains("](kg:") {
-            log::debug!(
-                "Document '{}' already has KG links, skipping preprocessing to prevent double processing",
+        let has_existing_kg_links = document.body.contains("](kg:");
+        log::debug!(
+            "🔍 [KG-DEBUG] Document already has KG links: {}",
+            has_existing_kg_links
+        );
+        if has_existing_kg_links {
+            log::info!(
+                "🔍 [KG-DEBUG] Document '{}' already has KG links, skipping preprocessing to prevent double processing",
                 document.title
             );
             return Ok(document);
         }
 
         log::info!(
-            "🧠 Applying KG preprocessing to document '{}' for role '{}' (terraphim_it enabled)",
+            "🧠 [KG-DEBUG] Starting KG preprocessing for document '{}' with role '{}' (terraphim_it enabled)",
             document.title,
             role.name
         );
 
         // Apply KG preprocessing
-        let processed_doc = self.preprocess_document_content(document, &role).await?;
-
-        log::debug!(
-            "✅ KG preprocessing completed for document '{}'",
-            processed_doc.title
-        );
+        let document_title = document.title.clone(); // Save title before moving document
+        let processed_doc = match self.preprocess_document_content(document, &role).await {
+            Ok(doc) => {
+                let links_added = doc.body.contains("](kg:");
+                log::info!(
+                    "✅ [KG-DEBUG] KG preprocessing completed for document '{}'. Links added: {}",
+                    doc.title,
+                    links_added
+                );
+                if links_added {
+                    log::debug!(
+                        "🔍 [KG-DEBUG] Processed body preview: {}",
+                        doc.body.chars().take(200).collect::<String>()
+                    );
+                }
+                doc
+            }
+            Err(e) => {
+                log::error!(
+                    "❌ [KG-DEBUG] KG preprocessing failed for document '{}': {:?}",
+                    document_title,
+                    e
+                );
+                return Err(e);
+            }
+        };
 
         Ok(processed_doc)
     }
@@ -1087,69 +1164,6 @@ impl TerraphimService {
             // Fallback to simple contains if regex compilation fails
             text.contains(term)
         }
-    }
-
-    /// Check if a position in text is inside an existing HTML link tag
-    fn is_inside_link(text: &str, position: usize) -> bool {
-        // Find the most recent opening <a> tag before this position
-        let text_before = &text[..position];
-        let last_open = text_before.rfind("<a ");
-        let last_close = text_before.rfind("</a>");
-
-        match (last_open, last_close) {
-            (Some(open_pos), Some(close_pos)) => open_pos > close_pos,
-            (Some(_), None) => true,
-            _ => false,
-        }
-    }
-
-    /// Highlight search terms in text without interfering with existing KG links
-    fn highlight_search_terms(text: &str, search_query: &SearchQuery) -> String {
-        let mut result = text.to_string();
-
-        // Get all search terms from the query
-        let all_terms = search_query.get_all_terms();
-
-        for term in all_terms {
-            let term_str = term.as_str();
-            log::debug!("Highlighting search term: '{}'", term_str);
-
-            // Create regex pattern with word boundaries for better matching
-            let pattern = format!(r"\b{}\b", regex::escape(term_str));
-            if let Ok(regex) = Regex::new(&pattern) {
-                // Find all matches and their positions first to avoid borrow conflicts
-                let matches: Vec<_> = regex
-                    .find_iter(&result)
-                    .map(|m| (m.start(), m.end(), result[m.start()..m.end()].to_string()))
-                    .collect();
-
-                // Apply highlighting in reverse order to maintain positions
-                for (start, end, matched_text) in matches.into_iter().rev() {
-                    // Only highlight if not inside an existing link
-                    if !Self::is_inside_link(&result, start) {
-                        let highlighted =
-                            format!("<mark class='search-highlight'>{}</mark>", matched_text);
-                        result.replace_range(start..end, &highlighted);
-                        log::debug!(
-                            "Highlighted '{}' at position {}-{}",
-                            matched_text,
-                            start,
-                            end
-                        );
-                    } else {
-                        log::debug!(
-                            "Skipping highlight for '{}' at position {} (inside link)",
-                            matched_text,
-                            start
-                        );
-                    }
-                }
-            } else {
-                log::warn!("Failed to compile regex for term: '{}'", term_str);
-            }
-        }
-
-        result
     }
 
     /// Apply logical operators (AND/OR) to filter documents based on multiple search terms
@@ -2093,13 +2107,8 @@ impl TerraphimService {
                     );
                     let mut processed_docs = Vec::new();
                     for document in documents {
-                        let processed_doc = self
-                            .preprocess_document_content_with_search(
-                                document,
-                                &role,
-                                Some(search_query),
-                            )
-                            .await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
                     Ok(processed_docs)
@@ -2473,6 +2482,17 @@ impl TerraphimService {
         current_config.clone()
     }
 
+    // Test helper methods
+    #[cfg(test)]
+    pub async fn get_role(&self, role_name: &RoleName) -> Result<Role> {
+        let config = self.config_state.config.lock().await;
+        config
+            .roles
+            .get(role_name)
+            .cloned()
+            .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found", role_name)))
+    }
+
     /// Update the config
     ///
     /// Overwrites the config in the config state and returns the updated
@@ -2527,6 +2547,50 @@ impl TerraphimService {
         }
 
         Ok(current_config.clone())
+    }
+
+    /// Highlight search terms in the given text content
+    ///
+    /// This method wraps matching search terms with HTML-style highlighting tags
+    /// to make them visually distinct in the frontend.
+    fn highlight_search_terms(content: &str, search_query: &SearchQuery) -> String {
+        let mut highlighted_content = content.to_string();
+
+        // Get all terms from the search query
+        let terms = search_query.get_all_terms();
+
+        // Sort terms by length (longest first) to avoid partial replacements
+        let mut sorted_terms: Vec<&str> = terms.iter().map(|t| t.as_str()).collect();
+        sorted_terms.sort_by_key(|term| std::cmp::Reverse(term.len()));
+
+        for term in sorted_terms {
+            if term.trim().is_empty() {
+                continue;
+            }
+
+            // Create case-insensitive regex for the term
+            // Escape special regex characters in the search term
+            let escaped_term = regex::escape(term);
+
+            if let Ok(regex) = regex::RegexBuilder::new(&escaped_term)
+                .case_insensitive(true)
+                .build()
+            {
+                // Replace all matches with highlighted version
+                // Use a unique delimiter to avoid conflicts with existing HTML
+                let highlight_open = "<mark class=\"search-highlight\">";
+                let highlight_close = "</mark>";
+
+                highlighted_content = regex
+                    .replace_all(
+                        &highlighted_content,
+                        format!("{}{}{}", highlight_open, "$0", highlight_close),
+                    )
+                    .to_string();
+            }
+        }
+
+        highlighted_content
     }
 }
 

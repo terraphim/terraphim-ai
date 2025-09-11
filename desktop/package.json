@@ -75,6 +75,7 @@
     "@tiptap/suggestion": "^2.22.1",
     "@tomic/lib": "^0.36.0",
     "@tomic/svelte": "^0.35.2",
+    "biome": "^0.3.3",
     "bulma": "^0.9.4",
     "bulmaswatch": "^0.8.1",
     "comlink-fetch": "^0.1.2",

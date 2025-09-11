@@ -1,5 +1,8 @@
-name: Test with Earthly
-on: [pull_request]
+name: Test with Earthly (DEPRECATED)
+on:
+  # DISABLED - Migrated to ci-native.yml with GitHub Actions + Docker Buildx
+  # pull_request
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
