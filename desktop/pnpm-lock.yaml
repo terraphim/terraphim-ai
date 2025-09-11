@@ -30,11 +30,11 @@ importers:
         specifier: ^2.22.1
         version: 2.22.3(@tiptap/core@2.22.3(@tiptap/pm@2.22.3))(@tiptap/pm@2.22.3)
       '@tomic/lib':
-        specifier: ^0.36.0
-        version: 0.36.1
+        specifier: ^0.40.0
+        version: 0.40.0
       '@tomic/svelte':
         specifier: ^0.35.2
-        version: 0.35.2(@tomic/lib@0.36.1)
+        version: 0.35.2(@tomic/lib@0.40.0)
       biome:
         specifier: ^0.3.3
         version: 0.3.3
@@ -1193,8 +1193,8 @@ packages:
       '@tiptap/core': ^2.7.0
       '@tiptap/pm': ^2.7.0
 
-  '@tomic/lib@0.36.1':
-    resolution: {integrity: sha512-EnGK9o4KOzwjH9HC2bT+xt7ExT89auUvgNIkgzJ2tayp96Bz8eoaVhDtZrs1YOuXwxwA0EnGmtZ3PDveBTeLWA==}
+  '@tomic/lib@0.40.0':
+    resolution: {integrity: sha512-Js8e6EEAnC0zKmk7OuHWv+fkA+2i8C/H2HI8IARD8HPBHO1t4cwnuMsNhVQght3i5d/CSdYysvg44DAiGFGgbQ==}
 
   '@tomic/svelte@0.35.2':
     resolution: {integrity: sha512-6H/8aPVj633G4t8mRC3Ac7tMDxfbCnyf11qWhjpNdEctsooIWkoeBgD8Z7HIY6imKwrDluFfrq5VI3Q9rkcK+Q==}
@@ -1705,9 +1705,6 @@ packages:
 
   croact@1.0.4:
     resolution: {integrity: sha512-9GhvyzTY/IVUrMQ2iz/mzgZ8+NcjczmIo/t4FkC1CU0CEcau6v6VsEih4jkTa4ZmRgYTF0qXEZLObCzdDFplpw==}
-
-  cross-fetch@3.2.0:
-    resolution: {integrity: sha512-Q+xVJLoGOeIMXZmbUK4HYk+69cQH6LudR0Vu/pRm2YlU/hDV9CiS0gKUMaWY5f2NeUH9C1nV3bsTlCo0FsTV1Q==}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2559,6 +2556,9 @@ packages:
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
     engines: {node: '>=6'}
+
+  layerr@3.0.0:
+    resolution: {integrity: sha512-tv754Ki2dXpPVApOrjTyRo4/QegVb9eVFq4mjqp4+NM5NaX7syQvN5BBNfV/ZpAHCEHV24XdUVrBAoka4jt3pA==}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -3589,6 +3589,10 @@ packages:
 
   ufo@1.6.1:
     resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
+
+  ulidx@2.4.1:
+    resolution: {integrity: sha512-xY7c8LPyzvhvew0Fn+Ek3wBC9STZAuDI/Y5andCKi9AX6/jvfaX45PhsDX8oxgPL0YFp0Jhr8qWMbS/p9375Xg==}
+    engines: {node: '>=16'}
 
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
@@ -4746,19 +4750,17 @@ snapshots:
       '@tiptap/core': 2.22.3(@tiptap/pm@2.22.3)
       '@tiptap/pm': 2.22.3
 
-  '@tomic/lib@0.36.1':
+  '@tomic/lib@0.40.0':
     dependencies:
       '@noble/ed25519': 1.6.0
       '@noble/hashes': 0.5.9
       base64-arraybuffer: 1.0.2
-      cross-fetch: 3.2.0
       fast-json-stable-stringify: 2.1.0
-    transitivePeerDependencies:
-      - encoding
+      ulidx: 2.4.1
 
-  '@tomic/svelte@0.35.2(@tomic/lib@0.36.1)':
+  '@tomic/svelte@0.35.2(@tomic/lib@0.40.0)':
     dependencies:
-      '@tomic/lib': 0.36.1
+      '@tomic/lib': 0.40.0
       eslint: 8.57.1
       svelte: 3.59.2
     transitivePeerDependencies:
@@ -5349,12 +5351,6 @@ snapshots:
     dependencies:
       '@daybrush/utils': 1.13.0
       '@egjs/list-differ': 1.0.1
-
-  cross-fetch@3.2.0:
-    dependencies:
-      node-fetch: 2.7.0
-    transitivePeerDependencies:
-      - encoding
 
   cross-spawn@7.0.6:
     dependencies:
@@ -6360,6 +6356,8 @@ snapshots:
       graceful-fs: 4.2.11
 
   kleur@4.1.5: {}
+
+  layerr@3.0.0: {}
 
   levn@0.4.1:
     dependencies:
@@ -7496,6 +7494,10 @@ snapshots:
   uc.micro@2.1.0: {}
 
   ufo@1.6.1: {}
+
+  ulidx@2.4.1:
+    dependencies:
+      layerr: 3.0.0
 
   undici-types@5.26.5: {}
 
