@@ -109,7 +109,7 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(vitest@1.6.1)
       dotenv:
-        specifier: ^17.2.1
+        specifier: ^17.2.2
         version: 17.2.2
       jsdom:
         specifier: ^24.1.0
