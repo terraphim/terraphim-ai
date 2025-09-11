@@ -42,4 +42,4 @@ terraphim_automata = { path = "../terraphim_automata" }  # For AutomataPath
 terraphim_config = { path = "../terraphim_config" }
 terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
-env_logger = "0.10"
+env_logger = "0.11"
