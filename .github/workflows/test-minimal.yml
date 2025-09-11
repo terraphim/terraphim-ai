@@ -1,0 +1,59 @@
+name: Test Minimal Workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/test-minimal.yml']
+
+jobs:
+  test-basic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test basic commands
+        run: |
+          echo "Testing basic setup..."
+          ls -la
+          echo "Rust version check..."
+          rustc --version || echo "Rust not installed"
+          echo "Node version check..."
+          node --version || echo "Node not available"
+
+      - name: Test frontend directory
+        run: |
+          echo "Frontend directory contents:"
+          ls -la desktop/ || echo "Desktop directory not found"
+          cd desktop
+          echo "package.json exists:"
+          ls -la package.json || echo "package.json not found"
+
+  test-frontend-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Install frontend dependencies
+        working-directory: desktop
+        run: |
+          echo "Installing yarn dependencies..."
+          yarn install --frozen-lockfile
+          echo "Dependencies installed successfully"
+
+      - name: Test frontend commands
+        working-directory: desktop
+        run: |
+          echo "Available scripts:"
+          yarn run --help || echo "Yarn run failed"
+          echo "Testing build without strict checking..."
+          yarn run build || echo "Build failed - this is expected"
