@@ -1,5 +1,87 @@
 # Terraphim AI Lessons Learned
 
+
+## Browser Extension Development (2025-01-09)
+
+### Chrome Extension Message Size Limits and WASM Integration Issues
+
+**Problem**: Browser extension failing with "unreachable" WASM errors and Chrome message size limits.
+
+**Root Causes**:
+1. **WASM Serialization**: Rust WASM function used deprecated `.into_serde()` method causing panics
+2. **Web Worker Compatibility**: ES6 modules don't work with `importScripts()` in Web Workers
+3. **Chrome Message Limits**: Sending 921KB+ of processed HTML exceeded extension message size limits
+4. **API Response Structure**: Server returned nested JSON `{"status":"success","config":{...}}` but client expected direct config
+5. **Hardcoded URLs**: Extension contained hardcoded `https://alexmikhalev.terraphim.cloud/` references
+6. **Message Channel Closure**: Unhandled async errors caused message channels to close before responses were received
+
+**Solutions Applied**:
+1. **Web Worker Wrapper**: Created custom WASM wrapper that exposes functions via `globalThis` instead of ES6 exports
+2. **JavaScript Fallback**: Implemented regex-based text replacement as fallback when WASM fails
+3. **Client-Side Processing**: Changed architecture to send replacement maps instead of processed HTML
+4. **Config Extraction**: Fixed API client to extract nested config: `this.config = data.config`
+5. **Dynamic URLs**: Replaced hardcoded URLs with configurable knowledge graph domains
+6. **Async Error Handling**: Added global try-catch wrapper around async message handler to prevent channel closure
+7. **API Instance Management**: Fixed duplicate API instance creation causing configuration mismatches
+8. **Dependency-Specific Error Messages**: Added clear error messages for missing Cloudflare credentials in concept mapping
+
+**Key Technical Insights**:
+- Chrome extensions have strict message size limits (~1MB)
+- WASM functions in Web Workers need careful serialization handling
+- DOM processing should happen client-side for large content
+- Always implement fallback mechanisms for WASM functionality
+- Async message handlers must handle all errors to prevent channel closure
+- Singleton pattern critical for consistent state across extension components
+- Configuration dependencies should have specific error messages for user guidance
+
+**Architecture Pattern**:
+```
+Background Script: Generate replacement rules → send to content script
+Content Script: Apply rules directly to DOM using TreeWalker
+```
+
+**Error Handling Pattern**:
+```javascript
+chrome.runtime.onMessage.addListener(function (message, sender, senderResponse) {
+    (async () => {
+        try {
+            // Check if API is initialized and configured
+            if (!api) {
+                api = terraphimAPI; // Fallback to singleton if not set
+            }
+            if (!api.isConfigured()) {
+                await api.initialize(); // Try to re-initialize
+            }
+            // ... message handling code
+        } catch (globalError) {
+            console.error("Global message handler error:", globalError);
+            senderResponse({ error: "Message handler failed: " + globalError.message });
+        }
+    })();
+    return true;
+});
+```
+
+**Singleton Pattern for Extensions**:
+```javascript
+// Create singleton instance
+const terraphimAPI = new TerraphimAPI();
+
+// Auto-initialize with retry logic
+async function autoInitialize() {
+    try {
+        await terraphimAPI.initialize();
+        console.log('TerraphimAPI auto-initialization completed successfully');
+    } catch (error) {
+        if (initializationAttempts < maxInitAttempts) {
+            setTimeout(autoInitialize, 2000); // Retry after 2 seconds
+        }
+    }
+}
+```
+
+This pattern avoids large message passing, provides better performance, ensures functionality regardless of WASM compatibility issues, and prevents message channel closure errors.
+
 ## CI/CD Migration and WebKit Dependency Management (2025-09-04)
 
 ### 🔧 GitHub Actions Ubuntu Package Dependencies
