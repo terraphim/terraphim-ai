@@ -1,4 +1,5 @@
 use terraphim_config::{Haystack, Role, ServiceType};
+use terraphim_types::RelevanceFunction;
 
 #[test]
 fn clickup_haystack_serializes_extra_parameters() {
@@ -13,10 +14,17 @@ fn clickup_haystack_serializes_extra_parameters() {
 
 #[test]
 fn role_with_clickup_haystack_is_valid() {
-    let mut role = Role::new("ClickUp");
-    role.shortname = Some("ClickUp".to_string());
-    role.theme = "lumen".to_string();
-    role.haystacks = vec![Haystack::new("clickup".into(), ServiceType::ClickUp, true)];
+    let role = Role {
+        shortname: Some("ClickUp".to_string()),
+        name: "ClickUp".into(),
+        relevance_function: RelevanceFunction::TitleScorer,
+        terraphim_it: false,
+        theme: "lumen".into(),
+        kg: None,
+        haystacks: vec![Haystack::new("clickup".into(), ServiceType::ClickUp, true)],
+        extra: ahash::AHashMap::new(),
+        ..Default::default()
+    };
     let json = serde_json::to_string(&role).unwrap();
     assert!(json.contains("ClickUp"));
 }

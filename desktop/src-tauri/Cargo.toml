@@ -55,6 +55,8 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-appender = "0.2.3"
 tracing-log = "0.1"
+ulid = "1.1.2"
+chrono = { version = "0.4.38", features = ["serde"] }
 
 [dev-dependencies]
 tokio-test = "0.4.4"
