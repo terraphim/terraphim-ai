@@ -1,0 +1,48 @@
+<!-- FILEPATH: /home/alex/rust_code/terraphim/TerraphimAIParseExtension/sidepanel.html -->
+<html>
+  <head>
+    <title>Terraphim AI concepts sidepanel</title>
+  </head>
+  <body>
+    <h1>Terraphim AI Concepts</h1>
+    <hr />
+    <p id="select-a-word">Select a word to see the concepts.</p>
+    <div>
+      <h2 id="definition-word"></h2>
+      <p id="definition-text"></p>
+    </div>
+
+<div class="row">
+    <div class="column">
+        <h2>Inputs</h2>
+        <p>Some text..</p>
+    </div>
+    <div class="column">
+        <h2>Activites</h2>
+        <p>Some text..</p>
+    </div>
+    <div class="column">
+        <h2>Outputs</h2>
+        <p>Some text..</p>
+    </div>
+</div>
+
+<style>
+    /* Style the columns */
+    .column {
+        float: left;
+        width: 33.33%;
+        padding: 10px;
+        height: 300px; /* Should be removed. Only for demonstration */
+    }
+
+    /* Clear floats after the columns */
+    .row:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+</style>
+<script src="sidepanel.js"></script>
+</body>
+</html>
