@@ -48,7 +48,7 @@ fn transparent_style() -> Style {
 }
 
 /// Create a block with optional transparent background
-fn create_block(title: &str, transparent: bool) -> Block<'_> {
+fn create_block(title: &str, transparent: bool) -> Block {
     let block = Block::default().title(title).borders(Borders::ALL);
 
     if transparent {
