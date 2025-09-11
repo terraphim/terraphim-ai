@@ -445,7 +445,36 @@ impl RoleGraph {
             Vec::new();
 
         for term in search_terms {
-            let node_ids = self.find_matching_node_ids(term);
+            // Handle multi-word terms intelligently
+            let node_ids = if term.contains(' ') {
+                log::debug!("Multi-word term detected: '{}'", term);
+                // First try to match the complete phrase
+                let phrase_matches = self.find_matching_node_ids(term);
+                if phrase_matches.is_empty() {
+                    log::debug!(
+                        "No exact phrase match for '{}', trying individual words",
+                        term
+                    );
+                    // Fallback: match individual words in the phrase
+                    term.split_whitespace()
+                        .flat_map(|word| {
+                            log::debug!("Searching for word: '{}'", word);
+                            self.find_matching_node_ids(word)
+                        })
+                        .collect()
+                } else {
+                    log::debug!(
+                        "Found {} phrase matches for '{}'",
+                        phrase_matches.len(),
+                        term
+                    );
+                    phrase_matches
+                }
+            } else {
+                self.find_matching_node_ids(term)
+            };
+
+            log::debug!("Term '{}' matched {} node IDs", term, node_ids.len());
             let mut term_docs = AHashMap::new();
 
             for node_id in node_ids {
