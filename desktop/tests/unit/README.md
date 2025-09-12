@@ -16,11 +16,22 @@ Comprehensive test suite for search operator parsing functionality. Tests includ
 ### `operator-parsing.test.mjs`
 Comprehensive test suite for search operator parsing functionality (ES modules format).
 
+### `autocomplete-parsing.test.mjs`
+Test suite for autocomplete suggestion application and parsing integration. Tests include:
+
+- **Partial term replacement**: When autocomplete suggestions replace partial terms
+- **Multi-word suggestions**: Handling suggestions with multiple words
+- **Operator integration**: How suggestions work with AND/OR operators
+- **Edge cases**: Complex queries and various input scenarios
+
 ## Running the Tests
 
 ```bash
 # Run the operator parsing tests
 node tests/unit/operator-parsing.test.mjs
+
+# Run the autocomplete parsing tests
+node tests/unit/autocomplete-parsing.test.mjs
 ```
 
 ## Test Coverage
