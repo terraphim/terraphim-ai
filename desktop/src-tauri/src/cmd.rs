@@ -1006,7 +1006,7 @@ pub async fn add_context_to_conversation(
 
     let ctx_type = match context_type.as_str() {
         "document" => ContextType::Document,
-        "search_result" => ContextType::SearchResult,
+        "search_result" => ContextType::Document, // Changed from SearchResult to Document
         "user_input" => ContextType::UserInput,
         "system" => ContextType::System,
         "external" => ContextType::External,
@@ -1171,7 +1171,7 @@ pub async fn update_context(
     let context_type = if let Some(type_str) = &request.context_type {
         match type_str.as_str() {
             "document" => ContextType::Document,
-            "search_result" => ContextType::SearchResult,
+            "search_result" => ContextType::Document, // Changed from SearchResult to Document
             "user_input" => ContextType::UserInput,
             "system" => ContextType::System,
             "external" => ContextType::External,

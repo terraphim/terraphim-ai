@@ -487,6 +487,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/:id/context/:context_id",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
+        // KG Context Management routes
+        .route(
+            "/conversations/:id/context/kg/search",
+            get(api::search_kg_terms),
+        )
+        .route(
+            "/conversations/:id/context/kg/term",
+            post(api::add_kg_term_context),
+        )
+        .route(
+            "/conversations/:id/context/kg/index",
+            post(api::add_kg_index_context),
+        )
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))

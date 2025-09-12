@@ -751,7 +751,7 @@ impl ContextItem {
 
         Self {
             id: uuid::Uuid::new_v4().to_string(),
-            context_type: ContextType::SearchResult,
+            context_type: ContextType::Document, // Changed from SearchResult to Document
             title: format!("Search: {}", query),
             summary: Some(format!(
                 "Search results for '{}' - {} documents found",
@@ -764,6 +764,115 @@ impl ContextItem {
             relevance_score: documents.first().and_then(|d| d.rank.map(|r| r as f64)),
         }
     }
+
+    /// Create a new context item from a KG term definition
+    pub fn from_kg_term_definition(kg_term: &KGTermDefinition) -> Self {
+        let mut metadata = AHashMap::new();
+        metadata.insert("source_type".to_string(), "kg_term".to_string());
+        metadata.insert("term_id".to_string(), kg_term.id.to_string());
+        metadata.insert("normalized_term".to_string(), kg_term.normalized_term.to_string());
+        metadata.insert("synonyms_count".to_string(), kg_term.synonyms.len().to_string());
+        metadata.insert("related_terms_count".to_string(), kg_term.related_terms.len().to_string());
+        metadata.insert("usage_examples_count".to_string(), kg_term.usage_examples.len().to_string());
+        
+        if let Some(ref url) = kg_term.url {
+            metadata.insert("url".to_string(), url.clone());
+        }
+
+        // Add KG-specific metadata
+        for (key, value) in &kg_term.metadata {
+            metadata.insert(format!("kg_{}", key), value.clone());
+        }
+
+        let mut content = format!("**Term:** {}\n", kg_term.term);
+        
+        if let Some(ref definition) = kg_term.definition {
+            content.push_str(&format!("**Definition:** {}\n", definition));
+        }
+
+        if !kg_term.synonyms.is_empty() {
+            content.push_str(&format!("**Synonyms:** {}\n", kg_term.synonyms.join(", ")));
+        }
+
+        if !kg_term.related_terms.is_empty() {
+            content.push_str(&format!("**Related Terms:** {}\n", kg_term.related_terms.join(", ")));
+        }
+
+        if !kg_term.usage_examples.is_empty() {
+            content.push_str("**Usage Examples:**\n");
+            for (i, example) in kg_term.usage_examples.iter().enumerate() {
+                content.push_str(&format!("{}. {}\n", i + 1, example));
+            }
+        }
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            context_type: ContextType::KGTermDefinition,
+            title: format!("KG Term: {}", kg_term.term),
+            summary: Some(format!(
+                "Knowledge Graph term '{}' with {} synonyms and {} related terms",
+                kg_term.term,
+                kg_term.synonyms.len(),
+                kg_term.related_terms.len()
+            )),
+            content,
+            metadata,
+            created_at: chrono::Utc::now(),
+            relevance_score: kg_term.relevance_score,
+        }
+    }
+
+    /// Create a new context item from a complete KG index
+    pub fn from_kg_index(kg_index: &KGIndexInfo) -> Self {
+        let mut metadata = AHashMap::new();
+        metadata.insert("source_type".to_string(), "kg_index".to_string());
+        metadata.insert("kg_name".to_string(), kg_index.name.clone());
+        metadata.insert("total_terms".to_string(), kg_index.total_terms.to_string());
+        metadata.insert("total_nodes".to_string(), kg_index.total_nodes.to_string());
+        metadata.insert("total_edges".to_string(), kg_index.total_edges.to_string());
+        metadata.insert("source".to_string(), kg_index.source.clone());
+        metadata.insert("last_updated".to_string(), kg_index.last_updated.to_rfc3339());
+        
+        if let Some(ref version) = kg_index.version {
+            metadata.insert("version".to_string(), version.clone());
+        }
+
+        let content = format!(
+            "**Knowledge Graph Index: {}**\n\n\
+            **Statistics:**\n\
+            - Total Terms: {}\n\
+            - Total Nodes: {}\n\
+            - Total Edges: {}\n\
+            - Source: {}\n\
+            - Last Updated: {}\n\
+            - Version: {}\n\n\
+            This context includes the complete knowledge graph index with all terms, \
+            relationships, and metadata available for reference.",
+            kg_index.name,
+            kg_index.total_terms,
+            kg_index.total_nodes,
+            kg_index.total_edges,
+            kg_index.source,
+            kg_index.last_updated.format("%Y-%m-%d %H:%M:%S UTC"),
+            kg_index.version.as_deref().unwrap_or("N/A")
+        );
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            context_type: ContextType::KGIndex,
+            title: format!("KG Index: {}", kg_index.name),
+            summary: Some(format!(
+                "Complete knowledge graph index with {} terms, {} nodes, and {} edges",
+                kg_index.total_terms,
+                kg_index.total_nodes,
+                kg_index.total_edges
+            )),
+            content,
+            metadata,
+            created_at: chrono::Utc::now(),
+            relevance_score: Some(1.0), // High relevance for complete index
+        }
+    }
 }
 
 /// Types of context that can be added to conversations
@@ -773,14 +882,64 @@ impl ContextItem {
 pub enum ContextType {
     /// Context from a single document
     Document,
-    /// Context from search results
-    SearchResult,
     /// User-provided context
     UserInput,
     /// System-generated context
     System,
     /// Context from external tools or APIs
     External,
+    /// Context from KG term definition with synonyms and metadata
+    KGTermDefinition,
+    /// Context from complete knowledge graph index
+    KGIndex,
+}
+
+/// Knowledge Graph term definition with comprehensive metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct KGTermDefinition {
+    /// The primary term
+    pub term: String,
+    /// Normalized term value
+    pub normalized_term: NormalizedTermValue,
+    /// Unique identifier for the term
+    pub id: u64,
+    /// Definition of the term
+    pub definition: Option<String>,
+    /// Synonyms for the term
+    pub synonyms: Vec<String>,
+    /// Related terms
+    pub related_terms: Vec<String>,
+    /// Usage examples
+    pub usage_examples: Vec<String>,
+    /// URL reference if available
+    pub url: Option<String>,
+    /// Additional metadata
+    pub metadata: AHashMap<String, String>,
+    /// Relevance score for ranking
+    pub relevance_score: Option<f64>,
+}
+
+/// Knowledge Graph index information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct KGIndexInfo {
+    /// Name of the knowledge graph
+    pub name: String,
+    /// Total number of terms in the index
+    pub total_terms: usize,
+    /// Number of nodes in the graph
+    pub total_nodes: usize,
+    /// Number of edges in the graph
+    pub total_edges: usize,
+    /// Last updated timestamp
+    pub last_updated: chrono::DateTime<chrono::Utc>,
+    /// Source of the knowledge graph
+    pub source: String,
+    /// Version of the knowledge graph
+    pub version: Option<String>,
 }
 
 /// Enhanced chat message with context support
