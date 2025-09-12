@@ -6,6 +6,8 @@
   import BackButton from '../BackButton.svelte';
   import { invoke } from '@tauri-apps/api/tauri';
   import ContextEditModal from './ContextEditModal.svelte';
+  import KGSearchModal from '../Search/KGSearchModal.svelte';
+  import KGContextItem from '../Search/KGContextItem.svelte';
 
   type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
   type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
@@ -53,6 +55,9 @@
   let editingContext: ContextItem | null = null;
   let contextEditMode: 'create' | 'edit' = 'edit';
   let deletingContextId: string | null = null;
+
+  // KG search modal
+  let showKGSearchModal = false;
 
   function addUserMessage(text: string) {
     messages = [...messages, { role: 'user', content: text }];
@@ -416,6 +421,23 @@
     }
   }
 
+  // KG search modal handlers
+  function openKGSearch() {
+    showKGSearchModal = true;
+  }
+
+  function handleKGTermAdded(event: CustomEvent) {
+    console.log('✅ KG term added to context:', event.detail.term);
+    // Reload context to show the new KG term
+    loadConversationContext();
+  }
+
+  function handleKGIndexAdded(event: CustomEvent) {
+    console.log('✅ KG index added to context for role:', event.detail.role);
+    // Reload context to show the new KG index
+    loadConversationContext();
+  }
+
   onMount(() => {
     // seed with a friendly greeting
     messages = [
@@ -501,12 +523,20 @@
             <div class="level-left">
               <div class="level-item">
   <h4 class="title is-5">Context</h4>
-                <button class="button is-small is-primary" data-testid="show-add-context-button" on:click={toggleAddContextForm}>
-                  <span class="icon is-small">
-                    <i class="fas fa-plus"></i>
-                  </span>
-                  <span>Add Context</span>
-                </button>
+                <div class="buttons has-addons">
+                  <button class="button is-small is-primary" data-testid="show-add-context-button" on:click={toggleAddContextForm}>
+                    <span class="icon is-small">
+                      <i class="fas fa-plus"></i>
+                    </span>
+                    <span>Add</span>
+                  </button>
+                  <button class="button is-small is-info" data-testid="kg-search-button" on:click={openKGSearch}>
+                    <span class="icon is-small">
+                      <i class="fas fa-sitemap"></i>
+                    </span>
+                    <span>KG Search</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="level-right">
@@ -594,76 +624,88 @@
           {:else}
             <div class="context-items" data-testid="conversation-context">
               {#each contextItems as item, index}
-                <div class="context-item" data-context-id={item.id} data-testid={`context-item-${index}`} data-context-type={item.context_type}>
-                  <div class="level is-mobile">
-                    <div class="level-left">
-                      <div class="level-item">
-                        <span class="tag is-small {
-                          item.context_type === 'Document' ? 'is-info' :
-                          item.context_type === 'SearchResult' ? 'is-primary' :
-                          item.context_type === 'UserInput' ? 'is-warning' : 'is-light'
-                        }" data-testid={`context-type-${index}`}>
-                          {item.context_type.replace(/([A-Z])/g, ' $1').trim()}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="level-right">
-                      <div class="level-item">
-                        {#if item.relevance_score}
-                          <span class="tag is-light is-small">
-                            {item.relevance_score.toFixed(1)}
+                {#if item.context_type === 'KGTermDefinition' || item.context_type === 'KGIndex'}
+                  <!-- Use specialized KG context item component -->
+                  <KGContextItem
+                    contextItem={item}
+                    compact={true}
+                    on:remove={e => deleteContext(e.detail.contextId)}
+                    on:viewDetails={e => editContext(e.detail.contextItem)}
+                  />
+                {:else}
+                  <!-- Use default context item rendering for non-KG items -->
+                  <div class="context-item" data-context-id={item.id} data-testid={`context-item-${index}`} data-context-type={item.context_type}>
+                    <div class="level is-mobile">
+                      <div class="level-left">
+                        <div class="level-item">
+                          <span class="tag is-small {
+                            item.context_type === 'Document' ? 'is-info' :
+                            item.context_type === 'SearchResult' ? 'is-primary' :
+                            item.context_type === 'UserInput' ? 'is-warning' : 'is-light'
+                          }" data-testid={`context-type-${index}`}>
+                            {item.context_type.replace(/([A-Z])/g, ' $1').trim()}
                           </span>
-                        {/if}
+                        </div>
                       </div>
-                      <div class="level-item context-actions">
-                        <div class="field is-grouped">
-                          <div class="control">
-                            <button
-                              class="button is-small is-light"
-                              on:click={() => editContext(item)}
-                              data-testid={`edit-context-${index}`}
-                              title="Edit context"
-                            >
-                              <span class="icon is-small">
-                                <i class="fas fa-edit"></i>
-                              </span>
-                            </button>
-                          </div>
-                          <div class="control">
-                            <button
-                              class="button is-small is-light is-danger"
-                              on:click={() => confirmDeleteContext(item)}
-                              data-testid={`delete-context-${index}`}
-                              title="Delete context"
-                            >
-                              <span class="icon is-small">
-                                <i class="fas fa-trash"></i>
-                              </span>
-                            </button>
+                      <div class="level-right">
+                        <div class="level-item">
+                          {#if item.relevance_score}
+                            <span class="tag is-light is-small">
+                              {item.relevance_score.toFixed(1)}
+                            </span>
+                          {/if}
+                        </div>
+                        <div class="level-item context-actions">
+                          <div class="field is-grouped">
+                            <div class="control">
+                              <button
+                                class="button is-small is-light"
+                                on:click={() => editContext(item)}
+                                data-testid={`edit-context-${index}`}
+                                title="Edit context"
+                              >
+                                <span class="icon is-small">
+                                  <i class="fas fa-edit"></i>
+                                </span>
+                              </button>
+                            </div>
+                            <div class="control">
+                              <button
+                                class="button is-small is-light is-danger"
+                                on:click={() => confirmDeleteContext(item)}
+                                data-testid={`delete-context-${index}`}
+                                title="Delete context"
+                              >
+                                <span class="icon is-small">
+                                  <i class="fas fa-trash"></i>
+                                </span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <h6 class="title is-6 has-text-dark" data-testid={`context-title-${index}`}>{item.title}</h6>
+                    <h6 class="title is-6 has-text-dark" data-testid={`context-title-${index}`}>{item.title}</h6>
 
-                  <div class="content is-small">
-                    {#if item.summary}
-                      <p class="context-summary" data-testid={`context-summary-${index}`}>
-                        {item.summary}
-                      </p>
-                    {:else}
-                      <p class="context-preview" data-testid={`context-content-${index}`}>
-                        {item.content.substring(0, 150)}{item.content.length > 150 ? '...' : ''}
-                      </p>
-                    {/if}
-                  </div>
+                    <div class="content is-small">
+                      {#if item.summary}
+                        <p class="context-summary" data-testid={`context-summary-${index}`}>
+                          {item.summary}
+                        </p>
+                      {:else}
+                        <p class="context-preview" data-testid={`context-content-${index}`}>
+                          {item.content.substring(0, 150)}{item.content.length > 150 ? '...' : ''}
+                        </p>
+                      {/if}
+                    </div>
 
-                  <div class="is-size-7 has-text-grey">
-                    Added: {new Date(item.created_at).toLocaleString()}
+                    <div class="is-size-7 has-text-grey">
+                      Added: {new Date(item.created_at).toLocaleString()}
+                    </div>
                   </div>
-                </div>
+                {/if}
+
                 {#if index < contextItems.length - 1}
                   <hr class="context-divider">
                 {/if}
@@ -706,6 +748,13 @@
     showContextEditModal = false;
     editingContext = null;
   }}
+/>
+
+<!-- KG Search Modal -->
+<KGSearchModal
+  bind:active={showKGSearchModal}
+  on:termAdded={handleKGTermAdded}
+  on:kgIndexAdded={handleKGIndexAdded}
 />
 
 <style>

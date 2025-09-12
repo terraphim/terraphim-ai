@@ -478,7 +478,7 @@ mod tests {
 
         let context = context_manager.create_search_context("test query", &documents, Some(2));
 
-        assert_eq!(context.context_type, ContextType::SearchResult);
+        assert_eq!(context.context_type, ContextType::Document);
         assert_eq!(context.title, "Search: test query");
         assert!(context.content.contains("test query"));
         assert!(context.content.contains("Document 1"));
