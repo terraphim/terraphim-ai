@@ -774,7 +774,7 @@ impl ContextItem {
         metadata.insert("synonyms_count".to_string(), kg_term.synonyms.len().to_string());
         metadata.insert("related_terms_count".to_string(), kg_term.related_terms.len().to_string());
         metadata.insert("usage_examples_count".to_string(), kg_term.usage_examples.len().to_string());
-        
+
         if let Some(ref url) = kg_term.url {
             metadata.insert("url".to_string(), url.clone());
         }
@@ -785,7 +785,7 @@ impl ContextItem {
         }
 
         let mut content = format!("**Term:** {}\n", kg_term.term);
-        
+
         if let Some(ref definition) = kg_term.definition {
             content.push_str(&format!("**Definition:** {}\n", definition));
         }
@@ -832,7 +832,7 @@ impl ContextItem {
         metadata.insert("total_edges".to_string(), kg_index.total_edges.to_string());
         metadata.insert("source".to_string(), kg_index.source.clone());
         metadata.insert("last_updated".to_string(), kg_index.last_updated.to_rfc3339());
-        
+
         if let Some(ref version) = kg_index.version {
             metadata.insert("version".to_string(), version.clone());
         }
