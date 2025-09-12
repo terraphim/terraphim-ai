@@ -213,7 +213,7 @@ async fn test_context_formatting() {
         },
         ContextItem {
             id: "search-1".to_string(),
-            context_type: ContextType::SearchResult,
+            context_type: ContextType::Document,
             title: "Search Result: API Examples".to_string(),
             summary: Some("Code examples for API usage".to_string()),
             content: "Example: curl -X GET https://api.example.com/users".to_string(),

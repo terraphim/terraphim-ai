@@ -57,7 +57,7 @@
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
-    
+
     searchTimeout = setTimeout(() => {
       if (query.trim().length >= 2) {
         searchKGTerms();
@@ -154,7 +154,7 @@
       if ($is_tauri) {
         await invoke("add_kg_index_context", {
           request: {
-            conversation_id: "default", // TODO: Get actual conversation ID  
+            conversation_id: "default", // TODO: Get actual conversation ID
             role_name: $role
           }
         });
@@ -180,7 +180,7 @@
     selectedSuggestion = null;
     searchError = null;
     isSearching = false;
-    
+
     if (searchTimeout) {
       clearTimeout(searchTimeout);
       searchTimeout = null;
@@ -214,12 +214,12 @@
   function navigateSuggestions(direction: number) {
     if (suggestions.length === 0) return;
 
-    const currentIndex = selectedSuggestion 
+    const currentIndex = selectedSuggestion
       ? suggestions.findIndex(s => s.term === selectedSuggestion?.term)
       : -1;
-    
+
     let newIndex = currentIndex + direction;
-    
+
     if (newIndex < 0) {
       newIndex = suggestions.length - 1;
     } else if (newIndex >= suggestions.length) {
@@ -336,11 +336,11 @@
     </div>
 
     <Field>
-      <Input 
+      <Input
         bind:element={searchInput}
-        bind:value={query} 
+        bind:value={query}
         on:input={handleQueryChange}
-        placeholder="Search knowledge graph terms..." 
+        placeholder="Search knowledge graph terms..."
         type="search"
         disabled={isSearching}
       />
@@ -360,7 +360,7 @@
     {:else if suggestions.length > 0}
       <div class="suggestions-list">
         {#each suggestions as suggestion}
-          <div 
+          <div
             class="suggestion-item {selectedSuggestion?.term === suggestion.term ? 'selected' : ''}"
             on:click={() => selectSuggestion(suggestion)}
             on:keydown={(e) => e.key === 'Enter' && selectSuggestion(suggestion)}
@@ -404,10 +404,10 @@
       <Button on:click={handleClose}>
         Cancel
       </Button>
-      
+
       {#if selectedSuggestion}
-        <Button 
-          type="is-primary" 
+        <Button
+          type="is-primary"
           on:click={addTermToContext}
           disabled={!selectedSuggestion}
         >
@@ -420,9 +420,9 @@
       <div class="kg-index-description">
         Add the entire knowledge graph index for role "{$role}" to provide comprehensive context information.
       </div>
-      <Button 
-        type="is-link" 
-        size="is-small" 
+      <Button
+        type="is-link"
+        size="is-small"
         on:click={addKGIndexToContext}
       >
         Add Complete KG Index to Context

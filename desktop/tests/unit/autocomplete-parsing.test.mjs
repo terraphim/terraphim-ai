@@ -9,7 +9,7 @@ function applySuggestion(input, suggestion) {
     // It's a term suggestion - replace the current partial term
     const words = input.trim().split(/\s+/);
     const lastWord = words[words.length - 1];
-    
+
     // If the last word is a partial match for the suggestion, replace it
     if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
       // Replace the last word with the full suggestion
@@ -76,30 +76,30 @@ testCases.forEach((testCase, index) => {
   console.log(`Test ${index + 1}: ${testCase.name}`);
   console.log(`  Input: "${testCase.input}"`);
   console.log(`  Suggestion: "${testCase.suggestion}"`);
-  
+
   const result = applySuggestion(testCase.input, testCase.suggestion);
   console.log(`  Result: "${result}"`);
   console.log(`  Expected: "${testCase.expectedOutput}"`);
-  
+
   const outputMatch = result === testCase.expectedOutput;
   console.log(`  ✅ Output match: ${outputMatch}`);
-  
+
   if (outputMatch) {
     // Test parsing of the result
     const parsed = parseSearchInput(result);
     console.log(`  Parsed terms: [${parsed.terms.join(', ')}]`);
     console.log(`  Expected terms: [${testCase.expectedTerms.join(', ')}]`);
-    
+
     const termsMatch = JSON.stringify(parsed.terms) === JSON.stringify(testCase.expectedTerms);
     console.log(`  ✅ Terms match: ${termsMatch}`);
-    
+
     if (!termsMatch) {
       allPassed = false;
     }
   } else {
     allPassed = false;
   }
-  
+
   console.log('');
 });
 

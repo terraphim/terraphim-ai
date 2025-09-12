@@ -1,6 +1,6 @@
 declare module 'svelma' {
   import { SvelteComponent } from 'svelte';
-  
+
   export class Field extends SvelteComponent {}
   export class Input extends SvelteComponent {}
   export class Taglist extends SvelteComponent {}
