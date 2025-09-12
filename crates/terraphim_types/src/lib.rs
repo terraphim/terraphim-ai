@@ -770,10 +770,22 @@ impl ContextItem {
         let mut metadata = AHashMap::new();
         metadata.insert("source_type".to_string(), "kg_term".to_string());
         metadata.insert("term_id".to_string(), kg_term.id.to_string());
-        metadata.insert("normalized_term".to_string(), kg_term.normalized_term.to_string());
-        metadata.insert("synonyms_count".to_string(), kg_term.synonyms.len().to_string());
-        metadata.insert("related_terms_count".to_string(), kg_term.related_terms.len().to_string());
-        metadata.insert("usage_examples_count".to_string(), kg_term.usage_examples.len().to_string());
+        metadata.insert(
+            "normalized_term".to_string(),
+            kg_term.normalized_term.to_string(),
+        );
+        metadata.insert(
+            "synonyms_count".to_string(),
+            kg_term.synonyms.len().to_string(),
+        );
+        metadata.insert(
+            "related_terms_count".to_string(),
+            kg_term.related_terms.len().to_string(),
+        );
+        metadata.insert(
+            "usage_examples_count".to_string(),
+            kg_term.usage_examples.len().to_string(),
+        );
 
         if let Some(ref url) = kg_term.url {
             metadata.insert("url".to_string(), url.clone());
@@ -795,7 +807,10 @@ impl ContextItem {
         }
 
         if !kg_term.related_terms.is_empty() {
-            content.push_str(&format!("**Related Terms:** {}\n", kg_term.related_terms.join(", ")));
+            content.push_str(&format!(
+                "**Related Terms:** {}\n",
+                kg_term.related_terms.join(", ")
+            ));
         }
 
         if !kg_term.usage_examples.is_empty() {
@@ -831,7 +846,10 @@ impl ContextItem {
         metadata.insert("total_nodes".to_string(), kg_index.total_nodes.to_string());
         metadata.insert("total_edges".to_string(), kg_index.total_edges.to_string());
         metadata.insert("source".to_string(), kg_index.source.clone());
-        metadata.insert("last_updated".to_string(), kg_index.last_updated.to_rfc3339());
+        metadata.insert(
+            "last_updated".to_string(),
+            kg_index.last_updated.to_rfc3339(),
+        );
 
         if let Some(ref version) = kg_index.version {
             metadata.insert("version".to_string(), version.clone());
@@ -863,9 +881,7 @@ impl ContextItem {
             title: format!("KG Index: {}", kg_index.name),
             summary: Some(format!(
                 "Complete knowledge graph index with {} terms, {} nodes, and {} edges",
-                kg_index.total_terms,
-                kg_index.total_nodes,
-                kg_index.total_edges
+                kg_index.total_terms, kg_index.total_nodes, kg_index.total_edges
             )),
             content,
             metadata,

@@ -72,7 +72,7 @@ describe('Search Operator Behavior', () => {
     it('should build AND query correctly', () => {
       const parsed = parseSearchInput('rust AND javascript');
       const query = buildSearchQuery(parsed, 'Engineer');
-      
+
       expect(query.search_term).toBe('rust');
       expect(query.search_terms).toEqual(['rust', 'javascript']);
       expect(query.operator).toBe('and');
@@ -82,7 +82,7 @@ describe('Search Operator Behavior', () => {
     it('should build OR query correctly', () => {
       const parsed = parseSearchInput('python OR typescript');
       const query = buildSearchQuery(parsed, 'Engineer');
-      
+
       expect(query.search_term).toBe('python');
       expect(query.search_terms).toEqual(['python', 'typescript']);
       expect(query.operator).toBe('or');
@@ -92,7 +92,7 @@ describe('Search Operator Behavior', () => {
     it('should build single term query correctly', () => {
       const parsed = parseSearchInput('rust');
       const query = buildSearchQuery(parsed, 'Engineer');
-      
+
       expect(query.search_term).toBe('rust');
       expect(query.search_terms).toBeUndefined();
       expect(query.operator).toBeUndefined();
@@ -102,7 +102,7 @@ describe('Search Operator Behavior', () => {
     it('should handle empty terms', () => {
       const parsed = parseSearchInput('rust AND   AND javascript');
       const query = buildSearchQuery(parsed, 'Engineer');
-      
+
       expect(query.search_term).toBe('rust');
       expect(query.search_terms).toEqual(['rust', 'javascript']);
       expect(query.operator).toBe('and');

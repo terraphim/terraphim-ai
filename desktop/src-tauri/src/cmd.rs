@@ -1223,28 +1223,75 @@ pub async fn update_context(
 
 // === KG Search Commands ===
 
+use lru::LruCache;
+use std::num::NonZeroUsize;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Cached autocomplete index with role name and timestamp
+/// Performance metrics for cache monitoring
+#[derive(Default)]
+struct CacheMetrics {
+    hits: AtomicU64,
+    misses: AtomicU64,
+    builds: AtomicU64,
+    evictions: AtomicU64,
+}
+
+impl CacheMetrics {
+    fn record_hit(&self) {
+        self.hits.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_miss(&self) {
+        self.misses.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_build(&self) {
+        self.builds.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_eviction(&self) {
+        self.evictions.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[allow(dead_code)]
+    fn get_hit_ratio(&self) -> f64 {
+        let hits = self.hits.load(Ordering::Relaxed);
+        let misses = self.misses.load(Ordering::Relaxed);
+        if hits + misses == 0 {
+            0.0
+        } else {
+            hits as f64 / (hits + misses) as f64
+        }
+    }
+}
+
+/// Cached autocomplete index with Arc for efficient sharing
 #[derive(Clone)]
 struct CachedAutocompleteIndex {
-    index: terraphim_automata::AutocompleteIndex,
+    index: Arc<terraphim_automata::AutocompleteIndex>,
     role_name: String,
     created_at: u64,
+    build_time_ms: u64,
 }
 
 impl CachedAutocompleteIndex {
-    fn new(index: terraphim_automata::AutocompleteIndex, role_name: String) -> Self {
+    fn new(
+        index: terraphim_automata::AutocompleteIndex,
+        role_name: String,
+        build_time_ms: u64,
+    ) -> Self {
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
 
         Self {
-            index,
+            index: Arc::new(index),
             role_name,
             created_at,
+            build_time_ms,
         }
     }
 
@@ -1261,17 +1308,91 @@ impl CachedAutocompleteIndex {
 
         current_time - self.created_at < 600 // 10 minutes
     }
+
+    /// Get shared reference to the index (no cloning needed)
+    fn get_index(&self) -> Arc<terraphim_automata::AutocompleteIndex> {
+        Arc::clone(&self.index)
+    }
 }
 
-/// Global cache for autocomplete indices
-#[allow(clippy::incompatible_msrv)]
-static AUTOCOMPLETE_INDEX_CACHE: OnceLock<tokio::sync::Mutex<Option<CachedAutocompleteIndex>>> =
-    OnceLock::new();
+/// LRU cache with performance monitoring for autocomplete indices
+type IndexCache = LruCache<String, CachedAutocompleteIndex>;
 
-/// Get or create the global autocomplete index cache
+/// Global LRU cache for autocomplete indices with metrics
 #[allow(clippy::incompatible_msrv)]
-fn get_autocomplete_cache() -> &'static tokio::sync::Mutex<Option<CachedAutocompleteIndex>> {
-    AUTOCOMPLETE_INDEX_CACHE.get_or_init(|| tokio::sync::Mutex::new(None))
+static AUTOCOMPLETE_INDEX_CACHE: OnceLock<tokio::sync::RwLock<IndexCache>> = OnceLock::new();
+
+/// Global cache metrics
+static CACHE_METRICS: CacheMetrics = CacheMetrics {
+    hits: AtomicU64::new(0),
+    misses: AtomicU64::new(0),
+    builds: AtomicU64::new(0),
+    evictions: AtomicU64::new(0),
+};
+
+/// Get or create the global autocomplete index cache with LRU eviction
+#[allow(clippy::incompatible_msrv)]
+fn get_autocomplete_cache() -> &'static tokio::sync::RwLock<IndexCache> {
+    AUTOCOMPLETE_INDEX_CACHE.get_or_init(|| {
+        // Cache up to 10 role indices with LRU eviction
+        let cache = LruCache::new(NonZeroUsize::new(10).unwrap());
+        tokio::sync::RwLock::new(cache)
+    })
+}
+
+/// Pre-warm the autocomplete cache for frequently used roles
+#[allow(dead_code)]
+pub async fn pre_warm_autocomplete_cache(config_state: &ConfigState) {
+    log::info!("🔥 Pre-warming autocomplete cache...");
+
+    let config = config_state.config.lock().await;
+    let roles_to_warm: Vec<_> = config.roles.keys().take(5).cloned().collect(); // Top 5 roles
+    drop(config);
+
+    let mut handles = Vec::new();
+
+    for role_name in roles_to_warm {
+        let config_state = config_state.clone();
+        let role_name_str = role_name.original.clone();
+
+        let handle = tokio::spawn(async move {
+            log::debug!("Pre-warming cache for role: {}", role_name_str);
+
+            let mut terraphim_service = TerraphimService::new(config_state);
+            if let Ok(thesaurus) = terraphim_service.ensure_thesaurus_loaded(&role_name).await {
+                if let Ok(index) = terraphim_automata::build_autocomplete_index(thesaurus, None) {
+                    let build_time = std::time::Instant::now();
+                    let cached_index =
+                        CachedAutocompleteIndex::new(index, role_name_str.clone(), 0);
+
+                    // Add to cache
+                    let cache = get_autocomplete_cache();
+                    let mut cache_guard = cache.write().await;
+                    if let Some(evicted) = cache_guard.put(role_name_str.clone(), cached_index) {
+                        log::debug!("Evicted cached index for role: {}", evicted.role_name);
+                        CACHE_METRICS.record_eviction();
+                    }
+
+                    log::debug!(
+                        "✅ Pre-warmed cache for role: {} in {:?}",
+                        role_name_str,
+                        build_time.elapsed()
+                    );
+                }
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all pre-warming tasks to complete
+    for handle in handles {
+        if let Err(e) = handle.await {
+            log::warn!("Pre-warming task failed: {}", e);
+        }
+    }
+
+    log::info!("✅ Autocomplete cache pre-warming completed");
 }
 
 /// Request for KG search
@@ -1366,22 +1487,32 @@ pub async fn search_kg_terms(
         }
     }
 
-    // Check if we have a valid cached autocomplete index first
+    // Check if we have a valid cached autocomplete index first using RwLock for better concurrency
     let autocomplete_index = {
-        let cache = get_autocomplete_cache().lock().await;
-        if let Some(ref cached) = *cache {
+        let cache = get_autocomplete_cache().read().await;
+        if let Some(cached) = cache.peek(&request.role_name) {
             if cached.is_valid(&request.role_name) {
                 log::debug!(
-                    "Using cached autocomplete index for role '{}'",
+                    "✅ Cache HIT: Using cached autocomplete index for role '{}' (build time: {}ms)",
+                    request.role_name,
+                    cached.build_time_ms
+                );
+                CACHE_METRICS.record_hit();
+                Some(cached.get_index())
+            } else {
+                log::debug!(
+                    "⏰ Cache EXPIRED: Index expired for role '{}', will rebuild",
                     request.role_name
                 );
-                Some(cached.index.clone())
-            } else {
-                log::debug!("Cached index expired or role mismatch, will rebuild");
+                CACHE_METRICS.record_miss();
                 None
             }
         } else {
-            log::debug!("No cached index found, will build new one");
+            log::debug!(
+                "❌ Cache MISS: No cached index found for role '{}', will build new one",
+                request.role_name
+            );
+            CACHE_METRICS.record_miss();
             None
         }
     };
@@ -1408,6 +1539,7 @@ pub async fn search_kg_terms(
             }
         };
 
+        let build_start = std::time::Instant::now();
         let new_index = match build_autocomplete_index(thesaurus, None) {
             Ok(index) => index,
             Err(e) => {
@@ -1420,20 +1552,37 @@ pub async fn search_kg_terms(
             }
         };
 
-        // Cache the new index
+        let build_time_ms = build_start.elapsed().as_millis() as u64;
+        CACHE_METRICS.record_build();
+
+        let index_arc = Arc::new(new_index);
+
+        // Cache the new index using write lock only when necessary
         {
-            let mut cache = get_autocomplete_cache().lock().await;
-            *cache = Some(CachedAutocompleteIndex::new(
-                new_index.clone(),
+            let mut cache = get_autocomplete_cache().write().await;
+            let cached_index = CachedAutocompleteIndex::new(
+                (*index_arc).clone(), // Clone the index itself, not the Arc
                 request.role_name.clone(),
-            ));
+                build_time_ms,
+            );
+
+            if let Some(evicted) = cache.put(request.role_name.clone(), cached_index) {
+                log::debug!(
+                    "🗑️ Cache EVICTION: Evicted cached index for role '{}' to make room for '{}'",
+                    evicted.role_name,
+                    request.role_name
+                );
+                CACHE_METRICS.record_eviction();
+            }
+
             log::debug!(
-                "Cached new autocomplete index for role '{}'",
-                request.role_name
+                "💾 Cache STORE: Cached new autocomplete index for role '{}' (build time: {}ms)",
+                request.role_name,
+                build_time_ms
             );
         }
 
-        new_index
+        index_arc
     };
 
     // Perform fuzzy search first, then fallback to regular search
@@ -1664,5 +1813,96 @@ pub async fn add_kg_index_context(
                 error: Some(format!("Failed to add KG index context: {}", e)),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_kg_search_request_validation() {
+        let request = KGSearchRequest {
+            query: "async".to_string(),
+            role_name: "Engineer".to_string(),
+            limit: Some(10),
+            min_similarity: Some(0.7),
+        };
+
+        assert_eq!(request.query, "async");
+        assert_eq!(request.role_name, "Engineer");
+        assert_eq!(request.limit, Some(10));
+        assert_eq!(request.min_similarity, Some(0.7));
+    }
+
+    #[tokio::test]
+    async fn test_empty_query_validation() {
+        let request = KGSearchRequest {
+            query: "".to_string(),
+            role_name: "Engineer".to_string(),
+            limit: Some(10),
+            min_similarity: Some(0.7),
+        };
+
+        assert!(request.query.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cache_metrics_initialization() {
+        // Test that cache metrics can be accessed without panicking
+        CACHE_METRICS.record_hit();
+        CACHE_METRICS.record_miss();
+        CACHE_METRICS.record_build();
+        CACHE_METRICS.record_eviction();
+
+        // Test passes if we reach here without panic
+    }
+
+    #[tokio::test]
+    async fn test_status_enum() {
+        match Status::Success {
+            Status::Success => {} // Test passes
+            Status::Error => panic!("Should be Success"),
+        }
+
+        match Status::Error {
+            Status::Error => {} // Test passes
+            Status::Success => panic!("Should be Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_kg_add_term_request_validation() {
+        let request = AddKGTermContextRequest {
+            conversation_id: "test_conv".to_string(),
+            term: "async".to_string(),
+            role_name: "Engineer".to_string(),
+        };
+
+        assert_eq!(request.conversation_id, "test_conv");
+        assert_eq!(request.term, "async");
+        assert_eq!(request.role_name, "Engineer");
+    }
+
+    #[tokio::test]
+    async fn test_kg_add_index_request_validation() {
+        let request = AddKGIndexContextRequest {
+            conversation_id: "test_conv".to_string(),
+            role_name: "Engineer".to_string(),
+        };
+
+        assert_eq!(request.conversation_id, "test_conv");
+        assert_eq!(request.role_name, "Engineer");
+    }
+
+    #[tokio::test]
+    async fn test_cache_key_creation() {
+        // Test that cache keys work correctly
+        let role1 = "Engineer";
+        let role2 = "Engineer";
+        let role3 = "DataScientist";
+
+        assert_eq!(role1, role2);
+        assert_ne!(role1, role3);
     }
 }

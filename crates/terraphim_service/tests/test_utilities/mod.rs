@@ -344,7 +344,7 @@ impl ContextTestData {
             },
             ContextItem {
                 id: "search-ctx".to_string(),
-                context_type: ContextType::SearchResult,
+                context_type: ContextType::Document,
                 title: "Search Result Context".to_string(),
                 summary: Some("Search result context item".to_string()),
                 content: "This context came from a search result".to_string(),

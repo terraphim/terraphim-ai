@@ -17,7 +17,7 @@
     metadata: Record<string, string>;
     created_at: string;
     relevance_score?: number;
-    
+
     // KG-specific fields
     kg_term_definition?: KGTermDefinition;
     kg_index_info?: KGIndexInfo;
@@ -71,11 +71,11 @@
   }
 
   // Get display icon based on context type
-  $: displayIcon = contextItem.context_type === "KGTermDefinition" 
-    ? "fas fa-tag" 
+  $: displayIcon = contextItem.context_type === "KGTermDefinition"
+    ? "fas fa-tag"
     : "fas fa-sitemap";
 
-  // Get display color based on context type  
+  // Get display color based on context type
   $: displayColor = contextItem.context_type === "KGTermDefinition"
     ? "is-info"
     : "is-primary";
@@ -261,20 +261,20 @@
         {contextItem.context_type === "KGTermDefinition" ? "KG Term" : "KG Index"}
       </Tag>
     </div>
-    
+
     <div class="context-actions">
-      <Button 
-        size="is-small" 
+      <Button
+        size="is-small"
         type="is-ghost"
         on:click={handleViewDetails}
         title="View details"
       >
         <Icon icon="fas fa-eye" size="is-small" />
       </Button>
-      
+
       {#if removable}
-        <Button 
-          size="is-small" 
+        <Button
+          size="is-small"
           type="is-ghost"
           on:click={handleRemove}
           title="Remove from context"
@@ -288,7 +288,7 @@
   <div class="context-content {compact ? 'compact' : ''}">
     {#if contextItem.context_type === "KGTermDefinition" && contextItem.kg_term_definition}
       {@const term = contextItem.kg_term_definition}
-      
+
       <div class="term-definition {compact ? 'compact' : ''}">
         {#if term.definition}
           <div class="definition-text {compact ? 'compact' : ''}">
@@ -329,7 +329,7 @@
 
     {:else if contextItem.context_type === "KGIndex" && contextItem.kg_index_info}
       {@const index = contextItem.kg_index_info}
-      
+
       <div class="kg-index-stats {compact ? 'compact' : ''}">
         <div class="stat-item">
           <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_terms)}</div>
@@ -359,7 +359,7 @@
 
   <div class="context-meta {compact ? 'compact' : ''}">
     <span>Added {formatDate(contextItem.created_at)}</span>
-    
+
     {#if contextItem.relevance_score}
       <span class="relevance-score">
         Relevance: {(contextItem.relevance_score * 100).toFixed(0)}%

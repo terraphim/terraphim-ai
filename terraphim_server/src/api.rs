@@ -1744,15 +1744,16 @@ pub(crate) async fn get_autocomplete(
 
 // =================== CONVERSATION MANAGEMENT API ===================
 
+use chrono::{DateTime, Duration, Utc};
+use std::collections::HashMap;
 use terraphim_service::context::{ContextConfig, ContextManager};
 use terraphim_types::{ConversationId, ConversationSummary};
-use std::collections::HashMap;
-use chrono::{DateTime, Duration, Utc};
 
 /// Cached autocomplete result with expiration
 #[derive(Debug, Clone)]
-struct CachedAutocompleteResult {
+pub(crate) struct CachedAutocompleteResult {
     suggestions: Vec<AutocompleteSuggestion>,
+    #[allow(dead_code)]
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
 }
@@ -1773,10 +1774,9 @@ impl CachedAutocompleteResult {
 }
 
 /// Global autocomplete cache
-pub static AUTOCOMPLETE_CACHE: std::sync::LazyLock<tokio::sync::Mutex<HashMap<String, CachedAutocompleteResult>>> =
-    std::sync::LazyLock::new(|| {
-        tokio::sync::Mutex::new(HashMap::new())
-    });
+pub static AUTOCOMPLETE_CACHE: std::sync::LazyLock<
+    tokio::sync::Mutex<HashMap<String, CachedAutocompleteResult>>,
+> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(HashMap::new()));
 
 /// Global context manager instance
 pub static CONTEXT_MANAGER: std::sync::LazyLock<tokio::sync::Mutex<ContextManager>> =
@@ -2156,8 +2156,6 @@ pub(crate) async fn update_context_in_conversation(
 #[derive(Debug, Deserialize)]
 pub struct KGSearchRequest {
     pub query: String,
-    pub limit: Option<usize>,
-    pub min_similarity: Option<f64>,
 }
 
 /// Response for KG search
@@ -2215,7 +2213,8 @@ pub(crate) async fn search_kg_terms(
     let autocomplete_response = get_autocomplete(
         State(config_state),
         Path((role_name.to_string(), request.query.clone())),
-    ).await?;
+    )
+    .await?;
 
     match autocomplete_response {
         Json(response) => {
@@ -2256,10 +2255,12 @@ pub(crate) async fn add_kg_term_context(
     let documents = terraphim_service
         .find_documents_for_kg_term(&role_name, &request.term)
         .await
-        .map_err(|e| crate::error::ApiError(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            anyhow::anyhow!("Failed to find KG documents: {}", e),
-        ))?;
+        .map_err(|e| {
+            crate::error::ApiError(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                anyhow::anyhow!("Failed to find KG documents: {}", e),
+            )
+        })?;
 
     if documents.is_empty() {
         return Ok(Json(AddContextResponse {
@@ -2275,10 +2276,14 @@ pub(crate) async fn add_kg_term_context(
         normalized_term: terraphim_types::NormalizedTermValue::new(request.term.clone()),
         id: 1, // TODO: Get actual term ID from thesaurus
         definition: Some(doc.description.clone().unwrap_or_default()),
-        synonyms: Vec::new(), // TODO: Extract from thesaurus
-        related_terms: Vec::new(), // TODO: Extract from thesaurus
+        synonyms: Vec::new(),       // TODO: Extract from thesaurus
+        related_terms: Vec::new(),  // TODO: Extract from thesaurus
         usage_examples: Vec::new(), // TODO: Extract from thesaurus
-        url: if doc.url.is_empty() { None } else { Some(doc.url.clone()) },
+        url: if doc.url.is_empty() {
+            None
+        } else {
+            Some(doc.url.clone())
+        },
         metadata: {
             let mut meta = ahash::AHashMap::new();
             meta.insert("source_document".to_string(), doc.id.clone());
@@ -2319,14 +2324,15 @@ pub(crate) async fn add_kg_index_context(
     let role_name = RoleName::new(&request.role);
 
     // Get rolegraph to extract KG index information
-    let rolegraph_sync = config_state.roles.get(&role_name)
-        .ok_or_else(|| crate::error::ApiError(
+    let rolegraph_sync = config_state.roles.get(&role_name).ok_or_else(|| {
+        crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!("Role '{}' not found", role_name),
-        ))?;
+        )
+    })?;
 
     let rolegraph = rolegraph_sync.lock().await;
-    
+
     let kg_index = terraphim_types::KGIndexInfo {
         name: format!("KG Index for {}", role_name),
         total_terms: rolegraph.thesaurus.len(),

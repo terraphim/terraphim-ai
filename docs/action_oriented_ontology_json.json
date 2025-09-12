@@ -5,13 +5,13 @@
       "version": "1.0",
       "description": "Comprehensive action-based taxonomy of build automation and CI/CD tools",
       "tools_covered": [
-        "Dockerfile", "Earthfile", "GitHub Actions", "GitLab CI", 
+        "Dockerfile", "Earthfile", "GitHub Actions", "GitLab CI",
         "CircleCI", "Azure Pipelines", "Jenkins", "Buildkite", "Jest"
       ],
       "action_count": 15,
       "created": "2025-09-07"
     },
-    
+
     "actions": {
       "RUN": {
         "description": "Execute commands and scripts",
@@ -19,7 +19,7 @@
           "execute", "invoke", "launch", "call", "trigger", "exec", "shell"
         ],
         "related_terms": [
-          "command execution", "script invocation", "process spawning", 
+          "command execution", "script invocation", "process spawning",
           "shell scripting", "remote execution", "container execution"
         ],
         "tool_mappings": {
@@ -41,7 +41,7 @@
           "compile", "assemble", "package", "construct", "generate", "make", "bundle"
         ],
         "related_terms": [
-          "compilation", "assembly", "packaging", "artifact creation", 
+          "compilation", "assembly", "packaging", "artifact creation",
           "multi-stage builds", "incremental builds", "cross-compilation"
         ],
         "tool_mappings": {
@@ -63,7 +63,7 @@
           "verify", "validate", "check", "assert", "examine", "prove", "inspect"
         ],
         "related_terms": [
-          "unit testing", "integration testing", "validation", "assertion", 
+          "unit testing", "integration testing", "validation", "assertion",
           "test execution", "test suites", "coverage analysis"
         ],
         "tool_mappings": {
@@ -85,7 +85,7 @@
           "transfer", "sync", "move", "deploy", "distribute", "replicate", "clone"
         ],
         "related_terms": [
-          "file transfer", "artifact copying", "workspace sharing", 
+          "file transfer", "artifact copying", "workspace sharing",
           "asset distribution", "configuration sync"
         ],
         "tool_mappings": {
@@ -107,7 +107,7 @@
           "store", "archive", "preserve", "persist", "cache", "retain", "upload"
         ],
         "related_terms": [
-          "artifact storage", "registry push", "versioned storage", 
+          "artifact storage", "registry push", "versioned storage",
           "retention policies", "artifact repositories"
         ],
         "tool_mappings": {
@@ -129,7 +129,7 @@
           "release", "publish", "ship", "rollout", "promote", "deliver", "push"
         ],
         "related_terms": [
-          "deployment strategies", "blue-green", "canary", "rolling updates", 
+          "deployment strategies", "blue-green", "canary", "rolling updates",
           "environment promotion", "continuous delivery"
         ],
         "tool_mappings": {
@@ -151,7 +151,7 @@
           "store", "buffer", "memoize", "persist", "accelerate", "optimize"
         ],
         "related_terms": [
-          "dependency caching", "build caching", "layer caching", 
+          "dependency caching", "build caching", "layer caching",
           "cache invalidation", "cache keys", "cache restoration"
         ],
         "tool_mappings": {
@@ -173,7 +173,7 @@
           "initiate", "start", "launch", "activate", "fire", "invoke", "schedule"
         ],
         "related_terms": [
-          "webhooks", "event triggers", "manual triggers", "pipeline triggers", 
+          "webhooks", "event triggers", "manual triggers", "pipeline triggers",
           "scheduled execution", "conditional triggers"
         ],
         "tool_mappings": {
@@ -195,7 +195,7 @@
           "setup", "initialize", "provision", "customize", "parameterize", "define"
         ],
         "related_terms": [
-          "environment variables", "build arguments", "runtime configuration", 
+          "environment variables", "build arguments", "runtime configuration",
           "parameter injection", "feature flags"
         ],
         "tool_mappings": {
@@ -217,7 +217,7 @@
           "lint", "scan", "audit", "inspect", "review", "analyze", "check"
         ],
         "related_terms": [
-          "linting", "security scanning", "compliance checks", "syntax validation", 
+          "linting", "security scanning", "compliance checks", "syntax validation",
           "schema validation", "quality gates"
         ],
         "tool_mappings": {
@@ -239,7 +239,7 @@
           "observe", "track", "watch", "log", "measure", "report", "analyze"
         ],
         "related_terms": [
-          "logging", "metrics collection", "tracing", "health checks", 
+          "logging", "metrics collection", "tracing", "health checks",
           "performance monitoring", "observability"
         ],
         "tool_mappings": {
@@ -261,7 +261,7 @@
           "alert", "inform", "communicate", "broadcast", "message", "report"
         ],
         "related_terms": [
-          "webhook notifications", "email alerts", "Slack integration", 
+          "webhook notifications", "email alerts", "Slack integration",
           "status updates", "build notifications"
         ],
         "tool_mappings": {
@@ -283,7 +283,7 @@
           "repeat", "reattempt", "recover", "fallback", "rerun", "restart"
         ],
         "related_terms": [
-          "exponential backoff", "circuit breakers", "failure recovery", 
+          "exponential backoff", "circuit breakers", "failure recovery",
           "retry policies", "resilience patterns"
         ],
         "tool_mappings": {
@@ -305,7 +305,7 @@
           "pause", "delay", "hold", "synchronize", "block", "depend", "await"
         ],
         "related_terms": [
-          "synchronization", "dependencies", "health checks", "manual approvals", 
+          "synchronization", "dependencies", "health checks", "manual approvals",
           "resource availability"
         ],
         "tool_mappings": {
@@ -327,7 +327,7 @@
           "plan", "queue", "defer", "time", "program", "cron", "automate"
         ],
         "related_terms": [
-          "cron expressions", "scheduled triggers", "time-based automation", 
+          "cron expressions", "scheduled triggers", "time-based automation",
           "recurring jobs", "periodic execution"
         ],
         "tool_mappings": {
