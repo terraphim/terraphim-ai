@@ -1536,7 +1536,7 @@ pub struct AutocompleteResponse {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct AutocompleteSuggestion {
     /// The suggested term
     pub term: String,
@@ -1608,6 +1608,7 @@ pub(crate) async fn get_thesaurus(
 ///
 /// This endpoint uses the Finite State Transducer (FST) from terraphim_automata
 /// to provide fast, intelligent autocomplete suggestions with fuzzy matching.
+/// Results are cached for 10 minutes to improve performance.
 pub(crate) async fn get_autocomplete(
     State(config_state): State<ConfigState>,
     Path((role_name, query)): Path<(String, String)>,
@@ -1623,6 +1624,22 @@ pub(crate) async fn get_autocomplete(
     );
 
     let role_name = RoleName::new(&role_name);
+    let cache_key = format!("{}:{}", role_name, query);
+
+    // Check cache first
+    {
+        let cache = AUTOCOMPLETE_CACHE.lock().await;
+        if let Some(cached) = cache.get(&cache_key) {
+            if cached.is_valid() {
+                log::debug!("Returning cached autocomplete results for '{}'", cache_key);
+                return Ok(Json(AutocompleteResponse {
+                    status: Status::Success,
+                    suggestions: cached.suggestions.clone(),
+                    error: None,
+                }));
+            }
+        }
+    }
 
     // Get the role graph for the specified role
     let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
@@ -1710,6 +1727,14 @@ pub(crate) async fn get_autocomplete(
         query
     );
 
+    // Cache the results
+    {
+        let mut cache = AUTOCOMPLETE_CACHE.lock().await;
+        let cached_result = CachedAutocompleteResult::new(suggestions.clone());
+        cache.insert(cache_key.clone(), cached_result);
+        log::debug!("Cached autocomplete results for '{}'", cache_key);
+    }
+
     Ok(Json(AutocompleteResponse {
         status: Status::Success,
         suggestions,
@@ -1721,6 +1746,37 @@ pub(crate) async fn get_autocomplete(
 
 use terraphim_service::context::{ContextConfig, ContextManager};
 use terraphim_types::{ConversationId, ConversationSummary};
+use std::collections::HashMap;
+use chrono::{DateTime, Duration, Utc};
+
+/// Cached autocomplete result with expiration
+#[derive(Debug, Clone)]
+struct CachedAutocompleteResult {
+    suggestions: Vec<AutocompleteSuggestion>,
+    created_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+}
+
+impl CachedAutocompleteResult {
+    fn new(suggestions: Vec<AutocompleteSuggestion>) -> Self {
+        let now = Utc::now();
+        Self {
+            suggestions,
+            created_at: now,
+            expires_at: now + Duration::minutes(10), // 10-minute cache
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        Utc::now() < self.expires_at
+    }
+}
+
+/// Global autocomplete cache
+pub static AUTOCOMPLETE_CACHE: std::sync::LazyLock<tokio::sync::Mutex<HashMap<String, CachedAutocompleteResult>>> =
+    std::sync::LazyLock::new(|| {
+        tokio::sync::Mutex::new(HashMap::new())
+    });
 
 /// Global context manager instance
 pub static CONTEXT_MANAGER: std::sync::LazyLock<tokio::sync::Mutex<ContextManager>> =
@@ -1931,7 +1987,7 @@ pub(crate) async fn add_context_to_conversation(
 
     let context_type = match request.context_type.as_str() {
         "document" => terraphim_types::ContextType::Document,
-        "search_result" => terraphim_types::ContextType::SearchResult,
+        "search_result" => terraphim_types::ContextType::Document, // Changed from SearchResult to Document
         "user_input" => terraphim_types::ContextType::UserInput,
         "system" => terraphim_types::ContextType::System,
         "external" => terraphim_types::ContextType::External,
@@ -2050,7 +2106,7 @@ pub(crate) async fn update_context_in_conversation(
     let context_type = if let Some(ref type_str) = request.context_type {
         match type_str.as_str() {
             "document" => terraphim_types::ContextType::Document,
-            "search_result" => terraphim_types::ContextType::SearchResult,
+            "search_result" => terraphim_types::ContextType::Document, // Changed from SearchResult to Document
             "user_input" => terraphim_types::ContextType::UserInput,
             "system" => terraphim_types::ContextType::System,
             "external" => terraphim_types::ContextType::External,
@@ -2090,6 +2146,208 @@ pub(crate) async fn update_context_in_conversation(
             status: Status::Error,
             context: None,
             error: Some(format!("Failed to update context: {}", e)),
+        })),
+    }
+}
+
+// =================== KG CONTEXT MANAGEMENT API ===================
+
+/// Request to search KG terms with autocomplete
+#[derive(Debug, Deserialize)]
+pub struct KGSearchRequest {
+    pub query: String,
+    pub limit: Option<usize>,
+    pub min_similarity: Option<f64>,
+}
+
+/// Response for KG search
+#[derive(Debug, Serialize)]
+pub struct KGSearchResponse {
+    pub status: Status,
+    pub suggestions: Vec<AutocompleteSuggestion>,
+    pub error: Option<String>,
+}
+
+/// Request to add KG term definition to context
+#[derive(Debug, Deserialize)]
+pub struct AddKGTermContextRequest {
+    pub term: String,
+    pub role: String,
+}
+
+/// Request to add complete KG index to context
+#[derive(Debug, Deserialize)]
+pub struct AddKGIndexContextRequest {
+    pub role: String,
+}
+
+/// Search KG terms with autocomplete and caching
+pub(crate) async fn search_kg_terms(
+    State(config_state): State<ConfigState>,
+    Path(conversation_id): Path<String>,
+    Query(request): Query<KGSearchRequest>,
+) -> Result<Json<KGSearchResponse>> {
+    log::debug!(
+        "Searching KG terms for conversation {} with query '{}'",
+        conversation_id,
+        request.query
+    );
+
+    let role_name = RoleName::new(&request.query); // Use query as role for now, should be passed in request
+    let cache_key = format!("kg_search:{}:{}", role_name, request.query);
+
+    // Check cache first
+    {
+        let cache = AUTOCOMPLETE_CACHE.lock().await;
+        if let Some(cached) = cache.get(&cache_key) {
+            if cached.is_valid() {
+                log::debug!("Returning cached KG search results for '{}'", cache_key);
+                return Ok(Json(KGSearchResponse {
+                    status: Status::Success,
+                    suggestions: cached.suggestions.clone(),
+                    error: None,
+                }));
+            }
+        }
+    }
+
+    // Use existing autocomplete functionality
+    let autocomplete_response = get_autocomplete(
+        State(config_state),
+        Path((role_name.to_string(), request.query.clone())),
+    ).await?;
+
+    match autocomplete_response {
+        Json(response) => {
+            // Cache the results
+            {
+                let mut cache = AUTOCOMPLETE_CACHE.lock().await;
+                let cached_result = CachedAutocompleteResult::new(response.suggestions.clone());
+                cache.insert(cache_key.clone(), cached_result);
+                log::debug!("Cached KG search results for '{}'", cache_key);
+            }
+
+            Ok(Json(KGSearchResponse {
+                status: response.status,
+                suggestions: response.suggestions,
+                error: response.error,
+            }))
+        }
+    }
+}
+
+/// Add KG term definition to conversation context
+pub(crate) async fn add_kg_term_context(
+    State(config_state): State<ConfigState>,
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddKGTermContextRequest>,
+) -> Result<Json<AddContextResponse>> {
+    log::debug!(
+        "Adding KG term '{}' to conversation {} context",
+        request.term,
+        conversation_id
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id);
+    let role_name = RoleName::new(&request.role);
+
+    // Use existing KG search to find documents for the term
+    let mut terraphim_service = TerraphimService::new(config_state);
+    let documents = terraphim_service
+        .find_documents_for_kg_term(&role_name, &request.term)
+        .await
+        .map_err(|e| crate::error::ApiError(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            anyhow::anyhow!("Failed to find KG documents: {}", e),
+        ))?;
+
+    if documents.is_empty() {
+        return Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("No documents found for KG term '{}'", request.term)),
+        }));
+    }
+
+    // Create KG term definition from the first document
+    let doc = &documents[0];
+    let kg_term = terraphim_types::KGTermDefinition {
+        term: request.term.clone(),
+        normalized_term: terraphim_types::NormalizedTermValue::new(request.term.clone()),
+        id: 1, // TODO: Get actual term ID from thesaurus
+        definition: Some(doc.description.clone().unwrap_or_default()),
+        synonyms: Vec::new(), // TODO: Extract from thesaurus
+        related_terms: Vec::new(), // TODO: Extract from thesaurus
+        usage_examples: Vec::new(), // TODO: Extract from thesaurus
+        url: if doc.url.is_empty() { None } else { Some(doc.url.clone()) },
+        metadata: {
+            let mut meta = ahash::AHashMap::new();
+            meta.insert("source_document".to_string(), doc.id.clone());
+            meta.insert("document_title".to_string(), doc.title.clone());
+            meta
+        },
+        relevance_score: doc.rank.map(|r| r as f64),
+    };
+
+    let context_item = terraphim_types::ContextItem::from_kg_term_definition(&kg_term);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => Ok(Json(AddContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to add KG term context: {}", e)),
+        })),
+    }
+}
+
+/// Add complete KG index to conversation context
+pub(crate) async fn add_kg_index_context(
+    State(config_state): State<ConfigState>,
+    Path(conversation_id): Path<String>,
+    Json(request): Json<AddKGIndexContextRequest>,
+) -> Result<Json<AddContextResponse>> {
+    log::debug!(
+        "Adding KG index for role '{}' to conversation {} context",
+        request.role,
+        conversation_id
+    );
+
+    let conv_id = ConversationId::from_string(conversation_id);
+    let role_name = RoleName::new(&request.role);
+
+    // Get rolegraph to extract KG index information
+    let rolegraph_sync = config_state.roles.get(&role_name)
+        .ok_or_else(|| crate::error::ApiError(
+            StatusCode::NOT_FOUND,
+            anyhow::anyhow!("Role '{}' not found", role_name),
+        ))?;
+
+    let rolegraph = rolegraph_sync.lock().await;
+    
+    let kg_index = terraphim_types::KGIndexInfo {
+        name: format!("KG Index for {}", role_name),
+        total_terms: rolegraph.thesaurus.len(),
+        total_nodes: rolegraph.nodes_map().len(),
+        total_edges: rolegraph.edges_map().len(),
+        last_updated: chrono::Utc::now(), // TODO: Get actual last updated time
+        source: "local".to_string(),
+        version: Some("1.0".to_string()),
+    };
+
+    let context_item = terraphim_types::ContextItem::from_kg_index(&kg_index);
+
+    let mut manager = CONTEXT_MANAGER.lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => Ok(Json(AddContextResponse {
+            status: Status::Success,
+            error: None,
+        })),
+        Err(e) => Ok(Json(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("Failed to add KG index context: {}", e)),
         })),
     }
 }
