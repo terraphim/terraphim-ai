@@ -151,7 +151,6 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                ..Default::default()
             },
         )
         .build()
@@ -182,7 +181,6 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                ..Default::default()
             },
         )
         .build()
@@ -202,7 +200,6 @@ async fn test_dual_haystack_comprehensive_validation() {
                 kg: None,
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
-                ..Default::default()
             },
         )
         .build()
@@ -224,7 +221,6 @@ async fn test_dual_haystack_comprehensive_validation() {
                     ServiceType::Ripgrep,
                     true,
                 )],
-                ..Default::default()
             },
         )
         .build()
@@ -709,7 +705,6 @@ async fn test_source_differentiation_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                ..Default::default()
             },
         )
         .build()
