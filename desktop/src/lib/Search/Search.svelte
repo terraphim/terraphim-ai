@@ -264,8 +264,22 @@
 
       $input = $input + ` ${suggestion} `;
     } else {
-      // It's a term suggestion - add it as a selected term
-      addSelectedTerm(suggestion, currentLogicalOperator);
+      // It's a term suggestion - replace the current partial term
+      const words = $input.trim().split(/\s+/);
+      const lastWord = words[words.length - 1];
+      
+      // If the last word is a partial match for the suggestion, replace it
+      if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
+        // Replace the last word with the full suggestion
+        words[words.length - 1] = suggestion;
+        $input = words.join(' ');
+        
+        // Trigger parsing to update chips with the new input
+        parseAndUpdateChips($input);
+      } else {
+        // If no partial match, add as new term
+        addSelectedTerm(suggestion, currentLogicalOperator);
+      }
     }
 
     suggestions = [];
