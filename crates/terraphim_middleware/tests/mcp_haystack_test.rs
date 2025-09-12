@@ -28,7 +28,6 @@ async fn mcp_live_haystack_smoke() {
             .with_extra_parameter("base_url".into(), base_url.clone())
             .with_extra_parameter("transport".into(), "sse".into())],
         extra: ahash::AHashMap::new(),
-        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()

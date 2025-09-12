@@ -254,7 +254,6 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
             atomic_server_secret: None,
             extra_parameters: extra_params,
         }],
-        ..Default::default()
     };
 
     let config = ConfigBuilder::new()
