@@ -4,23 +4,18 @@ use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
 use terraphim_types::{RelevanceFunction, RoleName};
 
 fn create_test_role() -> Role {
-    Role {
-        shortname: Some("Test".to_string()),
-        name: "Test".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![Haystack {
-            location: "test_data".to_string(),
-            service: ServiceType::Ripgrep,
-            read_only: true,
-            atomic_server_secret: None,
-            extra_parameters: std::collections::HashMap::new(),
-        }],
-        extra: ahash::AHashMap::new(),
-        ..Default::default()
-    }
+    let mut role = Role::new("Test");
+    role.shortname = Some("Test".to_string());
+    role.relevance_function = RelevanceFunction::TitleScorer;
+    role.theme = "default".to_string();
+    role.haystacks = vec![Haystack {
+        location: "test_data".to_string(),
+        service: ServiceType::Ripgrep,
+        read_only: true,
+        atomic_server_secret: None,
+        extra_parameters: std::collections::HashMap::new(),
+    }];
+    role
 }
 
 fn create_test_config() -> terraphim_config::Config {
