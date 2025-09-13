@@ -2333,17 +2333,34 @@ pub(crate) async fn add_kg_index_context(
 
     let rolegraph = rolegraph_sync.lock().await;
 
-    let kg_index = terraphim_types::KGIndexInfo {
-        name: format!("KG Index for {}", role_name),
-        total_terms: rolegraph.thesaurus.len(),
-        total_nodes: rolegraph.nodes_map().len(),
-        total_edges: rolegraph.edges_map().len(),
-        last_updated: chrono::Utc::now(), // TODO: Get actual last updated time
-        source: "local".to_string(),
-        version: Some("1.0".to_string()),
-    };
+    // Serialize just the thesaurus as the main content
+    let thesaurus_content = serde_json::to_string_pretty(&rolegraph.thesaurus)
+        .unwrap_or_else(|e| format!("Failed to serialize thesaurus: {}", e));
 
-    let context_item = terraphim_types::ContextItem::from_kg_index(&kg_index);
+    // Create context item with thesaurus data
+    let mut metadata = ahash::AHashMap::new();
+    metadata.insert("source_type".to_string(), "kg_index".to_string());
+    metadata.insert("kg_name".to_string(), format!("KG Index for {}", role_name));
+    metadata.insert("total_terms".to_string(), rolegraph.thesaurus.len().to_string());
+    metadata.insert("total_nodes".to_string(), rolegraph.nodes_map().len().to_string());
+    metadata.insert("total_edges".to_string(), rolegraph.edges_map().len().to_string());
+    metadata.insert("source".to_string(), "local".to_string());
+    metadata.insert("last_updated".to_string(), chrono::Utc::now().to_rfc3339());
+    metadata.insert("version".to_string(), "1.0".to_string());
+
+    let context_item = terraphim_types::ContextItem {
+        id: format!("kg_index_{}", chrono::Utc::now().timestamp_millis()),
+        context_type: terraphim_types::ContextType::KGIndex,
+        title: format!("Thesaurus for {}", role_name),
+        summary: Some(format!(
+            "Knowledge graph thesaurus with {} terms for domain-specific vocabulary and concepts",
+            rolegraph.thesaurus.len()
+        )),
+        content: thesaurus_content,
+        metadata,
+        created_at: chrono::Utc::now(),
+        relevance_score: Some(1.0),
+    };
 
     let mut manager = CONTEXT_MANAGER.lock().await;
     match manager.add_context(&conv_id, context_item) {
