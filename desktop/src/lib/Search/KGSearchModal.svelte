@@ -689,7 +689,7 @@
 </style>
 
 <Modal bind:active on:close={handleClose}>
-  <div class="box wrapper">
+  <div class="box wrapper" data-testid="kg-search-modal">
     <div class="kg-search-container" on:keydown={handleKeydown}>
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
@@ -715,9 +715,10 @@
               icon="search"
               expanded
               autofocus
+              data-testid="kg-search-input"
             />
             {#if typeaheadSuggestions.length > 0}
-              <ul class="suggestions">
+              <ul class="suggestions" data-testid="kg-typeahead-list">
                 {#each typeaheadSuggestions as s, index}
                   <li
                     class:active={index === typeaheadIndex}
@@ -732,6 +733,7 @@
                     role="option"
                     aria-selected={index === typeaheadIndex}
                     aria-label={`Apply suggestion: ${s}`}
+                    data-testid="kg-typeahead-item"
                   >
                     {s}
                   </li>
@@ -743,13 +745,13 @@
       </div>
 
       {#if searchError}
-        <Message type="is-danger">
+        <Message type="is-danger" data-testid="kg-search-error">
           {searchError}
         </Message>
       {/if}
 
       {#if isSearching}
-        <div class="empty-state">
+        <div class="empty-state" data-testid="kg-search-loading">
           <div class="progress-container">
             <div class="progress-bar">
               <div class="progress-fill"></div>
@@ -758,13 +760,14 @@
           <p>Searching knowledge graph...</p>
         </div>
       {:else if suggestions.length > 0}
-        <div class="suggestions-container">
+        <div class="suggestions-container" data-testid="kg-suggestions-list">
           {#each suggestions as suggestion}
             <button
               class="suggestion-item {selectedSuggestion?.term === suggestion.term ? 'is-active' : ''}"
               on:click={() => selectSuggestion(suggestion)}
               on:keydown={(e) => e.key === 'Enter' && selectSuggestion(suggestion)}
               type="button"
+              data-testid="kg-suggestion-item"
             >
               <div class="suggestion-term">
                 {suggestion.term}
@@ -789,7 +792,7 @@
           {/each}
         </div>
       {:else if query.trim().length >= 2}
-        <div class="notification is-light">
+        <div class="notification is-light" data-testid="kg-search-empty">
           <p class="has-text-centered">No knowledge graph terms found for "<strong>{query}</strong>"</p>
           <p class="has-text-centered is-size-7 has-text-grey mt-2">Try different keywords or check if the role "{$role}" has a knowledge graph enabled.</p>
         </div>
@@ -811,6 +814,7 @@
               type="is-primary"
               on:click={addTermToContext}
               disabled={!selectedSuggestion}
+              data-testid="kg-add-term-button"
             >
               Add "{selectedSuggestion.term}" to Context
             </Button>
@@ -827,6 +831,7 @@
           size="is-small"
           style="width: 100%;"
           on:click={addKGIndexToContext}
+          data-testid="kg-add-index-button"
         >
           Add Complete Thesaurus to Context
         </Button>

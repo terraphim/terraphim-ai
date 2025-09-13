@@ -10,7 +10,7 @@ use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
 use terraphim_types::Thesaurus;
 use terraphim_types::{
-    ConversationId, Document, KGIndexInfo, KGTermDefinition, NormalizedTermValue, RoleName,
+    ConversationId, ContextItem, ContextType, Document, KGIndexInfo, KGTermDefinition, NormalizedTermValue, RoleName,
     SearchQuery,
 };
 
@@ -20,6 +20,7 @@ use serde::Serializer;
 use serde_json::Value;
 use std::collections::HashMap;
 use tsify::Tsify;
+use ulid;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -768,7 +769,7 @@ pub async fn get_autocomplete_suggestions(
 
 use terraphim_service::context::{ContextConfig, ContextManager};
 use terraphim_types::{
-    ChatMessage as TerraphimChatMessage, ContextItem, ContextType, ConversationSummary,
+    ChatMessage as TerraphimChatMessage, ConversationSummary,
 };
 
 /// Response for conversation creation
@@ -1784,6 +1785,10 @@ pub async fn add_kg_index_context(
 
     let rolegraph = rolegraph_sync.lock().await;
 
+    // Serialize the full thesaurus to JSON
+    let thesaurus_json = serde_json::to_string_pretty(&rolegraph.thesaurus)
+        .unwrap_or_else(|_| "{}".to_string());
+
     let kg_index = KGIndexInfo {
         name: format!("Knowledge Graph Index for {}", request.role_name),
         total_terms: rolegraph.thesaurus.len(),
@@ -1795,7 +1800,31 @@ pub async fn add_kg_index_context(
     };
     drop(rolegraph);
 
-    let context_item = terraphim_types::ContextItem::from_kg_index(&kg_index);
+    // Create context item with full thesaurus JSON content
+    let context_item = ContextItem {
+        id: ulid::Ulid::new().to_string(),
+        context_type: ContextType::System, // Use System type for KG index
+        title: kg_index.name.clone(),
+        summary: Some(format!(
+            "Complete thesaurus with {} terms, {} nodes, and {} edges. Contains full JSON vocabulary data for comprehensive AI understanding.",
+            kg_index.total_terms, kg_index.total_nodes, kg_index.total_edges
+        )),
+        content: thesaurus_json,
+        metadata: {
+            let mut meta = AHashMap::new();
+            meta.insert("total_terms".to_string(), kg_index.total_terms.to_string());
+            meta.insert("total_nodes".to_string(), kg_index.total_nodes.to_string());
+            meta.insert("total_edges".to_string(), kg_index.total_edges.to_string());
+            meta.insert("source".to_string(), kg_index.source.clone());
+            meta.insert("version".to_string(), kg_index.version.clone().unwrap_or_default());
+            meta.insert("last_updated".to_string(), kg_index.last_updated.to_rfc3339());
+            meta.insert("content_type".to_string(), "thesaurus_json".to_string());
+            meta.insert("kg_index_type".to_string(), "KGIndex".to_string());
+            meta
+        },
+        created_at: chrono::Utc::now(),
+        relevance_score: Some(1.0),
+    };
 
     let mut manager = get_context_manager().lock().await;
     match manager.add_context(&conv_id, context_item) {
