@@ -303,7 +303,7 @@
         });
         if (response.ok) {
           const data = await response.json();
-          if (data.status === 'Success') {
+          if (data.status === 'success') {
             console.log('✅ Context deleted successfully via HTTP');
             await loadConversationContext();
           } else {
@@ -355,7 +355,7 @@
         });
         if (response.ok) {
           const data = await response.json();
-          if (data.status === 'Success') {
+          if (data.status === 'success') {
             console.log('✅ Context updated successfully via HTTP');
             await loadConversationContext();
           } else {
@@ -753,6 +753,7 @@
 <!-- KG Search Modal -->
 <KGSearchModal
   bind:active={showKGSearchModal}
+  conversationId={conversationId}
   on:termAdded={handleKGTermAdded}
   on:kgIndexAdded={handleKGIndexAdded}
 />
