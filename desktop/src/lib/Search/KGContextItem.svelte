@@ -348,6 +348,14 @@
           <div class="stat-label">Version</div>
         </div>
       </div>
+      
+      {#if !compact}
+        <div class="notification is-success is-light mt-3">
+          <p class="is-size-7">
+            <strong>Thesaurus Data:</strong> This context item contains the complete thesaurus as JSON, providing all domain-specific vocabulary and term mappings for comprehensive AI understanding.
+          </p>
+        </div>
+      {/if}
     {/if}
 
     {#if contextItem.summary && !compact}
