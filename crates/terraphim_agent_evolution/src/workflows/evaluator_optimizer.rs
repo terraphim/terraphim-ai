@@ -594,15 +594,17 @@ Please provide a completely new response that addresses the original request whi
     fn extract_overall_score(&self, response: &str) -> f64 {
         // Look for patterns like "overall score: 0.7" or "score: 7/10"
         let patterns = [
-            r"overall.{0,20}score.{0,10}(\d+\.?\d*)",
-            r"score.{0,10}(\d+\.?\d*)",
-            r"(\d+\.?\d*).{0,10}/10",
-            r"(\d+\.?\d*)%",
+            r"overall.*score[:\s]+(\d+(?:\.\d+)?)",
+            r"score[:\s]+(\d+(?:\.\d+)?)",
+            r"(\d+(?:\.\d+)?)\s*/\s*10",
+            r"(\d+(?:\.\d+)?)\s*%",
         ];
+
+        let response_lower = response.to_lowercase();
 
         for pattern in &patterns {
             if let Ok(regex) = regex::Regex::new(pattern) {
-                if let Some(captures) = regex.captures(&response.to_lowercase()) {
+                if let Some(captures) = regex.captures(&response_lower) {
                     if let Some(score_str) = captures.get(1) {
                         if let Ok(score) = score_str.as_str().parse::<f64>() {
                             return if score > 1.0 { score / 10.0 } else { score }.clamp(0.0, 1.0);

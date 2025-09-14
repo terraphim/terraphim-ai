@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Prompt Chaining - Interactive Coding Environment</title>
+    <link rel="stylesheet" href="../shared/styles.css">
+    <style>
+        .coding-environment {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .input-panel {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+        }
+        
+        .output-panel {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .step-editor {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--surface-2);
+        }
+        
+        .step-editor.active {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+        
+        .step-number {
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        
+        .step-output {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .step-output h4 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .step-content {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        
+        .editable-step {
+            border: 1px dashed var(--border);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .editable-step:hover {
+            border-color: var(--primary);
+            background: #f8faff;
+        }
+        
+        .chain-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .template-selector {
+            flex: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .coding-environment {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>🔗 AI Prompt Chaining</h1>
+            <p>Interactive Coding Environment - Step-by-step software development workflow</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Controls -->
+        <div class="chain-controls">
+            <div class="template-selector">
+                <label class="form-label" for="project-template">Project Template:</label>
+                <select id="project-template" class="form-input">
+                    <option value="web-app">Web Application</option>
+                    <option value="api-service">REST API Service</option>
+                    <option value="cli-tool">Command Line Tool</option>
+                    <option value="data-analysis">Data Analysis Script</option>
+                    <option value="ml-model">Machine Learning Model</option>
+                </select>
+            </div>
+            <div class="controls">
+                <button id="start-chain" class="btn primary">Start Development</button>
+                <button id="pause-chain" class="btn" disabled>Pause</button>
+                <button id="reset-chain" class="btn">Reset</button>
+            </div>
+        </div>
+
+        <!-- Workflow Status -->
+        <div class="workflow-container">
+            <div class="workflow-header">
+                <h2 class="workflow-title">Development Pipeline</h2>
+                <span id="workflow-status" class="workflow-status idle">Idle</span>
+            </div>
+            
+            <!-- Pipeline Visualization -->
+            <div id="pipeline-container"></div>
+            
+            <!-- Progress Bar -->
+            <div id="progress-container"></div>
+        </div>
+
+        <!-- Main Interface -->
+        <div class="coding-environment">
+            <!-- Input Panel -->
+            <div class="input-panel">
+                <h3>📝 Project Definition</h3>
+                
+                <div class="form-group">
+                    <label class="form-label" for="project-description">Describe your project:</label>
+                    <textarea 
+                        id="project-description" 
+                        class="form-input form-textarea" 
+                        placeholder="Example: Build a task management web app with user authentication, CRUD operations for tasks, and a clean responsive UI using React and Node.js"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="tech-stack">Technology Stack (optional):</label>
+                    <input 
+                        type="text" 
+                        id="tech-stack" 
+                        class="form-input" 
+                        placeholder="React, Node.js, MongoDB, Express"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="requirements">Special Requirements (optional):</label>
+                    <textarea 
+                        id="requirements" 
+                        class="form-input form-textarea" 
+                        placeholder="Must be mobile-responsive, include tests, follow accessibility standards"
+                        rows="3"
+                    ></textarea>
+                </div>
+
+                <!-- Step Editors -->
+                <div id="step-editors">
+                    <!-- Dynamic step editors will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="output-panel">
+                <h3>🚀 Development Output</h3>
+                <div id="chain-output">
+                    <p class="text-muted">Start the development process to see step-by-step outputs here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div id="metrics-container" style="display: none;">
+            <h3>📊 Execution Metrics</h3>
+            <!-- Metrics will be populated here -->
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="../shared/api-client.js"></script>
+    <script src="../shared/workflow-visualizer.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
