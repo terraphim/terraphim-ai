@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_config"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim configuration"
@@ -18,11 +18,11 @@ path = "src/bin/main.rs"
 name = "terraphim-config"
 
 [dependencies]
-terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
-terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "0.1.0", features = ["remote-loading"] }
-terraphim_persistence = { path = "../terraphim_persistence", version = "0.1.0" }
-terraphim_settings = { path = "../terraphim_settings", version = "0.1.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.2.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", features = ["remote-loading"] }
+terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "0.2.0" }
 
 opendal = { version = "0.44.2", features = [
     "services-dashmap",

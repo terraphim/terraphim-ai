@@ -183,7 +183,7 @@ pub(crate) async fn get_config_schema() -> Json<Value> {
 /// Request body for updating the selected role only
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SelectedRoleRequest {
-    pub selected_role: terraphim_types::RoleName,
+    pub selectedrole: terraphim_types::RoleName,
 }
 
 /// Update only the selected role without replacing the whole config
@@ -193,7 +193,7 @@ pub(crate) async fn update_selected_role(
 ) -> Result<Json<ConfigResponse>> {
     let terraphim_service = TerraphimService::new(config_state.clone());
     let config = terraphim_service
-        .update_selected_role(payload.selected_role)
+        .update_selected_role(payload.selectedrole)
         .await?;
 
     Ok(Json(ConfigResponse {
@@ -588,26 +588,30 @@ pub(crate) async fn chat_completion(
     // Build messages array; optionally inject system prompt and context
     let mut messages_json: Vec<serde_json::Value> = Vec::new();
 
-    // Start with system prompt if available (support both OpenRouter and generic formats)
+    // Start with system prompt if available (prioritize llm_system_prompt, then provider-specific, then extra)
     let system_prompt = {
-        #[cfg(feature = "openrouter")]
-        {
-            role.openrouter_chat_system_prompt.or_else(|| {
-                // Try generic system prompt from extra
+        // First priority: llm_system_prompt (provider-agnostic)
+        role.llm_system_prompt.or_else(|| {
+            #[cfg(feature = "openrouter")]
+            {
+                // Second priority: OpenRouter-specific system prompt
+                role.openrouter_chat_system_prompt.or_else(|| {
+                    // Third priority: generic system prompt from extra
+                    role.extra
+                        .get("system_prompt")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
+            }
+            #[cfg(not(feature = "openrouter"))]
+            {
+                // Second priority: generic system prompt from extra
                 role.extra
                     .get("system_prompt")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string())
-            })
-        }
-        #[cfg(not(feature = "openrouter"))]
-        {
-            // Try generic system prompt from extra
-            role.extra
-                .get("system_prompt")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        }
+            }
+        })
     };
 
     if let Some(system) = &system_prompt {
@@ -662,7 +666,7 @@ pub(crate) async fn chat_completion(
     // Determine model name for response
     let model_name = request
         .model
-        .or_else(|| {
+        .or({
             #[cfg(feature = "openrouter")]
             {
                 role.openrouter_chat_model
@@ -2341,9 +2345,18 @@ pub(crate) async fn add_kg_index_context(
     let mut metadata = ahash::AHashMap::new();
     metadata.insert("source_type".to_string(), "kg_index".to_string());
     metadata.insert("kg_name".to_string(), format!("KG Index for {}", role_name));
-    metadata.insert("total_terms".to_string(), rolegraph.thesaurus.len().to_string());
-    metadata.insert("total_nodes".to_string(), rolegraph.nodes_map().len().to_string());
-    metadata.insert("total_edges".to_string(), rolegraph.edges_map().len().to_string());
+    metadata.insert(
+        "total_terms".to_string(),
+        rolegraph.thesaurus.len().to_string(),
+    );
+    metadata.insert(
+        "total_nodes".to_string(),
+        rolegraph.nodes_map().len().to_string(),
+    );
+    metadata.insert(
+        "total_edges".to_string(),
+        rolegraph.edges_map().len().to_string(),
+    );
     metadata.insert("source".to_string(), "local".to_string());
     metadata.insert("last_updated".to_string(), chrono::Utc::now().to_rfc3339());
     metadata.insert("version".to_string(), "1.0".to_string());

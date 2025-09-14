@@ -520,6 +520,7 @@ mod tests {
             openrouter_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
             openrouter_chat_model: None,
+            llm_system_prompt: None,
             extra: ahash::AHashMap::new(),
         }
     }

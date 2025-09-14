@@ -128,6 +128,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
         extra: AHashMap::new(),
+        llm_system_prompt: None,
     };
 
     config.roles.insert(role_name.clone(), role);
@@ -356,6 +357,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
         extra: AHashMap::new(),
+        llm_system_prompt: None,
     };
 
     config.roles.insert(role_name.clone(), role);

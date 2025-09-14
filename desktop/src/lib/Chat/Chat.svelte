@@ -392,15 +392,23 @@
         requestBody.conversation_id = conversationId;
       }
 
-      const res = await fetch(`${CONFIG.ServerURL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      let data: ChatResponse;
+      if ($is_tauri) {
+        // Tauri mode - use invoke
+        data = await invoke('chat', { request: requestBody });
+      } else {
+        // Web mode - use HTTP API
+        const res = await fetch(`${CONFIG.ServerURL}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        data = await res.json();
       }
-      const data: ChatResponse = await res.json();
+      
       modelUsed = data.model_used ?? null;
       if (data.status?.toLowerCase() === 'success' && data.message) {
         messages = [...messages, { role: 'assistant', content: data.message }];
