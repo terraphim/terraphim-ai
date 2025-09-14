@@ -386,6 +386,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::add_search_context_to_conversation,
             cmd::delete_context,
             cmd::update_context,
+            // Chat command
+            cmd::chat,
             // KG search commands
             cmd::search_kg_terms,
             cmd::add_kg_term_context,

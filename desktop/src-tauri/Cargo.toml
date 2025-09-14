@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-ai-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "Desktop app for Terraphim, a privacy preserving AI assistant: Take control of the relevance"
 authors = ["Terraphim Contributors"]
 license = "Apache-2.0"
@@ -20,16 +20,16 @@ path = "src/bin/generate-bindings.rs"
 tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
-terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.1.0", features = ["typescript"] }
-terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "0.1.0", features = ["native"] }
-terraphim_config = { path = "../../crates/terraphim_config", version = "0.1.0", features = ["typescript"] }
-terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.1.0" }
-terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.1.0" }
-terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.1.0" }
-terraphim_types = { path = "../../crates/terraphim_types", version = "0.1.0", features = ["typescript"] }
-terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.1.0" }
-terraphim_service = { path = "../../crates/terraphim_service", version = "0.1.0" }
-terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "0.1.0" }
+terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
+terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "0.2.0", features = ["native"] }
+terraphim_config = { path = "../../crates/terraphim_config", version = "0.2.0", features = ["typescript"] }
+terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.2.0" }
+terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.2.0" }
+terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.2.0" }
+terraphim_types = { path = "../../crates/terraphim_types", version = "0.2.0", features = ["typescript"] }
+terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.2.0" }
+terraphim_service = { path = "../../crates/terraphim_service", version = "0.2.0" }
+terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "0.2.0" }
 rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["server"] }
 serde_json_any_key = "2.0.0"
 anyhow = "1.0.81"
@@ -74,6 +74,8 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 # OpenRouter AI integration feature
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+# Ollama AI integration feature
+ollama = ["terraphim_service/ollama"]
 # Optional database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
 rocksdb = ["terraphim_persistence/services-rocksdb"]

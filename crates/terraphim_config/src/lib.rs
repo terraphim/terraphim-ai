@@ -114,6 +114,9 @@ pub struct Role {
     #[cfg(feature = "openrouter")]
     #[serde(default)]
     pub openrouter_chat_model: Option<String>,
+    /// System prompt for LLM chat conversations (provider-agnostic)
+    #[serde(default)]
+    pub llm_system_prompt: Option<String>,
     #[serde(flatten)]
     #[schemars(skip)]
     pub extra: AHashMap<String, Value>,
@@ -393,6 +396,7 @@ impl ConfigBuilder {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
                 extra: AHashMap::new(),
             },
         );
@@ -436,6 +440,7 @@ impl ConfigBuilder {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: Some("You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.".to_string()),
                 extra: AHashMap::new(),
             },
         );
@@ -471,6 +476,7 @@ impl ConfigBuilder {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: Some("You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.".to_string()),
                 extra: AHashMap::new(),
             },
         );
@@ -540,6 +546,7 @@ impl ConfigBuilder {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: None,
                     extra: AHashMap::new(),
                 },
             )
@@ -581,6 +588,7 @@ impl ConfigBuilder {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: Some("You are an expert software engineer specializing in system architecture, DevOps, and full-stack development. You help with designing scalable systems, implementing best practices, and troubleshooting technical issues.".to_string()),
                     extra: AHashMap::new(),
                 },
             )
@@ -622,6 +630,7 @@ impl ConfigBuilder {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: Some("You are an expert system operator and DevOps engineer specializing in infrastructure management, monitoring, deployment automation, and operational excellence. Focus on reliability, scalability, and security best practices.".to_string()),
                     extra: AHashMap::new(),
                 },
             )
@@ -665,6 +674,7 @@ impl ConfigBuilder {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: None,
                     extra: AHashMap::new(),
                 },
             )
@@ -706,6 +716,7 @@ impl ConfigBuilder {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: Some("You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.".to_string()),
                     extra: AHashMap::new(),
                 },
             )
@@ -739,6 +750,7 @@ impl ConfigBuilder {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: Some("You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.".to_string()),
                     extra: AHashMap::new(),
                 },
             )
@@ -1209,6 +1221,7 @@ mod tests {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: None,
                 },
             )
             .add_role(
@@ -1242,6 +1255,7 @@ mod tests {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: None,
                 },
             )
             .add_role(
@@ -1283,6 +1297,7 @@ mod tests {
                     openrouter_chat_system_prompt: None,
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
+                    llm_system_prompt: None,
                 },
             )
             .default_role("Default")
@@ -1346,6 +1361,7 @@ mod tests {
             openrouter_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
             openrouter_chat_model: None,
+            llm_system_prompt: None,
         }
     }
 
@@ -1440,5 +1456,58 @@ mod tests {
         let toml = toml::to_string_pretty(&config).unwrap();
         log::debug!("Config: {:#?}", config);
         assert!(!toml.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_llm_system_prompt_serialization() {
+        let mut role = dummy_role();
+        role.llm_system_prompt =
+            Some("You are a helpful assistant specialized in Rust programming.".to_string());
+
+        // Test JSON serialization
+        let json = serde_json::to_string_pretty(&role).unwrap();
+        log::debug!("Role with system prompt: {}", json);
+        assert!(json.contains("llm_system_prompt"));
+        assert!(json.contains("You are a helpful assistant specialized in Rust programming."));
+
+        // Test deserialization
+        let deserialized_role: Role = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            deserialized_role.llm_system_prompt,
+            Some("You are a helpful assistant specialized in Rust programming.".to_string())
+        );
+
+        // Test with None value
+        role.llm_system_prompt = None;
+        let json_none = serde_json::to_string_pretty(&role).unwrap();
+        let deserialized_none: Role = serde_json::from_str(&json_none).unwrap();
+        assert_eq!(deserialized_none.llm_system_prompt, None);
+    }
+
+    #[tokio::test]
+    async fn test_role_with_different_system_prompts() {
+        // Test role with llm_system_prompt
+        let mut rust_role = dummy_role();
+        rust_role.name = "Rust Engineer".into();
+        rust_role.llm_system_prompt = Some("You are an expert Rust developer.".to_string());
+
+        // Test role with openrouter prompt (when feature enabled)
+        let mut ai_role = dummy_role();
+        ai_role.name = "AI Engineer".into();
+        #[cfg(feature = "openrouter")]
+        {
+            ai_role.openrouter_chat_system_prompt = Some("You are an AI/ML expert.".to_string());
+        }
+        ai_role.llm_system_prompt = Some("You are an AI engineering specialist.".to_string());
+
+        // Verify serialization preserves both
+        let rust_json = serde_json::to_string(&rust_role).unwrap();
+        let ai_json = serde_json::to_string(&ai_role).unwrap();
+
+        assert!(rust_json.contains("You are an expert Rust developer"));
+        assert!(ai_json.contains("You are an AI engineering specialist"));
+
+        #[cfg(feature = "openrouter")]
+        assert!(ai_json.contains("You are an AI/ML expert"));
     }
 }

@@ -1663,6 +1663,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
 name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7087,7 +7093,7 @@ checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
 name = "terraphim-ai-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7130,14 +7136,14 @@ dependencies = [
 
 [[package]]
 name = "terraphim-markdown-parser"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "pulldown-cmark",
 ]
 
 [[package]]
 name = "terraphim_atomic_client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "cfg-if",
@@ -7164,7 +7170,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_automata"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
@@ -7189,7 +7195,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_build_args"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -7213,7 +7219,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_config"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7245,7 +7251,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_mcp_server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7276,7 +7282,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "async-trait",
@@ -7314,7 +7320,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_onepassword_cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7336,7 +7342,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_persistence"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-once-cell",
  "async-trait",
@@ -7360,7 +7366,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rolegraph"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
@@ -7383,7 +7389,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7392,6 +7398,7 @@ dependencies = [
  "chrono",
  "clap 4.5.40",
  "dircpy",
+ "dotenv",
  "env_logger 0.11.8",
  "log",
  "mime_guess",
@@ -7427,7 +7434,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_service"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7462,7 +7469,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_settings"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "directories",
  "envtestkit",
@@ -7476,7 +7483,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_tui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap 4.5.40",
@@ -7512,7 +7519,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",

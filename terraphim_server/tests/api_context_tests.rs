@@ -46,6 +46,7 @@ fn create_test_config() -> Config {
                 openrouter_chat_model: None,
                 extra: AHashMap::new(),
                 terraphim_it: false,
+                llm_system_prompt: None,
             },
         )
         .build()

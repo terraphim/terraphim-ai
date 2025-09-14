@@ -10,8 +10,8 @@ use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
 use terraphim_types::Thesaurus;
 use terraphim_types::{
-    ConversationId, ContextItem, ContextType, Document, KGIndexInfo, KGTermDefinition, NormalizedTermValue, RoleName,
-    SearchQuery,
+    ContextItem, ContextType, ConversationId, Document, KGIndexInfo, KGTermDefinition,
+    NormalizedTermValue, RoleName, SearchQuery,
 };
 
 use ahash::AHashMap;
@@ -768,9 +768,7 @@ pub async fn get_autocomplete_suggestions(
 // =================== CONVERSATION MANAGEMENT COMMANDS ===================
 
 use terraphim_service::context::{ContextConfig, ContextManager};
-use terraphim_types::{
-    ChatMessage as TerraphimChatMessage, ConversationSummary,
-};
+use terraphim_types::{ChatMessage as TerraphimChatMessage, ConversationSummary};
 
 /// Response for conversation creation
 #[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
@@ -830,6 +828,33 @@ pub struct UpdateContextResponse {
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DeleteContextResponse {
     pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Request for chat messages
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ChatRequest {
+    pub role: String,
+    pub messages: Vec<ChatMessage>,
+    pub conversation_id: Option<String>,
+}
+
+/// Chat message structure
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Response for chat operations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ChatResponse {
+    pub status: String,
+    pub message: Option<String>,
+    pub model_used: Option<String>,
     pub error: Option<String>,
 }
 
@@ -1219,6 +1244,154 @@ pub async fn update_context(
                 error: Some(format!("Failed to update context: {}", e)),
             })
         }
+    }
+}
+
+/// Chat endpoint for LLM interactions
+#[command]
+pub async fn chat(
+    config_state: State<'_, ConfigState>,
+    request: ChatRequest,
+) -> Result<ChatResponse> {
+    log::debug!("Chat request for role: {}", request.role);
+
+    let role_name = RoleName::new(&request.role);
+
+    // Get the role configuration
+    let config = {
+        let config_guard = config_state.config.lock().await;
+        config_guard.clone()
+    };
+
+    let role_config = match config.roles.get(&role_name) {
+        Some(role) => role,
+        None => {
+            return Ok(ChatResponse {
+                status: "error".to_string(),
+                message: None,
+                model_used: None,
+                error: Some(format!("Role '{}' not found", request.role)),
+            });
+        }
+    };
+
+    // Check for LLM provider configuration in role.extra
+    log::debug!("Role extra settings: {:?}", role_config.extra);
+
+    let llm_provider = role_config
+        .extra
+        .get("llm_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let openrouter_enabled = role_config
+        .extra
+        .get("openrouter_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    log::debug!("LLM provider from extra: '{}'", llm_provider);
+    log::debug!("OpenRouter enabled: {}", openrouter_enabled);
+
+    // Determine the LLM provider
+    let provider = if !llm_provider.is_empty() {
+        llm_provider.to_string()
+    } else if openrouter_enabled {
+        "openrouter".to_string()
+    } else {
+        "".to_string()
+    };
+
+    if provider.is_empty() {
+        return Ok(ChatResponse {
+            status: "error".to_string(),
+            message: None,
+            model_used: None,
+            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
+        });
+    }
+
+    // Use the terraphim_service LLM client for actual integration
+    use terraphim_service::llm;
+
+    // Try to build an LLM client from the role configuration
+    let Some(llm_client) = llm::build_llm_from_role(&role_config) else {
+        return Ok(ChatResponse {
+            status: "error".to_string(),
+            message: None,
+            model_used: None,
+            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
+        });
+    };
+
+    // Build messages array for the LLM
+    let mut messages_json: Vec<serde_json::Value> = Vec::new();
+
+    // Inject context from conversation if provided
+    if let Some(conversation_id) = &request.conversation_id {
+        let conv_id = ConversationId::from_string(conversation_id.clone());
+        let manager = get_context_manager().lock().await;
+
+        if let Some(conversation) = manager.get_conversation(&conv_id) {
+            // Build context content from all context items
+            let mut context_content = String::new();
+
+            if !conversation.global_context.is_empty() {
+                context_content.push_str("=== CONTEXT INFORMATION ===\n");
+                context_content.push_str("The following information provides relevant context for this conversation:\n\n");
+
+                for (index, context_item) in conversation.global_context.iter().enumerate() {
+                    context_content.push_str(&format!(
+                        "Context Item {}: {}\n",
+                        index + 1,
+                        context_item.title
+                    ));
+                    if let Some(score) = context_item.relevance_score {
+                        context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
+                    }
+                    context_content.push_str(&format!("Content: {}\n", context_item.content));
+                    if !context_item.metadata.is_empty() {
+                        context_content
+                            .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
+                    }
+                    context_content.push_str("\n---\n\n");
+                }
+
+                context_content.push_str("=== END CONTEXT ===\n\n");
+                context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
+
+                // Add context as a system message
+                messages_json
+                    .push(serde_json::json!({"role": "system", "content": context_content}));
+            }
+        }
+    }
+
+    // Add user messages from the request
+    for m in request.messages.iter() {
+        messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
+    }
+
+    // Configure chat options
+    let chat_opts = llm::ChatOptions {
+        max_tokens: Some(1024),
+        temperature: Some(0.7),
+    };
+
+    // Call the LLM client
+    match llm_client.chat_completion(messages_json, chat_opts).await {
+        Ok(reply) => Ok(ChatResponse {
+            status: "success".to_string(),
+            message: Some(reply),
+            model_used: Some(llm_client.name().to_string()),
+            error: None,
+        }),
+        Err(e) => Ok(ChatResponse {
+            status: "error".to_string(),
+            message: None,
+            model_used: Some(llm_client.name().to_string()),
+            error: Some(format!("Chat failed: {}", e)),
+        }),
     }
 }
 
@@ -1786,8 +1959,8 @@ pub async fn add_kg_index_context(
     let rolegraph = rolegraph_sync.lock().await;
 
     // Serialize the full thesaurus to JSON
-    let thesaurus_json = serde_json::to_string_pretty(&rolegraph.thesaurus)
-        .unwrap_or_else(|_| "{}".to_string());
+    let thesaurus_json =
+        serde_json::to_string_pretty(&rolegraph.thesaurus).unwrap_or_else(|_| "{}".to_string());
 
     let kg_index = KGIndexInfo {
         name: format!("Knowledge Graph Index for {}", request.role_name),
