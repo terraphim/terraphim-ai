@@ -102,10 +102,36 @@ impl LlmAdapter for MockLlmAdapter {
             }
         }
 
-        // Mock response that reflects the input for testing
+        // Special handling for quality score requests
+        if (prompt.contains("Rate the quality") && prompt.contains("0.0 to 1.0")) ||
+           (prompt.to_lowercase().contains("overall quality score") && prompt.contains("0.0 to 1.0")) {
+            // Return varied quality scores for different types of tasks to create different lesson types
+            if prompt.contains("2+2") {
+                return Ok("0.95".to_string()); // Very high score for simple math
+            } else if prompt.contains("Analyze") {
+                return Ok("0.75".to_string()); // Medium score for prompt chaining (expects just a number)
+            } else {
+                // For prompt chaining assessment, return just a number
+                if prompt.contains("Respond with only the numerical score") {
+                    return Ok("0.85".to_string());
+                } else {
+                    return Ok("Overall quality score: 0.85".to_string()); // For evaluator-optimizer (expects descriptive text)
+                }
+            }
+        }
+        
+        // Mock response that reflects key terms from the input for testing
+        // Extract and include important keywords from the prompt
+        let keywords: Vec<&str> = prompt
+            .split_whitespace()
+            .filter(|word| word.len() > 3)
+            .take(5)
+            .collect();
+        
         Ok(format!(
-            "Mock response to: {}",
-            prompt.chars().take(50).collect::<String>()
+            "Analysis of {}: Based on the request about {}, here's a detailed response covering these aspects.",
+            keywords.join(", "),
+            prompt.chars().take(100).collect::<String>()
         ))
     }
 
@@ -213,6 +239,6 @@ mod tests {
             .complete("test prompt", CompletionOptions::default())
             .await;
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Mock response"));
+        assert!(result.unwrap().contains("Analysis of"));
     }
 }

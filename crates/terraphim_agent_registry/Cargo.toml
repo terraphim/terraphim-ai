@@ -1,0 +1,64 @@
+[package]
+name = "terraphim_agent_registry"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Knowledge graph-based agent registry for intelligent agent discovery and capability matching"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "agents", "knowledge-graph", "registry", "discovery"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+# Core Terraphim dependencies
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "0.1.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
+terraphim_gen_agent = { path = "../terraphim_gen_agent", version = "0.1.0" }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "0.1.0" }
+terraphim_agent_messaging = { path = "../terraphim_agent_messaging", version = "0.1.0" }
+
+# Core async runtime and utilities
+tokio = { workspace = true }
+async-trait = "0.1"
+futures-util = "0.3"
+
+# Error handling and serialization
+thiserror = "1.0.58"
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = "1.0.116"
+
+# Unique identifiers and time handling
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+log = "0.4.21"
+
+# Collections and utilities
+ahash = { version = "0.8.8", features = ["serde"] }
+indexmap = { version = "2.0", features = ["serde"] }
+
+# Knowledge graph and search
+petgraph = { version = "0.6", features = ["serde-1"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+env_logger = "0.11"
+serial_test = "3.0"
+
+[features]
+default = []
+benchmarks = ["dep:criterion"]
+
+[dependencies.criterion]
+version = "0.5"
+optional = true
+
+[[bench]]
+name = "registry_benchmarks"
+harness = false
+required-features = ["benchmarks"]

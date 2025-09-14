@@ -1,0 +1,56 @@
+[package]
+name = "terraphim_gen_agent"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "OTP GenServer-inspired agent behavior framework for standardized agent patterns"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "agents", "genserver", "otp", "behavior"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "0.1.0" }
+terraphim_agent_messaging = { path = "../terraphim_agent_messaging", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
+
+# Core async runtime and utilities
+tokio = { workspace = true }
+async-trait = "0.1"
+futures-util = "0.3"
+
+# Error handling and serialization
+thiserror = "1.0.58"
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = "1.0.116"
+
+# Unique identifiers and time handling
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+log = "0.4.21"
+
+# Collections and utilities
+ahash = { version = "0.8.8", features = ["serde"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+env_logger = "0.11"
+serial_test = "3.0"
+
+[features]
+default = []
+benchmarks = ["dep:criterion"]
+
+[dependencies.criterion]
+version = "0.5"
+optional = true
+
+[[bench]]
+name = "genagent_benchmarks"
+harness = false
+required-features = ["benchmarks"]
