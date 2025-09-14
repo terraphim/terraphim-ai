@@ -64,6 +64,7 @@ mod tests {
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
                     extra: AHashMap::new(),
+                    llm_system_prompt: None,
                 },
             )
             .default_role("Engineer")

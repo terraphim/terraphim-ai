@@ -325,6 +325,7 @@ fn create_ollama_live_role(base_url: &str) -> terraphim_config::Role {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
 
