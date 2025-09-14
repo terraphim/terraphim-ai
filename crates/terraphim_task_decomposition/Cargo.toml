@@ -1,0 +1,64 @@
+[package]
+name = "terraphim_task_decomposition"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Knowledge graph-based task decomposition system for intelligent task analysis and execution planning"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["ai", "agents", "tasks", "knowledge-graph", "decomposition"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+# Core Terraphim dependencies
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "0.1.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
+# terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "0.1.0" }
+# terraphim_goal_alignment = { path = "../terraphim_goal_alignment", version = "0.1.0" }
+
+# Core async runtime and utilities
+tokio = { workspace = true }
+async-trait = "0.1"
+futures-util = "0.3"
+
+# Error handling and serialization
+thiserror = "1.0.58"
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = "1.0.116"
+
+# Unique identifiers and time handling
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+log = "0.4.21"
+
+# Collections and utilities
+ahash = { version = "0.8.8", features = ["serde"] }
+indexmap = { version = "2.0", features = ["serde"] }
+
+# Graph algorithms
+petgraph = { version = "0.6", features = ["serde-1"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+env_logger = "0.11"
+serial_test = "3.0"
+
+[features]
+default = []
+benchmarks = ["dep:criterion"]
+
+[dependencies.criterion]
+version = "0.5"
+optional = true
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "task_decomposition_benchmarks"
+# harness = false
+# required-features = ["benchmarks"]

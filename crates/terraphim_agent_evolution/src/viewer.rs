@@ -28,6 +28,64 @@ impl MemoryEvolutionViewer {
         end: DateTime<Utc>,
     ) -> EvolutionResult<EvolutionTimeline> {
         let summary = evolution_system.get_evolution_summary(start, end).await?;
+        let mut events = Vec::new();
+
+        // Create events from completed tasks
+        let tasks_state = &evolution_system.tasks.current_state;
+        for completed_task in &tasks_state.completed {
+            if completed_task.completed_at >= start && completed_task.completed_at <= end {
+                events.push(EvolutionEvent {
+                    timestamp: completed_task.completed_at,
+                    event_type: EventType::TaskCompletion,
+                    description: format!("Completed task: {}", completed_task.original_task.content),
+                    impact_score: 0.7,
+                });
+            }
+        }
+
+        // Create events from learned lessons
+        let lessons_state = &evolution_system.lessons.current_state;
+        
+        // Collect all lessons from different categories
+        let mut all_lessons = Vec::new();
+        all_lessons.extend(&lessons_state.technical_lessons);
+        all_lessons.extend(&lessons_state.process_lessons);
+        all_lessons.extend(&lessons_state.domain_lessons);
+        all_lessons.extend(&lessons_state.failure_lessons);
+        all_lessons.extend(&lessons_state.success_patterns);
+        
+        for lesson in all_lessons {
+            if lesson.learned_at >= start && lesson.learned_at <= end {
+                let (event_type, impact_score) = match lesson.category {
+                    crate::lessons::LessonCategory::SuccessPattern => (EventType::PerformanceImprovement, 0.8),
+                    crate::lessons::LessonCategory::Failure => (EventType::PerformanceRegression, 0.6),
+                    _ => (EventType::LessonLearned, 0.5),
+                };
+                
+                events.push(EvolutionEvent {
+                    timestamp: lesson.learned_at,
+                    event_type,
+                    description: format!("Learned: {}", lesson.title),
+                    impact_score,
+                });
+            }
+        }
+
+        // Create events from memory consolidations (if any occurred in the time range)
+        let memory_state = &evolution_system.memory.current_state;
+        if memory_state.metadata.last_updated >= start && memory_state.metadata.last_updated <= end {
+            if memory_state.metadata.total_consolidations > 0 {
+                events.push(EvolutionEvent {
+                    timestamp: memory_state.metadata.last_updated,
+                    event_type: EventType::MemoryConsolidation,
+                    description: format!("Consolidated {} memories for better organization", memory_state.total_size()),
+                    impact_score: 0.4,
+                });
+            }
+        }
+
+        // Sort events by timestamp
+        events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
         Ok(EvolutionTimeline {
             agent_id: self.agent_id.clone(),
@@ -38,7 +96,7 @@ impl MemoryEvolutionViewer {
             task_completion_rate: summary.task_completion_rate,
             learning_velocity: summary.learning_velocity,
             alignment_trend: summary.alignment_trend,
-            events: vec![], // Would be populated from actual snapshot data
+            events,
         })
     }
 

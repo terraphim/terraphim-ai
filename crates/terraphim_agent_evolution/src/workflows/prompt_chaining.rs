@@ -39,7 +39,7 @@ impl Default for ChainConfig {
             max_chain_length: 5,
             step_timeout: Duration::from_secs(60),
             preserve_context: true,
-            quality_check: false,
+            quality_check: true,
         }
     }
 }
@@ -387,7 +387,7 @@ mod tests {
         assert_eq!(config.max_chain_length, 5);
         assert_eq!(config.step_timeout, Duration::from_secs(60));
         assert!(config.preserve_context);
-        assert!(!config.quality_check);
+        assert!(config.quality_check);
     }
 
     #[test]
