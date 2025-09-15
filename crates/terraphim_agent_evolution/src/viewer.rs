@@ -37,7 +37,10 @@ impl MemoryEvolutionViewer {
                 events.push(EvolutionEvent {
                     timestamp: completed_task.completed_at,
                     event_type: EventType::TaskCompletion,
-                    description: format!("Completed task: {}", completed_task.original_task.content),
+                    description: format!(
+                        "Completed task: {}",
+                        completed_task.original_task.content
+                    ),
                     impact_score: 0.7,
                 });
             }
@@ -45,7 +48,7 @@ impl MemoryEvolutionViewer {
 
         // Create events from learned lessons
         let lessons_state = &evolution_system.lessons.current_state;
-        
+
         // Collect all lessons from different categories
         let mut all_lessons = Vec::new();
         all_lessons.extend(&lessons_state.technical_lessons);
@@ -53,15 +56,19 @@ impl MemoryEvolutionViewer {
         all_lessons.extend(&lessons_state.domain_lessons);
         all_lessons.extend(&lessons_state.failure_lessons);
         all_lessons.extend(&lessons_state.success_patterns);
-        
+
         for lesson in all_lessons {
             if lesson.learned_at >= start && lesson.learned_at <= end {
                 let (event_type, impact_score) = match lesson.category {
-                    crate::lessons::LessonCategory::SuccessPattern => (EventType::PerformanceImprovement, 0.8),
-                    crate::lessons::LessonCategory::Failure => (EventType::PerformanceRegression, 0.6),
+                    crate::lessons::LessonCategory::SuccessPattern => {
+                        (EventType::PerformanceImprovement, 0.8)
+                    }
+                    crate::lessons::LessonCategory::Failure => {
+                        (EventType::PerformanceRegression, 0.6)
+                    }
                     _ => (EventType::LessonLearned, 0.5),
                 };
-                
+
                 events.push(EvolutionEvent {
                     timestamp: lesson.learned_at,
                     event_type,
@@ -73,12 +80,16 @@ impl MemoryEvolutionViewer {
 
         // Create events from memory consolidations (if any occurred in the time range)
         let memory_state = &evolution_system.memory.current_state;
-        if memory_state.metadata.last_updated >= start && memory_state.metadata.last_updated <= end {
+        if memory_state.metadata.last_updated >= start && memory_state.metadata.last_updated <= end
+        {
             if memory_state.metadata.total_consolidations > 0 {
                 events.push(EvolutionEvent {
                     timestamp: memory_state.metadata.last_updated,
                     event_type: EventType::MemoryConsolidation,
-                    description: format!("Consolidated {} memories for better organization", memory_state.total_size()),
+                    description: format!(
+                        "Consolidated {} memories for better organization",
+                        memory_state.total_size()
+                    ),
                     impact_score: 0.4,
                 });
             }

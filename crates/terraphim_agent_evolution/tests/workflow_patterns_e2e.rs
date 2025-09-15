@@ -109,8 +109,18 @@ async fn test_prompt_chaining_analysis_e2e() {
     assert_eq!(result.metadata.pattern_used, "prompt_chaining");
 
     // Verify execution trace has expected structure
-    eprintln!("DEBUG: Analysis execution trace length: {}", result.execution_trace.len());
-    eprintln!("DEBUG: Analysis step IDs: {:?}", result.execution_trace.iter().map(|s| &s.step_id).collect::<Vec<_>>());
+    eprintln!(
+        "DEBUG: Analysis execution trace length: {}",
+        result.execution_trace.len()
+    );
+    eprintln!(
+        "DEBUG: Analysis step IDs: {:?}",
+        result
+            .execution_trace
+            .iter()
+            .map(|s| &s.step_id)
+            .collect::<Vec<_>>()
+    );
     assert!(result.execution_trace.len() >= 2); // Should have multiple steps (changed from 3 to 2)
     assert!(result.execution_trace.iter().all(|step| step.success)); // All steps should succeed
 
@@ -226,7 +236,10 @@ async fn test_routing_complex_task_quality_focus() {
     };
 
     let routing = workflows::routing::Routing::new(primary_adapter)
-        .add_route("openai_gpt35".to_string(), LlmAdapterFactory::create_mock("basic"))
+        .add_route(
+            "openai_gpt35".to_string(),
+            LlmAdapterFactory::create_mock("basic"),
+        )
         .add_route(
             "openai_gpt4".to_string(),
             LlmAdapterFactory::create_mock("premium"),
@@ -299,7 +312,9 @@ async fn test_parallelization_comparison_task_e2e() {
     let task_descriptions: Vec<_> = result.execution_trace.iter().map(|s| &s.step_id).collect();
     assert!(task_descriptions
         .iter()
-        .any(|id| id.contains("analysis_perspective") || id.contains("practical_perspective") || id.contains("creative_perspective")));
+        .any(|id| id.contains("analysis_perspective")
+            || id.contains("practical_perspective")
+            || id.contains("creative_perspective")));
 
     // Resource usage should reflect parallel execution
     assert!(result.metadata.resources_used.parallel_tasks >= 2);
@@ -320,9 +335,9 @@ async fn test_parallelization_research_decomposition() {
     // Should have research-specific parallel tasks (falls back to generic)
     let step_ids: Vec<_> = result.execution_trace.iter().map(|s| &s.step_id).collect();
     eprintln!("DEBUG: Research step IDs: {:?}", step_ids);
-    assert!(step_ids
-        .iter()
-        .any(|id| id.contains("analysis_perspective") || id.contains("practical_perspective") || id.contains("creative_perspective")));
+    assert!(step_ids.iter().any(|id| id.contains("analysis_perspective")
+        || id.contains("practical_perspective")
+        || id.contains("creative_perspective")));
 }
 
 #[tokio::test]
