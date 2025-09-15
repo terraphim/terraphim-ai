@@ -4,14 +4,102 @@
  */
 
 class TerraphimApiClient {
-  constructor(baseUrl = 'http://localhost:3000') {
+  constructor(baseUrl = 'http://localhost:8000', options = {}) {
     this.baseUrl = baseUrl;
     this.headers = {
       'Content-Type': 'application/json',
     };
+    
+    // Configuration options
+    this.options = {
+      timeout: options.timeout || 30000,
+      maxRetries: options.maxRetries || 3,
+      retryDelay: options.retryDelay || 1000,
+      enableWebSocket: options.enableWebSocket !== false,
+      autoReconnect: options.autoReconnect !== false,
+      ...options
+    };
+    
+    // WebSocket integration
+    this.wsClient = null;
+    
+    if (this.options.enableWebSocket && typeof TerraphimWebSocketClient !== 'undefined') {
+      this.initializeWebSocket();
+    }
   }
 
-  // Generic request method
+  initializeWebSocket() {
+    try {
+      this.wsClient = new TerraphimWebSocketClient({
+        url: this.getWebSocketUrl(),
+        reconnectInterval: 3000,
+        maxReconnectAttempts: 10
+      });
+      
+      // Set up event handlers for workflow updates
+      this.wsClient.subscribe('connected', (data) => {
+        console.log('WebSocket connected at:', data.timestamp);
+      });
+      
+      this.wsClient.subscribe('disconnected', (data) => {
+        console.log('WebSocket disconnected:', data.reason);
+      });
+      
+    } catch (error) {
+      console.warn('Failed to initialize WebSocket client:', error);
+      this.enableWebSocket = false;
+    }
+  }
+
+  getWebSocketUrl() {
+    const protocol = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const url = new URL(this.baseUrl);
+    return `${protocol}//${url.host}/ws`;
+  }
+
+  // Configuration management methods
+  updateConfiguration(newConfig) {
+    const oldBaseUrl = this.baseUrl;
+    const oldOptions = { ...this.options };
+    
+    if (newConfig.baseUrl && newConfig.baseUrl !== this.baseUrl) {
+      this.baseUrl = newConfig.baseUrl;
+    }
+    
+    this.options = { ...this.options, ...newConfig };
+    
+    // Reinitialize WebSocket if URL changed or WebSocket settings changed
+    if (newConfig.baseUrl !== oldBaseUrl || 
+        newConfig.enableWebSocket !== oldOptions.enableWebSocket ||
+        newConfig.autoReconnect !== oldOptions.autoReconnect) {
+      this.reinitializeWebSocket();
+    }
+    
+    return { oldBaseUrl, oldOptions };
+  }
+
+  getConfiguration() {
+    return {
+      baseUrl: this.baseUrl,
+      wsUrl: this.getWebSocketUrl(),
+      ...this.options
+    };
+  }
+
+  reinitializeWebSocket() {
+    // Cleanup existing WebSocket
+    if (this.wsClient) {
+      this.wsClient.disconnect();
+      this.wsClient = null;
+    }
+    
+    // Initialize new WebSocket if enabled
+    if (this.options.enableWebSocket && typeof TerraphimWebSocketClient !== 'undefined') {
+      this.initializeWebSocket();
+    }
+  }
+
+  // Generic request method with retry logic
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
     const config = {
@@ -19,24 +107,60 @@ class TerraphimApiClient {
       ...options,
     };
 
-    try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json();
-      }
-      
-      return await response.text();
-    } catch (error) {
-      console.error(`API Error [${endpoint}]:`, error);
-      throw error;
+    // Add timeout
+    if (this.options.timeout) {
+      config.signal = AbortSignal.timeout(this.options.timeout);
     }
+
+    let lastError;
+    let attempts = 0;
+    const maxAttempts = this.options.maxRetries + 1;
+
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        const response = await fetch(url, config);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const error = new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+          
+          // Only retry on server errors (5xx) or network errors
+          if (response.status >= 500 && attempts < maxAttempts) {
+            lastError = error;
+            await this.delay(this.options.retryDelay * attempts);
+            continue;
+          }
+          
+          throw error;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return await response.json();
+        }
+        
+        return await response.text();
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on abort/timeout errors unless it's a network error
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+          break;
+        }
+        
+        // Retry on network errors
+        if (attempts < maxAttempts && (error.code === 'NETWORK_ERROR' || error.message.includes('fetch'))) {
+          await this.delay(this.options.retryDelay * attempts);
+          continue;
+        }
+        
+        break;
+      }
+    }
+
+    console.error(`API Error [${endpoint}] after ${attempts} attempts:`, lastError);
+    throw lastError;
   }
 
   // Health check
@@ -77,39 +201,147 @@ class TerraphimApiClient {
     });
   }
 
-  // Workflow execution endpoints (to be implemented)
-  async executePromptChain(input) {
+  // Workflow execution endpoints with WebSocket support
+  async executePromptChain(input, options = {}) {
+    if (this.wsClient && options.realTime) {
+      return this.executeWorkflowWithWebSocket('prompt-chain', input, options);
+    }
     return this.request('/workflows/prompt-chain', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
 
-  async executeRouting(input) {
+  async executeRouting(input, options = {}) {
+    if (this.wsClient && options.realTime) {
+      return this.executeWorkflowWithWebSocket('routing', input, options);
+    }
     return this.request('/workflows/route', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
 
-  async executeParallel(input) {
+  async executeParallel(input, options = {}) {
+    if (this.wsClient && options.realTime) {
+      return this.executeWorkflowWithWebSocket('parallel', input, options);
+    }
     return this.request('/workflows/parallel', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
 
-  async executeOrchestration(input) {
+  async executeOrchestration(input, options = {}) {
+    if (this.wsClient && options.realTime) {
+      return this.executeWorkflowWithWebSocket('orchestration', input, options);
+    }
     return this.request('/workflows/orchestrate', {
       method: 'POST',
       body: JSON.stringify(input),
     });
   }
 
-  async executeOptimization(input) {
+  async executeOptimization(input, options = {}) {
+    if (this.wsClient && options.realTime) {
+      return this.executeWorkflowWithWebSocket('optimization', input, options);
+    }
     return this.request('/workflows/optimize', {
       method: 'POST',
       body: JSON.stringify(input),
+    });
+  }
+
+  // WebSocket-enabled workflow execution
+  async executeWorkflowWithWebSocket(workflowType, input, options = {}) {
+    return new Promise((resolve, reject) => {
+      const sessionId = this.wsClient.startWorkflow(workflowType, {
+        input,
+        role: input.role || 'default',
+        overallRole: input.overallRole || 'content_creator',
+        ...options
+      });
+
+      let workflowResult = null;
+      let progressCallback = options.onProgress;
+      let agentUpdateCallback = options.onAgentUpdate;
+      let qualityCallback = options.onQualityUpdate;
+
+      // Set up event listeners for this session
+      const cleanupListeners = [];
+
+      // Progress updates
+      const progressUnsub = this.wsClient.subscribe('workflow_progress', (data) => {
+        if (data.sessionId === sessionId && progressCallback) {
+          progressCallback({
+            step: data.data.currentStep,
+            total: data.data.totalSteps,
+            current: data.data.currentTask,
+            percentage: data.data.progress
+          });
+        }
+      });
+      cleanupListeners.push(progressUnsub);
+
+      // Agent updates
+      const agentUnsub = this.wsClient.subscribe('agent_update', (data) => {
+        if (data.sessionId === sessionId && agentUpdateCallback) {
+          agentUpdateCallback(data.data);
+        }
+      });
+      cleanupListeners.push(agentUnsub);
+
+      // Quality assessment updates
+      const qualityUnsub = this.wsClient.subscribe('quality_assessment', (data) => {
+        if (data.sessionId === sessionId && qualityCallback) {
+          qualityCallback(data.data);
+        }
+      });
+      cleanupListeners.push(qualityUnsub);
+
+      // Completion handler
+      const completionUnsub = this.wsClient.subscribe('workflow_completed', (data) => {
+        if (data.sessionId === sessionId) {
+          workflowResult = data.data;
+          
+          // Cleanup listeners
+          cleanupListeners.forEach(unsub => unsub());
+          
+          resolve({
+            sessionId,
+            success: true,
+            result: workflowResult.result,
+            metadata: {
+              executionTime: workflowResult.executionTime,
+              pattern: workflowType,
+              steps: workflowResult.steps?.length || 1,
+              sessionInfo: this.wsClient.getWorkflowSession(sessionId)
+            }
+          });
+        }
+      });
+      cleanupListeners.push(completionUnsub);
+
+      // Error handler
+      const errorUnsub = this.wsClient.subscribe('workflow_error', (data) => {
+        if (data.sessionId === sessionId) {
+          // Cleanup listeners
+          cleanupListeners.forEach(unsub => unsub());
+          
+          reject(new Error(data.data.error || 'Workflow execution failed'));
+        }
+      });
+      cleanupListeners.push(errorUnsub);
+
+      // Set a timeout for the workflow
+      const timeout = options.timeout || 300000; // 5 minutes default
+      setTimeout(() => {
+        if (!workflowResult) {
+          cleanupListeners.forEach(unsub => unsub());
+          this.wsClient.stopWorkflow(sessionId);
+          reject(new Error('Workflow execution timeout'));
+        }
+      }, timeout);
     });
   }
 
@@ -398,11 +630,122 @@ class TerraphimApiClient {
 
     return mockOutputs[stepId] || `Generated output for ${stepId}: ${input.prompt.substring(0, 100)}...`;
   }
+
+  // WebSocket utility methods
+  isWebSocketEnabled() {
+    return this.enableWebSocket && this.wsClient && this.wsClient.isConnected;
+  }
+
+  getWebSocketStatus() {
+    return this.wsClient ? this.wsClient.getConnectionStatus() : { connected: false };
+  }
+
+  subscribeToWorkflowEvents(eventType, callback) {
+    if (this.wsClient) {
+      return this.wsClient.subscribe(eventType, callback);
+    }
+    return () => {}; // no-op unsubscribe function
+  }
+
+  getActiveWorkflowSessions() {
+    return this.wsClient ? this.wsClient.getAllWorkflowSessions() : [];
+  }
+
+  pauseWorkflowSession(sessionId) {
+    if (this.wsClient) {
+      this.wsClient.pauseWorkflow(sessionId);
+    }
+  }
+
+  resumeWorkflowSession(sessionId) {
+    if (this.wsClient) {
+      this.wsClient.resumeWorkflow(sessionId);
+    }
+  }
+
+  stopWorkflowSession(sessionId) {
+    if (this.wsClient) {
+      this.wsClient.stopWorkflow(sessionId);
+    }
+  }
+
+  updateWorkflowConfiguration(sessionId, config) {
+    if (this.wsClient) {
+      this.wsClient.updateWorkflowConfig(sessionId, config);
+    }
+  }
+
+  // Real-time workflow monitoring
+  monitorWorkflow(sessionId, callbacks = {}) {
+    const unsubscribeFunctions = [];
+
+    if (callbacks.onProgress) {
+      const unsub = this.subscribeToWorkflowEvents('workflow_progress', (data) => {
+        if (data.sessionId === sessionId) {
+          callbacks.onProgress(data.data);
+        }
+      });
+      unsubscribeFunctions.push(unsub);
+    }
+
+    if (callbacks.onAgentUpdate) {
+      const unsub = this.subscribeToWorkflowEvents('agent_update', (data) => {
+        if (data.sessionId === sessionId) {
+          callbacks.onAgentUpdate(data.data);
+        }
+      });
+      unsubscribeFunctions.push(unsub);
+    }
+
+    if (callbacks.onQualityUpdate) {
+      const unsub = this.subscribeToWorkflowEvents('quality_assessment', (data) => {
+        if (data.sessionId === sessionId) {
+          callbacks.onQualityUpdate(data.data);
+        }
+      });
+      unsubscribeFunctions.push(unsub);
+    }
+
+    if (callbacks.onComplete) {
+      const unsub = this.subscribeToWorkflowEvents('workflow_completed', (data) => {
+        if (data.sessionId === sessionId) {
+          callbacks.onComplete(data.data);
+          // Auto-cleanup on completion
+          unsubscribeFunctions.forEach(fn => fn());
+        }
+      });
+      unsubscribeFunctions.push(unsub);
+    }
+
+    if (callbacks.onError) {
+      const unsub = this.subscribeToWorkflowEvents('workflow_error', (data) => {
+        if (data.sessionId === sessionId) {
+          callbacks.onError(data.data);
+          // Auto-cleanup on error
+          unsubscribeFunctions.forEach(fn => fn());
+        }
+      });
+      unsubscribeFunctions.push(unsub);
+    }
+
+    // Return cleanup function
+    return () => {
+      unsubscribeFunctions.forEach(fn => fn());
+    };
+  }
+
+  // Cleanup method
+  disconnect() {
+    if (this.wsClient) {
+      this.wsClient.disconnect();
+      this.wsClient = null;
+    }
+  }
 }
 
 // WebSocket client for real-time updates
 class WorkflowWebSocket {
-  constructor(url = 'ws://localhost:3000/ws') {
+  constructor(url = 'ws://localhost:8000/ws') {
     this.url = url;
     this.ws = null;
     this.listeners = new Map();

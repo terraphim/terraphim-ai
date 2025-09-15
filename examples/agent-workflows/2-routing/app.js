@@ -5,8 +5,9 @@
 
 class RoutingPrototypingDemo {
   constructor() {
-    this.apiClient = new TerraphimApiClient();
+    this.apiClient = null; // Will be initialized with settings
     this.visualizer = new WorkflowVisualizer('pipeline-container');
+    this.settingsIntegration = null;
     this.currentTemplate = 'landing-page';
     this.selectedModel = null;
     this.complexityScore = 0;
@@ -82,11 +83,12 @@ class RoutingPrototypingDemo {
         example: 'Creative showcase with portfolio pieces'
       }
     };
-
-    this.init();
   }
 
-  init() {
+  async init() {
+    // Initialize settings system first
+    await this.initializeSettings();
+    
     this.setupEventListeners();
     this.renderModels();
     this.renderTemplateCards();
@@ -96,6 +98,25 @@ class RoutingPrototypingDemo {
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
+  }
+
+  async initializeSettings() {
+    try {
+      const initialized = await initializeSettings();
+      if (initialized) {
+        this.settingsIntegration = getSettingsIntegration();
+        this.apiClient = window.apiClient;
+        console.log('Settings integration initialized successfully');
+      } else {
+        // Fallback to default API client
+        console.warn('Settings integration failed, using default configuration');
+        this.apiClient = new TerraphimApiClient();
+      }
+    } catch (error) {
+      console.error('Failed to initialize settings:', error);
+      // Fallback to default API client
+      this.apiClient = new TerraphimApiClient();
+    }
   }
 
   setupEventListeners() {
@@ -582,6 +603,7 @@ class RoutingPrototypingDemo {
 }
 
 // Initialize the demo when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new RoutingPrototypingDemo();
+document.addEventListener('DOMContentLoaded', async () => {
+  const demo = new RoutingPrototypingDemo();
+  await demo.init();
 });

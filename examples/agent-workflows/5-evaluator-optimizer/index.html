@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Evaluator-Optimizer - Content Generation Studio</title>
+    <link rel="stylesheet" href="../shared/styles.css">
+    <style>
+        .studio-environment {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .generation-workspace {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            min-height: 700px;
+        }
+        
+        .optimization-panel {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            height: fit-content;
+        }
+        
+        .content-input {
+            margin-bottom: 2rem;
+        }
+        
+        .quality-criteria {
+            margin-bottom: 2rem;
+        }
+        
+        .criteria-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        
+        .criterion-card {
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .criterion-card:hover {
+            border-color: var(--primary);
+            background: #f8faff;
+        }
+        
+        .criterion-card.selected {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+        
+        .criterion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .criterion-name {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+        
+        .criterion-weight {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--surface-2);
+            padding: 0.125rem 0.5rem;
+            border-radius: var(--radius-full);
+        }
+        
+        .criterion-slider {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        
+        .optimization-settings {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+        }
+        
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        
+        .setting-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .setting-label {
+            font-size: 0.875rem;
+            color: var(--text);
+        }
+        
+        .setting-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .iteration-history {
+            margin-bottom: 2rem;
+        }
+        
+        .history-timeline {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+        }
+        
+        .iteration-node {
+            min-width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            background: white;
+        }
+        
+        .iteration-node:hover {
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+        
+        .iteration-node.active {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+        
+        .iteration-node.best {
+            border-color: var(--success);
+            background: #d1fae5;
+        }
+        
+        .iteration-number {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text);
+        }
+        
+        .iteration-score {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .generation-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .content-versions {
+            display: grid;
+            gap: 1.5rem;
+        }
+        
+        .version-card {
+            padding: 1.5rem;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .version-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .version-title {
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .version-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .quality-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+        }
+        
+        .quality-high {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .quality-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .quality-low {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .version-content {
+            line-height: 1.6;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+        
+        .version-feedback {
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: var(--radius-md);
+            margin-bottom: 1rem;
+        }
+        
+        .feedback-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+        
+        .feedback-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .feedback-item {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+        
+        .feedback-item:last-child {
+            border-bottom: none;
+        }
+        
+        .feedback-positive {
+            color: var(--success);
+        }
+        
+        .feedback-negative {
+            color: var(--danger);
+        }
+        
+        .quality-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .metric-card {
+            padding: 0.75rem;
+            background: white;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        
+        .optimization-chart {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--primary);
+        }
+        
+        .chart-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .chart-visualization {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chart-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            height: 200px;
+            width: 100%;
+            justify-content: space-around;
+        }
+        
+        .chart-bar {
+            flex: 1;
+            background: var(--primary);
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            position: relative;
+            transition: var(--transition);
+            min-width: 40px;
+            max-width: 60px;
+        }
+        
+        .chart-bar:hover {
+            opacity: 0.8;
+        }
+        
+        .bar-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        
+        .bar-value {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        @media (max-width: 1200px) {
+            .studio-environment {
+                grid-template-columns: 1fr;
+            }
+            
+            .optimization-panel {
+                order: 1;
+            }
+            
+            .generation-workspace {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>🔄 AI Evaluator-Optimizer</h1>
+            <p>Content Generation Studio - Iterative improvement through quality evaluation and optimization</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Workflow Status -->
+        <div class="workflow-container">
+            <div class="workflow-header">
+                <h2 class="workflow-title">Generation-Evaluation-Optimization Cycle</h2>
+                <span id="workflow-status" class="workflow-status idle">Ready to Generate</span>
+            </div>
+            
+            <!-- Pipeline Visualization -->
+            <div id="pipeline-container"></div>
+            
+            <!-- Progress Bar -->
+            <div id="progress-container"></div>
+        </div>
+
+        <!-- Main Interface -->
+        <div class="studio-environment">
+            <!-- Generation Workspace -->
+            <div class="generation-workspace">
+                <h3 id="workspace-title">Content Generation Studio</h3>
+                
+                <!-- Content Input -->
+                <div class="content-input">
+                    <label class="form-label" for="content-prompt">Content Brief:</label>
+                    <textarea 
+                        id="content-prompt" 
+                        class="form-input form-textarea" 
+                        placeholder="Example: Write a comprehensive blog post about the future of sustainable technology, focusing on renewable energy innovations, smart cities, and green manufacturing processes. Target audience: technology professionals and environmental advocates."
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <!-- Generation Controls -->
+                <div class="generation-controls">
+                    <button id="generate-btn" class="btn primary">Generate Content</button>
+                    <button id="optimize-btn" class="btn" disabled>Start Optimization</button>
+                    <button id="stop-btn" class="btn" disabled>Stop</button>
+                    <button id="reset-btn" class="btn">Reset</button>
+                </div>
+
+                <!-- Iteration History -->
+                <div class="iteration-history">
+                    <h4>Optimization History</h4>
+                    <div class="history-timeline" id="history-timeline">
+                        <!-- Iteration nodes will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Content Versions -->
+                <div id="content-versions" class="content-versions">
+                    <!-- Initial State -->
+                    <div id="initial-state" class="text-center" style="padding: 3rem;">
+                        <div style="color: var(--text-muted);">
+                            <h4>🚀 Ready to Generate & Optimize</h4>
+                            <p>Enter your content brief and configure quality criteria, then watch as the AI iteratively improves the content through evaluation and optimization cycles.</p>
+                            <p style="font-size: 0.875rem; margin-top: 1rem;">The system will generate, evaluate, and refine content until quality thresholds are met.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optimization Chart -->
+                <div id="optimization-chart" class="optimization-chart" style="display: none;">
+                    <div class="chart-header">
+                        <span style="font-size: 2rem;">📈</span>
+                        <div>
+                            <div class="chart-title">Quality Improvement Over Iterations</div>
+                            <div style="color: var(--text-muted); font-size: 0.875rem;">Tracking quality scores across optimization cycles</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-visualization" id="chart-visualization">
+                        <div class="chart-bars" id="chart-bars">
+                            <!-- Chart bars will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimization Panel -->
+            <div class="optimization-panel">
+                <h3>⚙️ Optimization Settings</h3>
+                
+                <!-- Quality Criteria -->
+                <div class="quality-criteria">
+                    <h4>Quality Criteria</h4>
+                    <div class="criteria-grid" id="criteria-grid">
+                        <!-- Quality criteria will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Optimization Settings -->
+                <div class="optimization-settings">
+                    <div class="setting-row">
+                        <span class="setting-label">Max Iterations:</span>
+                        <span class="setting-value" id="max-iterations">5</span>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Quality Threshold:</span>
+                        <span class="setting-value" id="quality-threshold">85%</span>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Learning Rate:</span>
+                        <span class="setting-value" id="learning-rate">0.3</span>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Feedback Mode:</span>
+                        <span class="setting-value" id="feedback-mode">Adaptive</span>
+                    </div>
+                </div>
+
+                <!-- Current Metrics -->
+                <div class="current-metrics">
+                    <h4>Current Quality Metrics</h4>
+                    <div class="quality-metrics" id="current-quality-metrics">
+                        <!-- Metrics will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Best Version Info -->
+                <div class="best-version" style="margin-top: 2rem; padding: 1rem; background: #d1fae5; border-radius: var(--radius-md); display: none;" id="best-version-info">
+                    <h4 style="color: #065f46; margin-bottom: 0.5rem;">🏆 Best Version</h4>
+                    <div style="font-size: 0.875rem; color: #065f46;">
+                        <div>Iteration: <span id="best-iteration" style="font-weight: 600;">-</span></div>
+                        <div>Quality Score: <span id="best-score" style="font-weight: 600;">-</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" style="display: none; margin-top: 2rem;">
+            <div class="workflow-container">
+                <div class="workflow-header">
+                    <h3>📊 Optimization Results & Analytics</h3>
+                </div>
+                <div id="results-content"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="../shared/api-client.js"></script>
+    <script src="../shared/server-discovery.js"></script>
+    <script src="../shared/settings-manager.js"></script>
+    <script src="../shared/settings-ui.js"></script>
+    <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/workflow-visualizer.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

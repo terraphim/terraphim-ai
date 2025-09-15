@@ -11,8 +11,8 @@ use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
 
+use crate::AppState;
 use terraphim_config::Config;
-use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::magic_unpair;
 use terraphim_rolegraph::RoleGraph;
@@ -39,11 +39,11 @@ pub struct CreateDocumentResponse {
 
 /// Creates index of the document for each rolegraph
 pub(crate) async fn create_document(
-    State(config): State<ConfigState>,
+    State(app_state): State<AppState>,
     Json(document): Json<Document>,
 ) -> Result<Json<CreateDocumentResponse>> {
     log::debug!("create_document");
-    let mut terraphim_service = TerraphimService::new(config.clone());
+    let mut terraphim_service = TerraphimService::new(app_state.config_state.clone());
     let document = terraphim_service.create_document(document).await?;
     Ok(Json(CreateDocumentResponse {
         status: Status::Success,
@@ -74,12 +74,12 @@ pub struct SearchResponse {
 /// Search for documents in all Terraphim graphs defined in the config via GET params
 pub(crate) async fn search_documents(
     Extension(_tx): Extension<SearchResultsStream>,
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     search_query: Query<SearchQuery>,
 ) -> Result<Json<SearchResponse>> {
     log::debug!("search_document called with {:?}", search_query);
 
-    let mut terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(app_state.config_state);
     let results = terraphim_service.search(&search_query.0).await?;
     let total = results.len();
 
@@ -93,12 +93,12 @@ pub(crate) async fn search_documents(
 /// Search for documents in all Terraphim graphs defined in the config via POST body
 pub(crate) async fn search_documents_post(
     Extension(_tx): Extension<SearchResultsStream>,
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     search_query: Json<SearchQuery>,
 ) -> Result<Json<SearchResponse>> {
     log::debug!("POST Searching documents with query: {search_query:?}");
 
-    let mut terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(app_state.config_state);
     let results = terraphim_service.search(&search_query).await?;
     let total = results.len();
 
@@ -127,9 +127,9 @@ pub struct ConfigResponse {
 }
 
 /// API handler for Terraphim Config
-pub(crate) async fn get_config(State(config): State<ConfigState>) -> Result<Json<ConfigResponse>> {
+pub(crate) async fn get_config(State(app_state): State<AppState>) -> Result<Json<ConfigResponse>> {
     log::debug!("Called API endpoint get_config");
-    let terraphim_service = TerraphimService::new(config);
+    let terraphim_service = TerraphimService::new(app_state.config_state);
     let config = terraphim_service.fetch_config().await;
     Ok(Json(ConfigResponse {
         status: Status::Success,
@@ -142,13 +142,13 @@ pub(crate) async fn get_config(State(config): State<ConfigState>) -> Result<Json
 /// This function updates the configuration both in-memory and persists it to disk
 /// so that the changes survive server restarts.
 pub(crate) async fn update_config(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Json(config_new): Json<Config>,
 ) -> Result<Json<ConfigResponse>> {
     log::info!("Updating configuration and persisting to disk");
 
     // Update in-memory configuration
-    let mut config = config_state.config.lock().await;
+    let mut config = app_state.config_state.config.lock().await;
     *config = config_new.clone();
     drop(config); // Release the lock before async save operation
 
@@ -188,10 +188,10 @@ pub struct SelectedRoleRequest {
 
 /// Update only the selected role without replacing the whole config
 pub(crate) async fn update_selected_role(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Json(payload): Json<SelectedRoleRequest>,
 ) -> Result<Json<ConfigResponse>> {
-    let terraphim_service = TerraphimService::new(config_state.clone());
+    let terraphim_service = TerraphimService::new(app_state.config_state.clone());
     let config = terraphim_service
         .update_selected_role(payload.selected_role)
         .await?;
@@ -231,18 +231,18 @@ pub struct RoleGraphQuery {
 
 /// Return nodes and edges for the RoleGraph of the requested role (or currently selected role if omitted)
 pub(crate) async fn get_rolegraph(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Query(query): Query<RoleGraphQuery>,
 ) -> Result<Json<RoleGraphResponseDto>> {
     // Determine which role we should use
     let role_name: RoleName = if let Some(role_str) = query.role {
         RoleName::new(&role_str)
     } else {
-        config_state.get_selected_role().await
+        app_state.config_state.get_selected_role().await
     };
 
     // Retrieve the rolegraph for the role
-    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
+    let Some(rolegraph_sync) = app_state.config_state.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Rolegraph not found for role: {role_name}")),
@@ -303,7 +303,7 @@ pub struct KgSearchQuery {
 /// For example, given "haystack", it will find documents like "haystack.md" that contain
 /// this term or its synonyms ("datasource", "service", "agent").
 pub(crate) async fn find_documents_by_kg_term(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     axum::extract::Path(role_name): axum::extract::Path<String>,
     Query(query): Query<KgSearchQuery>,
 ) -> Result<Json<SearchResponse>> {
@@ -314,7 +314,7 @@ pub(crate) async fn find_documents_by_kg_term(
     );
 
     let role_name = RoleName::new(&role_name);
-    let mut terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(app_state.config_state);
 
     let results = terraphim_service
         .find_documents_for_kg_term(&role_name, &query.term)
@@ -555,11 +555,11 @@ pub struct ChatResponse {
 
 /// Handle chat completion via generic LLM client (OpenRouter, Ollama, etc.)
 pub(crate) async fn chat_completion(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Json(request): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>> {
     let role_name = RoleName::new(&request.role);
-    let config = config_state.config.lock().await;
+    let config = app_state.config_state.config.lock().await;
 
     let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(ChatResponse {
@@ -727,11 +727,11 @@ pub struct OpenRouterModelsResponse {
 
 #[allow(dead_code)]
 pub(crate) async fn list_openrouter_models(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Json(req): Json<OpenRouterModelsRequest>,
 ) -> Result<Json<OpenRouterModelsResponse>> {
     let role_name = RoleName::new(&req.role);
-    let config = config_state.config.lock().await;
+    let config = app_state.config_state.config.lock().await;
     let Some(role) = config.roles.get(&role_name) else {
         return Ok(Json(OpenRouterModelsResponse {
             status: Status::Error,
@@ -806,7 +806,7 @@ pub(crate) async fn list_openrouter_models(
 /// It requires the role to have OpenRouter properly configured (enabled, API key, model).
 /// Summaries are cached in the persistence layer to avoid redundant API calls.
 pub(crate) async fn summarize_document(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Json(request): Json<SummarizeDocumentRequest>,
 ) -> Result<Json<SummarizeDocumentResponse>> {
     log::debug!(
@@ -816,7 +816,7 @@ pub(crate) async fn summarize_document(
     );
 
     let role_name = RoleName::new(&request.role);
-    let config = config_state.config.lock().await;
+    let config = app_state.config_state.config.lock().await;
 
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
@@ -868,7 +868,7 @@ pub(crate) async fn summarize_document(
 
         drop(config); // Release the lock before async operations
 
-        let mut terraphim_service = TerraphimService::new(config_state);
+        let mut terraphim_service = TerraphimService::new(app_state.config_state);
 
         // Try to load existing document first
         let document_opt = match terraphim_service
@@ -985,11 +985,11 @@ pub(crate) async fn summarize_document(
 
 /// Check summarization status and capabilities for a role
 pub(crate) async fn get_summarization_status(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Query(query): Query<SummarizationStatusQuery>,
 ) -> Result<Json<SummarizationStatusResponse>> {
     let role_name = RoleName::new(&query.role);
-    let config = config_state.config.lock().await;
+    let config = app_state.config_state.config.lock().await;
 
     let Some(role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
@@ -1034,7 +1034,7 @@ pub(crate) async fn get_summarization_status(
 
 /// Submit a document for async summarization
 pub(crate) async fn async_summarize_document(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Extension(summarization_manager): Extension<
         Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
     >,
@@ -1047,7 +1047,7 @@ pub(crate) async fn async_summarize_document(
     );
 
     let role_name = RoleName::new(&request.role);
-    let config = config_state.config.lock().await;
+    let config = app_state.config_state.config.lock().await;
 
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
@@ -1064,7 +1064,7 @@ pub(crate) async fn async_summarize_document(
     drop(config); // Release the lock
 
     // Load the document
-    let mut terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(app_state.config_state);
     let document = match terraphim_service
         .get_document_by_id(&request.document_id)
         .await
@@ -1366,7 +1366,7 @@ pub(crate) async fn get_queue_stats(
 
 /// Submit multiple documents for batch summarization
 pub(crate) async fn batch_summarize_documents(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Extension(summarization_manager): Extension<
         Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
     >,
@@ -1379,7 +1379,7 @@ pub(crate) async fn batch_summarize_documents(
     );
 
     let role_name = RoleName::new(&request.role);
-    let config = config_state.config.lock().await;
+    let config = app_state.config_state.config.lock().await;
 
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
@@ -1416,7 +1416,7 @@ pub(crate) async fn batch_summarize_documents(
         }
     };
 
-    let mut terraphim_service = TerraphimService::new(config_state);
+    let mut terraphim_service = TerraphimService::new(app_state.config_state);
     let manager = summarization_manager.lock().await;
 
     let mut task_ids = Vec::new();
@@ -1565,7 +1565,7 @@ pub struct AutocompleteSuggestion {
 /// This endpoint returns the thesaurus (concept mappings) for a given role,
 /// which is used for search bar autocomplete functionality in the UI.
 pub(crate) async fn get_thesaurus(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Path(role_name): Path<String>,
 ) -> Result<Json<ThesaurusResponse>> {
     log::debug!("Getting thesaurus for role '{}'", role_name);
@@ -1573,7 +1573,7 @@ pub(crate) async fn get_thesaurus(
     let role_name = RoleName::new(&role_name);
 
     // Get the role graph for the specified role
-    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
+    let Some(rolegraph_sync) = app_state.config_state.roles.get(&role_name) else {
         return Ok(Json(ThesaurusResponse {
             status: Status::Error,
             thesaurus: None,
@@ -1609,7 +1609,7 @@ pub(crate) async fn get_thesaurus(
 /// This endpoint uses the Finite State Transducer (FST) from terraphim_automata
 /// to provide fast, intelligent autocomplete suggestions with fuzzy matching.
 pub(crate) async fn get_autocomplete(
-    State(config_state): State<ConfigState>,
+    State(app_state): State<AppState>,
     Path((role_name, query)): Path<(String, String)>,
 ) -> Result<Json<AutocompleteResponse>> {
     use terraphim_automata::{
@@ -1625,7 +1625,7 @@ pub(crate) async fn get_autocomplete(
     let role_name = RoleName::new(&role_name);
 
     // Get the role graph for the specified role
-    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
+    let Some(rolegraph_sync) = app_state.config_state.roles.get(&role_name) else {
         return Ok(Json(AutocompleteResponse {
             status: Status::Error,
             suggestions: vec![],

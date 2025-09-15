@@ -5,8 +5,9 @@
 
 class ParallelizationAnalysisDemo {
   constructor() {
-    this.apiClient = new TerraphimApiClient();
+    this.apiClient = null; // Will be initialized with settings
     this.visualizer = new WorkflowVisualizer('pipeline-container');
+    this.settingsIntegration = null;
     this.selectedDomains = new Set(['business', 'technical', 'social']);
     this.selectedPerspectives = new Set();
     this.analysisResults = new Map();
@@ -71,10 +72,12 @@ class ParallelizationAnalysisDemo {
       }
     };
 
-    this.init();
   }
 
-  init() {
+  async init() {
+    // Initialize settings system first
+    await this.initializeSettings();
+    
     this.setupEventListeners();
     this.renderPerspectives();
     this.renderDomainTags();
@@ -84,6 +87,25 @@ class ParallelizationAnalysisDemo {
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
+  }
+
+  async initializeSettings() {
+    try {
+      const initialized = await initializeSettings();
+      if (initialized) {
+        this.settingsIntegration = getSettingsIntegration();
+        this.apiClient = window.apiClient;
+        console.log('Settings integration initialized successfully');
+      } else {
+        // Fallback to default API client
+        console.warn('Settings integration failed, using default configuration');
+        this.apiClient = new TerraphimApiClient();
+      }
+    } catch (error) {
+      console.error('Failed to initialize settings:', error);
+      // Fallback to default API client
+      this.apiClient = new TerraphimApiClient();
+    }
   }
 
   setupEventListeners() {
@@ -714,6 +736,7 @@ class ParallelizationAnalysisDemo {
 }
 
 // Initialize the demo when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new ParallelizationAnalysisDemo();
+document.addEventListener('DOMContentLoaded', async () => {
+  const demo = new ParallelizationAnalysisDemo();
+  await demo.init();
 });
