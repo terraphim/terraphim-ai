@@ -380,8 +380,8 @@ async fn test_graceful_degradation() {
 
     // Evolution system should remain stable despite edge cases
     let evolution_system = manager.evolution_system();
-    assert!(evolution_system.memory.current_state.short_term.len() >= 0);
-    assert!(evolution_system.tasks.current_state.total_tasks() >= 0);
+    // Memory state has valid short-term entries
+    // Task state has valid task count
 }
 
 #[tokio::test]
@@ -601,16 +601,16 @@ fn validate_evolution_state(evolution_system: &AgentEvolutionSystem) {
     let lessons_state = &evolution_system.lessons.current_state;
 
     // All states should be internally consistent
-    assert!(memory_state.short_term.len() >= 0);
-    assert!(memory_state.long_term.len() >= 0);
-    assert!(memory_state.episodic_memory.len() >= 0);
+    // Memory state has valid short-term entries
+    // Memory state has valid long-term entries
+    // Memory state has valid episodic entries
 
-    assert!(tasks_state.total_tasks() >= 0);
+    // Task state has valid total tasks count
     assert!(tasks_state.completed_tasks() <= tasks_state.total_tasks());
 
-    assert!(lessons_state.technical_lessons.len() >= 0);
-    assert!(lessons_state.process_lessons.len() >= 0);
-    assert!(lessons_state.success_patterns.len() >= 0);
+    // Lessons state has valid technical lessons
+    // Lessons state has valid process lessons
+    // Lessons state has valid success patterns
 
     // Timestamps should be reasonable - using task metadata timestamps as proxy
     // assert!(&evolution_system.tasks.current_state.metadata.created_at <= &evolution_system.tasks.current_state.metadata.last_updated);

@@ -533,7 +533,7 @@ pub struct RuntimeStats {
 
 /// GenAgent factory for creating and managing agent runtimes
 pub struct GenAgentFactory {
-    state_manager: Arc<StateManager>,
+    state_manager: Arc<dyn StateManager>,
     default_config: RuntimeConfig,
     runtimes: Arc<RwLock<HashMap<AgentPid, Box<dyn Any + Send + Sync>>>>,
 }

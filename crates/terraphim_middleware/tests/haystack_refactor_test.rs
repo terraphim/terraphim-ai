@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use std::collections::HashMap;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_middleware::command::ripgrep::RipgrepCommand;
@@ -254,6 +255,21 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
             atomic_server_secret: None,
             extra_parameters: extra_params,
         }],
+        #[cfg(feature = "openrouter")]
+        openrouter_enabled: false,
+        #[cfg(feature = "openrouter")]
+        openrouter_api_key: None,
+        #[cfg(feature = "openrouter")]
+        openrouter_model: None,
+        #[cfg(feature = "openrouter")]
+        openrouter_auto_summarize: false,
+        #[cfg(feature = "openrouter")]
+        openrouter_chat_enabled: false,
+        #[cfg(feature = "openrouter")]
+        openrouter_chat_system_prompt: None,
+        #[cfg(feature = "openrouter")]
+        openrouter_chat_model: None,
+        extra: AHashMap::new(),
     };
 
     let config = ConfigBuilder::new()
