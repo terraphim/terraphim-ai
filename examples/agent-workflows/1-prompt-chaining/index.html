@@ -125,6 +125,9 @@
     </header>
 
     <main class="container">
+        <!-- Connection Status -->
+        <div id="connection-status-container"></div>
+        
         <!-- Controls -->
         <div class="chain-controls">
             <div class="template-selector">
@@ -217,8 +220,14 @@
     </main>
 
     <!-- Scripts -->
+    <script src="../shared/websocket-client.js"></script>
     <script src="../shared/api-client.js"></script>
+    <script src="../shared/server-discovery.js"></script>
+    <script src="../shared/settings-manager.js"></script>
+    <script src="../shared/settings-ui.js"></script>
+    <script src="../shared/settings-integration.js"></script>
     <script src="../shared/workflow-visualizer.js"></script>
+    <script src="../shared/connection-status.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

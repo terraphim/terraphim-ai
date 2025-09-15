@@ -5,12 +5,14 @@
 
 class PromptChainingDemo {
   constructor() {
-    this.apiClient = new TerraphimApiClient();
+    this.apiClient = null; // Will be initialized by settings
     this.visualizer = new WorkflowVisualizer('pipeline-container');
     this.currentExecution = null;
     this.isPaused = false;
     this.steps = [];
     this.currentStepIndex = 0;
+    this.connectionStatus = null;
+    this.settingsIntegration = null;
     
     this.initializeElements();
     this.setupEventListeners();
@@ -46,6 +48,49 @@ class PromptChainingDemo {
     this.projectDescription.addEventListener('input', () => this.saveState());
     this.techStack.addEventListener('input', () => this.saveState());
     this.requirements.addEventListener('input', () => this.saveState());
+  }
+
+  initializeConnectionStatus() {
+    // Initialize WebSocket connection status component
+    if (typeof ConnectionStatusComponent !== 'undefined') {
+      this.connectionStatus = new ConnectionStatusComponent('connection-status-container', this.apiClient);
+    }
+  }
+
+  async initializeSettings() {
+    try {
+      // Initialize settings integration
+      const initialized = await initializeSettings();
+      if (initialized) {
+        this.settingsIntegration = getSettingsIntegration();
+        
+        // Get global API client created by settings
+        this.apiClient = window.apiClient;
+        
+        // Update connection status with new API client if available
+        if (this.connectionStatus && this.apiClient && typeof this.connectionStatus.updateApiClient === 'function') {
+          this.connectionStatus.updateApiClient(this.apiClient);
+        }
+        
+        console.log('Settings initialized successfully');
+        
+        // Initialize connection status after API client is ready
+        this.initializeConnectionStatus();
+      } else {
+        // Fallback to default API client
+        this.apiClient = new TerraphimApiClient();
+        console.warn('Settings initialization failed, using default API client');
+        
+        // Initialize connection status with fallback client
+        this.initializeConnectionStatus();
+      }
+    } catch (error) {
+      console.error('Settings initialization error:', error);
+      this.apiClient = new TerraphimApiClient();
+      
+      // Initialize connection status with fallback client
+      this.initializeConnectionStatus();
+    }
   }
 
   loadProjectTemplate() {
@@ -335,8 +380,13 @@ class PromptChainingDemo {
         }
       };
 
+      // Enhance input with settings
+      const enhancedInput = this.settingsIntegration 
+        ? this.settingsIntegration.enhanceWorkflowInput(input)
+        : input;
+
       // Execute workflow
-      await this.executePromptChain(input);
+      await this.executePromptChain(enhancedInput);
       
     } catch (error) {
       console.error('Chain execution failed:', error);
@@ -966,7 +1016,13 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
 }
 
 // Initialize the demo when page loads
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   window.promptChainDemo = new PromptChainingDemo();
+  await window.promptChainDemo.initializeSettings();
   window.promptChainDemo.loadState(); // Load any saved state
+  
+  // Ensure settings UI is globally available
+  if (window.promptChainDemo.settingsIntegration && window.promptChainDemo.settingsIntegration.getSettingsUI()) {
+    console.log('Settings UI ready - use Ctrl+, to open');
+  }
 });
