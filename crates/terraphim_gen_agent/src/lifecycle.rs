@@ -129,7 +129,7 @@ pub struct LifecycleManager<State: AgentState> {
     supervisor_id: SupervisorId,
     stats: Arc<Mutex<LifecycleStats>>,
     state_container: Arc<RwLock<Option<StateContainer<State>>>>,
-    state_manager: Arc<StateManager>,
+    state_manager: Arc<dyn StateManager>,
     hibernation_timeout: Option<Duration>,
     last_activity: Arc<Mutex<Instant>>,
 }
@@ -138,7 +138,7 @@ impl<State: AgentState + 'static> LifecycleManager<State> {
     pub fn new(
         agent_id: AgentPid,
         supervisor_id: SupervisorId,
-        state_manager: Arc<StateManager>,
+        state_manager: Arc<dyn StateManager>,
         hibernation_timeout: Option<Duration>,
     ) -> Self {
         let stats = LifecycleStats::new(agent_id.clone());
