@@ -348,7 +348,7 @@
           <div class="stat-label">Version</div>
         </div>
       </div>
-      
+
       {#if !compact}
         <div class="notification is-success is-light mt-3">
           <p class="is-size-7">

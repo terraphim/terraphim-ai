@@ -16,6 +16,11 @@
   let suggestions: string[] = [];
   let suggestionIndex = -1;
 
+  // SSE streaming for summarization updates
+  let sseConnection: EventSource | null = null;
+  let summarizationTaskIds: string[] = [];
+  let taskStatuses: Map<string, any> = new Map();
+
   // Term chips state
   interface SelectedTerm {
     value: string;
@@ -43,12 +48,153 @@
     }, 300); // 300ms delay to allow for multiple autocomplete selections
   }
 
-  // Clean up timeout on component destruction
+  // Clean up timeout, SSE connection, and polling on component destruction
   onDestroy(() => {
     if (parseTimeout) {
       clearTimeout(parseTimeout);
     }
+    if (sseConnection) {
+      sseConnection.close();
+      sseConnection = null;
+    }
+    stopPollingForSummaries();
   });
+
+
+  // SSE connection management
+  function startSummarizationStreaming() {
+    if ($is_tauri) {
+      // For Tauri, use polling instead of SSE
+      startPollingForSummaries();
+      return;
+    }
+
+    if (sseConnection) {
+      sseConnection.close();
+    }
+
+    const baseUrl = $serverUrl.replace('/documents/search', '');
+    const sseUrl = `${baseUrl}/summarization/stream`;
+
+    try {
+      sseConnection = new EventSource(sseUrl);
+
+      sseConnection.onopen = () => {
+        console.log('SSE connection opened for summarization updates');
+      };
+
+      sseConnection.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE received:', data);
+
+          if (data.task_id && data.status === 'completed' && data.summary) {
+            // Update the corresponding document with the completed summary
+            updateDocumentSummary(data.task_id, data.summary);
+          }
+        } catch (error) {
+          console.warn('Failed to parse SSE message:', error);
+        }
+      };
+
+      sseConnection.onerror = (error) => {
+        console.warn('SSE connection error:', error);
+        // Auto-reconnect after a delay
+        setTimeout(() => {
+          if (sseConnection) {
+            startSummarizationStreaming();
+          }
+        }, 5000);
+      };
+    } catch (error) {
+      console.error('Failed to create SSE connection:', error);
+    }
+  }
+
+  // Polling fallback for Tauri (since EventSource isn't supported)
+  let pollingInterval: number | null = null;
+
+  function startPollingForSummaries() {
+    console.log('Starting polling for summary updates (Tauri mode)');
+
+    // Stop any existing polling
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+
+    // Poll every 2 seconds for summary updates
+    pollingInterval = setInterval(async () => {
+      if (results.length === 0) return;
+
+      try {
+        // Re-search to get updated documents with summaries
+        const searchQuery = buildSearchQueryFromInput();
+        if (!searchQuery) return;
+
+        const response: SearchResponse = await invoke("search", {
+          searchQuery,
+        });
+
+        if (response.status === "success") {
+          // Update results with any new summaries
+          const updatedResults = response.results;
+
+          // Check if any documents now have summaries that didn't before
+          let hasUpdates = false;
+          for (let i = 0; i < Math.min(results.length, updatedResults.length); i++) {
+            if (!results[i].summarization && updatedResults[i].summarization) {
+              hasUpdates = true;
+              console.log(`New AI summary found for document: ${updatedResults[i].title}`);
+            }
+          }
+
+          if (hasUpdates) {
+            results = updatedResults;
+            console.log('Updated results with new AI summaries');
+          }
+
+          // Stop polling if all documents that need summaries have them
+          const documentsNeedingSummaries = results.filter(doc =>
+            !doc.summarization && doc.body && doc.body.length > 500
+          );
+
+          if (documentsNeedingSummaries.length === 0) {
+            console.log('All summaries complete, stopping polling');
+            stopPollingForSummaries();
+          }
+        }
+      } catch (error) {
+        console.error('Error during summary polling:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    // Auto-stop polling after 30 seconds to prevent infinite polling
+    setTimeout(() => {
+      if (pollingInterval) {
+        console.log('Stopping summary polling after timeout');
+        stopPollingForSummaries();
+      }
+    }, 30000);
+  }
+
+  function stopPollingForSummaries() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
+  function updateDocumentSummary(taskId: string, summary: string) {
+    // Find and update the document with the completed summary
+    results = results.map(doc => {
+      // Update document that doesn't have a summarization yet
+      if (!doc.summarization && doc.body && doc.body.length > 500) {
+        return { ...doc, summarization: summary };
+      }
+      return doc;
+    });
+    console.log(`Updated document summary for task ${taskId}:`, summary);
+  }
 
   // Function to parse input and update chips
   function parseAndUpdateChips(inputText: string) {
@@ -365,6 +511,8 @@
           results = response.results;
           console.log("Response results");
           console.log(results);
+          // Start SSE streaming for summarization updates (Tauri doesn't support SSE)
+          // SSE will be available when using web interface
         } else {
           error = `Search failed: ${response.status}`;
           console.error("Search failed:", response);
@@ -395,6 +543,9 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
+
+        // Start SSE streaming for real-time summarization updates
+        startSummarizationStreaming();
       } catch (err) {
         console.error("Error fetching data:", err);
         error = `Error fetching data: ${err}`;

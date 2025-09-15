@@ -1,6 +1,6 @@
 /**
  * Smoke Test for Terraphim AI Testing Infrastructure
- * 
+ *
  * This is a quick validation test to ensure the testing environment
  * is properly configured and all basic systems are operational.
  */
@@ -18,7 +18,7 @@ test.describe('Smoke Tests - Testing Infrastructure', () => {
     // Test basic browser functionality
     await page.goto('about:blank');
     await expect(page).toHaveTitle('');
-    
+
     console.log('✅ Browser test passed');
   });
 
@@ -53,7 +53,7 @@ test.describe('Smoke Tests - Testing Infrastructure', () => {
     // Basic page navigation test
     await page.goto('data:text/html,<html><body><h1>Test</h1></body></html>');
     await expect(page.locator('h1')).toHaveText('Test');
-    
+
     console.log('✅ Test framework operational');
   });
 
@@ -79,7 +79,7 @@ test.describe('Smoke Tests - Frontend Readiness', () => {
       await page.goto('http://localhost:5173', { timeout: 5000 });
       const title = await page.title();
       console.log('✅ Frontend accessible at localhost:5173, title:', title);
-      
+
       // If frontend loads, check for basic elements
       const hasSearchInput = await page.locator('input[type="search"]').isVisible();
       if (hasSearchInput) {
@@ -129,7 +129,7 @@ test.describe('Smoke Tests - Model Availability', () => {
       try {
         const res = await fetch(`${baseUrl}/api/tags`);
         if (!res.ok) return { error: 'API not accessible' };
-        
+
         const data = await res.json();
         const models = data.models || [];
         return {
@@ -144,10 +144,10 @@ test.describe('Smoke Tests - Model Availability', () => {
 
     if (response.ok) {
       console.log(`✅ Found ${response.modelCount} Ollama models:`, response.models);
-      
+
       const hasLlama32 = response.models.some((name: string) => name.includes('llama3.2:3b'));
       const hasLlama3 = response.models.some((name: string) => name.includes('llama3'));
-      
+
       if (hasLlama32) {
         console.log('✅ llama3.2:3b model is available');
       } else if (hasLlama3) {
@@ -155,7 +155,7 @@ test.describe('Smoke Tests - Model Availability', () => {
       } else {
         console.log('⚠️ No suitable llama models found. Run: ollama pull llama3.2:3b');
       }
-      
+
       expect(response.modelCount).toBeGreaterThan(0);
     } else {
       console.log('⚠️ Could not check models:', response.error);
@@ -175,9 +175,9 @@ test.describe('Smoke Tests - Model Availability', () => {
             options: { num_predict: 5 }
           })
         });
-        
+
         if (!res.ok) return { error: `HTTP ${res.status}` };
-        
+
         const data = await res.json();
         return {
           ok: true,
@@ -202,15 +202,15 @@ test.describe('Smoke Tests - Model Availability', () => {
 
 test.describe('Smoke Tests - Configuration Files', () => {
   test('required configuration files should exist', async ({ page }) => {
-    // This is a placeholder test - in a real environment, 
+    // This is a placeholder test - in a real environment,
     // you'd check for config files, .env setup, etc.
-    
+
     console.log('Configuration file checks:');
     console.log('✅ .env.example created for secrets management');
     console.log('✅ Test helper scripts created');
     console.log('✅ Package.json updated with test commands');
     console.log('✅ TESTING.md documentation provided');
-    
+
     // Always pass - this is just informational
     expect(true).toBeTruthy();
   });
@@ -219,19 +219,19 @@ test.describe('Smoke Tests - Configuration Files', () => {
     // Check that our test infrastructure is properly set up
     const testCommands = [
       'test:chat',
-      'test:summarization', 
+      'test:summarization',
       'test:ollama',
       'test:config',
       'test:comprehensive',
       'validate:ollama',
       'setup:test'
     ];
-    
+
     console.log('Available test commands:');
     testCommands.forEach(cmd => {
       console.log(`✅ yarn ${cmd}`);
     });
-    
+
     expect(testCommands.length).toBeGreaterThan(0);
   });
 });

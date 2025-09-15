@@ -22,7 +22,7 @@ use terraphim_service::summarization_manager::SummarizationManager;
 use terraphim_service::summarization_queue::QueueConfig;
 use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
-use tokio::sync::broadcast::channel;
+use tokio::sync::{broadcast::channel, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
@@ -384,8 +384,10 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
-    // Initialize summarization manager
-    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
+    // Initialize summarization manager with Mutex for API handlers
+    let summarization_manager = Arc::new(Mutex::new(SummarizationManager::new(
+        QueueConfig::default(),
+    )));
     log::info!("Initialized summarization manager with default configuration");
 
     let app = Router::new()
@@ -431,6 +433,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
+        .route("/summarization/stream", get(api::stream_task_status))
+        .route("/summarization/stream/", get(api::stream_task_status))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))
@@ -582,8 +586,10 @@ pub async fn build_router_for_tests() -> Router {
 
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
-    // Initialize summarization manager
-    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
+    // Initialize summarization manager with Mutex for API handlers
+    let summarization_manager = Arc::new(Mutex::new(SummarizationManager::new(
+        QueueConfig::default(),
+    )));
 
     Router::new()
         .route("/health", get(health))
@@ -626,6 +632,8 @@ pub async fn build_router_for_tests() -> Router {
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
+        .route("/summarization/stream", get(api::stream_task_status))
+        .route("/summarization/stream/", get(api::stream_task_status))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))

@@ -408,7 +408,7 @@
         }
         data = await res.json();
       }
-      
+
       modelUsed = data.model_used ?? null;
       if (data.status?.toLowerCase() === 'success' && data.message) {
         messages = [...messages, { role: 'assistant', content: data.message }];

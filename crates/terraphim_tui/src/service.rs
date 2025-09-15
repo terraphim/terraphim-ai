@@ -113,13 +113,13 @@ impl TuiService {
         };
 
         let mut service = self.service.lock().await;
-        Ok(service.search(&query).await?)
+        Ok(service.search(&query).await?.documents)
     }
 
     /// Search documents using a complete SearchQuery (supports logical operators)
     pub async fn search_with_query(&self, query: &SearchQuery) -> Result<Vec<Document>> {
         let mut service = self.service.lock().await;
-        Ok(service.search(query).await?)
+        Ok(service.search(query).await?.documents)
     }
 
     /// Get thesaurus for a specific role

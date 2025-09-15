@@ -55,9 +55,9 @@ wait_for_service() {
     local url=$1
     local service_name=$2
     local timeout=$3
-    
+
     print_status "Waiting for $service_name to be ready..."
-    
+
     for i in $(seq 1 $timeout); do
         if curl -s "$url" >/dev/null 2>&1; then
             print_success "$service_name is ready!"
@@ -66,7 +66,7 @@ wait_for_service() {
         echo -n "."
         sleep 1
     done
-    
+
     echo ""
     print_error "$service_name failed to start within $timeout seconds"
     return 1
@@ -138,11 +138,11 @@ print_success "Ollama is installed"
 # Check if Ollama service is running
 if ! port_is_open 11434; then
     print_status "Starting Ollama service..."
-    
+
     # Try to start Ollama in background
     ollama serve &
     OLLAMA_PID=$!
-    
+
     # Wait for Ollama to start
     if wait_for_service "$OLLAMA_BASE_URL/api/tags" "Ollama" 30; then
         print_success "Ollama service started (PID: $OLLAMA_PID)"
@@ -163,7 +163,7 @@ if ollama list | grep -q "$OLLAMA_MODEL"; then
     print_success "Model $OLLAMA_MODEL is available"
 else
     print_status "Pulling model $OLLAMA_MODEL (this may take several minutes)..."
-    
+
     if ollama pull "$OLLAMA_MODEL"; then
         print_success "Model $OLLAMA_MODEL pulled successfully"
     else
@@ -227,7 +227,7 @@ else
     # Try to find the actual port
     print_status "Trying to find backend server port..."
     sleep 5
-    
+
     # Check common ports
     for port in 8080 3000 8000 8081; do
         if port_is_open $port; then

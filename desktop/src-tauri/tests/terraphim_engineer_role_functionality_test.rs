@@ -121,18 +121,18 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
         println!(
             "    📊 Search results for '{}': {} documents found",
             search_term,
-            search_result.len()
+            search_result.documents.len()
         );
 
         // Validate search results structure and content
-        for (i, doc) in search_result.iter().enumerate() {
+        for (i, doc) in search_result.documents.iter().enumerate() {
             assert!(!doc.id.is_empty(), "Document ID should not be empty");
             println!("      {}. '{}' (ID: '{}')", i + 1, doc.title, doc.id);
 
             // For specific terms, validate we're getting expected documents
-            if search_term == "architecture" && !search_result.is_empty() {
+            if search_term == "architecture" && !search_result.documents.is_empty() {
                 // Should find Architecture.md
-                let found_arch = search_result.iter().any(|d| {
+                let found_arch = search_result.documents.iter().any(|d| {
                     d.id.contains("Architecture.md")
                         || d.title.to_lowercase().contains("architecture")
                 });
@@ -142,10 +142,10 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
             }
         }
 
-        total_results_found += search_result.len();
+        total_results_found += search_result.documents.len();
 
         // The search should return SOME results since we have actual documentation
-        if search_result.is_empty() {
+        if search_result.documents.is_empty() {
             println!(
                 "    ⚠️  No results for '{}' - this may indicate indexing issues",
                 search_term
@@ -153,7 +153,7 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
         } else {
             println!(
                 "    ✅ Found {} results for '{}'",
-                search_result.len(),
+                search_result.documents.len(),
                 search_term
             );
         }
@@ -274,12 +274,12 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
 
     println!(
         "    📊 Default role search results: {} documents",
-        default_result.len()
+        default_result.documents.len()
     );
 
-    if !default_result.is_empty() {
+    if !default_result.documents.is_empty() {
         println!("    ✅ Default role CAN find documents - TerraphimGraph may have scoring issues");
-        for (i, doc) in default_result.iter().enumerate() {
+        for (i, doc) in default_result.documents.iter().enumerate() {
             println!("      {}. '{}' (ID: '{}')", i + 1, doc.title, doc.id);
         }
     } else {
@@ -320,12 +320,12 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
 
     println!(
         "    📊 Terraphim Engineer search results: {} documents",
-        engineer_result.len()
+        engineer_result.documents.len()
     );
 
-    if !engineer_result.is_empty() {
+    if !engineer_result.documents.is_empty() {
         println!("    ✅ TerraphimGraph working correctly");
-        for (i, doc) in engineer_result.iter().enumerate() {
+        for (i, doc) in engineer_result.documents.iter().enumerate() {
             println!("      {}. '{}' (ID: '{}')", i + 1, doc.title, doc.id);
         }
     } else {

@@ -258,11 +258,11 @@ test.describe('KG Thesaurus Content Addition E2E', () => {
       const expandButton = contextItem.locator('[data-testid="expand-context-button"]');
       if (await expandButton.isVisible()) {
         await expandButton.click();
-        
+
         // Verify expanded view shows the full JSON content
         const expandedContent = contextItem.locator('[data-testid="expanded-context-content"]');
         await expect(expandedContent).toBeVisible();
-        
+
         const expandedText = await expandedContent.textContent();
         expect(expandedText).toContain('{');
         expect(expandedText).toContain('"async"');

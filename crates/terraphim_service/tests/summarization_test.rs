@@ -246,7 +246,7 @@ async fn test_process_document_fields_queues_summarization_for_long_content() ->
     assert!(task_id.is_some()); // Summarization task was queued
 
     let description = doc.description.as_ref().unwrap();
-    assert!(description.contains("Software architecture"));
+    assert!(description.to_lowercase().contains("software architecture"));
 
     Ok(())
 }
@@ -446,7 +446,8 @@ async fn test_document_fields_integration_with_persistence() -> Result<()> {
         .description
         .as_ref()
         .unwrap()
-        .contains("Software architecture"));
+        .to_lowercase()
+        .contains("software architecture"));
 
     // Verify summarization is preserved
     assert!(loaded_doc

@@ -102,10 +102,10 @@ done
 if [ ${#MISSING_MODELS[@]} -gt 0 ]; then
     echo ""
     print_status "Pulling missing models..."
-    
+
     for model in "${MISSING_MODELS[@]}"; do
         print_status "Pulling $model (this may take several minutes)..."
-        
+
         if ollama pull "$model"; then
             print_success "Successfully pulled $model"
             if [ -z "$PRIMARY_MODEL" ]; then
@@ -132,10 +132,10 @@ print_status "Testing model functionality..."
 for i in "${!TEST_PROMPTS[@]}"; do
     prompt="${TEST_PROMPTS[$i]}"
     test_num=$((i + 1))
-    
+
     print_status "Test $test_num: Testing prompt generation..."
     echo "Prompt: $prompt"
-    
+
     # Create test request
     REQUEST_JSON=$(cat << EOF
 {
@@ -150,27 +150,27 @@ for i in "${!TEST_PROMPTS[@]}"; do
 }
 EOF
 )
-    
+
     # Send request and measure time
     start_time=$(date +%s%N)
-    
+
     RESPONSE=$(curl -s -X POST "$OLLAMA_BASE_URL/api/generate" \
         -H "Content-Type: application/json" \
         -d "$REQUEST_JSON")
-    
+
     end_time=$(date +%s%N)
     duration_ms=$(( (end_time - start_time) / 1000000 ))
-    
+
     # Parse response
     if echo "$RESPONSE" | grep -q '"response"'; then
         # Extract response text
         RESPONSE_TEXT=$(echo "$RESPONSE" | jq -r '.response' 2>/dev/null || \
                        echo "$RESPONSE" | grep -o '"response":"[^"]*"' | cut -d':' -f2 | tr -d '"')
-        
+
         if [ -n "$RESPONSE_TEXT" ] && [ "$RESPONSE_TEXT" != "null" ]; then
             print_success "Test $test_num passed (${duration_ms}ms)"
             echo "Response: ${RESPONSE_TEXT:0:100}..."
-            
+
             # Check response quality
             word_count=$(echo "$RESPONSE_TEXT" | wc -w)
             if [ "$word_count" -gt 5 ]; then
@@ -178,7 +178,7 @@ EOF
             else
                 print_warning "  ⚠ Response quality: Short ($word_count words)"
             fi
-            
+
             # Check response time
             if [ "$duration_ms" -lt 10000 ]; then
                 echo "  ✓ Response time: Fast (${duration_ms}ms)"
@@ -194,7 +194,7 @@ EOF
         print_error "Test $test_num failed: Invalid response format"
         echo "Response: $RESPONSE"
     fi
-    
+
     echo ""
 done
 
@@ -224,7 +224,7 @@ stream_duration_ms=$(( (end_time - start_time) / 1000000 ))
 
 if echo "$STREAM_RESPONSE" | grep -q '"response"'; then
     print_success "Streaming test passed (${stream_duration_ms}ms)"
-    
+
     # Count streaming chunks
     chunk_count=$(echo "$STREAM_RESPONSE" | grep -c '"response"' || echo "1")
     echo "  ✓ Streaming chunks: $chunk_count"
@@ -264,7 +264,7 @@ if [ -n "$MODEL_INFO" ]; then
     if [ -n "$MODEL_SIZE" ]; then
         echo "Model size: $MODEL_SIZE"
     fi
-    
+
     # Try to extract quantization
     QUANTIZATION=$(echo "$MODEL_INFO" | jq -r '.details.quantization_level // empty' 2>/dev/null || echo "")
     if [ -n "$QUANTIZATION" ]; then
