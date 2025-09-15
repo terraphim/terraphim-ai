@@ -807,6 +807,24 @@ impl ConfigBuilder {
         Ok(self)
     }
 
+    /// Set the default model provider for all roles
+    pub fn default_model_provider(mut self, provider: &str) -> Self {
+        self.config.default_model_provider = Some(provider.to_string());
+        self
+    }
+
+    /// Set the default chat model for all roles
+    pub fn default_chat_model(mut self, model: &str) -> Self {
+        self.config.default_chat_model = Some(model.to_string());
+        self
+    }
+
+    /// Set the default summarization model for all roles
+    pub fn default_summarization_model(mut self, model: &str) -> Self {
+        self.config.default_summarization_model = Some(model.to_string());
+        self
+    }
+
     /// Build the config
     pub fn build(self) -> Result<Config> {
         // Make sure that we have at least one role
@@ -850,6 +868,15 @@ pub struct Config {
     /// The default role to use if no role is specified
     pub default_role: RoleName,
     pub selected_role: RoleName,
+    /// Default LLM provider for all roles (can be overridden per role)
+    #[serde(default)]
+    pub default_model_provider: Option<String>,
+    /// Default model for chat functionality (can be overridden per role)
+    #[serde(default)]
+    pub default_chat_model: Option<String>,
+    /// Default model for summarization functionality (can be overridden per role)
+    #[serde(default)]
+    pub default_summarization_model: Option<String>,
 }
 
 impl Config {
@@ -860,6 +887,9 @@ impl Config {
             roles: AHashMap::new(),
             default_role: RoleName::new("Default"),
             selected_role: RoleName::new("Default"),
+            default_model_provider: None,
+            default_chat_model: None,
+            default_summarization_model: None,
         }
     }
 }

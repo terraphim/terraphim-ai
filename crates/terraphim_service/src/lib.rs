@@ -27,6 +27,7 @@ pub mod http_client;
 pub mod logging;
 
 // Summarization queue system for production-ready async processing
+pub mod queue_based_rate_limiter;
 pub mod rate_limiter;
 pub mod summarization_manager;
 pub mod summarization_queue;
@@ -106,14 +107,116 @@ impl crate::error::TerraphimError for ServiceError {
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
+/// Enhanced search result that includes both documents and async task IDs
+#[derive(Debug, Clone)]
+pub struct SearchResult {
+    /// The found documents
+    pub documents: Vec<Document>,
+    /// Task IDs for async summarization operations (if any)
+    pub summarization_task_ids: Vec<String>,
+}
+
+impl SearchResult {
+    pub fn new(documents: Vec<Document>) -> Self {
+        Self {
+            documents,
+            summarization_task_ids: Vec::new(),
+        }
+    }
+
+    pub fn with_task_ids(documents: Vec<Document>, task_ids: Vec<String>) -> Self {
+        Self {
+            documents,
+            summarization_task_ids: task_ids,
+        }
+    }
+
+    /// Merge completed summarizations into documents
+    pub async fn merge_completed_summaries(
+        mut self,
+        _summarization_manager: Option<
+            &std::sync::Arc<tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>>,
+        >,
+    ) -> Self {
+        if self.summarization_task_ids.is_empty() {
+            return self;
+        }
+
+        // Brief wait for fast summarizations to complete and be persisted
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        let mut updated_documents = Vec::new();
+
+        for mut document in self.documents {
+            // Try to load from persistence if no summary exists
+            if document.summarization.is_none() {
+                match Document::new(document.id.clone()).load().await {
+                    Ok(persisted_doc) => {
+                        if let Some(ref summary) = persisted_doc.summarization {
+                            document.summarization = Some(summary.clone());
+                            log::debug!("Loaded persisted summary for document: {}", document.id);
+                        }
+                    }
+                    Err(e) => {
+                        log::debug!(
+                            "No persisted summary found for document {}: {:?}",
+                            document.id,
+                            e
+                        );
+                    }
+                }
+            }
+
+            updated_documents.push(document);
+        }
+
+        self.documents = updated_documents;
+        self
+    }
+}
+
 pub struct TerraphimService {
     config_state: ConfigState,
+    summarization_manager: Option<
+        std::sync::Arc<tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>>,
+    >,
 }
 
 impl TerraphimService {
-    /// Create a new TerraphimService
+    /// Create a new TerraphimService with an external summarization manager
+    pub fn with_manager(
+        config_state: ConfigState,
+        summarization_manager: std::sync::Arc<
+            tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>,
+        >,
+    ) -> Self {
+        Self {
+            config_state,
+            summarization_manager: Some(summarization_manager),
+        }
+    }
+
+    /// Create a new TerraphimService with its own summarization manager
     pub fn new(config_state: ConfigState) -> Self {
-        Self { config_state }
+        // Initialize summarization manager with default configuration
+        let queue_config = crate::summarization_queue::QueueConfig {
+            max_concurrent_workers: 4,
+            max_queue_size: 1000,
+            max_queue_time: std::time::Duration::from_secs(300),
+            task_retention_time: std::time::Duration::from_secs(3600),
+            rate_limits: std::collections::HashMap::new(),
+            retry_delay: std::time::Duration::from_secs(1),
+            max_retry_delay: std::time::Duration::from_secs(30),
+        };
+
+        let summarization_manager = Some(std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::summarization_manager::SummarizationManager::new(queue_config),
+        )));
+
+        Self {
+            config_state,
+            summarization_manager,
+        }
     }
 
     /// Build a thesaurus from the haystack and update the knowledge graph automata URL
@@ -893,10 +996,10 @@ impl TerraphimService {
             role: None,
         };
 
-        let documents = self.search(&search_query).await?;
+        let search_result = self.search(&search_query).await?;
 
         // Look for a document whose title matches the requested ID
-        for doc in documents {
+        for doc in search_result.documents {
             if doc.title == document_id || doc.id == document_id {
                 log::debug!("Found document '{}' via search fallback", document_id);
                 return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
@@ -974,11 +1077,41 @@ impl TerraphimService {
         mut documents: Vec<Document>,
         role: &Role,
     ) -> Result<Vec<Document>> {
-        use crate::llm::{build_llm_from_role, SummarizeOptions};
+        use crate::llm::{build_llm_for_summarization, SummarizeOptions};
 
-        let llm = match build_llm_from_role(role) {
-            Some(client) => client,
-            None => return Ok(documents),
+        log::debug!(
+            "[DEBUGGER:enhance_ai:{}] enhance_descriptions_with_ai called for role '{}' with {} documents",
+            line!(),
+            role.name,
+            documents.len()
+        );
+
+        // Get config from config_state for fallback models
+        let config = self.config_state.config.lock().await.clone();
+        log::debug!(
+            "[DEBUGGER:enhance_ai:{}] config default_summarization_model={:?}, default_model_provider={:?}",
+            line!(),
+            config.default_summarization_model,
+            config.default_model_provider
+        );
+
+        let llm = match build_llm_for_summarization(role, Some(&config)) {
+            Some(client) => {
+                log::debug!(
+                    "[DEBUGGER:enhance_ai:{}] LLM client built successfully: {}",
+                    line!(),
+                    client.name()
+                );
+                client
+            }
+            None => {
+                log::warn!(
+                    "[DEBUGGER:enhance_ai:{}] Failed to build LLM client for role '{}', returning original documents",
+                    line!(),
+                    role.name
+                );
+                return Ok(documents);
+            }
         };
 
         log::info!(
@@ -1059,6 +1192,75 @@ impl TerraphimService {
 
         // Good candidates for AI summarization
         true
+    }
+
+    /// Submit documents for async summarization and return immediately
+    ///
+    /// This method queues documents for background summarization without blocking
+    /// the search response. Returns task IDs that can be used to track progress.
+    async fn submit_async_summarization(
+        &self,
+        documents: Vec<Document>,
+        role: &Role,
+    ) -> Result<Vec<String>> {
+        let mut task_ids = Vec::new();
+
+        if let Some(ref manager) = self.summarization_manager {
+            // Get config for task
+            let config = self.config_state.config.lock().await.clone();
+
+            // Lock the manager to access its methods
+            let manager = manager.lock().await;
+
+            for document in documents {
+                if self.should_generate_ai_summary(&document) {
+                    match manager
+                        .summarize_document_with_config(
+                            document,
+                            role.clone(),
+                            config.clone(),
+                            None,       // priority
+                            None,       // max_summary_length
+                            Some(true), // force_regenerate - always use real LLM for auto-summarization
+                            None,       // callback_url
+                        )
+                        .await
+                    {
+                        Ok(submit_result) => match submit_result {
+                            crate::summarization_queue::SubmitResult::Queued {
+                                task_id, ..
+                            } => {
+                                task_ids.push(task_id.to_string());
+                                log::debug!(
+                                    "Submitted document for async summarization: {}",
+                                    task_id
+                                );
+                            }
+                            crate::summarization_queue::SubmitResult::Duplicate(task_id) => {
+                                task_ids.push(task_id.to_string());
+                                log::debug!(
+                                    "Document already queued for summarization: {}",
+                                    task_id
+                                );
+                            }
+                            crate::summarization_queue::SubmitResult::QueueFull => {
+                                log::warn!("Failed to submit document: queue is full");
+                            }
+                            crate::summarization_queue::SubmitResult::ValidationError(err) => {
+                                log::warn!("Failed to submit document: validation error: {}", err);
+                            }
+                        },
+                        Err(e) => {
+                            log::warn!("Failed to submit document for summarization: {}", e);
+                        }
+                    }
+                }
+            }
+        } else {
+            log::warn!("Summarization manager not available for async summarization");
+        }
+
+        Ok(task_ids)
     }
 
     /// Get the role for the given search query
@@ -1234,7 +1436,7 @@ impl TerraphimService {
         search_term: &NormalizedTermValue,
     ) -> Result<Vec<Document>> {
         let role = self.config_state.get_selected_role().await;
-        let documents = self
+        let search_result = self
             .search(&SearchQuery {
                 search_term: search_term.clone(),
                 search_terms: None,
@@ -1244,11 +1446,14 @@ impl TerraphimService {
                 limit: None,
             })
             .await?;
-        Ok(documents)
+        Ok(search_result.documents)
     }
 
     /// Search for documents in the haystacks
-    pub async fn search(&mut self, search_query: &SearchQuery) -> Result<Vec<Document>> {
+    pub async fn search(&mut self, search_query: &SearchQuery) -> Result<SearchResult> {
+        // Initialize task IDs collection for async summarization tracking
+        let mut all_task_ids = Vec::new();
+
         // Get the role from the config
         log::debug!("Role for searching: {:?}", search_query.role);
         let role = self.get_search_role(search_query).await?;
@@ -1391,27 +1596,41 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
-                #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
-                    log::debug!(
-                        "Applying OpenRouter AI summarization to {} search results for role '{}'",
-                        docs_ranked.len(),
-                        role.name
-                    );
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                // Submit documents for async summarization instead of blocking
+                let should_use_openrouter = {
+                    #[cfg(feature = "openrouter")]
+                    {
+                        role.has_openrouter_config() && role.openrouter_auto_summarize
+                    }
+                    #[cfg(not(feature = "openrouter"))]
+                    {
+                        false
+                    }
+                };
+
+                // Check if role wants AI summarization via generic LLM config
+                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
+
+                if should_use_openrouter || should_use_llm_auto_summarize {
+                    if should_use_openrouter {
+                        log::debug!(
+                            "Submitting {} search results for async OpenRouter AI summarization for role '{}'",
+                            docs_ranked.len(),
+                            role.name
+                        );
+                    } else {
+                        log::debug!(
+                            "Submitting {} search results for async LLM AI summarization for role '{}'",
+                            docs_ranked.len(),
+                            role.name
+                        );
+                    }
+
+                    let task_ids = self
+                        .submit_async_summarization(docs_ranked.clone(), &role)
                         .await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
-                    log::debug!(
-                        "Applying LLM AI summarization to {} search results for role '{}'",
-                        docs_ranked.len(),
-                        role.name
-                    );
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
-                        .await?;
+                    all_task_ids.extend(task_ids);
                 }
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
@@ -1448,9 +1667,15 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    Ok(processed_docs)
+                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 } else {
-                    Ok(docs_ranked)
+                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 }
             }
             RelevanceFunction::BM25 => {
@@ -1490,22 +1715,36 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
-                #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                // Apply AI summarization if enabled via OpenRouter or generic LLM config
+                let should_use_openrouter = {
+                    #[cfg(feature = "openrouter")]
+                    {
+                        role.has_openrouter_config() && role.openrouter_auto_summarize
+                    }
+                    #[cfg(not(feature = "openrouter"))]
+                    {
+                        false
+                    }
+                };
+
+                // Check if role wants AI summarization via generic LLM config
+                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
+
+                if should_use_openrouter || should_use_llm_auto_summarize {
+                    if should_use_openrouter {
+                        log::debug!("Submitting {} BM25 search results for background OpenRouter AI summarization for role '{}'", docs_ranked.len(), role.name);
+                    } else {
+                        log::debug!(
+                            "Submitting {} BM25 search results for background LLM AI summarization for role '{}'",
+                            docs_ranked.len(),
+                            role.name
+                        );
+                    }
+
+                    let task_ids = self
+                        .submit_async_summarization(docs_ranked.clone(), &role)
                         .await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
-                    log::debug!(
-                        "Applying LLM AI summarization to {} BM25 search results for role '{}'",
-                        docs_ranked.len(),
-                        role.name
-                    );
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
-                        .await?;
+                    all_task_ids.extend(task_ids);
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -1541,9 +1780,15 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    Ok(processed_docs)
+                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 } else {
-                    Ok(docs_ranked)
+                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 }
             }
             RelevanceFunction::BM25F => {
@@ -1583,22 +1828,36 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
-                #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                // Apply AI summarization if enabled via OpenRouter or generic LLM config
+                let should_use_openrouter = {
+                    #[cfg(feature = "openrouter")]
+                    {
+                        role.has_openrouter_config() && role.openrouter_auto_summarize
+                    }
+                    #[cfg(not(feature = "openrouter"))]
+                    {
+                        false
+                    }
+                };
+
+                // Check if role wants AI summarization via generic LLM config
+                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
+
+                if should_use_openrouter || should_use_llm_auto_summarize {
+                    if should_use_openrouter {
+                        log::debug!("Submitting {} BM25F search results for background OpenRouter AI summarization for role '{}'", docs_ranked.len(), role.name);
+                    } else {
+                        log::debug!(
+                            "Submitting {} BM25F search results for background LLM AI summarization for role '{}'",
+                            docs_ranked.len(),
+                            role.name
+                        );
+                    }
+
+                    let task_ids = self
+                        .submit_async_summarization(docs_ranked.clone(), &role)
                         .await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
-                    log::debug!(
-                        "Applying LLM AI summarization to {} BM25F search results for role '{}'",
-                        docs_ranked.len(),
-                        role.name
-                    );
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
-                        .await?;
+                    all_task_ids.extend(task_ids);
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -1634,9 +1893,15 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    Ok(processed_docs)
+                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 } else {
-                    Ok(docs_ranked)
+                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 }
             }
             RelevanceFunction::BM25Plus => {
@@ -1676,13 +1941,36 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
-                #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
-                    docs_ranked = self
-                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                // Apply AI summarization if enabled via OpenRouter or generic LLM config
+                let should_use_openrouter = {
+                    #[cfg(feature = "openrouter")]
+                    {
+                        role.has_openrouter_config() && role.openrouter_auto_summarize
+                    }
+                    #[cfg(not(feature = "openrouter"))]
+                    {
+                        false
+                    }
+                };
+
+                // Check if role wants AI summarization via generic LLM config
+                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
+
+                if should_use_openrouter || should_use_llm_auto_summarize {
+                    if should_use_openrouter {
+                        log::debug!("Submitting {} BM25Plus search results for background OpenRouter AI summarization for role '{}'", docs_ranked.len(), role.name);
+                    } else {
+                        log::debug!(
+                            "Submitting {} BM25Plus search results for background LLM AI summarization for role '{}'",
+                            docs_ranked.len(),
+                            role.name
+                        );
+                    }
+
+                    let task_ids = self
+                        .submit_async_summarization(docs_ranked.clone(), &role)
                         .await?;
+                    all_task_ids.extend(task_ids);
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -1718,9 +2006,15 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    Ok(processed_docs)
+                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 } else {
-                    Ok(docs_ranked)
+                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 }
             }
             RelevanceFunction::TerraphimGraph => {
@@ -2066,22 +2360,40 @@ impl TerraphimService {
                     }
                 }
 
-                // Apply OpenRouter AI summarization if enabled for this role
-                #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() {
-                    log::debug!(
-                        "Applying OpenRouter AI summarization to {} search results for role '{}'",
-                        documents.len(),
-                        role.name
-                    );
-                    documents = self.enhance_descriptions_with_ai(documents, &role).await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
-                    log::debug!(
-                        "Applying LLM AI summarization to {} search results for role '{}'",
-                        documents.len(),
-                        role.name
-                    );
-                    documents = self.enhance_descriptions_with_ai(documents, &role).await?;
+                // Apply AI summarization if enabled via OpenRouter or generic LLM config
+                let should_use_openrouter = {
+                    #[cfg(feature = "openrouter")]
+                    {
+                        role.has_openrouter_config() && role.openrouter_auto_summarize
+                    }
+                    #[cfg(not(feature = "openrouter"))]
+                    {
+                        false
+                    }
+                };
+
+                // Check if role wants AI summarization via generic LLM config
+                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
+
+                if should_use_openrouter || should_use_llm_auto_summarize {
+                    if should_use_openrouter {
+                        log::debug!(
+                            "Submitting {} TerraphimGraph search results for background OpenRouter AI summarization for role '{}'",
+                            documents.len(),
+                            role.name
+                        );
+                    } else {
+                        log::debug!(
+                            "Submitting {} TerraphimGraph search results for background LLM AI summarization for role '{}'",
+                            documents.len(),
+                            role.name
+                        );
+                    }
+
+                    let task_ids = self
+                        .submit_async_summarization(documents.clone(), &role)
+                        .await?;
+                    all_task_ids.extend(task_ids);
                 }
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
@@ -2102,9 +2414,15 @@ impl TerraphimService {
                             .await?;
                         processed_docs.push(processed_doc);
                     }
-                    Ok(processed_docs)
+                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 } else {
-                    Ok(documents)
+                    let result = SearchResult::with_task_ids(documents, all_task_ids);
+                    Ok(result
+                        .merge_completed_summaries(self.summarization_manager.as_ref())
+                        .await)
                 }
             }
         }

@@ -38,7 +38,7 @@ echo -e "  Model: ${OLLAMA_MODEL}"
 echo -e "\n${BLUE}Checking Ollama...${NC}"
 if curl -s "${OLLAMA_BASE_URL}/api/tags" > /dev/null; then
     echo -e "${GREEN}✓ Ollama is running${NC}"
-    
+
     # Ensure model is available
     echo -e "${BLUE}Ensuring model is loaded...${NC}"
     if command -v ollama &> /dev/null; then

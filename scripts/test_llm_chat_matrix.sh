@@ -44,7 +44,7 @@ SKIPPED_TESTS=0
 check_service() {
     local service_name=$1
     local check_command=$2
-    
+
     echo -e "${BLUE}Checking ${service_name}...${NC}"
     if eval "$check_command" > /dev/null 2>&1; then
         echo -e "${GREEN}✓ ${service_name} is available${NC}"
@@ -58,7 +58,7 @@ check_service() {
 # Function to run pre-commit checks
 run_precommit() {
     echo -e "${BLUE}Running pre-commit checks...${NC}"
-    
+
     # Cargo format check
     if cargo fmt --all -- --check > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Cargo format check passed${NC}"
@@ -67,7 +67,7 @@ run_precommit() {
         cargo fmt --all
         echo -e "${GREEN}✓ Fixed formatting issues${NC}"
     fi
-    
+
     # Cargo clippy
     if cargo clippy --workspace --all-targets -- -D warnings > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Cargo clippy passed${NC}"
@@ -75,7 +75,7 @@ run_precommit() {
         echo -e "${YELLOW}⚠ Cargo clippy warnings (continuing anyway)${NC}"
         cargo clippy --workspace --all-targets || true
     fi
-    
+
     # Check for secrets in code (not in .env)
     if command -v detect-secrets &> /dev/null; then
         if detect-secrets scan --exclude-files '.env' > /dev/null 2>&1; then
@@ -84,7 +84,7 @@ run_precommit() {
             echo -e "${YELLOW}⚠ Potential secrets detected (check manually)${NC}"
         fi
     fi
-    
+
     return 0
 }
 
@@ -92,9 +92,9 @@ run_precommit() {
 run_agent_validations() {
     local test_name=$1
     local test_output=$2
-    
+
     echo -e "${BLUE}Running agent validations for ${test_name}...${NC}"
-    
+
     # Run overseer validation (security & compliance)
     echo "Validating with @agent-overseer..."
     if echo "$test_output" | grep -q "passed"; then
@@ -102,7 +102,7 @@ run_agent_validations() {
     else
         echo -e "${YELLOW}⚠ Overseer validation: Review test output manually${NC}"
     fi
-    
+
     # Run performance expert review (check timing)
     echo "Reviewing with @agent-rust-performance-expert..."
     if echo "$test_output" | grep -qE "[0-9]+ms|[0-9]+\.[0-9]+s"; then
@@ -119,15 +119,15 @@ test_combination() {
     local haystack=$2
     local llm_provider=$3
     local test_docs=$4
-    
+
     ((TOTAL_TESTS++))
-    
+
     echo -e "\n${BLUE}Testing: ${role} + ${haystack} + ${llm_provider}${NC}"
     echo "Test documents: ${test_docs}"
-    
+
     local start_time=$(date +%s%N)
     local test_output
-    
+
     # Run the specific test
     local features_flag=""
     if [[ "$llm_provider" == "ollama" ]]; then
@@ -135,20 +135,20 @@ test_combination() {
     elif [[ "$llm_provider" == "openrouter" ]]; then
         features_flag="--features openrouter"
     fi
-    
+
     if test_output=$(cargo test --test llm_chat_matrix_test $features_flag -- \
         "${role}_${haystack}_${llm_provider}" \
         --ignored --nocapture 2>&1); then
-        
+
         local end_time=$(date +%s%N)
         local duration=$((($end_time - $start_time) / 1000000)) # Convert to milliseconds
-        
+
         echo -e "${GREEN}✓ Test passed (${duration}ms)${NC}"
         ((PASSED_TESTS++))
-        
+
         # Run agent validations
         run_agent_validations "${role}_${haystack}" "$test_output"
-        
+
         # Log success to results file
         if [ ! -s "$RESULTS_FILE" ]; then
             echo "[" > "$RESULTS_FILE"
@@ -159,11 +159,11 @@ test_combination() {
     else
         echo -e "${RED}✗ Test failed${NC}"
         ((FAILED_TESTS++))
-        
+
         # Show error details
         echo -e "${RED}Error details:${NC}"
         echo "$test_output" | tail -10
-        
+
         # Log failure to results file
         if [ ! -s "$RESULTS_FILE" ]; then
             echo "[" > "$RESULTS_FILE"
@@ -181,19 +181,19 @@ main() {
     echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
     echo -e "Using configuration from: ${PROJECT_ROOT}/.env"
     echo -e "Test data from: ${TEST_DATA_DIR}"
-    
+
     # Create results directory
     mkdir -p "$TEST_RESULTS_DIR"
     echo -n "" > "$RESULTS_FILE"  # Initialize empty file
-    
+
     # Step 1: Check prerequisites
     echo -e "\n${YELLOW}Step 1: Checking prerequisites...${NC}"
-    
+
     # Check Ollama
     OLLAMA_AVAILABLE=false
     if check_service "Ollama" "curl -s ${OLLAMA_BASE_URL}/api/tags"; then
         OLLAMA_AVAILABLE=true
-        
+
         # Ensure model is loaded
         echo "Loading Ollama model ${OLLAMA_MODEL}..."
         if command -v ollama &> /dev/null; then
@@ -202,7 +202,7 @@ main() {
             echo -e "${YELLOW}⚠ ollama command not found, assuming model is loaded${NC}"
         fi
     fi
-    
+
     # Check OpenRouter (rate limited)
     OPENROUTER_AVAILABLE=false
     if [ ! -z "$OPENROUTER_API_KEY" ]; then
@@ -210,7 +210,7 @@ main() {
         OPENROUTER_AVAILABLE=true
         echo -e "${YELLOW}Note: OpenRouter has rate limits - tests will use retry logic${NC}"
     fi
-    
+
     # Check other services from .env
     ATOMIC_AVAILABLE=false
     if [ ! -z "$ATOMIC_SERVER_URL" ] && [ ! -z "$ATOMIC_SERVER_SECRET" ]; then
@@ -218,51 +218,51 @@ main() {
             ATOMIC_AVAILABLE=true
         fi
     fi
-    
+
     CLICKUP_AVAILABLE=false
     if [ ! -z "$CLICKUP_API_TOKEN" ] && [ ! -z "$CLICKUP_TEAM_ID" ]; then
         echo -e "${GREEN}✓ ClickUp configured${NC}"
         CLICKUP_AVAILABLE=true
     fi
-    
+
     PERPLEXITY_AVAILABLE=false
     if [ ! -z "$PERPLEXITY_API_KEY" ]; then
         echo -e "${GREEN}✓ Perplexity API configured${NC}"
         PERPLEXITY_AVAILABLE=true
     fi
-    
+
     MCP_AVAILABLE=false
     if [ ! -z "$MCP_SERVER_URL" ]; then
         if check_service "MCP Server" "curl -s ${MCP_SERVER_URL}/health"; then
             MCP_AVAILABLE=true
         fi
     fi
-    
+
     # Step 2: Run pre-commit checks
     echo -e "\n${YELLOW}Step 2: Running pre-commit checks...${NC}"
     run_precommit
-    
+
     # Step 3: Build project
     echo -e "\n${YELLOW}Step 3: Building project...${NC}"
     if ! cargo build --workspace --tests; then
         echo -e "${RED}✗ Build failed${NC}"
         exit 1
     fi
-    
+
     # Step 4: Run test matrix
     echo -e "\n${YELLOW}Step 4: Running test matrix...${NC}"
-    
+
     # Define test roles
     declare -a ROLES=("Default" "Rust Engineer" "AI Engineer" "Terraphim Engineer" "System Operator")
-    
+
     # Core tests with Ollama (always run if available)
     if [ "$OLLAMA_AVAILABLE" = true ]; then
         echo -e "\n${BLUE}=== Core Tests with Ollama (Local LLM) ===${NC}"
-        
+
         # Test each role with local documents
         for role in "${ROLES[@]}"; do
             test_combination "$role" "Ripgrep" "ollama" "${TEST_DATA_DIR}"
-            
+
             # Test with KG docs for engineer roles
             if [[ "$role" == *"Engineer"* ]] && [ -d "${TEST_DATA_DIR}/kg" ]; then
                 test_combination "$role" "KnowledgeGraph" "ollama" "${TEST_DATA_DIR}/kg"
@@ -273,31 +273,31 @@ main() {
         echo -e "  To enable Ollama tests, run: ollama serve"
         ((SKIPPED_TESTS+=10))
     fi
-    
+
     # Integration tests with external services
     echo -e "\n${BLUE}=== Integration Tests with External Services ===${NC}"
-    
+
     if [ "$ATOMIC_AVAILABLE" = true ] && [ "$OLLAMA_AVAILABLE" = true ]; then
         test_combination "Terraphim Engineer" "Atomic" "ollama" "remote"
     else
         echo -e "${YELLOW}⚠ Skipping Atomic Server test${NC}"
         ((SKIPPED_TESTS++))
     fi
-    
+
     if [ "$CLICKUP_AVAILABLE" = true ] && [ "$OLLAMA_AVAILABLE" = true ]; then
         test_combination "System Operator" "ClickUp" "ollama" "tasks"
     else
         echo -e "${YELLOW}⚠ Skipping ClickUp test${NC}"
         ((SKIPPED_TESTS++))
     fi
-    
+
     # Limited OpenRouter tests (preserve API quota)
     if [ "$OPENROUTER_AVAILABLE" = true ]; then
         echo -e "\n${BLUE}=== Limited OpenRouter Tests (Preserving Quota) ===${NC}"
-        
+
         # Only run 2-3 critical tests to preserve rate limits
         test_combination "AI Engineer" "Ripgrep" "openrouter" "${TEST_DATA_DIR}/Architecture.md"
-        
+
         if [ "$PERPLEXITY_AVAILABLE" = true ]; then
             test_combination "AI Engineer" "Perplexity" "openrouter" "web-search"
         fi
@@ -305,23 +305,23 @@ main() {
         echo -e "${YELLOW}⚠ Skipping OpenRouter tests (not configured)${NC}"
         ((SKIPPED_TESTS+=3))
     fi
-    
+
     # Step 5: Final validation and reporting
     echo -e "\n${YELLOW}Step 5: Generating final report...${NC}"
-    
+
     # Close JSON array if file has content
     if [ -s "$RESULTS_FILE" ]; then
         echo "]" >> "$RESULTS_FILE"
     else
         echo "[]" > "$RESULTS_FILE"
     fi
-    
+
     # Generate summary report
     local pass_rate=0
     if [ $TOTAL_TESTS -gt 0 ]; then
         pass_rate=$(echo "scale=2; ${PASSED_TESTS}*100/${TOTAL_TESTS}" | bc 2>/dev/null || echo "0")
     fi
-    
+
     cat <<EOF > "${TEST_RESULTS_DIR}/summary_${TIMESTAMP}.txt"
 ═══════════════════════════════════════════════════════
 LLM Chat Test Matrix Report
@@ -358,14 +358,14 @@ $(if [ "$OLLAMA_AVAILABLE" = false ]; then echo "- Install and start Ollama for 
 $(if [ "$OPENROUTER_AVAILABLE" = false ]; then echo "- Configure OpenRouter API key for cloud LLM testing"; fi)
 $(if [ $FAILED_TESTS -gt 0 ]; then echo "- Review failed tests and check service configurations"; fi)
 EOF
-    
+
     echo -e "${GREEN}✓ Report saved to: ${TEST_RESULTS_DIR}/summary_${TIMESTAMP}.txt${NC}"
-    
+
     # Display summary
     echo -e "\n${BLUE}═══════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}                Test Results Summary               ${NC}"  
+    echo -e "${BLUE}                Test Results Summary               ${NC}"
     echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
-    
+
     if [ $FAILED_TESTS -eq 0 ] && [ $TOTAL_TESTS -gt 0 ]; then
         echo -e "${GREEN}🎉 All ${TOTAL_TESTS} tests passed successfully!${NC}"
         echo -e "${GREEN}✅ LLM Chat functionality is working correctly${NC}"

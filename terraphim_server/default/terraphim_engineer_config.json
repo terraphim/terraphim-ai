@@ -1,6 +1,9 @@
 {
   "id": "Server",
   "global_shortcut": "Ctrl+Shift+T",
+  "default_model_provider": "ollama",
+  "default_chat_model": "gemma2:2b",
+  "default_summarization_model": "gemma3:270m",
   "roles": {
     "Default": {
       "shortname": "Default",
@@ -18,7 +21,12 @@
           "extra_parameters": {}
         }
       ],
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     },
     "Terraphim Engineer": {
       "shortname": "TerraEng",
@@ -47,7 +55,8 @@
       "extra": {
         "llm_provider": "ollama",
         "ollama_base_url": "http://127.0.0.1:11434",
-        "ollama_model": "llama3.2:3b"
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
       },
       "llm_system_prompt": "You are a Terraphim Engineer, an expert in Rust, async programming, knowledge graphs, and the Terraphim AI system architecture. You help with development, debugging, and optimization of the Terraphim platform. Focus on technical accuracy, performance, and following Rust best practices."
     },
@@ -78,7 +87,8 @@
       "extra": {
         "llm_provider": "ollama",
         "ollama_base_url": "http://127.0.0.1:11434",
-        "ollama_model": "llama3.2:3b"
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
       },
       "llm_system_prompt": "You are an Engineer specializing in knowledge graphs, semantic search, and the Terraphim system. You help with system architecture, data modeling, and technical implementation. Focus on building robust, scalable solutions."
     },
@@ -98,7 +108,12 @@
           "extra_parameters": {}
         }
       ],
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     }
   },
   "default_role": "Terraphim Engineer",
