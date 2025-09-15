@@ -5,8 +5,9 @@
 
 class OrchestratorWorkersDemo {
   constructor() {
-    this.apiClient = new TerraphimApiClient();
+    this.apiClient = null; // Will be initialized with settings
     this.visualizer = new WorkflowVisualizer('pipeline-container');
+    this.settingsIntegration = null;
     this.selectedSources = new Set(['arxiv', 'pubmed', 'semantic_scholar']);
     this.isRunning = false;
     this.currentStage = 0;
@@ -142,11 +143,12 @@ class OrchestratorWorkersDemo {
         duration: 3000
       }
     ];
-
-    this.init();
   }
 
-  init() {
+  async init() {
+    // Initialize settings system first
+    await this.initializeSettings();
+    
     this.setupEventListeners();
     this.renderDataSources();
     this.renderWorkers();
@@ -156,6 +158,25 @@ class OrchestratorWorkersDemo {
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
+  }
+
+  async initializeSettings() {
+    try {
+      const initialized = await initializeSettings();
+      if (initialized) {
+        this.settingsIntegration = getSettingsIntegration();
+        this.apiClient = window.apiClient;
+        console.log('Settings integration initialized successfully');
+      } else {
+        // Fallback to default API client
+        console.warn('Settings integration failed, using default configuration');
+        this.apiClient = new TerraphimApiClient();
+      }
+    } catch (error) {
+      console.error('Failed to initialize settings:', error);
+      // Fallback to default API client
+      this.apiClient = new TerraphimApiClient();
+    }
   }
 
   setupEventListeners() {
@@ -646,6 +667,7 @@ class OrchestratorWorkersDemo {
 }
 
 // Initialize the demo when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new OrchestratorWorkersDemo();
+document.addEventListener('DOMContentLoaded', async () => {
+  const demo = new OrchestratorWorkersDemo();
+  await demo.init();
 });

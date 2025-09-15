@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -9,6 +10,7 @@ use axum::{
 };
 use regex::Regex;
 use rust_embed::RustEmbed;
+use tokio::sync::{broadcast, RwLock};
 
 // Pre-compiled regex for normalizing document IDs (performance optimization)
 static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
@@ -117,6 +119,7 @@ fn create_document_description(content: &str) -> Option<String> {
 
 mod api;
 mod error;
+pub mod workflows;
 
 use api::{
     create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
@@ -136,6 +139,14 @@ static INDEX_HTML: &str = "index.html";
 #[derive(RustEmbed)]
 #[folder = "../desktop/dist"]
 struct Assets;
+
+// Extended application state that includes workflow management
+#[derive(Clone)]
+pub struct AppState {
+    pub config_state: ConfigState,
+    pub workflow_sessions: Arc<workflows::WorkflowSessions>,
+    pub websocket_broadcaster: workflows::WebSocketBroadcaster,
+}
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
@@ -388,6 +399,18 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
     log::info!("Initialized summarization manager with default configuration");
 
+    // Initialize workflow management components
+    let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
+    let (websocket_broadcaster, _) = broadcast::channel(1000);
+    log::info!("Initialized workflow management system with WebSocket support");
+
+    // Create extended application state
+    let app_state = AppState {
+        config_state,
+        workflow_sessions,
+        websocket_broadcaster,
+    };
+
     let app = Router::new()
         .route("/health", get(health))
         // .route("/documents", get(list_documents))
@@ -487,8 +510,10 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
+        // Add workflow management routes
+        .merge(workflows::create_router())
         .fallback(static_handler)
-        .with_state(config_state)
+        .with_state(app_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
         .layer(
@@ -564,6 +589,17 @@ pub async fn build_router_for_tests() -> Router {
 
     // Initialize summarization manager
     let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
+
+    // Initialize workflow management components for tests
+    let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
+    let (websocket_broadcaster, _) = broadcast::channel(100);
+
+    // Create extended application state for tests
+    let app_state = AppState {
+        config_state,
+        workflow_sessions,
+        websocket_broadcaster,
+    };
 
     Router::new()
         .route("/health", get(health))
@@ -662,7 +698,9 @@ pub async fn build_router_for_tests() -> Router {
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
-        .with_state(config_state)
+        // Add workflow management routes for tests
+        .merge(workflows::create_router())
+        .with_state(app_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
         .layer(
