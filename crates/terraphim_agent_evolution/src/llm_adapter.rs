@@ -103,8 +103,10 @@ impl LlmAdapter for MockLlmAdapter {
         }
 
         // Special handling for quality score requests
-        if (prompt.contains("Rate the quality") && prompt.contains("0.0 to 1.0")) ||
-           (prompt.to_lowercase().contains("overall quality score") && prompt.contains("0.0 to 1.0")) {
+        if (prompt.contains("Rate the quality") && prompt.contains("0.0 to 1.0"))
+            || (prompt.to_lowercase().contains("overall quality score")
+                && prompt.contains("0.0 to 1.0"))
+        {
             // Return varied quality scores for different types of tasks to create different lesson types
             if prompt.contains("2+2") {
                 return Ok("0.95".to_string()); // Very high score for simple math
@@ -119,7 +121,7 @@ impl LlmAdapter for MockLlmAdapter {
                 }
             }
         }
-        
+
         // Mock response that reflects key terms from the input for testing
         // Extract and include important keywords from the prompt
         let keywords: Vec<&str> = prompt
@@ -127,7 +129,7 @@ impl LlmAdapter for MockLlmAdapter {
             .filter(|word| word.len() > 3)
             .take(5)
             .collect();
-        
+
         Ok(format!(
             "Analysis of {}: Based on the request about {}, here's a detailed response covering these aspects.",
             keywords.join(", "),
