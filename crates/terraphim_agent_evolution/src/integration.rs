@@ -261,7 +261,11 @@ impl EvolutionWorkflowManager {
                 last_accessed: None,
                 access_count: 0,
                 importance: crate::memory::ImportanceLevel::Medium,
-                tags: vec![task_id.clone(), "execution_trace".to_string(), task_analysis.domain.clone()],
+                tags: vec![
+                    task_id.clone(),
+                    "execution_trace".to_string(),
+                    task_analysis.domain.clone(),
+                ],
                 associations: std::collections::HashMap::new(),
             };
             self.evolution_system.memory.add_memory(memory_item).await?;
@@ -271,7 +275,10 @@ impl EvolutionWorkflowManager {
         let task_memory = crate::memory::MemoryItem {
             id: format!("task_memory_{}", task_id),
             item_type: crate::memory::MemoryItemType::Experience,
-            content: format!("Completed task in {} domain: {}", task_analysis.domain, workflow_output.result),
+            content: format!(
+                "Completed task in {} domain: {}",
+                task_analysis.domain, workflow_output.result
+            ),
             created_at: chrono::Utc::now(),
             last_accessed: None,
             access_count: 0,
@@ -280,7 +287,11 @@ impl EvolutionWorkflowManager {
             } else {
                 crate::memory::ImportanceLevel::Medium
             },
-            tags: vec![task_id.clone(), task_analysis.domain.clone(), "task_result".to_string()],
+            tags: vec![
+                task_id.clone(),
+                task_analysis.domain.clone(),
+                "task_result".to_string(),
+            ],
             associations: if let Some(ctx) = context {
                 let mut assoc = std::collections::HashMap::new();
                 assoc.insert("context".to_string(), ctx.to_string());
@@ -294,10 +305,16 @@ impl EvolutionWorkflowManager {
         // Add episodic memory for the entire task execution
         let episode = crate::memory::Episode {
             id: format!("episodic_{}", task_id),
-            description: format!("Executed {} using {} pattern", task_id, workflow_output.metadata.pattern_used),
+            description: format!(
+                "Executed {} using {} pattern",
+                task_id, workflow_output.metadata.pattern_used
+            ),
             timestamp: chrono::Utc::now(),
             outcome: crate::memory::EpisodeOutcome::Success,
-            learned: vec![format!("Workflow {} completed successfully", workflow_output.metadata.pattern_used)],
+            learned: vec![format!(
+                "Workflow {} completed successfully",
+                workflow_output.metadata.pattern_used
+            )],
         };
         self.evolution_system
             .memory
@@ -308,9 +325,9 @@ impl EvolutionWorkflowManager {
         // Extract lessons from the execution
         if let Some(quality_score) = workflow_output.metadata.quality_score {
             let timestamp = chrono::Utc::now().timestamp();
-            
+
             // Create multiple types of lessons for comprehensive learning
-            
+
             // 1. Performance-based lesson (Success Pattern, Process, or Failure)
             let performance_lesson_type = if quality_score > 0.8 {
                 "success_pattern"
@@ -377,8 +394,11 @@ impl EvolutionWorkflowManager {
                 contexts: vec![],
                 metadata: HashMap::new(),
             };
-            self.evolution_system.lessons.add_lesson(performance_lesson).await?;
-            
+            self.evolution_system
+                .lessons
+                .add_lesson(performance_lesson)
+                .await?;
+
             // 2. Process lesson (always create for workflow improvement insights)
             let process_lesson = crate::lessons::Lesson {
                 id: format!("proc_lesson_{}_{}", task_id, timestamp + 1),
@@ -398,9 +418,11 @@ impl EvolutionWorkflowManager {
                 ),
                 category: crate::lessons::LessonCategory::Process,
                 evidence: vec![crate::lessons::Evidence {
-                    description: format!("Execution completed in {:?} with {} steps", 
-                                       workflow_output.metadata.execution_time,
-                                       workflow_output.metadata.steps_executed),
+                    description: format!(
+                        "Execution completed in {:?} with {} steps",
+                        workflow_output.metadata.execution_time,
+                        workflow_output.metadata.steps_executed
+                    ),
                     source: crate::lessons::EvidenceSource::TaskExecution,
                     outcome: crate::lessons::EvidenceOutcome::Success,
                     confidence: 0.8,
@@ -426,8 +448,11 @@ impl EvolutionWorkflowManager {
                 contexts: vec![],
                 metadata: HashMap::new(),
             };
-            self.evolution_system.lessons.add_lesson(process_lesson).await?;
-            
+            self.evolution_system
+                .lessons
+                .add_lesson(process_lesson)
+                .await?;
+
             // 3. Technical lesson for coding/technical tasks
             if task_analysis.domain == "coding" || task_analysis.domain == "analysis" {
                 let technical_lesson = crate::lessons::Lesson {
@@ -447,9 +472,11 @@ impl EvolutionWorkflowManager {
                     ),
                     category: crate::lessons::LessonCategory::Technical,
                     evidence: vec![crate::lessons::Evidence {
-                        description: format!("Completed in {:?} with {} steps", 
-                                           workflow_output.metadata.execution_time,
-                                           workflow_output.metadata.steps_executed),
+                        description: format!(
+                            "Completed in {:?} with {} steps",
+                            workflow_output.metadata.execution_time,
+                            workflow_output.metadata.steps_executed
+                        ),
                         source: crate::lessons::EvidenceSource::TaskExecution,
                         outcome: crate::lessons::EvidenceOutcome::Success,
                         confidence: 0.9,
@@ -475,9 +502,12 @@ impl EvolutionWorkflowManager {
                     contexts: vec![],
                     metadata: HashMap::new(),
                 };
-                self.evolution_system.lessons.add_lesson(technical_lesson).await?;
+                self.evolution_system
+                    .lessons
+                    .add_lesson(technical_lesson)
+                    .await?;
             }
-            
+
             // 3. Domain-specific lesson
             let domain_lesson = crate::lessons::Lesson {
                 id: format!("domain_lesson_{}_{}", task_id, timestamp + 3),
@@ -490,12 +520,14 @@ impl EvolutionWorkflowManager {
                 ),
                 insight: format!(
                     "Domain-specific patterns for {} benefit from {} methodology",
-                    task_analysis.domain,
-                    workflow_output.metadata.pattern_used
+                    task_analysis.domain, workflow_output.metadata.pattern_used
                 ),
                 category: crate::lessons::LessonCategory::Domain,
                 evidence: vec![crate::lessons::Evidence {
-                    description: format!("Successfully applied {} domain knowledge", task_analysis.domain),
+                    description: format!(
+                        "Successfully applied {} domain knowledge",
+                        task_analysis.domain
+                    ),
                     source: crate::lessons::EvidenceSource::SelfReflection,
                     outcome: crate::lessons::EvidenceOutcome::Success,
                     confidence: 0.8,
@@ -507,10 +539,7 @@ impl EvolutionWorkflowManager {
                 learned_at: chrono::Utc::now(),
                 last_applied: None,
                 applied_count: 0,
-                tags: vec![
-                    task_analysis.domain.clone(),
-                    "domain_expertise".to_string(),
-                ],
+                tags: vec![task_analysis.domain.clone(), "domain_expertise".to_string()],
                 last_validated: None,
                 validated: false,
                 success_rate: 0.0,
@@ -520,7 +549,10 @@ impl EvolutionWorkflowManager {
                 contexts: vec![],
                 metadata: HashMap::new(),
             };
-            self.evolution_system.lessons.add_lesson(domain_lesson).await?;
+            self.evolution_system
+                .lessons
+                .add_lesson(domain_lesson)
+                .await?;
         }
 
         Ok(())
