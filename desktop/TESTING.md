@@ -282,34 +282,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-          
+
       - name: Install Ollama
         run: |
           curl https://ollama.ai/install.sh | sh
           ollama serve &
           sleep 10
           ollama pull llama3.2:3b
-          
+
       - name: Install dependencies
         run: |
           cd desktop
           npm install
-          
+
       - name: Setup test environment
         run: |
           cd desktop
           npm run setup:test
-          
+
       - name: Run comprehensive tests
         run: |
           cd desktop
           npm run test:comprehensive:ci
-          
+
       - name: Upload test results
         uses: actions/upload-artifact@v3
         with:
@@ -321,7 +321,7 @@ jobs:
 
 Configure these secrets in your CI environment:
 - `ATOMIC_SERVER_SECRET`
-- `OPENROUTER_API_KEY` 
+- `OPENROUTER_API_KEY`
 - `CLICKUP_API_TOKEN`
 - `GITHUB_TOKEN`
 
@@ -352,7 +352,7 @@ open coverage/index.html
 Tests include performance monitoring:
 
 - **Response Times**: LLM response latency
-- **Memory Usage**: Frontend and Ollama memory consumption  
+- **Memory Usage**: Frontend and Ollama memory consumption
 - **Error Rates**: Failed requests and timeouts
 - **Model Performance**: Token generation speed
 

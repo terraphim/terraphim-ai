@@ -22,12 +22,12 @@ test.describe('KG Thesaurus JSON Content', () => {
     // Debug: Check what's on the page
     const pageContent = await page.textContent('body');
     console.log('Page content preview:', pageContent?.substring(0, 500));
-    
+
     // Check if KG search button exists
     const kgButton = page.locator('[data-testid="kg-search-button"]');
     const isVisible = await kgButton.isVisible();
     console.log('KG search button visible:', isVisible);
-    
+
     if (!isVisible) {
       // Try to find any button with "KG" text
       const kgTextButton = page.locator('button:has-text("KG")');
@@ -59,7 +59,7 @@ test.describe('KG Thesaurus JSON Content', () => {
     expect(contextText).toContain('{');
     expect(contextText).toContain('}');
     expect(contextText).toContain('"');
-    
+
     // Verify it contains thesaurus-related terms
     expect(contextText).toMatch(/definition|synonyms|related_terms|usage_examples|metadata/i);
 

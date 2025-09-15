@@ -63,6 +63,9 @@ mod kg_protocol_resolution_test {
             roles,
             default_role: role_name.clone(),
             selected_role: role_name.clone(),
+            default_chat_model: None,
+            default_model_provider: None,
+            default_summarization_model: None,
         };
 
         let config_state = ConfigState {
@@ -209,6 +212,9 @@ mod kg_protocol_resolution_test {
             roles,
             default_role: role_name.clone(),
             selected_role: role_name.clone(),
+            default_chat_model: None,
+            default_model_provider: None,
+            default_summarization_model: None,
         };
 
         let config_state = ConfigState {

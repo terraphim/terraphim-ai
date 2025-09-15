@@ -22,7 +22,7 @@ test.describe('LLM Provider Configuration Tests', () => {
     // Look for the error message
     const errorMessage = page.locator('text=No LLM provider configured for this role');
     const hasError = await errorMessage.isVisible();
-    
+
     if (hasError) {
       console.log('✅ Reproduced the LLM provider configuration error');
       const errorText = await errorMessage.textContent();
@@ -73,7 +73,7 @@ test.describe('LLM Provider Configuration Tests', () => {
     // Check if there's still an error
     const errorMessage = page.locator('text=No LLM provider configured for this role');
     const hasError = await errorMessage.isVisible();
-    
+
     if (hasError) {
       console.log('❌ LLM provider error still present after configuration');
       const errorText = await errorMessage.textContent();
@@ -96,7 +96,7 @@ test.describe('LLM Provider Configuration Tests', () => {
         // Check for response or error
         const response = page.locator('.message, .response, .assistant-message');
         const error = page.locator('.error, .error-message');
-        
+
         if (await response.isVisible()) {
           console.log('✅ Chat response received');
         } else if (await error.isVisible()) {
@@ -120,10 +120,10 @@ test.describe('LLM Provider Configuration Tests', () => {
     // Check if LLM provider fields are present
     const llmProviderSelect = firstRole.locator('select[name*="llm_provider"]');
     const hasLlmProvider = await llmProviderSelect.isVisible();
-    
+
     if (hasLlmProvider) {
       console.log('✅ LLM provider configuration UI found');
-      
+
       // Test selecting Ollama
       await llmProviderSelect.selectOption('ollama');
       await ciWait(page, 'small');
@@ -131,12 +131,12 @@ test.describe('LLM Provider Configuration Tests', () => {
       // Check if Ollama-specific fields appear
       const modelInput = firstRole.locator('input[name*="llm_model"]');
       const baseUrlInput = firstRole.locator('input[name*="llm_base_url"]');
-      
+
       const hasModelInput = await modelInput.isVisible();
       const hasBaseUrlInput = await baseUrlInput.isVisible();
-      
+
       console.log('Ollama fields - Model:', hasModelInput, 'Base URL:', hasBaseUrlInput);
-      
+
       if (hasModelInput && hasBaseUrlInput) {
         console.log('✅ Ollama configuration fields are properly displayed');
       } else {
