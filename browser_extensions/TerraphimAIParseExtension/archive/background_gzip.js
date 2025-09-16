@@ -86,5 +86,3 @@ init = (tab) => {
 chrome.action.onClicked.addListener(tab => {
     init(tab)
 });
-
-
