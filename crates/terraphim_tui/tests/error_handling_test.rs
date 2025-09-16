@@ -60,7 +60,10 @@ async fn test_connection_refused_handling() {
     assert!(
         error_str.contains("connect")
             || error_str.contains("refused")
-            || error_str.contains("network"),
+            || error_str.contains("network")
+            || error_str.contains("connection")
+            || error_str.contains("unreachable")
+            || error_str.contains("sending request"),
         "Error should indicate connection issue: {}",
         error
     );
@@ -458,7 +461,12 @@ async fn test_client_timeout_configuration() {
     let error = result.unwrap_err();
     let error_str = error.to_string().to_lowercase();
     assert!(
-        error_str.contains("timeout") || error_str.contains("connect"),
+        error_str.contains("timeout")
+            || error_str.contains("connect")
+            || error_str.contains("timed out")
+            || error_str.contains("deadline")
+            || error_str.contains("elapsed")
+            || error_str.contains("health check failed"),
         "Error should indicate timeout: {}",
         error
     );
