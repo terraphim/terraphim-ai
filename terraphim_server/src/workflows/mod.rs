@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 
+pub mod multi_agent_handlers;
 pub mod optimization;
 pub mod orchestration;
 pub mod parallel;
