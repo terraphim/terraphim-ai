@@ -769,7 +769,7 @@ pub(crate) async fn list_openrouter_models(
 ) -> Result<Json<OpenRouterModelsResponse>> {
     let role_name = RoleName::new(&req.role);
     let config = config_state.config.lock().await;
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(_role) = config.roles.get(&role_name) else {
         return Ok(Json(OpenRouterModelsResponse {
             status: Status::Error,
             models: vec![],
@@ -1004,7 +1004,7 @@ pub(crate) async fn get_summarization_status(
     let role_name = RoleName::new(&query.role);
     let config = config_state.config.lock().await;
 
-    let Some(role) = config.roles.get(&role_name) else {
+    let Some(_role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Role '{}' not found", query.role)),
