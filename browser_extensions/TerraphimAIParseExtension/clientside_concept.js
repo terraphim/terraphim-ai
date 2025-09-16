@@ -8,4 +8,3 @@ console.log("Running clientside_concepts.js");
     console.log('concept complete')
 }
 )();
-
