@@ -12,12 +12,9 @@ readme = "../../README.md"
 edition = "2021"
 rust-version = "1.57"
 
-[[bin]]
-name = "generate-bindings"
-path = "src/bin/generate-bindings.rs"
 
 [build-dependencies]
-tauri-build = { version = "2.2.0", features = [] }
+tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
 terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
