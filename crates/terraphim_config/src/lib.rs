@@ -123,6 +123,35 @@ pub struct Role {
 }
 
 impl Role {
+    /// Create a new Role with default values for all fields
+    pub fn new(name: impl Into<RoleName>) -> Self {
+        Self {
+            shortname: None,
+            name: name.into(),
+            relevance_function: RelevanceFunction::TitleScorer,
+            terraphim_it: false,
+            theme: "default".to_string(),
+            kg: None,
+            haystacks: vec![],
+            #[cfg(feature = "openrouter")]
+            openrouter_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_api_key: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_model: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_auto_summarize: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_enabled: false,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_system_prompt: None,
+            #[cfg(feature = "openrouter")]
+            openrouter_chat_model: None,
+            llm_system_prompt: None,
+            extra: AHashMap::new(),
+        }
+    }
+
     /// Check if OpenRouter is properly configured for this role
     #[cfg(feature = "openrouter")]
     pub fn has_openrouter_config(&self) -> bool {

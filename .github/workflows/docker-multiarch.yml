@@ -1,0 +1,163 @@
+name: Docker Multi-Architecture Build
+
+on:
+  workflow_call:
+    inputs:
+      platforms:
+        description: 'Target platforms (comma-separated)'
+        required: false
+        type: string
+        default: 'linux/amd64,linux/arm64,linux/arm/v7'
+      ubuntu-versions:
+        description: 'Ubuntu versions to build (JSON array)'
+        required: false
+        type: string
+        default: '["20.04", "22.04", "24.04"]'
+      push:
+        description: 'Push images to registry'
+        required: false
+        type: boolean
+        default: false
+      tag:
+        description: 'Docker image tag'
+        required: false
+        type: string
+        default: 'latest'
+      dockerhub-username:
+        description: 'Docker Hub username'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      DOCKERHUB_TOKEN:
+        description: 'Docker Hub token'
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ubuntu-version: ${{ fromJSON(inputs.ubuntu-versions) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          driver-opts: |
+            network=host
+          buildkitd-flags: |
+            --allow-insecure-entitlement security.insecure
+            --allow-insecure-entitlement network.host
+
+      - name: Log in to Container Registry
+        if: inputs.push
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: inputs.push && inputs.dockerhub-username != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ inputs.dockerhub-username }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ inputs.dockerhub-username != '' && format('{0}/terraphim-server', inputs.dockerhub-username) || '' }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}
+            type=raw,value=latest-ubuntu${{ matrix.ubuntu-version }},enable={{is_default_branch}}
+            type=semver,pattern={{version}}-ubuntu${{ matrix.ubuntu-version }}
+            type=semver,pattern={{major}}.{{minor}}-ubuntu${{ matrix.ubuntu-version }}
+          labels: |
+            org.opencontainers.image.title=Terraphim Server
+            org.opencontainers.image.description=Privacy-first AI assistant with semantic search
+            org.opencontainers.image.vendor=Terraphim AI
+            ubuntu.version=${{ matrix.ubuntu-version }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.multiarch
+          platforms: ${{ inputs.platforms }}
+          push: ${{ inputs.push }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            UBUNTU_VERSION=${{ matrix.ubuntu-version }}
+            RUST_VERSION=1.85.0
+            NODE_VERSION=20
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      - name: Verify multi-arch build
+        if: inputs.push
+        run: |
+          echo "Verifying multi-architecture build for Ubuntu ${{ matrix.ubuntu-version }}:"
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }}
+
+      - name: Test image functionality
+        run: |
+          # Test the built image on current platform
+          CURRENT_PLATFORM=$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')
+          if echo "${{ inputs.platforms }}" | grep -q "$CURRENT_PLATFORM"; then
+            echo "Testing image on $CURRENT_PLATFORM"
+            docker run --rm --platform=$CURRENT_PLATFORM \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }} \
+              /usr/local/bin/terraphim_server --version
+          else
+            echo "Current platform $CURRENT_PLATFORM not in build targets, skipping functional test"
+          fi
+
+  build-summary:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Docker Multi-Architecture Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Ubuntu Version | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          UBUNTU_VERSIONS='${{ inputs.ubuntu-versions }}'
+          for version in $(echo $UBUNTU_VERSIONS | jq -r '.[]'); do
+            if [[ "${{ needs.build-and-push.result }}" == "success" ]]; then
+              echo "| $version | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| $version | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platforms:** ${{ inputs.platforms }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Push to Registry:** ${{ inputs.push }}" >> $GITHUB_STEP_SUMMARY
