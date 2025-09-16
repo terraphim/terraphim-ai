@@ -925,7 +925,6 @@ impl ContextItem {
     }
 }
 
-
 /// Knowledge Graph term definition with comprehensive metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]

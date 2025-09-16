@@ -512,7 +512,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers(Any)
-                .allow_methods(vec![
+                .allow_methods([
                     Method::GET,
                     Method::POST,
                     Method::PUT,
@@ -527,12 +527,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     // This is the new way to start the server
     // However, we can't use it yet, because some crates have not updated
     // to `http` 1.0.0 yet.
-    // let listener = tokio::net::TcpListener::bind(server_hostname).await?;
-    // axum::serve(listener, app).await?;
-
-    axum::Server::bind(&server_hostname)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(server_hostname).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
@@ -697,7 +693,7 @@ pub async fn build_router_for_tests() -> Router {
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers(Any)
-                .allow_methods(vec![
+                .allow_methods([
                     Method::GET,
                     Method::POST,
                     Method::PUT,
