@@ -101,6 +101,18 @@ jobs:
           docker run --rm "${IMAGE_TAG}" rustc --version
           docker run --rm "${IMAGE_TAG}" cargo --version
 
+      - name: Save Docker image
+        run: |
+          IMAGE_TAG="terraphim-builder:${{ github.run_number }}-${{ github.sha }}"
+          docker save "${IMAGE_TAG}" | gzip > terraphim-builder-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: terraphim-builder-image.tar.gz
+          retention-days: 1
+
   lint-and-format:
     runs-on: ubuntu-latest
     needs: [setup, build-base-image]
@@ -109,6 +121,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
 
       - name: Run format check
         run: |
@@ -153,6 +175,16 @@ jobs:
         with:
           name: frontend-dist
           path: frontend-dist
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
 
       - name: Build Rust project
         run: |
@@ -210,6 +242,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
 
       - name: Run tests
         run: |
