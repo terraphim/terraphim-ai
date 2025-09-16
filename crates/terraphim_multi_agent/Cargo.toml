@@ -22,10 +22,11 @@ rig-core = { workspace = true }
 
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
+futures = "0.3"
 
 # Terraphim dependencies
 terraphim_types = { path = "../terraphim_types" }
-terraphim_config = { path = "../terraphim_config" }
+terraphim_config = { path = "../terraphim_config", features = ["openrouter"] }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_persistence = { path = "../terraphim_persistence" }

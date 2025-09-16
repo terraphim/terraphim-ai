@@ -107,13 +107,12 @@ impl Default for AgentConfig {
 }
 
 /// Core Terraphim Agent that wraps a Role configuration with Rig integration
-#[derive()]
 pub struct TerraphimAgent {
     // Core identity
     pub agent_id: AgentId,
     pub role_config: Role,
     pub config: AgentConfig,
-    pub status: AgentStatus,
+    pub status: Arc<RwLock<AgentStatus>>,
 
     // Knowledge graph context
     pub rolegraph: Arc<RoleGraph>,
@@ -143,7 +142,32 @@ pub struct TerraphimAgent {
 
     // Metadata
     pub created_at: DateTime<Utc>,
-    pub last_active: DateTime<Utc>,
+    pub last_active: Arc<RwLock<DateTime<Utc>>>,
+}
+
+impl Clone for TerraphimAgent {
+    fn clone(&self) -> Self {
+        Self {
+            agent_id: self.agent_id,
+            role_config: self.role_config.clone(),
+            config: self.config.clone(),
+            status: self.status.clone(),
+            rolegraph: self.rolegraph.clone(),
+            automata: self.automata.clone(),
+            memory: self.memory.clone(),
+            tasks: self.tasks.clone(),
+            lessons: self.lessons.clone(),
+            goals: self.goals.clone(),
+            context: self.context.clone(),
+            command_history: self.command_history.clone(),
+            token_tracker: self.token_tracker.clone(),
+            cost_tracker: self.cost_tracker.clone(),
+            persistence: self.persistence.clone(),
+            llm_client: self.llm_client.clone(),
+            created_at: self.created_at,
+            last_active: self.last_active.clone(),
+        }
+    }
 }
 
 impl TerraphimAgent {
@@ -214,7 +238,7 @@ impl TerraphimAgent {
             agent_id,
             role_config,
             config,
-            status: AgentStatus::Initializing,
+            status: Arc::new(RwLock::new(AgentStatus::Initializing)),
             rolegraph,
             automata,
             memory,
@@ -228,20 +252,21 @@ impl TerraphimAgent {
             persistence,
             llm_client,
             created_at: now,
-            last_active: now,
+            last_active: Arc::new(RwLock::new(now)),
         })
     }
 
     /// Initialize the agent and load any persisted state
-    pub async fn initialize(&mut self) -> MultiAgentResult<()> {
+    pub async fn initialize(&self) -> MultiAgentResult<()> {
         // Try to load existing state from persistence
-        self.load_state().await?;
+        // TODO: Implement proper state loading with interior mutability
+        // self.load_state().await?;
 
         // Set up system context
         self.setup_system_context().await?;
 
-        self.status = AgentStatus::Ready;
-        self.last_active = Utc::now();
+        *self.status.write().await = AgentStatus::Ready;
+        *self.last_active.write().await = Utc::now();
 
         log::info!(
             "Agent {} ({}) initialized successfully",
@@ -254,15 +279,18 @@ impl TerraphimAgent {
 
     /// Process a command using Rig framework
     pub async fn process_command(
-        &mut self,
+        &self,
         input: CommandInput,
     ) -> MultiAgentResult<CommandOutput> {
-        if self.status != AgentStatus::Ready {
-            return Err(MultiAgentError::AgentNotAvailable(self.agent_id));
+        {
+            let status = self.status.read().await;
+            if *status != AgentStatus::Ready {
+                return Err(MultiAgentError::AgentNotAvailable(self.agent_id));
+            }
         }
 
-        self.status = AgentStatus::Busy;
-        self.last_active = Utc::now();
+        *self.status.write().await = AgentStatus::Busy;
+        *self.last_active.write().await = Utc::now();
 
         let start_time = Utc::now();
         let mut command_record = CommandRecord::new(self.agent_id, input.clone());
@@ -270,7 +298,7 @@ impl TerraphimAgent {
         // Capture context snapshot
         let context_snapshot = {
             let context = self.context.read().await;
-            crate::history::HistoryContextSnapshot::from_context(&*context)
+            crate::history::HistoryContextSnapshot::from_context(&context)
         };
         command_record = command_record.with_context_snapshot(context_snapshot);
 
@@ -301,7 +329,7 @@ impl TerraphimAgent {
                 // Learn from successful interaction
                 self.learn_from_interaction(&command_record).await?;
 
-                self.status = AgentStatus::Ready;
+                *self.status.write().await = AgentStatus::Ready;
 
                 // Add to command history
                 {
@@ -318,7 +346,7 @@ impl TerraphimAgent {
                 );
                 command_record = command_record.with_error(cmd_error);
 
-                self.status = AgentStatus::Error(error.to_string());
+                *self.status.write().await = AgentStatus::Error(error.to_string());
 
                 // Add failed command to history
                 {
@@ -361,9 +389,9 @@ impl TerraphimAgent {
             role_config: self.role_config.clone(),
             config: self.config.clone(),
             goals: self.goals.clone(),
-            status: self.status.clone(),
+            status: self.status.read().await.clone(),
             created_at: self.created_at,
-            last_active: self.last_active,
+            last_active: *self.last_active.read().await,
             memory_snapshot: {
                 let memory = self.memory.read().await;
                 memory.state.clone()
@@ -380,7 +408,7 @@ impl TerraphimAgent {
 
         let key = format!("agent_state:{}", self.agent_id);
         let serialized =
-            serde_json::to_vec(&state).map_err(|e| MultiAgentError::SerializationError(e))?;
+            serde_json::to_vec(&state).map_err(MultiAgentError::SerializationError)?;
 
         // Use DeviceStorage write method
         self.persistence
@@ -394,19 +422,21 @@ impl TerraphimAgent {
     }
 
     /// Load agent state from persistence
-    async fn load_state(&mut self) -> MultiAgentResult<()> {
+    #[allow(dead_code)]
+    async fn load_state(&self) -> MultiAgentResult<()> {
         let key = format!("agent_state:{}", self.agent_id);
 
         match self.persistence.fastest_op.read(&key).await {
             Ok(data) => {
                 let state: AgentState = serde_json::from_slice(&data)
-                    .map_err(|e| MultiAgentError::SerializationError(e))?;
+                    .map_err(MultiAgentError::SerializationError)?;
 
                 // Restore state
-                self.goals = state.goals;
-                self.status = state.status;
-                self.created_at = state.created_at;
-                self.last_active = state.last_active;
+                // TODO: Implement proper state loading with interior mutability
+                // self.goals = state.goals;
+                *self.status.write().await = state.status;
+                // self.created_at = state.created_at;
+                *self.last_active.write().await = state.last_active;
 
                 // Restore evolution components
                 {
@@ -501,8 +531,8 @@ impl TerraphimAgent {
             if quality_score >= self.config.quality_threshold {
                 // Extract lessons from high-quality interactions
                 let _lesson = format!(
-                    "Successful {} command: {} -> {} (quality: {:.2})",
-                    format!("{:?}", record.input.command_type),
+                    "Successful {:?} command: {} -> {} (quality: {:.2})",
+                    record.input.command_type,
                     record.input.text.chars().take(50).collect::<String>(),
                     record.output.text.chars().take(50).collect::<String>(),
                     quality_score
@@ -695,9 +725,9 @@ impl TerraphimAgent {
         use terraphim_types::{RoleName, Thesaurus};
         let role_name = RoleName::from(role_config.name.as_str());
         let thesaurus = Thesaurus::new("default".to_string());
-        Ok(RoleGraph::new(role_name, thesaurus)
+        RoleGraph::new(role_name, thesaurus)
             .await
-            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?)
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
     }
 
     async fn load_automata(_role_config: &Role) -> MultiAgentResult<AutocompleteIndex> {
@@ -708,10 +738,8 @@ impl TerraphimAgent {
         use terraphim_types::Thesaurus;
 
         let thesaurus = Thesaurus::new("default".to_string());
-        Ok(
-            build_autocomplete_index(thesaurus, Some(AutocompleteConfig::default()))
-                .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?,
-        )
+        build_autocomplete_index(thesaurus, Some(AutocompleteConfig::default()))
+                .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
     }
 
     fn extract_individual_goals(role_config: &Role) -> Vec<String> {
@@ -911,6 +939,13 @@ mod tests {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            openrouter_enabled: false,
+            openrouter_api_key: None,
+            openrouter_model: None,
+            openrouter_auto_summarize: false,
+            openrouter_chat_enabled: false,
+            openrouter_chat_system_prompt: None,
+            openrouter_chat_model: None,
             extra: ahash::AHashMap::default(),
         };
 
@@ -927,7 +962,7 @@ mod tests {
         let agent = TerraphimAgent::new(role, persistence, None).await.unwrap();
 
         assert_eq!(agent.role_config.name, "Test Agent".into());
-        assert_eq!(agent.status, AgentStatus::Initializing);
+        assert_eq!(*agent.status.read().await, AgentStatus::Initializing);
     }
 
     #[tokio::test]
@@ -946,6 +981,13 @@ mod tests {
                 location: "./src".to_string(),
                 service: ServiceType::Ripgrep,
             }],
+            openrouter_enabled: false,
+            openrouter_api_key: None,
+            openrouter_model: None,
+            openrouter_auto_summarize: false,
+            openrouter_chat_enabled: false,
+            openrouter_chat_system_prompt: None,
+            openrouter_chat_model: None,
             extra: {
                 let mut extra = ahash::AHashMap::new();
                 extra.insert(
