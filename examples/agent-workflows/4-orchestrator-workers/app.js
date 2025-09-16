@@ -400,21 +400,32 @@ class OrchestratorWorkersDemo {
       this.updateWorkerStatus(workerId, 'active', 'Processing...');
     });
     
-    // Simulate stage execution with progress updates
-    const startTime = Date.now();
-    const progressInterval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(100, (elapsed / stage.duration) * 100);
-      
-      stage.workers.forEach(workerId => {
-        this.updateWorkerProgress(workerId, progress);
+    // Execute real orchestration workflow with API client
+    try {
+      const result = await this.apiClient.executeOrchestration({
+        prompt: `Execute ${stage.name} stage with workers: ${stage.workers.join(', ')}`,
+        role: 'orchestrator',
+        overall_role: 'data_science_pipeline_coordinator',
+        config: {
+          stage: stage.id,
+          workers: stage.workers,
+          dataSources: Array.from(this.selectedSources)
+        }
+      }, {
+        realTime: true,
+        onProgress: (progress) => {
+          stage.workers.forEach(workerId => {
+            this.updateWorkerProgress(workerId, progress.percentage || 0);
+          });
+        }
       });
-    }, 100);
-    
-    // Wait for stage completion
-    await this.delay(stage.duration);
-    
-    clearInterval(progressInterval);
+      
+      // Store API result for later use
+      this.stageResults.set(stage.id, result.result || result);
+    } catch (error) {
+      console.error(`Stage ${stage.id} execution failed:`, error);
+      // Fallback to basic completion for demo purposes
+    }
     
     // Complete workers
     stage.workers.forEach(workerId => {

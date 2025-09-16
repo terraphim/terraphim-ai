@@ -5,8 +5,8 @@ use tokio::time::{sleep, Duration};
 
 use super::{
     complete_workflow_session, create_workflow_session, fail_workflow_session,
-    generate_workflow_id, update_workflow_status, ExecutionStatus, WorkflowMetadata,
-    WorkflowRequest, WorkflowResponse,
+    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -42,8 +42,24 @@ pub async fn execute_routing(
     )
     .await;
 
-    let result =
-        execute_routing_workflow(&state, &workflow_id, &request.prompt, &role, &overall_role).await;
+    // Use real multi-agent execution instead of simulation
+    let result = match MultiAgentWorkflowExecutor::new().await {
+        Ok(executor) => executor
+            .execute_routing(
+                &workflow_id,
+                &request.prompt,
+                &role,
+                &overall_role,
+                &state.workflow_sessions,
+                &state.websocket_broadcaster,
+            )
+            .await
+            .map_err(|e| e.to_string()),
+        Err(e) => {
+            log::error!("Failed to create multi-agent executor: {:?}", e);
+            Err(format!("Failed to initialize multi-agent system: {}", e))
+        }
+    };
 
     let execution_time = start_time.elapsed().as_millis() as u64;
 
@@ -60,7 +76,7 @@ pub async fn execute_routing(
             Ok(Json(WorkflowResponse {
                 workflow_id,
                 success: true,
-                result: Some(routing_result),
+                result: Some(routing_result.clone()),
                 error: None,
                 metadata: WorkflowMetadata {
                     execution_time_ms: execution_time,

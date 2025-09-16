@@ -5,8 +5,8 @@ use tokio::time::{sleep, Duration};
 
 use super::{
     complete_workflow_session, create_workflow_session, fail_workflow_session,
-    generate_workflow_id, update_workflow_status, ExecutionStatus, WorkflowMetadata,
-    WorkflowRequest, WorkflowResponse,
+    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -173,85 +173,54 @@ pub async fn execute_orchestration(
     )
     .await;
 
-    // Initialize orchestrator
-    let orchestrator = create_orchestrator(&request.prompt).await;
+    let role = request
+        .role
+        .unwrap_or_else(|| "Task Orchestrator".to_string());
+    let overall_role = request
+        .overall_role
+        .unwrap_or_else(|| "Workflow Coordinator".to_string());
 
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        10.0,
-        Some("Orchestrator initialized, analyzing task structure".to_string()),
-    )
-    .await;
-
-    // Decompose task and create specialized workers
-    let (task_assignments, workers) =
-        decompose_and_assign_tasks(&orchestrator, &request.prompt).await;
-
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        25.0,
-        Some(format!(
-            "Task decomposition complete: {} workers assigned {} tasks",
-            workers.len(),
-            task_assignments.len()
-        )),
-    )
-    .await;
-
-    // Execute coordinated work
-    let coordination_start = Instant::now();
-    let worker_results = execute_coordinated_work(&orchestrator, &workers, &task_assignments).await;
-    let coordination_duration = coordination_start.elapsed();
-
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        75.0,
-        Some("Worker execution complete, orchestrator synthesizing results".to_string()),
-    )
-    .await;
-
-    // Orchestrator synthesizes final result
-    let orchestration_result = synthesize_orchestration_result(
-        orchestrator,
-        worker_results,
-        coordination_duration,
-        &request.prompt,
-    )
-    .await;
-
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        95.0,
-        Some("Final synthesis complete, generating comprehensive report".to_string()),
-    )
-    .await;
+    // Use real multi-agent execution instead of simulation
+    let result = match MultiAgentWorkflowExecutor::new().await {
+        Ok(executor) => {
+            match executor
+                .execute_orchestration(
+                    &workflow_id,
+                    &request.prompt,
+                    &role,
+                    &overall_role,
+                    &state.workflow_sessions,
+                    &state.websocket_broadcaster,
+                )
+                .await
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    fail_workflow_session(
+                        &state.workflow_sessions,
+                        &state.websocket_broadcaster,
+                        workflow_id.clone(),
+                        e.to_string(),
+                    )
+                    .await;
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to create multi-agent executor: {:?}", e);
+            fail_workflow_session(
+                &state.workflow_sessions,
+                &state.websocket_broadcaster,
+                workflow_id.clone(),
+                format!("Failed to initialize multi-agent system: {}", e),
+            )
+            .await;
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     let execution_time = start_time.elapsed().as_millis() as u64;
-
-    let result = serde_json::json!({
-        "workflow_type": "Orchestration",
-        "coordination_approach": "Hierarchical Task Decomposition",
-        "result": orchestration_result,
-        "metadata": {
-            "orchestrator_efficiency": calculate_orchestrator_efficiency(&orchestration_result),
-            "worker_coordination_success": orchestration_result.orchestrator_summary.successful_completions as f64
-                / orchestration_result.orchestrator_summary.total_tasks_assigned as f64,
-            "resource_utilization": orchestration_result.coordination_metrics.worker_utilization_rate,
-            "coordination_model": "Centralized Command & Control"
-        }
-    });
 
     // Complete workflow
     complete_workflow_session(
@@ -265,20 +234,16 @@ pub async fn execute_orchestration(
     let response = WorkflowResponse {
         workflow_id,
         success: true,
-        result: Some(result),
+        result: Some(result.clone()),
         error: None,
         metadata: WorkflowMetadata {
             execution_time_ms: execution_time,
             pattern: "Orchestration".to_string(),
-            steps: orchestration_result
-                .orchestrator_summary
-                .total_tasks_assigned,
-            role: request
-                .role
-                .unwrap_or_else(|| "Task Orchestrator".to_string()),
-            overall_role: request
-                .overall_role
-                .unwrap_or_else(|| "Workflow Coordinator".to_string()),
+            steps: result["execution_summary"]["workers_count"]
+                .as_u64()
+                .unwrap_or(3) as usize,
+            role,
+            overall_role,
         },
     };
 

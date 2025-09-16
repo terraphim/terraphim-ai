@@ -458,12 +458,19 @@ class PromptChainingDemo {
       totalSteps: this.steps.length
     };
     
-    // Simulate execution with API client
-    const result = await this.apiClient.simulateWorkflow('prompt-chain', stepInput, (progress) => {
-      // Update progress within step
-      const baseProgress = (stepIndex / this.steps.length) * 100;
-      const stepProgress = (progress.percentage / 100) * (100 / this.steps.length);
-      this.visualizer.updateProgress(baseProgress + stepProgress, progress.current);
+    // Execute real prompt chain workflow with API client
+    const result = await this.apiClient.executePromptChain({
+      prompt: stepInput.prompt,
+      role: stepInput.role || 'technical_writer',
+      overall_role: stepInput.overall_role || 'software_developer'
+    }, {
+      realTime: true,
+      onProgress: (progress) => {
+        // Update progress within step
+        const baseProgress = (stepIndex / this.steps.length) * 100;
+        const stepProgress = (progress.percentage / 100) * (100 / this.steps.length);
+        this.visualizer.updateProgress(baseProgress + stepProgress, progress.current);
+      }
     });
     
     return {

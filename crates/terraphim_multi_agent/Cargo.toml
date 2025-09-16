@@ -1,0 +1,36 @@
+[package]
+name = "terraphim_multi_agent"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-agent system for Terraphim built on roles with Rig framework integration"
+license = "MIT"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+
+# Rig framework for LLM management
+rig-core = { workspace = true }
+
+# Additional dependencies
+ahash = { version = "0.8.8", features = ["serde"] }
+
+# Terraphim dependencies
+terraphim_types = { path = "../terraphim_types" }
+terraphim_config = { path = "../terraphim_config" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_automata = { path = "../terraphim_automata" }
+terraphim_persistence = { path = "../terraphim_persistence" }
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"

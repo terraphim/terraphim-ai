@@ -4,8 +4,8 @@ use tokio::time::{sleep, Duration};
 
 use super::{
     complete_workflow_session, create_workflow_session, fail_workflow_session,
-    generate_workflow_id, update_workflow_status, ExecutionStatus, WorkflowMetadata,
-    WorkflowRequest, WorkflowResponse,
+    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -39,8 +39,24 @@ pub async fn execute_prompt_chain(
     )
     .await;
 
-    let result =
-        execute_chain_workflow(&state, &workflow_id, &request.prompt, &role, &overall_role).await;
+    // Use real multi-agent execution instead of simulation
+    let result = match MultiAgentWorkflowExecutor::new().await {
+        Ok(executor) => executor
+            .execute_prompt_chain(
+                &workflow_id,
+                &request.prompt,
+                &role,
+                &overall_role,
+                &state.workflow_sessions,
+                &state.websocket_broadcaster,
+            )
+            .await
+            .map_err(|e| e.to_string()),
+        Err(e) => {
+            log::error!("Failed to create multi-agent executor: {:?}", e);
+            Err(format!("Failed to initialize multi-agent system: {}", e))
+        }
+    };
 
     let execution_time = start_time.elapsed().as_millis() as u64;
 
@@ -57,12 +73,14 @@ pub async fn execute_prompt_chain(
             Ok(Json(WorkflowResponse {
                 workflow_id,
                 success: true,
-                result: Some(chain_result),
+                result: Some(chain_result.clone()),
                 error: None,
                 metadata: WorkflowMetadata {
                     execution_time_ms: execution_time,
                     pattern: "prompt_chaining".to_string(),
-                    steps: 6,
+                    steps: chain_result["execution_summary"]["total_steps"]
+                        .as_u64()
+                        .unwrap_or(6) as usize,
                     role,
                     overall_role,
                 },
