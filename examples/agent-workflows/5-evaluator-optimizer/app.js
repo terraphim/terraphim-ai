@@ -355,25 +355,60 @@ class EvaluatorOptimizerDemo {
     const previousVersion = this.contentVersions[this.contentVersions.length - 1];
     const optimizationPrompt = this.buildOptimizationPrompt(previousVersion);
     
-    // Generate improved content
-    const improvedContent = await this.generateContent(
-      document.getElementById('content-prompt').value,
-      optimizationPrompt
-    );
-    
-    // Evaluate improved content
-    const qualityScores = await this.evaluateContent(
-      improvedContent, 
-      document.getElementById('content-prompt').value
-    );
-    
-    // Create new version
-    const version = {
-      iteration: this.currentIteration,
-      content: improvedContent,
-      qualityScores: qualityScores,
-      feedback: this.generateFeedback(qualityScores),
-      improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
+    try {
+      // Execute real optimization workflow with API client
+      const result = await this.apiClient.executeOptimization({
+        prompt: document.getElementById('content-prompt').value,
+        role: this.terraphimConfig.agentRoles.optimizer,
+        overall_role: this.terraphimConfig.overallRole,
+        config: {
+          previousContent: previousVersion.content,
+          optimizationPrompt: optimizationPrompt,
+          iteration: this.currentIteration,
+          qualityThreshold: this.qualityThreshold,
+          criteria: this.qualityCriteria.filter(c => c.enabled)
+        }
+      }, {
+        realTime: true,
+        onProgress: (progress) => {
+          const baseProgress = 70 + (this.currentIteration / this.maxIterations) * 30;
+          this.visualizer.updateProgress(baseProgress * (progress.percentage / 100), progress.current);
+        }
+      });
+      
+      // Extract improved content from API result
+      const improvedContent = result.result?.optimized_content || result.result?.final_result || 'Generated improved content';
+      const qualityScores = result.result?.quality_metrics || await this.evaluateContent(improvedContent, document.getElementById('content-prompt').value);
+      
+      // Create new version with API results
+      const version = {
+        iteration: this.currentIteration,
+        content: improvedContent,
+        qualityScores: qualityScores,
+        feedback: this.generateFeedback(qualityScores),
+        improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
+        apiResult: result.result // Store full API result
+      };
+    } catch (error) {
+      console.error('API optimization failed, falling back to simulation:', error);
+      
+      // Fallback to original simulation if API fails
+      const improvedContent = await this.generateContent(
+        document.getElementById('content-prompt').value,
+        optimizationPrompt
+      );
+      
+      const qualityScores = await this.evaluateContent(
+        improvedContent, 
+        document.getElementById('content-prompt').value
+      );
+      
+      const version = {
+        iteration: this.currentIteration,
+        content: improvedContent,
+        qualityScores: qualityScores,
+        feedback: this.generateFeedback(qualityScores),
+        improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
       timestamp: new Date()
     };
     

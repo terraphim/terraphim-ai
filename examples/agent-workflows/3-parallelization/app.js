@@ -320,13 +320,20 @@ class ParallelizationAnalysisDemo {
     }, 100);
     
     try {
-      // Simulate API call to parallelization workflow
-      const result = await this.apiClient.simulateWorkflow('parallel', {
+      // Execute real parallelization workflow with API client
+      const result = await this.apiClient.executeParallel({
         prompt: topic,
-        perspective: perspective.name,
-        domains: Array.from(this.selectedDomains)
-      }, (progress) => {
-        // Progress updates handled by interval above
+        role: perspective.name.toLowerCase() + '_specialist',
+        overall_role: 'multi_perspective_analyst',
+        config: {
+          perspective: perspective.name,
+          domains: Array.from(this.selectedDomains)
+        }
+      }, {
+        realTime: true,
+        onProgress: (progress) => {
+          // Progress updates handled by interval above
+        }
       });
       
       clearInterval(progressInterval);

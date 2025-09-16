@@ -5,8 +5,8 @@ use tokio::time::{sleep, Duration};
 
 use super::{
     complete_workflow_session, create_workflow_session, fail_workflow_session,
-    generate_workflow_id, update_workflow_status, ExecutionStatus, WorkflowMetadata,
-    WorkflowRequest, WorkflowResponse,
+    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -176,53 +176,54 @@ pub async fn execute_optimization(
     )
     .await;
 
-    // Initialize evaluator and optimizer agents
-    let evaluator = create_evaluator_agent(&request.prompt).await;
-    let optimizer = create_optimizer_agent(&request.prompt).await;
+    let role = request
+        .role
+        .unwrap_or_else(|| "Optimization Specialist".to_string());
+    let overall_role = request
+        .overall_role
+        .unwrap_or_else(|| "Quality Optimizer".to_string());
 
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        10.0,
-        Some("Evaluator and Optimizer agents initialized".to_string()),
-    )
-    .await;
-
-    // Execute iterative optimization process
-    let optimization_result = execute_iterative_optimization(
-        &evaluator,
-        &optimizer,
-        &request.prompt,
-        &state,
-        &workflow_id,
-    )
-    .await;
-
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        95.0,
-        Some("Optimization complete, generating final analysis".to_string()),
-    )
-    .await;
+    // Use real multi-agent execution instead of simulation
+    let result = match MultiAgentWorkflowExecutor::new().await {
+        Ok(executor) => {
+            match executor
+                .execute_optimization(
+                    &workflow_id,
+                    &request.prompt,
+                    &role,
+                    &overall_role,
+                    &state.workflow_sessions,
+                    &state.websocket_broadcaster,
+                )
+                .await
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    fail_workflow_session(
+                        &state.workflow_sessions,
+                        &state.websocket_broadcaster,
+                        workflow_id.clone(),
+                        e.to_string(),
+                    )
+                    .await;
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to create multi-agent executor: {:?}", e);
+            fail_workflow_session(
+                &state.workflow_sessions,
+                &state.websocket_broadcaster,
+                workflow_id.clone(),
+                format!("Failed to initialize multi-agent system: {}", e),
+            )
+            .await;
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     let execution_time = start_time.elapsed().as_millis() as u64;
-
-    let result = serde_json::json!({
-        "workflow_type": "Optimization",
-        "optimization_approach": "Evaluator-Optimizer Iterative Refinement",
-        "result": optimization_result,
-        "metadata": {
-            "optimization_efficiency": calculate_optimization_efficiency(&optimization_result),
-            "convergence_success": optimization_result.optimization_summary.convergence_achieved,
-            "quality_improvement": optimization_result.optimization_summary.total_improvement,
-            "iteration_strategy": "Adaptive Multi-Criteria Optimization"
-        }
-    });
 
     // Complete workflow
     complete_workflow_session(
@@ -236,18 +237,16 @@ pub async fn execute_optimization(
     let response = WorkflowResponse {
         workflow_id,
         success: true,
-        result: Some(result),
+        result: Some(result.clone()),
         error: None,
         metadata: WorkflowMetadata {
             execution_time_ms: execution_time,
             pattern: "Optimization".to_string(),
-            steps: optimization_result.optimization_summary.total_iterations,
-            role: request
-                .role
-                .unwrap_or_else(|| "Content Optimizer".to_string()),
-            overall_role: request
-                .overall_role
-                .unwrap_or_else(|| "Quality Enhancement Specialist".to_string()),
+            steps: result["execution_summary"]["iterations_completed"]
+                .as_u64()
+                .unwrap_or(3) as usize,
+            role,
+            overall_role,
         },
     };
 

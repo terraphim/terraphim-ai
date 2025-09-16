@@ -397,13 +397,20 @@ class RoutingPrototypingDemo {
     this.visualizer.updateProgress(80, `Generating with ${this.selectedModel.name}...`);
     
     try {
-      // Simulate API call to routing workflow
-      const result = await this.apiClient.simulateWorkflow('routing', {
+      // Execute real routing workflow with API client
+      const result = await this.apiClient.executeRouting({
         prompt: prompt,
-        template: this.currentTemplate,
-        complexity: this.complexityScore
-      }, (progress) => {
-        this.visualizer.updateProgress(80 + (progress.percentage * 0.2), progress.current);
+        role: this.selectedModel?.id || 'content_creator',
+        overall_role: 'technical_specialist',
+        config: {
+          template: this.currentTemplate,
+          complexity: this.complexityScore
+        }
+      }, {
+        realTime: true,
+        onProgress: (progress) => {
+          this.visualizer.updateProgress(80 + (progress.percentage * 0.2), progress.current);
+        }
       });
       
       this.routingResult = result;

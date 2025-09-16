@@ -5,8 +5,8 @@ use tokio::time::{sleep, Duration};
 
 use super::{
     complete_workflow_session, create_workflow_session, fail_workflow_session,
-    generate_workflow_id, update_workflow_status, ExecutionStatus, WorkflowMetadata,
-    WorkflowRequest, WorkflowResponse,
+    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -83,63 +83,54 @@ pub async fn execute_parallel(
     )
     .await;
 
-    // Determine the analysis type and create specialized agents
-    let agents = create_specialized_agents(&request.prompt).await;
+    let role = request
+        .role
+        .unwrap_or_else(|| "Multi-Agent Analyst".to_string());
+    let overall_role = request
+        .overall_role
+        .unwrap_or_else(|| "Parallel Processing Coordinator".to_string());
 
-    // Update progress
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        20.0,
-        Some(format!("Deployed {} specialized agents", agents.len())),
-    )
-    .await;
-
-    // Execute parallel analysis
-    let parallel_start = Instant::now();
-    let analyses = execute_parallel_analysis(&agents, &request.prompt).await;
-    let parallel_duration = parallel_start.elapsed();
-
-    // Update progress
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        70.0,
-        Some("Consolidating multi-perspective results".to_string()),
-    )
-    .await;
-
-    // Consolidate results
-    let consolidated_result = consolidate_analyses(analyses, parallel_duration).await;
-
-    // Update progress
-    update_workflow_status(
-        &state.workflow_sessions,
-        &state.websocket_broadcaster,
-        &workflow_id,
-        ExecutionStatus::Running,
-        90.0,
-        Some("Generating comprehensive report".to_string()),
-    )
-    .await;
+    // Use real multi-agent execution instead of simulation
+    let result = match MultiAgentWorkflowExecutor::new().await {
+        Ok(executor) => {
+            match executor
+                .execute_parallelization(
+                    &workflow_id,
+                    &request.prompt,
+                    &role,
+                    &overall_role,
+                    &state.workflow_sessions,
+                    &state.websocket_broadcaster,
+                )
+                .await
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    fail_workflow_session(
+                        &state.workflow_sessions,
+                        &state.websocket_broadcaster,
+                        workflow_id.clone(),
+                        e.to_string(),
+                    )
+                    .await;
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to create multi-agent executor: {:?}", e);
+            fail_workflow_session(
+                &state.workflow_sessions,
+                &state.websocket_broadcaster,
+                workflow_id.clone(),
+                format!("Failed to initialize multi-agent system: {}", e),
+            )
+            .await;
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     let execution_time = start_time.elapsed().as_millis() as u64;
-
-    let result = serde_json::json!({
-        "workflow_type": "Parallelization",
-        "analysis_approach": "Multi-Agent Parallel Processing",
-        "result": consolidated_result,
-        "metadata": {
-            "agents_deployed": consolidated_result.execution_summary.total_agents,
-            "parallel_efficiency": calculate_efficiency_score(&consolidated_result),
-            "consensus_achieved": consolidated_result.execution_summary.consensus_level > 0.7,
-            "processing_mode": "Concurrent Analysis"
-        }
-    });
 
     // Complete workflow
     complete_workflow_session(
@@ -153,18 +144,16 @@ pub async fn execute_parallel(
     let response = WorkflowResponse {
         workflow_id,
         success: true,
-        result: Some(result),
+        result: Some(result.clone()),
         error: None,
         metadata: WorkflowMetadata {
             execution_time_ms: execution_time,
             pattern: "Parallelization".to_string(),
-            steps: consolidated_result.execution_summary.total_agents,
-            role: request
-                .role
-                .unwrap_or_else(|| "Multi-Agent Analyst".to_string()),
-            overall_role: request
-                .overall_role
-                .unwrap_or_else(|| "Parallel Processing Coordinator".to_string()),
+            steps: result["execution_summary"]["perspectives_count"]
+                .as_u64()
+                .unwrap_or(3) as usize,
+            role,
+            overall_role,
         },
     };
 
