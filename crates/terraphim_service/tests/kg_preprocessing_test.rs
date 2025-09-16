@@ -51,6 +51,7 @@ async fn test_kg_preprocessing_basic_functionality() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
     config.roles.insert(role_name.clone(), role);
@@ -119,6 +120,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
 
@@ -146,6 +148,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
 
@@ -220,6 +223,7 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
     config.roles.insert(role_name.clone(), role);
