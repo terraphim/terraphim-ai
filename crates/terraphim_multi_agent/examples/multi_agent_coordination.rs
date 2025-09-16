@@ -8,14 +8,13 @@
 
 use ahash::AHashMap;
 use std::sync::Arc;
-use terraphim_config::{Role, ServiceType};
+use terraphim_config::Role;
 use terraphim_multi_agent::{
     test_utils::create_test_role, AgentRegistry, CommandInput, CommandType, MultiAgentResult,
     TerraphimAgent,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
-use tokio;
 
 /// Create specialized agent roles for coordination example
 fn create_specialized_roles() -> Vec<Role> {
@@ -29,6 +28,13 @@ fn create_specialized_roles() -> Vec<Role> {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            openrouter_enabled: false,
+            openrouter_api_key: None,
+            openrouter_model: None,
+            openrouter_auto_summarize: false,
+            openrouter_chat_enabled: false,
+            openrouter_chat_system_prompt: None,
+            openrouter_chat_model: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -44,6 +50,7 @@ fn create_specialized_roles() -> Vec<Role> {
                     ]),
                 );
                 extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
+                extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
                 extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
                 extra.insert("llm_temperature".to_string(), serde_json::json!(0.3)); // Focused analysis
                 extra
@@ -58,6 +65,13 @@ fn create_specialized_roles() -> Vec<Role> {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            openrouter_enabled: false,
+            openrouter_api_key: None,
+            openrouter_model: None,
+            openrouter_auto_summarize: false,
+            openrouter_chat_enabled: false,
+            openrouter_chat_system_prompt: None,
+            openrouter_chat_model: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -73,6 +87,7 @@ fn create_specialized_roles() -> Vec<Role> {
                     ]),
                 );
                 extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
+                extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
                 extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
                 extra.insert("llm_temperature".to_string(), serde_json::json!(0.5)); // Balanced creativity
                 extra
@@ -87,6 +102,13 @@ fn create_specialized_roles() -> Vec<Role> {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            openrouter_enabled: false,
+            openrouter_api_key: None,
+            openrouter_model: None,
+            openrouter_auto_summarize: false,
+            openrouter_chat_enabled: false,
+            openrouter_chat_system_prompt: None,
+            openrouter_chat_model: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -102,6 +124,7 @@ fn create_specialized_roles() -> Vec<Role> {
                     ]),
                 );
                 extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
+                extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
                 extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
                 extra.insert("llm_temperature".to_string(), serde_json::json!(0.4)); // Technical precision
                 extra
@@ -128,55 +151,54 @@ async fn example_agent_registry() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create registry
-    let mut registry = AgentRegistry::new();
+    let registry = AgentRegistry::new();
 
     // Create and register specialized agents
     let roles = create_specialized_roles();
-    let mut agents = Vec::new();
 
     for role in roles {
         let role_name = role.name.clone();
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
 
         let agent_id = agent.agent_id;
-        let capabilities = agent.get_capabilities();
+        let _capabilities = agent.get_capabilities();
 
-        // Register agent
-        registry.register_agent(agent_id, capabilities).await?;
-        agents.push(agent);
-
+        // Register agent using the new API
+        let agent_arc = Arc::new(agent);
+        registry.register_agent(agent_arc).await?;
+        
         println!("✅ Registered agent: {} (ID: {})", role_name, agent_id);
     }
 
-    // Discover agents by capability
+    // Discover agents by capability using the new API
     let code_review_agents = registry
-        .discover_agents_by_capability("code_review")
-        .await?;
+        .find_agents_by_capability("code_review")
+        .await;
     println!("🔍 Code review agents: {:?}", code_review_agents);
 
     let documentation_agents = registry
-        .discover_agents_by_capability("documentation")
-        .await?;
+        .find_agents_by_capability("documentation")
+        .await;
     println!("🔍 Documentation agents: {:?}", documentation_agents);
 
     let performance_agents = registry
-        .discover_agents_by_capability("performance_analysis")
-        .await?;
+        .find_agents_by_capability("performance_analysis")
+        .await;
     println!("🔍 Performance agents: {:?}", performance_agents);
 
     println!(
         "📊 Total registered agents: {}",
-        registry.get_all_agents().await?.len()
+        registry.get_all_agents().await.len()
     );
 
     Ok(())
 }
 
-/// Example 2: Coordinated Task Execution
+/// Example 2: Coordinated Task Execution using Registry
 async fn example_coordinated_execution() -> MultiAgentResult<()> {
-    println!("\n🤝 Example 2: Coordinated Task Execution");
-    println!("=========================================");
+    println!("\n🤝 Example 2: Coordinated Task Execution using Registry");
+    println!("=====================================================");
 
     // Initialize storage
     DeviceStorage::init_memory_only()
@@ -190,14 +212,15 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
     let storage_copy = unsafe { ptr::read(storage) };
     let persistence = Arc::new(storage_copy);
 
-    // Create specialized agents
+    // Create registry and register specialized agents
+    let registry = AgentRegistry::new();
     let roles = create_specialized_roles();
-    let mut agents = Vec::new();
 
     for role in roles {
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
-        agents.push(agent);
+        let agent_arc = Arc::new(agent);
+        registry.register_agent(agent_arc).await?;
     }
 
     // Task: Create and review a Rust function
@@ -206,49 +229,104 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
     println!("🎯 Collaborative Task: {}", task);
     println!();
 
-    // Step 1: Code generation (using first agent as general purpose)
+    // Get all agents from registry for coordination
+    let all_agents = registry.get_all_agents().await;
+    if all_agents.len() < 3 {
+        println!("⚠️ Need at least 3 agents for coordinated execution");
+        return Ok(());
+    }
+
+    // Step 1: Code generation (using first agent)
     println!("👨‍💻 Step 1: Code Generation");
     let code_input = CommandInput::new(task.to_string(), CommandType::Generate);
-    let code_result = agents[0].process_command(code_input).await?;
+    let code_result = all_agents[0].process_command(code_input).await?;
     println!("Generated code:\n{}\n", code_result.text);
 
-    // Step 2: Code review
+    // Step 2: Code review (using agents with code review capability)
     println!("🔍 Step 2: Code Review");
-    let review_input = CommandInput::new(
-        format!(
-            "Review this Rust code for quality and security:\n{}",
-            code_result.text
-        ),
-        CommandType::Review,
-    );
-    let review_result = agents[0].process_command(review_input).await?; // CodeReviewer
-    println!("Review feedback:\n{}\n", review_result.text);
+    let code_review_agents = registry.find_agents_by_capability("code_review").await;
+    if !code_review_agents.is_empty() {
+        if let Some(reviewer_agent) = registry.get_agent(&code_review_agents[0]).await {
+            let review_input = CommandInput::new(
+                format!(
+                    "Review this Rust code for quality and security:\n{}",
+                    code_result.text
+                ),
+                CommandType::Review,
+            );
+            let review_result = reviewer_agent.process_command(review_input).await?;
+            println!("Review feedback:\n{}\n", review_result.text);
+        }
+    } else {
+        println!("No code review agents found, using general agent");
+        let review_input = CommandInput::new(
+            format!(
+                "Review this Rust code for quality and security:\n{}",
+                code_result.text
+            ),
+            CommandType::Review,
+        );
+        let review_result = all_agents[0].process_command(review_input).await?;
+        println!("Review feedback:\n{}\n", review_result.text);
+    }
 
-    // Step 3: Documentation
+    // Step 3: Documentation (using documentation agents)
     println!("📝 Step 3: Documentation Generation");
-    let doc_input = CommandInput::new(
-        format!(
-            "Create documentation for this Rust function:\n{}",
-            code_result.text
-        ),
-        CommandType::Generate,
-    );
-    let doc_result = agents[1].process_command(doc_input).await?; // DocumentationWriter
-    println!("Documentation:\n{}\n", doc_result.text);
+    let doc_agents = registry.find_agents_by_capability("documentation").await;
+    if !doc_agents.is_empty() {
+        if let Some(doc_agent) = registry.get_agent(&doc_agents[0]).await {
+            let doc_input = CommandInput::new(
+                format!(
+                    "Create documentation for this Rust function:\n{}",
+                    code_result.text
+                ),
+                CommandType::Generate,
+            );
+            let doc_result = doc_agent.process_command(doc_input).await?;
+            println!("Documentation:\n{}\n", doc_result.text);
+        }
+    } else {
+        println!("No documentation agents found, using general agent");
+        let doc_input = CommandInput::new(
+            format!(
+                "Create documentation for this Rust function:\n{}",
+                code_result.text
+            ),
+            CommandType::Generate,
+        );
+        let doc_result = all_agents[1].process_command(doc_input).await?;
+        println!("Documentation:\n{}\n", doc_result.text);
+    }
 
-    // Step 4: Performance analysis
+    // Step 4: Performance analysis (using performance agents)
     println!("⚡ Step 4: Performance Analysis");
-    let perf_input = CommandInput::new(
-        format!(
-            "Analyze the performance of this Rust function and suggest optimizations:\n{}",
-            code_result.text
-        ),
-        CommandType::Analyze,
-    );
-    let perf_result = agents[2].process_command(perf_input).await?; // PerformanceOptimizer
-    println!("Performance analysis:\n{}\n", perf_result.text);
+    let perf_agents = registry.find_agents_by_capability("performance_analysis").await;
+    if !perf_agents.is_empty() {
+        if let Some(perf_agent) = registry.get_agent(&perf_agents[0]).await {
+            let perf_input = CommandInput::new(
+                format!(
+                    "Analyze the performance of this Rust function and suggest optimizations:\n{}",
+                    code_result.text
+                ),
+                CommandType::Analyze,
+            );
+            let perf_result = perf_agent.process_command(perf_input).await?;
+            println!("Performance analysis:\n{}\n", perf_result.text);
+        }
+    } else {
+        println!("No performance agents found, using general agent");
+        let perf_input = CommandInput::new(
+            format!(
+                "Analyze the performance of this Rust function and suggest optimizations:\n{}",
+                code_result.text
+            ),
+            CommandType::Analyze,
+        );
+        let perf_result = all_agents[2].process_command(perf_input).await?;
+        println!("Performance analysis:\n{}\n", perf_result.text);
+    }
 
-    println!("✅ Collaborative task completed with multi-agent coordination!");
+    println!("✅ Collaborative task completed with registry-based multi-agent coordination!");
 
     Ok(())
 }
@@ -274,7 +352,7 @@ async fn example_parallel_processing() -> MultiAgentResult<()> {
     let mut agents = Vec::new();
     for i in 0..3 {
         let role = create_test_role();
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
         agents.push(agent);
         println!("✅ Created agent {} for parallel processing", i + 1);
@@ -348,7 +426,7 @@ async fn example_performance_comparison() -> MultiAgentResult<()> {
 
     for role in roles {
         let agent_name = role.name.clone();
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
         agents.push((agent_name, agent));
     }
