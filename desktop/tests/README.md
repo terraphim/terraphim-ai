@@ -16,10 +16,13 @@ The autocomplete test suite validates the complete Novel Editor autocomplete wor
 
 ```
 tests/
-├── e2e/
+├── e2e/                                   # End-to-end Playwright tests
 │   ├── novel-autocomplete.spec.ts          # Main test specification
 │   └── helpers/
 │       └── autocomplete-helpers.ts         # Test helper functions
+├── unit/                                  # Unit tests for individual components
+│   ├── operator-parsing.test.mjs          # Search operator parsing tests
+│   └── README.md                          # Unit tests documentation
 ├── fixtures/
 │   └── autocomplete-fixtures.ts            # Test data and mock responses
 ├── global-setup-autocomplete.ts            # Pre-test setup and MCP server startup
@@ -57,7 +60,16 @@ tests/
 
 ## Running Tests
 
-### Quick Start
+### Unit Tests
+```bash
+# From the desktop directory
+cd desktop
+
+# Run operator parsing tests
+node tests/unit/operator-parsing.test.mjs
+```
+
+### End-to-End Tests
 ```bash
 # From the desktop directory
 cd desktop
