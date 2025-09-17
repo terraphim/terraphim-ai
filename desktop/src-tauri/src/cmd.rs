@@ -20,7 +20,6 @@ use serde::Serializer;
 use serde_json::Value;
 use std::collections::HashMap;
 use tsify::Tsify;
-use ulid;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -1315,7 +1314,7 @@ pub async fn chat(
     use terraphim_service::llm;
 
     // Try to build an LLM client from the role configuration
-    let Some(llm_client) = llm::build_llm_from_role(&role_config) else {
+    let Some(llm_client) = llm::build_llm_from_role(role_config) else {
         return Ok(ChatResponse {
             status: "error".to_string(),
             message: None,
