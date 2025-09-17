@@ -31,10 +31,11 @@ wasm-bindgen-futures = "0.4"
 html2md = "0.2"
 async-trait = "0.1.73"
 url = "2.4"
+urlencoding = "2.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 scraper = "0.24.0"
-urlencoding = "2.1"
 reqwest-eventsource = { version = "0.5", optional = true }
+mcp-spec = { version = "0.1", optional = true }
 
 [dev-dependencies]
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
@@ -58,4 +59,4 @@ mcp-sse = ["reqwest-eventsource"]
 # High-level MCP support using SSE/http-only (no rust-sdk)
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
-mcp-rust-sdk = ["mcp-sse"]
+mcp-rust-sdk = ["mcp-spec", "mcp-sse"]
