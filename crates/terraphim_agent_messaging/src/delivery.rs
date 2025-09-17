@@ -12,20 +12,15 @@ use tokio::time::interval;
 use crate::{AgentPid, MessageEnvelope, MessageId, MessagingError, MessagingResult};
 
 /// Delivery guarantee levels
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DeliveryGuarantee {
     /// At most once - fire and forget
     AtMostOnce,
     /// At least once - retry until acknowledged
+    #[default]
     AtLeastOnce,
     /// Exactly once - deduplicated delivery
     ExactlyOnce,
-}
-
-impl Default for DeliveryGuarantee {
-    fn default() -> Self {
-        DeliveryGuarantee::AtLeastOnce
-    }
 }
 
 /// Delivery status for tracking message delivery
@@ -421,7 +416,7 @@ impl DeliveryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DeliveryOptions, MessagePriority};
+    use crate::DeliveryOptions;
 
     #[tokio::test]
     async fn test_delivery_record_lifecycle() {

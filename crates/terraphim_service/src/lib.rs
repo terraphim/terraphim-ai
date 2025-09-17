@@ -1408,7 +1408,7 @@ impl TerraphimService {
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
+                if role.has_llm_config() && role.llm_auto_summarize {
                     log::debug!(
                         "Applying OpenRouter AI summarization to {} search results for role '{}'",
                         docs_ranked.len(),
@@ -1417,7 +1417,8 @@ impl TerraphimService {
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
                     log::debug!(
                         "Applying LLM AI summarization to {} search results for role '{}'",
                         docs_ranked.len(),
@@ -1506,12 +1507,13 @@ impl TerraphimService {
 
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
+                if role.has_llm_config() && role.llm_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
                     log::debug!(
                         "Applying LLM AI summarization to {} BM25 search results for role '{}'",
                         docs_ranked.len(),
@@ -1599,12 +1601,13 @@ impl TerraphimService {
 
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
+                if role.has_llm_config() && role.llm_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
                     log::debug!(
                         "Applying LLM AI summarization to {} BM25F search results for role '{}'",
                         docs_ranked.len(),
@@ -1692,7 +1695,7 @@ impl TerraphimService {
 
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() && role.openrouter_auto_summarize {
+                if role.has_llm_config() && role.llm_auto_summarize {
                     log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
@@ -2082,14 +2085,15 @@ impl TerraphimService {
 
                 // Apply OpenRouter AI summarization if enabled for this role
                 #[cfg(feature = "openrouter")]
-                if role.has_openrouter_config() {
+                if role.has_llm_config() {
                     log::debug!(
                         "Applying OpenRouter AI summarization to {} search results for role '{}'",
                         documents.len(),
                         role.name
                     );
                     documents = self.enhance_descriptions_with_ai(documents, &role).await?;
-                } else if crate::llm::role_wants_ai_summarize(&role) {
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
                     log::debug!(
                         "Applying LLM AI summarization to {} search results for role '{}'",
                         documents.len(),
@@ -2741,19 +2745,19 @@ mod tests {
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -2808,19 +2812,19 @@ mod tests {
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -2927,19 +2931,19 @@ mod tests {
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -3047,19 +3051,19 @@ mod tests {
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);

@@ -131,8 +131,8 @@ impl AgentSupervisor {
         }
 
         // Signal shutdown to background tasks
-        if let Some(sender) = self.shutdown_signal.lock().await.take() {
-            let _ = sender;
+        if let Some(_sender) = self.shutdown_signal.lock().await.take() {
+            // Sender will be dropped, signaling shutdown
         }
 
         self.status = SupervisorStatus::Stopped;
@@ -547,7 +547,7 @@ impl AgentSupervisor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{TestAgent, TestAgentFactory};
+    use crate::TestAgentFactory;
     use serde_json::json;
     use std::sync::Arc;
 
@@ -607,7 +607,7 @@ mod tests {
         let spec2 = AgentSpec::new("test".to_string(), json!({}));
 
         let agent_id1 = supervisor.spawn_agent(spec1).await.unwrap();
-        let agent_id2 = supervisor.spawn_agent(spec2).await.unwrap();
+        let _agent_id2 = supervisor.spawn_agent(spec2).await.unwrap();
 
         // Simulate agent failure
         supervisor

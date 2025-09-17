@@ -6,8 +6,8 @@ use serde_json::json;
 use tokio::time::sleep;
 
 use terraphim_agent_messaging::{
-    AgentMessage, AgentPid, DeliveryConfig, DeliveryGuarantee, DeliveryOptions, MessageEnvelope,
-    MessagePriority, MessageSystem, RouterConfig,
+    AgentPid, DeliveryGuarantee, DeliveryOptions, MessageEnvelope, MessagePriority, MessageSystem,
+    RouterConfig,
 };
 
 #[tokio::test]

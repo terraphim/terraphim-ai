@@ -28,13 +28,13 @@ fn create_specialized_roles() -> Vec<Role> {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_model: None,
-            openrouter_auto_summarize: false,
-            openrouter_chat_enabled: false,
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -65,13 +65,13 @@ fn create_specialized_roles() -> Vec<Role> {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_model: None,
-            openrouter_auto_summarize: false,
-            openrouter_chat_enabled: false,
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -102,13 +102,13 @@ fn create_specialized_roles() -> Vec<Role> {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_model: None,
-            openrouter_auto_summarize: false,
-            openrouter_chat_enabled: false,
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(

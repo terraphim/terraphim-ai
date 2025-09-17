@@ -6,7 +6,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::{AgentId, MultiAgentError, MultiAgentResult, TerraphimAgent};
+use crate::{AgentId, AgentStatus, MultiAgentError, MultiAgentResult, TerraphimAgent};
+
+/// Information about a registered agent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInfo {
+    pub id: AgentId,
+    pub name: String,
+    pub capabilities: Vec<String>,
+    pub status: AgentStatus,
+}
 
 /// Agent registry for managing multiple agents
 #[derive()]
@@ -85,6 +94,30 @@ impl AgentRegistry {
     pub async fn list_agents(&self) -> Vec<AgentId> {
         let agents = self.agents.read().await;
         agents.keys().cloned().collect()
+    }
+
+    /// List all agents with their information
+    pub async fn list_all_agents(&self) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        let mut result = Vec::new();
+        
+        for (id, agent) in agents.iter() {
+            let status = agent.status.read().await.clone();
+            result.push(AgentInfo {
+                id: *id,
+                name: agent.role_config.name.to_string(),
+                capabilities: vec![], // TODO: Extract capabilities from agent
+                status,
+            });
+        }
+        
+        result
+    }
+
+    /// Get all agents (for workflow orchestration)
+    pub async fn get_all_agents(&self) -> Vec<Arc<TerraphimAgent>> {
+        let agents = self.agents.read().await;
+        agents.values().cloned().collect()
     }
 }
 

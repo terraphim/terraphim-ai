@@ -17,8 +17,8 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 
-# Rig framework for LLM management
-rig-core = { workspace = true }
+# Direct HTTP client approach (like Goose) for LLM communication
+reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }

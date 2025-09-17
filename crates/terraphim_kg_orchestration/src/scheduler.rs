@@ -42,7 +42,7 @@ impl TaskScheduler {
         agent_pool: Arc<AgentPool>,
     ) -> OrchestrationResult<Self> {
         // Create mock automata and role graph for the decomposition system
-        let automata = Arc::new(MockAutomata::default());
+        let automata = Arc::new(MockAutomata);
         let role_graph = Self::create_default_role_graph().await?;
 
         let decomposition_system = Arc::new(TerraphimTaskDecompositionSystem::with_default_config(

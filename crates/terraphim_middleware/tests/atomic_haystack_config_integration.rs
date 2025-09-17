@@ -233,7 +233,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
         .expect("Failed to create config state");
 
     let search_query = SearchQuery {
-        search_term: "Terraphim".to_string().into(), // Convert to NormalizedTermValue
+        search_term: "Terraphim".into(),
         skip: Some(0),
         limit: Some(10),
         role: Some("AtomicUser".into()),

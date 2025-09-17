@@ -700,6 +700,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -717,6 +725,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         };
 
@@ -738,6 +754,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         };
 
@@ -760,6 +784,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -777,6 +809,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -795,6 +835,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -812,6 +860,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -829,6 +885,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
