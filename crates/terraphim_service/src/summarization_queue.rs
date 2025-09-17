@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
 
-use terraphim_config::Role;
+use terraphim_config::{Config, Role};
 use terraphim_types::Document;
 
 /// Unique identifier for summarization tasks
@@ -105,6 +105,8 @@ pub struct SummarizationTask {
     pub document: Document,
     /// Role configuration for summarization
     pub role: Role,
+    /// Global configuration for fallbacks
+    pub config: Option<Config>,
     /// Task priority
     pub priority: Priority,
     /// Number of retry attempts
@@ -127,6 +129,7 @@ impl SummarizationTask {
             id: TaskId::new(),
             document,
             role,
+            config: None,
             priority: Priority::default(),
             retry_count: 0,
             max_retries: 3,
@@ -159,6 +162,11 @@ impl SummarizationTask {
 
     pub fn with_callback_url(mut self, url: String) -> Self {
         self.callback_url = Some(url);
+        self
+    }
+
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = Some(config);
         self
     }
 

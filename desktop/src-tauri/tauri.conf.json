@@ -1,13 +1,13 @@
 {
-  "build": {
-    "beforeDevCommand": "yarn run dev",
-    "beforeBuildCommand": "yarn run build",
-    "devUrl": "http://localhost:5173",
-    "frontendDist": "../dist"
-  },
   "package": {
     "productName": "Terraphim Desktop",
     "version": "0.2.0"
+  },
+  "build": {
+    "beforeDevCommand": "yarn run dev",
+    "beforeBuildCommand": "yarn run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
   },
   "tauri": {
     "allowlist": {

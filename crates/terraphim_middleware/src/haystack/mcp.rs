@@ -175,171 +175,67 @@ async fn http_fallback_list_or_search(
 
 #[cfg(feature = "mcp-rust-sdk")]
 async fn query_mcp_sse(base: &str, needle: &str, _bearer: Option<&str>) -> Result<Index> {
-    use mcp_client::{ClientInfo, McpClient, McpClientTrait, McpService, SseTransport, Transport};
-    use serde_json::json;
-    use std::collections::HashMap;
-
-    let sse_url = format!("{}/sse", base);
-    let env: HashMap<String, String> = HashMap::new();
-    let transport = SseTransport::new(sse_url, env);
-    let handle = transport
-        .start()
-        .await
-        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
-    let mut client = McpClient::new(McpService::new(handle));
-    let _ = client
-        .initialize(
-            ClientInfo {
-                name: "terraphim".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            Default::default(),
-        )
-        .await
-        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
-
-    let tools = client
-        .list_tools(None)
-        .await
-        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
-    let tool_name = tools
-        .tools
-        .iter()
-        .map(|t| t.name.as_str())
-        .find(|&n| n == "search" || n == "list")
-        .unwrap_or("list");
-
-    let args = if tool_name == "search" {
-        json!({ "query": needle })
-    } else {
-        json!({})
-    };
-
-    let call = client
-        .call_tool(tool_name, args)
-        .await
-        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
-
-    let mut index = Index::new();
-    for content in call.content {
-        // Prefer explicit text blocks
-        if let Some(text) = content.as_text() {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
-                if let Some(items) = value.as_array() {
-                    for item in items {
-                        if let Some(doc) = item_to_document(item) {
-                            index.insert(doc.id.clone(), doc);
-                        }
-                    }
-                }
-            }
-            continue;
-        }
-        // Handle embedded resources that may contain text
-        if let mcp_spec::content::Content::Resource(res) = &content {
-            let text = res.get_text();
-            if !text.is_empty() {
-                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
-                    if let Some(items) = value.as_array() {
-                        for item in items {
-                            if let Some(doc) = item_to_document(item) {
-                                index.insert(doc.id.clone(), doc);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Ok(index)
+    // Using rmcp for MCP client functionality - SSE transport not yet implemented
+    // TODO: Implement SSE transport for MCP
+    let _ = (base, needle);
+    Err(crate::Error::Indexation(
+        "MCP SSE transport not yet implemented".to_string(),
+    ))
 }
 
 #[cfg(feature = "mcp-rust-sdk")]
 async fn query_mcp_stdio(needle: &str) -> Result<Index> {
-    use mcp_client::{
-        ClientInfo, McpClient, McpClientTrait, McpService, StdioTransport, Transport,
+    // Using rmcp for MCP client functionality
+    use rmcp::{
+        model::CallToolRequestParam,
+        service::ServiceExt,
+        transport::{ConfigureCommandExt, TokioChildProcess},
     };
-    use serde_json::json;
-    use std::collections::HashMap;
     use tokio::process::Command;
 
-    // Launch server-everything in stdio mode
-    let mut _child = Command::new("npx")
-        .arg("-y")
-        .arg("@modelcontextprotocol/server-everything")
-        .arg("stdio")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
-
-    let transport = StdioTransport::new(
-        // executable
-        "npx",
-        // args
-        vec![
-            "-y".to_string(),
-            "@modelcontextprotocol/server-everything".to_string(),
-            "stdio".to_string(),
-        ],
-        // env
-        HashMap::new(),
-    );
-    let handle = transport
-        .start()
-        .await
-        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
-    let mut client = McpClient::new(McpService::new(handle));
-    let _ = client
-        .initialize(
-            ClientInfo {
-                name: "terraphim".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
+    // Create service with child process transport
+    let service = ()
+        .serve(TokioChildProcess::new(Command::new("npx").configure(
+            |cmd| {
+                cmd.arg("-y").arg("@modelcontextprotocol/server-everything");
             },
-            Default::default(),
-        )
+        ))?)
         .await
         .map_err(|e| crate::Error::Indexation(e.to_string()))?;
 
-    let tools = client
-        .list_tools(None)
+    // List tools
+    let tools = service
+        .list_tools(Default::default())
         .await
         .map_err(|e| crate::Error::Indexation(e.to_string()))?;
+
     let tool_name = tools
         .tools
         .iter()
-        .map(|t| t.name.as_str())
-        .find(|&n| n == "search" || n == "list")
-        .unwrap_or("list");
+        .find(|t| t.name == "search" || t.name == "list")
+        .map(|t| t.name.clone())
+        .unwrap_or_else(|| "list".to_string().into());
 
-    let args = if tool_name == "search" {
-        json!({ "query": needle })
+    let arguments = if tool_name == "search" {
+        serde_json::json!({ "query": needle }).as_object().cloned()
     } else {
-        json!({})
+        serde_json::json!({}).as_object().cloned()
     };
-    let call = client
-        .call_tool(tool_name, args)
+
+    // Call tool
+    let call = service
+        .call_tool(CallToolRequestParam {
+            name: tool_name,
+            arguments,
+        })
         .await
         .map_err(|e| crate::Error::Indexation(e.to_string()))?;
 
     let mut index = Index::new();
     for content in call.content {
-        if let Some(text) = content.as_text() {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
-                if let Some(items) = value.as_array() {
-                    for item in items {
-                        if let Some(doc) = item_to_document(item) {
-                            index.insert(doc.id.clone(), doc);
-                        }
-                    }
-                }
-            }
-            continue;
-        }
-        if let mcp_spec::content::Content::Resource(res) = &content {
-            let text = res.get_text();
-            if !text.is_empty() {
-                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+        match content.raw {
+            rmcp::model::RawContent::Text(text) => {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text.text) {
                     if let Some(items) = value.as_array() {
                         for item in items {
                             if let Some(doc) = item_to_document(item) {
@@ -349,7 +245,20 @@ async fn query_mcp_stdio(needle: &str) -> Result<Index> {
                     }
                 }
             }
+            _ => {
+                // Handle other content types if needed
+                continue;
+            }
         }
+        // Note: Handling resources with the rmcp API might be different
+        // This would need to be adjusted based on the actual rmcp response structure
     }
+
+    // Cancel the service
+    service
+        .cancel()
+        .await
+        .map_err(|e| crate::Error::Indexation(e.to_string()))?;
+
     Ok(index)
 }

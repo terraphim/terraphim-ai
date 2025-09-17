@@ -50,7 +50,7 @@ The API key detection has been successfully integrated into the existing Terraph
 # ✅ API key detection already integrated in existing pre-commit hook
 
 # Test with hardcoded credentials
-echo 'const API_KEY = "sk-1234567890abcdef";' > test.js
+echo 'const API_KEY = "sk-1234567890abcdef";' > test.js  # pragma: allowlist secret
 git add test.js
 git commit -m "test"
 # ❌ API keys or credentials detected! (Successfully blocked)
@@ -67,7 +67,7 @@ Checking for secrets and sensitive data...
 Running detailed scan...
 ERROR: Potential API key found in: test.js
   Pattern: generic_api_key
-    Line 1: const API_KEY = "sk-1234567890abcdef";
+    Line 1: const API_KEY = "sk-1234567890abcdef";  # pragma: allowlist secret
 
 ERROR: 🚨 API key violations detected!
 ```

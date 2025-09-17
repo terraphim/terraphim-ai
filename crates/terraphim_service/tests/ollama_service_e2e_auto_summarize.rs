@@ -91,13 +91,13 @@ async fn e2e_search_auto_summarize_with_ollama() {
 
     let results = service.search(&search_query).await.expect("search ok");
     // If no results, bail out rather than failing build environments
-    if results.is_empty() {
+    if results.documents.is_empty() {
         eprintln!("No search results found in temp haystack — skipping assertions");
         return;
     }
 
     // We expect auto-summarization to attempt to fill description
-    let had_description = results.iter().any(|d| {
+    let had_description = results.documents.iter().any(|d| {
         d.description
             .as_ref()
             .map(|s| !s.trim().is_empty())

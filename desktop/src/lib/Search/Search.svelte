@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import { Field, Input, Taglist, Tag } from "svelma";
   import { input, is_tauri, role, roles, serverUrl } from "../stores";
@@ -14,7 +15,11 @@
   let error: string | null = null;
   let suggestions: string[] = [];
   let suggestionIndex = -1;
-  let selectedOperator: 'none' | 'and' | 'or' = 'none';
+
+  // SSE streaming for summarization updates
+  let sseConnection: EventSource | null = null;
+  let summarizationTaskIds: string[] = [];
+  let taskStatuses: Map<string, any> = new Map();
 
   // Term chips state
   interface SelectedTerm {
@@ -31,8 +36,164 @@
 
   // Reactive statement to parse input and update chips when user types
   // Only parse when input contains operators to avoid constant parsing
+  // Add a small delay to prevent aggressive parsing during autocomplete
+  let parseTimeout: number | null = null;
   $: if ($input && !isUpdatingFromChips && ($input.includes(' AND ') || $input.includes(' OR ') || $input.includes(' and ') || $input.includes(' or '))) {
-    parseAndUpdateChips($input);
+    if (parseTimeout) {
+      clearTimeout(parseTimeout);
+    }
+    parseTimeout = setTimeout(() => {
+      parseAndUpdateChips($input);
+      parseTimeout = null;
+    }, 300); // 300ms delay to allow for multiple autocomplete selections
+  }
+
+  // Clean up timeout, SSE connection, and polling on component destruction
+  onDestroy(() => {
+    if (parseTimeout) {
+      clearTimeout(parseTimeout);
+    }
+    if (sseConnection) {
+      sseConnection.close();
+      sseConnection = null;
+    }
+    stopPollingForSummaries();
+  });
+
+
+  // SSE connection management
+  function startSummarizationStreaming() {
+    if ($is_tauri) {
+      // For Tauri, use polling instead of SSE
+      startPollingForSummaries();
+      return;
+    }
+
+    if (sseConnection) {
+      sseConnection.close();
+    }
+
+    const baseUrl = $serverUrl.replace('/documents/search', '');
+    const sseUrl = `${baseUrl}/summarization/stream`;
+
+    try {
+      sseConnection = new EventSource(sseUrl);
+
+      sseConnection.onopen = () => {
+        console.log('SSE connection opened for summarization updates');
+      };
+
+      sseConnection.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE received:', data);
+
+          if (data.task_id && data.status === 'completed' && data.summary) {
+            // Update the corresponding document with the completed summary
+            updateDocumentSummary(data.task_id, data.summary);
+          }
+        } catch (error) {
+          console.warn('Failed to parse SSE message:', error);
+        }
+      };
+
+      sseConnection.onerror = (error) => {
+        console.warn('SSE connection error:', error);
+        // Auto-reconnect after a delay
+        setTimeout(() => {
+          if (sseConnection) {
+            startSummarizationStreaming();
+          }
+        }, 5000);
+      };
+    } catch (error) {
+      console.error('Failed to create SSE connection:', error);
+    }
+  }
+
+  // Polling fallback for Tauri (since EventSource isn't supported)
+  let pollingInterval: number | null = null;
+
+  function startPollingForSummaries() {
+    console.log('Starting polling for summary updates (Tauri mode)');
+
+    // Stop any existing polling
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+
+    // Poll every 2 seconds for summary updates
+    pollingInterval = setInterval(async () => {
+      if (results.length === 0) return;
+
+      try {
+        // Re-search to get updated documents with summaries
+        const searchQuery = buildSearchQueryFromInput();
+        if (!searchQuery) return;
+
+        const response: SearchResponse = await invoke("search", {
+          searchQuery,
+        });
+
+        if (response.status === "success") {
+          // Update results with any new summaries
+          const updatedResults = response.results;
+
+          // Check if any documents now have summaries that didn't before
+          let hasUpdates = false;
+          for (let i = 0; i < Math.min(results.length, updatedResults.length); i++) {
+            if (!results[i].summarization && updatedResults[i].summarization) {
+              hasUpdates = true;
+              console.log(`New AI summary found for document: ${updatedResults[i].title}`);
+            }
+          }
+
+          if (hasUpdates) {
+            results = updatedResults;
+            console.log('Updated results with new AI summaries');
+          }
+
+          // Stop polling if all documents that need summaries have them
+          const documentsNeedingSummaries = results.filter(doc =>
+            !doc.summarization && doc.body && doc.body.length > 500
+          );
+
+          if (documentsNeedingSummaries.length === 0) {
+            console.log('All summaries complete, stopping polling');
+            stopPollingForSummaries();
+          }
+        }
+      } catch (error) {
+        console.error('Error during summary polling:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    // Auto-stop polling after 30 seconds to prevent infinite polling
+    setTimeout(() => {
+      if (pollingInterval) {
+        console.log('Stopping summary polling after timeout');
+        stopPollingForSummaries();
+      }
+    }, 30000);
+  }
+
+  function stopPollingForSummaries() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
+  function updateDocumentSummary(taskId: string, summary: string) {
+    // Find and update the document with the completed summary
+    results = results.map(doc => {
+      // Update document that doesn't have a summarization yet
+      if (!doc.summarization && doc.body && doc.body.length > 500) {
+        return { ...doc, summarization: summary };
+      }
+      return doc;
+    });
+    console.log(`Updated document summary for task ${taskId}:`, summary);
   }
 
   // Function to parse input and update chips
@@ -113,14 +274,6 @@
     const words = inputValue.split(/\s+/);
     const lastWord = words[words.length - 1].toLowerCase();
 
-    // If user has selected an operator from UI, don't suggest text operators
-    if (selectedOperator !== 'none') {
-      // For UI operator selection, suggest terms for any word in input
-      if (lastWord.length < 2) {
-        return [];
-      }
-      return getTermSuggestions(lastWord);
-    }
 
     // If we have operators in the input, prioritize term suggestions after operators
     if (parsed.hasOperator && parsed.terms.length > 0) {
@@ -133,7 +286,7 @@
     }
 
     // If the last word is a partial "and" or "or", suggest these operators
-    if (words.length > 1 && selectedOperator === 'none') {
+    if (words.length > 1) {
       const operatorSuggestions = [];
       if ("and".startsWith(lastWord)) {
         operatorSuggestions.push("AND");
@@ -162,13 +315,8 @@
     try {
       const termSuggestions = await getTermSuggestions(inputValue);
 
-      // Add operator suggestions if we have a single term and no UI operator selected
-      if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
-        // Prioritize capitalized operators
-        return [...termSuggestions.slice(0, 5), "AND", "OR"];
-      }
-
-      return termSuggestions;
+      // Return only term suggestions (no operators in autocomplete)
+      return termSuggestions.slice(0, 7);
     } catch (error) {
       console.warn('Error fetching autocomplete suggestions:', error);
       // Fall back to thesaurus-based matching
@@ -177,11 +325,8 @@
         .map(([key]) => key)
         .slice(0, 5);
 
-      if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
-        return [...termSuggestions, "AND", "OR"];
-      }
-
-      return termSuggestions;
+      // Return only term suggestions (no operators in autocomplete)
+      return termSuggestions.slice(0, 7);
     }
   }
 
@@ -205,12 +350,8 @@
       try {
         const termSuggestions = await getSuggestions(currentWord);
 
-        // Add operator suggestions if we have existing terms
-        if (words.length > 1 && !textBeforeCursor.includes(' AND ') && !textBeforeCursor.includes(' OR ')) {
-          suggestions = [...termSuggestions, 'AND', 'OR'];
-        } else {
-          suggestions = termSuggestions;
-        }
+        // Return only term suggestions (no operators in autocomplete)
+        suggestions = termSuggestions;
       } catch (error) {
         console.warn('Failed to get suggestions:', error);
         suggestions = [];
@@ -274,8 +415,8 @@
         words[words.length - 1] = suggestion;
         $input = words.join(' ');
 
-        // Trigger parsing to update chips with the new input
-        parseAndUpdateChips($input);
+        // Don't immediately parse - let the user continue typing
+        // The reactive statement will handle parsing with a delay when operators are present
       } else {
         // If no partial match, add as new term
         addSelectedTerm(suggestion, currentLogicalOperator);
@@ -286,43 +427,10 @@
     suggestionIndex = -1;
   }
 
-  // Create SearchQuery using shared utilities and UI operator selection
+  // Create SearchQuery using shared utilities
   function buildSearchQueryFromInput(): any {
     const inputText = $input.trim();
     if (!inputText) return null;
-
-    // If user has selected an operator from UI, enforce it
-    if (selectedOperator !== 'none') {
-      // First parse the input to remove any text operators and get clean terms
-      const parsed = parseSearchInput(inputText);
-
-      // If parsing found operators, use those terms; otherwise split on spaces
-      const terms = parsed.hasOperator ? parsed.terms : inputText.split(/\s+/).filter(term => term.length > 0);
-
-      if (terms.length > 1) {
-        // Use shared utility with UI operator override
-        const fakeParser = {
-          hasOperator: true,
-          operator: (selectedOperator === 'and' ? 'AND' : 'OR') as 'AND' | 'OR',
-          terms: terms,
-          originalQuery: inputText,
-        };
-        const searchQuery = buildSearchQuery(fakeParser, $role);
-        return {
-          ...searchQuery,
-          skip: 0,
-          limit: 10,
-        };
-      } else {
-        // Single term with operator selected - just search single term
-        return {
-          search_term: inputText,
-          skip: 0,
-          limit: 10,
-          role: $role,
-        };
-      }
-    }
 
     // Use parseSearchInput to detect operators in text
     const parsed = parseSearchInput(inputText);
@@ -403,6 +511,8 @@
           results = response.results;
           console.log("Response results");
           console.log(results);
+          // Start SSE streaming for summarization updates (Tauri doesn't support SSE)
+          // SSE will be available when using web interface
         } else {
           error = `Search failed: ${response.status}`;
           console.error("Search failed:", response);
@@ -433,6 +543,9 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
+
+        // Start SSE streaming for real-time summarization updates
+        startSummarizationStreaming();
       } catch (err) {
         console.error("Error fetching data:", err);
         error = `Error fetching data: ${err}`;
@@ -519,29 +632,14 @@
         </div>
       {/if}
 
-      <div class="operator-controls">
-        <div class="control">
-          <label class="radio">
-            <input type="radio" bind:group={selectedOperator} value="none" />
-            Exact
-          </label>
-          <label class="radio">
-            <input type="radio" bind:group={selectedOperator} value="and" />
-            All (AND)
-          </label>
-          <label class="radio">
-            <input type="radio" bind:group={selectedOperator} value="or" />
-            Any (OR)
-          </label>
-        </div>
-
-        <!-- Parse button for manual parsing -->
-        {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
+      <!-- Parse button for manual parsing -->
+      {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
+        <div class="search-hint-container">
           <button type="button" class="button is-small is-info" on:click={() => parseAndUpdateChips($input)}>
             Parse Terms
           </button>
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
   </Field>
 </form>
@@ -586,27 +684,11 @@
     flex: 1;
   }
 
-  .operator-controls {
-    flex-shrink: 0;
-    min-width: 200px;
-  }
-
-  .operator-controls .control {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .operator-controls .radio {
-    font-size: 0.875rem;
-    cursor: pointer;
+  .search-hint-container {
+    margin-top: 0.5rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-  }
-
-  .operator-controls input[type="radio"] {
-    margin: 0;
   }
   .suggestions {
     position: absolute;

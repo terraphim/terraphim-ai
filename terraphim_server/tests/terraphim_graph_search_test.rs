@@ -214,10 +214,14 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
 
         let results = terraphim_service.search(&search_query).await?;
 
-        log::info!("  📊 Query '{}' returned {} results", query, results.len());
+        log::info!(
+            "  📊 Query '{}' returned {} results",
+            query,
+            results.documents.len()
+        );
 
         // Log result details for debugging
-        for (i, result) in results.iter().enumerate() {
+        for (i, result) in results.documents.iter().enumerate() {
             log::info!(
                 "    {}. '{}' (ID: {}, Rank: {:?})",
                 i + 1,
@@ -231,14 +235,14 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         // This is the core assertion that validates the fix
         if query == "haystack" || query == "service" || query == "terraphim-graph" {
             assert!(
-                !results.is_empty(),
+                !results.documents.is_empty(),
                 "Query '{}' should return results - this indicates TerraphimGraph is working",
                 query
             );
             log::info!(
                 "  ✅ Query '{}' successfully returned {} results",
                 query,
-                results.len()
+                results.documents.len()
             );
         }
     }
@@ -380,13 +384,13 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
 
     // Should return empty results, not crash
     assert!(
-        results.is_empty(),
+        results.documents.is_empty(),
         "Empty rolegraph should return empty results"
     );
 
     log::info!(
         "✅ Empty rolegraph search handled gracefully (returned {} results)",
-        results.len()
+        results.documents.len()
     );
     Ok(())
 }
