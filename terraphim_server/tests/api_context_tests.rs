@@ -46,6 +46,7 @@ fn create_test_config() -> Config {
                 openrouter_chat_model: None,
                 extra: AHashMap::new(),
                 terraphim_it: false,
+                llm_system_prompt: None,
             },
         )
         .build()
@@ -904,7 +905,7 @@ async fn test_add_search_context_to_conversation() {
 
     let context = &conversation.global_context[0];
     assert!(context.title.contains("rust programming"));
-    assert!(matches!(context.context_type, ContextType::SearchResult));
+    assert!(matches!(context.context_type, ContextType::Document));
     assert!(context.content.contains("First Test Document"));
     assert!(context.content.contains("Second Test Document"));
     // Should be limited to 2 documents
@@ -1124,7 +1125,7 @@ async fn test_conversation_context_workflow() {
     let search_context = conversation
         .global_context
         .iter()
-        .find(|ctx| matches!(ctx.context_type, ContextType::SearchResult))
+        .find(|ctx| matches!(ctx.context_type, ContextType::Document))
         .expect("Search context not found");
     assert!(search_context.title.contains("rust programming help"));
     assert!(search_context.content.contains("First Test Document"));

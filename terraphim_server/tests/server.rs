@@ -58,6 +58,7 @@ mod tests {
                     openrouter_chat_model: None,
                     extra: AHashMap::new(),
                     terraphim_it: false,
+                    llm_system_prompt: None,
                 },
             )
             .add_role(
@@ -99,6 +100,7 @@ mod tests {
                     openrouter_chat_model: None,
                     extra: AHashMap::new(),
                     terraphim_it: false,
+                    llm_system_prompt: None,
                 },
             )
             .add_role(
@@ -140,6 +142,7 @@ mod tests {
                     openrouter_chat_model: None,
                     extra: AHashMap::new(),
                     terraphim_it: false,
+                    llm_system_prompt: None,
                 },
             )
             .build()

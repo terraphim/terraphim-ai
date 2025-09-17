@@ -1,0 +1,26 @@
+VALIDATION_DATE=Sat 13 Sep 2025 09:32:04 BST
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+PRIMARY_MODEL=llama3.2:3b
+AVAILABLE_MODELS=MFDoom/deepseek-coder-v2-tool-calling:16b
+hopephoto/Qwen3-4B-Thinking-2507_q8:latest
+qwen3-coder:latest
+codellama:7b
+llama3.2:3b
+michaelneale/qwen3:latest
+gemma3:270m
+gpt-oss:20b
+kirito1/qwen3-coder:latest
+devstral:latest
+michaelneale/deepseek-r1-goose:latest
+codegemma:7b-code-q4_K_S
+llama3.1:latest
+codegemma:2b-code
+codegpt/replit-code-v1_5-3b:latest
+cogito:latest
+victornitu/rust-coder:latest
+deepseek-coder:latest
+qwen2.5-coder:latest
+gemma3:27b
+qwen3:latest
+qwen3:8b
+VALIDATION_STATUS=PASSED

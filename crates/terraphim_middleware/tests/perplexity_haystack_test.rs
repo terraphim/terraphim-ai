@@ -109,6 +109,7 @@ async fn test_perplexity_service_type_integration() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: ahash::AHashMap::new(),
     };
 
@@ -207,6 +208,7 @@ async fn test_perplexity_missing_api_key() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: ahash::AHashMap::new(),
     };
 
@@ -308,6 +310,7 @@ async fn perplexity_live_api_test() {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: ahash::AHashMap::new(),
     };
 

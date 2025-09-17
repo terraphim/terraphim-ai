@@ -49,6 +49,7 @@ mod kg_protocol_resolution_test {
             openrouter_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
             openrouter_chat_model: None,
+            llm_system_prompt: None,
             extra: AHashMap::new(),
         };
 
@@ -194,6 +195,7 @@ mod kg_protocol_resolution_test {
             openrouter_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
             openrouter_chat_model: None,
+            llm_system_prompt: None,
             extra: AHashMap::new(),
         };
 

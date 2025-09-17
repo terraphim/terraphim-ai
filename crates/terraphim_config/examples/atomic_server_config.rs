@@ -45,6 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
             },
         )
         .build()
@@ -99,6 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
             },
         )
         .add_role(
@@ -140,6 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
             },
         )
         .build()
@@ -187,6 +190,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
             },
         )
         .build()
@@ -241,6 +245,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
             },
         )
         .build()
@@ -343,6 +348,7 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 openrouter_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 openrouter_chat_model: None,
+                llm_system_prompt: None,
             },
         )
         .build()?;

@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-automata-node-rs"
-version = "0.1.0"
+version = "0.2.0"
 description = "Node JS binding to Terraphim AI internal matcher based on Aho-Corasick automata"
 authors = ["Terraphim Contributors"]
 license = "Apache-2.0"

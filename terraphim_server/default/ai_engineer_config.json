@@ -45,6 +45,7 @@
       "openrouter_enabled": true,
       "openrouter_api_key": null,
       "openrouter_model": "openai/gpt-3.5-turbo",
+      "llm_system_prompt": "You are an expert AI/ML engineer specializing in implementing machine learning features, integrating language models, and building intelligent automation systems. Focus on practical AI implementation, model integration, and AI-powered applications.",
       "extra": {}
     },
     "Terraphim Engineer": {
@@ -70,6 +71,7 @@
           "atomic_server_secret": null
         }
       ],
+      "llm_system_prompt": "You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.",
       "extra": {}
     },
     "Engineer": {
@@ -95,6 +97,7 @@
           "atomic_server_secret": null
         }
       ],
+      "llm_system_prompt": "You are an expert software engineer specializing in system architecture, DevOps, and full-stack development. You help with designing scalable systems, implementing best practices, and troubleshooting technical issues.",
       "extra": {}
     },
     "ClickUp": {

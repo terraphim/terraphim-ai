@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_middleware"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim middleware for searching haystacks"
@@ -13,11 +13,11 @@ readme = "../../README.md"
 
 
 [dependencies]
-terraphim_config = { path = "../terraphim_config", version = "0.1.0" }
-terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.1.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "0.1.0", features = ["tokio-runtime"] }
-terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
-terraphim_persistence = { path = "../terraphim_persistence", version = "0.1.0" }
+terraphim_config = { path = "../terraphim_config", version = "0.2.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.2.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", features = ["tokio-runtime"] }
+terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
 terraphim_atomic_client = { path = "../terraphim_atomic_client", features = ["native"] }
 
 ahash = { version = "0.8.8", features = ["serde"] }
@@ -52,6 +52,8 @@ tempfile = "3.8"
 
 [features]
 default = []
+# Enable openrouter integration
+openrouter = ["terraphim_config/openrouter"]
 # Enable SSE-based MCP client probing
 mcp-sse = ["reqwest-eventsource"]
 # High-level MCP support using SSE/http-only (no rust-sdk)

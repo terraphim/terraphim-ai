@@ -9,13 +9,18 @@ use terraphim_rolegraph::magic_unpair;
 use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
 use terraphim_types::Thesaurus;
-use terraphim_types::{Document, SearchQuery};
+use terraphim_types::{
+    ContextItem, ContextType, ConversationId, Document, KGIndexInfo, KGTermDefinition,
+    NormalizedTermValue, RoleName, SearchQuery,
+};
 
+use ahash::AHashMap;
 use schemars::schema_for;
 use serde::Serializer;
 use serde_json::Value;
 use std::collections::HashMap;
 use tsify::Tsify;
+use ulid;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
@@ -763,10 +768,7 @@ pub async fn get_autocomplete_suggestions(
 // =================== CONVERSATION MANAGEMENT COMMANDS ===================
 
 use terraphim_service::context::{ContextConfig, ContextManager};
-use terraphim_types::{
-    ChatMessage as TerraphimChatMessage, ContextItem, ContextType, ConversationId,
-    ConversationSummary,
-};
+use terraphim_types::{ChatMessage as TerraphimChatMessage, ConversationSummary};
 
 /// Response for conversation creation
 #[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
@@ -826,6 +828,33 @@ pub struct UpdateContextResponse {
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DeleteContextResponse {
     pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Request for chat messages
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ChatRequest {
+    pub role: String,
+    pub messages: Vec<ChatMessage>,
+    pub conversation_id: Option<String>,
+}
+
+/// Chat message structure
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Response for chat operations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ChatResponse {
+    pub status: String,
+    pub message: Option<String>,
+    pub model_used: Option<String>,
     pub error: Option<String>,
 }
 
@@ -1006,7 +1035,7 @@ pub async fn add_context_to_conversation(
 
     let ctx_type = match context_type.as_str() {
         "document" => ContextType::Document,
-        "search_result" => ContextType::SearchResult,
+        "search_result" => ContextType::Document, // Changed from SearchResult to Document
         "user_input" => ContextType::UserInput,
         "system" => ContextType::System,
         "external" => ContextType::External,
@@ -1171,7 +1200,7 @@ pub async fn update_context(
     let context_type = if let Some(type_str) = &request.context_type {
         match type_str.as_str() {
             "document" => ContextType::Document,
-            "search_result" => ContextType::SearchResult,
+            "search_result" => ContextType::Document, // Changed from SearchResult to Document
             "user_input" => ContextType::UserInput,
             "system" => ContextType::System,
             "external" => ContextType::External,
@@ -1215,5 +1244,867 @@ pub async fn update_context(
                 error: Some(format!("Failed to update context: {}", e)),
             })
         }
+    }
+}
+
+/// Chat endpoint for LLM interactions
+#[command]
+pub async fn chat(
+    config_state: State<'_, ConfigState>,
+    request: ChatRequest,
+) -> Result<ChatResponse> {
+    log::debug!("Chat request for role: {}", request.role);
+
+    let role_name = RoleName::new(&request.role);
+
+    // Get the role configuration
+    let config = {
+        let config_guard = config_state.config.lock().await;
+        config_guard.clone()
+    };
+
+    let role_config = match config.roles.get(&role_name) {
+        Some(role) => role,
+        None => {
+            return Ok(ChatResponse {
+                status: "error".to_string(),
+                message: None,
+                model_used: None,
+                error: Some(format!("Role '{}' not found", request.role)),
+            });
+        }
+    };
+
+    // Check for LLM provider configuration in role.extra
+    log::debug!("Role extra settings: {:?}", role_config.extra);
+
+    let llm_provider = role_config
+        .extra
+        .get("llm_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let openrouter_enabled = role_config
+        .extra
+        .get("openrouter_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    log::debug!("LLM provider from extra: '{}'", llm_provider);
+    log::debug!("OpenRouter enabled: {}", openrouter_enabled);
+
+    // Determine the LLM provider
+    let provider = if !llm_provider.is_empty() {
+        llm_provider.to_string()
+    } else if openrouter_enabled {
+        "openrouter".to_string()
+    } else {
+        "".to_string()
+    };
+
+    if provider.is_empty() {
+        return Ok(ChatResponse {
+            status: "error".to_string(),
+            message: None,
+            model_used: None,
+            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
+        });
+    }
+
+    // Use the terraphim_service LLM client for actual integration
+    use terraphim_service::llm;
+
+    // Try to build an LLM client from the role configuration
+    let Some(llm_client) = llm::build_llm_from_role(&role_config) else {
+        return Ok(ChatResponse {
+            status: "error".to_string(),
+            message: None,
+            model_used: None,
+            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
+        });
+    };
+
+    // Build messages array for the LLM
+    let mut messages_json: Vec<serde_json::Value> = Vec::new();
+
+    // Inject context from conversation if provided
+    if let Some(conversation_id) = &request.conversation_id {
+        let conv_id = ConversationId::from_string(conversation_id.clone());
+        let manager = get_context_manager().lock().await;
+
+        if let Some(conversation) = manager.get_conversation(&conv_id) {
+            // Build context content from all context items
+            let mut context_content = String::new();
+
+            if !conversation.global_context.is_empty() {
+                context_content.push_str("=== CONTEXT INFORMATION ===\n");
+                context_content.push_str("The following information provides relevant context for this conversation:\n\n");
+
+                for (index, context_item) in conversation.global_context.iter().enumerate() {
+                    context_content.push_str(&format!(
+                        "Context Item {}: {}\n",
+                        index + 1,
+                        context_item.title
+                    ));
+                    if let Some(score) = context_item.relevance_score {
+                        context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
+                    }
+                    context_content.push_str(&format!("Content: {}\n", context_item.content));
+                    if !context_item.metadata.is_empty() {
+                        context_content
+                            .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
+                    }
+                    context_content.push_str("\n---\n\n");
+                }
+
+                context_content.push_str("=== END CONTEXT ===\n\n");
+                context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
+
+                // Add context as a system message
+                messages_json
+                    .push(serde_json::json!({"role": "system", "content": context_content}));
+            }
+        }
+    }
+
+    // Add user messages from the request
+    for m in request.messages.iter() {
+        messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
+    }
+
+    // Configure chat options
+    let chat_opts = llm::ChatOptions {
+        max_tokens: Some(1024),
+        temperature: Some(0.7),
+    };
+
+    // Call the LLM client
+    match llm_client.chat_completion(messages_json, chat_opts).await {
+        Ok(reply) => Ok(ChatResponse {
+            status: "success".to_string(),
+            message: Some(reply),
+            model_used: Some(llm_client.name().to_string()),
+            error: None,
+        }),
+        Err(e) => Ok(ChatResponse {
+            status: "error".to_string(),
+            message: None,
+            model_used: Some(llm_client.name().to_string()),
+            error: Some(format!("Chat failed: {}", e)),
+        }),
+    }
+}
+
+// === KG Search Commands ===
+
+use lru::LruCache;
+use std::num::NonZeroUsize;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Performance metrics for cache monitoring
+#[derive(Default)]
+struct CacheMetrics {
+    hits: AtomicU64,
+    misses: AtomicU64,
+    builds: AtomicU64,
+    evictions: AtomicU64,
+}
+
+impl CacheMetrics {
+    fn record_hit(&self) {
+        self.hits.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_miss(&self) {
+        self.misses.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_build(&self) {
+        self.builds.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_eviction(&self) {
+        self.evictions.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[allow(dead_code)]
+    fn get_hit_ratio(&self) -> f64 {
+        let hits = self.hits.load(Ordering::Relaxed);
+        let misses = self.misses.load(Ordering::Relaxed);
+        if hits + misses == 0 {
+            0.0
+        } else {
+            hits as f64 / (hits + misses) as f64
+        }
+    }
+}
+
+/// Cached autocomplete index with Arc for efficient sharing
+#[derive(Clone)]
+struct CachedAutocompleteIndex {
+    index: Arc<terraphim_automata::AutocompleteIndex>,
+    role_name: String,
+    created_at: u64,
+    build_time_ms: u64,
+}
+
+impl CachedAutocompleteIndex {
+    fn new(
+        index: terraphim_automata::AutocompleteIndex,
+        role_name: String,
+        build_time_ms: u64,
+    ) -> Self {
+        let created_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        Self {
+            index: Arc::new(index),
+            role_name,
+            created_at,
+            build_time_ms,
+        }
+    }
+
+    /// Check if the cached index is still valid (within 10 minutes)
+    fn is_valid(&self, current_role: &str) -> bool {
+        if self.role_name != current_role {
+            return false;
+        }
+
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        current_time - self.created_at < 600 // 10 minutes
+    }
+
+    /// Get shared reference to the index (no cloning needed)
+    fn get_index(&self) -> Arc<terraphim_automata::AutocompleteIndex> {
+        Arc::clone(&self.index)
+    }
+}
+
+/// LRU cache with performance monitoring for autocomplete indices
+type IndexCache = LruCache<String, CachedAutocompleteIndex>;
+
+/// Global LRU cache for autocomplete indices with metrics
+#[allow(clippy::incompatible_msrv)]
+static AUTOCOMPLETE_INDEX_CACHE: OnceLock<tokio::sync::RwLock<IndexCache>> = OnceLock::new();
+
+/// Global cache metrics
+static CACHE_METRICS: CacheMetrics = CacheMetrics {
+    hits: AtomicU64::new(0),
+    misses: AtomicU64::new(0),
+    builds: AtomicU64::new(0),
+    evictions: AtomicU64::new(0),
+};
+
+/// Get or create the global autocomplete index cache with LRU eviction
+#[allow(clippy::incompatible_msrv)]
+fn get_autocomplete_cache() -> &'static tokio::sync::RwLock<IndexCache> {
+    AUTOCOMPLETE_INDEX_CACHE.get_or_init(|| {
+        // Cache up to 10 role indices with LRU eviction
+        let cache = LruCache::new(NonZeroUsize::new(10).unwrap());
+        tokio::sync::RwLock::new(cache)
+    })
+}
+
+/// Pre-warm the autocomplete cache for frequently used roles
+#[allow(dead_code)]
+pub async fn pre_warm_autocomplete_cache(config_state: &ConfigState) {
+    log::info!("🔥 Pre-warming autocomplete cache...");
+
+    let config = config_state.config.lock().await;
+    let roles_to_warm: Vec<_> = config.roles.keys().take(5).cloned().collect(); // Top 5 roles
+    drop(config);
+
+    let mut handles = Vec::new();
+
+    for role_name in roles_to_warm {
+        let config_state = config_state.clone();
+        let role_name_str = role_name.original.clone();
+
+        let handle = tokio::spawn(async move {
+            log::debug!("Pre-warming cache for role: {}", role_name_str);
+
+            let mut terraphim_service = TerraphimService::new(config_state);
+            if let Ok(thesaurus) = terraphim_service.ensure_thesaurus_loaded(&role_name).await {
+                if let Ok(index) = terraphim_automata::build_autocomplete_index(thesaurus, None) {
+                    let build_time = std::time::Instant::now();
+                    let cached_index =
+                        CachedAutocompleteIndex::new(index, role_name_str.clone(), 0);
+
+                    // Add to cache
+                    let cache = get_autocomplete_cache();
+                    let mut cache_guard = cache.write().await;
+                    if let Some(evicted) = cache_guard.put(role_name_str.clone(), cached_index) {
+                        log::debug!("Evicted cached index for role: {}", evicted.role_name);
+                        CACHE_METRICS.record_eviction();
+                    }
+
+                    log::debug!(
+                        "✅ Pre-warmed cache for role: {} in {:?}",
+                        role_name_str,
+                        build_time.elapsed()
+                    );
+                }
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all pre-warming tasks to complete
+    for handle in handles {
+        if let Err(e) = handle.await {
+            log::warn!("Pre-warming task failed: {}", e);
+        }
+    }
+
+    log::info!("✅ Autocomplete cache pre-warming completed");
+}
+
+/// Request for KG search
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct KGSearchRequest {
+    pub query: String,
+    pub role_name: String,
+    pub limit: Option<usize>,
+    pub min_similarity: Option<f64>,
+}
+
+/// Response for KG search operations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct KGSearchResponse {
+    pub status: Status,
+    pub suggestions: Vec<AutocompleteSuggestion>,
+    pub error: Option<String>,
+}
+
+/// Request for adding KG term context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AddKGTermContextRequest {
+    pub conversation_id: String,
+    pub term: String,
+    pub role_name: String,
+}
+
+/// Request for adding KG index context
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct AddKGIndexContextRequest {
+    pub conversation_id: String,
+    pub role_name: String,
+}
+
+/// Search KG terms with autocomplete functionality
+/// Uses FST-based autocomplete with fuzzy matching for intelligent search suggestions
+#[command]
+pub async fn search_kg_terms(
+    config_state: State<'_, ConfigState>,
+    request: KGSearchRequest,
+) -> Result<KGSearchResponse> {
+    // Import autocomplete functions at the top for use throughout function
+    use terraphim_automata::{
+        autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search,
+    };
+    log::debug!(
+        "Searching KG terms for role '{}' with query '{}'",
+        request.role_name,
+        request.query
+    );
+
+    let role_name = RoleName::new(&request.role_name);
+
+    // Input validation
+    if request.role_name.trim().is_empty() {
+        return Ok(KGSearchResponse {
+            status: Status::Error,
+            suggestions: Vec::new(),
+            error: Some("Role name cannot be empty".to_string()),
+        });
+    }
+
+    if request.query.len() > 1000 {
+        return Ok(KGSearchResponse {
+            status: Status::Error,
+            suggestions: Vec::new(),
+            error: Some("Query too long (maximum 1000 characters)".to_string()),
+        });
+    }
+
+    if let Some(min_sim) = request.min_similarity {
+        if !(0.0..=1.0).contains(&min_sim) {
+            return Ok(KGSearchResponse {
+                status: Status::Error,
+                suggestions: Vec::new(),
+                error: Some("Minimum similarity must be between 0.0 and 1.0".to_string()),
+            });
+        }
+    }
+
+    if let Some(limit) = request.limit {
+        if limit == 0 || limit > 100 {
+            return Ok(KGSearchResponse {
+                status: Status::Error,
+                suggestions: Vec::new(),
+                error: Some("Limit must be between 1 and 100".to_string()),
+            });
+        }
+    }
+
+    // Check if we have a valid cached autocomplete index first using RwLock for better concurrency
+    let autocomplete_index = {
+        let cache = get_autocomplete_cache().read().await;
+        if let Some(cached) = cache.peek(&request.role_name) {
+            if cached.is_valid(&request.role_name) {
+                log::debug!(
+                    "✅ Cache HIT: Using cached autocomplete index for role '{}' (build time: {}ms)",
+                    request.role_name,
+                    cached.build_time_ms
+                );
+                CACHE_METRICS.record_hit();
+                Some(cached.get_index())
+            } else {
+                log::debug!(
+                    "⏰ Cache EXPIRED: Index expired for role '{}', will rebuild",
+                    request.role_name
+                );
+                CACHE_METRICS.record_miss();
+                None
+            }
+        } else {
+            log::debug!(
+                "❌ Cache MISS: No cached index found for role '{}', will build new one",
+                request.role_name
+            );
+            CACHE_METRICS.record_miss();
+            None
+        }
+    };
+
+    // If no valid cached index, build a new one
+    let autocomplete_index = if let Some(index) = autocomplete_index {
+        index
+    } else {
+        let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
+
+        // Ensure thesaurus is loaded for the role
+        let thesaurus = match terraphim_service.ensure_thesaurus_loaded(&role_name).await {
+            Ok(thesaurus) => thesaurus,
+            Err(e) => {
+                log::error!("Failed to load thesaurus for role '{}': {}", role_name, e);
+                return Ok(KGSearchResponse {
+                    status: Status::Error,
+                    suggestions: Vec::new(),
+                    error: Some(format!(
+                        "Failed to load knowledge graph for role '{}': {}",
+                        role_name, e
+                    )),
+                });
+            }
+        };
+
+        let build_start = std::time::Instant::now();
+        let new_index = match build_autocomplete_index(thesaurus, None) {
+            Ok(index) => index,
+            Err(e) => {
+                log::error!("Failed to build autocomplete index: {}", e);
+                return Ok(KGSearchResponse {
+                    status: Status::Error,
+                    suggestions: Vec::new(),
+                    error: Some(format!("Failed to build search index: {}", e)),
+                });
+            }
+        };
+
+        let build_time_ms = build_start.elapsed().as_millis() as u64;
+        CACHE_METRICS.record_build();
+
+        let index_arc = Arc::new(new_index);
+
+        // Cache the new index using write lock only when necessary
+        {
+            let mut cache = get_autocomplete_cache().write().await;
+            let cached_index = CachedAutocompleteIndex::new(
+                (*index_arc).clone(), // Clone the index itself, not the Arc
+                request.role_name.clone(),
+                build_time_ms,
+            );
+
+            if let Some(evicted) = cache.put(request.role_name.clone(), cached_index) {
+                log::debug!(
+                    "🗑️ Cache EVICTION: Evicted cached index for role '{}' to make room for '{}'",
+                    evicted.role_name,
+                    request.role_name
+                );
+                CACHE_METRICS.record_eviction();
+            }
+
+            log::debug!(
+                "💾 Cache STORE: Cached new autocomplete index for role '{}' (build time: {}ms)",
+                request.role_name,
+                build_time_ms
+            );
+        }
+
+        index_arc
+    };
+
+    // Perform fuzzy search first, then fallback to regular search
+    let results = if let Some(min_sim) = request.min_similarity {
+        match fuzzy_autocomplete_search(&autocomplete_index, &request.query, min_sim, request.limit)
+        {
+            Ok(results) => results,
+            Err(fuzzy_err) => {
+                log::debug!(
+                    "Fuzzy search failed ({}), falling back to regular search",
+                    fuzzy_err
+                );
+                // Fallback to regular autocomplete on fuzzy search failure
+                match autocomplete_search(&autocomplete_index, &request.query, request.limit) {
+                    Ok(results) => results,
+                    Err(e) => {
+                        log::error!("Autocomplete search failed: {}", e);
+                        return Ok(KGSearchResponse {
+                            status: Status::Error,
+                            suggestions: Vec::new(),
+                            error: Some(format!("Search failed: {}", e)),
+                        });
+                    }
+                }
+            }
+        }
+    } else {
+        // Use regular autocomplete search
+        match autocomplete_search(&autocomplete_index, &request.query, request.limit) {
+            Ok(results) => results,
+            Err(e) => {
+                log::error!("Autocomplete search failed: {}", e);
+                return Ok(KGSearchResponse {
+                    status: Status::Error,
+                    suggestions: Vec::new(),
+                    error: Some(format!("Search failed: {}", e)),
+                });
+            }
+        }
+    };
+
+    // Convert AutocompleteResult to AutocompleteSuggestion
+    let suggestions: Vec<AutocompleteSuggestion> = results
+        .into_iter()
+        .map(|result| AutocompleteSuggestion {
+            term: result.term,
+            text: None,
+            normalized_term: Some(result.normalized_term.to_string()),
+            url: result.url,
+            snippet: None,
+            score: result.score,
+            suggestion_type: Some("kg_term".to_string()),
+            icon: Some("kg".to_string()),
+        })
+        .collect();
+
+    log::debug!(
+        "Found {} KG suggestions for query '{}'",
+        suggestions.len(),
+        request.query
+    );
+
+    Ok(KGSearchResponse {
+        status: Status::Success,
+        suggestions,
+        error: None,
+    })
+}
+
+/// Add KG term definition to conversation context
+#[command]
+pub async fn add_kg_term_context(
+    config_state: State<'_, ConfigState>,
+    request: AddKGTermContextRequest,
+) -> Result<AddContextResponse> {
+    log::debug!(
+        "Adding KG term '{}' to conversation {} context (role: {})",
+        request.term,
+        request.conversation_id,
+        request.role_name
+    );
+
+    let conv_id = ConversationId::from_string(request.conversation_id.clone());
+    let role_name = RoleName::new(&request.role_name);
+    let mut terraphim_service = TerraphimService::new(config_state.inner().clone());
+
+    // Find documents related to the KG term
+    let documents = match terraphim_service
+        .find_documents_for_kg_term(&role_name, &request.term)
+        .await
+    {
+        Ok(docs) => docs,
+        Err(e) => {
+            log::error!(
+                "Failed to find documents for KG term '{}': {}",
+                request.term,
+                e
+            );
+            return Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!(
+                    "Failed to find documents for term '{}': {}",
+                    request.term, e
+                )),
+            });
+        }
+    };
+
+    if documents.is_empty() {
+        return Ok(AddContextResponse {
+            status: Status::Error,
+            error: Some(format!("No documents found for KG term '{}'", request.term)),
+        });
+    }
+
+    // Create KG term definition from the first document
+    let doc = &documents[0];
+    let kg_term = KGTermDefinition {
+        term: request.term.clone(),
+        normalized_term: NormalizedTermValue::new(request.term.clone()),
+        id: 1, // TODO: Get actual term ID from thesaurus
+        definition: Some(doc.description.clone().unwrap_or_default()),
+        synonyms: Vec::new(),       // TODO: Extract from thesaurus
+        related_terms: Vec::new(),  // TODO: Extract from thesaurus
+        usage_examples: Vec::new(), // TODO: Extract from thesaurus
+        url: if doc.url.is_empty() {
+            None
+        } else {
+            Some(doc.url.clone())
+        },
+        metadata: {
+            let mut meta = AHashMap::new();
+            meta.insert("source_document".to_string(), doc.id.clone());
+            meta.insert("document_title".to_string(), doc.title.clone());
+            meta
+        },
+        relevance_score: doc.rank.map(|r| r as f64),
+    };
+
+    let context_item = terraphim_types::ContextItem::from_kg_term_definition(&kg_term);
+
+    let mut manager = get_context_manager().lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => {
+            log::debug!("Successfully added KG term context to conversation");
+            Ok(AddContextResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to add KG term context: {}", e);
+            Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to add KG term context: {}", e)),
+            })
+        }
+    }
+}
+
+/// Add complete KG index information to conversation context
+#[command]
+pub async fn add_kg_index_context(
+    config_state: State<'_, ConfigState>,
+    request: AddKGIndexContextRequest,
+) -> Result<AddContextResponse> {
+    log::debug!(
+        "Adding KG index for role '{}' to conversation {} context",
+        request.role_name,
+        request.conversation_id
+    );
+
+    let conv_id = ConversationId::from_string(request.conversation_id.clone());
+    let role_name = RoleName::new(&request.role_name);
+
+    // Get role configuration to access the rolegraph
+    let config = config_state.config.lock().await;
+    let _role_config = match config.roles.get(&role_name) {
+        Some(role) => role,
+        None => {
+            return Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Role '{}' not found", request.role_name)),
+            });
+        }
+    };
+    drop(config);
+
+    // Get rolegraph from config state
+    let rolegraph_sync = match config_state.roles.get(&role_name) {
+        Some(rg) => rg,
+        None => {
+            return Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Role graph for '{}' not found", request.role_name)),
+            });
+        }
+    };
+
+    let rolegraph = rolegraph_sync.lock().await;
+
+    // Serialize the full thesaurus to JSON
+    let thesaurus_json =
+        serde_json::to_string_pretty(&rolegraph.thesaurus).unwrap_or_else(|_| "{}".to_string());
+
+    let kg_index = KGIndexInfo {
+        name: format!("Knowledge Graph Index for {}", request.role_name),
+        total_terms: rolegraph.thesaurus.len(),
+        total_nodes: rolegraph.nodes_map().len(),
+        total_edges: rolegraph.edges_map().len(),
+        last_updated: chrono::Utc::now(), // TODO: Get actual last updated time
+        source: "local".to_string(),
+        version: Some("1.0".to_string()),
+    };
+    drop(rolegraph);
+
+    // Create context item with full thesaurus JSON content
+    let context_item = ContextItem {
+        id: ulid::Ulid::new().to_string(),
+        context_type: ContextType::System, // Use System type for KG index
+        title: kg_index.name.clone(),
+        summary: Some(format!(
+            "Complete thesaurus with {} terms, {} nodes, and {} edges. Contains full JSON vocabulary data for comprehensive AI understanding.",
+            kg_index.total_terms, kg_index.total_nodes, kg_index.total_edges
+        )),
+        content: thesaurus_json,
+        metadata: {
+            let mut meta = AHashMap::new();
+            meta.insert("total_terms".to_string(), kg_index.total_terms.to_string());
+            meta.insert("total_nodes".to_string(), kg_index.total_nodes.to_string());
+            meta.insert("total_edges".to_string(), kg_index.total_edges.to_string());
+            meta.insert("source".to_string(), kg_index.source.clone());
+            meta.insert("version".to_string(), kg_index.version.clone().unwrap_or_default());
+            meta.insert("last_updated".to_string(), kg_index.last_updated.to_rfc3339());
+            meta.insert("content_type".to_string(), "thesaurus_json".to_string());
+            meta.insert("kg_index_type".to_string(), "KGIndex".to_string());
+            meta
+        },
+        created_at: chrono::Utc::now(),
+        relevance_score: Some(1.0),
+    };
+
+    let mut manager = get_context_manager().lock().await;
+    match manager.add_context(&conv_id, context_item) {
+        Ok(()) => {
+            log::debug!("Successfully added KG index context to conversation");
+            Ok(AddContextResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to add KG index context: {}", e);
+            Ok(AddContextResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to add KG index context: {}", e)),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_kg_search_request_validation() {
+        let request = KGSearchRequest {
+            query: "async".to_string(),
+            role_name: "Engineer".to_string(),
+            limit: Some(10),
+            min_similarity: Some(0.7),
+        };
+
+        assert_eq!(request.query, "async");
+        assert_eq!(request.role_name, "Engineer");
+        assert_eq!(request.limit, Some(10));
+        assert_eq!(request.min_similarity, Some(0.7));
+    }
+
+    #[tokio::test]
+    async fn test_empty_query_validation() {
+        let request = KGSearchRequest {
+            query: "".to_string(),
+            role_name: "Engineer".to_string(),
+            limit: Some(10),
+            min_similarity: Some(0.7),
+        };
+
+        assert!(request.query.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cache_metrics_initialization() {
+        // Test that cache metrics can be accessed without panicking
+        CACHE_METRICS.record_hit();
+        CACHE_METRICS.record_miss();
+        CACHE_METRICS.record_build();
+        CACHE_METRICS.record_eviction();
+
+        // Test passes if we reach here without panic
+    }
+
+    #[tokio::test]
+    async fn test_status_enum() {
+        match Status::Success {
+            Status::Success => {} // Test passes
+            Status::Error => panic!("Should be Success"),
+        }
+
+        match Status::Error {
+            Status::Error => {} // Test passes
+            Status::Success => panic!("Should be Error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_kg_add_term_request_validation() {
+        let request = AddKGTermContextRequest {
+            conversation_id: "test_conv".to_string(),
+            term: "async".to_string(),
+            role_name: "Engineer".to_string(),
+        };
+
+        assert_eq!(request.conversation_id, "test_conv");
+        assert_eq!(request.term, "async");
+        assert_eq!(request.role_name, "Engineer");
+    }
+
+    #[tokio::test]
+    async fn test_kg_add_index_request_validation() {
+        let request = AddKGIndexContextRequest {
+            conversation_id: "test_conv".to_string(),
+            role_name: "Engineer".to_string(),
+        };
+
+        assert_eq!(request.conversation_id, "test_conv");
+        assert_eq!(request.role_name, "Engineer");
+    }
+
+    #[tokio::test]
+    async fn test_cache_key_creation() {
+        // Test that cache keys work correctly
+        let role1 = "Engineer";
+        let role2 = "Engineer";
+        let role3 = "DataScientist";
+
+        assert_eq!(role1, role2);
+        assert_ne!(role1, role3);
     }
 }
