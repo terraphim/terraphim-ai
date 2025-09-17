@@ -213,7 +213,7 @@ async fn test_context_formatting() {
         },
         ContextItem {
             id: "search-1".to_string(),
-            context_type: ContextType::SearchResult,
+            context_type: ContextType::Document,
             title: "Search Result: API Examples".to_string(),
             summary: Some("Code examples for API usage".to_string()),
             content: "Example: curl -X GET https://api.example.com/users".to_string(),
@@ -299,6 +299,7 @@ fn create_test_openrouter_role() -> terraphim_config::Role {
         openrouter_chat_enabled: true,
         openrouter_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
         openrouter_chat_model: Some("openai/gpt-3.5-turbo".to_string()),
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
 
@@ -332,6 +333,7 @@ fn create_test_ollama_role(base_url: &str) -> terraphim_config::Role {
         openrouter_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
+        llm_system_prompt: None,
         extra: AHashMap::new(),
     };
 
