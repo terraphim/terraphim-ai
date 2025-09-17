@@ -1,0 +1,403 @@
+{
+  "build_automation_action_ontology": {
+    "metadata": {
+      "title": "Action-Oriented Build Automation Ontology",
+      "version": "1.0",
+      "description": "Comprehensive action-based taxonomy of build automation and CI/CD tools",
+      "tools_covered": [
+        "Dockerfile", "Earthfile", "GitHub Actions", "GitLab CI",
+        "CircleCI", "Azure Pipelines", "Jenkins", "Buildkite", "Jest"
+      ],
+      "action_count": 15,
+      "created": "2025-09-07"
+    },
+
+    "actions": {
+      "RUN": {
+        "description": "Execute commands and scripts",
+        "synonyms": [
+          "execute", "invoke", "launch", "call", "trigger", "exec", "shell"
+        ],
+        "related_terms": [
+          "command execution", "script invocation", "process spawning",
+          "shell scripting", "remote execution", "container execution"
+        ],
+        "tool_mappings": {
+          "dockerfile": "RUN [command] with shell/exec forms, mount options",
+          "earthfile": "RUN [options] <command> with --push, --secret, --interactive flags",
+          "github_actions": "run: step with shell/working-directory options",
+          "gitlab_ci": "script:, before_script:, after_script: arrays",
+          "circleci": "run: step with command/working_directory fields",
+          "azure_pipelines": "script:, bash:, pwsh:, powershell: steps",
+          "jenkins": "sh, bat, powershell steps in pipeline blocks",
+          "buildkite": "command: field in steps, supports multi-line",
+          "jest": "test(), it() functions execute test code"
+        }
+      },
+
+      "BUILD": {
+        "description": "Compile and assemble artifacts",
+        "synonyms": [
+          "compile", "assemble", "package", "construct", "generate", "make", "bundle"
+        ],
+        "related_terms": [
+          "compilation", "assembly", "packaging", "artifact creation",
+          "multi-stage builds", "incremental builds", "cross-compilation"
+        ],
+        "tool_mappings": {
+          "dockerfile": "Multi-stage FROM ... AS pattern with stage targeting",
+          "earthfile": "BUILD +target command with parallel execution",
+          "github_actions": "uses: with setup actions (setup-node, setup-java)",
+          "gitlab_ci": "image: specification with build scripts",
+          "circleci": "orb commands for language-specific builds",
+          "azure_pipelines": "Built-in tasks (MSBuild, DotNetCoreCLI, Maven, Gradle)",
+          "jenkins": "Plugin-based (Maven Integration, Gradle Plugin, MSBuild)",
+          "buildkite": "Command-based with docker plugin for environments",
+          "jest": "Not applicable - testing framework only"
+        }
+      },
+
+      "TEST": {
+        "description": "Verify and validate functionality",
+        "synonyms": [
+          "verify", "validate", "check", "assert", "examine", "prove", "inspect"
+        ],
+        "related_terms": [
+          "unit testing", "integration testing", "validation", "assertion",
+          "test execution", "test suites", "coverage analysis"
+        ],
+        "tool_mappings": {
+          "dockerfile": "Test stages in multi-stage builds (FROM base AS test)",
+          "earthfile": "Dedicated test targets with WITH DOCKER for complex scenarios",
+          "github_actions": "strategy.matrix for parallel testing across versions",
+          "gitlab_ci": "parallel.matrix with coverage regex patterns",
+          "circleci": "parallelism: with test splitting (circleci tests split)",
+          "azure_pipelines": "Testing tasks (VSTest, DotNetCoreCLI test, PublishTestResults)",
+          "jenkins": "junit, test result publishing plugins",
+          "buildkite": "Test annotations with junit-annotate plugin",
+          "jest": "describe(), test(), it(), expect() with matchers"
+        }
+      },
+
+      "COPY": {
+        "description": "Transfer files and artifacts",
+        "synonyms": [
+          "transfer", "sync", "move", "deploy", "distribute", "replicate", "clone"
+        ],
+        "related_terms": [
+          "file transfer", "artifact copying", "workspace sharing",
+          "asset distribution", "configuration sync"
+        ],
+        "tool_mappings": {
+          "dockerfile": "COPY [options] <src> <dest> with --from, --chown flags",
+          "earthfile": "COPY +target/artifact with enhanced artifact references",
+          "github_actions": "actions/upload-artifact, actions/download-artifact",
+          "gitlab_ci": "artifacts:paths with exclude patterns",
+          "circleci": "persist_to_workspace, attach_workspace",
+          "azure_pipelines": "CopyFiles@2 task, multi-repo checkout",
+          "jenkins": "archiveArtifacts, stash/unstash commands",
+          "buildkite": "artifact_paths with buildkite-agent artifact commands",
+          "jest": "Not applicable - testing framework only"
+        }
+      },
+
+      "SAVE": {
+        "description": "Store artifacts and outputs",
+        "synonyms": [
+          "store", "archive", "preserve", "persist", "cache", "retain", "upload"
+        ],
+        "related_terms": [
+          "artifact storage", "registry push", "versioned storage",
+          "retention policies", "artifact repositories"
+        ],
+        "tool_mappings": {
+          "dockerfile": "Implicit through final stage output",
+          "earthfile": "SAVE ARTIFACT, SAVE IMAGE with AS LOCAL option",
+          "github_actions": "upload-artifact with retention-days",
+          "gitlab_ci": "artifacts: with reports, paths, expire_in",
+          "circleci": "store_artifacts, store_test_results",
+          "azure_pipelines": "PublishPipelineArtifact@1, Azure Artifacts integration",
+          "jenkins": "archiveArtifacts with fingerprinting",
+          "buildkite": "artifact_paths, buildkite-agent meta-data set",
+          "jest": "Coverage reports saved to filesystem"
+        }
+      },
+
+      "DEPLOY": {
+        "description": "Release and publish applications",
+        "synonyms": [
+          "release", "publish", "ship", "rollout", "promote", "deliver", "push"
+        ],
+        "related_terms": [
+          "deployment strategies", "blue-green", "canary", "rolling updates",
+          "environment promotion", "continuous delivery"
+        ],
+        "tool_mappings": {
+          "dockerfile": "RUN commands for deployment in build",
+          "earthfile": "RUN --push for conditional deployment actions",
+          "github_actions": "environment: with deployment actions",
+          "gitlab_ci": "environment: with deployment_tier, rules",
+          "circleci": "Workflow filters for branch-specific deployment",
+          "azure_pipelines": "deployment: jobs with strategies (runOnce, rolling, canary)",
+          "jenkins": "Deployment plugins, when { branch 'main' } conditions",
+          "buildkite": "concurrency_group for deployment control, block steps",
+          "jest": "Not applicable - testing framework only"
+        }
+      },
+
+      "CACHE": {
+        "description": "Optimize performance through caching",
+        "synonyms": [
+          "store", "buffer", "memoize", "persist", "accelerate", "optimize"
+        ],
+        "related_terms": [
+          "dependency caching", "build caching", "layer caching",
+          "cache invalidation", "cache keys", "cache restoration"
+        ],
+        "tool_mappings": {
+          "dockerfile": "Layer caching, RUN --mount=type=cache",
+          "earthfile": "CACHE command, --auto-skip, mount caching",
+          "github_actions": "actions/cache with hashFiles keys",
+          "gitlab_ci": "cache: with key, paths, policy",
+          "circleci": "restore_cache, save_cache with checksum",
+          "azure_pipelines": "Cache@2 task with cache keys",
+          "jenkins": "Job Cacher plugin, cache blocks",
+          "buildkite": "Cache plugins for various backends",
+          "jest": "--cache flag for test result caching"
+        }
+      },
+
+      "TRIGGER": {
+        "description": "Initiate workflows and processes",
+        "synonyms": [
+          "initiate", "start", "launch", "activate", "fire", "invoke", "schedule"
+        ],
+        "related_terms": [
+          "webhooks", "event triggers", "manual triggers", "pipeline triggers",
+          "scheduled execution", "conditional triggers"
+        ],
+        "tool_mappings": {
+          "dockerfile": "ONBUILD for downstream triggers",
+          "earthfile": "Target dependencies, BUILD +target triggers",
+          "github_actions": "on: events (push, pull_request, workflow_dispatch)",
+          "gitlab_ci": "trigger:, workflow:rules, pipeline sources",
+          "circleci": "triggers: with schedule, workflow filters",
+          "azure_pipelines": "trigger:, pr:, schedules:, resource triggers",
+          "jenkins": "triggers { cron(), pollSCM(), upstream() }",
+          "buildkite": "Webhook-based, trigger: step for downstream",
+          "jest": "--watch for file change triggers"
+        }
+      },
+
+      "CONFIGURE": {
+        "description": "Set parameters and environment",
+        "synonyms": [
+          "setup", "initialize", "provision", "customize", "parameterize", "define"
+        ],
+        "related_terms": [
+          "environment variables", "build arguments", "runtime configuration",
+          "parameter injection", "feature flags"
+        ],
+        "tool_mappings": {
+          "dockerfile": "ARG, ENV for build/runtime variables",
+          "earthfile": "ARG --global, LET, SET for variables",
+          "github_actions": "env:, defaults:, input parameters",
+          "gitlab_ci": "variables:, default:, extends:",
+          "circleci": "executors:, environment: configuration",
+          "azure_pipelines": "variables:, parameters: with types",
+          "jenkins": "parameters {}, environment {} blocks",
+          "buildkite": "env: at build/step level, agent targeting",
+          "jest": "jest.config.js, CLI options, setupFiles"
+        }
+      },
+
+      "VALIDATE": {
+        "description": "Check correctness and compliance",
+        "synonyms": [
+          "lint", "scan", "audit", "inspect", "review", "analyze", "check"
+        ],
+        "related_terms": [
+          "linting", "security scanning", "compliance checks", "syntax validation",
+          "schema validation", "quality gates"
+        ],
+        "tool_mappings": {
+          "dockerfile": "Build-time validation through RUN commands",
+          "earthfile": "IF conditions for conditional validation",
+          "github_actions": "Validation actions from marketplace",
+          "gitlab_ci": "rules:changes with validation scripts",
+          "circleci": "Orbs for specific validation tasks",
+          "azure_pipelines": "Template validation, policy enforcement",
+          "jenkins": "Input validation, custom validation scripts",
+          "buildkite": "Conditional validation with expressions",
+          "jest": "expect() assertions, snapshot testing"
+        }
+      },
+
+      "MONITOR": {
+        "description": "Observe execution and performance",
+        "synonyms": [
+          "observe", "track", "watch", "log", "measure", "report", "analyze"
+        ],
+        "related_terms": [
+          "logging", "metrics collection", "tracing", "health checks",
+          "performance monitoring", "observability"
+        ],
+        "tool_mappings": {
+          "dockerfile": "HEALTHCHECK for container monitoring",
+          "earthfile": "HEALTHCHECK, monitoring setup targets",
+          "github_actions": "if: failure() with notification actions",
+          "gitlab_ci": "when: always for monitoring steps",
+          "circleci": "Slack orb notifications on failure",
+          "azure_pipelines": "Pipeline analytics, Application Insights integration",
+          "jenkins": "Monitoring plugins (JavaMelody), timestamps",
+          "buildkite": "Build annotations for monitoring data",
+          "jest": "--coverage for code coverage monitoring"
+        }
+      },
+
+      "NOTIFY": {
+        "description": "Communicate status and results",
+        "synonyms": [
+          "alert", "inform", "communicate", "broadcast", "message", "report"
+        ],
+        "related_terms": [
+          "webhook notifications", "email alerts", "Slack integration",
+          "status updates", "build notifications"
+        ],
+        "tool_mappings": {
+          "dockerfile": "RUN commands with curl for webhooks",
+          "earthfile": "RUN --push with notification scripts",
+          "github_actions": "Notification marketplace actions (Slack, Teams)",
+          "gitlab_ci": "Webhook notifications in scripts",
+          "circleci": "Slack orb, approval notifications",
+          "azure_pipelines": "Service hooks for Teams, Slack, email",
+          "jenkins": "slackSend, emailext plugins",
+          "buildkite": "Slack plugin for notifications",
+          "jest": "--notify flag for desktop notifications"
+        }
+      },
+
+      "RETRY": {
+        "description": "Handle failures and recovery",
+        "synonyms": [
+          "repeat", "reattempt", "recover", "fallback", "rerun", "restart"
+        ],
+        "related_terms": [
+          "exponential backoff", "circuit breakers", "failure recovery",
+          "retry policies", "resilience patterns"
+        ],
+        "tool_mappings": {
+          "dockerfile": "No native support, script-based retry loops",
+          "earthfile": "No native support, script-based implementation",
+          "github_actions": "Third-party retry actions (nick-fields/retry)",
+          "gitlab_ci": "retry: with max attempts and conditions",
+          "circleci": "Manual workflow re-runs, no_output_timeout",
+          "azure_pipelines": "retryCountOnTaskFailure on tasks",
+          "jenkins": "retry(n) {} block, conditional retry logic",
+          "buildkite": "retry: with automatic/manual configuration",
+          "jest": "jest.retryTimes() for flaky test handling"
+        }
+      },
+
+      "WAIT": {
+        "description": "Synchronize execution and dependencies",
+        "synonyms": [
+          "pause", "delay", "hold", "synchronize", "block", "depend", "await"
+        ],
+        "related_terms": [
+          "synchronization", "dependencies", "health checks", "manual approvals",
+          "resource availability"
+        ],
+        "tool_mappings": {
+          "dockerfile": "No native support, implicit through stages",
+          "earthfile": "WAIT ... END for explicit synchronization",
+          "github_actions": "Job dependencies with needs:, wait actions",
+          "gitlab_ci": "when: manual, stage dependencies",
+          "circleci": "type: approval for manual gates",
+          "azure_pipelines": "dependsOn: for job/stage orchestration",
+          "jenkins": "parallel {} with implicit wait, milestone steps",
+          "buildkite": "wait: ~ step, continue_on_failure option",
+          "jest": "Async/await, done callbacks for async tests"
+        }
+      },
+
+      "SCHEDULE": {
+        "description": "Time-based execution automation",
+        "synonyms": [
+          "plan", "queue", "defer", "time", "program", "cron", "automate"
+        ],
+        "related_terms": [
+          "cron expressions", "scheduled triggers", "time-based automation",
+          "recurring jobs", "periodic execution"
+        ],
+        "tool_mappings": {
+          "dockerfile": "No native support, external orchestration required",
+          "earthfile": "No native support, CI/CD integration required",
+          "github_actions": "schedule: with cron expressions",
+          "gitlab_ci": "$CI_PIPELINE_SOURCE == 'schedule', UI scheduling",
+          "circleci": "triggers: with schedule and cron",
+          "azure_pipelines": "schedules: with cron and branch filters",
+          "jenkins": "triggers { cron() }, parameterized cron",
+          "buildkite": "External scheduling via webhooks/API",
+          "jest": "No native scheduling, external runners required"
+        }
+      }
+    },
+
+    "cross_cutting_concepts": {
+      "universal_actions": [
+        "RUN", "CONFIGURE", "COPY", "SAVE"
+      ],
+      "ci_cd_specific": [
+        "DEPLOY", "TRIGGER", "NOTIFY", "WAIT", "SCHEDULE"
+      ],
+      "build_specific": [
+        "BUILD", "CACHE"
+      ],
+      "quality_assurance": [
+        "TEST", "VALIDATE", "MONITOR"
+      ],
+      "resilience_patterns": [
+        "RETRY", "WAIT", "MONITOR"
+      ]
+    },
+
+    "semantic_relationships": {
+      "sequential_actions": [
+        ["CONFIGURE", "BUILD", "TEST", "DEPLOY"],
+        ["TRIGGER", "RUN", "SAVE", "NOTIFY"]
+      ],
+      "parallel_actions": [
+        ["BUILD", "TEST"],
+        ["MONITOR", "CACHE"]
+      ],
+      "conditional_actions": [
+        ["VALIDATE", "DEPLOY"],
+        ["TEST", "NOTIFY"]
+      ],
+      "recovery_actions": [
+        ["RETRY", "NOTIFY"],
+        ["WAIT", "RETRY"]
+      ]
+    },
+
+    "tool_capabilities": {
+      "full_featured": {
+        "tools": ["GitHub Actions", "GitLab CI", "Azure Pipelines", "Jenkins"],
+        "supported_actions": 14
+      },
+      "build_focused": {
+        "tools": ["Dockerfile", "Earthfile"],
+        "supported_actions": 8
+      },
+      "ci_focused": {
+        "tools": ["CircleCI", "Buildkite"],
+        "supported_actions": 12
+      },
+      "test_focused": {
+        "tools": ["Jest"],
+        "supported_actions": 6
+      }
+    }
+  }
+}

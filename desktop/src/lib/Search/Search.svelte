@@ -459,20 +459,6 @@
           on:keydown={handleKeydown}
           on:input={updateSuggestions}
         />
-    <div class="search-row">
-      <div class="input-wrapper">
-        <Input
-          type="search"
-          bind:value={$input}
-          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-          icon="search"
-          expanded
-          autofocus
-          on:click={handleSearchInputEvent}
-          on:submit={handleSearchInputEvent}
-          on:keydown={handleKeydown}
-          on:input={updateSuggestions}
-        />
       {#if suggestions.length > 0}
         <ul class="suggestions">
           {#each suggestions as suggestion, index}

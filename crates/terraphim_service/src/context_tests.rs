@@ -205,7 +205,7 @@ mod tests {
 
         let context_item = manager.create_search_context(query, &documents, Some(2));
 
-        assert_eq!(context_item.context_type, ContextType::SearchResult);
+        assert_eq!(context_item.context_type, ContextType::Document);
         assert_eq!(context_item.title, "Search: test query");
         assert!(context_item.content.contains(query));
         assert!(context_item.content.contains("Test Document 0"));
@@ -228,7 +228,7 @@ mod tests {
 
         let context_item = manager.create_search_context(query, &documents, None);
 
-        assert_eq!(context_item.context_type, ContextType::SearchResult);
+        assert_eq!(context_item.context_type, ContextType::Document);
         assert!(context_item.content.contains("No results found"));
         assert_eq!(context_item.metadata.get("result_count").unwrap(), "0");
     }
@@ -277,7 +277,7 @@ mod tests {
 
         let context_item = ContextItem::from_search_result(query, &documents);
 
-        assert_eq!(context_item.context_type, ContextType::SearchResult);
+        assert_eq!(context_item.context_type, ContextType::Document);
         assert_eq!(context_item.title, "Search: test search");
         assert!(context_item.content.contains(query));
         assert!(context_item.content.contains("Test Document 0"));
