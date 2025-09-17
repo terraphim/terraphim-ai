@@ -135,6 +135,15 @@ build-debug-native:
   WORKDIR /code
   RUN cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
+  # Save the entire target directory for reuse by fmt, lint, test
+  SAVE ARTIFACT /code/target /target
+
+workspace-debug:
+  FROM +source-native
+  WORKDIR /code
+  # Copy the pre-built target directory from build-debug-native
+  COPY +build-debug-native/target /code/target
+  # The workspace now has all compiled artifacts ready
 
 source:
   FROM +install
@@ -203,7 +212,7 @@ build-debug:
   SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
 
 test:
-  FROM +build-debug-native
+  FROM +workspace-debug
   # DO rust+SET_CACHE_MOUNTS_ENV
   # COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
@@ -212,12 +221,12 @@ test:
   #DO rust+CARGO --args="test --offline"
 
 fmt:
-  FROM +build-debug-native
+  FROM +workspace-debug
   RUN cargo fmt --check
 
 lint:
-  FROM +build-debug-native
-  RUN cargo clippy --no-deps --all-features --all-targets
+  FROM +workspace-debug
+  RUN cargo clippy --workspace --all-targets --all-features
 
 build-focal:
   FROM ubuntu:20.04

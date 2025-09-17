@@ -18,16 +18,22 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
     };
   }
 
-  // Check for AND operator (case insensitive, word boundaries)
-  const andRegex = /\b(and)\b/i;
-  const orRegex = /\b(or)\b/i;
+  // First, check for capitalized operators (priority)
+  const capitalizedAndRegex = /\b(AND)\b/;
+  const capitalizedOrRegex = /\b(OR)\b/;
 
-  const hasAnd = andRegex.test(trimmedInput);
-  const hasOr = orRegex.test(trimmedInput);
+  // Then check for lowercase operators (fallback)
+  const lowercaseAndRegex = /\b(and)\b/i;
+  const lowercaseOrRegex = /\b(or)\b/i;
 
-  // Handle AND operator
-  if (hasAnd && !hasOr) {
-    const terms = trimmedInput.split(andRegex)
+  const hasCapitalizedAnd = capitalizedAndRegex.test(trimmedInput);
+  const hasCapitalizedOr = capitalizedOrRegex.test(trimmedInput);
+  const hasLowercaseAnd = lowercaseAndRegex.test(trimmedInput) && !hasCapitalizedAnd;
+  const hasLowercaseOr = lowercaseOrRegex.test(trimmedInput) && !hasCapitalizedOr;
+
+  // Handle capitalized AND operator (highest priority)
+  if (hasCapitalizedAnd && !hasCapitalizedOr) {
+    const terms = trimmedInput.split(capitalizedAndRegex)
       .filter((part, index) => index % 2 === 0) // Take only non-operator parts
       .map(term => term.trim())
       .filter(term => term.length > 0); // Remove empty terms
@@ -40,9 +46,9 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
     };
   }
 
-  // Handle OR operator
-  if (hasOr && !hasAnd) {
-    const terms = trimmedInput.split(orRegex)
+  // Handle capitalized OR operator (second priority)
+  if (hasCapitalizedOr && !hasCapitalizedAnd) {
+    const terms = trimmedInput.split(capitalizedOrRegex)
       .filter((part, index) => index % 2 === 0) // Take only non-operator parts
       .map(term => term.trim())
       .filter(term => term.length > 0); // Remove empty terms
@@ -55,14 +61,14 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
     };
   }
 
-  // Handle mixed operators - use the first one found
-  if (hasAnd && hasOr) {
-    const andIndex = trimmedInput.toLowerCase().indexOf(' and ');
-    const orIndex = trimmedInput.toLowerCase().indexOf(' or ');
+  // Handle mixed capitalized operators - use the first one found
+  if (hasCapitalizedAnd && hasCapitalizedOr) {
+    const andIndex = trimmedInput.indexOf(' AND ');
+    const orIndex = trimmedInput.indexOf(' OR ');
 
     if (andIndex !== -1 && (orIndex === -1 || andIndex < orIndex)) {
-      const terms = trimmedInput.split(andRegex)
-        .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+      // Use AND as the operator, but split on both AND and OR to get all terms
+      const terms = trimmedInput.split(/\s+(?:AND|OR)\s+/i)
         .map(term => term.trim())
         .filter(term => term.length > 0); // Remove empty terms
 
@@ -73,8 +79,70 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
         originalQuery: inputText,
       };
     } else if (orIndex !== -1) {
-      const terms = trimmedInput.split(orRegex)
-        .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+      // Use OR as the operator, but split on both AND and OR to get all terms
+      const terms = trimmedInput.split(/\s+(?:AND|OR)\s+/i)
+        .map(term => term.trim())
+        .filter(term => term.length > 0); // Remove empty terms
+
+      return {
+        hasOperator: true,
+        operator: 'OR',
+        terms,
+        originalQuery: inputText,
+      };
+    }
+  }
+
+  // Fallback to lowercase operators if no capitalized ones found
+  if (hasLowercaseAnd && !hasLowercaseOr) {
+    const terms = trimmedInput.split(lowercaseAndRegex)
+      .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+      .map(term => term.trim())
+      .filter(term => term.length > 0); // Remove empty terms
+
+    return {
+      hasOperator: true,
+      operator: 'AND',
+      terms,
+      originalQuery: inputText,
+    };
+  }
+
+  // Handle lowercase OR operator
+  if (hasLowercaseOr && !hasLowercaseAnd) {
+    const terms = trimmedInput.split(lowercaseOrRegex)
+      .filter((part, index) => index % 2 === 0) // Take only non-operator parts
+      .map(term => term.trim())
+      .filter(term => term.length > 0); // Remove empty terms
+
+    return {
+      hasOperator: true,
+      operator: 'OR',
+      terms,
+      originalQuery: inputText,
+    };
+  }
+
+  // Handle mixed lowercase operators - use the first one found
+  if (hasLowercaseAnd && hasLowercaseOr) {
+    const andIndex = trimmedInput.toLowerCase().indexOf(' and ');
+    const orIndex = trimmedInput.toLowerCase().indexOf(' or ');
+
+    if (andIndex !== -1 && (orIndex === -1 || andIndex < orIndex)) {
+      // Use AND as the operator, but split on both and and or to get all terms
+      const terms = trimmedInput.split(/\s+(?:and|or)\s+/i)
+        .map(term => term.trim())
+        .filter(term => term.length > 0); // Remove empty terms
+
+      return {
+        hasOperator: true,
+        operator: 'AND',
+        terms,
+        originalQuery: inputText,
+      };
+    } else if (orIndex !== -1) {
+      // Use OR as the operator, but split on both and and or to get all terms
+      const terms = trimmedInput.split(/\s+(?:and|or)\s+/i)
         .map(term => term.trim())
         .filter(term => term.length > 0); // Remove empty terms
 
