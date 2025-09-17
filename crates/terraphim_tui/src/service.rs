@@ -16,36 +16,192 @@ pub struct TuiService {
 impl TuiService {
     /// Initialize a new TUI service with embedded configuration
     pub async fn new() -> Result<Self> {
+        Self::new_internal(None).await
+    }
+
+    /// Initialize a new TUI service with a custom configuration file
+    pub async fn new_with_config_file(config_path: &str) -> Result<Self> {
+        // Validate config file exists and is readable before proceeding
+        Self::validate_config_file(config_path)?;
+        Self::new_internal(Some(config_path)).await
+    }
+
+    /// Validate that the config file exists and is readable
+    fn validate_config_file(config_path: &str) -> Result<()> {
+        use std::fs;
+        
+        // Check if file exists
+        if !std::path::Path::new(config_path).exists() {
+            return Err(anyhow::anyhow!(
+                "Configuration file not found: '{}'\n\
+                Please ensure the file exists and the path is correct.\n\
+                Example: terraphim-tui --config /path/to/config.json search query",
+                config_path
+            ));
+        }
+
+        // Check if file is readable
+        match fs::metadata(config_path) {
+            Ok(metadata) => {
+                if metadata.is_dir() {
+                    return Err(anyhow::anyhow!(
+                        "Configuration path is a directory, not a file: '{}'\n\
+                        Please provide a path to a JSON configuration file.",
+                        config_path
+                    ));
+                }
+                
+                if metadata.len() == 0 {
+                    return Err(anyhow::anyhow!(
+                        "Configuration file is empty: '{}'\n\
+                        Please provide a valid JSON configuration file.",
+                        config_path
+                    ));
+                }
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Cannot read configuration file '{}': {}\n\
+                    Please check file permissions and ensure the file is accessible.",
+                    config_path, e
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate the loaded configuration content for required fields and structure
+    fn validate_config_content(config: &terraphim_config::Config) -> Result<()> {
+        // Check if selected_role exists in roles
+        if !config.roles.contains_key(&config.selected_role) {
+            return Err(anyhow::anyhow!(
+                "Invalid configuration: selected_role '{}' not found in roles.\n\
+                Available roles: {:?}\n\
+                Please ensure the selected_role matches one of the defined role names.",
+                config.selected_role,
+                config.roles.keys().collect::<Vec<_>>()
+            ));
+        }
+
+        // Check if roles is not empty
+        if config.roles.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Invalid configuration: no roles defined.\n\
+                At least one role must be configured in the 'roles' section."
+            ));
+        }
+
+        // Validate each role has required fields
+        for (role_name, role) in &config.roles {
+            if role.haystacks.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Invalid configuration: role '{}' has no haystacks defined.\n\
+                    Each role must have at least one haystack configured.",
+                    role_name
+                ));
+            }
+
+            // Validate each haystack has required fields
+            for (i, haystack) in role.haystacks.iter().enumerate() {
+                if haystack.location.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "Invalid configuration: haystack {} in role '{}' has empty location.\n\
+                        Each haystack must specify a valid location path.",
+                        i + 1, role_name
+                    ));
+                }
+            }
+        }
+
+        log::debug!("Configuration validation passed for config with {} roles", config.roles.len());
+        Ok(())
+    }
+
+    /// Internal implementation for service initialization
+    async fn new_internal(config_path: Option<&str>) -> Result<Self> {
         // Initialize logging
         terraphim_service::logging::init_logging(
             terraphim_service::logging::detect_logging_config(),
         );
 
-        log::info!("Initializing TUI service with embedded configuration");
+        if let Some(path) = config_path {
+            log::info!("Initializing TUI service with custom configuration from: {}", path);
+        } else {
+            log::info!("Initializing TUI service with embedded configuration");
+        }
 
         // Load device settings
         let device_settings = DeviceSettings::load_from_env_and_file(None)?;
         log::debug!("Device settings: {:?}", device_settings);
 
-        // Try to load existing configuration, fallback to default embedded config
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
-            Ok(mut config) => match config.load().await {
-                Ok(config) => {
-                    log::info!("Loaded existing embedded configuration");
-                    config
+        // Load configuration from custom file or use embedded config
+        let mut config = if let Some(config_file) = config_path {
+            // Load from custom config file
+            match std::fs::read_to_string(config_file) {
+                Ok(config_content) => {
+                    match serde_json::from_str::<terraphim_config::Config>(&config_content) {
+                        Ok(config) => {
+                            log::info!("Successfully loaded custom configuration from: {}", config_file);
+                            // Validate the loaded configuration
+                            Self::validate_config_content(&config)?;
+                            config
+                        }
+                        Err(e) => {
+                            log::error!("Failed to parse config file {}: {}", config_file, e);
+                            return Err(anyhow::anyhow!(
+                                "Failed to parse configuration file '{}': {}\n\n\
+                                Common issues:\n\
+                                • Check that the file contains valid JSON syntax\n\
+                                • Ensure all required fields are present (id, selected_role, roles)\n\
+                                • Verify that role configurations are properly formatted\n\n\
+                                Example valid configuration:\n\
+                                {{\n  \
+                                  \"id\": \"Custom\",\n  \
+                                  \"selected_role\": \"MyRole\",\n  \
+                                  \"roles\": {{\n    \
+                                    \"MyRole\": {{\n      \
+                                      \"name\": \"MyRole\",\n      \
+                                      \"relevance_function\": \"title-scorer\",\n      \
+                                      \"haystacks\": [...]\n    \
+                                    }}\n  \
+                                  }}\n\
+                                }}",
+                                config_file, e
+                            ));
+                        }
+                    }
                 }
                 Err(e) => {
-                    log::info!("Failed to load config: {:?}, using default embedded", e);
+                    log::error!("Failed to read config file {}: {}", config_file, e);
+                    return Err(anyhow::anyhow!(
+                        "Failed to read configuration file '{}': {}\n\
+                        Please ensure the file exists and is readable.",
+                        config_file, e
+                    ));
+                }
+            }
+        } else {
+            // Use embedded configuration (existing logic)
+            match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+                Ok(mut config) => match config.load().await {
+                    Ok(config) => {
+                        log::info!("Loaded existing embedded configuration");
+                        config
+                    }
+                    Err(e) => {
+                        log::info!("Failed to load config: {:?}, using default embedded", e);
+                        ConfigBuilder::new_with_id(ConfigId::Embedded)
+                            .build_default_embedded()
+                            .build()?
+                    }
+                },
+                Err(e) => {
+                    log::warn!("Failed to build config: {:?}, using default", e);
                     ConfigBuilder::new_with_id(ConfigId::Embedded)
                         .build_default_embedded()
                         .build()?
                 }
-            },
-            Err(e) => {
-                log::warn!("Failed to build config: {:?}, using default", e);
-                ConfigBuilder::new_with_id(ConfigId::Embedded)
-                    .build_default_embedded()
-                    .build()?
             }
         };
 

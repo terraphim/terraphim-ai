@@ -76,6 +76,15 @@ struct Cli {
     /// Enable transparent background mode
     #[arg(long, default_value_t = false)]
     transparent: bool,
+    /// Path to a custom configuration file (JSON format)
+    /// 
+    /// Allows you to use a custom configuration instead of the embedded defaults.
+    /// The file should contain role definitions, haystack configurations, and
+    /// scoring function settings.
+    /// 
+    /// Example: --config /path/to/custom-config.json
+    #[arg(long, value_name = "FILE")]
+    config: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -177,7 +186,7 @@ fn main() -> Result<()> {
             if cli.server {
                 rt.block_on(run_server_command(command, &cli.server_url))
             } else {
-                rt.block_on(run_offline_command(command))
+                rt.block_on(run_offline_command(command, cli.config.as_deref()))
             }
         }
     }
@@ -198,8 +207,12 @@ async fn run_tui_with_service(_service: TuiService, transparent: bool) -> Result
     run_tui(transparent)
 }
 
-async fn run_offline_command(command: Command) -> Result<()> {
-    let service = TuiService::new().await?;
+async fn run_offline_command(command: Command, config_path: Option<&str>) -> Result<()> {
+    let service = if let Some(config_path) = config_path {
+        TuiService::new_with_config_file(config_path).await?
+    } else {
+        TuiService::new().await?
+    };
 
     match command {
         Command::Search {
