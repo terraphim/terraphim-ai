@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import { Field, Input, Taglist, Tag } from "svelma";
   import { input, is_tauri, role, roles, serverUrl } from "../stores";
@@ -15,6 +14,7 @@
   let error: string | null = null;
   let suggestions: string[] = [];
   let suggestionIndex = -1;
+  let selectedOperator: 'none' | 'and' | 'or' = 'none';
 
   // Term chips state
   interface SelectedTerm {
@@ -31,24 +31,9 @@
 
   // Reactive statement to parse input and update chips when user types
   // Only parse when input contains operators to avoid constant parsing
-  // Add a small delay to prevent aggressive parsing during autocomplete
-  let parseTimeout: number | null = null;
   $: if ($input && !isUpdatingFromChips && ($input.includes(' AND ') || $input.includes(' OR ') || $input.includes(' and ') || $input.includes(' or '))) {
-    if (parseTimeout) {
-      clearTimeout(parseTimeout);
-    }
-    parseTimeout = setTimeout(() => {
-      parseAndUpdateChips($input);
-      parseTimeout = null;
-    }, 300); // 300ms delay to allow for multiple autocomplete selections
+    parseAndUpdateChips($input);
   }
-
-  // Clean up timeout on component destruction
-  onDestroy(() => {
-    if (parseTimeout) {
-      clearTimeout(parseTimeout);
-    }
-  });
 
   // Function to parse input and update chips
   function parseAndUpdateChips(inputText: string) {
@@ -128,6 +113,14 @@
     const words = inputValue.split(/\s+/);
     const lastWord = words[words.length - 1].toLowerCase();
 
+    // If user has selected an operator from UI, don't suggest text operators
+    if (selectedOperator !== 'none') {
+      // For UI operator selection, suggest terms for any word in input
+      if (lastWord.length < 2) {
+        return [];
+      }
+      return getTermSuggestions(lastWord);
+    }
 
     // If we have operators in the input, prioritize term suggestions after operators
     if (parsed.hasOperator && parsed.terms.length > 0) {
@@ -140,7 +133,7 @@
     }
 
     // If the last word is a partial "and" or "or", suggest these operators
-    if (words.length > 1) {
+    if (words.length > 1 && selectedOperator === 'none') {
       const operatorSuggestions = [];
       if ("and".startsWith(lastWord)) {
         operatorSuggestions.push("AND");
@@ -169,8 +162,13 @@
     try {
       const termSuggestions = await getTermSuggestions(inputValue);
 
-      // Return only term suggestions (no operators in autocomplete)
-      return termSuggestions.slice(0, 7);
+      // Add operator suggestions if we have a single term and no UI operator selected
+      if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
+        // Prioritize capitalized operators
+        return [...termSuggestions.slice(0, 5), "AND", "OR"];
+      }
+
+      return termSuggestions;
     } catch (error) {
       console.warn('Error fetching autocomplete suggestions:', error);
       // Fall back to thesaurus-based matching
@@ -179,8 +177,11 @@
         .map(([key]) => key)
         .slice(0, 5);
 
-      // Return only term suggestions (no operators in autocomplete)
-      return termSuggestions.slice(0, 7);
+      if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
+        return [...termSuggestions, "AND", "OR"];
+      }
+
+      return termSuggestions;
     }
   }
 
@@ -204,8 +205,12 @@
       try {
         const termSuggestions = await getSuggestions(currentWord);
 
-        // Return only term suggestions (no operators in autocomplete)
-        suggestions = termSuggestions;
+        // Add operator suggestions if we have existing terms
+        if (words.length > 1 && !textBeforeCursor.includes(' AND ') && !textBeforeCursor.includes(' OR ')) {
+          suggestions = [...termSuggestions, 'AND', 'OR'];
+        } else {
+          suggestions = termSuggestions;
+        }
       } catch (error) {
         console.warn('Failed to get suggestions:', error);
         suggestions = [];
@@ -269,8 +274,8 @@
         words[words.length - 1] = suggestion;
         $input = words.join(' ');
 
-        // Don't immediately parse - let the user continue typing
-        // The reactive statement will handle parsing with a delay when operators are present
+        // Trigger parsing to update chips with the new input
+        parseAndUpdateChips($input);
       } else {
         // If no partial match, add as new term
         addSelectedTerm(suggestion, currentLogicalOperator);
@@ -281,10 +286,43 @@
     suggestionIndex = -1;
   }
 
-  // Create SearchQuery using shared utilities
+  // Create SearchQuery using shared utilities and UI operator selection
   function buildSearchQueryFromInput(): any {
     const inputText = $input.trim();
     if (!inputText) return null;
+
+    // If user has selected an operator from UI, enforce it
+    if (selectedOperator !== 'none') {
+      // First parse the input to remove any text operators and get clean terms
+      const parsed = parseSearchInput(inputText);
+
+      // If parsing found operators, use those terms; otherwise split on spaces
+      const terms = parsed.hasOperator ? parsed.terms : inputText.split(/\s+/).filter(term => term.length > 0);
+
+      if (terms.length > 1) {
+        // Use shared utility with UI operator override
+        const fakeParser = {
+          hasOperator: true,
+          operator: (selectedOperator === 'and' ? 'AND' : 'OR') as 'AND' | 'OR',
+          terms: terms,
+          originalQuery: inputText,
+        };
+        const searchQuery = buildSearchQuery(fakeParser, $role);
+        return {
+          ...searchQuery,
+          skip: 0,
+          limit: 10,
+        };
+      } else {
+        // Single term with operator selected - just search single term
+        return {
+          search_term: inputText,
+          skip: 0,
+          limit: 10,
+          role: $role,
+        };
+      }
+    }
 
     // Use parseSearchInput to detect operators in text
     const parsed = parseSearchInput(inputText);
@@ -481,14 +519,29 @@
         </div>
       {/if}
 
-      <!-- Parse button for manual parsing -->
-      {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
-        <div class="search-hint-container">
+      <div class="operator-controls">
+        <div class="control">
+          <label class="radio">
+            <input type="radio" bind:group={selectedOperator} value="none" />
+            Exact
+          </label>
+          <label class="radio">
+            <input type="radio" bind:group={selectedOperator} value="and" />
+            All (AND)
+          </label>
+          <label class="radio">
+            <input type="radio" bind:group={selectedOperator} value="or" />
+            Any (OR)
+          </label>
+        </div>
+
+        <!-- Parse button for manual parsing -->
+        {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
           <button type="button" class="button is-small is-info" on:click={() => parseAndUpdateChips($input)}>
             Parse Terms
           </button>
-        </div>
-      {/if}
+        {/if}
+      </div>
     </div>
   </Field>
 </form>
@@ -533,11 +586,27 @@
     flex: 1;
   }
 
-  .search-hint-container {
-    margin-top: 0.5rem;
+  .operator-controls {
+    flex-shrink: 0;
+    min-width: 200px;
+  }
+
+  .operator-controls .control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .operator-controls .radio {
+    font-size: 0.875rem;
+    cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .operator-controls input[type="radio"] {
+    margin: 0;
   }
   .suggestions {
     position: absolute;

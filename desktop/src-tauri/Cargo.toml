@@ -17,7 +17,7 @@ name = "generate-bindings"
 path = "src/bin/generate-bindings.rs"
 
 [build-dependencies]
-tauri-build = { version = "1.5.1", features = [] }
+tauri-build = { version = "2.2.0", features = [] }
 
 [dependencies]
 terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
@@ -30,11 +30,11 @@ terraphim_types = { path = "../../crates/terraphim_types", version = "0.2.0", fe
 terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.2.0" }
 terraphim_service = { path = "../../crates/terraphim_service", version = "0.2.0" }
 terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "0.2.0" }
-rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk.git", features = ["server"] }
+rmcp = { version = "0.6.1", features = ["server"] }
 serde_json_any_key = "2.0.0"
 anyhow = "1.0.81"
 log = "0.4.21"
-env_logger = "0.11.0"
+env_logger = "0.11.8"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
 tauri = { version = "1.7.1", features = [
@@ -47,23 +47,22 @@ tauri = { version = "1.7.1", features = [
 serde_json = "1.0.104"
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
-chrono = { version = "0.4", features = ["serde"] }
-ulid = { version = "1.0", features = ["serde"] }
 ahash = "0.8.11"
-lru = "0.12"
-schemars = { version = "0.8", features = ["derive"] }
-tsify = { version = "0.4", features = ["js"] }
+schemars = { version = "0.8.22", features = ["derive"] }
+tsify = { version = "0.5", features = ["js"] }
 wasm-bindgen = "0.2"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-appender = "0.2.3"
 tracing-log = "0.1"
+ulid = "1.1.2"
+chrono = { version = "0.4.38", features = ["serde"] }
 
 [dev-dependencies]
 tokio-test = "0.4.4"
 serial_test = "3.1.1"
 tempfile = "3.12.0"
-mockall = "0.13.0"
+mockall = "0.13.1"
 
 [features]
 # by default Tauri runs in production mode

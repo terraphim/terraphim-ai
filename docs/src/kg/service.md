@@ -1,2 +1,5 @@
-# Terraphim Service
-synonyms:: provider, middleware
+# Service
+
+A service acts as middleware component in the architecture.
+
+synonyms:: services, middleware, component, microservice
