@@ -1341,11 +1341,6 @@
   resolved "https://registry.npmjs.org/@tiptap/suggestion/-/suggestion-2.22.1.tgz"
   integrity sha512-dPNa1pH8D1wB9tITgUGEkjzlf/ScMjBjlwdkcZAsfz6jHdYCgGAUCpDpUvFRv7/DUESfoJqLqW0+/Kq+xFQS0Q==
 
-"@tiptap/suggestion@^2.22.1":
-  version "2.26.1"
-  resolved "https://registry.yarnpkg.com/@tiptap/suggestion/-/suggestion-2.26.1.tgz#64b567443668ff9afb5533737f877e3604ab53ae"
-  integrity sha512-iNWJdQN7h01keNoVwyCsdI7ZX11YkrexZjCnutWK17Dd72s3NYVTmQXu7saftwddT4nDdlczNxAFosrt0zMhcg==
-
 "@tomic/lib@^0.35.0-beta.1":
   version "0.35.2"
   resolved "https://registry.npmjs.org/@tomic/lib/-/lib-0.35.2.tgz"
