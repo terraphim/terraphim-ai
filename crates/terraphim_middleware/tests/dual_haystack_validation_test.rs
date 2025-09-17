@@ -153,19 +153,19 @@ async fn test_dual_haystack_comprehensive_validation() {
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
+                llm_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -198,19 +198,19 @@ async fn test_dual_haystack_comprehensive_validation() {
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
+                llm_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -232,19 +232,19 @@ async fn test_dual_haystack_comprehensive_validation() {
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
+                llm_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -268,19 +268,19 @@ async fn test_dual_haystack_comprehensive_validation() {
                     true,
                 )],
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
+                llm_chat_model: None,
                 extra: AHashMap::new(),
             },
         )
@@ -767,19 +767,19 @@ async fn test_source_differentiation_validation() {
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
+                llm_chat_model: None,
                 extra: AHashMap::new(),
             },
         )

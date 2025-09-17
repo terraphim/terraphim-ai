@@ -155,7 +155,7 @@ impl LessonsState {
         for tag in &lesson.tags {
             self.lesson_index
                 .entry(tag.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(lesson.id.clone());
         }
 

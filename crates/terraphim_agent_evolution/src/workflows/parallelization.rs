@@ -464,8 +464,7 @@ impl Parallelization {
                             .partial_cmp(&score_b)
                             .unwrap_or(std::cmp::Ordering::Equal)
                     })
-                    .and_then(|r| r.result.as_ref())
-                    .map(|s| s.clone())
+                    .and_then(|r| r.result.as_ref()).cloned()
                     .unwrap_or_else(|| "No valid result found".to_string());
                 Ok(best_result)
             }
@@ -503,8 +502,7 @@ impl Parallelization {
                             .filter_map(|r| r.result.as_ref())
                             .filter(|r| r == result)
                             .count()
-                    })
-                    .map(|s| s.clone())
+                    }).cloned()
                     .unwrap_or_else(|| "No consensus reached".to_string());
                 Ok(most_common)
             }
@@ -687,9 +685,8 @@ impl WorkflowPattern for Parallelization {
         };
 
         // Parallel execution reduces total time but adds overhead
-        let estimated_tasks = if input.prompt.len() > 2000 { 4 } else { 3 };
-        let batches = (estimated_tasks + self.parallel_config.max_parallel_tasks - 1)
-            / self.parallel_config.max_parallel_tasks;
+        let estimated_tasks: usize = if input.prompt.len() > 2000 { 4 } else { 3 };
+        let batches = estimated_tasks.div_ceil(self.parallel_config.max_parallel_tasks);
 
         base_time_per_task * batches as u32 + Duration::from_secs(10)
         // aggregation overhead

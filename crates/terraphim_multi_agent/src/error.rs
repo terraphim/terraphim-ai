@@ -92,6 +92,10 @@ pub enum MultiAgentError {
     /// Timeout error
     #[error("Operation timed out after {seconds}s")]
     Timeout { seconds: u64 },
+
+    /// Session not found
+    #[error("Session with ID {0} not found")]
+    SessionNotFound(uuid::Uuid),
 }
 
 impl From<anyhow::Error> for MultiAgentError {

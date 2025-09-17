@@ -503,6 +503,7 @@ pub enum LogicalOperator {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SearchQuery {
     /// Primary search term for backward compatibility
+    #[serde(alias = "query")]
     pub search_term: NormalizedTermValue,
     /// Multiple search terms for logical operations
     pub search_terms: Option<Vec<NormalizedTermValue>>,

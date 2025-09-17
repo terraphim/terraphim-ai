@@ -1,5 +1,4 @@
 use terraphim_multi_agent::{test_utils::*, *};
-use tokio_test;
 
 #[tokio::test]
 async fn test_generate_command_processing() {
@@ -174,7 +173,7 @@ async fn test_command_tracking() {
     // Verify token tracking
     let token_tracker = agent.token_tracker.read().await;
     assert!(
-        token_tracker.total_tokens > 0,
+        token_tracker.total_input_tokens + token_tracker.total_output_tokens > 0,
         "Should have recorded token usage"
     );
 

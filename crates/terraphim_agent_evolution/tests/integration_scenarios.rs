@@ -368,7 +368,7 @@ async fn test_graceful_degradation() {
         match result {
             Ok(output) => {
                 // If successful, should have reasonable output
-                assert!(output.len() > 0 || prompt.is_empty());
+                assert!(!output.is_empty() || prompt.is_empty());
             }
             Err(e) => {
                 // If failed, should have informative error message
@@ -379,7 +379,7 @@ async fn test_graceful_degradation() {
     }
 
     // Evolution system should remain stable despite edge cases
-    let evolution_system = manager.evolution_system();
+    let _evolution_system = manager.evolution_system();
     // Memory state has valid short-term entries
     // Task state has valid task count
 }
@@ -519,7 +519,7 @@ async fn test_evolution_viewer_integration() {
     let mut manager = EvolutionWorkflowManager::new("viewer_integration_agent".to_string());
 
     // Execute some tasks to create evolution history
-    let tasks = vec![
+    let tasks = [
         "Analyze market trends",
         "Compare technologies",
         "Write recommendations",
@@ -544,7 +544,7 @@ async fn test_evolution_viewer_integration() {
     let start_time = end_time - chrono::Duration::minutes(5);
 
     let timeline_result = viewer
-        .get_timeline(&manager.evolution_system(), start_time, end_time)
+        .get_timeline(manager.evolution_system(), start_time, end_time)
         .await;
 
     // Should be able to retrieve evolution timeline
@@ -553,7 +553,7 @@ async fn test_evolution_viewer_integration() {
     assert!(!timeline.events.is_empty());
 
     // Timeline should show progression
-    assert!(timeline.events.len() >= 1);
+    assert!(!timeline.events.is_empty());
 
     // Each evolution step should have valid structure
     for evolution_step in &timeline.events {
@@ -565,53 +565,4 @@ async fn test_evolution_viewer_integration() {
 
 // Helper functions for integration testing
 
-/// Create a test scenario with specific characteristics
-fn create_test_scenario(scenario_type: &str) -> WorkflowInput {
-    let (task_id, prompt, context) = match scenario_type {
-        "simple" => ("simple_scenario", "What is the weather?", None),
-        "complex" => ("complex_scenario", 
-            "Analyze the comprehensive impact of artificial intelligence on global economic systems",
-            Some("Include both positive and negative effects")),
-        "comparison" => ("comparison_scenario", 
-            "Compare and contrast different renewable energy technologies",
-            None),
-        "research" => ("research_scenario",
-            "Research the latest developments in quantum computing",
-            Some("Focus on practical applications")),
-        "quality_critical" => ("quality_scenario",
-            "Write a formal proposal for implementing AI ethics guidelines",
-            Some("Must meet academic standards")),
-        _ => ("default_scenario", "Generic test prompt", None),
-    };
 
-    WorkflowInput {
-        task_id: task_id.to_string(),
-        agent_id: "integration_test_agent".to_string(),
-        prompt: prompt.to_string(),
-        context: context.map(|s| s.to_string()),
-        parameters: WorkflowParameters::default(),
-        timestamp: Utc::now(),
-    }
-}
-
-/// Validate evolution state consistency
-fn validate_evolution_state(evolution_system: &AgentEvolutionSystem) {
-    let memory_state = &evolution_system.memory.current_state;
-    let tasks_state = &&evolution_system.tasks.current_state;
-    let lessons_state = &evolution_system.lessons.current_state;
-
-    // All states should be internally consistent
-    // Memory state has valid short-term entries
-    // Memory state has valid long-term entries
-    // Memory state has valid episodic entries
-
-    // Task state has valid total tasks count
-    assert!(tasks_state.completed_tasks() <= tasks_state.total_tasks());
-
-    // Lessons state has valid technical lessons
-    // Lessons state has valid process lessons
-    // Lessons state has valid success patterns
-
-    // Timestamps should be reasonable - using task metadata timestamps as proxy
-    // assert!(&evolution_system.tasks.current_state.metadata.created_at <= &evolution_system.tasks.current_state.metadata.last_updated);
-}

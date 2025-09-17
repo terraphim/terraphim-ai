@@ -6,20 +6,15 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Restart strategies for handling agent failures
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum RestartStrategy {
     /// Restart only the failed agent
+    #[default]
     OneForOne,
     /// Restart all agents if one fails
     OneForAll,
     /// Restart the failed agent and all agents started after it
     RestForOne,
-}
-
-impl Default for RestartStrategy {
-    fn default() -> Self {
-        RestartStrategy::OneForOne
-    }
 }
 
 /// Restart intensity configuration

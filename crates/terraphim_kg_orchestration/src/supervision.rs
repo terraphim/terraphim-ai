@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use async_trait::async_trait;
 use log::{debug, error, info, warn};
@@ -25,7 +25,7 @@ use terraphim_task_decomposition::{
 
 use crate::{
     AgentAssignment, AgentPool, ExecutionCoordinator, OrchestrationError, OrchestrationResult,
-    ScheduledWorkflow, SimpleAgent, TaskResult, TaskScheduler, WorkflowResult, WorkflowStatus,
+    ScheduledWorkflow, SimpleAgent, TaskResult, TaskScheduler, WorkflowStatus,
 };
 
 /// Supervision tree orchestration engine
@@ -293,7 +293,7 @@ impl SupervisionTreeOrchestrator {
         )));
 
         // Create mock dependencies for now - in a real implementation these would be properly configured
-        let automata = Arc::new(terraphim_task_decomposition::MockAutomata::default());
+        let automata = Arc::new(terraphim_task_decomposition::MockAutomata);
         let role_name = terraphim_types::RoleName::new("supervisor");
         let thesaurus =
             terraphim_automata::load_thesaurus(&terraphim_automata::AutomataPath::local_example())
@@ -570,7 +570,7 @@ impl SupervisionTreeOrchestrator {
             .recovery_actions
             .iter()
             .filter(|a| a.action_type == RecoveryActionType::AgentRestart)
-            .last()
+            .next_back()
             .map(|a| a.timestamp.elapsed().unwrap_or(Duration::ZERO))
             .unwrap_or(elapsed);
 

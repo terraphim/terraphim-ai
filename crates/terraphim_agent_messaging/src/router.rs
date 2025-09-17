@@ -130,7 +130,7 @@ impl DefaultMessageRouter {
 
                                 // Convert envelope to agent message for retry
                                 let agent_message = AgentMessage::cast(
-                                    envelope.from.clone().unwrap_or_else(|| AgentPid::new()),
+                                    envelope.from.clone().unwrap_or_else(AgentPid::new),
                                     envelope.payload.clone()
                                 );
 
@@ -187,7 +187,7 @@ impl DefaultMessageRouter {
     ) -> MessagingResult<AgentMessage> {
         // For now, we'll create a cast message
         // In a real implementation, we'd need to preserve the original message type
-        let from = envelope.from.clone().unwrap_or_else(|| AgentPid::new());
+        let from = envelope.from.clone().unwrap_or_default();
         Ok(AgentMessage::cast(from, envelope.payload.clone()))
     }
 }
@@ -394,7 +394,7 @@ impl MessageSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DeliveryOptions, MessagePriority};
+    use crate::DeliveryOptions;
 
     #[tokio::test]
     async fn test_router_registration() {

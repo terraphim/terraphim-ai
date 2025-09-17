@@ -1,0 +1,32 @@
+FROM qwen2.5-coder:32b
+
+# GPU Optimization Parameters
+
+PARAMETER num_gpu 1
+
+# Model Behavior Parameters
+
+PARAMETER temperature 0.7
+PARAMETER num_ctx 32768
+PARAMETER repeat_penalty 1.1
+PARAMETER top_p 0.8
+PARAMETER stop "</error>"
+PARAMETER stop "</trace>"
+PARAMETER stop "</fix>"
+
+# System Configuration
+
+SYSTEM """You are a specialized Rust debugging assistant powered by Qwen2.5-Coder. Your expertise is:
+1. Rust compiler analysis and error resolution
+2. Memory safety and lifetime diagnostics
+3. Performance bottleneck detection
+4. Code smell identification
+Keep solutions concise and practical."""
+
+# Response Template
+
+TEMPLATE """{{ if .System }}{{ .System }}{{ end }}
+{{if .Prompt}}Code:
+{{ .Prompt }}
+<trace>{{ .Response }}</trace>
+<fix>{{ .Response }}</fix>{{end}}"""

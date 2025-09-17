@@ -510,10 +510,10 @@ pub struct SummarizationStatusQuery {
 pub struct SummarizationStatusResponse {
     /// Status of the request
     pub status: Status,
-    /// Whether OpenRouter is enabled for this role
-    pub openrouter_enabled: bool,
-    /// Whether OpenRouter is properly configured for this role
-    pub openrouter_configured: bool,
+    /// Whether LLM is enabled for this role
+    pub llm_enabled: bool,
+    /// Whether LLM is properly configured for this role
+    pub llm_configured: bool,
     /// The model that would be used for summarization
     pub model: Option<String>,
     /// Number of documents with existing summaries for this role
@@ -592,7 +592,7 @@ pub(crate) async fn chat_completion(
     let system_prompt = {
         #[cfg(feature = "openrouter")]
         {
-            role.openrouter_chat_system_prompt.or_else(|| {
+            role.llm_chat_system_prompt.or_else(|| {
                 // Try generic system prompt from extra
                 role.extra
                     .get("system_prompt")
@@ -665,9 +665,9 @@ pub(crate) async fn chat_completion(
         .or_else(|| {
             #[cfg(feature = "openrouter")]
             {
-                role.openrouter_chat_model
+                role.llm_chat_model
                     .clone()
-                    .or_else(|| role.openrouter_model.clone())
+                    .or_else(|| role.llm_model.clone())
             }
             #[cfg(not(feature = "openrouter"))]
             {
@@ -745,7 +745,7 @@ pub(crate) async fn list_openrouter_models(
         // Determine API key preference: request -> role -> env
         let api_key = if let Some(k) = &req.api_key {
             k.clone()
-        } else if let Some(k) = &role.openrouter_api_key {
+        } else if let Some(k) = &role.llm_api_key {
             k.clone()
         } else {
             match std::env::var("OPENROUTER_KEY") {
@@ -762,7 +762,7 @@ pub(crate) async fn list_openrouter_models(
 
         // Any valid model string works for constructing the client
         let seed_model = role
-            .openrouter_model
+            .llm_model
             .clone()
             .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
 
@@ -833,7 +833,7 @@ pub(crate) async fn summarize_document(
     // Check if OpenRouter is enabled and configured for this role
     #[cfg(feature = "openrouter")]
     {
-        if !role_ref.has_openrouter_config() {
+        if !role_ref.has_llm_config() {
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
@@ -848,7 +848,7 @@ pub(crate) async fn summarize_document(
         let role = role_ref.clone();
 
         // Get the API key from environment variable if not set in role
-        let api_key = if let Some(key) = &role.openrouter_api_key {
+        let api_key = if let Some(key) = &role.llm_api_key {
             key.clone()
         } else {
             std::env::var("OPENROUTER_KEY").map_err(|_| {
@@ -860,7 +860,7 @@ pub(crate) async fn summarize_document(
         };
 
         let model = role
-            .openrouter_model
+            .llm_model
             .as_deref()
             .unwrap_or("openai/gpt-3.5-turbo");
         let max_length = request.max_length.unwrap_or(250);
@@ -1000,10 +1000,10 @@ pub(crate) async fn get_summarization_status(
 
     #[cfg(feature = "openrouter")]
     {
-        let openrouter_enabled = role.openrouter_enabled;
-        let openrouter_configured =
-            role.has_openrouter_config() || std::env::var("OPENROUTER_KEY").is_ok();
-        let model = role.get_openrouter_model().map(|s| s.to_string());
+        let llm_enabled = role.llm_enabled;
+        let llm_configured =
+            role.has_llm_config() || std::env::var("OPENROUTER_KEY").is_ok();
+        let model = role.get_llm_model().map(|s| s.to_string());
 
         // Note: For now, we'll set cached_summaries_count to 0
         // In the future, this could query the persistence layer for documents with summaries
@@ -1011,8 +1011,8 @@ pub(crate) async fn get_summarization_status(
 
         Ok(Json(SummarizationStatusResponse {
             status: Status::Success,
-            openrouter_enabled,
-            openrouter_configured,
+            llm_enabled,
+            llm_configured,
             model,
             cached_summaries_count,
         }))
@@ -1022,8 +1022,8 @@ pub(crate) async fn get_summarization_status(
     {
         Ok(Json(SummarizationStatusResponse {
             status: Status::Success,
-            openrouter_enabled: false,
-            openrouter_configured: false,
+            llm_enabled: false,
+            llm_configured: false,
             model: None,
             cached_summaries_count: 0,
         }))

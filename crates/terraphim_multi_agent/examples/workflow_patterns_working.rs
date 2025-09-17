@@ -33,7 +33,7 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create development agent
-    let mut dev_agent = TerraphimAgent::new(create_test_role(), persistence, None).await?;
+    let dev_agent = TerraphimAgent::new(create_test_role(), persistence, None).await?;
     dev_agent.initialize().await?;
 
     println!("✅ Development agent created: {}", dev_agent.agent_id);
@@ -100,23 +100,23 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create different agents for different complexity levels
-    let mut simple_agent =
+    let simple_agent =
         TerraphimAgent::new(create_simple_role(), persistence.clone(), None).await?;
     simple_agent.initialize().await?;
 
-    let mut complex_agent =
+    let complex_agent =
         TerraphimAgent::new(create_complex_role(), persistence.clone(), None).await?;
     complex_agent.initialize().await?;
 
     println!("✅ Created simple and complex task agents");
 
-    // Test routing based on task complexity
+    // Test routing based on task complexity  
     let tasks = vec![
-        ("Say hello", 0.2, &mut simple_agent),
+        ("Say hello", 0.2, &simple_agent),
         (
-            "Design distributed system architecture",
+            "Design distributed system architecture", 
             0.9,
-            &mut complex_agent,
+            &complex_agent,
         ),
     ];
 
@@ -173,7 +173,7 @@ async fn demonstrate_parallelization() -> MultiAgentResult<()> {
     let mut agents = Vec::new();
     for perspective in &perspectives {
         let role = create_perspective_role(perspective);
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
         agents.push(agent);
     }
@@ -233,7 +233,7 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     let mut worker_agents = Vec::new();
     for worker_name in &workers {
         let role = create_worker_role(worker_name);
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
         worker_agents.push(agent);
     }

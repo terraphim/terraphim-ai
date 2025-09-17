@@ -11,8 +11,9 @@ use uuid::Uuid;
 
 use rig::{
     providers::{anthropic, ollama, openai},
-    client::CompletionClient,
     completion::Prompt,
+    agent::Agent,
+    client::CompletionClient,
 };
 
 use crate::{
@@ -177,22 +178,22 @@ impl TokenUsage {
 /// Enum to abstract over different agent types from different providers
 #[derive(Clone)]
 pub enum LlmAgent {
-    OpenAI(Arc<rig::agent::Agent<openai::responses_api::ResponsesCompletionModel>>),
-    Anthropic(Arc<rig::agent::Agent<anthropic::completion::CompletionModel>>),
-    Ollama(Arc<rig::agent::Agent<ollama::CompletionModel>>),
+    OpenAI(Arc<Agent<openai::responses_api::ResponsesCompletionModel>>),
+    Anthropic(Arc<Agent<anthropic::completion::CompletionModel>>),
+    Ollama(Arc<Agent<ollama::CompletionModel>>),
 }
 
 impl LlmAgent {
     pub async fn prompt(&self, prompt: &str) -> Result<String, String> {
         match self {
             LlmAgent::OpenAI(agent) => {
-                agent.prompt(prompt).await.map_err(|e| e.to_string())
+                agent.as_ref().prompt(prompt).await.map_err(|e| e.to_string())
             }
             LlmAgent::Anthropic(agent) => {
-                agent.prompt(prompt).await.map_err(|e| e.to_string())
+                agent.as_ref().prompt(prompt).await.map_err(|e| e.to_string())
             }
             LlmAgent::Ollama(agent) => {
-                agent.prompt(prompt).await.map_err(|e| e.to_string())
+                agent.as_ref().prompt(prompt).await.map_err(|e| e.to_string())
             }
         }
     }

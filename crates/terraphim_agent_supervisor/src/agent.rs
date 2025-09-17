@@ -160,6 +160,12 @@ pub struct TestAgent {
     config: serde_json::Value,
 }
 
+impl Default for TestAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TestAgent {
     pub fn new() -> Self {
         Self {

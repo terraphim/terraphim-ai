@@ -177,9 +177,9 @@ impl LlmClient for OpenRouterClient {
 
 #[cfg(feature = "openrouter")]
 fn build_openrouter_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
-    let api_key = role.openrouter_api_key.as_deref()?;
+    let api_key = role.llm_api_key.as_deref()?;
     let model = role
-        .openrouter_model
+        .llm_model
         .as_deref()
         .unwrap_or("openai/gpt-3.5-turbo");
     match crate::openrouter::OpenRouterService::new(api_key, model) {

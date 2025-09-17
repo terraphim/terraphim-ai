@@ -70,6 +70,11 @@ impl From<terraphim_persistence::Error> for TerraphimConfigError {
     }
 }
 
+/// Default context window size for LLM requests
+fn default_context_window() -> Option<u64> {
+    Some(32768)
+}
+
 /// A role is a collection of settings for a specific user
 ///
 /// It contains a user's knowledge graph, a list of haystacks, as
@@ -86,34 +91,30 @@ pub struct Role {
     pub theme: String,
     pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
-    /// Enable AI-powered article summaries using OpenRouter
-    #[cfg(feature = "openrouter")]
+    /// Enable AI-powered article summaries using LLM providers
     #[serde(default)]
-    pub openrouter_enabled: bool,
-    /// API key for OpenRouter service
-    #[cfg(feature = "openrouter")]
+    pub llm_enabled: bool,
+    /// API key for LLM service
     #[serde(default)]
-    pub openrouter_api_key: Option<String>,
-    /// Model to use for generating summaries (e.g., "openai/gpt-3.5-turbo")
-    #[cfg(feature = "openrouter")]
+    pub llm_api_key: Option<String>,
+    /// Model to use for generating summaries (e.g., "openai/gpt-3.5-turbo", "gemma3:270m")
     #[serde(default)]
-    pub openrouter_model: Option<String>,
-    /// Automatically summarize search results using OpenRouter
-    #[cfg(feature = "openrouter")]
+    pub llm_model: Option<String>,
+    /// Automatically summarize search results using LLM
     #[serde(default)]
-    pub openrouter_auto_summarize: bool,
-    /// Enable Chat interface backed by OpenRouter
-    #[cfg(feature = "openrouter")]
+    pub llm_auto_summarize: bool,
+    /// Enable Chat interface backed by LLM
     #[serde(default)]
-    pub openrouter_chat_enabled: bool,
+    pub llm_chat_enabled: bool,
     /// Optional system prompt to use for chat conversations
-    #[cfg(feature = "openrouter")]
     #[serde(default)]
-    pub openrouter_chat_system_prompt: Option<String>,
-    /// Optional chat model override (falls back to openrouter_model)
-    #[cfg(feature = "openrouter")]
+    pub llm_chat_system_prompt: Option<String>,
+    /// Optional chat model override (falls back to llm_model)
     #[serde(default)]
-    pub openrouter_chat_model: Option<String>,
+    pub llm_chat_model: Option<String>,
+    /// Maximum tokens for LLM context window (default: 32768)
+    #[serde(default = "default_context_window")]
+    pub llm_context_window: Option<u64>,
     #[serde(flatten)]
     #[schemars(skip)]
     pub extra: AHashMap<String, Value>,
@@ -130,48 +131,29 @@ impl Role {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: default_context_window(),
             extra: AHashMap::new(),
         }
     }
 
-    /// Check if OpenRouter is properly configured for this role
-    #[cfg(feature = "openrouter")]
-    pub fn has_openrouter_config(&self) -> bool {
-        self.openrouter_enabled
-            && self.openrouter_api_key.is_some()
-            && self.openrouter_model.is_some()
+    /// Check if LLM is properly configured for this role
+    pub fn has_llm_config(&self) -> bool {
+        self.llm_enabled
+            && self.llm_api_key.is_some()
+            && self.llm_model.is_some()
     }
 
-    /// Check if OpenRouter is properly configured (stub when feature is disabled)
-    #[cfg(not(feature = "openrouter"))]
-    pub fn has_openrouter_config(&self) -> bool {
-        false
-    }
 
-    /// Get the OpenRouter model name, providing a sensible default
-    #[cfg(feature = "openrouter")]
-    pub fn get_openrouter_model(&self) -> Option<&str> {
-        self.openrouter_model.as_deref()
-    }
-
-    /// Get the OpenRouter model name (stub when feature is disabled)
-    #[cfg(not(feature = "openrouter"))]
-    pub fn get_openrouter_model(&self) -> Option<&str> {
-        None
+    /// Get the LLM model name, providing a sensible default
+    pub fn get_llm_model(&self) -> Option<&str> {
+        self.llm_model.as_deref()
     }
 }
 
@@ -389,117 +371,59 @@ impl ConfigBuilder {
         self.config.id = ConfigId::Embedded;
 
         // Add Default role with basic functionality
-        self = self.add_role(
-            "Default",
-            Role {
-                shortname: Some("Default".to_string()),
-                name: "Default".into(),
-                relevance_function: RelevanceFunction::TitleScorer,
-                terraphim_it: false,
-                theme: "spacelab".to_string(),
-                kg: None,
-                haystacks: vec![Haystack {
-                    location: "docs/src".to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: true,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                }],
-                #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_model: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                extra: AHashMap::new(),
-            },
+        let mut default_role = Role::new("Default");
+        default_role.shortname = Some("Default".to_string());
+        default_role.theme = "spacelab".to_string();
+        default_role.haystacks = vec![Haystack {
+            location: "docs/src".to_string(),
+            service: ServiceType::Ripgrep,
+            read_only: true,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+        }];
+        
+        self = self.add_role("Default", default_role
         );
 
         // Add Terraphim Engineer role with knowledge graph
-        self = self.add_role(
-            "Terraphim Engineer",
-            Role {
-                shortname: Some("TerraEng".to_string()),
-                name: "Terraphim Engineer".into(),
-                relevance_function: RelevanceFunction::TerraphimGraph,
-                terraphim_it: true,
-                theme: "lumen".to_string(),
-                kg: Some(KnowledgeGraph {
-                    automata_path: None,
-                    knowledge_graph_local: Some(KnowledgeGraphLocal {
-                        input_type: KnowledgeGraphInputType::Markdown,
-                        path: PathBuf::from("docs/src/kg"),
-                    }),
-                    public: true,
-                    publish: true,
-                }),
-                haystacks: vec![Haystack {
-                    location: "docs/src".to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: true,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                }],
-                #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_model: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                extra: AHashMap::new(),
-            },
+        let mut terraphim_role = Role::new("Terraphim Engineer");
+        terraphim_role.shortname = Some("TerraEng".to_string());
+        terraphim_role.relevance_function = RelevanceFunction::TerraphimGraph;
+        terraphim_role.terraphim_it = true;
+        terraphim_role.theme = "lumen".to_string();
+        terraphim_role.kg = Some(KnowledgeGraph {
+            automata_path: None,
+            knowledge_graph_local: Some(KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/src/kg"),
+            }),
+            public: true,
+            publish: true,
+        });
+        terraphim_role.haystacks = vec![Haystack {
+            location: "docs/src".to_string(),
+            service: ServiceType::Ripgrep,
+            read_only: true,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+        }];
+        
+        self = self.add_role("Terraphim Engineer", terraphim_role
         );
 
         // Add Rust Engineer role with QueryRs
-        self = self.add_role(
-            "Rust Engineer",
-            Role {
-                shortname: Some("rust-engineer".to_string()),
-                name: "Rust Engineer".into(),
-                relevance_function: RelevanceFunction::TitleScorer,
-                terraphim_it: false,
-                theme: "cosmo".to_string(),
-                kg: None,
-                haystacks: vec![Haystack {
-                    location: "https://query.rs".to_string(),
-                    service: ServiceType::QueryRs,
-                    read_only: true,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                }],
-                #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_model: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                extra: AHashMap::new(),
-            },
-        );
+        let mut rust_engineer_role = Role::new("Rust Engineer");
+        rust_engineer_role.shortname = Some("rust-engineer".to_string());
+        rust_engineer_role.theme = "cosmo".to_string();
+        rust_engineer_role.haystacks = vec![Haystack {
+            location: "https://query.rs".to_string(),
+            service: ServiceType::QueryRs,
+            read_only: true,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+        }];
+        
+        self = self.add_role("Rust Engineer", rust_engineer_role);
 
         // Set Terraphim Engineer as default and selected role
         self.config.default_role = RoleName::new("Terraphim Engineer");
@@ -536,121 +460,67 @@ impl ConfigBuilder {
         .unwrap();
         log::info!("Automata remote URL: {automata_remote}");
         self.global_shortcut("Ctrl+X")
-            .add_role(
-                "Default",
-                Role {
-                    shortname: Some("Default".to_string()),
-                    name: "Default".into(),
-                    relevance_function: RelevanceFunction::TitleScorer,
-                    terraphim_it: false,
-                    theme: "spacelab".to_string(),
-                    kg: None,
-                    haystacks: vec![Haystack {
-                        location: system_operator_haystack.to_string_lossy().to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
-                },
-            )
-            .add_role(
-                "Engineer",
-                Role {
-                    shortname: Some("Engineer".into()),
-                    name: "Engineer".into(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
-                    terraphim_it: true,
-                    theme: "lumen".to_string(),
-                    kg: Some(KnowledgeGraph {
-                        automata_path: Some(automata_remote.clone()),
-                        knowledge_graph_local: Some(KnowledgeGraphLocal {
-                            input_type: KnowledgeGraphInputType::Markdown,
-                            path: system_operator_haystack.clone(),
-                        }),
-                        public: true,
-                        publish: true,
+            .add_role("Default", {
+                let mut default_role = Role::new("Default");
+                default_role.shortname = Some("Default".to_string());
+                default_role.theme = "spacelab".to_string();
+                default_role.haystacks = vec![Haystack {
+                    location: system_operator_haystack.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                default_role
+            })
+            .add_role("Engineer", {
+                let mut engineer_role = Role::new("Engineer");
+                engineer_role.shortname = Some("Engineer".into());
+                engineer_role.relevance_function = RelevanceFunction::TerraphimGraph;
+                engineer_role.terraphim_it = true;
+                engineer_role.theme = "lumen".to_string();
+                engineer_role.kg = Some(KnowledgeGraph {
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
                     }),
-                    haystacks: vec![Haystack {
-                        location: system_operator_haystack.to_string_lossy().to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
-                },
-            )
-            .add_role(
-                "System Operator",
-                Role {
-                    shortname: Some("operator".to_string()),
-                    name: "System Operator".into(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
-                    terraphim_it: true,
-                    theme: "superhero".to_string(),
-                    kg: Some(KnowledgeGraph {
-                        automata_path: Some(automata_remote.clone()),
-                        knowledge_graph_local: Some(KnowledgeGraphLocal {
-                            input_type: KnowledgeGraphInputType::Markdown,
-                            path: system_operator_haystack.clone(),
-                        }),
-                        public: true,
-                        publish: true,
+                    public: true,
+                    publish: true,
+                });
+                engineer_role.haystacks = vec![Haystack {
+                    location: system_operator_haystack.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                engineer_role
+            })
+            .add_role("System Operator", {
+                let mut system_operator_role = Role::new("System Operator");
+                system_operator_role.shortname = Some("operator".to_string());
+                system_operator_role.relevance_function = RelevanceFunction::TerraphimGraph;
+                system_operator_role.terraphim_it = true;
+                system_operator_role.theme = "superhero".to_string();
+                system_operator_role.kg = Some(KnowledgeGraph {
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: system_operator_haystack.clone(),
                     }),
-                    haystacks: vec![Haystack {
-                        location: system_operator_haystack.to_string_lossy().to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
-                },
-            )
+                    public: true,
+                    publish: true,
+                });
+                system_operator_role.haystacks = vec![Haystack {
+                    location: system_operator_haystack.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                system_operator_role
+            })
             .default_role("Default")
             .unwrap()
     }
@@ -661,113 +531,56 @@ impl ConfigBuilder {
         log::info!("Documents path: {:?}", default_data_path);
         self.config.id = ConfigId::Desktop;
         self.global_shortcut("Ctrl+X")
-            .add_role(
-                "Default",
-                Role {
-                    shortname: Some("Default".to_string()),
-                    name: "Default".to_string().into(),
-                    relevance_function: RelevanceFunction::TitleScorer,
-                    terraphim_it: false,
-                    theme: "spacelab".to_string(),
-                    kg: None,
-                    haystacks: vec![Haystack {
-                        location: default_data_path.to_string_lossy().to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
-                },
-            )
-            .add_role(
-                "Terraphim Engineer",
-                Role {
-                    shortname: Some("TerraEng".to_string()),
-                    name: "Terraphim Engineer".to_string().into(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
-                    terraphim_it: true,
-                    theme: "lumen".to_string(),
-                    kg: Some(KnowledgeGraph {
-                        automata_path: None, // Set to None so it builds from local KG files during startup
-                        knowledge_graph_local: Some(KnowledgeGraphLocal {
-                            input_type: KnowledgeGraphInputType::Markdown,
-                            path: default_data_path.join("kg"),
-                        }),
-                        public: true,
-                        publish: true,
+            .add_role("Default", {
+                let mut default_role = Role::new("Default");
+                default_role.shortname = Some("Default".to_string());
+                default_role.theme = "spacelab".to_string();
+                default_role.haystacks = vec![Haystack {
+                    location: default_data_path.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                default_role
+            })
+            .add_role("Terraphim Engineer", {
+                let mut terraphim_engineer_role = Role::new("Terraphim Engineer");
+                terraphim_engineer_role.shortname = Some("TerraEng".to_string());
+                terraphim_engineer_role.relevance_function = RelevanceFunction::TerraphimGraph;
+                terraphim_engineer_role.terraphim_it = true;
+                terraphim_engineer_role.theme = "lumen".to_string();
+                terraphim_engineer_role.kg = Some(KnowledgeGraph {
+                    automata_path: None, // Set to None so it builds from local KG files during startup
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: default_data_path.join("kg"),
                     }),
-                    haystacks: vec![Haystack {
-                        location: default_data_path.to_string_lossy().to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
-                },
-            )
-            .add_role(
-                "Rust Engineer",
-                Role {
-                    shortname: Some("rust-engineer".to_string()),
-                    name: "Rust Engineer".to_string().into(),
-                    relevance_function: RelevanceFunction::TitleScorer,
-                    terraphim_it: false,
-                    theme: "cosmo".to_string(),
-                    kg: None,
-                    haystacks: vec![Haystack {
-                        location: "https://query.rs".to_string(),
-                        service: ServiceType::QueryRs,
-                        read_only: true,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
-                },
-            )
+                    public: true,
+                    publish: true,
+                });
+                terraphim_engineer_role.haystacks = vec![Haystack {
+                    location: default_data_path.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                terraphim_engineer_role
+            })
+            .add_role("Rust Engineer", {
+                let mut rust_engineer_role = Role::new("Rust Engineer");
+                rust_engineer_role.shortname = Some("rust-engineer".to_string());
+                rust_engineer_role.theme = "cosmo".to_string();
+                rust_engineer_role.haystacks = vec![Haystack {
+                    location: "https://query.rs".to_string(),
+                    service: ServiceType::QueryRs,
+                    read_only: true,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                rust_engineer_role
+            })
             .default_role("Terraphim Engineer")
             .unwrap()
     }
@@ -1204,113 +1017,56 @@ mod tests {
         .unwrap();
         let config = ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
-            .add_role(
-                "Default",
-                Role {
-                    shortname: Some("Default".to_string()),
-                    name: "Default".into(),
-                    relevance_function: RelevanceFunction::TitleScorer,
-                    terraphim_it: false,
-                    theme: "spacelab".to_string(),
-                    kg: None,
-                    haystacks: vec![Haystack {
-                        location: "localsearch".to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    extra: AHashMap::new(),
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                },
-            )
-            .add_role(
-                "Engineer",
-                Role {
-                    shortname: Some("Engineer".to_string()),
-                    name: "Engineer".into(),
-                    relevance_function: RelevanceFunction::TitleScorer,
-                    terraphim_it: false,
-                    theme: "lumen".to_string(),
-                    kg: None,
-                    haystacks: vec![Haystack {
-                        location: "localsearch".to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    extra: AHashMap::new(),
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                },
-            )
-            .add_role(
-                "System Operator",
-                Role {
-                    shortname: Some("operator".to_string()),
-                    name: "System Operator".into(),
-                    relevance_function: RelevanceFunction::TerraphimGraph,
-                    terraphim_it: true,
-                    theme: "superhero".to_string(),
-                    kg: Some(KnowledgeGraph {
-                        automata_path: Some(automata_remote.clone()),
-                        knowledge_graph_local: Some(KnowledgeGraphLocal {
-                            input_type: KnowledgeGraphInputType::Markdown,
-                            path: PathBuf::from("~/pkm"),
-                        }),
-                        public: true,
-                        publish: true,
+            .add_role("Default", {
+                let mut default_role = Role::new("Default");
+                default_role.shortname = Some("Default".to_string());
+                default_role.theme = "spacelab".to_string();
+                default_role.haystacks = vec![Haystack {
+                    location: "localsearch".to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                default_role
+            })
+            .add_role("Engineer", {
+                let mut engineer_role = Role::new("Engineer");
+                engineer_role.shortname = Some("Engineer".to_string());
+                engineer_role.theme = "lumen".to_string();
+                engineer_role.haystacks = vec![Haystack {
+                    location: "localsearch".to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                engineer_role
+            })
+            .add_role("System Operator", {
+                let mut system_operator_role = Role::new("System Operator");
+                system_operator_role.shortname = Some("operator".to_string());
+                system_operator_role.relevance_function = RelevanceFunction::TerraphimGraph;
+                system_operator_role.terraphim_it = true;
+                system_operator_role.theme = "superhero".to_string();
+                system_operator_role.kg = Some(KnowledgeGraph {
+                    automata_path: Some(automata_remote.clone()),
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: PathBuf::from("~/pkm"),
                     }),
-                    haystacks: vec![Haystack {
-                        location: "/tmp/system_operator/pages/".to_string(),
-                        service: ServiceType::Ripgrep,
-                        read_only: false,
-                        atomic_server_secret: None,
-                        extra_parameters: std::collections::HashMap::new(),
-                    }],
-                    extra: AHashMap::new(),
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                },
-            )
+                    public: true,
+                    publish: true,
+                });
+                system_operator_role.haystacks = vec![Haystack {
+                    location: "/tmp/system_operator/pages/".to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                }];
+                system_operator_role
+            })
             .default_role("Default")
             .unwrap()
             .build()
@@ -1338,41 +1094,23 @@ mod tests {
     }
 
     fn dummy_role() -> Role {
-        Role {
-            shortname: Some("father".into()),
-            name: "Father".into(),
-            relevance_function: RelevanceFunction::TitleScorer,
-            terraphim_it: false,
-            theme: "lumen".to_string(),
-            kg: Some(KnowledgeGraph {
-                automata_path: Some(AutomataPath::local_example()),
-                knowledge_graph_local: None,
-                public: true,
-                publish: true,
-            }),
-            haystacks: vec![Haystack {
-                location: "localsearch".to_string(),
-                service: ServiceType::Ripgrep,
-                read_only: false,
-                atomic_server_secret: None,
-                extra_parameters: std::collections::HashMap::new(),
-            }],
-            extra: AHashMap::new(),
-            #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-        }
+        let mut role = Role::new("Father");
+        role.shortname = Some("father".into());
+        role.theme = "lumen".to_string();
+        role.kg = Some(KnowledgeGraph {
+            automata_path: Some(AutomataPath::local_example()),
+            knowledge_graph_local: None,
+            public: true,
+            publish: true,
+        });
+        role.haystacks = vec![Haystack {
+            location: "localsearch".to_string(),
+            service: ServiceType::Ripgrep,
+            read_only: false,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+        }];
+        role
     }
 
     #[test]

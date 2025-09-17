@@ -28,19 +28,27 @@
 //! ```
 
 pub mod agent;
+pub mod agents;
 pub mod context;
 pub mod error;
+pub mod genai_llm_client;
 pub mod history;
-pub mod llm_client;
+pub mod llm_types;
+// pub mod llm_client;      // Disabled - uses rig-core
+// pub mod simple_llm_client; // Disabled - uses rig-core
 pub mod registry;
 pub mod tracking;
 pub mod workflows;
 
 pub use agent::*;
+pub use agents::*;
 pub use context::*;
 pub use error::*;
+pub use genai_llm_client::*;
 pub use history::*;
-pub use llm_client::*;
+pub use llm_types::*;
+// pub use llm_client::*;      // Disabled - uses rig-core
+// pub use simple_llm_client::*; // Disabled - uses rig-core
 pub use registry::*;
 pub use tracking::*;
 pub use workflows::*;
@@ -60,57 +68,43 @@ pub mod test_utils {
     use terraphim_persistence::DeviceStorage;
 
     pub fn create_test_role() -> Role {
-        Role {
-            shortname: Some("test".to_string()),
-            name: "TestAgent".into(),
-            relevance_function: terraphim_types::RelevanceFunction::BM25,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            extra: {
-                let mut extra = AHashMap::new();
-                extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
-                extra.insert(
-                    "ollama_base_url".to_string(),
-                    serde_json::json!("http://127.0.0.1:11434"),
-                );
-                extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
-                extra
-            },
-        }
+        let mut role = Role::new("TestAgent");
+        role.shortname = Some("test".to_string());
+        role.relevance_function = terraphim_types::RelevanceFunction::BM25;
+        // Use rust-genai with Ollama for local testing with gemma3:270m
+        role.extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
+        role.extra.insert("llm_model".to_string(), serde_json::json!("gemma3:270m"));
+        role.extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
+        role
     }
 
-    pub async fn create_test_agent_with_mock_storage() -> Result<TerraphimAgent, MultiAgentError> {
-        let role = create_test_role();
-
-        // Create a mock storage for testing - this will be a simplified version
-        // that doesn't require the complex DeviceStorage singleton
+    pub async fn create_test_agent_simple() -> Result<TerraphimAgent, MultiAgentError> {
         use terraphim_persistence::memory::create_memory_only_device_settings;
+        
         let _settings = create_memory_only_device_settings()
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        // Initialize real memory storage for testing
+        // Initialize memory storage
         DeviceStorage::init_memory_only()
             .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        // Use the singleton instance
         let storage_ref = DeviceStorage::instance()
             .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        // Clone the storage to avoid lifetime issues
+        // Use the same unsafe pattern from the examples
         use std::ptr;
         let storage_copy = unsafe { ptr::read(storage_ref) };
         let persistence = Arc::new(storage_copy);
-
+        
+        let role = create_test_role();
         TerraphimAgent::new(role, persistence, None).await
     }
 
     // For now, alias the simpler version for tests
     pub async fn create_test_agent() -> Result<TerraphimAgent, MultiAgentError> {
-        create_test_agent_with_mock_storage().await
+        create_test_agent_simple().await
     }
 }
 

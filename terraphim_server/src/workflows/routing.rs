@@ -537,7 +537,6 @@ fn calculate_output_quality(route: &RouteOption, complexity: &serde_json::Value)
 }
 
 fn calculate_cost_efficiency(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
-    let complexity_score = complexity["score"].as_f64().unwrap_or(0.5);
     let quality = calculate_expected_quality(route, complexity);
 
     // Cost efficiency = quality per dollar spent

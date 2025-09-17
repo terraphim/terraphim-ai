@@ -197,7 +197,7 @@ async fn execute_chain_step(
     }))
 }
 
-fn get_chain_steps(prompt: &str, role: &str) -> Vec<ChainStep> {
+fn get_chain_steps(_prompt: &str, role: &str) -> Vec<ChainStep> {
     // Role-specific step variations
     match role {
         "technical_writer" => vec![
@@ -338,7 +338,7 @@ fn generate_specification_output(context: &str, role: &str) -> String {
     }
 }
 
-fn generate_architecture_output(context: &str, role: &str) -> String {
+fn generate_architecture_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# System Architecture\n\n## Component Overview\n- Frontend: React with TypeScript\n- Backend: Rust with Axum framework\n- Database: PostgreSQL with Redis cache\n- Infrastructure: Docker containers on Kubernetes\n\n## Integration Points\n- REST API for client communication\n- WebSocket for real-time updates\n- External service integrations via HTTP clients".to_string(),
         "content_creator" => "# Content Architecture\n\n## Information Hierarchy\n- Hero section with key value proposition\n- Feature sections with benefits\n- Social proof and testimonials\n- Call-to-action optimization\n\n## Content Flow\n- Awareness → Interest → Consideration → Action\n- Progressive disclosure of information\n- Multiple engagement touchpoints".to_string(),
@@ -346,7 +346,7 @@ fn generate_architecture_output(context: &str, role: &str) -> String {
     }
 }
 
-fn generate_planning_output(context: &str, role: &str) -> String {
+fn generate_planning_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Implementation Roadmap\n\n## Phase 1: Foundation (Weeks 1-2)\n- Set up development environment\n- Implement core infrastructure\n- Basic API endpoints\n\n## Phase 2: Core Features (Weeks 3-6)\n- User authentication and authorization\n- Primary business logic\n- Database schema and migrations\n\n## Phase 3: Integration & Testing (Weeks 7-8)\n- Third-party integrations\n- Comprehensive testing suite\n- Performance optimization".to_string(),
         "content_creator" => "# Editorial Calendar\n\n## Week 1-2: Foundation Content\n- Brand positioning articles\n- Product introduction materials\n- FAQ and support documentation\n\n## Week 3-4: Engagement Content\n- Tutorial and how-to guides\n- Customer success stories\n- Industry insights and trends\n\n## Week 5-6: Conversion Content\n- Product demonstrations\n- Comparison guides\n- Testimonials and case studies".to_string(),
@@ -354,7 +354,7 @@ fn generate_planning_output(context: &str, role: &str) -> String {
     }
 }
 
-fn generate_implementation_output(context: &str, role: &str) -> String {
+fn generate_implementation_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Code Implementation\n\n## Core Module Structure\n```rust\npub struct Application {\n    config: Config,\n    database: Database,\n    cache: Cache,\n}\n\nimpl Application {\n    pub async fn new() -> Result<Self, Error> {\n        // Implementation details\n    }\n}\n```\n\n## Key Features Implemented\n- Robust error handling with custom error types\n- Async/await throughout for optimal performance\n- Comprehensive logging and monitoring\n- Security best practices implementation".to_string(),
         "content_creator" => "# Content Deliverables\n\n## Primary Content Assets\n- **Landing Page Copy**: Compelling value proposition with clear CTAs\n- **Product Descriptions**: Feature-benefit focused with user outcomes\n- **Blog Articles**: 6 thought leadership pieces on industry trends\n- **Email Sequences**: 5-part nurture series for lead conversion\n\n## Supporting Materials\n- Social media templates and captions\n- Sales enablement materials\n- Customer onboarding documentation\n- Brand guidelines and style guide".to_string(),
@@ -362,7 +362,7 @@ fn generate_implementation_output(context: &str, role: &str) -> String {
     }
 }
 
-fn generate_testing_output(context: &str, role: &str) -> String {
+fn generate_testing_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Testing Strategy\n\n## Test Coverage Summary\n- Unit Tests: 95% code coverage\n- Integration Tests: All API endpoints validated\n- End-to-End Tests: Critical user journeys automated\n- Performance Tests: Load testing up to 10k concurrent users\n\n## Quality Gates\n- All tests pass in CI/CD pipeline\n- Code quality metrics meet standards\n- Security scan shows no high/critical vulnerabilities\n- Performance benchmarks within acceptable ranges".to_string(),
         "content_creator" => "# Content Quality Review\n\n## Editorial Review Results\n- Grammar and spelling: 100% accuracy achieved\n- Brand voice consistency: Aligned across all content\n- SEO optimization: Target keywords integrated naturally\n- Readability scores: Grade 8-10 level for accessibility\n\n## Engagement Validation\n- A/B tested headlines show 25% improvement\n- Call-to-action placement optimized for conversion\n- Mobile responsiveness verified across devices\n- Social sharing elements properly implemented".to_string(),
@@ -370,7 +370,7 @@ fn generate_testing_output(context: &str, role: &str) -> String {
     }
 }
 
-fn generate_deployment_output(context: &str, role: &str) -> String {
+fn generate_deployment_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Deployment Guide\n\n## Production Deployment\n- Docker containers deployed to Kubernetes cluster\n- Database migrations executed successfully\n- SSL certificates configured and validated\n- Monitoring and alerting systems active\n\n## Operational Procedures\n- Health check endpoints responding correctly\n- Log aggregation and analysis configured\n- Backup and recovery procedures tested\n- Incident response playbooks documented\n\n## Post-Launch Monitoring\n- Application metrics within expected ranges\n- User activity tracking and analytics enabled\n- Performance monitoring dashboards active\n- Support documentation and runbooks complete".to_string(),
         "content_creator" => "# Content Launch & Distribution\n\n## Publication Status\n- Website content published and live\n- Blog posts scheduled across 4-week period\n- Email campaigns loaded in marketing automation\n- Social media content queued for distribution\n\n## Marketing Activation\n- SEO meta tags and structured data implemented\n- Social sharing optimization completed\n- Analytics and conversion tracking active\n- Lead capture forms integrated and tested\n\n## Performance Tracking\n- Content performance dashboards configured\n- A/B testing framework ready for optimization\n- User feedback collection mechanisms enabled\n- Regular content audit and update schedule established".to_string(),

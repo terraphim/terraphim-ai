@@ -87,7 +87,7 @@ impl TaskComplexity {
 }
 
 /// Knowledge graph context for tasks
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct TaskKnowledgeContext {
     /// Knowledge domains this task operates in
     pub domains: Vec<String>,
@@ -103,20 +103,6 @@ pub struct TaskKnowledgeContext {
     pub output_types: Vec<String>,
     /// Semantic similarity thresholds
     pub similarity_thresholds: HashMap<String, f64>,
-}
-
-impl Default for TaskKnowledgeContext {
-    fn default() -> Self {
-        Self {
-            domains: Vec::new(),
-            concepts: Vec::new(),
-            relationships: Vec::new(),
-            keywords: Vec::new(),
-            input_types: Vec::new(),
-            output_types: Vec::new(),
-            similarity_thresholds: HashMap::new(),
-        }
-    }
 }
 
 /// Task constraints and requirements

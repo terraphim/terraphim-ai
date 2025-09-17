@@ -355,7 +355,7 @@ impl AgentContext {
 
         if non_pinned.len() <= available_slots {
             // All items fit
-            self.items = pinned.into_iter().chain(non_pinned.into_iter()).collect();
+            self.items = pinned.into_iter().chain(non_pinned).collect();
         } else {
             // Need to select items - 70% by relevance, 30% by recency
             non_pinned.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());
@@ -374,7 +374,7 @@ impl AgentContext {
             recent.sort_by(|a, b| b.added_at.cmp(&a.added_at));
             selected.extend(recent.into_iter().take(recency_count));
 
-            self.items = pinned.into_iter().chain(selected.into_iter()).collect();
+            self.items = pinned.into_iter().chain(selected).collect();
         }
 
         Ok(())
