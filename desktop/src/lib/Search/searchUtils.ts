@@ -21,7 +21,7 @@ export function parseSearchInput(inputText: string): ParsedSearchInput {
   // First, check for capitalized operators (priority)
   const capitalizedAndRegex = /\b(AND)\b/;
   const capitalizedOrRegex = /\b(OR)\b/;
-  
+
   // Then check for lowercase operators (fallback)
   const lowercaseAndRegex = /\b(and)\b/i;
   const lowercaseOrRegex = /\b(or)\b/i;

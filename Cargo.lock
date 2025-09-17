@@ -939,10 +939,11 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
 name = "colored"
-version = "3.0.0"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
+checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
+ "lazy_static",
  "windows-sys 0.59.0",
 ]
 
@@ -2823,6 +2824,19 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-io-timeout",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
+dependencies = [
+ "bytes",
+ "hyper 0.14.32",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
 ]
 
 [[package]]
@@ -5315,10 +5329,12 @@ dependencies = [
  "http-body 0.4.6",
  "hyper 0.14.32",
  "hyper-rustls 0.24.2",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
  "mime",
+ "native-tls",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -5331,6 +5347,7 @@ dependencies = [
  "sync_wrapper 0.1.2",
  "system-configuration 0.5.1",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.24.1",
  "tokio-util",
  "tower-service",
@@ -5359,7 +5376,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.7.0",
  "hyper-rustls 0.27.7",
- "hyper-tls",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "js-sys",
  "log",
@@ -5458,9 +5475,8 @@ dependencies = [
 
 [[package]]
 name = "rmcp"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7dd163d26e254725137b7933e4ba042ea6bf2d756a4260559aaea8b6ad4c27e"
+version = "0.6.4"
+source = "git+https://github.com/modelcontextprotocol/rust-sdk.git#ddef4ce529dda7a5bf261da08ae4d677f5cdf243"
 dependencies = [
  "axum 0.8.4",
  "base64 0.22.1",
@@ -5490,9 +5506,8 @@ dependencies = [
 
 [[package]]
 name = "rmcp-macros"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a43bb4c90a0d4b12f7315eb681a73115d335a2cee81322eca96f3467fe4cd06f"
+version = "0.6.4"
+source = "git+https://github.com/modelcontextprotocol/rust-sdk.git#ddef4ce529dda7a5bf261da08ae4d677f5cdf243"
 dependencies = [
  "darling 0.21.3",
  "proc-macro2",
@@ -6186,6 +6201,20 @@ dependencies = [
 
 [[package]]
 name = "serial_test"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e56dd856803e253c8f298af3f4d7eb0ae5e23a737252cd90bb4f3b435033b2d"
+dependencies = [
+ "dashmap",
+ "futures",
+ "lazy_static",
+ "log",
+ "parking_lot 0.12.4",
+ "serial_test_derive 2.0.0",
+]
+
+[[package]]
+name = "serial_test"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b258109f244e1d6891bf1053a55d63a5cd4f8f4c30cf9a1280989f80e7a1fa9"
@@ -6195,7 +6224,18 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.4",
  "scc",
- "serial_test_derive",
+ "serial_test_derive 3.2.0",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91d129178576168c589c9ec973feedf7d3126c01ac2bf08795109aa35b69fb8f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -7046,6 +7086,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "chrono",
  "env_logger 0.11.8",
  "log",
  "mockall 0.13.1",
@@ -7055,7 +7096,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_json_any_key",
- "serial_test",
+ "serial_test 3.2.0",
  "tauri",
  "tauri-build",
  "tempfile",
@@ -7077,6 +7118,7 @@ dependencies = [
  "tracing-log 0.1.4",
  "tracing-subscriber",
  "tsify",
+ "ulid",
  "wasm-bindgen",
 ]
 
@@ -7171,7 +7213,7 @@ dependencies = [
  "anyhow",
  "async-once-cell",
  "async-trait",
- "dirs 6.0.0",
+ "dirs 5.0.1",
  "env_logger 0.10.2",
  "log",
  "opendal",
@@ -7208,7 +7250,7 @@ dependencies = [
  "regex",
  "rmcp",
  "serde_json",
- "serial_test",
+ "serial_test 3.2.0",
  "tempfile",
  "terraphim_automata",
  "terraphim_config",
@@ -7240,12 +7282,12 @@ dependencies = [
  "log",
  "mcp-client",
  "mcp-spec",
- "reqwest 0.12.23",
+ "reqwest 0.11.27",
  "reqwest-eventsource",
  "scraper",
  "serde",
  "serde_json",
- "serial_test",
+ "serial_test 2.0.0",
  "tempfile",
  "terraphim_atomic_client",
  "terraphim_automata",
@@ -7258,6 +7300,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "url",
+ "urlencoding",
  "uuid",
  "walkdir",
  "wasm-bindgen-futures",
@@ -7297,7 +7340,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "serial_test",
+ "serial_test 3.2.0",
  "temp-env",
  "tempfile",
  "terraphim_config",
@@ -7348,12 +7391,12 @@ dependencies = [
  "mime_guess",
  "portpicker",
  "regex",
- "reqwest 0.12.23",
+ "reqwest 0.11.27",
  "rust-embed",
  "schemars 0.8.22",
  "serde",
  "serde_json",
- "serial_test",
+ "serial_test 3.2.0",
  "static-files",
  "tempfile",
  "terraphim_automata",
@@ -7393,7 +7436,7 @@ dependencies = [
  "reqwest 0.12.23",
  "serde",
  "serde_json",
- "serial_test",
+ "serial_test 3.2.0",
  "strsim 0.11.1",
  "tempfile",
  "terraphim_automata",
@@ -7445,7 +7488,7 @@ dependencies = [
  "rustyline",
  "serde",
  "serde_json",
- "serial_test",
+ "serial_test 3.2.0",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
@@ -7467,6 +7510,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "chrono",
  "log",
  "schemars 0.8.22",
  "serde",
@@ -7474,6 +7518,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tsify",
  "ulid",
+ "uuid",
  "wasm-bindgen",
 ]
 

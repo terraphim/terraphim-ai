@@ -38,18 +38,18 @@
   // Function to parse input and update chips
   function parseAndUpdateChips(inputText: string) {
     const parsed = parseSearchInput(inputText);
-    
+
     if (parsed.hasOperator && parsed.terms.length > 1) {
       const newSelectedTerms = parsed.terms.map(term => {
         const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
         return { value: term, isFromKG };
       });
-      
+
       // Only update if the terms have actually changed
       const currentTermValues = selectedTerms.map(t => t.value);
       const newTermValues = newSelectedTerms.map(t => t.value);
-      
-      if (JSON.stringify(currentTermValues) !== JSON.stringify(newTermValues) || 
+
+      if (JSON.stringify(currentTermValues) !== JSON.stringify(newTermValues) ||
           currentLogicalOperator !== parsed.operator) {
         selectedTerms = newSelectedTerms;
         currentLogicalOperator = parsed.operator;
@@ -148,7 +148,7 @@
 
     // If the input ends with "AND" or "OR", suggest terms but don't include operators
     const inputLower = inputValue.toLowerCase();
-    if (inputLower.includes(" and ") || inputLower.includes(" or ") || 
+    if (inputLower.includes(" and ") || inputLower.includes(" or ") ||
         inputLower.includes(" AND ") || inputLower.includes(" OR ")) {
       // For multi-term queries, only suggest terms after the operator
       const termAfterOperator = lastWord;
@@ -204,7 +204,7 @@
       // Get term suggestions for longer words
       try {
         const termSuggestions = await getSuggestions(currentWord);
-        
+
         // Add operator suggestions if we have existing terms
         if (words.length > 1 && !textBeforeCursor.includes(' AND ') && !textBeforeCursor.includes(' OR ')) {
           suggestions = [...termSuggestions, 'AND', 'OR'];
@@ -267,13 +267,13 @@
       // It's a term suggestion - replace the current partial term
       const words = $input.trim().split(/\s+/);
       const lastWord = words[words.length - 1];
-      
+
       // If the last word is a partial match for the suggestion, replace it
       if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
         // Replace the last word with the full suggestion
         words[words.length - 1] = suggestion;
         $input = words.join(' ');
-        
+
         // Trigger parsing to update chips with the new input
         parseAndUpdateChips($input);
       } else {
@@ -295,10 +295,10 @@
     if (selectedOperator !== 'none') {
       // First parse the input to remove any text operators and get clean terms
       const parsed = parseSearchInput(inputText);
-      
+
       // If parsing found operators, use those terms; otherwise split on spaces
       const terms = parsed.hasOperator ? parsed.terms : inputText.split(/\s+/).filter(term => term.length > 0);
-      
+
       if (terms.length > 1) {
         // Use shared utility with UI operator override
         const fakeParser = {
@@ -362,7 +362,7 @@
 
   function updateInputFromSelectedTerms() {
     isUpdatingFromChips = true;
-    
+
     if (selectedTerms.length === 0) {
       $input = '';
       currentLogicalOperator = null;
@@ -373,7 +373,7 @@
       const operator = currentLogicalOperator || 'AND';
       $input = selectedTerms.map(t => t.value).join(` ${operator} `);
     }
-    
+
     // Reset the flag after a brief delay to allow reactivity to settle
     setTimeout(() => {
       isUpdatingFromChips = false;
@@ -489,16 +489,6 @@
               role="option"
               aria-selected={index === suggestionIndex}
               aria-label={`Apply suggestion: ${suggestion}`}
-              on:keydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  applySuggestion(suggestion);
-                }
-              }}
-              tabindex="0"
-              role="option"
-              aria-selected={index === suggestionIndex}
-              aria-label={`Apply suggestion: ${suggestion}`}
             >
               {suggestion}
             </li>
@@ -513,14 +503,14 @@
           <Taglist>
             {#each selectedTerms as term, index}
               <div class="term-tag-wrapper" class:from-kg={term.isFromKG}>
-                <Tag 
-                  rounded 
+                <Tag
+                  rounded
                   on:click={() => removeSelectedTerm(term.value)}
                   title="Click to remove term"
                 >
                   {term.value}
-                  <button 
-                    class="remove-tag-btn" 
+                  <button
+                    class="remove-tag-btn"
                     on:click|stopPropagation={() => removeSelectedTerm(term.value)}
                     aria-label={`Remove term: ${term.value}`}
                   >
@@ -558,7 +548,7 @@
             Any (OR)
           </label>
         </div>
-        
+
         <!-- Parse button for manual parsing -->
         {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
           <button type="button" class="button is-small is-info" on:click={() => parseAndUpdateChips($input)}>
