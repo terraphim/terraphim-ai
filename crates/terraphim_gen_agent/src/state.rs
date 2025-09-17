@@ -251,11 +251,13 @@ mod tests {
         let state = ExampleState::new("test_agent".to_string());
 
         // Test serialization
-        let data = state.serialize().await.unwrap();
+        let data = AgentState::serialize(&state).await.unwrap();
         assert!(!data.is_empty());
 
         // Test deserialization
-        let deserialized = ExampleState::deserialize(&data).await.unwrap();
+        let deserialized = <ExampleState as AgentState>::deserialize(&data)
+            .await
+            .unwrap();
         assert_eq!(deserialized.name, "test_agent");
         assert_eq!(deserialized.counter, 0);
         assert!(deserialized.active);
@@ -278,7 +280,8 @@ mod tests {
         assert!(continue_transition.is_continue());
         assert!(!continue_transition.is_stop());
 
-        let stop_transition = StateTransition::Stop("test reason".to_string());
+        let stop_transition: StateTransition<ExampleState> =
+            StateTransition::Stop("test reason".to_string());
         assert!(stop_transition.is_stop());
         assert_eq!(stop_transition.stop_reason(), Some("test reason"));
 

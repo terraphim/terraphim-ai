@@ -881,7 +881,7 @@ fn generate_evaluation_rationale(criterion: &str, score: f64) -> String {
     )
 }
 
-fn identify_strengths(variant: &ContentVariant, scores: &[CriterionScore]) -> Vec<String> {
+fn identify_strengths(_variant: &ContentVariant, scores: &[CriterionScore]) -> Vec<String> {
     scores
         .iter()
         .filter(|s| s.score > 0.75)
@@ -889,7 +889,7 @@ fn identify_strengths(variant: &ContentVariant, scores: &[CriterionScore]) -> Ve
         .collect()
 }
 
-fn identify_weaknesses(variant: &ContentVariant, scores: &[CriterionScore]) -> Vec<String> {
+fn identify_weaknesses(_variant: &ContentVariant, scores: &[CriterionScore]) -> Vec<String> {
     scores
         .iter()
         .filter(|s| s.score < 0.6)
@@ -898,7 +898,7 @@ fn identify_weaknesses(variant: &ContentVariant, scores: &[CriterionScore]) -> V
 }
 
 fn generate_improvement_suggestions(
-    variant: &ContentVariant,
+    _variant: &ContentVariant,
     scores: &[CriterionScore],
 ) -> Vec<String> {
     let mut suggestions = Vec::new();

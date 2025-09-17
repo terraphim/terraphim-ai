@@ -100,9 +100,6 @@ impl TaskRouter {
         let mut complexity = TaskComplexity::Simple;
         let mut domain = "general".to_string();
         let mut estimated_steps = 1;
-        let mut suitable_for_parallel = false;
-        let mut quality_critical = false;
-        let mut requires_decomposition = false;
 
         // Simple heuristic-based analysis
         // In a real implementation, this might use ML models or more sophisticated analysis
@@ -136,7 +133,7 @@ impl TaskRouter {
         }
 
         // Decomposition check
-        requires_decomposition = prompt.contains("step by step")
+        let requires_decomposition = prompt.contains("step by step")
             || prompt.contains("break down")
             || matches!(
                 complexity,
@@ -144,12 +141,12 @@ impl TaskRouter {
             );
 
         // Parallelization check
-        suitable_for_parallel = prompt.contains("compare")
+        let suitable_for_parallel = prompt.contains("compare")
             || prompt.contains("multiple")
             || prompt.contains("different approaches");
 
         // Quality critical check
-        quality_critical = prompt.contains("important")
+        let quality_critical = prompt.contains("important")
             || prompt.contains("critical")
             || prompt.contains("precise")
             || prompt.contains("accurate");

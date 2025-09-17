@@ -12,9 +12,9 @@ use terraphim_persistence::{DeviceStorage, Persistable};
 use terraphim_rolegraph::RoleGraph;
 
 use crate::{
-    extract_llm_config, AgentContext, AgentId, CommandHistory, CommandInput, CommandOutput,
-    CommandRecord, CommandType, ContextItem, ContextItemType, CostTracker, LlmMessage, LlmRequest,
-    MultiAgentError, MultiAgentResult, RigLlmClient, TokenUsageTracker,
+    AgentContext, AgentId, CommandHistory, CommandInput, CommandOutput,
+    CommandRecord, CommandType, ContextItem, ContextItemType, CostTracker, GenAiLlmClient, LlmMessage, LlmRequest,
+    MultiAgentError, MultiAgentResult, TokenUsageTracker,
 };
 
 /// Goals for an agent
@@ -138,7 +138,7 @@ pub struct TerraphimAgent {
     pub persistence: Arc<DeviceStorage>,
 
     // LLM Client
-    pub llm_client: Arc<RigLlmClient>,
+    pub llm_client: Arc<GenAiLlmClient>,
 
     // Metadata
     pub created_at: DateTime<Utc>,
@@ -220,16 +220,16 @@ impl TerraphimAgent {
         let token_tracker = Arc::new(RwLock::new(TokenUsageTracker::new(agent_id)));
         let cost_tracker = Arc::new(RwLock::new(CostTracker::new()));
 
-        // Initialize LLM client
-        let llm_config = extract_llm_config(&role_config.extra);
+        // Initialize LLM client using role configuration
+        let provider = role_config.extra.get("llm_provider")
+            .and_then(|v| v.as_str())
+            .unwrap_or("ollama");
+        let model = role_config.extra.get("llm_model")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        
         let llm_client = Arc::new(
-            RigLlmClient::new(
-                llm_config,
-                agent_id,
-                token_tracker.clone(),
-                cost_tracker.clone(),
-            )
-            .await?,
+            GenAiLlmClient::from_config(provider, model)?
         );
 
         let now = Utc::now();
@@ -570,7 +570,7 @@ impl TerraphimAgent {
             .with_metadata("command_type".to_string(), "generate".to_string())
             .with_metadata("agent_id".to_string(), self.agent_id.to_string());
 
-        let response = self.llm_client.complete(request).await?;
+        let response = self.llm_client.generate(request).await?;
         Ok(CommandOutput::new(response.content))
     }
 
@@ -594,7 +594,7 @@ impl TerraphimAgent {
             .with_metadata("command_type".to_string(), "answer".to_string())
             .with_metadata("agent_id".to_string(), self.agent_id.to_string());
 
-        let response = self.llm_client.complete(request).await?;
+        let response = self.llm_client.generate(request).await?;
         Ok(CommandOutput::new(response.content))
     }
 
@@ -630,7 +630,7 @@ impl TerraphimAgent {
             .with_metadata("command_type".to_string(), "analyze".to_string())
             .with_metadata("agent_id".to_string(), self.agent_id.to_string());
 
-        let response = self.llm_client.complete(request).await?;
+        let response = self.llm_client.generate(request).await?;
         Ok(CommandOutput::new(response.content))
     }
 
@@ -663,7 +663,7 @@ impl TerraphimAgent {
             .with_metadata("command_type".to_string(), "create".to_string())
             .with_metadata("agent_id".to_string(), self.agent_id.to_string());
 
-        let response = self.llm_client.complete(request).await?;
+        let response = self.llm_client.generate(request).await?;
         Ok(CommandOutput::new(response.content))
     }
 
@@ -692,7 +692,7 @@ impl TerraphimAgent {
             .with_metadata("command_type".to_string(), "review".to_string())
             .with_metadata("agent_id".to_string(), self.agent_id.to_string());
 
-        let response = self.llm_client.complete(request).await?;
+        let response = self.llm_client.generate(request).await?;
         Ok(CommandOutput::new(response.content))
     }
 
@@ -931,23 +931,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_creation() {
-        let role = Role {
-            shortname: Some("test".to_string()),
-            name: "Test Agent".into(),
-            relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_model: None,
-            openrouter_auto_summarize: false,
-            openrouter_chat_enabled: false,
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_model: None,
-            extra: ahash::AHashMap::default(),
-        };
+        let mut role = Role::new("Test Agent");
+        role.shortname = Some("test".to_string());
 
         DeviceStorage::init_memory_only().await.unwrap();
         // Use test utility function which handles storage correctly
@@ -967,36 +952,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_capabilities() {
-        let role = Role {
-            shortname: Some("eng".to_string()),
-            name: "Engineering Agent".into(),
-            relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![terraphim_config::Haystack {
-                read_only: false,
-                atomic_server_secret: None,
-                extra_parameters: std::collections::HashMap::new(),
-                location: "./src".to_string(),
-                service: ServiceType::Ripgrep,
-            }],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_model: None,
-            openrouter_auto_summarize: false,
-            openrouter_chat_enabled: false,
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_model: None,
-            extra: {
-                let mut extra = ahash::AHashMap::new();
-                extra.insert(
-                    "capabilities".to_string(),
-                    serde_json::json!(["code_review", "architecture"]),
-                );
-                extra
-            },
-        };
+        let mut role = Role::new("Engineering Agent");
+        role.shortname = Some("eng".to_string());
+        role.haystacks = vec![terraphim_config::Haystack {
+            read_only: false,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+            location: "./src".to_string(),
+            service: ServiceType::Ripgrep,
+        }];
+        role.extra.insert(
+            "capabilities".to_string(),
+            serde_json::json!(["code_review", "architecture"]),
+        );
 
         DeviceStorage::init_memory_only().await.unwrap();
         // Use test utility function which handles storage correctly

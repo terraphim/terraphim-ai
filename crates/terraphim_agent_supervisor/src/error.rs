@@ -110,7 +110,7 @@ pub enum ErrorCategory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentPid, SupervisorId};
+    use crate::AgentPid;
 
     #[test]
     fn test_error_recoverability() {

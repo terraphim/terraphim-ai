@@ -449,12 +449,10 @@ impl KnowledgeGraphTaskDecomposer {
             } else {
                 0.5
             }
+        } else if subtasks.len() <= 2 {
+            1.0
         } else {
-            if subtasks.len() <= 2 {
-                1.0
-            } else {
-                0.7
-            }
+            0.7
         };
 
         score += complexity_score * 0.3;

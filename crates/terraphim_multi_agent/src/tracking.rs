@@ -356,7 +356,7 @@ impl CostTracker {
 
         self.daily_spending
             .entry(today)
-            .or_insert_with(HashMap::new)
+            .or_default()
             .entry(agent_id)
             .and_modify(|e| *e += cost_usd)
             .or_insert(cost_usd);

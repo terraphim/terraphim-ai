@@ -10,7 +10,7 @@ use chrono::Utc;
 // use tokio_test;
 
 use terraphim_agent_evolution::{
-    workflows::{WorkflowInput, WorkflowOutput, WorkflowParameters, WorkflowPattern},
+    workflows::{WorkflowInput, WorkflowParameters, WorkflowPattern},
     *,
 };
 
@@ -531,7 +531,7 @@ async fn test_evaluator_optimizer_iterative_improvement() {
     assert_eq!(result.metadata.pattern_used, "evaluator_optimizer");
 
     // Should show at least initial generation, may have optimization iterations
-    assert!(result.execution_trace.len() >= 1); // At least initial generation
+    assert!(!result.execution_trace.is_empty()); // At least initial generation
     assert!(result
         .execution_trace
         .iter()
@@ -790,27 +790,4 @@ async fn test_error_handling_and_recovery() {
 
 // Helper functions for test setup and validation
 
-/// Validate that a workflow output meets basic quality requirements
-fn validate_workflow_output(output: &WorkflowOutput, expected_pattern: &str) {
-    assert_eq!(output.metadata.pattern_used, expected_pattern);
-    assert!(output.metadata.execution_time > Duration::from_millis(0));
-    assert!(!output.execution_trace.is_empty());
-    assert!(!output.result.is_empty());
 
-    // All execution steps should have proper structure
-    for step in &output.execution_trace {
-        assert!(!step.step_id.is_empty());
-        assert!(!step.output.is_empty() || !step.success);
-        assert!(step.duration >= Duration::from_millis(0));
-    }
-
-    // Resource usage should be tracked
-    assert!(output.metadata.resources_used.llm_calls > 0);
-}
-
-/// Create a mock adapter that simulates different behaviors for testing
-fn create_specialized_test_adapter(behavior: &str) -> std::sync::Arc<dyn LlmAdapter> {
-    // This would create adapters with specific behaviors for testing
-    // For now, we use the standard mock adapter
-    LlmAdapterFactory::create_mock(behavior)
-}

@@ -710,7 +710,6 @@ mod tests {
             agent_id: agent_id.clone(),
             supervisor_id: supervisor_id.clone(),
             config: serde_json::json!({}),
-            timeout: Duration::from_secs(30),
         };
 
         let agent = TestRuntimeAgent;
