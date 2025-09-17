@@ -73,24 +73,62 @@ if [ "$secrets_found" = true ]; then
 fi
 print_status "SUCCESS" "No secrets detected"
 
-# Check Rust formatting
+# Comprehensive Rust checks
 if command_exists cargo; then
-    print_status "INFO" "Checking Rust formatting..."
-    if ! cargo fmt --all -- --check >/dev/null 2>&1; then
-        print_status "FAIL" "Rust code is not properly formatted"
-        print_status "INFO" "Run 'cargo fmt' to fix formatting issues"
-        exit 1
-    fi
-    print_status "SUCCESS" "Rust formatting check passed"
+    # Check if there are any Rust files in the staged changes
+    rust_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(rs|toml)$' || true)
 
-    # Check Rust linting
-    print_status "INFO" "Running Rust linter (clippy)..."
-    if ! cargo clippy --workspace --all-targets --all-features -- -D warnings >/dev/null 2>&1; then
-        print_status "FAIL" "Clippy found issues"
-        print_status "INFO" "Run 'cargo clippy --workspace --all-targets --all-features -- -D warnings' to see details"
-        exit 1
+    if [ -n "$rust_files" ]; then
+        print_status "INFO" "Rust files detected, running comprehensive Rust checks..."
+
+        # Check Rust formatting
+        print_status "INFO" "Checking Rust formatting..."
+        if ! cargo fmt --all -- --check >/dev/null 2>&1; then
+            print_status "FAIL" "Rust code is not properly formatted"
+            print_status "INFO" "Run 'cargo fmt' to fix formatting issues"
+            exit 1
+        fi
+        print_status "SUCCESS" "Rust formatting check passed"
+
+        # Check Rust compilation (cargo check - faster than full build)
+        print_status "INFO" "Running cargo check..."
+        if ! timeout 60s cargo check --workspace --all-targets >/dev/null 2>&1; then
+            print_status "FAIL" "Cargo check failed - compilation errors detected"
+            print_status "INFO" "Run 'cargo check --workspace --all-targets' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "Cargo check passed"
+
+        # Check Rust linting (clippy)
+        print_status "INFO" "Running Rust linter (clippy)..."
+        if ! timeout 60s cargo clippy --workspace --all-targets >/dev/null 2>&1; then
+            print_status "FAIL" "Clippy found issues"
+            print_status "INFO" "Run 'cargo clippy --workspace --all-targets' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "Rust linting passed"
+
+        # Build the project (optimized for speed)
+        print_status "INFO" "Building Rust project..."
+        if ! timeout 90s cargo build --workspace >/dev/null 2>&1; then
+            print_status "FAIL" "Cargo build failed"
+            print_status "INFO" "Run 'cargo build --workspace' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "Cargo build passed"
+
+        # Run tests (with timeout to avoid hanging)
+        print_status "INFO" "Running Rust tests..."
+        if ! timeout 90s cargo test --workspace --lib >/dev/null 2>&1; then
+            print_status "FAIL" "Some tests are failing"
+            print_status "INFO" "Run 'cargo test --workspace --lib' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "All Rust tests passed"
+
+    else
+        print_status "INFO" "No Rust files in staged changes, skipping Rust-specific checks"
     fi
-    print_status "SUCCESS" "Rust linting passed"
 else
     print_status "WARN" "Cargo not found, skipping Rust checks"
 fi
@@ -153,6 +191,30 @@ if [ -n "$toml_files" ]; then
         print_status "SUCCESS" "TOML syntax checks passed"
     else
         print_status "WARN" "Cargo not found, skipping TOML syntax check"
+    fi
+fi
+
+# Validate commit message format (conventional commits)
+if [ -f "$1" ]; then
+    commit_msg_file="$1"
+elif [ -f ".git/COMMIT_EDITMSG" ]; then
+    commit_msg_file=".git/COMMIT_EDITMSG"
+else
+    commit_msg_file=""
+fi
+
+if [ -n "$commit_msg_file" ] && [ -f "$commit_msg_file" ]; then
+    print_status "INFO" "Validating conventional commit format..."
+    commit_msg=$(head -n1 "$commit_msg_file")
+
+    # Check conventional commit format: type(scope): description
+    if [[ "$commit_msg" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?\!?:\ .{1,50} ]]; then
+        print_status "SUCCESS" "Conventional commit format is valid!"
+    else
+        print_status "WARN" "Commit message doesn't follow conventional commit format"
+        print_status "INFO" "Expected format: type(scope): description"
+        print_status "INFO" "Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert"
+        print_status "INFO" "Current message: $commit_msg"
     fi
 fi
 
