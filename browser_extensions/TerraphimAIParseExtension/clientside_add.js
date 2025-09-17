@@ -9,4 +9,3 @@ console.log("Running clientside_add.js");
     console.log('parsing complete')
 }
 )();
-

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
-  import { Field, Input } from "svelma";
+  import { Field, Input, Taglist, Tag } from "svelma";
   import { input, is_tauri, role, roles, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
   import type { Document, SearchResponse } from "./SearchResult";
@@ -26,11 +26,50 @@
 
   $: thesaurusEntries = Object.entries($thesaurus);
 
+  // State to prevent circular updates
+  let isUpdatingFromChips = false;
+
+  // Reactive statement to parse input and update chips when user types
+  // Only parse when input contains operators to avoid constant parsing
+  $: if ($input && !isUpdatingFromChips && ($input.includes(' AND ') || $input.includes(' OR ') || $input.includes(' and ') || $input.includes(' or '))) {
+    parseAndUpdateChips($input);
+  }
+
+  // Function to parse input and update chips
+  function parseAndUpdateChips(inputText: string) {
+    const parsed = parseSearchInput(inputText);
+
+    if (parsed.hasOperator && parsed.terms.length > 1) {
+      const newSelectedTerms = parsed.terms.map(term => {
+        const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
+        return { value: term, isFromKG };
+      });
+
+      // Only update if the terms have actually changed
+      const currentTermValues = selectedTerms.map(t => t.value);
+      const newTermValues = newSelectedTerms.map(t => t.value);
+
+      if (JSON.stringify(currentTermValues) !== JSON.stringify(newTermValues) ||
+          currentLogicalOperator !== parsed.operator) {
+        selectedTerms = newSelectedTerms;
+        currentLogicalOperator = parsed.operator;
+      }
+    } else if (parsed.terms.length === 1 && selectedTerms.length > 0) {
+      // Single term - clear chips if they exist
+      selectedTerms = [];
+      currentLogicalOperator = null;
+    } else if (parsed.terms.length === 0) {
+      // Empty input - clear everything
+      selectedTerms = [];
+      currentLogicalOperator = null;
+    }
+  }
+
   // Helper function to get term suggestions for autocomplete
   async function getTermSuggestions(query: string): Promise<string[]> {
     try {
       if ($is_tauri) {
-        const response = await invoke("get_autocomplete_suggestions", {
+        const response: any = await invoke("get_autocomplete_suggestions", {
           query: query,
           roleName: $role,
           limit: 8
@@ -69,22 +108,29 @@
       return [];
     }
 
+    // Parse the input to detect operators and terms
+    const parsed = parseSearchInput(inputValue);
+    const words = inputValue.split(/\s+/);
+    const lastWord = words[words.length - 1].toLowerCase();
+
     // If user has selected an operator from UI, don't suggest text operators
     if (selectedOperator !== 'none') {
       // For UI operator selection, suggest terms for any word in input
-      const words = inputValue.split(/\s+/);
-      const lastWord = words[words.length - 1].toLowerCase();
-
       if (lastWord.length < 2) {
         return [];
       }
-
       return getTermSuggestions(lastWord);
     }
 
-    // Check if user is typing after a term that could be followed by AND/OR
-    const words = inputValue.split(/\s+/);
-    const lastWord = words[words.length - 1].toLowerCase();
+    // If we have operators in the input, prioritize term suggestions after operators
+    if (parsed.hasOperator && parsed.terms.length > 0) {
+      // Get the last term (what user is currently typing)
+      const currentTerm = parsed.terms[parsed.terms.length - 1];
+      if (currentTerm && currentTerm.length >= 2) {
+        return getTermSuggestions(currentTerm);
+      }
+      return [];
+    }
 
     // If the last word is a partial "and" or "or", suggest these operators
     if (words.length > 1 && selectedOperator === 'none') {
@@ -102,23 +148,24 @@
 
     // If the input ends with "AND" or "OR", suggest terms but don't include operators
     const inputLower = inputValue.toLowerCase();
-    if (inputLower.includes(" and ") || inputLower.includes(" or ")) {
+    if (inputLower.includes(" and ") || inputLower.includes(" or ") ||
+        inputLower.includes(" AND ") || inputLower.includes(" OR ")) {
       // For multi-term queries, only suggest terms after the operator
       const termAfterOperator = lastWord;
       if (termAfterOperator.length < 2) {
         return [];
       }
-
       return getTermSuggestions(termAfterOperator);
     }
 
-    // Regular single-term autocomplete
+    // Regular single-term autocomplete with enhanced operator suggestions
     try {
       const termSuggestions = await getTermSuggestions(inputValue);
 
       // Add operator suggestions if we have a single term and no UI operator selected
       if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
-        return [...termSuggestions.slice(0, 6), "AND", "OR"];
+        // Prioritize capitalized operators
+        return [...termSuggestions.slice(0, 5), "AND", "OR"];
       }
 
       return termSuggestions;
@@ -128,7 +175,7 @@
       const termSuggestions = thesaurusEntries
         .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
         .map(([key]) => key)
-        .slice(0, 6);
+        .slice(0, 5);
 
       if (words.length === 1 && words[0].length > 2 && selectedOperator === 'none') {
         return [...termSuggestions, "AND", "OR"];
@@ -148,10 +195,22 @@
     const words = textBeforeCursor.split(/\s+/);
     const currentWord = words[words.length - 1];
 
-    // Only fetch suggestions if the current word has at least 2 characters
-    if (currentWord.length >= 2) {
+    // Check if user is typing an operator
+    if (currentWord.toLowerCase() === 'a' || currentWord.toLowerCase() === 'an') {
+      suggestions = ['AND'];
+    } else if (currentWord.toLowerCase() === 'o' || currentWord.toLowerCase() === 'or') {
+      suggestions = ['OR'];
+    } else if (currentWord.length >= 2) {
+      // Get term suggestions for longer words
       try {
-        suggestions = await getSuggestions(currentWord);
+        const termSuggestions = await getSuggestions(currentWord);
+
+        // Add operator suggestions if we have existing terms
+        if (words.length > 1 && !textBeforeCursor.includes(' AND ') && !textBeforeCursor.includes(' OR ')) {
+          suggestions = [...termSuggestions, 'AND', 'OR'];
+        } else {
+          suggestions = termSuggestions;
+        }
       } catch (error) {
         console.warn('Failed to get suggestions:', error);
         suggestions = [];
@@ -163,18 +222,33 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (suggestions.length === 0) return;
-
-    if (event.key === "ArrowDown") {
+    if (suggestions.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
+      } else if ((event.key === "Enter" || event.key === "Tab") && suggestionIndex !== -1) {
+        event.preventDefault();
+        applySuggestion(suggestions[suggestionIndex]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        suggestions = [];
+        suggestionIndex = -1;
+      }
+    } else if (event.key === "Enter") {
       event.preventDefault();
-      suggestionIndex = (suggestionIndex + 1) % suggestions.length;
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
-    } else if ((event.key === "Enter" || event.key === "Tab") && suggestionIndex !== -1) {
-      event.preventDefault();
-      applySuggestion(suggestions[suggestionIndex]);
+      parseAndSearch();
     }
+  }
+
+  // Combined function to parse input into chips and then search
+  function parseAndSearch() {
+    // Force parsing of the current input
+    parseAndUpdateChips($input);
+    // Then perform search
+    handleSearchInputEvent();
   }
 
   function applySuggestion(suggestion: string) {
@@ -190,8 +264,22 @@
 
       $input = $input + ` ${suggestion} `;
     } else {
-      // It's a term suggestion - add it as a selected term
-      addSelectedTerm(suggestion, currentLogicalOperator);
+      // It's a term suggestion - replace the current partial term
+      const words = $input.trim().split(/\s+/);
+      const lastWord = words[words.length - 1];
+
+      // If the last word is a partial match for the suggestion, replace it
+      if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
+        // Replace the last word with the full suggestion
+        words[words.length - 1] = suggestion;
+        $input = words.join(' ');
+
+        // Trigger parsing to update chips with the new input
+        parseAndUpdateChips($input);
+      } else {
+        // If no partial match, add as new term
+        addSelectedTerm(suggestion, currentLogicalOperator);
+      }
     }
 
     suggestions = [];
@@ -205,13 +293,17 @@
 
     // If user has selected an operator from UI, enforce it
     if (selectedOperator !== 'none') {
-      // Split on spaces to get multiple terms
-      const terms = inputText.split(/\s+/).filter(term => term.length > 0);
+      // First parse the input to remove any text operators and get clean terms
+      const parsed = parseSearchInput(inputText);
+
+      // If parsing found operators, use those terms; otherwise split on spaces
+      const terms = parsed.hasOperator ? parsed.terms : inputText.split(/\s+/).filter(term => term.length > 0);
+
       if (terms.length > 1) {
         // Use shared utility with UI operator override
         const fakeParser = {
           hasOperator: true,
-          operator: selectedOperator === 'and' ? 'AND' : 'OR',
+          operator: (selectedOperator === 'and' ? 'AND' : 'OR') as 'AND' | 'OR',
           terms: terms,
           originalQuery: inputText,
         };
@@ -269,6 +361,8 @@
   }
 
   function updateInputFromSelectedTerms() {
+    isUpdatingFromChips = true;
+
     if (selectedTerms.length === 0) {
       $input = '';
       currentLogicalOperator = null;
@@ -279,6 +373,11 @@
       const operator = currentLogicalOperator || 'AND';
       $input = selectedTerms.map(t => t.value).join(` ${operator} `);
     }
+
+    // Reset the flag after a brief delay to allow reactivity to settle
+    setTimeout(() => {
+      isUpdatingFromChips = false;
+    }, 10);
   }
 
   function clearSelectedTerms() {
@@ -360,6 +459,20 @@
           on:keydown={handleKeydown}
           on:input={updateSuggestions}
         />
+    <div class="search-row">
+      <div class="input-wrapper">
+        <Input
+          type="search"
+          bind:value={$input}
+          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
+          icon="search"
+          expanded
+          autofocus
+          on:click={handleSearchInputEvent}
+          on:submit={handleSearchInputEvent}
+          on:keydown={handleKeydown}
+          on:input={updateSuggestions}
+        />
       {#if suggestions.length > 0}
         <ul class="suggestions">
           {#each suggestions as suggestion, index}
@@ -387,18 +500,33 @@
       <!-- Selected terms display -->
       {#if selectedTerms.length > 0}
         <div class="selected-terms-section">
-          <div class="search-terms">
+          <Taglist>
             {#each selectedTerms as term, index}
-              <TermChip
-                term={term.value}
-                isFromKG={term.isFromKG}
-                onRemove={() => removeSelectedTerm(term.value)}
-              />
+              <div class="term-tag-wrapper" class:from-kg={term.isFromKG}>
+                <Tag
+                  rounded
+                  on:click={() => removeSelectedTerm(term.value)}
+                  title="Click to remove term"
+                >
+                  {term.value}
+                  <button
+                    class="remove-tag-btn"
+                    on:click|stopPropagation={() => removeSelectedTerm(term.value)}
+                    aria-label={`Remove term: ${term.value}`}
+                  >
+                    ×
+                  </button>
+                </Tag>
+              </div>
               {#if index < selectedTerms.length - 1}
-                <span class="operator-chip">{currentLogicalOperator || 'AND'}</span>
+                <div class="operator-tag-wrapper">
+                  <Tag class="operator-tag" rounded>
+                    {currentLogicalOperator || 'AND'}
+                  </Tag>
+                </div>
               {/if}
             {/each}
-          </div>
+          </Taglist>
           <button type="button" class="clear-terms-btn" on:click={clearSelectedTerms}>
             Clear all
           </button>
@@ -420,6 +548,13 @@
             Any (OR)
           </label>
         </div>
+
+        <!-- Parse button for manual parsing -->
+        {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
+          <button type="button" class="button is-small is-info" on:click={() => parseAndUpdateChips($input)}>
+            Parse Terms
+          </button>
+        {/if}
       </div>
     </div>
   </Field>
@@ -526,6 +661,59 @@
     background: rgba(0, 0, 0, 0.02);
     border-radius: 4px;
     border: 1px solid #e0e0e0;
+  }
+
+  .term-tag-wrapper {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    display: inline-block;
+  }
+
+  .term-tag-wrapper:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+
+  .term-tag-wrapper.from-kg :global(.tag) {
+    background-color: #3273dc;
+    color: white;
+  }
+
+  .term-tag-wrapper.from-kg:hover :global(.tag) {
+    background-color: #2366d1;
+  }
+
+  .remove-tag-btn {
+    position: absolute;
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    width: 1rem;
+    height: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+  }
+
+  .remove-tag-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .operator-tag-wrapper :global(.tag) {
+    background-color: #f5f5f5;
+    color: #666;
+    font-weight: 600;
+    cursor: default;
   }
 
   .clear-terms-btn {

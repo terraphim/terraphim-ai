@@ -129,4 +129,3 @@ chrome.contextMenus.removeAll(function () {
     console.log("Context menu action completed");
   })
 })
-
