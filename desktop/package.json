@@ -60,6 +60,7 @@
     "test:comprehensive:ci": "CI=true playwright test tests/e2e/chat-functionality.spec.ts tests/e2e/summarization.spec.ts tests/e2e/ollama-integration.spec.ts tests/e2e/config-wizard-complete.spec.ts --reporter=github,html,json --workers=1 --retries=3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.4",
     "@playwright/test": "^1.44.1",
     "@sveltejs/vite-plugin-svelte": "^2.1.0",
     "@tauri-apps/cli": "^1.5.11",

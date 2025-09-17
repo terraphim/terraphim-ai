@@ -8,8 +8,10 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
 
-use crate::llm::{build_llm_from_role, SummarizeOptions};
-use crate::rate_limiter::{estimate_tokens, RateLimiterManager};
+use terraphim_persistence::Persistable;
+
+use crate::llm::SummarizeOptions;
+// Rate limiter imports removed - not needed for sequential processing
 use crate::summarization_queue::{
     QueueCommand, QueueConfig, QueueStats, SummarizationTask, TaskId, TaskStatus,
 };
@@ -93,7 +95,6 @@ pub struct SummarizationWorker {
     config: QueueConfig,
     task_queue: BinaryHeap<PriorityTask>,
     task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
-    rate_limiter: RateLimiterManager,
     stats: Arc<RwLock<WorkerStats>>,
     is_paused: bool,
     active_workers: usize,
@@ -103,13 +104,10 @@ pub struct SummarizationWorker {
 impl SummarizationWorker {
     /// Create a new summarization worker
     pub fn new(config: QueueConfig, task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>) -> Self {
-        let rate_limiter = RateLimiterManager::new(config.rate_limits.clone());
-
         Self {
             config,
             task_queue: BinaryHeap::new(),
             task_status,
-            rate_limiter,
             stats: Arc::new(RwLock::new(WorkerStats::default())),
             is_paused: false,
             active_workers: 0,
@@ -133,7 +131,6 @@ impl SummarizationWorker {
 
         for worker_id in 0..self.config.max_concurrent_workers {
             let task_receiver = Arc::clone(&task_receiver);
-            let rate_limiter = self.rate_limiter.clone();
             let task_status = Arc::clone(&self.task_status);
             let stats = Arc::clone(&self.stats);
             let retry_delay = self.config.retry_delay;
@@ -143,7 +140,6 @@ impl SummarizationWorker {
                 Self::worker_loop(
                     worker_id,
                     task_receiver,
-                    rate_limiter,
                     task_status,
                     stats,
                     retry_delay,
@@ -342,7 +338,7 @@ impl SummarizationWorker {
             },
             is_paused: self.is_paused,
             active_workers: self.active_workers,
-            rate_limiter_status: self.rate_limiter.get_all_status().await,
+            rate_limiter_status: std::collections::HashMap::new(), // Rate limiting removed
         }
     }
 
@@ -394,7 +390,6 @@ impl SummarizationWorker {
     async fn worker_loop(
         worker_id: usize,
         task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<SummarizationTask>>>,
-        rate_limiter: RateLimiterManager,
         task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
         stats: Arc<RwLock<WorkerStats>>,
         retry_delay: Duration,
@@ -430,19 +425,44 @@ impl SummarizationWorker {
             }
 
             let start_time = Instant::now();
-            match Self::process_task(task.clone(), &rate_limiter).await {
+            match Self::process_task(task.clone()).await {
                 Ok(summary) => {
                     let duration = start_time.elapsed();
+
+                    // Update the task status with completion
                     let mut status_map = task_status.write().await;
                     status_map.insert(
                         task_id.clone(),
                         TaskStatus::Completed {
-                            summary,
+                            summary: summary.clone(),
                             completed_at: Utc::now(),
                             processing_duration_seconds: duration.as_secs(),
                         },
                     );
                     drop(status_map);
+
+                    // Persist the document with the summarization for future retrieval
+                    let mut updated_document = task.document.clone();
+                    updated_document.summarization = Some(summary.clone());
+
+                    match updated_document.save().await {
+                        Ok(_) => {
+                            log::debug!(
+                                "Worker {} persisted document {} with summarization",
+                                worker_id,
+                                task.document.id
+                            );
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "Worker {} failed to persist document {} with summarization: {:?}",
+                                worker_id,
+                                task.document.id,
+                                e
+                            );
+                            // Don't fail the task for persistence errors
+                        }
+                    }
 
                     // Record successful processing in stats
                     {
@@ -525,31 +545,38 @@ impl SummarizationWorker {
     }
 
     /// Process a single task
-    async fn process_task(
-        task: SummarizationTask,
-        rate_limiter: &RateLimiterManager,
-    ) -> Result<String, ServiceError> {
+    async fn process_task(task: SummarizationTask) -> Result<String, ServiceError> {
         // Check if summary already exists and force_regenerate is false
         if !task.force_regenerate {
             if let Some(existing_summary) = &task.document.description {
                 if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
-                    log::debug!("Using existing summary for document '{}'", task.document.id);
+                    log::info!(
+                        "Worker bypassing LLM: Using existing description as summary for document '{}' (length: {})",
+                        task.document.id, existing_summary.len()
+                    );
                     return Ok(existing_summary.clone());
                 }
             }
         }
 
-        // Build LLM client from role
-        let llm = build_llm_from_role(&task.role).ok_or_else(|| {
-            ServiceError::Config("No LLM provider configured for role".to_string())
-        })?;
+        // Check if document already has summarization (caching)
+        if let Some(existing_summary) = &task.document.summarization {
+            if !task.force_regenerate {
+                log::info!(
+                    "Worker bypassing LLM: Using cached summarization for document '{}' (length: {})",
+                    task.document.id, existing_summary.len()
+                );
+                return Ok(existing_summary.clone());
+            }
+        }
 
-        // Estimate tokens needed
-        let tokens_needed = estimate_tokens(&task.document.body);
+        // Build LLM client from role with config fallback
+        let llm = crate::llm::build_llm_for_summarization(&task.role, task.config.as_ref())
+            .ok_or_else(|| {
+                ServiceError::Config("No LLM provider configured for role".to_string())
+            })?;
 
-        // Wait for rate limit approval
-        let provider = llm.name();
-        rate_limiter.acquire(provider, tokens_needed).await?;
+        // Note: Rate limiting removed - not needed for sequential task processing
 
         // Create summarization options
         let options = SummarizeOptions {
@@ -557,6 +584,11 @@ impl SummarizationWorker {
         };
 
         // Call LLM with timeout
+        log::info!(
+            "Worker calling REAL LLM for document '{}' with {} chars of content",
+            task.document.id,
+            task.document.body.len()
+        );
         let summary_future = llm.summarize(&task.document.body, options);
         let summary = timeout(Duration::from_secs(120), summary_future)
             .await
@@ -583,27 +615,7 @@ impl SummarizationWorker {
     }
 }
 
-// Implement Clone for RateLimiterManager
-impl Clone for RateLimiterManager {
-    fn clone(&self) -> Self {
-        // This is a bit of a hack - we create a new manager with empty configs
-        // and then add the existing providers. In practice, we should refactor
-        // to use Arc<RateLimiterManager> instead.
-        let mut configs = HashMap::new();
-        // We can't easily clone the existing limiters, so we'll create with default configs
-        for provider in ["openrouter", "ollama"] {
-            configs.insert(
-                provider.to_string(),
-                crate::summarization_queue::RateLimitConfig {
-                    max_requests_per_minute: 60,
-                    max_tokens_per_minute: 10000,
-                    burst_size: 10,
-                },
-            );
-        }
-        Self::new(configs)
-    }
-}
+// Note: QueueBasedRateLimiterManager implements Clone automatically
 
 #[cfg(test)]
 mod tests {

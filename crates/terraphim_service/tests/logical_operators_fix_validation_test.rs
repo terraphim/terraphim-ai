@@ -225,7 +225,7 @@ mod logical_operators_fix_validation_tests {
         // In test environment might have no documents, just verify it doesn't crash
         println!(
             "Single term search returned {} documents",
-            filtered_docs.len()
+            filtered_docs.documents.len()
         );
     }
 

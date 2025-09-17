@@ -73,6 +73,39 @@ impl SummarizationManager {
         self.queue.submit_task(task).await
     }
 
+    /// Submit a document for summarization with config
+    #[allow(clippy::too_many_arguments)]
+    pub async fn summarize_document_with_config(
+        &self,
+        document: Document,
+        role: Role,
+        config: terraphim_config::Config,
+        priority: Option<Priority>,
+        max_summary_length: Option<usize>,
+        force_regenerate: Option<bool>,
+        callback_url: Option<String>,
+    ) -> Result<SubmitResult, ServiceError> {
+        let mut task = SummarizationTask::new(document, role).with_config(config);
+
+        if let Some(priority) = priority {
+            task = task.with_priority(priority);
+        }
+
+        if let Some(length) = max_summary_length {
+            task = task.with_max_summary_length(length);
+        }
+
+        if let Some(force) = force_regenerate {
+            task = task.with_force_regenerate(force);
+        }
+
+        if let Some(url) = callback_url {
+            task = task.with_callback_url(url);
+        }
+
+        self.queue.submit_task(task).await
+    }
+
     /// Get the status of a specific task
     pub async fn get_task_status(&self, task_id: &TaskId) -> Option<TaskStatus> {
         self.queue.get_task_status(task_id).await
