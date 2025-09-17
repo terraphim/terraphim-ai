@@ -179,9 +179,9 @@
           suggestions = [];
           return;
         }
-        
+
         const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($role)}`);
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'success') {
