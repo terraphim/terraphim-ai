@@ -1,6 +1,9 @@
 {
   "id": "OllamaLlama",
   "global_shortcut": "Ctrl+Shift+L",
+  "default_model_provider": "ollama",
+  "default_chat_model": "gemma2:2b",
+  "default_summarization_model": "gemma3:270m",
   "roles": {
     "Default": {
       "shortname": "Default",
@@ -39,7 +42,7 @@
       "llm_system_prompt": "You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.",
       "extra": {
         "llm_provider": "ollama",
-        "llm_model": "llama3.2:3b",
+        "llm_model": "gemma2:2b",
         "llm_base_url": "http://127.0.0.1:11434",
         "llm_auto_summarize": true,
         "llm_description": "Local Ollama instance with llama3.2:3b for Rust-focused development and documentation"
@@ -72,7 +75,7 @@
       "llm_system_prompt": "You are an expert Terraphim AI assistant specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.",
       "extra": {
         "llm_provider": "ollama",
-        "llm_model": "llama3.2:3b",
+        "llm_model": "gemma2:2b",
         "llm_base_url": "http://127.0.0.1:11434",
         "llm_auto_summarize": true,
         "llm_description": "AI-powered assistant using local llama3.2:3b with knowledge graph integration"
@@ -97,7 +100,7 @@
       "llm_system_prompt": "You are an expert software developer with broad knowledge across multiple programming languages and frameworks. You help with general software development tasks, debugging, and best practices.",
       "extra": {
         "llm_provider": "ollama",
-        "llm_model": "llama3.2:3b",
+        "llm_model": "gemma2:2b",
         "llm_base_url": "http://127.0.0.1:11434",
         "llm_auto_summarize": true,
         "llm_description": "Developer-focused role with BM25 scoring and llama3.2:3b summarization"

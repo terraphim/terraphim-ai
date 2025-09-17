@@ -132,11 +132,14 @@ impl McpService {
         match service.search(&search_query).await {
             Ok(documents) => {
                 let mut contents = Vec::new();
-                let summary = format!("Found {} documents matching your query.", documents.len());
+                let summary = format!(
+                    "Found {} documents matching your query.",
+                    documents.documents.len()
+                );
                 contents.push(Content::text(summary));
 
-                let limit = limit.unwrap_or(documents.len() as i32) as usize;
-                for (idx, doc) in documents.iter().enumerate() {
+                let limit = limit.unwrap_or(documents.documents.len() as i32) as usize;
+                for (idx, doc) in documents.documents.iter().enumerate() {
                     if idx >= limit {
                         break;
                     }
@@ -436,8 +439,8 @@ impl McpService {
                     skip: Some(0),
                 };
                 let snippet = match service.search(&sq).await {
-                    Ok(docs) if !docs.is_empty() => {
-                        let d = &docs[0];
+                    Ok(docs) if !docs.documents.is_empty() => {
+                        let d = &docs.documents[0];
                         if let Some(stub) = &d.stub {
                             stub.clone()
                         } else if let Some(desc) = &d.description {
@@ -1899,7 +1902,7 @@ impl ServerHandler for McpService {
 
             match service.search(&search_query).await {
                 Ok(documents) => {
-                    for doc in documents {
+                    for doc in documents.documents {
                         all_documents.insert(doc.id.clone());
                     }
                 }
@@ -1928,7 +1931,7 @@ impl ServerHandler for McpService {
 
             let resources = self
                 .resource_mapper
-                .documents_to_resources(&documents)
+                .documents_to_resources(&documents.documents)
                 .map_err(TerraphimMcpError::Anyhow)?;
 
             return Ok(ListResourcesResult {

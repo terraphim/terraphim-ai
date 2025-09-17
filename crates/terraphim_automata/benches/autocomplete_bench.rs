@@ -20,8 +20,10 @@ use terraphim_automata::autocomplete::{
     AutocompleteIndex,
 };
 use terraphim_automata::matcher::extract_paragraphs_from_automata;
-use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+#[cfg(all(feature = "remote-loading", feature = "tokio-runtime"))]
+use terraphim_automata::{load_thesaurus, AutomataPath};
 
 #[cfg(feature = "tokio-runtime")]
 use tokio::runtime::Runtime;

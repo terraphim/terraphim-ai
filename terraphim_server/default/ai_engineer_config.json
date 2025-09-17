@@ -1,6 +1,9 @@
 {
   "id": "Server",
   "global_shortcut": "Ctrl+Shift+A",
+  "default_model_provider": "ollama",
+  "default_chat_model": "gemma2:2b",
+  "default_summarization_model": "gemma3:270m",
   "roles": {
     "Default": {
       "shortname": "Default",
@@ -17,7 +20,12 @@
           "atomic_server_secret": null
         }
       ],
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     },
     "AI Engineer": {
       "shortname": "AI-Eng",
@@ -46,7 +54,12 @@
       "openrouter_api_key": null,
       "openrouter_model": "openai/gpt-3.5-turbo",
       "llm_system_prompt": "You are an expert AI/ML engineer specializing in implementing machine learning features, integrating language models, and building intelligent automation systems. Focus on practical AI implementation, model integration, and AI-powered applications.",
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     },
     "Terraphim Engineer": {
       "shortname": "TerraEng",
@@ -72,7 +85,12 @@
         }
       ],
       "llm_system_prompt": "You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.",
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     },
     "Engineer": {
       "shortname": "Engineer",
@@ -98,7 +116,12 @@
         }
       ],
       "llm_system_prompt": "You are an expert software engineer specializing in system architecture, DevOps, and full-stack development. You help with designing scalable systems, implementing best practices, and troubleshooting technical issues.",
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     },
     "ClickUp": {
       "shortname": "ClickUp",
@@ -120,7 +143,12 @@
           }
         }
       ],
-      "extra": {}
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "gemma2:2b",
+        "llm_auto_summarize": true
+      }
     }
   },
   "default_role": "AI Engineer",
