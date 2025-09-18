@@ -2534,3 +2534,47 @@ This comprehensive bug fix demonstrates the value of systematic code review, tho
 3. **Team Productivity**: Platform-native solutions often provide better integration benefits
 4. **Technology Lifecycle**: Plan for vendor changes as part of normal technology management
 5. **Documentation Value**: Comprehensive migration planning pays dividends in execution quality
+
+## Import Error Debugging Patterns (2025-09-18)
+
+### @tomic/lib Version Compatibility
+- **Issue**: `importJsonAdString` import error causing build failures
+- **Root Cause**: Function doesn't exist in @tomic/lib v0.40.0
+- **Pattern**: Always check package exports in node_modules when encountering import binding errors
+- **Debugging Steps**:
+  1. Check package.json for exact version
+  2. Examine node_modules/@tomic/lib/dist/src/index.d.ts for available exports
+  3. Search codebase to verify if import is actually used
+  4. Remove unused imports to prevent binding errors
+
+### Test Matrix Validation Approach
+- **Claimed vs Actual Results**: Documentation claims 100% success rate but requires real validation
+- **Testing Strategy**: Use tiered approach - local tests first, then credential-based remote tests
+- **Search Term Selection**: Use domain-appropriate terms:
+  - General: "test", "async", "system"
+  - Rust-specific (QueryRs): "tokio", "function", "async"
+  - Task management (ClickUp): "task", "project", "issue"
+- **Credential Management**: .env file contains all necessary API keys and tokens
+
+## Memory File System Requirements
+- **CLAUDE.md Compliance**: Project requires @memories.md, @lessons-learned.md, @scratchpad.md
+- **Purpose**: Track project state, technical insights, and active work
+- **Update Pattern**: Add entries after significant work completion
+- **Versioning**: Use incremental version numbers (v1.0.21, etc.)
+
+## Test Matrix Architecture Understanding
+- **Framework Location**: `crates/terraphim_tui/tests/scoring_haystack_matrix_tests.rs`
+- **Coverage**: 90 combinations (5 scoring × 6 haystacks × query scorers)
+- **Execution**: `./run_test_matrix.sh` with category options
+- **Expected Failure Rate**: Remote services may fail due to availability
+
+## Credential-Based Testing Patterns
+- **Atomic Server**: Requires ATOMIC_SERVER_URL and SECRET for local instance
+- **ClickUp**: Needs API_TOKEN and TEAM_ID for task search functionality
+- **QueryRs**: Public API, no credentials required
+- **Ripgrep**: Local filesystem, no credentials needed
+
+## Frontend Build Error Resolution
+- **Pattern**: Import binding errors often indicate version mismatches
+- **Solution**: Remove unused imports, verify package exports
+- **Prevention**: Regular dependency audits and import cleanup

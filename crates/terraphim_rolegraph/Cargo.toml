@@ -14,6 +14,7 @@ readme = "../../README.md"
 [dependencies]
 terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", features = ["tokio-runtime", "remote-loading"] }
 terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
 
 ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"

@@ -8,7 +8,7 @@ pub mod indexer;
 pub mod thesaurus;
 
 pub use haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer};
-pub use indexer::{search_haystacks, RipgrepIndexer};
+pub use indexer::{search_haystacks, search_haystacks_parallel, RipgrepIndexer};
 
 #[cfg(test)]
 mod tests;
@@ -41,6 +41,9 @@ pub enum Error {
 
     #[error("Validation error: {0}")]
     Validation(String),
+
+    #[error("Generic error: {0}")]
+    GenericError(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

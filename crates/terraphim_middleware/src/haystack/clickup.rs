@@ -2,24 +2,71 @@ use crate::indexer::IndexMiddleware;
 use crate::Result;
 use async_trait::async_trait;
 use reqwest::Client;
+use std::sync::Arc;
+use std::time::Duration;
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, Index};
+use tokio::sync::Semaphore;
 
 #[derive(Debug, Clone)]
 pub struct ClickUpHaystackIndexer {
     client: Client,
+    /// Rate limiter to prevent overwhelming ClickUp API
+    rate_limiter: Arc<Semaphore>,
+    /// Connection pool size for concurrent requests
+    pool_size: usize,
 }
 
 impl Default for ClickUpHaystackIndexer {
     fn default() -> Self {
-        Self {
-            client: Client::new(),
-        }
+        Self::new()
     }
 }
 
 impl ClickUpHaystackIndexer {
+    /// Create a new ClickUp indexer with connection pooling and rate limiting
+    pub fn new() -> Self {
+        let pool_size = 5; // Allow up to 5 concurrent requests
+
+        // Configure client with connection pooling
+        let client = Client::builder()
+            .pool_max_idle_per_host(pool_size)
+            .pool_idle_timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
+        Self {
+            client,
+            rate_limiter: Arc::new(Semaphore::new(pool_size)),
+            pool_size,
+        }
+    }
+
+    /// Create a new ClickUp indexer with custom configuration
+    pub fn with_config(pool_size: usize, timeout_secs: u64) -> Self {
+        let client = Client::builder()
+            .pool_max_idle_per_host(pool_size)
+            .pool_idle_timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(timeout_secs))
+            .connect_timeout(Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
+        Self {
+            client,
+            rate_limiter: Arc::new(Semaphore::new(pool_size)),
+            pool_size,
+        }
+    }
+
+    /// Get the configured pool size for this indexer
+    pub fn pool_size(&self) -> usize {
+        self.pool_size
+    }
+
     /// Normalize document ID to match persistence layer expectations
     fn normalize_document_id(&self, original_id: &str) -> String {
         // Create a dummy document to access the normalize_key method
@@ -98,6 +145,11 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
             let mut documents: Vec<Document> = Vec::new();
 
             if let Some(list) = list_id.clone() {
+                // Acquire rate limit permit
+                let _permit = self.rate_limiter.acquire().await.map_err(|e| {
+                    crate::Error::GenericError(format!("Rate limiter error: {}", e))
+                })?;
+
                 if let Ok(mut docs) = search_clickup_list(
                     &client,
                     &token,
@@ -112,6 +164,11 @@ impl IndexMiddleware for ClickUpHaystackIndexer {
                     documents.append(&mut docs);
                 }
             } else if let Some(team) = team_id.clone() {
+                // Acquire rate limit permit
+                let _permit = self.rate_limiter.acquire().await.map_err(|e| {
+                    crate::Error::GenericError(format!("Rate limiter error: {}", e))
+                })?;
+
                 if let Ok(mut docs) = search_clickup_universal(
                     &client,
                     &token,

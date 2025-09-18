@@ -77,11 +77,11 @@ struct Cli {
     #[arg(long, default_value_t = false)]
     transparent: bool,
     /// Path to a custom configuration file (JSON format)
-    /// 
+    ///
     /// Allows you to use a custom configuration instead of the embedded defaults.
     /// The file should contain role definitions, haystack configurations, and
     /// scoring function settings.
-    /// 
+    ///
     /// Example: --config /path/to/custom-config.json
     #[arg(long, value_name = "FILE")]
     config: Option<String>,

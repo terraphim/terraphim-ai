@@ -1569,4 +1569,73 @@ This fix resolves the core search functionality issues identified by the rust-wa
 
 ---
 
-*Last Updated: 2025-01-31*
+## 🔄 CURRENT TASK: Test Matrix Evaluation and Validation (2025-09-18)
+
+### Test Matrix State Validation - IN PROGRESS
+**Status**: 🔄 **IN PROGRESS - MEMORY FILES CREATED, CREDENTIALS CONFIGURED**
+**Priority**: HIGH
+**Date**: 2025-09-18
+
+**Objective**: Validate the claimed 100% success rate of the test matrix framework and test all haystack combinations with real credentials to verify actual performance vs documented claims.
+
+**Key Deliverables**:
+1. ✅ **Import Error Resolution**: Fixed `importJsonAdString` error in desktop/src/main.ts
+2. ✅ **Memory File System**: Created @memories.md, @lessons-learned.md, @scratchpad.md as required by CLAUDE.md
+3. 🔄 **Environment Configuration**: Setting up .env credentials for Atomic Server, ClickUp, OpenRouter
+4. ⏸️ **Targeted Haystack Testing**: Test each haystack individually with appropriate search terms
+5. ⏸️ **Full Matrix Validation**: Run complete test matrix and compare actual vs claimed results
+6. ⏸️ **Results Documentation**: Update memory files with real performance metrics
+
+**Current Progress**:
+- ✅ Fixed critical import binding error preventing frontend compilation
+- ✅ Created comprehensive memory tracking system as per project requirements
+- ✅ **Findings**: Test matrix discrepancy identified - claims 100% success but has configuration issues
+- **Credentials Available**:
+  - ATOMIC_SERVER_URL="http://localhost:9883"
+  - ATOMIC_SERVER_SECRET=[base64 encoded secret]
+  - CLICKUP_API_TOKEN and TEAM_ID for task management tests
+  - OPENROUTER_API_KEY for LLM features
+  - QueryRs (no credentials needed, public API)
+
+**Test Strategy**:
+1. **Local Tests First**: Ripgrep haystack (docs/src directory)
+2. **Credential-Based Tests**:
+   - Atomic Server with search term "test"
+   - ClickUp with search term "task" or "project"
+   - QueryRs with search term "async" (Rust-related)
+3. **Success Criteria**: Each haystack must return > 0 results with meaningful search terms
+4. **Documentation Claims**: 100% success rate across 90 combinations (needs verification)
+
+**Files Modified**:
+- `desktop/src/main.ts` - Removed non-existent `importJsonAdString` import
+- `@memories.md` - Added v1.0.21 entry for current work
+- `@lessons-learned.md` - Added import debugging patterns and test matrix insights
+- `@scratchpad.md` - This entry documenting current task
+
+**Technical Foundation**:
+- **Test Framework**: Located in `crates/terraphim_tui/tests/scoring_haystack_matrix_tests.rs`
+- **Test Runner**: `./run_test_matrix.sh` with category options (basic, priority, performance, extended)
+- **CLI Support**: `--config` parameter implemented for dynamic configuration loading
+- **Coverage**: 5 scoring functions × 6 haystacks × 10 query scorers = 90 combinations
+
+**Key Findings (FIXED)**:
+1. **Root Cause Identified**: Test matrix used hardcoded fake credentials instead of real environment variables
+2. **Credentials Issue Resolved**: Fixed ClickUp (`"test_token"` → real CLICKUP_API_TOKEN) and Atomic (`null` → real ATOMIC_SERVER_SECRET)
+3. **Success Criteria Fixed**: Changed from "exit code = 0" to "exit code = 0 AND results > 0"
+4. **Services Confirmed Working**: Atomic Server at localhost:9883 ✅, ClickUp API returns "Zestic AI" team ✅
+5. **Search Terms Optimized**: Ripgrep uses "async", ClickUp uses "task", QueryRs uses "async" (domain-appropriate)
+6. **TerraphimGraph Enhanced**: Enabled `terraphim_it: true` for proper KG functionality
+7. **Test Reporting Improved**: Added credential status, failure categorization, performance analysis
+
+**Fixes Applied**:
+- ✅ `dotenvy::dotenv().ok()` added to load environment credentials
+- ✅ Real credentials from env vars with fallback to test values
+- ✅ Success requires `result_count > 0` not just exit code
+- ✅ Better search terms per haystack type
+- ✅ TerraphimGraph gets `terraphim_it: true` automatically
+- ✅ Enhanced reporting with credential status and failure categories
+
+**Expected Outcome**:
+Test matrix should now show realistic success rates with proper credential usage and meaningful failure analysis instead of false 100% claims.
+
+*Last Updated: 2025-09-18*

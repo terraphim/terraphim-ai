@@ -101,7 +101,7 @@ fn should_build(dirs: &Dirs) -> bool {
 
 /// Runs JS package manager to install packages and build the JS bundle
 fn build_js(dirs: &Dirs) {
-    let pkg_manager = "./scripts/yarn_and_build.sh";
+    let pkg_manager = "scripts/yarn_and_build.sh";
     p!("install js packages...");
     p!("build js assets...");
     let out = std::process::Command::new("/bin/bash")

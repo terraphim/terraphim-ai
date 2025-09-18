@@ -226,12 +226,27 @@
     }
   }
 
-  // Helper function to get term suggestions for autocomplete
+  // Helper function to get term suggestions for autocomplete (thesaurus primary, API fallback)
   async function getTermSuggestions(query: string): Promise<string[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    
+    // PRIMARY: Use thesaurus matching first (same as KGModal)
+    const thesaurusResults = thesaurusEntries
+      .filter(([key]) => key.toLowerCase().includes(trimmed.toLowerCase()))
+      .map(([key]) => key)
+      .slice(0, 8);
+    
+    // If we have good thesaurus results, return them
+    if (thesaurusResults.length > 0) {
+      return thesaurusResults;
+    }
+    
+    // FALLBACK: Try API if thesaurus doesn't have results
     try {
       if ($is_tauri) {
         const response: any = await invoke("get_autocomplete_suggestions", {
-          query: query,
+          query: trimmed,
           roleName: $role,
           limit: 8
         });
@@ -240,7 +255,7 @@
           return response.suggestions.map((suggestion: any) => suggestion.term);
         }
       } else {
-        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(query)}`);
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(trimmed)}`);
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'success' && data.suggestions) {
@@ -248,16 +263,12 @@
           }
         }
       }
-
-      // Fallback to thesaurus matching
-      return thesaurusEntries
-        .filter(([key]) => key.toLowerCase().includes(query.toLowerCase()))
-        .map(([key]) => key)
-        .slice(0, 8);
     } catch (error) {
-      console.warn('Error fetching term suggestions:', error);
-      return [];
+      console.warn('Error fetching term suggestions API fallback:', error);
     }
+    
+    // Return empty if both thesaurus and API fail
+    return [];
   }
 
   async function getSuggestions(value: string): Promise<string[]> {

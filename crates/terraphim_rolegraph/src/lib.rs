@@ -61,6 +61,10 @@ pub struct RoleGraph {
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
+    /// Lazy automata construction for improved startup time
+    ac_lazy: Option<Arc<Mutex<Option<AhoCorasick>>>>,
+    #[allow(clippy::type_complexity)]
+    ac_reverse_nterm_lazy: Option<Arc<Mutex<Option<AHashMap<u64, NormalizedTermValue>>>>>,
 }
 
 impl RoleGraph {
@@ -89,7 +93,7 @@ impl RoleGraph {
             .build(keys)?;
 
         Ok(Self {
-            role,
+            role: role.clone(),
             nodes: AHashMap::new(),
             edges: AHashMap::new(),
             documents: AHashMap::new(),
@@ -97,7 +101,79 @@ impl RoleGraph {
             aho_corasick_values: values,
             ac,
             ac_reverse_nterm,
+            ac_lazy: None,
+            ac_reverse_nterm_lazy: None,
         })
+    }
+
+    /// Creates a new `RoleGraph` with lazy automata construction for faster startup
+    pub async fn new_lazy(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
+        log::info!("Creating lazy RoleGraph for role: {}", role);
+
+        // Create empty automata for initialization
+        let empty_ac = AhoCorasick::builder()
+            .match_kind(MatchKind::LeftmostLongest)
+            .ascii_case_insensitive(true)
+            .build(vec![""])
+            .unwrap_or_else(|_| AhoCorasick::builder().build(vec![""]).unwrap());
+
+        Ok(Self {
+            role: role.clone(),
+            nodes: AHashMap::new(),
+            edges: AHashMap::new(),
+            documents: AHashMap::new(),
+            thesaurus,
+            aho_corasick_values: Vec::new(),
+            ac: empty_ac,
+            ac_reverse_nterm: AHashMap::new(),
+            ac_lazy: Some(Arc::new(Mutex::new(None))),
+            ac_reverse_nterm_lazy: Some(Arc::new(Mutex::new(None))),
+        })
+    }
+
+    /// Ensures automata is built and returns reference to it
+    async fn ensure_automata(&self) -> Result<()> {
+        if let Some(lazy_ac) = &self.ac_lazy {
+            let mut ac_guard = lazy_ac.lock().await;
+            if ac_guard.is_none() {
+                log::info!(
+                    "Building automata for role: {} (lazy initialization)",
+                    self.role
+                );
+
+                // Build automata
+                let (keys, _values, ac_reverse_nterm) = self.prepare_automata_data();
+
+                let ac = AhoCorasick::builder()
+                    .match_kind(MatchKind::LeftmostLongest)
+                    .ascii_case_insensitive(true)
+                    .build(keys)?;
+
+                *ac_guard = Some(ac);
+
+                if let Some(lazy_reverse) = &self.ac_reverse_nterm_lazy {
+                    let mut reverse_guard = lazy_reverse.lock().await;
+                    *reverse_guard = Some(ac_reverse_nterm);
+                }
+
+                log::info!("Automata built successfully for role: {}", self.role);
+            }
+        }
+        Ok(())
+    }
+
+    fn prepare_automata_data(&self) -> (Vec<&str>, Vec<u64>, AHashMap<u64, NormalizedTermValue>) {
+        let mut keys = Vec::new();
+        let mut values = Vec::new();
+        let mut ac_reverse_nterm = AHashMap::new();
+
+        for (key, normalized_term) in &self.thesaurus {
+            keys.push(key.as_str());
+            values.push(normalized_term.id);
+            ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
+        }
+
+        (keys, values, ac_reverse_nterm)
     }
 
     /// Find all matches in the rolegraph for the given text
@@ -109,6 +185,25 @@ impl RoleGraph {
             .find_iter(text)
             .map(|mat| self.aho_corasick_values[mat.pattern()])
             .collect()
+    }
+
+    /// Async version of find_matching_node_ids that supports lazy loading
+    pub async fn find_matching_node_ids_async(&self, text: &str) -> Result<Vec<u64>> {
+        // Ensure automata is built
+        self.ensure_automata().await?;
+
+        if let Some(lazy_ac) = &self.ac_lazy {
+            let ac_guard = lazy_ac.lock().await;
+            if let Some(ac) = ac_guard.as_ref() {
+                return Ok(ac
+                    .find_iter(text)
+                    .map(|mat| self.aho_corasick_values[mat.pattern()])
+                    .collect());
+            }
+        }
+
+        // Fallback to regular method
+        Ok(self.find_matching_node_ids(text))
     }
 
     /// Check if all matched node IDs in the given text are connected by at least a single path

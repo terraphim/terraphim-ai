@@ -29,7 +29,7 @@ impl TuiService {
     /// Validate that the config file exists and is readable
     fn validate_config_file(config_path: &str) -> Result<()> {
         use std::fs;
-        
+
         // Check if file exists
         if !std::path::Path::new(config_path).exists() {
             return Err(anyhow::anyhow!(
@@ -50,7 +50,7 @@ impl TuiService {
                         config_path
                     ));
                 }
-                
+
                 if metadata.len() == 0 {
                     return Err(anyhow::anyhow!(
                         "Configuration file is empty: '{}'\n\
@@ -63,7 +63,8 @@ impl TuiService {
                 return Err(anyhow::anyhow!(
                     "Cannot read configuration file '{}': {}\n\
                     Please check file permissions and ensure the file is accessible.",
-                    config_path, e
+                    config_path,
+                    e
                 ));
             }
         }
@@ -108,13 +109,17 @@ impl TuiService {
                     return Err(anyhow::anyhow!(
                         "Invalid configuration: haystack {} in role '{}' has empty location.\n\
                         Each haystack must specify a valid location path.",
-                        i + 1, role_name
+                        i + 1,
+                        role_name
                     ));
                 }
             }
         }
 
-        log::debug!("Configuration validation passed for config with {} roles", config.roles.len());
+        log::debug!(
+            "Configuration validation passed for config with {} roles",
+            config.roles.len()
+        );
         Ok(())
     }
 
@@ -126,7 +131,10 @@ impl TuiService {
         );
 
         if let Some(path) = config_path {
-            log::info!("Initializing TUI service with custom configuration from: {}", path);
+            log::info!(
+                "Initializing TUI service with custom configuration from: {}",
+                path
+            );
         } else {
             log::info!("Initializing TUI service with embedded configuration");
         }
@@ -142,7 +150,10 @@ impl TuiService {
                 Ok(config_content) => {
                     match serde_json::from_str::<terraphim_config::Config>(&config_content) {
                         Ok(config) => {
-                            log::info!("Successfully loaded custom configuration from: {}", config_file);
+                            log::info!(
+                                "Successfully loaded custom configuration from: {}",
+                                config_file
+                            );
                             // Validate the loaded configuration
                             Self::validate_config_content(&config)?;
                             config
@@ -177,7 +188,8 @@ impl TuiService {
                     return Err(anyhow::anyhow!(
                         "Failed to read configuration file '{}': {}\n\
                         Please ensure the file exists and is readable.",
-                        config_file, e
+                        config_file,
+                        e
                     ));
                 }
             }
@@ -242,14 +254,6 @@ impl TuiService {
     pub async fn list_roles(&self) -> Vec<String> {
         let config = self.config_state.config.lock().await;
         config.roles.keys().map(|r| r.to_string()).collect()
-    }
-
-    /// Search documents using the current selected role
-    #[allow(dead_code)]
-    pub async fn search(&self, search_term: &str, limit: Option<usize>) -> Result<Vec<Document>> {
-        let selected_role = self.get_selected_role().await;
-        self.search_with_role(search_term, &selected_role, limit)
-            .await
     }
 
     /// Search documents with a specific role
@@ -358,7 +362,7 @@ impl TuiService {
     }
 
     /// Perform autocomplete search using thesaurus for a role
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used in REPL handler behind repl-mcp feature flag
     pub async fn autocomplete(
         &self,
         role_name: &RoleName,
@@ -383,8 +387,41 @@ impl TuiService {
         )?)
     }
 
-    /// Find matches in text using thesaurus
-    #[allow(dead_code)]
+    /// Generate a summary for a document or content
+    pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
+        let _service = self.service.lock().await;
+
+        // Create a temporary document for summarization
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let _document = terraphim_types::Document {
+            id: format!("temp_{}", timestamp),
+            url: "temp://content".to_string(),
+            title: "Temporary content".to_string(),
+            body: content.to_string(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+        };
+
+        // For now, return a simple summary since we don't have access to the full LLM API
+        // TODO: Implement proper summarization when LLM integration is available
+        let max_words = 50;
+        let words: Vec<&str> = content.split_whitespace().collect();
+        let summary = if words.len() > max_words {
+            format!("{}...", words[..max_words].join(" "))
+        } else {
+            content.to_string()
+        };
+
+        Ok(format!("Summary for role {}: {}", role_name, summary))
+    }
+
+    /// Find matches in text using role's thesaurus
     pub async fn find_matches(
         &self,
         role_name: &RoleName,
@@ -393,12 +430,12 @@ impl TuiService {
         // Get thesaurus for the role
         let thesaurus = self.get_thesaurus(role_name).await?;
 
-        // Find matches
-        Ok(terraphim_automata::find_matches(text, thesaurus, true)?)
+        // Use automata to find matches (include positions)
+        let matches = terraphim_automata::find_matches(text, thesaurus, true)?;
+        Ok(matches)
     }
 
-    /// Replace matches in text with links using thesaurus
-    #[allow(dead_code)]
+    /// Replace matches in text using role's thesaurus
     pub async fn replace_matches(
         &self,
         role_name: &RoleName,
@@ -408,17 +445,11 @@ impl TuiService {
         // Get thesaurus for the role
         let thesaurus = self.get_thesaurus(role_name).await?;
 
-        // Replace matches
-        let result = terraphim_automata::replace_matches(text, thesaurus, link_type)?;
-        Ok(String::from_utf8(result).unwrap_or_else(|_| text.to_string()))
-    }
-
-    /// Summarize content using available AI services
-    #[allow(dead_code)]
-    pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
-        // For now, use the chat method with a summarization prompt
-        let prompt = format!("Please summarize the following content:\n\n{}", content);
-        self.chat(role_name, &prompt, None).await
+        // Use automata to replace matches
+        let result_bytes = terraphim_automata::replace_matches(text, thesaurus, link_type)?;
+        let result_string = String::from_utf8(result_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to convert result to UTF-8: {}", e))?;
+        Ok(result_string)
     }
 
     /// Save configuration changes

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Modal, Field, Input, Button, Message } from "svelma";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { is_tauri, role, serverUrl } from "../stores";
+  import { is_tauri, role, serverUrl, thesaurus } from "../stores";
   import { CONFIG } from "../../config";
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
 
@@ -43,6 +43,9 @@
     error?: string;
   }
 
+  // Access thesaurus entries
+  $: thesaurusEntries = Object.entries($thesaurus);
+
   // Initialize query when modal opens
   $: if (active && initialQuery !== query) {
     query = initialQuery;
@@ -75,10 +78,23 @@
     }, 300);
   }
 
-  // Get KG term suggestions (autocomplete)
+  // Get KG term suggestions (thesaurus primary, API fallback)
   async function getTermSuggestions(q: string): Promise<string[]> {
     const trimmed = q.trim();
     if (!trimmed) return [];
+    
+    // PRIMARY: Use thesaurus matching first (same as Search component)
+    const thesaurusResults = thesaurusEntries
+      .filter(([key]) => key.toLowerCase().includes(trimmed.toLowerCase()))
+      .map(([key]) => key)
+      .slice(0, 8);
+    
+    // If we have good thesaurus results, return them
+    if (thesaurusResults.length > 0) {
+      return thesaurusResults;
+    }
+    
+    // FALLBACK: Try API if thesaurus doesn't have results
     try {
       if ($is_tauri) {
         const resp: any = await invoke("get_autocomplete_suggestions", {
@@ -90,7 +106,7 @@
           return resp.suggestions.map((s: any) => s.term);
         }
       } else {
-        const resp = await fetch(`${CONFIG.ServerURL}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(trimmed)}`);
+        const resp = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(trimmed)}`);
         if (resp.ok) {
           const data = await resp.json();
           if (data?.status === 'success' && Array.isArray(data.suggestions)) {
@@ -99,8 +115,10 @@
         }
       }
     } catch (e) {
-      console.warn('KG typeahead failed', e);
+      console.warn('KG typeahead API fallback failed', e);
     }
+    
+    // Return empty if both thesaurus and API fail
     return [];
   }
 
@@ -180,7 +198,7 @@
           return;
         }
 
-        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($role)}`);
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($role)}`);
 
         if (response.ok) {
           const data = await response.json();
@@ -241,7 +259,7 @@
         handleClose();
       } else {
         // Web mode - HTTP API
-        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/term`, {
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/conversations/${conversationId}/context/kg/term`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -295,7 +313,7 @@
         handleClose();
       } else {
         // Web mode - HTTP API
-        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/index`, {
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/conversations/${conversationId}/context/kg/index`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -460,6 +478,18 @@
   /* Typeahead dropdown (reused from Search.svelte) */
   .input-wrapper {
     position: relative;
+  }
+
+  /* Ensure input text is visible */
+  :global(.input-wrapper .input) {
+    color: #363636 !important;
+  }
+
+  /* Dark theme input text */
+  @media (prefers-color-scheme: dark) {
+    :global(.input-wrapper .input) {
+      color: #e0e0e0 !important;
+    }
   }
   .suggestions {
     position: absolute;
