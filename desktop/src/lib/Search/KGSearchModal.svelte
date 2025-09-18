@@ -18,6 +18,8 @@
   let searchError: string | null = null;
   let selectedSuggestion: KGSuggestion | null = null;
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Track initialization to avoid resetting user input while modal is open
+  let hasInitializedForOpen: boolean = false;
 
   // Typeahead state (reuses autocomplete behavior from Search.svelte)
   let typeaheadSuggestions: string[] = [];
@@ -46,12 +48,18 @@
   // Access thesaurus entries
   $: thesaurusEntries = Object.entries($thesaurus);
 
-  // Initialize query when modal opens
-  $: if (active && initialQuery !== query) {
+  // Initialize query only once when modal opens, do not reset while typing
+  $: if (active && !hasInitializedForOpen) {
     query = initialQuery;
     if (query.trim()) {
       searchKGTerms();
     }
+    hasInitializedForOpen = true;
+  }
+
+  // Reset initialization flag when modal closes
+  $: if (!active && hasInitializedForOpen) {
+    hasInitializedForOpen = false;
   }
 
   // Focus input when modal opens and clear any errors
@@ -142,6 +150,13 @@
   }
 
   function handleTypeaheadKeydown(event: KeyboardEvent) {
+    // Handle Escape key to close modal
+    if (event.key === 'Escape') {
+      handleClose();
+      return;
+    }
+    
+    // Handle arrow keys and Enter for typeahead suggestions
     if (typeaheadSuggestions.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -152,9 +167,6 @@
       } else if ((event.key === 'Enter' || event.key === 'Tab') && typeaheadIndex !== -1) {
         event.preventDefault();
         applyTypeaheadSuggestion(typeaheadSuggestions[typeaheadIndex]);
-      } else if (event.key === 'Escape') {
-        typeaheadSuggestions = [];
-        typeaheadIndex = -1;
       }
     }
   }
@@ -720,7 +732,7 @@
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-    <div class="kg-search-container" on:keydown={handleKeydown}>
+    <div class="kg-search-container">
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 
@@ -741,7 +753,6 @@
               on:keydown={handleTypeaheadKeydown}
               placeholder="Search knowledge graph terms..."
               type="search"
-              disabled={isSearching}
               icon="search"
               expanded
               autofocus

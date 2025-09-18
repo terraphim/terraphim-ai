@@ -28,6 +28,9 @@ desktop/src-tauri/Cargo.lock
 docs/src/thesaurus.json
 docs/src/*.json
 
+# Generated frontend/server build artifacts
+terraphim_server/dist/
+
 demo_data
 rust-sdk
 .env

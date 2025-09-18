@@ -799,7 +799,12 @@ impl ContextItem {
         let mut content = format!("**Term:** {}\n", kg_term.term);
 
         if let Some(ref definition) = kg_term.definition {
-            content.push_str(&format!("**Definition:** {}\n", definition));
+            // If definition looks like markdown (multiple lines or headers), embed as-is
+            if definition.contains('\n') || definition.contains('#') || definition.contains("**") {
+                content.push_str(&format!("\n{}\n", definition));
+            } else {
+                content.push_str(&format!("**Definition:** {}\n", definition));
+            }
         }
 
         if !kg_term.synonyms.is_empty() {

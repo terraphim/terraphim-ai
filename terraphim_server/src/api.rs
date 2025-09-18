@@ -2307,11 +2307,17 @@ pub(crate) async fn add_kg_term_context(
 
     // Create KG term definition from the first document
     let doc = &documents[0];
+    // Prefer full markdown body from the source KG document; fall back to description
+    let definition_text = if !doc.body.is_empty() {
+        doc.body.clone()
+    } else {
+        doc.description.clone().unwrap_or_default()
+    };
     let kg_term = terraphim_types::KGTermDefinition {
         term: request.term.clone(),
         normalized_term: terraphim_types::NormalizedTermValue::new(request.term.clone()),
         id: 1, // TODO: Get actual term ID from thesaurus
-        definition: Some(doc.description.clone().unwrap_or_default()),
+        definition: Some(definition_text),
         synonyms: Vec::new(),       // TODO: Extract from thesaurus
         related_terms: Vec::new(),  // TODO: Extract from thesaurus
         usage_examples: Vec::new(), // TODO: Extract from thesaurus
