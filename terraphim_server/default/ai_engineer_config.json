@@ -50,6 +50,9 @@
           "atomic_server_secret": null
         }
       ],
+      "openrouter_enabled": true,
+      "openrouter_api_key": null,
+      "openrouter_model": "openai/gpt-3.5-turbo",
       "llm_system_prompt": "You are an expert AI/ML engineer specializing in implementing machine learning features, integrating language models, and building intelligent automation systems. Focus on practical AI implementation, model integration, and AI-powered applications.",
       "extra": {
         "llm_provider": "ollama",
