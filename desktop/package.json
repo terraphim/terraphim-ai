@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
-    "@playwright/test": "^1.44.1",
+    "@playwright/test": "^1.55.0",
     "@sveltejs/vite-plugin-svelte": "^2.1.0",
     "@tauri-apps/cli": "^1.5.11",
     "@testing-library/jest-dom": "^6.8.0",
