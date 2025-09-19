@@ -7,8 +7,8 @@ class TerraphimSettingsManager {
   constructor() {
     this.storageKey = 'terraphim-agent-workflows-settings';
     this.defaultSettings = {
-      serverUrl: 'http://localhost:8000',
-      wsUrl: 'ws://localhost:8000/ws',
+      serverUrl: window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : 'http://localhost:8000',
+      wsUrl: window.location.protocol === 'file:' ? 'ws://127.0.0.1:8000/ws' : 'ws://localhost:8000/ws',
       apiTimeout: 30000,
       maxRetries: 3,
       retryDelay: 1000,

@@ -43,7 +43,7 @@ pub async fn execute_routing(
     .await;
 
     // Use real multi-agent execution instead of simulation
-    let result = match MultiAgentWorkflowExecutor::new().await {
+    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await {
         Ok(executor) => executor
             .execute_routing(
                 &workflow_id,

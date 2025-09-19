@@ -412,11 +412,31 @@
                     </div>
                 </div>
 
-                <!-- Orchestration Controls -->
-                <div class="orchestration-controls">
-                    <button id="start-pipeline" class="btn primary">Start Pipeline</button>
-                    <button id="pause-pipeline" class="btn" disabled>Pause</button>
-                    <button id="reset-pipeline" class="btn">Reset</button>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <div class="form-group">
+                        <label class="form-label" for="role-selector">Select Orchestrator Role:</label>
+                        <select id="role-selector" class="form-input" data-testid="role-selector"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="system-prompt">System Prompt:</label>
+                        <textarea 
+                            id="system-prompt" 
+                            class="form-input form-textarea" 
+                            rows="5"
+                            placeholder="The orchestrator's system prompt will appear here. You can edit it."
+                            data-testid="system-prompt"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">🚀 Actions</h3>
+                    <div class="controls">
+                        <button id="start-pipeline" class="btn primary">Start Pipeline</button>
+                        <button id="pause-pipeline" class="btn" disabled>Pause</button>
+                        <button id="reset-pipeline" class="btn">Reset</button>
+                    </div>
                 </div>
             </div>
 
@@ -476,6 +496,8 @@
     <script src="../shared/settings-ui.js"></script>
     <script src="../shared/settings-integration.js"></script>
     <script src="../shared/workflow-visualizer.js"></script>
+    <script src="../shared/connection-status.js"></script>
+    <script src="../shared/agent-config-manager.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

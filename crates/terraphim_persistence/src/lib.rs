@@ -11,12 +11,14 @@ use serde::{de::DeserializeOwned, Serialize};
 use terraphim_settings::DeviceSettings;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use terraphim_types::Document;
 
 pub use error::{Error, Result};
 
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
+#[derive(Debug)]
 pub struct DeviceStorage {
     pub ops: HashMap<String, (Operator, u128)>,
     pub fastest_op: Operator,
@@ -45,6 +47,37 @@ impl DeviceStorage {
             })
             .await?;
         Ok(storage)
+    }
+
+    /// Get an Arc<DeviceStorage> instance safely
+    ///
+    /// This is a safe alternative to using unsafe ptr::read operations.
+    /// It initializes storage if needed and returns an Arc clone.
+    pub async fn arc_instance() -> Result<Arc<DeviceStorage>> {
+        let storage_ref = Self::instance().await?;
+        
+        // Create a new DeviceStorage with cloned data rather than using unsafe code
+        let safe_storage = DeviceStorage {
+            ops: storage_ref.ops.clone(),
+            fastest_op: storage_ref.fastest_op.clone(),
+        };
+        
+        Ok(Arc::new(safe_storage))
+    }
+
+    /// Get an Arc<DeviceStorage> instance using memory-only backend safely
+    ///
+    /// This is a safe alternative to using unsafe ptr::read operations for tests.
+    pub async fn arc_memory_only() -> Result<Arc<DeviceStorage>> {
+        let storage_ref = Self::init_memory_only().await?;
+        
+        // Create a new DeviceStorage with cloned data rather than using unsafe code
+        let safe_storage = DeviceStorage {
+            ops: storage_ref.ops.clone(),
+            fastest_op: storage_ref.fastest_op.clone(),
+        };
+        
+        Ok(Arc::new(safe_storage))
     }
 }
 

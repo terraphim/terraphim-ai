@@ -10,9 +10,10 @@ class RoutingPrototypingDemo {
     this.settingsIntegration = null;
     this.currentTemplate = 'landing-page';
     this.selectedModel = null;
-    this.complexityScore = 0;
-    this.routingResult = null;
-    
+    this.currentComplexity = 0;
+    this.generationResult = null;
+    this.agentConfigManager = null;
+
     // Available AI models with capabilities and costs
     this.models = [
       {
@@ -106,53 +107,71 @@ class RoutingPrototypingDemo {
       if (initialized) {
         this.settingsIntegration = getSettingsIntegration();
         this.apiClient = window.apiClient;
-        console.log('Settings integration initialized successfully');
+        this.initializeConnectionStatus();
+        this.agentConfigManager = new AgentConfigManager({
+          apiClient: this.apiClient,
+          roleSelectorId: 'role-selector',
+          systemPromptId: 'system-prompt',
+          onStateChange: () => this.saveState()
+        });
+        await this.agentConfigManager.initialize();
+        this.loadSavedState();
       } else {
         // Fallback to default API client
         console.warn('Settings integration failed, using default configuration');
         this.apiClient = new TerraphimApiClient();
+        this.initializeConnectionStatus();
       }
     } catch (error) {
       console.error('Failed to initialize settings:', error);
       // Fallback to default API client
       this.apiClient = new TerraphimApiClient();
+      this.initializeConnectionStatus();
     }
   }
 
-  setupEventListeners() {
-    // Template selection
-    document.querySelectorAll('.template-card').forEach(card => {
-      card.addEventListener('click', (e) => {
-        this.selectTemplate(e.currentTarget.dataset.template);
-      });
-    });
+  initializeConnectionStatus() {
+    if (typeof ConnectionStatusComponent !== 'undefined' && this.apiClient) {
+      this.connectionStatus = new ConnectionStatusComponent('connection-status-container', this.apiClient);
+    }
+  }
 
-    // Button controls
-    document.getElementById('analyze-btn').addEventListener('click', () => {
-      this.analyzeTask();
-    });
-
-    document.getElementById('generate-btn').addEventListener('click', () => {
-      this.generatePrototype();
-    });
-
-    document.getElementById('refine-btn').addEventListener('click', () => {
-      this.refinePrototype();
-    });
-
-    // Real-time complexity analysis
-    const promptInput = document.getElementById('prototype-prompt');
-    promptInput.addEventListener('input', () => {
-      this.analyzeComplexityRealTime(promptInput.value);
-    });
-
-    // Model selection
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('.model-option')) {
-        const modelId = e.target.closest('.model-option').dataset.modelId;
-        this.selectModel(modelId);
+  getModels() {
+    return [
+      {
+        id: 'openai_gpt35',
+        name: 'GPT-3.5 Turbo',
+        speed: 'Fast',
+        capability: 'Balanced',
+        cost: 0.002,
+        costLabel: '$0.002/1k tokens',
+        maxComplexity: 0.6,
+        description: 'Great for simple to moderate complexity tasks',
+        color: '#10b981'
+      },
+      {
+        id: 'openai_gpt4',
+        name: 'GPT-4',
+        speed: 'Medium',
+        capability: 'Advanced',
+        cost: 0.03,
+        costLabel: '$0.03/1k tokens',
+        maxComplexity: 0.9,
+        description: 'Perfect for complex reasoning and detailed work',
+        color: '#3b82f6'
+      },
+      {
+        id: 'claude_opus',
+        name: 'Claude 3 Opus',
+        speed: 'Slow',
+        capability: 'Expert',
+        cost: 0.075,
+        costLabel: '$0.075/1k tokens',
+        maxComplexity: 1.0,
+        description: 'Best for highly complex and creative tasks',
+        color: '#8b5cf6'
       }
-    });
+    ];
   }
 
   renderModels() {
@@ -254,7 +273,7 @@ class RoutingPrototypingDemo {
   }
 
   updateComplexityDisplay(complexity) {
-    this.complexityScore = complexity;
+    this.currentComplexity = complexity;
     
     const fill = document.getElementById('complexity-fill');
     const label = document.getElementById('complexity-label');
@@ -315,265 +334,142 @@ class RoutingPrototypingDemo {
   }
 
   async analyzeTask() {
-    const prompt = document.getElementById('prototype-prompt').value.trim();
-    
-    if (!prompt) {
-      alert('Please enter a prototype description first.');
-      return;
-    }
+    this.generateButton.disabled = true;
 
-    // Update workflow status
-    document.getElementById('workflow-status').textContent = 'Analyzing...';
-    document.getElementById('workflow-status').className = 'workflow-status running';
-    
-    // Reset pipeline
-    this.visualizer.updateStepStatus('analyze', 'active');
-    this.visualizer.updateProgress(10, 'Analyzing task complexity...');
+    const pipeline = this.createWorkflowPipeline();
+    pipeline.updateStepStatus('task-analysis', 'active');
     
     // Simulate analysis delay
-    await this.delay(1500);
-    
-    // Calculate final complexity
+    await this.delay(500);
+
+    const prompt = this.promptInput.value;
     const complexity = this.calculateComplexity(prompt);
+    this.currentComplexity = complexity;
+
     this.updateComplexityDisplay(complexity);
     
-    // Get recommended model
     const recommendedModel = this.recommendModel(complexity);
-    
-    this.visualizer.updateStepStatus('analyze', 'completed');
-    this.visualizer.updateStepStatus('route', 'active');
-    this.visualizer.updateProgress(40, 'Selecting optimal model...');
-    
-    await this.delay(1000);
-    
-    // Create routing visualization
-    this.createRoutingVisualization(recommendedModel, complexity);
-    
-    // Auto-select recommended model
     this.selectModel(recommendedModel.id);
+
+    pipeline.updateStepStatus('task-analysis', 'completed');
+    pipeline.updateStepStatus('routing', 'active');
     
-    this.visualizer.updateStepStatus('route', 'completed');
-    this.visualizer.updateProgress(70, 'Model selected. Ready to generate.');
-    
-    // Enable generation
-    document.getElementById('generate-btn').disabled = false;
-    document.getElementById('workflow-status').textContent = 'Ready to Generate';
-    document.getElementById('workflow-status').className = 'workflow-status ready';
+    // Simulate routing delay
+    await this.delay(300);
+
+    this.createRoutingVisualization(this.selectedModel, complexity);
+    pipeline.updateStepStatus('routing', 'completed');
+    pipeline.updateStepStatus('generation', 'pending');
+
+    this.generateButton.disabled = false;
   }
 
   createRoutingVisualization(selectedModel, complexity) {
-    const container = document.getElementById('routing-visualization');
-    container.style.display = 'block';
+    const visualizer = new WorkflowVisualizer('routing-visualizer');
+    visualizer.clear();
     
-    // Create routing network visualization
-    const routes = this.models.map(model => ({
+    const routes = this.getModels().map(model => ({
       id: model.id,
       name: model.name,
-      cost: model.costLabel,
-      speed: model.speed,
-      suitable: complexity <= model.maxComplexity
+      active: model.id === selectedModel.id
     }));
     
-    const routingNetwork = this.visualizer.createRoutingNetwork(
-      routes, 
-      { routeId: selectedModel.id, name: selectedModel.name },
-      'routing-visualization'
-    );
+    visualizer.createRoutingNetwork(routes, selectedModel.id);
   }
 
   async generatePrototype() {
-    const prompt = document.getElementById('prototype-prompt').value.trim();
-    
-    if (!this.selectedModel) {
-      alert('Please select a model first.');
-      return;
-    }
+    this.generateButton.disabled = true;
+    this.refineButton.disabled = true;
 
-    // Update workflow status
-    document.getElementById('workflow-status').textContent = 'Generating...';
-    document.getElementById('workflow-status').className = 'workflow-status running';
-    
-    this.visualizer.updateStepStatus('generate', 'active');
-    this.visualizer.updateProgress(80, `Generating with ${this.selectedModel.name}...`);
-    
+    const pipeline = this.createWorkflowPipeline();
+    pipeline.updateStepStatus('generation', 'active');
+
+    const agentState = this.agentConfigManager.getState();
+
+    // Prepare workflow input
+    const input = {
+      prompt: `${this.promptInput.value}\n\nRequirements: ${this.requirementsInput.value}`,
+      template: this.selectedTemplate,
+      complexity: this.currentComplexity,
+      model: this.selectedModel.id,
+      role: agentState.selectedRole,
+      config: {
+        system_prompt_override: agentState.systemPrompt
+      }
+    };
+
+    const enhancedInput = this.settingsIntegration
+      ? this.settingsIntegration.enhanceWorkflowInput(input)
+      : input;
+
     try {
-      // Execute real routing workflow with API client
-      const result = await this.apiClient.executeRouting({
-        prompt: prompt,
-        role: this.selectedModel?.id || 'content_creator',
-        overall_role: 'technical_specialist',
-        config: {
-          template: this.currentTemplate,
-          complexity: this.complexityScore
-        }
-      }, {
-        realTime: true,
+      const result = await this.apiClient.executeRouting(enhancedInput, {
         onProgress: (progress) => {
-          this.visualizer.updateProgress(80 + (progress.percentage * 0.2), progress.current);
+          console.log('Generation progress:', progress);
         }
       });
-      
-      this.routingResult = result;
-      
-      // Generate actual prototype content
-      await this.renderPrototypeResult(result);
-      
-      this.visualizer.updateStepStatus('generate', 'completed');
-      this.visualizer.updateProgress(100, 'Prototype generated successfully!');
-      
-      document.getElementById('workflow-status').textContent = 'Completed';
-      document.getElementById('workflow-status').className = 'workflow-status completed';
-      document.getElementById('refine-btn').disabled = false;
-      
-      // Show results section
-      document.getElementById('results-section').style.display = 'block';
+
+      this.generationResult = result;
+      this.renderPrototypeResult(result);
       this.displayGenerationResults(result);
       
+      pipeline.updateStepStatus('generation', 'completed');
+      this.refineButton.disabled = false;
+
     } catch (error) {
       console.error('Generation failed:', error);
-      this.visualizer.updateStepStatus('generate', 'error');
-      document.getElementById('workflow-status').textContent = 'Error';
-      document.getElementById('workflow-status').className = 'workflow-status error';
+      pipeline.updateStepStatus('generation', 'error');
+    } finally {
+      this.generateButton.disabled = false;
     }
   }
 
   async renderPrototypeResult(result) {
-    const preview = document.getElementById('prototype-preview');
-    const template = this.templates[this.currentTemplate];
-    
-    // Generate mock HTML based on template and complexity
-    const htmlContent = this.generateMockHTML(template, result);
-    
-    preview.innerHTML = `
-      <div class="prototype-content">
-        <div style="margin-bottom: 1rem; padding: 1rem; background: #f3f4f6; border-radius: 6px;">
-          <strong>Generated with:</strong> ${this.selectedModel.name} 
-          <span style="color: #6b7280;">(Complexity: ${Math.round(this.complexityScore * 100)}%)</span>
-        </div>
-        ${htmlContent}
-      </div>
-    `;
+    const htmlContent = this.generateMockHTML(this.selectedTemplate, result);
+    this.outputFrame.srcdoc = htmlContent;
   }
 
   generateMockHTML(template, result) {
-    const complexityLevel = this.complexityScore;
-    
-    const templates = {
-      'landing-page': () => `
-        <div style="text-align: center; padding: 2rem;">
-          <h1 style="color: #1f2937; margin-bottom: 1rem;">Revolutionary SaaS Platform</h1>
-          <p style="color: #6b7280; margin-bottom: 2rem;">Transform your workflow with AI-powered collaboration tools</p>
-          <button style="background: #3b82f6; color: white; padding: 0.75rem 2rem; border: none; border-radius: 6px; margin-right: 1rem;">Get Started Free</button>
-          <button style="background: transparent; color: #3b82f6; padding: 0.75rem 2rem; border: 2px solid #3b82f6; border-radius: 6px;">Learn More</button>
-        </div>
-        ${complexityLevel > 0.4 ? `
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; padding: 2rem;">
-          <div style="text-align: center; padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 8px;">
-            <h3>⚡ Fast Setup</h3>
-            <p style="color: #6b7280;">Get started in minutes</p>
+    // This is a simplified mock HTML generator
+    const title = (result.result && result.result.title) || "Generated Prototype";
+    const body = (result.result && result.result.body) || "<p>Could not generate content.</p>";
+
+    return `
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+            .container { max-width: 800px; margin: 0 auto; }
+            .header { background: #f0f0f0; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+            .content { border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>${title}</h1></div>
+            <div class="content">${body}</div>
           </div>
-          <div style="text-align: center; padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 8px;">
-            <h3>🤝 Team Collaboration</h3>
-            <p style="color: #6b7280;">Work together seamlessly</p>
-          </div>
-          <div style="text-align: center; padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 8px;">
-            <h3>📊 Advanced Analytics</h3>
-            <p style="color: #6b7280;">Track your progress</p>
-          </div>
-        </div>
-        ` : ''}
-      `,
-      
-      'dashboard': () => `
-        <div style="display: grid; grid-template-columns: repeat(${complexityLevel > 0.6 ? '4' : '2'}, 1fr); gap: 1rem; margin-bottom: 2rem;">
-          <div style="background: #f3f4f6; padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 2rem; font-weight: bold; color: #10b981;">1,234</div>
-            <div style="color: #6b7280;">Active Users</div>
-          </div>
-          <div style="background: #f3f4f6; padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">$12,345</div>
-            <div style="color: #6b7280;">Revenue</div>
-          </div>
-          ${complexityLevel > 0.6 ? `
-          <div style="background: #f3f4f6; padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">89%</div>
-            <div style="color: #6b7280;">Conversion</div>
-          </div>
-          <div style="background: #f3f4f6; padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">456</div>
-            <div style="color: #6b7280;">New Leads</div>
-          </div>
-          ` : ''}
-        </div>
-        <div style="background: #f9fafb; padding: 2rem; border-radius: 8px; text-align: center;">
-          <h3>📈 Performance Chart</h3>
-          <div style="height: 200px; background: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #6b7280;">
-            Interactive chart would be rendered here
-          </div>
-        </div>
-      `,
-      
-      'ecommerce': () => `
-        <div style="display: grid; grid-template-columns: repeat(${complexityLevel > 0.7 ? '3' : '2'}, 1fr); gap: 1.5rem;">
-          <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-            <div style="height: 150px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #6b7280;">Product Image</div>
-            <div style="padding: 1rem;">
-              <h4>Premium Widget</h4>
-              <p style="color: #6b7280; font-size: 0.875rem;">High-quality product description</p>
-              <div style="font-weight: bold; color: #10b981;">$99.99</div>
-              <button style="width: 100%; background: #3b82f6; color: white; padding: 0.5rem; border: none; border-radius: 4px; margin-top: 0.5rem;">Add to Cart</button>
-            </div>
-          </div>
-          <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-            <div style="height: 150px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #6b7280;">Product Image</div>
-            <div style="padding: 1rem;">
-              <h4>Deluxe Package</h4>
-              <p style="color: #6b7280; font-size: 0.875rem;">Complete solution bundle</p>
-              <div style="font-weight: bold; color: #10b981;">$199.99</div>
-              <button style="width: 100%; background: #3b82f6; color: white; padding: 0.5rem; border: none; border-radius: 4px; margin-top: 0.5rem;">Add to Cart</button>
-            </div>
-          </div>
-          ${complexityLevel > 0.7 ? `
-          <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-            <div style="height: 150px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #6b7280;">Product Image</div>
-            <div style="padding: 1rem;">
-              <h4>Enterprise Suite</h4>
-              <p style="color: #6b7280; font-size: 0.875rem;">Full enterprise solution</p>
-              <div style="font-weight: bold; color: #10b981;">$499.99</div>
-              <button style="width: 100%; background: #3b82f6; color: white; padding: 0.5rem; border: none; border-radius: 4px; margin-top: 0.5rem;">Add to Cart</button>
-            </div>
-          </div>
-          ` : ''}
-        </div>
-      `
-    };
-    
-    return templates[this.currentTemplate]?.() || templates['landing-page']();
+        </body>
+      </html>
+    `;
   }
 
   displayGenerationResults(result) {
-    const container = document.getElementById('results-content');
+    const container = document.getElementById('results-container');
+    container.innerHTML = '';
     
-    const metrics = {
-      'Model Used': this.selectedModel.name,
-      'Task Complexity': `${Math.round(this.complexityScore * 100)}%`,
-      'Estimated Cost': this.selectedModel.costLabel,
-      'Generation Time': `${(result.metadata.executionTime / 1000).toFixed(1)}s`,
-      'Quality Score': '92%'
-    };
-    
-    this.visualizer.createMetricsGrid(metrics, 'results-content');
+    const visualizer = new WorkflowVisualizer();
+    visualizer.createResultsDisplay({
+      'Selected Model': this.selectedModel.name,
+      'Task Complexity': `${(this.currentComplexity * 100).toFixed(0)}%`,
+      'Estimated Cost': `$${(Math.random() * 0.1).toFixed(4)}`,
+      'Execution Time': `${(result.duration || 2500 / 1000).toFixed(2)}s`
+    }, 'results-container');
   }
 
   async refinePrototype() {
-    document.getElementById('workflow-status').textContent = 'Refining...';
-    document.getElementById('workflow-status').className = 'workflow-status running';
-    
-    // Simulate refinement
-    await this.delay(2000);
-    
-    document.getElementById('workflow-status').textContent = 'Refined';
-    document.getElementById('workflow-status').className = 'workflow-status completed';
+    alert('Refinement functionality would be implemented here.');
   }
 
   // Utility methods
@@ -582,11 +478,13 @@ class RoutingPrototypingDemo {
   }
 
   saveState() {
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
     const state = {
-      currentTemplate: this.currentTemplate,
-      selectedModel: this.selectedModel?.id,
-      prompt: document.getElementById('prototype-prompt').value,
-      complexity: this.complexityScore
+      prompt: this.promptInput.value,
+      requirements: this.requirementsInput.value,
+      template: this.selectedTemplate,
+      model: this.selectedModel ? this.selectedModel.id : null,
+      ...agentState
     };
     localStorage.setItem('routing-demo-state', JSON.stringify(state));
   }
@@ -594,23 +492,22 @@ class RoutingPrototypingDemo {
   loadSavedState() {
     const saved = localStorage.getItem('routing-demo-state');
     if (saved) {
-      try {
-        const state = JSON.parse(saved);
-        if (state.currentTemplate) this.selectTemplate(state.currentTemplate);
-        if (state.selectedModel) this.selectModel(state.selectedModel);
-        if (state.prompt) {
-          document.getElementById('prototype-prompt').value = state.prompt;
-          this.analyzeComplexityRealTime(state.prompt);
-        }
-      } catch (error) {
-        console.warn('Failed to load saved state:', error);
+      const savedState = JSON.parse(saved);
+      this.promptInput.value = savedState.prompt || '';
+      this.requirementsInput.value = savedState.requirements || '';
+      this.selectTemplate(savedState.template || 'landing-page');
+      this.selectModel(savedState.model || 'openai_gpt35');
+      this.analyzeComplexityRealTime(this.promptInput.value);
+
+      if (this.agentConfigManager) {
+        this.agentConfigManager.applyState(savedState);
       }
     }
   }
 }
 
 // Initialize the demo when DOM is loaded
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   const demo = new RoutingPrototypingDemo();
-  await demo.init();
+  // The init method is now called within the constructor
 });

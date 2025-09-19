@@ -91,7 +91,7 @@ pub async fn execute_parallel(
         .unwrap_or_else(|| "Parallel Processing Coordinator".to_string());
 
     // Use real multi-agent execution instead of simulation
-    let result = match MultiAgentWorkflowExecutor::new().await {
+    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await {
         Ok(executor) => {
             match executor
                 .execute_parallelization(

@@ -17,13 +17,13 @@ class EvaluatorOptimizerDemo {
     this.qualityHistory = [];
     this.bestVersion = null;
     
-    // Terraphim role configuration
+    // Terraphim role configuration - will be updated by agent config manager
     this.terraphimConfig = {
-      overallRole: 'content_creator', // Default overall role for the workflow
+      overallRole: 'TechnicalWriter', // Default overall role for the workflow
       agentRoles: {
-        generator: 'creative_writer',
-        evaluator: 'content_critic', 
-        optimizer: 'content_editor'
+        generator: 'TechnicalWriter',
+        evaluator: 'QAEngineer', 
+        optimizer: 'QAEngineer'
       },
       availableRoles: [
         'content_creator',
@@ -104,16 +104,26 @@ class EvaluatorOptimizerDemo {
       if (initialized) {
         this.settingsIntegration = getSettingsIntegration();
         this.apiClient = window.apiClient;
-        console.log('Settings integration initialized successfully');
+        this.initializeConnectionStatus();
+        this.agentConfigManager = new AgentConfigManager({
+          apiClient: this.apiClient,
+          roleSelectorId: 'role-selector',
+          systemPromptId: 'system-prompt',
+          onStateChange: () => this.saveState()
+        });
+        await this.agentConfigManager.initialize();
+        this.loadSavedState();
       } else {
         // Fallback to default API client
         console.warn('Settings integration failed, using default configuration');
         this.apiClient = new TerraphimApiClient();
+        this.initializeConnectionStatus();
       }
     } catch (error) {
       console.error('Failed to initialize settings:', error);
       // Fallback to default API client
       this.apiClient = new TerraphimApiClient();
+      this.initializeConnectionStatus();
     }
   }
 
@@ -156,6 +166,63 @@ class EvaluatorOptimizerDemo {
     promptInput.addEventListener('input', () => {
       this.analyzePrompt(promptInput.value);
     });
+
+    // Input elements
+    this.promptInput = document.getElementById('generation-prompt');
+
+    // Agent config is managed by AgentConfigManager
+
+    // Control buttons
+    this.generateButton = document.getElementById('generate-btn');
+    this.optimizeButton = document.getElementById('optimize-btn');
+    this.stopButton = document.getElementById('stop-btn');
+    this.resetButton = document.getElementById('reset-btn');
+
+    this.promptInput.addEventListener('input', () => this.analyzePrompt(this.promptInput.value));
+  }
+
+  initializeConnectionStatus() {
+    if (this.apiClient) {
+      this.connectionStatus = new ConnectionStatusComponent('connection-status-container', this.apiClient);
+    }
+  }
+
+  async initializeRoles() {
+    if (!this.apiClient) return;
+
+    try {
+      const config = await this.apiClient.getConfig();
+      if (config && config.roles) {
+        this.roles = config.roles;
+        this.populateRoleSelector();
+        this.loadSavedState();
+      }
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+    }
+  }
+
+  populateRoleSelector() {
+    this.roleSelector.innerHTML = '';
+    for (const roleName in this.roles) {
+      const option = document.createElement('option');
+      option.value = roleName;
+      option.textContent = this.roles[roleName].name || roleName;
+      this.roleSelector.appendChild(option);
+    }
+    this.onRoleChange();
+  }
+
+  onRoleChange() {
+    const selectedRoleName = this.roleSelector.value;
+    const role = this.roles[selectedRoleName];
+
+    if (role && role.extra && role.extra.system_prompt) {
+      this.systemPrompt.value = role.extra.system_prompt;
+    } else {
+      this.systemPrompt.value = 'This role has no default system prompt. You can define one here.';
+    }
+    this.saveState();
   }
 
   renderQualityCriteria() {
@@ -174,7 +241,7 @@ class EvaluatorOptimizerDemo {
   renderCurrentMetrics() {
     const container = document.getElementById('current-quality-metrics');
     const metrics = this.currentIteration > 0 ? 
-      this.contentVersions[this.currentIteration - 1]?.qualityScores : 
+      this.contentVersions[this.currentIteration - 1] && this.contentVersions[this.currentIteration - 1].qualityScores : 
       this.getDefaultMetrics();
     
     container.innerHTML = Object.entries(metrics).map(([key, value]) => `
@@ -196,7 +263,8 @@ class EvaluatorOptimizerDemo {
 
   formatMetricLabel(key) {
     if (key === 'overall') return 'Overall';
-    return this.qualityCriteria.find(c => c.id === key)?.name || key;
+    const criterion = this.qualityCriteria.find(c => c.id === key);
+    return criterion ? criterion.name : key;
   }
 
   toggleCriterion(criterionId) {
@@ -359,7 +427,7 @@ class EvaluatorOptimizerDemo {
       // Execute real optimization workflow with API client
       const result = await this.apiClient.executeOptimization({
         prompt: document.getElementById('content-prompt').value,
-        role: this.terraphimConfig.agentRoles.optimizer,
+        role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'QAEngineer',
         overall_role: this.terraphimConfig.overallRole,
         config: {
           previousContent: previousVersion.content,
@@ -377,8 +445,8 @@ class EvaluatorOptimizerDemo {
       });
       
       // Extract improved content from API result
-      const improvedContent = result.result?.optimized_content || result.result?.final_result || 'Generated improved content';
-      const qualityScores = result.result?.quality_metrics || await this.evaluateContent(improvedContent, document.getElementById('content-prompt').value);
+      const improvedContent = (result.result && result.result.optimized_content) || (result.result && result.result.final_result) || 'Generated improved content';
+      const qualityScores = (result.result && result.result.quality_metrics) || await this.evaluateContent(improvedContent, document.getElementById('content-prompt').value);
       
       // Create new version with API results
       const version = {
@@ -1050,7 +1118,8 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
           <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
             ${Object.entries(version.improvements).map(([criterion, improvement]) => {
               if (improvement.change > 2) {
-                const criterionName = this.qualityCriteria.find(c => c.id === criterion)?.name || criterion;
+                const criterionObj = this.qualityCriteria.find(c => c.id === criterion);
+                const criterionName = criterionObj ? criterionObj.name : criterion;
                 return `<span style="color: var(--success); font-size: 0.75rem;">↗ ${criterionName} +${Math.round(improvement.change)}%</span>`;
               }
               return '';
@@ -1191,17 +1260,17 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
   }
 
   saveState() {
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
     const state = {
-      prompt: document.getElementById('content-prompt').value,
-      qualityCriteria: this.qualityCriteria,
-      maxIterations: this.maxIterations,
-      qualityThreshold: this.qualityThreshold
+      prompt: this.promptInput.value,
+      selectedCriteria: Array.from(this.selectedCriteria),
+      ...agentState
     };
-    localStorage.setItem('evaluator-optimizer-demo-state', JSON.stringify(state));
+    localStorage.setItem('optimizer-demo-state', JSON.stringify(state));
   }
 
   loadSavedState() {
-    const saved = localStorage.getItem('evaluator-optimizer-demo-state');
+    const saved = localStorage.getItem('optimizer-demo-state');
     if (saved) {
       try {
         const state = JSON.parse(saved);
@@ -1217,6 +1286,11 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
         
         if (state.maxIterations) this.maxIterations = state.maxIterations;
         if (state.qualityThreshold) this.qualityThreshold = state.qualityThreshold;
+
+        if (this.agentConfigManager) {
+            this.agentConfigManager.applyState(state);
+        }
+
       } catch (error) {
         console.warn('Failed to load saved state:', error);
       }

@@ -181,7 +181,25 @@ async function initializeSettings() {
     globalSettingsIntegration = new WorkflowSettingsIntegration();
   }
   
-  return await globalSettingsIntegration.init();
+  const result = await globalSettingsIntegration.init();
+  
+  // If settings initialization fails, create a basic fallback API client
+  if (!result && !window.apiClient) {
+    console.log('Settings initialization failed, creating fallback API client');
+    // For local examples, use the correct server URL
+    const serverUrl = window.location.protocol === 'file:' 
+      ? 'http://127.0.0.1:8000' 
+      : 'http://localhost:8000';
+    
+    window.apiClient = new TerraphimApiClient(serverUrl, {
+      enableWebSocket: true,
+      autoReconnect: true
+    });
+    
+    return true; // Return true so examples work
+  }
+  
+  return result;
 }
 
 // Get settings integration instance

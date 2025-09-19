@@ -203,10 +203,7 @@ async fn create_test_storage(
     use std::sync::Arc;
     use terraphim_persistence::DeviceStorage;
 
-    DeviceStorage::init_memory_only().await?;
-    let storage_ref = DeviceStorage::instance().await?;
-
-    use std::ptr;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    Ok(Arc::new(storage_copy))
+    // Use the safe Arc method instead of unsafe ptr::read
+    let storage = DeviceStorage::arc_memory_only().await?;
+    Ok(storage)
 }

@@ -184,7 +184,7 @@ pub async fn execute_optimization(
         .unwrap_or_else(|| "Quality Optimizer".to_string());
 
     // Use real multi-agent execution instead of simulation
-    let result = match MultiAgentWorkflowExecutor::new().await {
+    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await {
         Ok(executor) => {
             match executor
                 .execute_optimization(
@@ -199,27 +199,57 @@ pub async fn execute_optimization(
             {
                 Ok(result) => result,
                 Err(e) => {
+                    let error_msg = e.to_string();
                     fail_workflow_session(
                         &state.workflow_sessions,
                         &state.websocket_broadcaster,
                         workflow_id.clone(),
-                        e.to_string(),
+                        error_msg.clone(),
                     )
                     .await;
-                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                    
+                    let execution_time = start_time.elapsed().as_millis() as u64;
+                    return Ok(Json(WorkflowResponse {
+                        workflow_id,
+                        success: false,
+                        result: None,
+                        error: Some(error_msg),
+                        metadata: WorkflowMetadata {
+                            execution_time_ms: execution_time,
+                            pattern: "Optimization".to_string(),
+                            steps: 0,
+                            role: role.clone(),
+                            overall_role: overall_role.clone(),
+                        },
+                    }));
                 }
             }
         }
         Err(e) => {
+            let error_msg = format!("Failed to initialize multi-agent system: {}", e);
             log::error!("Failed to create multi-agent executor: {:?}", e);
             fail_workflow_session(
                 &state.workflow_sessions,
                 &state.websocket_broadcaster,
                 workflow_id.clone(),
-                format!("Failed to initialize multi-agent system: {}", e),
+                error_msg.clone(),
             )
             .await;
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            
+            let execution_time = start_time.elapsed().as_millis() as u64;
+            return Ok(Json(WorkflowResponse {
+                workflow_id,
+                success: false,
+                result: None,
+                error: Some(error_msg),
+                metadata: WorkflowMetadata {
+                    execution_time_ms: execution_time,
+                    pattern: "Optimization".to_string(),
+                    steps: 0,
+                    role,
+                    overall_role,
+                },
+            }));
         }
     };
 

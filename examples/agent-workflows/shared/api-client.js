@@ -254,94 +254,154 @@ class TerraphimApiClient {
 
   // WebSocket-enabled workflow execution
   async executeWorkflowWithWebSocket(workflowType, input, options = {}) {
-    return new Promise((resolve, reject) => {
-      const sessionId = this.wsClient.startWorkflow(workflowType, {
-        input,
-        role: input.role || 'default',
-        overallRole: input.overallRole || 'content_creator',
-        ...options
-      });
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Enhanced agent configuration
+        const agentConfig = {
+          input,
+          role: input.role || this.getDefaultRoleForWorkflow(workflowType),
+          overallRole: input.overallRole || 'engineering_agent',
+          agentSettings: {
+            // TerraphimAgent configuration - use default values that will be overridden by role config
+            llm_provider: 'ollama',
+            llm_model: 'llama3.2:3b', // Default model, will be overridden by backend role config
+            llm_base_url: 'http://127.0.0.1:11434',
+            enable_rolegraph: true,
+            enable_knowledge_graph: true,
+            relevance_function: 'TerraphimGraph',
+            // Role-specific capabilities
+            ...this.getRoleGraphConfig(input.role || this.getDefaultRoleForWorkflow(workflowType)),
+            ...input.agentSettings
+          },
+          workflowConfig: {
+            enable_real_time_updates: true,
+            enable_agent_evolution: true,
+            enable_quality_assessment: true,
+            ...input.workflowConfig
+          },
+          ...options
+        };
+        
+        // Flatten the structure to match backend expectations
+        const flattenedRequest = {
+          prompt: input.prompt,
+          role: agentConfig.role,
+          overall_role: agentConfig.overallRole || 'engineering_agent',
+          // Include additional context if needed
+          ...(input.context && { context: input.context })
+        };
 
-      let workflowResult = null;
-      let progressCallback = options.onProgress;
-      let agentUpdateCallback = options.onAgentUpdate;
-      let qualityCallback = options.onQualityUpdate;
+        // Execute workflow via HTTP POST first to get workflow ID
+        const workflowResponse = await this.request(`/workflows/${this.getWorkflowEndpoint(workflowType)}`, {
+          method: 'POST',
+          body: JSON.stringify(flattenedRequest),
+        });
+        
+        // Generate or extract session ID for WebSocket tracking
+        const sessionId = workflowResponse.workflow_id || workflowResponse.session_id || this.generateSessionId();
+        
+        // Create WebSocket session for updates
+        this.wsClient.createWorkflowSession(sessionId);
 
-      // Set up event listeners for this session
-      const cleanupListeners = [];
+        let workflowResult = null;
+        let progressCallback = options.onProgress;
+        let agentUpdateCallback = options.onAgentUpdate;
+        let qualityCallback = options.onQualityUpdate;
 
-      // Progress updates
-      const progressUnsub = this.wsClient.subscribe('workflow_progress', (data) => {
-        if (data.sessionId === sessionId && progressCallback) {
-          progressCallback({
-            step: data.data.currentStep,
-            total: data.data.totalSteps,
-            current: data.data.currentTask,
-            percentage: data.data.progress
-          });
-        }
-      });
-      cleanupListeners.push(progressUnsub);
-
-      // Agent updates
-      const agentUnsub = this.wsClient.subscribe('agent_update', (data) => {
-        if (data.sessionId === sessionId && agentUpdateCallback) {
-          agentUpdateCallback(data.data);
-        }
-      });
-      cleanupListeners.push(agentUnsub);
-
-      // Quality assessment updates
-      const qualityUnsub = this.wsClient.subscribe('quality_assessment', (data) => {
-        if (data.sessionId === sessionId && qualityCallback) {
-          qualityCallback(data.data);
-        }
-      });
-      cleanupListeners.push(qualityUnsub);
-
-      // Completion handler
-      const completionUnsub = this.wsClient.subscribe('workflow_completed', (data) => {
-        if (data.sessionId === sessionId) {
-          workflowResult = data.data;
-          
-          // Cleanup listeners
-          cleanupListeners.forEach(unsub => unsub());
-          
+        // For non-real-time workflows, return HTTP response immediately
+        if (!options.realTime) {
           resolve({
             sessionId,
             success: true,
-            result: workflowResult.result,
+            result: workflowResponse,
             metadata: {
-              executionTime: workflowResult.executionTime,
               pattern: workflowType,
-              steps: workflowResult.steps?.length || 1,
-              sessionInfo: this.wsClient.getWorkflowSession(sessionId)
+              executionTime: workflowResponse.executionTime || 0,
+              steps: workflowResponse.steps || 1
             }
           });
+          return;
         }
-      });
-      cleanupListeners.push(completionUnsub);
 
-      // Error handler
-      const errorUnsub = this.wsClient.subscribe('workflow_error', (data) => {
-        if (data.sessionId === sessionId) {
-          // Cleanup listeners
-          cleanupListeners.forEach(unsub => unsub());
-          
-          reject(new Error(data.data.error || 'Workflow execution failed'));
-        }
-      });
-      cleanupListeners.push(errorUnsub);
+        // Set up event listeners for real-time WebSocket updates
+        const cleanupListeners = [];
 
-      // Set a timeout for the workflow
-      const timeout = options.timeout || 300000; // 5 minutes default
-      setTimeout(() => {
-        if (!workflowResult) {
-          cleanupListeners.forEach(unsub => unsub());
-          this.wsClient.stopWorkflow(sessionId);
-          reject(new Error('Workflow execution timeout'));
-        }
-      }, timeout);
+        // Progress updates
+        const progressUnsub = this.wsClient.subscribe('workflow_progress', (data) => {
+          if (data.sessionId === sessionId && progressCallback) {
+            progressCallback({
+              step: data.data.currentStep,
+              total: data.data.totalSteps,
+              current: data.data.currentTask,
+              percentage: data.data.progress
+            });
+          }
+        });
+        cleanupListeners.push(progressUnsub);
+
+        // Agent updates
+        const agentUnsub = this.wsClient.subscribe('agent_update', (data) => {
+          if (data.sessionId === sessionId && agentUpdateCallback) {
+            agentUpdateCallback(data.data);
+          }
+        });
+        cleanupListeners.push(agentUnsub);
+
+        // Quality assessment updates
+        const qualityUnsub = this.wsClient.subscribe('quality_assessment', (data) => {
+          if (data.sessionId === sessionId && qualityCallback) {
+            qualityCallback(data.data);
+          }
+        });
+        cleanupListeners.push(qualityUnsub);
+
+        // Completion handler
+        const completionUnsub = this.wsClient.subscribe('workflow_completed', (data) => {
+          if (data.sessionId === sessionId) {
+            workflowResult = data.data;
+            
+            // Cleanup listeners
+            cleanupListeners.forEach(unsub => unsub());
+            
+            resolve({
+              sessionId,
+              success: true,
+              result: workflowResult.result,
+              metadata: {
+                executionTime: workflowResult.executionTime,
+                pattern: workflowType,
+                steps: workflowResult.steps?.length || 1,
+                sessionInfo: this.wsClient.getWorkflowSession(sessionId)
+              }
+            });
+          }
+        });
+        cleanupListeners.push(completionUnsub);
+
+        // Error handler
+        const errorUnsub = this.wsClient.subscribe('workflow_error', (data) => {
+          if (data.sessionId === sessionId) {
+            // Cleanup listeners
+            cleanupListeners.forEach(unsub => unsub());
+            
+            reject(new Error(data.data.error || 'Workflow execution failed'));
+          }
+        });
+        cleanupListeners.push(errorUnsub);
+
+        // Set a timeout for the workflow
+        const timeout = options.timeout || 300000; // 5 minutes default
+        setTimeout(() => {
+          if (!workflowResult) {
+            cleanupListeners.forEach(unsub => unsub());
+            this.wsClient.stopWorkflow(sessionId);
+            reject(new Error('Workflow execution timeout'));
+          }
+        }, timeout);
+
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -732,6 +792,105 @@ class TerraphimApiClient {
     return () => {
       unsubscribeFunctions.forEach(fn => fn());
     };
+  }
+
+  // Agent configuration helper methods
+  getDefaultRoleForWorkflow(workflowType) {
+    const workflowRoleMap = {
+      'prompt-chain': 'RustSystemDeveloper',
+      'routing': 'BackendArchitect', 
+      'parallel': 'DataScientistAgent',
+      'orchestration': 'OrchestratorAgent',
+      'optimization': 'QAEngineer'
+    };
+    return workflowRoleMap[workflowType] || 'DevelopmentAgent';
+  }
+
+  getRoleGraphConfig(roleName) {
+    const roleConfigs = {
+      'sequential_developer': {
+        specialization: 'software_development',
+        capabilities: ['code_generation', 'testing', 'documentation'],
+        knowledge_domains: ['programming', 'architecture', 'best_practices'],
+        thesaurus_domains: ['tech_stack', 'development_patterns']
+      },
+      'intelligent_router': {
+        specialization: 'task_routing',
+        capabilities: ['complexity_analysis', 'resource_optimization', 'decision_making'],
+        knowledge_domains: ['ai_models', 'performance_metrics', 'cost_optimization'],
+        thesaurus_domains: ['routing_strategies', 'model_capabilities']
+      },
+      'parallel_coordinator': {
+        specialization: 'parallel_processing',
+        capabilities: ['task_decomposition', 'coordination', 'synchronization'],
+        knowledge_domains: ['concurrency', 'distributed_systems', 'load_balancing'],
+        thesaurus_domains: ['parallel_patterns', 'coordination_strategies']
+      },
+      'workflow_orchestrator': {
+        specialization: 'orchestration',
+        capabilities: ['workflow_management', 'resource_allocation', 'process_optimization'],
+        knowledge_domains: ['workflow_patterns', 'system_architecture', 'automation'],
+        thesaurus_domains: ['orchestration_patterns', 'workflow_concepts']
+      },
+      'quality_optimizer': {
+        specialization: 'optimization',
+        capabilities: ['quality_assessment', 'performance_tuning', 'iterative_improvement'],
+        knowledge_domains: ['quality_metrics', 'optimization_techniques', 'testing_strategies'],
+        thesaurus_domains: ['quality_concepts', 'optimization_patterns']
+      },
+      'general_agent': {
+        specialization: 'general_purpose',
+        capabilities: ['analysis', 'generation', 'problem_solving'],
+        knowledge_domains: ['general_knowledge', 'reasoning', 'communication'],
+        thesaurus_domains: ['general_concepts']
+      }
+    };
+    
+    return roleConfigs[roleName] || roleConfigs['general_agent'];
+  }
+
+  // Enhanced workflow configuration
+  createAgentWorkflowConfig(workflowType, input, customRole = null) {
+    const role = customRole || this.getDefaultRoleForWorkflow(workflowType);
+    const roleConfig = this.getRoleGraphConfig(role);
+    
+    return {
+      role: role,
+      agentSettings: {
+        llm_provider: 'ollama',
+        llm_model: 'llama3.2:3b', // Default model, will be overridden by backend role config
+        llm_base_url: 'http://127.0.0.1:11434',
+        enable_rolegraph: true,
+        enable_knowledge_graph: true,
+        relevance_function: 'TerraphimGraph',
+        ...roleConfig,
+        ...input.agentSettings
+      },
+      workflowConfig: {
+        enable_real_time_updates: true,
+        enable_agent_evolution: true,
+        enable_quality_assessment: true,
+        workflow_type: workflowType,
+        ...input.workflowConfig
+      },
+      input: input
+    };
+  }
+
+  // Helper methods for workflow execution
+  getWorkflowEndpoint(workflowType) {
+    const endpointMap = {
+      'prompt-chain': 'prompt-chain',
+      'routing': 'route',
+      'parallel': 'parallel',
+      'orchestration': 'orchestrate',
+      'optimization': 'optimize'
+    };
+    return endpointMap[workflowType] || workflowType;
+  }
+
+  generateSessionId() {
+    return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
   }
 
   // Cleanup method
