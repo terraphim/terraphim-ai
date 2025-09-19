@@ -631,6 +631,27 @@ impl Display for ConversationId {
     }
 }
 
+/// Types of context that can be added to conversations
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum ContextType {
+    /// System-level context
+    System,
+    /// User-provided context
+    UserInput,
+    /// Document-based context
+    Document,
+    /// Search result context
+    SearchResult,
+    /// External data or API context
+    External,
+    /// Context from KG term definition with synonyms and metadata
+    KGTermDefinition,
+    /// Context from complete knowledge graph index
+    KGIndex,
+}
+
 /// Unique identifier for messages within conversations
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
@@ -891,25 +912,6 @@ impl ContextItem {
     }
 }
 
-/// Types of context that can be added to conversations
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub enum ContextType {
-    /// Context from a single document
-    Document,
-    /// User-provided context
-    UserInput,
-    /// System-generated context
-    System,
-    /// Context from external tools or APIs
-    External,
-    /// Context from KG term definition with synonyms and metadata
-    KGTermDefinition,
-    /// Context from complete knowledge graph index
-    KGIndex,
-}
-
 /// Knowledge Graph term definition with comprehensive metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
@@ -958,7 +960,6 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
-/// Enhanced chat message with context support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

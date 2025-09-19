@@ -76,6 +76,29 @@
 
 [v1.0.20] Performance Analysis and Optimization Plan - (2025-01-31): Successfully completed comprehensive performance analysis using rust-performance-expert agent, identifying significant optimization opportunities across automata crate and service layer. **Key Findings**: FST-based autocomplete provides 2.3x performance advantage over alternatives but has 30-40% string allocation overhead, search pipeline can achieve 35-50% improvement through concurrent processing, memory usage can be reduced by 40-60% through pooling strategies. **Performance Improvement Plan**: Created comprehensive 10-week roadmap with three phases - immediate wins (30-50% improvement), medium-term architectural changes (25-70% improvement), and advanced optimizations (50%+ improvement). **Technical Foundation**: Recent code quality improvements (91% warning reduction) provide excellent optimization foundation, existing benchmarking infrastructure enables systematic validation. **Implementation Strategy**: Phased approach with incremental validation, SIMD acceleration with fallbacks, lock-free data structures, and zero-copy processing patterns. **Success Targets**: Sub-500ms search responses, <100ms autocomplete latency, 40% memory reduction, 3x concurrent capacity increase. Plan builds upon recent FST autocomplete implementation, code quality enhancements, and cross-platform architecture while maintaining system reliability and privacy-first design principles.
 
+### Auto-Update Architecture Implementation (2025-09-16)
+
+**User Request**: Implement comprehensive auto-update architecture for all Terraphim AI artifacts with Tauri v1 compatibility and 1Password integration
+
+**Key Achievements Completed**:
+1. **1Password Integration**: Created secure vault "Terraphim-Deployment" with automated setup scripts and CI/CD service account integration
+2. **Tauri Desktop Auto-Update**: Implemented signed update mechanism with template-based secret injection using `op inject`
+3. **CLI Binary Self-Update**: Created shared `terraphim_update` crate for GitHub Release-based updates across all CLI binaries
+4. **Release Automation**: Built comprehensive release pipeline with version management, testing, and deployment automation
+5. **Documentation**: Created detailed 1PASSWORD_SETUP.md with setup instructions and troubleshooting guide
+
+**Files Created/Modified**:
+- `.env.tauri-release` - 1Password environment references
+- `desktop/src-tauri/tauri.conf.json.template` - Template for op inject
+- `scripts/setup-1password-secrets.sh` - Automated 1Password setup
+- `scripts/build-with-signing.sh` - Secure build script
+- `scripts/release-all.sh` - Comprehensive release automation
+- `scripts/generate-latest-json.js` - Updater manifest generator
+- `crates/terraphim_update/` - Shared update functionality
+- `1PASSWORD_SETUP.md` - Complete setup documentation
+
+**Current Status**: Implementation complete, ready for testing phase
+
 ### Project Architecture
 - **Backend**: Rust-based MCP server with `rmcp` crate integration
 - **Frontend**: Svelte + Novel editor with TypeScript autocomplete service
@@ -84,3 +107,4 @@
 - **Testing**: Comprehensive Rust integration tests for MCP functionality
 - **TUI**: Terminal User Interface with full transparency support for macOS
 - **Performance**: Comprehensive optimization plan with 30-70% improvement targets across automata and service layers
+- **Auto-Update**: Complete architecture with 1Password integration, Tauri signed updates, and CLI self-update capability
