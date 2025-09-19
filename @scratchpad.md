@@ -1622,7 +1622,7 @@ This fix resolves the core search functionality issues identified by the rust-wa
 1. **Root Cause Identified**: Test matrix used hardcoded fake credentials instead of real environment variables
 2. **Credentials Issue Resolved**: Fixed ClickUp (`"test_token"` → real CLICKUP_API_TOKEN) and Atomic (`null` → real ATOMIC_SERVER_SECRET)
 3. **Success Criteria Fixed**: Changed from "exit code = 0" to "exit code = 0 AND results > 0"
-4. **Services Confirmed Working**: Atomic Server at localhost:9883 ✅, ClickUp API returns "Zestic AI" team ✅
+4. **Services Confirmed Working**: Atomic Server at localhost:9883 ✅, ClickUp API returns test team ✅
 5. **Search Terms Optimized**: Ripgrep uses "async", ClickUp uses "task", QueryRs uses "async" (domain-appropriate)
 6. **TerraphimGraph Enhanced**: Enabled `terraphim_it: true` for proper KG functionality
 7. **Test Reporting Improved**: Added credential status, failure categorization, performance analysis

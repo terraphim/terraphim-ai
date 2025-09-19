@@ -35,3 +35,6 @@ demo_data
 rust-sdk
 .env
 .aider*
+
+# Sensitive data exports
+crates/terraphim_atomic_client/export_out.json
