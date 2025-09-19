@@ -220,6 +220,7 @@ async fn handle_websocket_message(
             "list_active_workflows" => handle_list_active_workflows(state).await,
             "get_session_info" => handle_get_session_info(session_id, sessions).await,
             "ping" => handle_ping_command(session_id).await,
+            "heartbeat" => handle_ping_command(session_id).await, // Map heartbeat to ping
             _ => WebSocketResponse {
                 response_type: "error".to_string(),
                 session_id: Some(session_id.to_string()),

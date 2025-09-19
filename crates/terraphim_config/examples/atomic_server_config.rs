@@ -41,6 +41,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     true,
                 )
                 .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: Some(32768),
                 extra: {
                     let mut extra = AHashMap::new();
 
@@ -470,10 +478,7 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
 #[cfg(feature = "multi_agent")]
 async fn create_test_storage(
 ) -> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
-    use std::ptr;
-
-    DeviceStorage::init_memory_only().await?;
-    let storage_ref = DeviceStorage::instance().await?;
-    let storage_copy = unsafe { ptr::read(storage_ref) };
-    Ok(Arc::new(storage_copy))
+    // Use the safe Arc method instead of unsafe ptr::read
+    let storage = DeviceStorage::arc_memory_only().await?;
+    Ok(storage)
 }

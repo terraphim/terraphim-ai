@@ -16,37 +16,135 @@ use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
 
 use super::{
-    update_workflow_status, ExecutionStatus, WebSocketBroadcaster, WorkflowMetadata,
+    update_workflow_status, ExecutionStatus, LlmConfig, WebSocketBroadcaster, WorkflowMetadata,
     WorkflowSessions,
 };
+use crate::AppState;
+use terraphim_config::{Config, ConfigState};
 
 /// Multi-agent workflow executor
 pub struct MultiAgentWorkflowExecutor {
     agent_registry: AgentRegistry,
     persistence: Arc<DeviceStorage>,
+    config_state: Option<ConfigState>,
 }
 
 impl MultiAgentWorkflowExecutor {
     /// Create new multi-agent workflow executor
     pub async fn new() -> MultiAgentResult<Self> {
-        // Initialize storage for agents
-        DeviceStorage::init_memory_only()
+        // Initialize storage for agents using safe Arc method
+        let persistence = DeviceStorage::arc_memory_only()
             .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-        let storage_ref = DeviceStorage::instance()
-            .await
-            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-        use std::ptr;
-        let storage_copy = unsafe { ptr::read(storage_ref) };
-        let persistence = Arc::new(storage_copy);
 
         let agent_registry = AgentRegistry::new();
 
         Ok(Self {
             agent_registry,
             persistence,
+            config_state: None,
         })
+    }
+
+    /// Create new multi-agent workflow executor with config state
+    pub async fn new_with_config(config_state: ConfigState) -> MultiAgentResult<Self> {
+        // Initialize storage for agents using safe Arc method
+        let persistence = DeviceStorage::arc_memory_only()
+            .await
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
+
+        let agent_registry = AgentRegistry::new();
+
+        Ok(Self {
+            agent_registry,
+            persistence,
+            config_state: Some(config_state),
+        })
+    }
+
+    /// Resolve LLM configuration from multiple sources with priority order:
+    /// 1. Request-level config (highest priority)
+    /// 2. Role-level config from server config
+    /// 3. Global defaults
+    /// 4. Hardcoded fallback (lowest priority)
+    fn resolve_llm_config(&self, request_config: Option<&LlmConfig>, role_name: &str) -> LlmConfig {
+        let mut resolved = LlmConfig::default();
+
+        // Start with global defaults if we have config state
+        if let Some(config_state) = &self.config_state {
+            if let Ok(config) = config_state.config.try_lock() {
+                // Check if there's a global LLM config section
+                let default_role_name = "Default".into();
+                if let Some(default_role) = config.roles.get(&default_role_name) {
+                    if let Some(provider) = default_role.extra.get("llm_provider") {
+                        if let Some(provider_str) = provider.as_str() {
+                            resolved.llm_provider = Some(provider_str.to_string());
+                        }
+                    }
+                    if let Some(model) = default_role.extra.get("llm_model") {
+                        if let Some(model_str) = model.as_str() {
+                            resolved.llm_model = Some(model_str.to_string());
+                        }
+                    }
+                    if let Some(base_url) = default_role.extra.get("llm_base_url") {
+                        if let Some(base_url_str) = base_url.as_str() {
+                            resolved.llm_base_url = Some(base_url_str.to_string());
+                        }
+                    }
+                }
+
+                // Check role-specific config
+                let role_name_key = role_name.into();
+                if let Some(role) = config.roles.get(&role_name_key) {
+                    if let Some(provider) = role.extra.get("llm_provider") {
+                        if let Some(provider_str) = provider.as_str() {
+                            resolved.llm_provider = Some(provider_str.to_string());
+                        }
+                    }
+                    if let Some(model) = role.extra.get("llm_model") {
+                        if let Some(model_str) = model.as_str() {
+                            resolved.llm_model = Some(model_str.to_string());
+                        }
+                    }
+                    if let Some(base_url) = role.extra.get("llm_base_url") {
+                        if let Some(base_url_str) = base_url.as_str() {
+                            resolved.llm_base_url = Some(base_url_str.to_string());
+                        }
+                    }
+                    if let Some(temp) = role.extra.get("llm_temperature") {
+                        if let Some(temp_val) = temp.as_f64() {
+                            resolved.llm_temperature = Some(temp_val);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Override with request-level config (highest priority)
+        if let Some(req_config) = request_config {
+            if let Some(provider) = &req_config.llm_provider {
+                resolved.llm_provider = Some(provider.clone());
+            }
+            if let Some(model) = &req_config.llm_model {
+                resolved.llm_model = Some(model.clone());
+            }
+            if let Some(base_url) = &req_config.llm_base_url {
+                resolved.llm_base_url = Some(base_url.clone());
+            }
+            if let Some(temp) = req_config.llm_temperature {
+                resolved.llm_temperature = Some(temp);
+            }
+        }
+
+        log::debug!("Resolved LLM config for role '{}': provider={:?}, model={:?}, base_url={:?}, temperature={:?}",
+            role_name,
+            resolved.llm_provider,
+            resolved.llm_model,
+            resolved.llm_base_url,
+            resolved.llm_temperature
+        );
+
+        resolved
     }
 
     /// Execute prompt chaining workflow with actual TerraphimAgent
@@ -58,11 +156,16 @@ impl MultiAgentWorkflowExecutor {
         overall_role: &str,
         sessions: &WorkflowSessions,
         broadcaster: &WebSocketBroadcaster,
+        llm_config: Option<&LlmConfig>,
     ) -> MultiAgentResult<Value> {
         log::info!("Executing prompt chain workflow with TerraphimAgent");
 
-        // Create development agent for prompt chaining
-        let dev_role = self.create_development_role(role);
+        // Resolve LLM configuration
+        let resolved_config = self.resolve_llm_config(llm_config, role);
+
+        // Create agent for prompt chaining using the specified role
+        log::debug!("🔧 Creating agent using configured role: {}", role);
+        let dev_role = self.get_configured_role(role).await?;
         let mut dev_agent = TerraphimAgent::new(dev_role, self.persistence.clone(), None).await?;
         dev_agent.initialize().await?;
 
@@ -197,11 +300,25 @@ impl MultiAgentWorkflowExecutor {
         )
         .await;
 
-        let (mut selected_agent, route_id) = if complexity > 0.7 {
-            (self.create_complex_agent().await?, "complex_agent")
+        // Use the specified role for routing, but choose model based on complexity
+        let llm_config = if complexity > 0.7 {
+            // Use a more powerful model for complex tasks
+            Some(LlmConfig {
+                llm_provider: Some("ollama".to_string()),
+                llm_model: Some("llama3.2:3b".to_string()),
+                llm_base_url: Some("http://127.0.0.1:11434".to_string()),
+                llm_temperature: Some(0.3), // Lower temperature for complex analysis
+            })
         } else {
-            (self.create_simple_agent().await?, "simple_agent")
+            None // Use role defaults for simple tasks
         };
+        
+        log::debug!("🔧 Creating routing agent using configured role: {}", role);
+        let agent_role = self.get_configured_role(role).await?;
+        let mut selected_agent = TerraphimAgent::new(agent_role, self.persistence.clone(), None).await?;
+        selected_agent.initialize().await?;
+        
+        let route_id = if complexity > 0.7 { "complex_route" } else { "simple_route" };
 
         // Execute with selected agent
         update_workflow_status(
@@ -257,7 +374,10 @@ impl MultiAgentWorkflowExecutor {
     ) -> MultiAgentResult<Value> {
         log::info!("Executing parallelization workflow with multiple agents");
 
-        // Create multiple perspective agents
+        // Create multiple perspective agents using the specified role as base
+        // Resolve LLM configuration
+        let resolved_config = self.resolve_llm_config(None, role);
+
         let perspectives = vec![
             ("analytical", "Provide analytical, data-driven insights"),
             ("creative", "Offer creative and innovative perspectives"),
@@ -275,14 +395,23 @@ impl MultiAgentWorkflowExecutor {
                 workflow_id,
                 ExecutionStatus::Running,
                 (agents.len() as f64 / perspectives.len() as f64) * 30.0,
-                Some(format!("Creating {} agent", perspective_name)),
+                Some(format!("Creating {} perspective agent", perspective_name)),
             )
             .await;
 
-            let perspective_role =
-                self.create_perspective_role(perspective_name, perspective_description);
-            let mut agent =
-                TerraphimAgent::new(perspective_role, self.persistence.clone(), None).await?;
+            // Get the base role and modify it for the perspective
+            log::debug!("🔧 Creating {} perspective agent using base role: {}", perspective_name, role);
+            let mut base_role = self.get_configured_role(role).await?;
+            
+            // Add perspective information to the role's extra data
+            base_role.extra.insert("perspective".to_string(), serde_json::json!(perspective_name));
+            base_role.extra.insert("perspective_description".to_string(), serde_json::json!(perspective_description));
+            
+            // Update the role name to reflect the perspective
+            base_role.name = format!("{}_{}", role, perspective_name).into();
+            base_role.shortname = Some(format!("{}_{}", base_role.shortname.unwrap_or_default(), perspective_name));
+            
+            let mut agent = TerraphimAgent::new(base_role, self.persistence.clone(), None).await?;
             agent.initialize().await?;
             agents.push(agent);
         }
@@ -383,6 +512,9 @@ impl MultiAgentWorkflowExecutor {
     ) -> MultiAgentResult<Value> {
         log::info!("Executing orchestration workflow with hierarchical agents");
 
+        // Resolve LLM configuration
+        let resolved_config = self.resolve_llm_config(None, role);
+
         // Create orchestrator
         update_workflow_status(
             sessions,
@@ -394,7 +526,8 @@ impl MultiAgentWorkflowExecutor {
         )
         .await;
 
-        let orchestrator_role = self.create_orchestrator_role();
+        log::debug!("🔧 Creating orchestrator using configured role: {}", role);
+        let orchestrator_role = self.get_configured_role(role).await?;
         let mut orchestrator =
             TerraphimAgent::new(orchestrator_role, self.persistence.clone(), None).await?;
         orchestrator.initialize().await?;
@@ -421,7 +554,7 @@ impl MultiAgentWorkflowExecutor {
             )
             .await;
 
-            let worker_role = self.create_worker_role(worker_name, worker_description);
+            let worker_role = self.create_worker_role(worker_name, worker_description, &resolved_config);
             let mut worker =
                 TerraphimAgent::new(worker_role, self.persistence.clone(), None).await?;
             worker.initialize().await?;
@@ -547,7 +680,10 @@ impl MultiAgentWorkflowExecutor {
     ) -> MultiAgentResult<Value> {
         log::info!("Executing optimization workflow with iterative agents");
 
-        // Create generator and evaluator agents
+        // Resolve LLM configuration
+        let resolved_config = self.resolve_llm_config(None, role);
+
+        // Create generator and evaluator agents based on the specified role
         update_workflow_status(
             sessions,
             broadcaster,
@@ -558,14 +694,19 @@ impl MultiAgentWorkflowExecutor {
         )
         .await;
 
-        let generator_role = self.create_generator_role();
-        let mut generator =
-            TerraphimAgent::new(generator_role, self.persistence.clone(), None).await?;
+        // Create generator agent using the specified role but with generation focus
+        log::debug!("🔧 Creating generator agent based on role: {}", role);
+        let mut generator_role = self.get_configured_role(role).await?;
+        generator_role.extra.insert("specialization".to_string(), serde_json::json!("content_generation"));
+        generator_role.extra.insert("focus".to_string(), serde_json::json!("creative_output"));
+        generator_role.name = format!("{}_Generator", role).into();
+        let mut generator = TerraphimAgent::new(generator_role, self.persistence.clone(), None).await?;
         generator.initialize().await?;
 
-        let evaluator_role = self.create_evaluator_role();
-        let mut evaluator =
-            TerraphimAgent::new(evaluator_role, self.persistence.clone(), None).await?;
+        // Create evaluator agent using QAEngineer for evaluation capabilities
+        log::debug!("🔧 Creating evaluator using QAEngineer role for evaluation expertise");
+        let evaluator_role = self.get_configured_role("QAEngineer").await?;
+        let mut evaluator = TerraphimAgent::new(evaluator_role, self.persistence.clone(), None).await?;
         evaluator.initialize().await?;
 
         let max_iterations = 3;
@@ -669,7 +810,23 @@ impl MultiAgentWorkflowExecutor {
 
     // Helper methods for creating specialized agent roles
 
-    fn create_development_role(&self, base_role: &str) -> Role {
+    /// Apply LLM configuration to a role's extra fields
+    fn apply_llm_config_to_extra(&self, extra: &mut AHashMap<String, serde_json::Value>, llm_config: &LlmConfig) {
+        if let Some(provider) = &llm_config.llm_provider {
+            extra.insert("llm_provider".to_string(), serde_json::json!(provider));
+        }
+        if let Some(model) = &llm_config.llm_model {
+            extra.insert("llm_model".to_string(), serde_json::json!(model));
+        }
+        if let Some(base_url) = &llm_config.llm_base_url {
+            extra.insert("llm_base_url".to_string(), serde_json::json!(base_url));
+        }
+        if let Some(temperature) = llm_config.llm_temperature {
+            extra.insert("llm_temperature".to_string(), serde_json::json!(temperature));
+        }
+    }
+
+    fn create_development_role(&self, base_role: &str, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert(
             "agent_capabilities".to_string(),
@@ -687,9 +844,9 @@ impl MultiAgentWorkflowExecutor {
                 "Generate comprehensive documentation"
             ]),
         );
-        extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
-        extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.3));
+        
+        // Apply LLM configuration
+        self.apply_llm_config_to_extra(&mut extra, llm_config);
         extra.insert("base_role".to_string(), serde_json::json!(base_role));
 
         Role {
@@ -713,68 +870,39 @@ impl MultiAgentWorkflowExecutor {
     }
 
     async fn create_simple_agent(&self) -> MultiAgentResult<TerraphimAgent> {
-        let mut extra = AHashMap::new();
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.2));
-        extra.insert("agent_type".to_string(), serde_json::json!("simple"));
-
-        let role = Role {
-            shortname: Some("Simple".to_string()),
-            name: "SimpleTaskAgent".into(),
-            relevance_function: RelevanceFunction::TitleScorer,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            llm_enabled: false,
-            llm_api_key: None,
-            llm_model: None,
-            llm_auto_summarize: false,
-            llm_chat_enabled: false,
-            llm_chat_system_prompt: None,
-            llm_chat_model: None,
-            llm_context_window: Some(32768),
-            extra,
-        };
-
+        log::debug!("🔧 Creating simple agent using configured role: SimpleTaskAgent");
+        
+        // Use configured role instead of creating ad-hoc role
+        let role = self.get_configured_role("SimpleTaskAgent").await?;
+        
         let mut agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
         agent.initialize().await?;
         Ok(agent)
     }
 
     async fn create_complex_agent(&self) -> MultiAgentResult<TerraphimAgent> {
-        let mut extra = AHashMap::new();
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.4));
-        extra.insert("agent_type".to_string(), serde_json::json!("complex"));
-
-        let role = Role {
-            shortname: Some("Complex".to_string()),
-            name: "ComplexTaskAgent".into(),
-            relevance_function: RelevanceFunction::BM25,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            llm_enabled: false,
-            llm_api_key: None,
-            llm_model: None,
-            llm_auto_summarize: false,
-            llm_chat_enabled: false,
-            llm_chat_system_prompt: None,
-            llm_chat_model: None,
-            llm_context_window: Some(32768),
-            extra,
-        };
-
+        log::debug!("🔧 Creating complex agent using configured role: ComplexTaskAgent");
+        
+        // Use configured role instead of creating ad-hoc role
+        let role = self.get_configured_role("ComplexTaskAgent").await?;
+        
         let mut agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
         agent.initialize().await?;
         Ok(agent)
     }
 
-    fn create_perspective_role(&self, perspective: &str, description: &str) -> Role {
+    fn create_perspective_role(&self, perspective: &str, description: &str, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("perspective".to_string(), serde_json::json!(perspective));
         extra.insert("description".to_string(), serde_json::json!(description));
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.5));
+        
+        // Apply dynamic LLM configuration
+        self.apply_llm_config_to_extra(&mut extra, llm_config);
+        
+        // Set default temperature if not configured
+        if !extra.contains_key("llm_temperature") {
+            extra.insert("llm_temperature".to_string(), serde_json::json!(0.5));
+        }
 
         Role {
             shortname: Some(perspective.to_string()),
@@ -796,10 +924,17 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
-    fn create_orchestrator_role(&self) -> Role {
+    fn create_orchestrator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("orchestrator"));
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.3));
+        
+        // Apply dynamic LLM configuration
+        self.apply_llm_config_to_extra(&mut extra, llm_config);
+        
+        // Set default temperature if not configured
+        if !extra.contains_key("llm_temperature") {
+            extra.insert("llm_temperature".to_string(), serde_json::json!(0.3));
+        }
 
         Role {
             shortname: Some("Orchestrator".to_string()),
@@ -821,11 +956,18 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
-    fn create_worker_role(&self, worker_name: &str, description: &str) -> Role {
+    fn create_worker_role(&self, worker_name: &str, description: &str, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("worker_type".to_string(), serde_json::json!(worker_name));
         extra.insert("description".to_string(), serde_json::json!(description));
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.4));
+        
+        // Apply dynamic LLM configuration
+        self.apply_llm_config_to_extra(&mut extra, llm_config);
+        
+        // Set default temperature if not configured
+        if !extra.contains_key("llm_temperature") {
+            extra.insert("llm_temperature".to_string(), serde_json::json!(0.4));
+        }
 
         Role {
             shortname: Some(worker_name.to_string()),
@@ -847,10 +989,17 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
-    fn create_generator_role(&self) -> Role {
+    fn create_generator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("generator"));
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.6));
+        
+        // Apply dynamic LLM configuration
+        self.apply_llm_config_to_extra(&mut extra, llm_config);
+        
+        // Set default temperature if not configured
+        if !extra.contains_key("llm_temperature") {
+            extra.insert("llm_temperature".to_string(), serde_json::json!(0.6));
+        }
 
         Role {
             shortname: Some("Generator".to_string()),
@@ -872,10 +1021,17 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
-    fn create_evaluator_role(&self) -> Role {
+    fn create_evaluator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("evaluator"));
-        extra.insert("llm_temperature".to_string(), serde_json::json!(0.2));
+        
+        // Apply dynamic LLM configuration
+        self.apply_llm_config_to_extra(&mut extra, llm_config);
+        
+        // Set default temperature if not configured
+        if !extra.contains_key("llm_temperature") {
+            extra.insert("llm_temperature".to_string(), serde_json::json!(0.2));
+        }
 
         Role {
             shortname: Some("Evaluator".to_string()),
@@ -944,5 +1100,20 @@ impl MultiAgentWorkflowExecutor {
             }
         }
         7.0 // Default reasonable score
+    }
+
+    /// Get configured role from config state
+    async fn get_configured_role(&self, role_name: &str) -> MultiAgentResult<Role> {
+        let config_state = self.config_state.as_ref()
+            .ok_or_else(|| MultiAgentError::InvalidRoleConfig("No config state available".to_string()))?;
+        
+        // Access roles from the actual Config, not from config_state.roles which contains RoleGraphSync
+        let config = config_state.config.lock().await;
+        let role_key = role_name.to_string().into(); // Convert to RoleName
+        let role = config.roles.get(&role_key)
+            .ok_or_else(|| MultiAgentError::InvalidRoleConfig(format!("Role '{}' not found in configuration", role_name)))?;
+        
+        log::debug!("🎯 Using configured role: {} with LLM config: {:?}", role_name, role.extra);
+        Ok(role.clone())
     }
 }

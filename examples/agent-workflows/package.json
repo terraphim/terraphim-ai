@@ -22,7 +22,7 @@
   "author": "Terraphim AI",
   "license": "MIT",
   "dependencies": {
-    "playwright": "^1.40.0"
+    "playwright": "^1.55.0"
   },
   "engines": {
     "node": ">=18.0.0"

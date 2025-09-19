@@ -22,6 +22,11 @@ class TerraphimWebSocketClient {
   }
 
   getWebSocketUrl() {
+    // For local examples, use hardcoded server URL
+    if (window.location.protocol === 'file:') {
+      return 'ws://127.0.0.1:8000/ws';
+    }
+    
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname;
     const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
@@ -75,9 +80,21 @@ class TerraphimWebSocketClient {
   }
 
   handleMessage(message) {
-    const { type, workflowId, sessionId, data } = message;
+    // Handle malformed messages
+    if (!message || typeof message !== 'object') {
+      console.warn('Received malformed WebSocket message:', message);
+      return;
+    }
     
-    switch (type) {
+    const { response_type, workflowId, sessionId, data } = message;
+    
+    // Handle messages without response_type field
+    if (!response_type) {
+      console.warn('Received WebSocket message without response_type field:', message);
+      return;
+    }
+    
+    switch (response_type) {
       case 'workflow_started':
         this.handleWorkflowStarted(workflowId, sessionId, data);
         break;
@@ -106,12 +123,24 @@ class TerraphimWebSocketClient {
         this.handleHeartbeat(data);
         break;
         
+      case 'pong':
+        this.handlePong(data);
+        break;
+        
+      case 'connection_established':
+        this.handleConnectionEstablished(workflowId, sessionId, data);
+        break;
+        
+      case 'error':
+        this.handleServerError(workflowId, sessionId, data);
+        break;
+        
       default:
-        console.warn('Unknown message type:', type);
+        console.warn('Unknown message response_type:', response_type);
     }
     
     // Emit to all subscribers
-    this.emit(type, { workflowId, sessionId, data, timestamp: new Date() });
+    this.emit(response_type, { workflowId, sessionId, data, timestamp: new Date() });
   }
 
   handleWorkflowStarted(workflowId, sessionId, data) {
@@ -177,46 +206,115 @@ class TerraphimWebSocketClient {
   handleHeartbeat(data) {
     // Respond to server heartbeat
     this.send({
-      type: 'heartbeat_response',
-      timestamp: new Date().toISOString()
+      command_type: 'ping',
+      session_id: null,
+      workflow_id: null,
+      data: {
+        timestamp: new Date().toISOString()
+      }
     });
   }
 
-  startWorkflow(workflowType, config) {
-    const sessionId = this.generateSessionId();
-    const message = {
-      type: 'start_workflow',
-      workflowType,
+  handlePong(data) {
+    // Server responded to our ping
+    console.log('Received pong from server:', data);
+    // Update connection health indicator if needed
+  }
+
+  handleConnectionEstablished(workflowId, sessionId, data) {
+    console.log('WebSocket connection established:', data);
+    // Set connection as established and update UI if needed
+    this.isConnected = true;
+    
+    // Store server capabilities if provided
+    if (data && data.capabilities) {
+      this.serverCapabilities = data.capabilities;
+    }
+    
+    // Update session info
+    if (sessionId && data) {
+      this.serverSessionId = sessionId;
+      this.serverInfo = {
+        sessionId: sessionId,
+        serverTime: data.server_time,
+        capabilities: data.capabilities || []
+      };
+    }
+  }
+
+  handleServerError(workflowId, sessionId, data) {
+    console.error('Server error received:', data);
+    
+    // Create error object
+    const error = {
+      workflowId,
       sessionId,
-      config,
-      timestamp: new Date().toISOString()
+      message: data?.error || data?.message || 'Unknown server error',
+      code: data?.code,
+      timestamp: new Date(),
+      data
     };
     
-    this.send(message);
-    return sessionId;
+    // Store in error history for debugging
+    if (!this.errorHistory) {
+      this.errorHistory = [];
+    }
+    this.errorHistory.push(error);
+    
+    // Keep only last 10 errors
+    if (this.errorHistory.length > 10) {
+      this.errorHistory = this.errorHistory.slice(-10);
+    }
+    
+    // Emit error event for UI handling
+    this.emit('server_error', error);
+  }
+
+  // WebSocket workflows are now started via HTTP POST endpoints
+  // This method creates a session ID for tracking WebSocket updates
+  createWorkflowSession(workflowId) {
+    const sessionData = {
+      workflowId,
+      status: 'pending',
+      startTime: new Date(),
+      steps: [],
+      currentStep: 0
+    };
+    
+    this.workflowSessions.set(workflowId, sessionData);
+    return workflowId;
   }
 
   pauseWorkflow(sessionId) {
     this.send({
-      type: 'pause_workflow',
-      sessionId,
-      timestamp: new Date().toISOString()
+      command_type: 'pause_workflow',
+      session_id: sessionId,
+      workflow_id: sessionId,
+      data: {
+        timestamp: new Date().toISOString()
+      }
     });
   }
 
   resumeWorkflow(sessionId) {
     this.send({
-      type: 'resume_workflow',
-      sessionId,
-      timestamp: new Date().toISOString()
+      command_type: 'resume_workflow',
+      session_id: sessionId,
+      workflow_id: sessionId,
+      data: {
+        timestamp: new Date().toISOString()
+      }
     });
   }
 
   stopWorkflow(sessionId) {
     this.send({
-      type: 'stop_workflow',
-      sessionId,
-      timestamp: new Date().toISOString()
+      command_type: 'stop_workflow',
+      session_id: sessionId,
+      workflow_id: sessionId,
+      data: {
+        timestamp: new Date().toISOString()
+      }
     });
     
     // Clean up local session data
@@ -225,10 +323,13 @@ class TerraphimWebSocketClient {
 
   updateWorkflowConfig(sessionId, config) {
     this.send({
-      type: 'update_config',
-      sessionId,
-      config,
-      timestamp: new Date().toISOString()
+      command_type: 'update_config',
+      session_id: sessionId,
+      workflow_id: sessionId,
+      data: {
+        config,
+        timestamp: new Date().toISOString()
+      }
     });
   }
 
@@ -284,8 +385,12 @@ class TerraphimWebSocketClient {
     this.heartbeatTimer = setInterval(() => {
       if (this.isConnected) {
         this.send({
-          type: 'heartbeat',
-          timestamp: new Date().toISOString()
+          command_type: 'ping',
+          session_id: null,
+          workflow_id: null,
+          data: {
+            timestamp: new Date().toISOString()
+          }
         });
       }
     }, this.heartbeatInterval);
@@ -338,7 +443,10 @@ class TerraphimWebSocketClient {
       connected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
       activeSessions: this.workflowSessions.size,
-      subscribers: Array.from(this.subscribers.keys())
+      subscribers: Array.from(this.subscribers.keys()),
+      serverInfo: this.serverInfo || null,
+      serverCapabilities: this.serverCapabilities || [],
+      errorHistory: this.errorHistory || []
     };
   }
 }

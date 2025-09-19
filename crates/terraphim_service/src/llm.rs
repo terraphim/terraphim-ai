@@ -54,8 +54,14 @@ pub fn role_wants_ai_summarize(role: &terraphim_config::Role) -> bool {
 
 /// Best-effort builder that inspects role settings and returns an LLM client if configured.
 pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    eprintln!("🔧 Building LLM client for role: {}", role.name);
+    eprintln!("🔧 Role extra keys: {:?}", role.extra.keys().collect::<Vec<_>>());
+    log::debug!("Building LLM client for role: {}", role.name);
+    log::debug!("Role extra keys: {:?}", role.extra.keys().collect::<Vec<_>>());
+    
     // Check if there's a nested "extra" key (this handles a serialization issue)
     if let Some(nested_extra) = role.extra.get("extra") {
+        log::debug!("Found nested extra field");
         // Try to extract from nested extra
         if let Some(nested_obj) = nested_extra.as_object() {
             let nested_map: AHashMap<String, Value> = nested_obj
@@ -64,9 +70,12 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
                 .collect();
 
             if let Some(provider) = get_string_extra(&nested_map, "llm_provider") {
+                log::debug!("Found nested llm_provider: {}", provider);
                 match provider.as_str() {
                     "ollama" => {
-                        return build_ollama_from_nested_extra(&nested_map);
+                        let client = build_ollama_from_nested_extra(&nested_map);
+                        log::debug!("Built Ollama client from nested extra: {:?}", client.is_some());
+                        return client;
                     }
                     "openrouter" => {
                         // Would implement similar nested extraction for OpenRouter
@@ -80,9 +89,12 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
 
     // Prefer explicit `llm_provider` in `extra`
     if let Some(provider) = get_string_extra(&role.extra, "llm_provider") {
+        log::debug!("Found llm_provider: {}", provider);
         match provider.as_str() {
             "ollama" => {
-                return build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role))
+                let client = build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role));
+                log::debug!("Built Ollama client from role extra: {:?}", client.is_some());
+                return client;
             }
             "openrouter" => {
                 return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role))
@@ -99,11 +111,14 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
     }
 
     if has_ollama_hints(&role.extra) {
+        log::debug!("Found Ollama hints in extra");
         if let Some(client) = build_ollama_from_role(role) {
+            log::debug!("Built Ollama client from hints");
             return Some(client);
         }
     }
 
+    log::debug!("No LLM client could be built for role: {}", role.name);
     None
 }
 
@@ -449,6 +464,8 @@ fn build_ollama_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmCl
         .or_else(|| get_string_extra(&role.extra, "ollama_base_url"))
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
+    log::debug!("Building Ollama client: model={}, base_url={}", model, base_url);
+    
     let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
     Some(Arc::new(OllamaClient {
         http,
@@ -468,6 +485,9 @@ fn build_ollama_from_nested_extra(
         .or_else(|| get_string_extra(nested_extra, "ollama_base_url"))
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
+    log::debug!("Building Ollama client from nested extra: model={}, base_url={}", model, base_url);
+    log::debug!("Nested extra keys: {:?}", nested_extra.keys().collect::<Vec<_>>());
+    
     let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
     Some(Arc::new(OllamaClient {
         http,

@@ -13,6 +13,7 @@ class PromptChainingDemo {
     this.currentStepIndex = 0;
     this.connectionStatus = null;
     this.settingsIntegration = null;
+    this.agentConfigManager = null;
     
     this.initializeElements();
     this.setupEventListeners();
@@ -31,6 +32,8 @@ class PromptChainingDemo {
     this.projectDescription = document.getElementById('project-description');
     this.techStack = document.getElementById('tech-stack');
     this.requirements = document.getElementById('requirements');
+    
+    // Agent configuration elements are managed by AgentConfigManager
     
     // Output elements
     this.outputContainer = document.getElementById('chain-output');
@@ -76,6 +79,17 @@ class PromptChainingDemo {
         
         // Initialize connection status after API client is ready
         this.initializeConnectionStatus();
+
+        // Initialize agent config manager
+        this.agentConfigManager = new AgentConfigManager({
+          apiClient: this.apiClient,
+          roleSelectorId: 'role-selector',
+          systemPromptId: 'system-prompt',
+          onStateChange: () => this.saveState()
+        });
+        await this.agentConfigManager.initialize();
+        
+        this.loadState();
       } else {
         // Fallback to default API client
         this.apiClient = new TerraphimApiClient();
@@ -367,9 +381,15 @@ class PromptChainingDemo {
     this.currentStepIndex = 0;
     
     try {
+      const agentState = this.agentConfigManager.getState();
+
       // Prepare input
       const input = {
         prompt: this.buildMainPrompt(),
+        role: agentState.selectedRole,
+        config: {
+          system_prompt_override: agentState.systemPrompt,
+        },
         context: this.buildContext(),
         parameters: {
           steps: this.steps.map(step => ({
@@ -458,23 +478,44 @@ class PromptChainingDemo {
       totalSteps: this.steps.length
     };
     
-    // Execute real prompt chain workflow with API client
-    const result = await this.apiClient.executePromptChain({
+    // Enhanced agent configuration for prompt chaining
+    const agentConfig = this.apiClient.createAgentWorkflowConfig('prompt-chain', {
       prompt: stepInput.prompt,
-      role: stepInput.role || 'technical_writer',
-      overall_role: stepInput.overall_role || 'software_developer'
-    }, {
+      context: stepInput.context,
+      currentStep: stepIndex + 1,
+      totalSteps: this.steps.length,
+      stepType: step.id,
+      role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'RustSystemDeveloper',
+      agentSettings: {
+        specialization: 'software_development',
+        step_context: step.name,
+        chain_position: stepIndex,
+        enable_step_evolution: true
+      },
+      workflowConfig: {
+        step_chaining: true,
+        context_propagation: true,
+        quality_gates: true
+      }
+    });
+    
+    // Execute real prompt chain workflow with enhanced agent configuration
+    const result = await this.apiClient.executePromptChain(agentConfig, {
       realTime: true,
       onProgress: (progress) => {
+        console.log(`Step ${stepIndex + 1} progress:`, progress);
         // Update progress within step
         const baseProgress = (stepIndex / this.steps.length) * 100;
         const stepProgress = (progress.percentage / 100) * (100 / this.steps.length);
         this.visualizer.updateProgress(baseProgress + stepProgress, progress.current);
+      },
+      onAgentUpdate: (agentData) => {
+        console.log(`Agent update for step ${stepIndex + 1}:`, agentData);
       }
     });
     
     return {
-      output: result.result.steps?.[stepIndex]?.output || this.generateStepOutput(step, input),
+      output: (result.result.steps && result.result.steps[stepIndex] && result.result.steps[stepIndex].output) || this.generateStepOutput(step, input),
       duration: 2000 + Math.random() * 3000,
       metadata: result.metadata
     };
@@ -984,14 +1025,16 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
   }
 
   saveState() {
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
     const state = {
       projectDescription: this.projectDescription.value,
       techStack: this.techStack.value,
       requirements: this.requirements.value,
       template: this.templateSelector.value,
+      ...agentState,
       steps: this.steps.map(step => ({
         ...step,
-        prompt: document.getElementById(`prompt-${step.id}`)?.value || step.prompt
+        prompt: (document.getElementById(`prompt-${step.id}`) && document.getElementById(`prompt-${step.id}`).value) || step.prompt
       }))
     };
     
@@ -1010,7 +1053,11 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
         if (state.template) {
           this.templateSelector.value = state.template;
         }
-        
+
+        if (this.agentConfigManager) {
+            this.agentConfigManager.applyState(state);
+        }
+
         if (state.steps) {
           this.steps = state.steps;
           this.createStepEditors();
@@ -1026,7 +1073,6 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
 document.addEventListener('DOMContentLoaded', async () => {
   window.promptChainDemo = new PromptChainingDemo();
   await window.promptChainDemo.initializeSettings();
-  window.promptChainDemo.loadState(); // Load any saved state
   
   // Ensure settings UI is globally available
   if (window.promptChainDemo.settingsIntegration && window.promptChainDemo.settingsIntegration.getSettingsUI()) {

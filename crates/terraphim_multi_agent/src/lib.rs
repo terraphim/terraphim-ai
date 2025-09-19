@@ -36,6 +36,8 @@ pub mod history;
 pub mod llm_types;
 // pub mod llm_client;      // Disabled - uses rig-core
 // pub mod simple_llm_client; // Disabled - uses rig-core
+pub mod pool;
+pub mod pool_manager;
 pub mod registry;
 pub mod tracking;
 pub mod workflows;
@@ -49,6 +51,8 @@ pub use history::*;
 pub use llm_types::*;
 // pub use llm_client::*;      // Disabled - uses rig-core
 // pub use simple_llm_client::*; // Disabled - uses rig-core
+pub use pool::*;
+pub use pool_manager::*;
 pub use registry::*;
 pub use tracking::*;
 pub use workflows::*;
@@ -60,9 +64,9 @@ pub type MultiAgentResult<T> = Result<T, MultiAgentError>;
 pub type AgentId = uuid::Uuid;
 
 // Test utilities using real Ollama with gemma3:270m model
+#[cfg(test)]
 pub mod test_utils {
     use super::*;
-    use ahash::AHashMap;
     use std::sync::Arc;
     use terraphim_config::Role;
     use terraphim_persistence::DeviceStorage;

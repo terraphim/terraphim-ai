@@ -96,6 +96,26 @@ pub enum MultiAgentError {
     /// Session not found
     #[error("Session with ID {0} not found")]
     SessionNotFound(uuid::Uuid),
+
+    /// Agent pool exhausted
+    #[error("Agent pool is exhausted - no available agents")]
+    PoolExhausted,
+
+    /// Agent busy
+    #[error("Agent {0} is currently busy")]
+    AgentBusy(crate::AgentId),
+
+    /// Agent creation timeout
+    #[error("Agent creation timed out")]
+    AgentCreationTimeout,
+
+    /// Agent creation failed
+    #[error("Agent creation failed: {0}")]
+    AgentCreationFailed(String),
+
+    /// Pool error
+    #[error("Pool error: {0}")]
+    PoolError(String),
 }
 
 impl From<anyhow::Error> for MultiAgentError {

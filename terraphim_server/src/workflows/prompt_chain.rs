@@ -40,7 +40,7 @@ pub async fn execute_prompt_chain(
     .await;
 
     // Use real multi-agent execution instead of simulation
-    let result = match MultiAgentWorkflowExecutor::new().await {
+    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await {
         Ok(executor) => executor
             .execute_prompt_chain(
                 &workflow_id,
@@ -49,6 +49,7 @@ pub async fn execute_prompt_chain(
                 &overall_role,
                 &state.workflow_sessions,
                 &state.websocket_broadcaster,
+                request.llm_config.as_ref(),
             )
             .await
             .map_err(|e| e.to_string()),

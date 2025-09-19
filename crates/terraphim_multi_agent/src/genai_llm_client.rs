@@ -13,6 +13,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 /// Direct HTTP LLM client that works with multiple providers
+#[derive(Debug)]
 pub struct GenAiLlmClient {
     client: Client,
     provider: String,
@@ -204,23 +205,51 @@ impl GenAiLlmClient {
 
         let url = format!("{}/api/chat", self.base_url);
         
+        // Debug logging - log the request details
+        log::debug!("🤖 LLM Request to Ollama: {} at {}", self.model, url);
+        log::debug!("📋 Messages ({}):", ollama_request.messages.len());
+        for (i, msg) in ollama_request.messages.iter().enumerate() {
+            log::debug!("  [{}] {}: {}", i + 1, msg.role, 
+                if msg.content.len() > 200 { 
+                    format!("{}...", &msg.content[..200]) 
+                } else { 
+                    msg.content.clone() 
+                });
+        }
+        
         let response = self.client
             .post(&url)
             .json(&ollama_request)
             .send()
             .await
-            .map_err(|e| MultiAgentError::LlmError(format!("Ollama API request failed: {}", e)))?;
+            .map_err(|e| {
+                log::error!("❌ Ollama API request failed: {}", e);
+                MultiAgentError::LlmError(format!("Ollama API request failed: {}", e))
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            log::error!("❌ Ollama API error {}: {}", status, text);
             return Err(MultiAgentError::LlmError(format!("Ollama API error {}: {}", status, text)));
         }
 
         let ollama_response: OllamaResponse = response
             .json()
             .await
-            .map_err(|e| MultiAgentError::LlmError(format!("Failed to parse Ollama response: {}", e)))?;
+            .map_err(|e| {
+                log::error!("❌ Failed to parse Ollama response: {}", e);
+                MultiAgentError::LlmError(format!("Failed to parse Ollama response: {}", e))
+            })?;
+
+        // Debug logging - log the response
+        let response_content = &ollama_response.message.content;
+        log::debug!("✅ LLM Response from {}: {}", self.model, 
+            if response_content.len() > 200 { 
+                format!("{}...", &response_content[..200]) 
+            } else { 
+                response_content.clone() 
+            });
 
         Ok(ollama_response.message.content)
     }
@@ -322,6 +351,42 @@ impl GenAiLlmClient {
                 // Default to Ollama if unknown provider
                 log::warn!("Unknown provider '{}', defaulting to Ollama", provider);
                 Self::new_ollama(model)
+            }
+        }
+    }
+
+    /// Create client from provider configuration with custom base URL
+    pub fn from_config_with_url(provider: &str, model: Option<String>, base_url: Option<String>) -> MultiAgentResult<Self> {
+        match provider.to_lowercase().as_str() {
+            "ollama" => {
+                let mut config = ProviderConfig::ollama(model);
+                if let Some(url) = base_url {
+                    config.base_url = url;
+                }
+                Self::new("ollama".to_string(), config)
+            }
+            "openai" => {
+                let mut config = ProviderConfig::openai(model);
+                if let Some(url) = base_url {
+                    config.base_url = url;
+                }
+                Self::new("openai".to_string(), config)
+            }
+            "anthropic" => {
+                let mut config = ProviderConfig::anthropic(model);
+                if let Some(url) = base_url {
+                    config.base_url = url;
+                }
+                Self::new("anthropic".to_string(), config)
+            }
+            _ => {
+                // Default to Ollama if unknown provider
+                log::warn!("Unknown provider '{}', defaulting to Ollama with custom URL", provider);
+                let mut config = ProviderConfig::ollama(model);
+                if let Some(url) = base_url {
+                    config.base_url = url;
+                }
+                Self::new("ollama".to_string(), config)
             }
         }
     }

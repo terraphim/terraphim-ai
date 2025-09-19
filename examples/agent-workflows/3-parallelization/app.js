@@ -72,6 +72,13 @@ class ParallelizationAnalysisDemo {
       }
     };
 
+    this.activeDomains = new Set(['all']);
+    this.analysisResults = new Map();
+    this.isPaused = false;
+    this.isRunning = false;
+    this.agentConfigManager = null;
+
+    this.init();
   }
 
   async init() {
@@ -95,16 +102,26 @@ class ParallelizationAnalysisDemo {
       if (initialized) {
         this.settingsIntegration = getSettingsIntegration();
         this.apiClient = window.apiClient;
-        console.log('Settings integration initialized successfully');
+        this.initializeConnectionStatus();
+        this.agentConfigManager = new AgentConfigManager({
+          apiClient: this.apiClient,
+          roleSelectorId: 'role-selector',
+          systemPromptId: 'system-prompt',
+          onStateChange: () => this.saveState()
+        });
+        await this.agentConfigManager.initialize();
+        this.loadSavedState();
       } else {
         // Fallback to default API client
         console.warn('Settings integration failed, using default configuration');
         this.apiClient = new TerraphimApiClient();
+        this.initializeConnectionStatus();
       }
     } catch (error) {
       console.error('Failed to initialize settings:', error);
       // Fallback to default API client
       this.apiClient = new TerraphimApiClient();
+      this.initializeConnectionStatus();
     }
   }
 
@@ -125,23 +142,28 @@ class ParallelizationAnalysisDemo {
     });
 
     // Control buttons
-    document.getElementById('start-analysis').addEventListener('click', () => {
+    this.startButton = document.getElementById('start-analysis');
+    this.startButton.addEventListener('click', () => {
       this.startParallelAnalysis();
     });
 
-    document.getElementById('pause-analysis').addEventListener('click', () => {
-      this.pauseAnalysis();
-    });
+    this.pauseButton = document.getElementById('pause-analysis');
+    this.pauseButton.addEventListener('click', () => this.pauseAnalysis());
+    this.resetButton = document.getElementById('reset-analysis');
+    this.resetButton.addEventListener('click', () => this.resetAnalysis());
 
-    document.getElementById('reset-analysis').addEventListener('click', () => {
-      this.resetAnalysis();
-    });
+    // Input elements
+    this.topicInput = document.getElementById('analysis-topic');
 
-    // Real-time topic analysis
-    const topicInput = document.getElementById('analysis-topic');
-    topicInput.addEventListener('input', () => {
-      this.analyzeTopic(topicInput.value);
-    });
+    // Agent config is managed by AgentConfigManager
+
+    this.topicInput.addEventListener('input', () => this.analyzeTopic(this.topicInput.value));
+  }
+
+  initializeConnectionStatus() {
+    if (this.apiClient) {
+      this.connectionStatus = new ConnectionStatusComponent('connection-status-container', this.apiClient);
+    }
   }
 
   renderPerspectives() {
@@ -216,7 +238,7 @@ class ParallelizationAnalysisDemo {
   }
 
   async startParallelAnalysis() {
-    const topic = document.getElementById('analysis-topic').value.trim();
+    const topic = this.topicInput.value.trim();
     
     if (!topic) {
       alert('Please enter a topic to analyze.');
@@ -320,16 +342,30 @@ class ParallelizationAnalysisDemo {
     }, 100);
     
     try {
-      // Execute real parallelization workflow with API client
-      const result = await this.apiClient.executeParallel({
+      // Enhanced agent configuration for parallel processing
+      const agentConfig = this.apiClient.createAgentWorkflowConfig('parallel', {
         prompt: topic,
-        role: perspective.name.toLowerCase() + '_specialist',
-        overall_role: 'multi_perspective_analyst',
-        config: {
-          perspective: perspective.name,
-          domains: Array.from(this.selectedDomains)
+        perspective: perspective,
+        domains: Array.from(this.selectedDomains),
+        role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'DataScientistAgent',
+        agentSettings: {
+          perspective_specialty: perspective.name.toLowerCase(),
+          parallel_execution: true,
+          task_coordination: true,
+          result_aggregation: true,
+          cross_perspective_analysis: true,
+          domain_expertise: perspective.domains
+        },
+        workflowConfig: {
+          enable_parallel_processing: true,
+          perspective_isolation: true,
+          result_synchronization: true,
+          concurrent_agents: this.selectedPerspectives.size
         }
-      }, {
+      });
+
+      // Execute real parallelization workflow with enhanced agent configuration
+      const result = await this.apiClient.executeParallel(agentConfig, {
         realTime: true,
         onProgress: (progress) => {
           // Progress updates handled by interval above
@@ -466,7 +502,7 @@ class ParallelizationAnalysisDemo {
       })
     };
     
-    return analyses[perspective.id]?.(topic) || analyses.analytical(topic);
+    return (analyses[perspective.id] && analyses[perspective.id](topic)) || analyses.analytical(topic);
   }
 
   displayPerspectiveResult(perspectiveId, analysis) {
@@ -617,7 +653,7 @@ class ParallelizationAnalysisDemo {
       // Add more scoring logic as needed
     };
     
-    return scores[aspect]?.[perspectiveId] || 'Medium';
+    return (scores[aspect] && scores[aspect][perspectiveId]) || 'Medium';
   }
 
   formatScore(score) {
@@ -644,8 +680,8 @@ class ParallelizationAnalysisDemo {
   }
 
   updateControlsState() {
-    document.getElementById('start-analysis').disabled = this.isRunning;
-    document.getElementById('pause-analysis').disabled = !this.isRunning;
+    this.startButton.disabled = this.isRunning;
+    this.pauseButton.disabled = !this.isRunning;
   }
 
   pauseAnalysis() {
@@ -705,35 +741,38 @@ class ParallelizationAnalysisDemo {
   }
 
   saveState() {
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
     const state = {
-      selectedDomains: Array.from(this.selectedDomains),
-      selectedPerspectives: Array.from(this.selectedPerspectives),
-      topic: document.getElementById('analysis-topic').value
+      topic: this.topicInput.value,
+      activePerspectives: Array.from(this.selectedPerspectives),
+      activeDomains: Array.from(this.selectedDomains),
+      ...agentState
     };
-    localStorage.setItem('parallelization-demo-state', JSON.stringify(state));
+    localStorage.setItem('parallel-demo-state', JSON.stringify(state));
   }
 
   loadSavedState() {
-    const saved = localStorage.getItem('parallelization-demo-state');
+    const saved = localStorage.getItem('parallel-demo-state');
     if (saved) {
       try {
         const state = JSON.parse(saved);
         
-        if (state.selectedDomains) {
-          this.selectedDomains = new Set(state.selectedDomains);
+        if (state.activePerspectives) {
+          this.selectedPerspectives = new Set(state.activePerspectives);
+          this.renderPerspectives();
+        }
+        
+        if (state.activeDomains) {
+          this.selectedDomains = new Set(state.activeDomains);
           this.renderDomainTags();
         }
         
-        if (state.selectedPerspectives) {
-          state.selectedPerspectives.forEach(id => {
-            this.selectedPerspectives.add(id);
-            const card = document.querySelector(`[data-perspective="${id}"]`);
-            if (card) card.classList.add('selected');
-          });
-        }
-        
         if (state.topic) {
-          document.getElementById('analysis-topic').value = state.topic;
+          this.topicInput.value = state.topic;
+        }
+
+        if (this.agentConfigManager) {
+          this.agentConfigManager.applyState(state);
         }
       } catch (error) {
         console.warn('Failed to load saved state:', error);
