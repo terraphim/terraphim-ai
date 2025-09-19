@@ -38,7 +38,10 @@
     "test:webdriver:ui": "playwright test --config=playwright.webdriver.config.ts --ui",
     "test:webdriver:ci": "CI=true playwright test --config=playwright.webdriver.config.ts --reporter=line --workers=1",
     "test:webdriver:simple": "playwright test tests/webdriver/kg-graph-simple-webdriver.spec.ts --headed",
-    "test:webdriver:simple:ci": "CI=true playwright test tests/webdriver/kg-graph-simple-webdriver.spec.ts --reporter=line"
+    "test:webdriver:simple:ci": "CI=true playwright test tests/webdriver/kg-graph-simple-webdriver.spec.ts --reporter=line",
+    "benchmark": "vitest --config vitest.benchmark.config.ts --run",
+    "benchmark:watch": "vitest --config vitest.benchmark.config.ts",
+    "benchmark:ui": "vitest --config vitest.benchmark.config.ts --ui"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.1",

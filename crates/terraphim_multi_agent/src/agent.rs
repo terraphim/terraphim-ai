@@ -107,6 +107,7 @@ impl Default for AgentConfig {
 }
 
 /// Core Terraphim Agent that wraps a Role configuration with Rig integration
+#[derive(Debug)]
 pub struct TerraphimAgent {
     // Core identity
     pub agent_id: AgentId,
@@ -227,9 +228,15 @@ impl TerraphimAgent {
         let model = role_config.extra.get("llm_model")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
+        let base_url = role_config.extra.get("llm_base_url")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        
+        log::debug!("🤖 TerraphimAgent::new - LLM config: provider={}, model={:?}, base_url={:?}", 
+                   provider, model, base_url);
         
         let llm_client = Arc::new(
-            GenAiLlmClient::from_config(provider, model)?
+            GenAiLlmClient::from_config_with_url(provider, model, base_url)?
         );
 
         let now = Utc::now();
@@ -473,15 +480,26 @@ impl TerraphimAgent {
     async fn setup_system_context(&self) -> MultiAgentResult<()> {
         let mut context = self.context.write().await;
 
-        // Add system prompt
-        let system_prompt = format!(
-            "You are {}, a specialized AI agent with the following capabilities: {}. \
-             Your global goal is: {}. Your individual goals are: {}.",
-            self.role_config.name,
-            self.get_capabilities().join(", "),
-            self.goals.global_goal,
-            self.goals.individual_goals.join(", ")
-        );
+        // Add system prompt - use configured prompt if available, otherwise use generic
+        let system_prompt = if let Some(configured_prompt) = self.role_config.extra.get("llm_system_prompt") {
+            configured_prompt.as_str().unwrap_or("").to_string()
+        } else {
+            format!(
+                "You are {}, a specialized AI agent with the following capabilities: {}. \
+                 Your global goal is: {}. Your individual goals are: {}.",
+                self.role_config.name,
+                self.get_capabilities().join(", "),
+                self.goals.global_goal,
+                self.goals.individual_goals.join(", ")
+            )
+        };
+        
+        log::debug!("🎯 Agent {} using system prompt: {}", self.role_config.name, 
+                   if system_prompt.len() > 100 { 
+                       format!("{}...", &system_prompt[..100]) 
+                   } else { 
+                       system_prompt.clone() 
+                   });
 
         let mut system_item = ContextItem::new(
             ContextItemType::System,

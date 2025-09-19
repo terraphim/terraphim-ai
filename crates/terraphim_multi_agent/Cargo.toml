@@ -23,6 +23,7 @@ reqwest = { version = "0.12", features = ["json", "stream"] }
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
 futures = "0.3"
+rand = "0.8"
 
 # Terraphim dependencies
 terraphim_types = { path = "../terraphim_types" }
@@ -35,3 +36,8 @@ terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "agent_operations"
+harness = false

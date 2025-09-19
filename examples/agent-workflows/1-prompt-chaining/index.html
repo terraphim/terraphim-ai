@@ -141,7 +141,7 @@
                 </select>
             </div>
             <div class="controls">
-                <button id="start-chain" class="btn primary">Start Development</button>
+                <button id="start-chain" class="btn primary" data-testid="execute-chain">Start Development</button>
                 <button id="pause-chain" class="btn" disabled>Pause</button>
                 <button id="reset-chain" class="btn">Reset</button>
             </div>
@@ -151,7 +151,7 @@
         <div class="workflow-container">
             <div class="workflow-header">
                 <h2 class="workflow-title">Development Pipeline</h2>
-                <span id="workflow-status" class="workflow-status idle">Idle</span>
+                <span id="workflow-status" class="workflow-status connection-status" data-testid="connection-status">Idle</span>
             </div>
             
             <!-- Pipeline Visualization -->
@@ -197,6 +197,22 @@
                     ></textarea>
                 </div>
 
+                <h3>🤖 Agent Configuration</h3>
+                <div class="form-group">
+                    <label class="form-label" for="role-selector">Select Agent Role:</label>
+                    <select id="role-selector" class="form-input" data-testid="role-selector"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="system-prompt">System Prompt:</label>
+                    <textarea 
+                        id="system-prompt" 
+                        class="form-input form-textarea" 
+                        rows="5"
+                        placeholder="The agent's system prompt will appear here. You can edit it."
+                        data-testid="system-prompt"
+                    ></textarea>
+                </div>
+
                 <!-- Step Editors -->
                 <div id="step-editors">
                     <!-- Dynamic step editors will be inserted here -->
@@ -204,9 +220,9 @@
             </div>
 
             <!-- Output Panel -->
-            <div class="output-panel">
+            <div class="output-panel" data-testid="output-panel">
                 <h3>🚀 Development Output</h3>
-                <div id="chain-output">
+                <div id="chain-output" data-testid="output">
                     <p class="text-muted">Start the development process to see step-by-step outputs here.</p>
                 </div>
             </div>
@@ -228,6 +244,7 @@
     <script src="../shared/settings-integration.js"></script>
     <script src="../shared/workflow-visualizer.js"></script>
     <script src="../shared/connection-status.js"></script>
+    <script src="../shared/agent-config-manager.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -20,6 +20,26 @@ pub mod prompt_chain;
 pub mod routing;
 pub mod websocket;
 
+// LLM configuration for workflow execution
+#[derive(Debug, Deserialize, Clone)]
+pub struct LlmConfig {
+    pub llm_provider: Option<String>,
+    pub llm_model: Option<String>,
+    pub llm_base_url: Option<String>,
+    pub llm_temperature: Option<f64>,
+}
+
+impl Default for LlmConfig {
+    fn default() -> Self {
+        Self {
+            llm_provider: Some("ollama".to_string()),
+            llm_model: Some("llama3.2:3b".to_string()),
+            llm_base_url: Some("http://127.0.0.1:11434".to_string()),
+            llm_temperature: Some(0.3),
+        }
+    }
+}
+
 // Workflow execution request/response types
 #[derive(Debug, Deserialize)]
 pub struct WorkflowRequest {
@@ -27,6 +47,7 @@ pub struct WorkflowRequest {
     pub role: Option<String>,
     pub overall_role: Option<String>,
     pub config: Option<serde_json::Value>,
+    pub llm_config: Option<LlmConfig>,
 }
 
 #[derive(Debug, Serialize)]

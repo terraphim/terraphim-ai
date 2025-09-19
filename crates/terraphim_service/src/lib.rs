@@ -1053,9 +1053,16 @@ impl TerraphimService {
     ) -> Result<Vec<Document>> {
         use crate::llm::{build_llm_from_role, SummarizeOptions};
 
+        eprintln!("🤖 Attempting to build LLM client for role: {}", role.name);
         let llm = match build_llm_from_role(role) {
-            Some(client) => client,
-            None => return Ok(documents),
+            Some(client) => {
+                eprintln!("✅ LLM client successfully created: {}", client.name());
+                client
+            },
+            None => {
+                eprintln!("❌ No LLM client available for role: {}", role.name);
+                return Ok(documents);
+            },
         };
 
         log::info!(
@@ -1419,6 +1426,7 @@ impl TerraphimService {
                         .await?;
                 } else {
                     // Always apply LLM AI summarization if LLM client is available
+                    eprintln!("📋 Entering LLM AI summarization branch for role: {}", role.name);
                     log::debug!(
                         "Applying LLM AI summarization to {} search results for role '{}'",
                         docs_ranked.len(),
@@ -1741,6 +1749,7 @@ impl TerraphimService {
                 }
             }
             RelevanceFunction::TerraphimGraph => {
+                eprintln!("🧠 TerraphimGraph search initiated for role: {}", role.name);
                 self.build_thesaurus(search_query).await?;
                 let _thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
                 let scored_index_docs: Vec<IndexedDocument> = self
