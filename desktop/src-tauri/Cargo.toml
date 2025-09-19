@@ -14,7 +14,7 @@ rust-version = "1.57"
 
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
 terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }

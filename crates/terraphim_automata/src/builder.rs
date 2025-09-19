@@ -1,5 +1,8 @@
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "tokio-runtime")]
+use std::path::Path;
+use std::path::PathBuf;
+#[cfg(feature = "tokio-runtime")]
 use std::process::Stdio;
 use std::time;
 use thiserror::Error;
@@ -41,12 +44,16 @@ const LOGSEQ_SYNONYMS_KEYWORD: &str = "synonyms";
 
 #[derive(Default)]
 pub struct Logseq {
+    #[allow(dead_code)]
     service: LogseqService,
 }
 
 impl ThesaurusBuilder for Logseq {
     async fn build<P: Into<PathBuf> + Send>(&self, name: String, haystack: P) -> Result<Thesaurus> {
+        #[cfg(feature = "tokio-runtime")]
         let haystack = haystack.into();
+        #[cfg(not(feature = "tokio-runtime"))]
+        let _haystack = haystack.into();
         #[cfg(feature = "tokio-runtime")]
         let messages = self
             .service
@@ -59,6 +66,7 @@ impl ThesaurusBuilder for Logseq {
     }
 }
 
+#[allow(dead_code)]
 pub struct LogseqService {
     command: String,
     default_args: Vec<String>,
