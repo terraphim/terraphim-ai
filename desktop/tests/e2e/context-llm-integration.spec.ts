@@ -1,6 +1,6 @@
 /**
  * Context and LLM Integration Tests
- * 
+ *
  * This test suite focuses on the integration between context management
  * and LLM functionality, ensuring that context is properly passed to
  * the LLM and affects the responses.
@@ -96,16 +96,16 @@ test.describe('Context and LLM Integration Tests', () => {
 
       // Add initial document
       await addDocumentToContext(page, TEST_DOCUMENTS[0]);
-      
+
       // Chat with initial context
       await testLLMResponseWithContext(page, 'What does the first document say about async programming?');
-      
+
       // Add another document
       await addDocumentToContext(page, TEST_DOCUMENTS[1]);
-      
+
       // Chat with updated context
       await testLLMResponseWithContext(page, 'Now compare the concepts from both documents');
-      
+
       console.log('✅ Context updates and LLM responses work correctly');
     });
 
@@ -124,19 +124,19 @@ test.describe('Context and LLM Integration Tests', () => {
       const contextItems = page.locator('[data-testid="conversation-context"] .context-item');
       const deleteButton = contextItems.first().locator('[data-testid="delete-context-0"]');
       await deleteButton.click();
-      
+
       // Confirm deletion if modal appears
       const confirmDialog = page.locator('[data-testid="confirm-delete-modal"]');
       const hasConfirmDialog = await confirmDialog.isVisible();
       if (hasConfirmDialog) {
         await confirmDialog.locator('[data-testid="confirm-delete-button"]').click();
       }
-      
+
       await ciWait(page, 'medium');
 
       // Chat with reduced context
       await testLLMResponseWithContext(page, 'What documents are still in context?');
-      
+
       console.log('✅ Context removal and LLM responses work correctly');
     });
   });
@@ -302,16 +302,16 @@ test.describe('Context and LLM Integration Tests', () => {
       // Try to chat
       const chatInput = page.locator('[data-testid="chat-input"]');
       const sendButton = page.locator('[data-testid="send-message-button"]');
-      
+
       await chatInput.fill('Test message that should fail');
       await sendButton.click();
-      
+
       await ciWait(page, 'medium');
 
       // Should show error message
       const errorMessage = page.locator('.error, [data-testid="error-message"]');
       const hasError = await errorMessage.isVisible();
-      
+
       if (hasError) {
         console.log('✅ LLM error handled gracefully');
       } else {
@@ -342,7 +342,7 @@ test.describe('Context and LLM Integration Tests', () => {
   async function addDocumentToContext(page: any, document: any) {
     // Navigate to search first
     await ciNavigate(page, '/');
-    
+
     // Perform search (simulate finding the document)
     const searchInput = page.locator('input[type="search"]');
     await searchInput.fill(document.title);
@@ -353,7 +353,7 @@ test.describe('Context and LLM Integration Tests', () => {
     const searchResults = page.locator('[data-testid="search-results"] .box');
     const firstResult = searchResults.first();
     const addToContextButton = firstResult.locator('[data-testid="add-to-context-button"]');
-    
+
     if (await addToContextButton.isVisible()) {
       await addToContextButton.click();
       await ciWait(page, 'medium');
@@ -367,39 +367,39 @@ test.describe('Context and LLM Integration Tests', () => {
   async function addManualContext(page: any, document: any) {
     const addContextButton = page.locator('[data-testid="show-add-context-button"]');
     await addContextButton.click();
-    
+
     const titleInput = page.locator('[data-testid="context-title-input"]');
     const contentInput = page.locator('[data-testid="context-content-textarea"]');
     const saveButton = page.locator('[data-testid="add-context-submit-button"]');
-    
+
     await titleInput.fill(document.title);
     await contentInput.fill(document.content);
     await saveButton.click();
-    
+
     await ciWait(page, 'medium');
   }
 
   async function addKGTermToContext(page: any, term: string) {
     const kgSearchButton = page.locator('[data-testid="kg-search-button"]');
     const kgSearchVisible = await kgSearchButton.isVisible();
-    
+
     if (kgSearchVisible) {
       await kgSearchButton.click();
-      
+
       const kgModal = page.locator('[data-testid="kg-search-modal"]');
       await expect(kgModal).toBeVisible();
 
       const searchInput = kgModal.locator('[data-testid="kg-search-input"]');
       await searchInput.fill(term);
-      
+
       const searchButton = kgModal.locator('[data-testid="kg-search-submit"]');
       await searchButton.click();
-      
+
       await ciWait(page, 'medium');
 
       const results = kgModal.locator('[data-testid="kg-search-results"] .result-item');
       const resultCount = await results.count();
-      
+
       if (resultCount > 0) {
         const addButton = results.first().locator('[data-testid="add-to-context"]');
         await addButton.click();
@@ -414,19 +414,19 @@ test.describe('Context and LLM Integration Tests', () => {
   async function testLLMResponseWithContext(page: any, message: string) {
     const chatInput = page.locator('[data-testid="chat-input"]');
     const sendButton = page.locator('[data-testid="send-message-button"]');
-    
+
     await chatInput.fill(message);
     await sendButton.click();
-    
+
     // Wait for user message
     await ciWait(page, 'small');
-    
+
     // Wait for assistant response
     await page.waitForSelector('.msg.assistant', {
       timeout: LLM_RESPONSE_TIMEOUT,
       state: 'visible'
     });
-    
+
     await ciWait(page, 'small');
   }
 
@@ -436,4 +436,3 @@ test.describe('Context and LLM Integration Tests', () => {
     return await lastMessage.textContent();
   }
 });
-

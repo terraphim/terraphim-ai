@@ -14,6 +14,27 @@
 
 # Terraphim AI Project Scratchpad
 
+### ✅ COMPLETED: Comprehensive Architecture Documentation Update - (2025-01-31)
+
+**Task**: Update @Architecture.md with comprehensive mermaid diagrams showing all Terraphim AI components and haystacks.
+
+**Status**: ✅ **COMPLETED SUCCESSFULLY**
+
+**Key Achievements**:
+- ✅ **Complete System Architecture**: Updated main diagram with all 10 haystack services and 20+ crates
+- ✅ **Haystack Services Documentation**: Added detailed section explaining each of the 10 haystack types
+- ✅ **Enhanced Search Flow**: Updated search processing diagrams to include all haystack types with relevance scoring
+- ✅ **Crate Dependency Architecture**: Added haystack layer and all infrastructure components
+- ✅ **Configuration Diagrams**: Updated role system diagrams to include all haystack configurations
+- ✅ **Comprehensive Summary**: Added system summary highlighting multi-layer architecture and extensibility
+
+**Technical Details**:
+- **Core Haystacks** (6): Ripgrep, Atomic, QueryRs, ClickUp, MCP, Perplexity
+- **Extended Haystacks** (4): Google Docs, Atlassian, Discourse, JMAP
+- **Relevance Scoring**: TitleScorer, BM25 Family (BM25, BM25F, BM25Plus), TerraphimGraph
+- **Frontend Interfaces**: Desktop Tauri, Web UI, Terminal UI, VS Code Extension, Node.js bindings
+- **Architecture Layers**: Frontend, API, Service, Knowledge, Data, Haystack, Integration, External Systems
+
 ### 🔄 ACTIVE: Test Infrastructure Validation & Port Configuration Fix - (2025-09-20)
 
 **Task**: Review all tests and end-to-end user journeys, ensure all haystacks work, TerraphimGraph relevance functions, and knowledge graph editing with proper local service configuration.
