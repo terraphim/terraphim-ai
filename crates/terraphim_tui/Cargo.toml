@@ -41,7 +41,7 @@ chrono = { version = "0.4", features = ["serde"] }
 rustyline = { version = "14.0", optional = true }
 colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
-indicatif = { version = "0.17", optional = true }
+indicatif = { version = "0.18", optional = true }
 dirs = { version = "5.0", optional = true }
 
 terraphim_types = { path = "../terraphim_types" }
