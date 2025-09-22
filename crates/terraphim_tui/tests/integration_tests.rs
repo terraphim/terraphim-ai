@@ -577,18 +577,18 @@ async fn test_full_feature_matrix() -> Result<()> {
             println!("  ✓ {}: completed", test_name);
         }
 
-        // Configuration tests
+        // Configuration tests - use an existing role
         let config_tests = vec![(
             "config-set-role",
-            vec!["config", "set", "selected_role", "TestRole"],
+            vec!["config", "set", "selected_role", "Default"],
         )];
 
         for (test_name, args) in config_tests {
             let (_stdout, stderr, code) = run_offline_command(&args)?;
             assert_eq!(
                 code, 0,
-                "Config test '{}' should succeed in {} mode: stderr={}",
-                test_name, mode_name, stderr
+                "Config test '{}' should succeed in {} mode: stderr={}, stdout={}",
+                test_name, mode_name, stderr, _stdout
             );
             println!("  ✓ {}: succeeded", test_name);
         }
