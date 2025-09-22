@@ -1,6 +1,6 @@
 /**
  * Complete Workflow Integration Test
- * 
+ *
  * This test covers the complete end-to-end workflow:
  * 1. Search for documents
  * 2. Add documents to context
@@ -127,7 +127,7 @@ test.describe('Complete Workflow Integration Tests', () => {
       // Should show empty state
       const emptyState = page.locator('[data-testid="empty-state"], .has-text-centered');
       const hasEmptyState = await emptyState.isVisible();
-      
+
       if (hasEmptyState) {
         console.log('✅ Empty search results handled gracefully');
       }
@@ -161,7 +161,7 @@ test.describe('Complete Workflow Integration Tests', () => {
       const searchResults = page.locator('[data-testid="search-results"] .box');
       const firstResult = searchResults.first();
       const addToContextButton = firstResult.locator('[data-testid="add-to-context-button"]');
-      
+
       if (await addToContextButton.isVisible()) {
         await addToContextButton.click();
         await ciWait(page, 'medium');
@@ -252,7 +252,7 @@ test.describe('Complete Workflow Integration Tests', () => {
       // Should handle error gracefully
       const errorMessage = page.locator('.error, [data-testid="error-message"]');
       const hasError = await errorMessage.isVisible();
-      
+
       if (hasError) {
         console.log('✅ Network error handled gracefully');
       }
@@ -292,11 +292,11 @@ test.describe('Complete Workflow Integration Tests', () => {
 
       // Try to chat
       await performChatWithContext(page, 'Test message that should fail');
-      
+
       // Should handle error gracefully
       const errorMessage = page.locator('.error, [data-testid="error-message"]');
       const hasError = await errorMessage.isVisible();
-      
+
       if (hasError) {
         console.log('✅ LLM error handled gracefully');
       }
@@ -379,26 +379,26 @@ test.describe('Complete Workflow Integration Tests', () => {
 
   async function performMultipleSearches(page: any, queries: string[]) {
     const allResults = [];
-    
+
     for (const query of queries) {
       await performSearch(page, query);
       const searchResults = page.locator('[data-testid="search-results"] .box');
       const resultCount = await searchResults.count();
       allResults.push(resultCount);
     }
-    
+
     return allResults;
   }
 
   async function addDocumentsToContext(page: any, searchResults: number[]) {
     let totalAdded = 0;
-    
+
     for (let i = 0; i < searchResults.length; i++) {
       if (searchResults[i] > 0) {
         const searchResultsElements = page.locator('[data-testid="search-results"] .box');
         const firstResult = searchResultsElements.first();
         const addToContextButton = firstResult.locator('[data-testid="add-to-context-button"]');
-        
+
         if (await addToContextButton.isVisible()) {
           await addToContextButton.click();
           await ciWait(page, 'medium');
@@ -406,7 +406,7 @@ test.describe('Complete Workflow Integration Tests', () => {
         }
       }
     }
-    
+
     return totalAdded;
   }
 
@@ -418,46 +418,46 @@ test.describe('Complete Workflow Integration Tests', () => {
   async function performChatWithContext(page: any, message: string) {
     const chatInput = page.locator('[data-testid="chat-input"]');
     const sendButton = page.locator('[data-testid="send-message-button"]');
-    
+
     await chatInput.fill(message);
     await sendButton.click();
-    
+
     // Wait for user message
     await ciWait(page, 'small');
-    
+
     // Wait for assistant response
     await page.waitForSelector('.msg.assistant', {
       timeout: LLM_RESPONSE_TIMEOUT,
       state: 'visible'
     });
-    
+
     await ciWait(page, 'small');
   }
 
   async function addKGTermsToContext(page: any, terms: string[]) {
     let addedCount = 0;
-    
+
     for (const term of terms) {
       const kgSearchButton = page.locator('[data-testid="kg-search-button"]');
       const kgSearchVisible = await kgSearchButton.isVisible();
-      
+
       if (kgSearchVisible) {
         await kgSearchButton.click();
-        
+
         const kgModal = page.locator('[data-testid="kg-search-modal"]');
         await expect(kgModal).toBeVisible();
 
         const searchInput = kgModal.locator('[data-testid="kg-search-input"]');
         await searchInput.fill(term);
-        
+
         const searchButton = kgModal.locator('[data-testid="kg-search-submit"]');
         await searchButton.click();
-        
+
         await ciWait(page, 'medium');
 
         const results = kgModal.locator('[data-testid="kg-search-results"] .result-item');
         const resultCount = await results.count();
-        
+
         if (resultCount > 0) {
           const addButton = results.first().locator('[data-testid="add-to-context"]');
           await addButton.click();
@@ -469,27 +469,27 @@ test.describe('Complete Workflow Integration Tests', () => {
         await closeButton.click();
       }
     }
-    
+
     return addedCount;
   }
 
   async function verifyContextInfluence(page: any, expectedContext: string[]) {
     const chatInput = page.locator('[data-testid="chat-input"]');
     const sendButton = page.locator('[data-testid="send-message-button"]');
-    
+
     await chatInput.fill('Please reference the specific terms and concepts from the context in your response');
     await sendButton.click();
-    
+
     // Wait for response
     await page.waitForSelector('.msg.assistant', {
       timeout: LLM_RESPONSE_TIMEOUT,
       state: 'visible'
     });
-    
+
     // Check if response mentions context
     const assistantMessage = page.locator('.msg.assistant').last();
     const responseText = await assistantMessage.textContent();
-    
+
     // Response should be substantial
     expect(responseText?.length).toBeGreaterThan(50);
     console.log('✅ Context influence verified in LLM response');
@@ -498,18 +498,17 @@ test.describe('Complete Workflow Integration Tests', () => {
   async function addManualContext(page: any, context: any) {
     const addContextButton = page.locator('[data-testid="show-add-context-button"]');
     await addContextButton.click();
-    
+
     const titleInput = page.locator('[data-testid="context-title-input"]');
     const contentInput = page.locator('[data-testid="context-content-textarea"]');
     const typeSelect = page.locator('[data-testid="context-type-select"]');
     const saveButton = page.locator('[data-testid="add-context-submit-button"]');
-    
+
     await titleInput.fill(context.title);
     await contentInput.fill(context.content);
     await typeSelect.selectOption(context.type);
     await saveButton.click();
-    
+
     await ciWait(page, 'medium');
   }
 });
-

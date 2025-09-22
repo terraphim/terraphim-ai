@@ -1,6 +1,6 @@
 /**
  * Unit Tests for Persistence Functionality
- * 
+ *
  * Tests the localStorage-based persistence functions used by
  * Search and Chat components.
  */
@@ -73,7 +73,7 @@ describe('Search State Persistence', () => {
   it('should handle corrupted search state gracefully', () => {
     const mockRole = 'TestRole';
     const stateKey = `terraphim:searchState:${mockRole}`;
-    
+
     // Save corrupted JSON
     localStorage.setItem(stateKey, '{invalid json}');
 
@@ -142,7 +142,7 @@ describe('Chat State Persistence', () => {
   it('should validate message structure on load', () => {
     const mockRole = 'TestRole';
     const stateKey = `terraphim:chatState:${mockRole}`;
-    
+
     // Save state with invalid message structure
     const invalidState = {
       messages: 'not an array',
@@ -151,7 +151,7 @@ describe('Chat State Persistence', () => {
     localStorage.setItem(stateKey, JSON.stringify(invalidState));
 
     const loadedState = JSON.parse(localStorage.getItem(stateKey) || '{}');
-    
+
     // Validation logic should check if messages is array
     const isValidMessages = Array.isArray(loadedState.messages);
     const isValidConversationId = typeof loadedState.conversationId === 'string';
@@ -163,7 +163,7 @@ describe('Chat State Persistence', () => {
   it('should handle role-specific state separation', () => {
     const role1 = 'Role1';
     const role2 = 'Role2';
-    
+
     const state1 = { messages: [{ role: 'user', content: 'Message from role1' }] };
     const state2 = { messages: [{ role: 'user', content: 'Message from role2' }] };
 
@@ -186,32 +186,32 @@ describe('Markdown Preference Persistence', () => {
 
   it('should save and load markdown preference', () => {
     const prefKey = 'terraphim:chatMarkdown';
-    
+
     // Save preference
     localStorage.setItem(prefKey, 'true');
-    
+
     // Load preference
     const loadedPref = localStorage.getItem(prefKey);
     const isMarkdownEnabled = loadedPref === 'true';
-    
+
     expect(isMarkdownEnabled).toBe(true);
-    
+
     // Change preference
     localStorage.setItem(prefKey, 'false');
     const updatedPref = localStorage.getItem(prefKey);
     const isMarkdownDisabled = updatedPref === 'false';
-    
+
     expect(isMarkdownDisabled).toBe(true);
   });
 
   it('should handle missing markdown preference', () => {
     const prefKey = 'terraphim:chatMarkdown';
-    
+
     // No preference set
     const loadedPref = localStorage.getItem(prefKey);
-    
+
     expect(loadedPref).toBeNull();
-    
+
     // Should default to false when null
     const defaultValue = loadedPref === 'true';
     expect(defaultValue).toBe(false);
@@ -224,10 +224,10 @@ describe('Storage Quota and Error Handling', () => {
     const mockSetItem = vi.fn(() => {
       throw new DOMException('QuotaExceededError');
     });
-    
+
     const originalSetItem = localStorage.setItem;
     localStorage.setItem = mockSetItem;
-    
+
     // Should not crash when quota is exceeded
     expect(() => {
       try {
@@ -237,7 +237,7 @@ describe('Storage Quota and Error Handling', () => {
         expect(e).toBeInstanceOf(DOMException);
       }
     }).not.toThrow();
-    
+
     // Restore original
     localStorage.setItem = originalSetItem;
   });
@@ -247,10 +247,10 @@ describe('Storage Quota and Error Handling', () => {
     const mockGetItem = vi.fn(() => {
       throw new DOMException('SecurityError');
     });
-    
+
     const originalGetItem = localStorage.getItem;
     localStorage.getItem = mockGetItem;
-    
+
     // Should handle security errors gracefully
     expect(() => {
       try {
@@ -259,7 +259,7 @@ describe('Storage Quota and Error Handling', () => {
         expect(e).toBeInstanceOf(DOMException);
       }
     }).not.toThrow();
-    
+
     // Restore original
     localStorage.getItem = originalGetItem;
   });

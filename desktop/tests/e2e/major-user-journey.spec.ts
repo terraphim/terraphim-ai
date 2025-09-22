@@ -1,6 +1,6 @@
 /**
  * Comprehensive End-to-End Test for Major User Journey
- * 
+ *
  * This test covers the complete user journey:
  * 1. Search for documents
  * 2. Add document to context
@@ -8,7 +8,7 @@
  * 4. Add KG term to context
  * 5. Chat with enhanced context
  * 6. Verify context is passed to LLM
- * 
+ *
  * This test validates the core functionality that users rely on most.
  */
 
@@ -53,7 +53,7 @@ test.describe('Major User Journey E2E Tests', () => {
 
     // Navigate to the application
     await ciNavigate(page, '/');
-    
+
     // Wait for the app to load
     await ciWaitForSelector(page, '[data-testid="search-tab"]', 'navigation');
   });
@@ -65,7 +65,7 @@ test.describe('Major User Journey E2E Tests', () => {
       // Step 1: Search for documents
       console.log('📝 Step 1: Searching for documents...');
       await performSearch(page, TEST_SEARCH_QUERIES[0]);
-      
+
       // Verify search results are displayed
       const searchResults = page.locator('[data-testid="search-results"] .box');
       await expect(searchResults.first()).toBeVisible();
@@ -75,11 +75,11 @@ test.describe('Major User Journey E2E Tests', () => {
       console.log('📝 Step 2: Adding document to context...');
       const firstResult = searchResults.first();
       const addToContextButton = firstResult.locator('[data-testid="add-to-context-button"]');
-      
+
       // Wait for the button to be available
       await expect(addToContextButton).toBeVisible();
       await addToContextButton.click();
-      
+
       // Wait for success notification
       await ciWait(page, 'medium');
       console.log('✅ Document added to context');
@@ -94,7 +94,7 @@ test.describe('Major User Journey E2E Tests', () => {
       console.log('📝 Step 4: Verifying context is visible...');
       const contextPanel = page.locator('[data-testid="context-panel"]');
       await expect(contextPanel).toBeVisible();
-      
+
       const contextItems = contextPanel.locator('[data-testid="conversation-context"] .context-item');
       await expect(contextItems.first()).toBeVisible();
       console.log('✅ Context items visible in chat');
@@ -128,14 +128,14 @@ test.describe('Major User Journey E2E Tests', () => {
       // Search and add multiple documents
       for (let i = 0; i < 2; i++) {
         await performSearch(page, TEST_SEARCH_QUERIES[i]);
-        
+
         const searchResults = page.locator('[data-testid="search-results"] .box');
         const result = searchResults.first();
         const addToContextButton = result.locator('[data-testid="add-to-context-button"]');
-        
+
         await addToContextButton.click();
         await ciWait(page, 'medium');
-        
+
         console.log(`✅ Document ${i + 1} added to context`);
       }
 
@@ -160,12 +160,12 @@ test.describe('Major User Journey E2E Tests', () => {
       const searchInput = page.locator('input[type="search"]');
       await searchInput.click();
       await searchInput.fill('rust');
-      
+
       // Wait for autocomplete suggestions
       await ciWait(page, 'small');
       const suggestions = page.locator('.suggestions li');
       const suggestionCount = await suggestions.count();
-      
+
       if (suggestionCount > 0) {
         // Select first suggestion
         await suggestions.first().click();
@@ -194,7 +194,7 @@ test.describe('Major User Journey E2E Tests', () => {
       // Should show empty state or no results message
       const emptyState = page.locator('[data-testid="empty-state"], .has-text-centered');
       const hasEmptyState = await emptyState.isVisible();
-      
+
       if (hasEmptyState) {
         console.log('✅ Empty state handled gracefully');
       } else {
@@ -210,10 +210,10 @@ test.describe('Major User Journey E2E Tests', () => {
 
       const chatInput = page.locator('[data-testid="chat-input"]');
       const sendButton = page.locator('[data-testid="send-message-button"]');
-      
+
       await chatInput.fill('Test message without context');
       await sendButton.click();
-      
+
       // Should handle chat without context gracefully
       await ciWait(page, 'medium');
       console.log('✅ Chat without context handled gracefully');
@@ -240,11 +240,11 @@ test.describe('Major User Journey E2E Tests', () => {
       // Remove context item
       const deleteButton = contextItems.first().locator('[data-testid="delete-context-0"]');
       await deleteButton.click();
-      
+
       // Confirm deletion if modal appears
       const confirmDialog = page.locator('[data-testid="confirm-delete-modal"]');
       const hasConfirmDialog = await confirmDialog.isVisible();
-      
+
       if (hasConfirmDialog) {
         await confirmDialog.locator('[data-testid="confirm-delete-button"]').click();
       }
@@ -276,7 +276,7 @@ test.describe('Major User Journey E2E Tests', () => {
 
       const titleInput = editModal.locator('[data-testid="context-title-input"]');
       await titleInput.fill('Edited Title');
-      
+
       const saveButton = editModal.locator('[data-testid="save-context-button"]');
       await saveButton.click();
 
@@ -294,26 +294,26 @@ test.describe('Major User Journey E2E Tests', () => {
       // Open KG search modal
       const kgSearchButton = page.locator('[data-testid="kg-search-button"]');
       const kgSearchVisible = await kgSearchButton.isVisible();
-      
+
       if (kgSearchVisible) {
         await kgSearchButton.click();
-        
+
         const kgModal = page.locator('[data-testid="kg-search-modal"]');
         await expect(kgModal).toBeVisible();
 
         // Search for KG terms
         const searchInput = kgModal.locator('[data-testid="kg-search-input"]');
         await searchInput.fill(TEST_KG_TERMS[0]);
-        
+
         const searchButton = kgModal.locator('[data-testid="kg-search-submit"]');
         await searchButton.click();
-        
+
         await ciWait(page, 'medium');
 
         // Add first result to context
         const results = kgModal.locator('[data-testid="kg-search-results"] .result-item');
         const resultCount = await results.count();
-        
+
         if (resultCount > 0) {
           const addButton = results.first().locator('[data-testid="add-to-context"]');
           await addButton.click();
@@ -340,43 +340,43 @@ test.describe('Major User Journey E2E Tests', () => {
   async function performChatWithContext(page: any, message: string) {
     const chatInput = page.locator('[data-testid="chat-input"]');
     const sendButton = page.locator('[data-testid="send-message-button"]');
-    
+
     await chatInput.fill(message);
     await sendButton.click();
-    
+
     // Wait for user message to appear
     await ciWait(page, 'small');
-    
+
     // Wait for assistant response
     await page.waitForSelector('.msg.assistant', {
       timeout: LLM_RESPONSE_TIMEOUT,
       state: 'visible'
     });
-    
+
     await ciWait(page, 'small');
   }
 
   async function addKGTermToContext(page: any, term: string) {
     const kgSearchButton = page.locator('[data-testid="kg-search-button"]');
     const kgSearchVisible = await kgSearchButton.isVisible();
-    
+
     if (kgSearchVisible) {
       await kgSearchButton.click();
-      
+
       const kgModal = page.locator('[data-testid="kg-search-modal"]');
       await expect(kgModal).toBeVisible();
 
       const searchInput = kgModal.locator('[data-testid="kg-search-input"]');
       await searchInput.fill(term);
-      
+
       const searchButton = kgModal.locator('[data-testid="kg-search-submit"]');
       await searchButton.click();
-      
+
       await ciWait(page, 'medium');
 
       const results = kgModal.locator('[data-testid="kg-search-results"] .result-item');
       const resultCount = await results.count();
-      
+
       if (resultCount > 0) {
         const addButton = results.first().locator('[data-testid="add-to-context"]');
         await addButton.click();
@@ -392,23 +392,22 @@ test.describe('Major User Journey E2E Tests', () => {
     // Send a message that should reference the context
     const chatInput = page.locator('[data-testid="chat-input"]');
     const sendButton = page.locator('[data-testid="send-message-button"]');
-    
+
     await chatInput.fill('Please reference the specific documents and terms I added to context in your response');
     await sendButton.click();
-    
+
     // Wait for response
     await page.waitForSelector('.msg.assistant', {
       timeout: LLM_RESPONSE_TIMEOUT,
       state: 'visible'
     });
-    
+
     // Check if the response mentions context or seems to reference it
     const assistantMessage = page.locator('.msg.assistant').last();
     const responseText = await assistantMessage.textContent();
-    
+
     // The response should be substantial and not just a generic response
     expect(responseText?.length).toBeGreaterThan(50);
     console.log('✅ LLM response received with context integration');
   }
 });
-
