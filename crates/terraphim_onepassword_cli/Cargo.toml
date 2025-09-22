@@ -39,7 +39,7 @@ reqwest = { workspace = true, features = ["json"], optional = true }
 env = "1.0"
 
 # Process handling for op CLI
-which = "6.0"
+which = "8.0"
 
 # Jiff for time handling (as per rules)
 jiff = "0.2"
