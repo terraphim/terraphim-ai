@@ -49,7 +49,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
 ahash = "0.8.11"
 lru = "0.12"
-schemars = { version = "0.8.22", features = ["derive"] }
+schemars = { version = "1.0.4", features = ["derive"] }
 tsify = { version = "0.5", features = ["js"] }
 wasm-bindgen = "0.2"
 tracing = "0.1.40"
