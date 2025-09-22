@@ -40,7 +40,7 @@ rust-embed = { version = "8.2.0", features = ["axum", "axum-ex", "mime-guess"] }
 env_logger = "0.11.8"
 url = "2.5.0"
 ahash = "0.8.11"
-schemars = "0.8.22"
+schemars = "1.0.4"
 regex = "1.11.0"
 walkdir = "2.4"
 chrono = { version = "0.4", features = ["serde"] }
