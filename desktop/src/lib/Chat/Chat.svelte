@@ -77,7 +77,7 @@
 
   // KG search modal
   let showKGSearchModal = false;
-  
+
   // KG document modal (for viewing KG term documents)
   let showKgModal = false;
   let kgDocument: any = null;
@@ -339,7 +339,7 @@
     if (context.context_type === 'KGTermDefinition') {
       // Extract term from different possible sources
       let term: string | null = termFromEvent || null;
-      
+
       // Try to get term from kg_term_definition object (if available)
       if (context.kg_term_definition?.term) {
         term = context.kg_term_definition.term;
@@ -352,7 +352,7 @@
       else if (context.metadata?.normalized_term) {
         term = context.metadata.normalized_term;
       }
-      
+
       if (term) {
         await showKGDocumentsForTerm(term);
       } else {
@@ -373,7 +373,7 @@
   // Show KG documents for a term using find_documents_for_kg_term API
   async function showKGDocumentsForTerm(term: string) {
     console.log(`🔍 Finding KG documents for term: "${term}" in role: "${$role}"`);
-    
+
     try {
       if ($is_tauri) {
         // Use Tauri command for desktop app
@@ -403,7 +403,7 @@
           console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
         }
       } else {
-        // Use HTTP fetch for web mode  
+        // Use HTTP fetch for web mode
         console.log('  Making HTTP fetch call...');
         const baseUrl = CONFIG.ServerURL;
         const encodedRole = encodeURIComponent($role);
@@ -411,7 +411,7 @@
         const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
 
         const response = await fetch(url);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         }
@@ -420,7 +420,7 @@
         console.log('  📄 Response data:', data.status, 'Results:', data.results?.length || 0);
 
         if (data.status === 'success' && data.results && data.results.length > 0) {
-          // Show the first (highest-ranked) document  
+          // Show the first (highest-ranked) document
           kgDocument = data.results[0];
           kgRank = kgDocument.rank || 0;
           kgTerm = term;
@@ -660,20 +660,20 @@
       if (modelUsed) {
         // Check if modelUsed is actually a provider name (common providers)
         const commonProviders = ['ollama', 'openrouter', 'anthropic', 'openai', 'groq'];
-        
+
         if (commonProviders.includes(modelUsed.toLowerCase())) {
           // modelUsed is a provider name, try to get the actual model from role config
           const cfg: any = get(configStore) as any;
           const rname = get(role) as string;
           const r: any = cfg?.roles ? cfg.roles[rname] : null;
-          
+
           let actualModel = '';
           if (modelUsed.toLowerCase() === 'ollama') {
             actualModel = r?.ollama_model || r?.llm_chat_model || '';
           } else if (modelUsed.toLowerCase() === 'openrouter') {
             actualModel = r?.openrouter_chat_model || r?.openrouter_model || '';
           }
-          
+
           providerHint = `Provider: ${modelUsed}${actualModel ? ` model: ${actualModel}` : ''}`;
         } else {
           // modelUsed is likely an actual model name, show it as Model
@@ -684,17 +684,17 @@
         const cfg: any = get(configStore) as any;
         const rname = get(role) as string;
         const r: any = cfg?.roles ? cfg.roles[rname] : null;
-        
+
         // Try to determine provider from role settings
         let provider = '';
         let model = '';
-        
+
         // Check for OpenRouter configuration
         if (r?.openrouter_enabled || r?.openrouter_chat_model || r?.openrouter_model) {
           provider = 'openrouter';
           model = r?.openrouter_chat_model || r?.openrouter_model || '';
         }
-        // Check for Ollama configuration  
+        // Check for Ollama configuration
         else if (r?.ollama_model || r?.llm_provider === 'ollama') {
           provider = 'ollama';
           model = r?.ollama_model || r?.llm_chat_model || '';
@@ -709,7 +709,7 @@
           provider = cfg.default_model_provider;
           model = cfg?.default_chat_model || '';
         }
-        
+
         // Only show hint if we have provider info
         if (provider) {
           providerHint = `Provider: ${provider}${model ? ` model: ${model}` : ''}`;

@@ -52,7 +52,7 @@
       searchKGTerms();
     }
   }
-  
+
   // Reset when modal closes
   $: if (!active) {
     modalInitialized = false;
@@ -119,7 +119,7 @@
       suggestionIndex = -1;
       return;
     }
-    
+
     try {
       const suggestions = await getTermSuggestions(inputValue);
       autocompleteSuggestions = suggestions;
@@ -136,14 +136,14 @@
     query = suggestion;
     autocompleteSuggestions = [];
     suggestionIndex = -1;
-    
+
     // Trigger search for the selected term
     if (query.trim().length >= 2) {
       searchKGTerms();
     }
   }
 
-  // Handle input changes - matches Search.svelte pattern  
+  // Handle input changes - matches Search.svelte pattern
   async function handleInput(event: Event) {
     // Don't interfere with normal text input
     handleQueryChange(); // For debounced KG search

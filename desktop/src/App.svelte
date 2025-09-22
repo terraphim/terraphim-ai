@@ -39,8 +39,8 @@
     <div class="top-controls">
       <div class="main-navigation">
         <div class="navigation-row">
-          <button 
-            class="logo-back-button" 
+          <button
+            class="logo-back-button"
             on:click={goBack}
             on:keydown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -149,7 +149,7 @@
     flex: 1;
     margin-bottom: 0;
   }
-  
+
   .logo-back-button {
     background: none;
     border: none;
@@ -163,24 +163,24 @@
     justify-content: center;
     flex-shrink: 0;
   }
-  
+
   .logo-back-button:hover {
     background-color: rgba(0, 0, 0, 0.05);
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
-  
+
   .logo-back-button:active {
     transform: translateY(0);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
-  
+
   .logo-image {
     height: 32px;
     width: auto;
     object-fit: contain;
   }
-  
+
   /* Responsive design */
   @media (max-width: 768px) {
     .logo-back-button {
