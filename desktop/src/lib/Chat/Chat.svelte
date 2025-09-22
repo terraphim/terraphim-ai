@@ -3,7 +3,6 @@
   import { get } from 'svelte/store';
   import { role, is_tauri, configStore } from '../stores';
   import { CONFIG } from '../../config';
-  import BackButton from '../BackButton.svelte';
   import { invoke } from '@tauri-apps/api/tauri';
   import ContextEditModal from './ContextEditModal.svelte';
   import KGSearchModal from '../Search/KGSearchModal.svelte';
@@ -756,8 +755,6 @@
     }
   }
 </script>
-
-<BackButton fallbackPath="/" />
 
 <section class="section" data-testid="chat-interface">
   <div class="container">
