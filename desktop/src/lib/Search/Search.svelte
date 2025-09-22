@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import { Field, Input, Taglist, Tag } from "svelma";
   import { input, is_tauri, role, roles, serverUrl } from "../stores";
@@ -34,6 +34,38 @@
   // State to prevent circular updates
   let isUpdatingFromChips = false;
 
+  // --- Persistence helpers ---
+  function searchStateKey(): string {
+    return `terraphim:searchState:${$role}`;
+  }
+
+  function loadSearchState() {
+    try {
+      if (typeof window === 'undefined') return;
+      const raw = localStorage.getItem(searchStateKey());
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (typeof data.input === 'string') {
+        $input = data.input;
+      }
+      if (Array.isArray(data.results)) {
+        results = data.results;
+      }
+    } catch (e) {
+      console.warn('Failed to load search state:', e);
+    }
+  }
+
+  function saveSearchState() {
+    try {
+      if (typeof window === 'undefined') return;
+      const data = { input: $input, results };
+      localStorage.setItem(searchStateKey(), JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save search state:', e);
+    }
+  }
+
   // Reactive statement to parse input and update chips when user types
   // Only parse when input contains operators to avoid constant parsing
   // Add a small delay to prevent aggressive parsing during autocomplete
@@ -47,6 +79,11 @@
       parseTimeout = null;
     }, 300); // 300ms delay to allow for multiple autocomplete selections
   }
+
+  // Hydrate previous state on mount
+  onMount(() => {
+    loadSearchState();
+  });
 
   // Clean up timeout, SSE connection, and polling on component destruction
   onDestroy(() => {
@@ -151,6 +188,7 @@
           if (hasUpdates) {
             results = updatedResults;
             console.log('Updated results with new AI summaries');
+            saveSearchState();
           }
 
           // Stop polling if all documents that need summaries have them
@@ -194,6 +232,7 @@
       return doc;
     });
     console.log(`Updated document summary for task ${taskId}:`, summary);
+    saveSearchState();
   }
 
   // Function to parse input and update chips
@@ -461,11 +500,13 @@
 
     // Update the input to show the structured query
     updateInputFromSelectedTerms();
+    saveSearchState();
   }
 
   function removeSelectedTerm(term: string) {
     selectedTerms = selectedTerms.filter(t => t.value !== term);
     updateInputFromSelectedTerms();
+    saveSearchState();
   }
 
   function updateInputFromSelectedTerms() {
@@ -492,6 +533,7 @@
     selectedTerms = [];
     currentLogicalOperator = null;
     $input = '';
+    saveSearchState();
   }
 
   async function handleSearchInputEvent() {
@@ -511,6 +553,7 @@
           results = response.results;
           console.log("Response results");
           console.log(results);
+          saveSearchState();
           // Start SSE streaming for summarization updates (Tauri doesn't support SSE)
           // SSE will be available when using web interface
         } else {
@@ -543,6 +586,7 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
+        saveSearchState();
 
         // Start SSE streaming for real-time summarization updates
         startSummarizationStreaming();

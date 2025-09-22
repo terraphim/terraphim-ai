@@ -1,13 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { role, is_tauri } from '../stores';
+  import { role, is_tauri, configStore } from '../stores';
   import { CONFIG } from '../../config';
   import BackButton from '../BackButton.svelte';
   import { invoke } from '@tauri-apps/api/tauri';
   import ContextEditModal from './ContextEditModal.svelte';
   import KGSearchModal from '../Search/KGSearchModal.svelte';
   import KGContextItem from '../Search/KGContextItem.svelte';
+  import ArticleModal from '../Search/ArticleModal.svelte';
+  import Markdown from 'svelte-markdown';
+  // Tauri APIs for saving files (only used in desktop)
+  let tauriDialog: any = null;
+  let tauriFs: any = null;
 
   type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
   type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
@@ -20,6 +25,19 @@
     created_at: string;
     relevance_score?: number;
     metadata?: { [key: string]: string };
+    // KG-specific fields
+    kg_term_definition?: {
+      term: string;
+      normalized_term: string;
+      id: number;
+      definition?: string;
+      synonyms: string[];
+      related_terms: string[];
+      usage_examples: string[];
+      url?: string;
+      metadata: Record<string, string>;
+      relevance_score?: number;
+    };
   };
   type Conversation = {
     id: string;
@@ -36,6 +54,8 @@
   let sending = false;
   let error: string | null = null;
   let modelUsed: string | null = null;
+  let providerHint: string = '';
+  let renderMarkdown: boolean = false;
 
   // Conversation and context management
   let conversationId: string | null = null;
@@ -58,9 +78,58 @@
 
   // KG search modal
   let showKGSearchModal = false;
+  
+  // KG document modal (for viewing KG term documents)
+  let showKgModal = false;
+  let kgDocument: any = null;
+  let kgTerm: string | null = null;
+  let kgRank: number | null = null;
+
+  // --- Persistence helpers ---
+  function chatStateKey(): string {
+    const r = get(role) as string;
+    return `terraphim:chatState:${r}`;
+  }
+
+  function loadChatState() {
+    try {
+      if (typeof window === 'undefined') return;
+      const raw = localStorage.getItem(chatStateKey());
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.messages)) {
+        messages = data.messages;
+      }
+      if (typeof data.conversationId === 'string') {
+        conversationId = data.conversationId;
+      }
+    } catch (e) {
+      console.warn('Failed to load chat state:', e);
+    }
+  }
+
+  function saveChatState() {
+    try {
+      if (typeof window === 'undefined') return;
+      const data = { messages, conversationId };
+      localStorage.setItem(chatStateKey(), JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save chat state:', e);
+    }
+  }
+
+  // Persist markdown toggle preference
+  function mdPrefKey(): string { return 'terraphim:chatMarkdown'; }
+  function loadMdPref() {
+    try { const v = localStorage.getItem(mdPrefKey()); if (v != null) renderMarkdown = v === 'true'; } catch {}
+  }
+  function saveMdPref() {
+    try { localStorage.setItem(mdPrefKey(), renderMarkdown ? 'true' : 'false'); } catch {}
+  }
 
   function addUserMessage(text: string) {
     messages = [...messages, { role: 'user', content: text }];
+    saveChatState();
   }
 
   // Load or create a conversation
@@ -112,6 +181,7 @@
         if (result.status === 'success' && result.conversation_id) {
           conversationId = result.conversation_id;
           console.log('🆕 Created new conversation:', conversationId);
+          saveChatState();
         }
       } else {
         const response = await fetch(`${CONFIG.ServerURL}/conversations`, {
@@ -127,6 +197,7 @@
           if (data.status === 'Success' && data.conversation_id) {
             conversationId = data.conversation_id;
             console.log('🆕 Created new conversation:', conversationId);
+            saveChatState();
           }
         }
       }
@@ -264,10 +335,106 @@
   }
 
   // Edit context functionality
-  function editContext(context: ContextItem) {
-    editingContext = context;
-    contextEditMode = 'edit';
-    showContextEditModal = true;
+  async function editContext(context: ContextItem, termFromEvent?: string) {
+    // For KG context items, use find_documents_for_kg_term to show related documents
+    if (context.context_type === 'KGTermDefinition') {
+      // Extract term from different possible sources
+      let term: string | null = termFromEvent || null;
+      
+      // Try to get term from kg_term_definition object (if available)
+      if (context.kg_term_definition?.term) {
+        term = context.kg_term_definition.term;
+      }
+      // Fallback: extract from title (format: "KG Term: {term}")
+      else if (context.title.startsWith('KG Term: ')) {
+        term = context.title.replace('KG Term: ', '');
+      }
+      // Fallback: try normalized_term from metadata
+      else if (context.metadata?.normalized_term) {
+        term = context.metadata.normalized_term;
+      }
+      
+      if (term) {
+        await showKGDocumentsForTerm(term);
+      } else {
+        console.warn('Could not extract term from KG context item:', context);
+        // Fall back to edit modal
+        editingContext = context;
+        contextEditMode = 'edit';
+        showContextEditModal = true;
+      }
+    } else {
+      // For regular context items, use the edit modal
+      editingContext = context;
+      contextEditMode = 'edit';
+      showContextEditModal = true;
+    }
+  }
+
+  // Show KG documents for a term using find_documents_for_kg_term API
+  async function showKGDocumentsForTerm(term: string) {
+    console.log(`🔍 Finding KG documents for term: "${term}" in role: "${$role}"`);
+    
+    try {
+      if ($is_tauri) {
+        // Use Tauri command for desktop app
+        console.log('  Making Tauri invoke call...');
+        console.log('  Tauri command: find_documents_for_kg_term');
+        console.log('  Tauri params:', { roleName: $role, term: term });
+
+        const response: any = await invoke('find_documents_for_kg_term', {
+          roleName: $role,
+          term: term
+        });
+
+        console.log('  📥 Tauri response received:');
+        console.log('    Status:', response.status);
+        console.log('    Results count:', response.results?.length || 0);
+        console.log('    Total:', response.total || 0);
+
+        if (response.status === 'success' && response.results && response.results.length > 0) {
+          // Show the first (highest-ranked) document in a modal
+          kgDocument = response.results[0];
+          kgRank = kgDocument.rank || 0;
+          kgTerm = term;
+          console.log('  ✅ Found KG document:', kgDocument.title);
+          console.log('  📄 Document content preview:', kgDocument.body?.substring(0, 200) + '...');
+          showKgModal = true;
+        } else {
+          console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
+        }
+      } else {
+        // Use HTTP fetch for web mode  
+        console.log('  Making HTTP fetch call...');
+        const baseUrl = CONFIG.ServerURL;
+        const encodedRole = encodeURIComponent($role);
+        const encodedTerm = encodeURIComponent(term);
+        const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
+
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('  📄 Response data:', data.status, 'Results:', data.results?.length || 0);
+
+        if (data.status === 'success' && data.results && data.results.length > 0) {
+          // Show the first (highest-ranked) document  
+          kgDocument = data.results[0];
+          kgRank = kgDocument.rank || 0;
+          kgTerm = term;
+          console.log('  ✅ Found KG document:', kgDocument.title);
+          console.log('  📄 Document content preview:', kgDocument.body?.substring(0, 200) + '...');
+          showKgModal = true;
+        } else {
+          console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching KG document:', error);
+    }
   }
 
   // Delete context with confirmation
@@ -412,6 +579,7 @@
       modelUsed = data.model_used ?? null;
       if (data.status?.toLowerCase() === 'success' && data.message) {
         messages = [...messages, { role: 'assistant', content: data.message }];
+        saveChatState();
       } else {
         error = data.error || 'Chat failed';
       }
@@ -447,10 +615,23 @@
   }
 
   onMount(() => {
-    // seed with a friendly greeting
-    messages = [
-      { role: 'assistant', content: 'Hi! How can I help you? Ask me anything about your search results or documents.' }
-    ];
+    // Load markdown preference
+    loadMdPref();
+
+    // Hydrate chat state from localStorage if present; otherwise seed greeting
+    loadChatState();
+    if (messages.length === 0) {
+      messages = [
+        { role: 'assistant', content: 'Hi! How can I help you? Ask me anything about your search results or documents.' }
+      ];
+      saveChatState();
+    }
+
+    // Lazy-load Tauri modules if running in desktop
+    if (get(is_tauri)) {
+      import('@tauri-apps/api/dialog').then((m) => tauriDialog = m).catch(() => {});
+      import('@tauri-apps/api/fs').then((m) => tauriFs = m).catch(() => {});
+    }
 
     // Initialize conversation and load context
     initializeConversation();
@@ -472,6 +653,108 @@
       };
     }
   });
+
+  // Compute provider/model hint from actual chat response or role settings
+  $: {
+    try {
+      // If we have a model_used from the actual chat response, analyze it
+      if (modelUsed) {
+        // Check if modelUsed is actually a provider name (common providers)
+        const commonProviders = ['ollama', 'openrouter', 'anthropic', 'openai', 'groq'];
+        
+        if (commonProviders.includes(modelUsed.toLowerCase())) {
+          // modelUsed is a provider name, try to get the actual model from role config
+          const cfg: any = get(configStore) as any;
+          const rname = get(role) as string;
+          const r: any = cfg?.roles ? cfg.roles[rname] : null;
+          
+          let actualModel = '';
+          if (modelUsed.toLowerCase() === 'ollama') {
+            actualModel = r?.ollama_model || r?.llm_chat_model || '';
+          } else if (modelUsed.toLowerCase() === 'openrouter') {
+            actualModel = r?.openrouter_chat_model || r?.openrouter_model || '';
+          }
+          
+          providerHint = `Provider: ${modelUsed}${actualModel ? ` model: ${actualModel}` : ''}`;
+        } else {
+          // modelUsed is likely an actual model name, show it as Model
+          providerHint = `Model: ${modelUsed}`;
+        }
+      } else {
+        // Otherwise, fall back to role configuration for display before any chat
+        const cfg: any = get(configStore) as any;
+        const rname = get(role) as string;
+        const r: any = cfg?.roles ? cfg.roles[rname] : null;
+        
+        // Try to determine provider from role settings
+        let provider = '';
+        let model = '';
+        
+        // Check for OpenRouter configuration
+        if (r?.openrouter_enabled || r?.openrouter_chat_model || r?.openrouter_model) {
+          provider = 'openrouter';
+          model = r?.openrouter_chat_model || r?.openrouter_model || '';
+        }
+        // Check for Ollama configuration  
+        else if (r?.ollama_model || r?.llm_provider === 'ollama') {
+          provider = 'ollama';
+          model = r?.ollama_model || r?.llm_chat_model || '';
+        }
+        // Check for generic LLM provider
+        else if (r?.llm_provider) {
+          provider = r.llm_provider;
+          model = r?.llm_chat_model || '';
+        }
+        // Check global defaults
+        else if (cfg?.default_model_provider) {
+          provider = cfg.default_model_provider;
+          model = cfg?.default_chat_model || '';
+        }
+        
+        // Only show hint if we have provider info
+        if (provider) {
+          providerHint = `Provider: ${provider}${model ? ` model: ${model}` : ''}`;
+        } else {
+          providerHint = '';
+        }
+      }
+    } catch(e) {
+      providerHint = modelUsed ? `Model: ${modelUsed}` : '';
+    }
+  }
+
+  // Copy/save helpers
+  async function copyAsMarkdown(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch (e) {
+      console.warn('Clipboard write failed', e);
+    }
+  }
+
+  async function saveAsMarkdown(content: string) {
+    try {
+      if (get(is_tauri) && tauriDialog && tauriFs) {
+        const savePath = await tauriDialog.save({ filters: [{ name: 'Markdown', extensions: ['md'] }] });
+        if (savePath) {
+          await tauriFs.writeTextFile(savePath as string, content);
+        }
+      } else {
+        // Browser fallback: trigger download
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chat.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.warn('Save markdown failed', e);
+    }
+  }
 </script>
 
 <BackButton fallbackPath="/" />
@@ -488,10 +771,28 @@
         {/if}
 
         <div class="chat-window" data-testid="chat-messages">
+      <div class="chat-toolbar">
+        <label class="checkbox is-size-7">
+          <input type="checkbox" bind:checked={renderMarkdown} on:change={saveMdPref} />
+          Render markdown
+        </label>
+      </div>
       {#each messages as m, i}
         <div class={`msg ${m.role}`}>
           <div class="bubble">
-            <pre>{m.content}</pre>
+            {#if renderMarkdown && m.role === 'assistant'}
+              <div class="markdown-body"><Markdown>{m.content}</Markdown></div>
+              <div class="msg-actions">
+                <button class="button is-small is-light" title="Copy as markdown" on:click={() => copyAsMarkdown(m.content)}>
+                  <span class="icon is-small"><i class="fas fa-copy"></i></span>
+                </button>
+                <button class="button is-small is-light" title="Save as markdown" on:click={() => saveAsMarkdown(m.content)}>
+                  <span class="icon is-small"><i class="fas fa-save"></i></span>
+                </button>
+              </div>
+            {:else}
+              <pre>{m.content}</pre>
+            {/if}
           </div>
         </div>
       {/each}
@@ -505,8 +806,8 @@
       {/if}
     </div>
 
-    {#if modelUsed}
-      <p class="is-size-7 has-text-grey">Model: {modelUsed}</p>
+    {#if providerHint}
+      <p class="is-size-7 has-text-grey">{providerHint}</p>
     {/if}
     {#if error}
       <p class="has-text-danger is-size-7">{error}</p>
@@ -638,7 +939,7 @@
                     contextItem={item}
                     compact={true}
                     on:remove={e => deleteContext(e.detail.contextId)}
-                    on:viewDetails={e => editContext(e.detail.contextItem)}
+                    on:viewDetails={e => editContext(e.detail.contextItem, e.detail.term)}
                   />
                 {:else}
                   <!-- Use default context item rendering for non-KG items -->
@@ -766,6 +1067,16 @@
   on:kgIndexAdded={handleKGIndexAdded}
 />
 
+<!-- KG Document Modal -->
+{#if kgDocument}
+  <ArticleModal
+    bind:active={showKgModal}
+    item={kgDocument}
+    kgTerm={kgTerm}
+    kgRank={kgRank}
+  />
+{/if}
+
 <style>
   .chat-window {
     border: 1px solid #ececec;
@@ -775,6 +1086,20 @@
     overflow: auto;
     background: #fff;
     margin-bottom: 0.75rem;
+  }
+  .chat-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+  }
+  .markdown-body :global(pre), .markdown-body :global(code) {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg-actions {
+    margin-top: 0.25rem;
+    display: flex;
+    gap: 0.25rem;
   }
   .msg { display: flex; margin-bottom: 0.5rem; }
   .msg.user { justify-content: flex-end; }
