@@ -780,8 +780,14 @@
       {#each messages as m, i}
         <div class={`msg ${m.role}`}>
           <div class="bubble">
-            {#if renderMarkdown && m.role === 'assistant'}
-              <div class="markdown-body"><Markdown>{m.content}</Markdown></div>
+            {#if m.role === 'assistant'}
+              <!-- Assistant messages: show markdown or plain text based on toggle -->
+              {#if renderMarkdown}
+                <div class="markdown-body"><Markdown source={m.content} /></div>
+              {:else}
+                <pre>{m.content}</pre>
+              {/if}
+              <!-- Always show action buttons for assistant messages -->
               <div class="msg-actions">
                 <button class="button is-small is-light" title="Copy as markdown" on:click={() => copyAsMarkdown(m.content)}>
                   <span class="icon is-small"><i class="fas fa-copy"></i></span>
@@ -791,6 +797,7 @@
                 </button>
               </div>
             {:else}
+              <!-- User/system messages: always show as plain text -->
               <pre>{m.content}</pre>
             {/if}
           </div>
