@@ -1,7 +1,20 @@
-listening on http://127.0.0.1:8000
-[2025-08-11T10:45:48Z ERROR terraphim_service] Failed to load thesaurus: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+warning: /Users/alex/projects/terraphim/terraphim-ai/crates/haystack_googledocs/Cargo.toml: version requirement `6.0.0+20240613` for dependency `google-docs1` includes semver metadata which will be ignored, removing the metadata is recommended to avoid confusion
+   Compiling terraphim_server v0.2.0 (/Users/alex/projects/terraphim/terraphim-ai/terraphim_server)
+warning: terraphim_server@0.2.0: Source file modified: "../desktop/dist/index.html", rebuilding...
+warning: terraphim_server@0.2.0: install js packages...
+warning: terraphim_server@0.2.0: build js assets...
+warning: terraphim_server@0.2.0: js build successful
+    Finished `release` profile [optimized] target(s) in 27.27s
+     Running `target/release/terraphim_server --role 'Terraphim Engineer'`
+[2025-09-21T19:14:22Z WARN  terraphim_server] Unknown role 'Terraphim Engineer', using terraphim_engineer_config.json
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-21T19:14:22Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
 
-    Context:
-       service: dashmap
-       path: thesaurus_terraphimengineer.json
-    )
+thread 'main' panicked at /Users/alex/projects/terraphim/terraphim-ai/terraphim_server/src/lib.rs:450:10:
+Path segments must not start with `:`. For capture groups, use `{capture}`. If you meant to literally match a segment starting with a colon, call `without_v07_checks` on the router.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

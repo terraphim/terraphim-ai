@@ -1,5 +1,71 @@
 # Terraphim AI Lessons Learned
 
+## Test Infrastructure Validation and Local Services Setup (2025-09-20)
+
+### Critical Insight: Always Validate Assumptions Before Implementation
+**Context**: User requested comprehensive test validation, assuming TerraphimGraph needed implementation
+**Lesson**: Deep code review revealed TerraphimGraph was already fully implemented with sophisticated graph-based ranking
+**Implementation Detail**:
+- `crates/terraphim_rolegraph/src/lib.rs::query_graph()` provides weighted ranking: `(node.rank + edge.rank + document.rank) / 3`
+- Search flow in `crates/terraphim_service/src/lib.rs:2020-2300` uses graph ranking + TF-IDF enhancement
+- Logical operators (AND/OR) supported via `query_graph_with_operators()`
+
+**Key Insight**: Thorough investigation saved significant development time and prevented unnecessary duplication
+
+### Port Configuration Management in Microservices
+**Context**: MCP server tests failing due to incorrect port references
+**Lesson**: Service port configurations must be consistent across all files and documentation
+**Root Cause**: MCP server was referenced as port 3001 in code but actually runs on port 8001
+**Fix Pattern**:
+```rust
+// Wrong (old):
+.unwrap_or_else(|| "http://127.0.0.1:3001".to_string())
+
+// Correct (new):
+.unwrap_or_else(|| "http://127.0.0.1:8001".to_string())
+```
+**Key Insight**: Use grep to find ALL port references when changing service configurations
+
+### Local Services vs Docker for Development Testing
+**Context**: Need to validate services work together without Docker complexity
+**Lesson**: Local services provide faster iteration and easier debugging for development
+**Implementation Strategy**:
+- Use locally installed Ollama (via Ollama.app) - already running, fast access
+- Use local atomic-server binary (`../atomic-server/target/release/atomic-server`) - no container overhead
+- Build and run services directly with cargo - easier debugging and log access
+- Environment variables in `.env.test` for configuration consistency
+
+**Key Insight**: Local services reduce startup time from ~2-3 minutes (Docker) to ~30 seconds and provide direct log access
+
+### Test Infrastructure Architecture Pattern
+**Context**: Need comprehensive test orchestration for complex multi-service system
+**Lesson**: Create layered test infrastructure with automated service management
+**Architecture**:
+```bash
+# Layer 1: Environment setup
+./scripts/test_env_setup_local.sh    # Start all services
+.env.test                            # Service configuration
+
+# Layer 2: Validation tests
+tests/validate_local_setup.rs        # Service availability
+cargo test -- --ignored             # Service integration
+
+# Layer 3: Comprehensive testing
+./scripts/run_all_tests.sh          # Unit + Integration + E2E
+./scripts/test_env_teardown.sh      # Clean shutdown
+```
+**Key Insight**: Automated service lifecycle management enables reliable CI/CD and developer workflows
+
+### Knowledge Graph vs Context API Distinction
+**Context**: User mentioned "existing API endpoints to edit knowledge graph terms"
+**Lesson**: Distinguish between knowledge graph editing (thesaurus modification) and context management
+**Actual Implementation**:
+- **Context APIs**: `/conversations/:id/context/kg/term` - Add KG terms to conversation context
+- **Knowledge Graph**: Built from source files (markdown), no direct editing API
+- **Thesaurus Management**: File-based rebuilding, not runtime modification
+
+**Key Insight**: User may conflate related but different functionalities - always verify the actual use case
+
 ## Auto-Update Architecture Implementation (2025-09-16)
 
 ### Critical Security Pattern: 1Password Integration with op inject
@@ -1653,7 +1719,7 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 ### Key Insights
 - Feature-gate new protocol clients so default builds stay green; ship HTTP/SSE fallback first.
 - Align to crate API from crates.io (`mcp-client 0.1.0`): use `McpService` wrapper; `SseTransport`/`StdioTransport` provide handles, not Tower services.
-- SDK `Content` doesn’t expose direct `text` field; tool responses may be text blocks or structured JSON — parse defensively.
+- SDK `Content` doesn't expose direct `text` field; tool responses may be text blocks or structured JSON — parse defensively.
 
 ### Implementation Notes
 - `terraphim_middleware` features: `mcp` (SSE/http), `mcp-rust-sdk` (SDK clients optional).
@@ -1696,7 +1762,7 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 ### Key Insights
 - Introduce a provider-agnostic trait first, then migrate callsites. Keeps incremental risk low.
 - Use `Role.extra` for non-breaking config while existing OpenRouter fields continue to work.
-- Ollama’s chat API is OpenAI-like but returns `{ message: { content } }`; handle that shape.
+- Ollama's chat API is OpenAI-like but returns `{ message: { content } }`; handle that shape.
 
 ### Implementation Notes
 - New `terraphim_service::llm` module with `LlmClient` trait and `SummarizeOptions`.
@@ -1707,7 +1773,7 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 
 ### Testing
 - Compiles with default features and `--features openrouter`.
-- Added `ollama` feature flag; verify absence doesn’t impact default builds.
+- Added `ollama` feature flag; verify absence doesn't impact default builds.
  - Mocking Ollama with `wiremock` is straightforward using `/api/chat`; ensure response parsing targets `message.content`.
  - End-to-end tests should skip gracefully if local Ollama is unreachable; probe `/api/tags` with a short timeout first.
 
@@ -2616,3 +2682,15 @@ This comprehensive bug fix demonstrates the value of systematic code review, tho
 3. **Team Productivity**: Platform-native solutions often provide better integration benefits
 4. **Technology Lifecycle**: Plan for vendor changes as part of normal technology management
 5. **Documentation Value**: Comprehensive migration planning pays dividends in execution quality
+
+## Initial Refactoring for Modular Haystacks (2025-09-19)
+- Systematic directory moves preserve git history when using mv within repo
+- Cargo new --lib creates proper lib crate structure
+- Workspace members need explicit listing for non-standard crate names
+- Trait definitions should be minimal and focused on essential methods
+
+## Private Repo Setup Lessons (2025-09-19)
+- Use git init for new repos, then copy crate contents
+- Add git dependency with tag for stability
+- Preserve git history by moving directories properly
+- Test compilation in private repo independently

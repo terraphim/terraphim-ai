@@ -57,7 +57,11 @@
     "test:llm": "playwright test tests/e2e/chat-functionality.spec.ts tests/e2e/summarization.spec.ts tests/e2e/ollama-integration.spec.ts",
     "test:llm:ci": "CI=true playwright test tests/e2e/chat-functionality.spec.ts tests/e2e/summarization.spec.ts tests/e2e/ollama-integration.spec.ts --reporter=line --workers=1 --retries=3",
     "test:comprehensive": "playwright test tests/e2e/chat-functionality.spec.ts tests/e2e/summarization.spec.ts tests/e2e/ollama-integration.spec.ts tests/e2e/config-wizard-complete.spec.ts",
-    "test:comprehensive:ci": "CI=true playwright test tests/e2e/chat-functionality.spec.ts tests/e2e/summarization.spec.ts tests/e2e/ollama-integration.spec.ts tests/e2e/config-wizard-complete.spec.ts --reporter=github,html,json --workers=1 --retries=3"
+    "test:comprehensive:ci": "CI=true playwright test tests/e2e/chat-functionality.spec.ts tests/e2e/summarization.spec.ts tests/e2e/ollama-integration.spec.ts tests/e2e/config-wizard-complete.spec.ts --reporter=github,html,json --workers=1 --retries=3",
+    "test:persistence": "playwright test tests/e2e/state-persistence.spec.ts",
+    "test:persistence:ci": "CI=true playwright test tests/e2e/state-persistence.spec.ts --reporter=line --workers=1 --retries=3",
+    "test:persistence:headed": "playwright test tests/e2e/state-persistence.spec.ts --headed",
+    "test:unit:persistence": "vitest tests/unit/persistence.test.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",

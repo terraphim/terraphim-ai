@@ -73,11 +73,11 @@ async fn handle_update_commands(args: &Args) -> Result<()> {
         println!("🔍 Checking for terraphim_server updates...");
         match check_for_updates("terraphim_server").await {
             Ok(status) => {
-                println!("{}", status);
+                println!("{status}");
                 Ok(())
             }
             Err(e) => {
-                eprintln!("❌ Failed to check for updates: {}", e);
+                eprintln!("❌ Failed to check for updates: {e}");
                 std::process::exit(1);
             }
         }
@@ -85,11 +85,11 @@ async fn handle_update_commands(args: &Args) -> Result<()> {
         println!("🚀 Updating terraphim_server...");
         match update_binary("terraphim_server").await {
             Ok(status) => {
-                println!("{}", status);
+                println!("{status}");
                 Ok(())
             }
             Err(e) => {
-                eprintln!("❌ Update failed: {}", e);
+                eprintln!("❌ Update failed: {e}");
                 std::process::exit(1);
             }
         }

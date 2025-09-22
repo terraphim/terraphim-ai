@@ -18,7 +18,6 @@
     RelevanceFunction,
     KnowledgeGraphInputType
   } from "./generated/types";
-  import BackButton from "./BackButton.svelte";
 
   const schema = writable<any>(null);
 
@@ -436,8 +435,6 @@ async function fetchLlmModels(roleIdx: number) {
     }
   }
 </script>
-
-<BackButton fallbackPath="/" />
 
 <div class="box">
   <div class="is-flex is-justify-content-space-between is-align-items-center" style="gap: .5rem;">

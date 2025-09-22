@@ -14,26 +14,49 @@
 
 # Terraphim AI Project Scratchpad
 
-### 🔄 ACTIVE: CI/CD Migration to GitHub Actions - (2025-09-04)
+### ✅ COMPLETED: Comprehensive Architecture Documentation Update - (2025-01-31)
 
-**Task**: Complete migration from Earthly to GitHub Actions due to service shutdown, fix all failing workflows, and deliver comprehensive CI/CD pipeline.
+**Task**: Update @Architecture.md with comprehensive mermaid diagrams showing all Terraphim AI components and haystacks.
 
-**Status**: 🔄 **IN PROGRESS** - Critical WebKit fix completed, monitoring comprehensive pipeline
+**Status**: ✅ **COMPLETED SUCCESSFULLY**
+
+**Key Achievements**:
+- ✅ **Complete System Architecture**: Updated main diagram with all 10 haystack services and 20+ crates
+- ✅ **Haystack Services Documentation**: Added detailed section explaining each of the 10 haystack types
+- ✅ **Enhanced Search Flow**: Updated search processing diagrams to include all haystack types with relevance scoring
+- ✅ **Crate Dependency Architecture**: Added haystack layer and all infrastructure components
+- ✅ **Configuration Diagrams**: Updated role system diagrams to include all haystack configurations
+- ✅ **Comprehensive Summary**: Added system summary highlighting multi-layer architecture and extensibility
+
+**Technical Details**:
+- **Core Haystacks** (6): Ripgrep, Atomic, QueryRs, ClickUp, MCP, Perplexity
+- **Extended Haystacks** (4): Google Docs, Atlassian, Discourse, JMAP
+- **Relevance Scoring**: TitleScorer, BM25 Family (BM25, BM25F, BM25Plus), TerraphimGraph
+- **Frontend Interfaces**: Desktop Tauri, Web UI, Terminal UI, VS Code Extension, Node.js bindings
+- **Architecture Layers**: Frontend, API, Service, Knowledge, Data, Haystack, Integration, External Systems
+
+### 🔄 ACTIVE: Test Infrastructure Validation & Port Configuration Fix - (2025-09-20)
+
+**Task**: Review all tests and end-to-end user journeys, ensure all haystacks work, TerraphimGraph relevance functions, and knowledge graph editing with proper local service configuration.
+
+**Status**: 🔄 **IN PROGRESS** - Local services setup completed, validating comprehensive test suite
 
 **Current Progress**:
-- ✅ **WebKit Package Fix**: Updated all workflow files from `libwebkit2gtk-4.0-dev` to `libwebkit2gtk-4.1-dev` for Ubuntu 24.04 compatibility
-- ✅ **CI Native Workflow**: Created comprehensive workflow with setup, lint-and-format, build-frontend, build-rust, build-docker, build-tauri, test-suite, security-scan, release
-- ✅ **Lint & Format**: System dependencies now installing successfully, cargo fmt check passing, cargo clippy currently running
-- 🔄 **Frontend Build**: Completed successfully with artifacts uploaded
-- 🔄 **Tauri Builds**: Running on all 3 platforms (macOS, Windows, Ubuntu)
-- ⏸️ **Backend Jobs**: build-rust, build-docker, test-suite waiting for lint completion
+- ✅ **MCP Port Fix**: Updated MCP server port from 3001 to 8001 in middleware and tests
+- ✅ **Test Environment**: Created .env.test with local service configuration
+- ✅ **Setup Scripts**: Created test_env_setup_local.sh using local Ollama, Atomic Server, and MCP server
+- ✅ **Teardown Scripts**: Created test_env_teardown.sh for clean service shutdown
+- ✅ **Validation Tests**: Created validate_local_setup.rs for service availability testing
+- ✅ **Comprehensive Test Runner**: Created run_all_tests.sh with unit, integration, and E2E test orchestration
+- 🔄 **Service Validation**: Testing local environment setup (Ollama ✅, Atomic Server ✅, MCP/Terraphim building)
 
 **Next Steps**:
-- Monitor clippy completion and fix any issues
-- Verify build-rust job starts and completes successfully
-- Ensure build-docker multi-architecture builds work
-- Validate test-suite execution
-- Confirm security-scan and release workflows
+- Complete service startup validation (Terraphim Server finishing build)
+- Run comprehensive test suite with all services
+- Validate TerraphimGraph ranking functionality
+- Test all haystack types (Ripgrep, Atomic, MCP, QueryRs)
+- Verify knowledge graph editing APIs work
+- Document test setup and execution procedures
 
 **Technical Details**:
 - **Workflow Run**: 17466036744 (CI Native GitHub Actions + Docker Buildx)
@@ -1570,3 +1593,17 @@ This fix resolves the core search functionality issues identified by the rust-wa
 ---
 
 *Last Updated: 2025-01-31*
+
+### Progress Update: Refactoring Started
+- Moved jmap_haystack to crates/haystack_jmap
+- Moved atlassian_haystack to crates/haystack_atlassian
+- Created haystack_core crate with basic trait
+- Updated workspace Cargo.toml
+
+Next: Implement traits and create private repos
+
+### Progress Update: Private Repos Created
+- Created local git repos for haystack_jmap_private and haystack_atlassian_private
+- Copied crate contents
+- Updated Cargo.toml to depend on haystack_core from main repo git
+- Ready for GitHub private repo creation and push

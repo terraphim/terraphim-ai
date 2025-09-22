@@ -704,7 +704,16 @@ impl ConfigBuilder {
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
                     llm_system_prompt: None,
-                    extra: AHashMap::new(),
+                    extra: {
+                        let mut extra = AHashMap::new();
+                        extra.insert("llm_provider".to_string(), Value::String("openrouter".to_string()));
+                        extra.insert("ollama_base_url".to_string(), Value::String("http://127.0.0.1:11434".to_string()));
+                        extra.insert("ollama_model".to_string(), Value::String("llama3.2:3b".to_string()));
+                        extra.insert("llm_chat_model".to_string(), Value::String("llama3.2:3b".to_string()));
+                        extra.insert("llm_summarization_model".to_string(), Value::String("gemma3:270m".to_string()));
+                        extra.insert("llm_auto_summarize".to_string(), Value::Bool(true));
+                        extra
+                    },
                 },
             )
             .add_role(
@@ -746,7 +755,16 @@ impl ConfigBuilder {
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
                     llm_system_prompt: Some("You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.".to_string()),
-                    extra: AHashMap::new(),
+                    extra: {
+                        let mut extra = AHashMap::new();
+                        extra.insert("llm_provider".to_string(), Value::String("openrouter".to_string()));
+                        extra.insert("ollama_base_url".to_string(), Value::String("http://127.0.0.1:11434".to_string()));
+                        extra.insert("ollama_model".to_string(), Value::String("llama3.2:3b".to_string()));
+                        extra.insert("llm_chat_model".to_string(), Value::String("llama3.2:3b".to_string()));
+                        extra.insert("llm_summarization_model".to_string(), Value::String("gemma3:270m".to_string()));
+                        extra.insert("llm_auto_summarize".to_string(), Value::Bool(true));
+                        extra
+                    },
                 },
             )
             .add_role(
@@ -780,7 +798,16 @@ impl ConfigBuilder {
                     #[cfg(feature = "openrouter")]
                     openrouter_chat_model: None,
                     llm_system_prompt: Some("You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.".to_string()),
-                    extra: AHashMap::new(),
+                    extra: {
+                        let mut extra = AHashMap::new();
+                        extra.insert("llm_provider".to_string(), Value::String("openrouter".to_string()));
+                        extra.insert("ollama_base_url".to_string(), Value::String("http://127.0.0.1:11434".to_string()));
+                        extra.insert("ollama_model".to_string(), Value::String("llama3.2:3b".to_string()));
+                        extra.insert("llm_chat_model".to_string(), Value::String("llama3.2:3b".to_string()));
+                        extra.insert("llm_summarization_model".to_string(), Value::String("gemma3:270m".to_string()));
+                        extra.insert("llm_auto_summarize".to_string(), Value::Bool(true));
+                        extra
+                    },
                 },
             )
             .default_role("Terraphim Engineer")

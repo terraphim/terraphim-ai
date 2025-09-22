@@ -2,7 +2,6 @@
   import { Route } from "tinro";
   import { Button, Field, Input, Switch, Select } from "svelma";
   import FetchRole from "./FetchRole.svelte";
-  import BackButton from "../BackButton.svelte";
   import { Agent } from "@tomic/lib";
   import { JSONEditor } from "svelte-jsoneditor";
   import { CONFIG } from "../../config";
@@ -105,8 +104,6 @@
   $: console.log("Print name", $name);
   $: console.log("Print roles", $roles);
 </script>
-
-<BackButton fallbackPath="/" />
 
 <div class="box">
   <!-- <Tab label="Atomic"> -->

@@ -6,7 +6,6 @@
   import { is_tauri, configStore } from "$lib/stores";
   import { get } from "svelte/store";
   import { CONFIG } from "../config";
-  import BackButton from "./BackButton.svelte";
 
   let content = {
     json: $configStore,
@@ -46,8 +45,6 @@
     content = { json: $configStore };
   });
 </script>
-
-<BackButton fallbackPath="/" />
 
 <div class="box">
   <p>
