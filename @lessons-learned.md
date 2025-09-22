@@ -1,5 +1,87 @@
 # Terraphim AI Lessons Learned
 
+## Auto-Update Architecture Implementation (2025-09-16)
+
+### Critical Security Pattern: 1Password Integration with op inject
+**Context**: Implementing secure auto-update system with Tauri signing keys
+**Lesson**: Never hardcode secrets, even as placeholders - use template-based injection
+**Implementation**:
+```bash
+# Create template with 1Password references
+op inject -i src-tauri/tauri.conf.json.template -o src-tauri/tauri.conf.json
+
+# Template pattern
+"pubkey": "op://Terraphim-Deployment/Tauri Update Signing/TAURI_PUBLIC_KEY"
+```
+**Key Insight**: User feedback "Don't hardcode keys - use op inject" led to proper template system, demonstrating importance of security-first mindset
+
+### Tauri v1 vs v2 Compatibility Considerations
+**Context**: Project uses Tauri v1.8.3, user specifically mentioned "we are on tauri 1"
+**Lesson**: Version-specific implementation matters for updater configuration
+**Technical Details**:
+- Tauri v1 uses different updater API than v2
+- Must check project's actual Tauri version before implementing
+- Updater endpoints, public key format, and configuration structure all version-dependent
+
+### Shared Crate Pattern for CLI Updates
+**Context**: Multiple CLI binaries (terraphim_server, terraphim_tui, terraphim_mcp_server) need self-update
+**Lesson**: Create shared module instead of duplicating self_update integration
+**Implementation**:
+```rust
+// crates/terraphim_update/src/lib.rs
+pub async fn update_binary(bin_name: impl Into<String>) -> Result<UpdateStatus>
+
+// Usage in each binary
+use terraphim_update::update_binary;
+let status = update_binary("terraphim_server").await?;
+```
+**Benefit**: Single source of truth for update logic, consistent behavior across binaries
+
+### GitHub Releases as Distribution Channel
+**Context**: Need reliable distribution for both desktop and CLI updates
+**Lesson**: GitHub Releases provide free, reliable CDN with proper versioning
+**Architecture**:
+- Desktop: latest.json manifest points to GitHub Release assets
+- CLI: self_update crate fetches from GitHub API
+- Single release process creates all artifacts
+
+### CI/CD with 1Password Service Accounts
+**Context**: Automated builds need access to signing secrets without exposing them
+**Lesson**: 1Password service accounts provide secure, auditable secret access for CI
+**Implementation**:
+```yaml
+# GitHub Actions
+- name: Install 1Password CLI
+  uses: 1password/install-cli-action@v1
+
+- name: Build with secrets
+  env:
+    OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+  run: |
+    op inject -i config.template -o config.json
+    op run --env-file=.env.ci -- build-command
+```
+
+### Release Automation Script Architecture
+**Context**: Complex release process with version updates, testing, building, and deployment
+**Lesson**: Comprehensive script with dry-run mode enables safe automation
+**Key Features**:
+- Prerequisite validation (1Password CLI, git status, etc.)
+- Version validation and conflict checking
+- Multiple file format updates (Cargo.toml, package.json, manifest.json)
+- Integrated testing and building
+- Confirmation prompts for destructive operations
+- Dry-run mode for testing
+
+### Template-Based Configuration Management
+**Context**: Need to inject secrets into configuration files without storing them in git
+**Lesson**: Separate templates from actual config files, use op inject pattern
+**File Structure**:
+```
+tauri.conf.json          <- Generated, in .gitignore
+tauri.conf.json.template <- In git, contains op:// references
+```
+**Process**: Build scripts inject secrets from template to create actual config
 
 ## Browser Extension Development (2025-01-09)
 

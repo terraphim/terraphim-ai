@@ -1,3 +1,5 @@
+#![allow(mismatched_lifetime_syntaxes)]
+
 use std::io;
 
 use anyhow::Result;
@@ -26,6 +28,7 @@ mod repl;
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_update::{check_for_updates, update_binary};
 
 #[derive(clap::ValueEnum, Debug, Clone)]
 enum LogicalOperatorCli {
@@ -136,6 +139,12 @@ enum Command {
         #[arg(long, default_value = "http://localhost:8000")]
         server_url: String,
     },
+
+    /// Check for updates without installing
+    CheckUpdate,
+
+    /// Update to latest version if available
+    Update,
 }
 
 #[derive(Subcommand, Debug)]
@@ -351,6 +360,32 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
+        Command::CheckUpdate => {
+            println!("🔍 Checking for terraphim-tui updates...");
+            match check_for_updates("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Update => {
+            println!("🚀 Updating terraphim-tui...");
+            match update_binary("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Update failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -555,6 +590,32 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             }
 
             Ok(())
+        }
+        Command::CheckUpdate => {
+            println!("🔍 Checking for terraphim-tui updates...");
+            match check_for_updates("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Update => {
+            println!("🚀 Updating terraphim-tui...");
+            match update_binary("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Update failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")

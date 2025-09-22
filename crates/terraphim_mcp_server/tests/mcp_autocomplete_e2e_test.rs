@@ -89,7 +89,6 @@ async fn create_autocomplete_test_config() -> Result<String> {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }],
-        extra: ahash::AHashMap::new(),
         #[cfg(feature = "openrouter")]
         openrouter_enabled: false,
         #[cfg(feature = "openrouter")]
@@ -105,6 +104,7 @@ async fn create_autocomplete_test_config() -> Result<String> {
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
         llm_system_prompt: None,
+        extra: ahash::AHashMap::new(),
     };
 
     let mut config = ConfigBuilder::new()
@@ -572,7 +572,6 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         theme: "spacelab".to_string(),
         kg: None, // No knowledge graph
         haystacks: vec![],
-        extra: ahash::AHashMap::new(),
         #[cfg(feature = "openrouter")]
         openrouter_enabled: false,
         #[cfg(feature = "openrouter")]
@@ -588,6 +587,7 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         #[cfg(feature = "openrouter")]
         openrouter_chat_model: None,
         llm_system_prompt: None,
+        extra: ahash::AHashMap::new(),
     };
 
     let invalid_config = ConfigBuilder::new()
