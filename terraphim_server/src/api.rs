@@ -2419,6 +2419,7 @@ pub(crate) async fn add_kg_index_context(
         })),
     }
 }
+
 /// SSE endpoint for real-time task status updates
 pub(crate) async fn stream_task_status(
     Extension(_summarization_manager): Extension<

@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::{
-    http::{header, StatusCode, Uri},
+    http::{header, Method, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
     Extension, Router,
@@ -23,7 +23,7 @@ use terraphim_service::summarization_queue::QueueConfig;
 use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
 use tokio::sync::{broadcast::channel, Mutex};
-// use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
 /// Create a proper description from document content
@@ -507,7 +507,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .fallback(static_handler)
         .with_state(config_state)
         .layer(Extension(tx))
-        .layer(Extension(summarization_manager));
+        .layer(Extension(summarization_manager))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_headers(Any)
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ]),
+        );
 
     // Note: Prefixing the host with `http://` makes the URL clickable in some terminals
     println!("listening on http://{server_hostname}");
@@ -675,4 +687,16 @@ pub async fn build_router_for_tests() -> Router {
         .with_state(config_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_headers(Any)
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ]),
+        )
 }

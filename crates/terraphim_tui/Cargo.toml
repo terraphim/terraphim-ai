@@ -26,6 +26,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = "0.4"
 jiff = "0.1"
 urlencoding = "2.1"
+terraphim_update = { path = "../terraphim_update", version = "0.2.0" }
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "14.0", optional = true }
