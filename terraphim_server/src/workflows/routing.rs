@@ -28,10 +28,10 @@ pub async fn execute_routing(
     let workflow_id = generate_workflow_id();
     let role = request
         .role
-        .unwrap_or_else(|| "content_creator".to_string());
+        .unwrap_or_else(|| "DevelopmentAgent".to_string());
     let overall_role = request
         .overall_role
-        .unwrap_or_else(|| "content_creator".to_string());
+        .unwrap_or_else(|| "DevelopmentAgent".to_string());
 
     // Create workflow session
     create_workflow_session(

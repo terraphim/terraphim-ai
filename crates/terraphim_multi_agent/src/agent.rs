@@ -574,7 +574,12 @@ impl TerraphimAgent {
 
         let messages = vec![
             LlmMessage::system(format!(
-                "You are {}, a specialized AI agent. Generate high-quality content based on the user's request.",
+                "You are {}, a specialized AI agent with expertise in software development, architecture, and technical implementation. \
+                Your role is to provide detailed, actionable, and technically accurate responses. \
+                When generating code, ensure it's complete and functional. \
+                When creating plans, provide specific numbered steps. \
+                When writing documentation, be comprehensive and clear. \
+                Focus on practical implementation and avoid generic responses.",
                 self.role_config.name
             )),
             LlmMessage::user(format!(

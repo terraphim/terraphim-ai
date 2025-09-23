@@ -8,10 +8,7 @@ use axum::{
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
-use tokio::{
-    sync::{broadcast, RwLock},
-    time::{sleep, Duration},
-};
+use tokio::sync::{broadcast, RwLock};
 
 use super::{ExecutionStatus, WebSocketMessage, WorkflowStatus};
 use crate::AppState;
@@ -219,6 +216,7 @@ async fn handle_websocket_message(
             "get_workflow_status" => handle_get_workflow_status(cmd, state).await,
             "list_active_workflows" => handle_list_active_workflows(state).await,
             "get_session_info" => handle_get_session_info(session_id, sessions).await,
+            "execute_workflow" => handle_execute_workflow(cmd, session_id, state).await,
             "ping" => handle_ping_command(session_id).await,
             "heartbeat" => handle_ping_command(session_id).await, // Map heartbeat to ping
             _ => WebSocketResponse {
@@ -601,4 +599,143 @@ pub fn get_websocket_stats(sessions: &HashMap<String, WebSocketSession>) -> serd
         },
         "timestamp": chrono::Utc::now()
     })
+}
+
+async fn handle_execute_workflow(
+    cmd: WebSocketCommand,
+    session_id: &str,
+    state: &AppState,
+) -> WebSocketResponse {
+    use super::{
+        create_workflow_session, generate_workflow_id,
+        multi_agent_handlers::MultiAgentWorkflowExecutor,
+    };
+
+    // Extract workflow parameters from the command data
+    let workflow_data = cmd.data.unwrap_or_default();
+    let workflow_type = workflow_data
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("prompt-chain")
+        .to_string();
+
+    // Extract request parameters
+    let prompt = workflow_data
+        .get("prompt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let role = workflow_data
+        .get("role")
+        .and_then(|v| v.as_str())
+        .unwrap_or("DevelopmentAgent")
+        .to_string();
+
+    let overall_role = workflow_data
+        .get("overall_role")
+        .and_then(|v| v.as_str())
+        .unwrap_or("DevelopmentAgent")
+        .to_string();
+
+    let workflow_id = generate_workflow_id();
+
+    // Create workflow session for tracking
+    create_workflow_session(
+        &state.workflow_sessions,
+        &state.websocket_broadcaster,
+        workflow_id.clone(),
+        workflow_type.to_string(),
+    )
+    .await;
+
+    // Clone the necessary state for the async task
+    let config_state = state.config_state.clone();
+    let sessions = state.workflow_sessions.clone();
+    let broadcaster = state.websocket_broadcaster.clone();
+    let wf_id = workflow_id.clone();
+    let wf_type = workflow_type.clone();
+
+    // Execute workflow asynchronously to avoid blocking WebSocket
+    tokio::spawn(async move {
+        log::info!(
+            "Starting WebSocket workflow execution: {} ({})",
+            wf_id,
+            wf_type
+        );
+
+        let result = match MultiAgentWorkflowExecutor::new_with_config(config_state).await {
+            Ok(executor) => match wf_type.as_str() {
+                "prompt-chain" => {
+                    executor
+                        .execute_prompt_chain(
+                            &wf_id,
+                            &prompt,
+                            &role,
+                            &overall_role,
+                            &sessions,
+                            &broadcaster,
+                            None,
+                            None,
+                        )
+                        .await
+                }
+                _ => Err(terraphim_multi_agent::MultiAgentError::WorkflowError(
+                    format!("Unsupported workflow type: {}", wf_type),
+                )),
+            },
+            Err(e) => {
+                log::error!("Failed to create multi-agent executor: {:?}", e);
+                Err(terraphim_multi_agent::MultiAgentError::WorkflowError(
+                    format!("Failed to initialize executor: {}", e),
+                ))
+            }
+        };
+
+        // Broadcast final result
+        match result {
+            Ok(workflow_result) => {
+                log::info!("WebSocket workflow {} completed successfully", wf_id);
+                let _ = broadcaster.send(super::WebSocketMessage {
+                    message_type: "workflow_completed".to_string(),
+                    workflow_id: Some(wf_id.clone()),
+                    session_id: None,
+                    data: serde_json::json!({
+                        "result": workflow_result,
+                        "success": true
+                    }),
+                    timestamp: chrono::Utc::now(),
+                });
+            }
+            Err(error) => {
+                log::error!("WebSocket workflow {} failed: {}", wf_id, error);
+                let _ = broadcaster.send(super::WebSocketMessage {
+                    message_type: "workflow_error".to_string(),
+                    workflow_id: Some(wf_id.clone()),
+                    session_id: None,
+                    data: serde_json::json!({
+                        "error": error.to_string(),
+                        "success": false
+                    }),
+                    timestamp: chrono::Utc::now(),
+                });
+            }
+        }
+    });
+
+    // Return immediately with workflow started confirmation
+    WebSocketResponse {
+        response_type: "workflow_started".to_string(),
+        session_id: Some(session_id.to_string()),
+        workflow_id: Some(workflow_id.clone()),
+        data: serde_json::json!({
+            "workflow_id": workflow_id,
+            "type": workflow_type,
+            "status": "started",
+            "message": "Workflow execution started, updates will be sent via WebSocket"
+        }),
+        timestamp: chrono::Utc::now(),
+        success: true,
+        error: None,
+    }
 }

@@ -13,6 +13,12 @@ class RoutingPrototypingDemo {
     this.currentComplexity = 0;
     this.generationResult = null;
     this.agentConfigManager = null;
+    
+    // Element references
+    this.promptInput = null;
+    this.generateButton = null;
+    this.analyzeButton = null;
+    this.refineButton = null;
 
     // Available AI models with capabilities and costs
     this.models = [
@@ -87,6 +93,12 @@ class RoutingPrototypingDemo {
   }
 
   async init() {
+    // Initialize element references
+    this.promptInput = document.getElementById('prototype-prompt');
+    this.generateButton = document.getElementById('generate-btn');
+    this.analyzeButton = document.getElementById('analyze-btn');
+    this.refineButton = document.getElementById('refine-btn');
+    
     // Initialize settings system first
     await this.initializeSettings();
     
@@ -133,6 +145,46 @@ class RoutingPrototypingDemo {
   initializeConnectionStatus() {
     if (typeof ConnectionStatusComponent !== 'undefined' && this.apiClient) {
       this.connectionStatus = new ConnectionStatusComponent('connection-status-container', this.apiClient);
+    }
+  }
+
+  setupEventListeners() {
+    // Analyze Task button event listener
+    if (this.analyzeButton) {
+      this.analyzeButton.addEventListener('click', () => this.analyzeTask());
+    }
+    
+    // Generate Prototype button event listener  
+    if (this.generateButton) {
+      this.generateButton.addEventListener('click', () => this.generatePrototype());
+    }
+    
+    // Refine button event listener
+    if (this.refineButton) {
+      this.refineButton.addEventListener('click', () => this.refinePrototype());
+    }
+    
+    // Template selection event listeners
+    document.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const template = card.dataset.template;
+        this.selectTemplate(template);
+      });
+    });
+    
+    // Model selection event listeners
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.model-option')) {
+        const modelId = e.target.closest('.model-option').dataset.modelId;
+        this.selectModel(modelId);
+      }
+    });
+    
+    // Real-time complexity analysis
+    if (this.promptInput) {
+      this.promptInput.addEventListener('input', () => {
+        this.analyzeComplexityRealTime(this.promptInput.value);
+      });
     }
   }
 
@@ -331,6 +383,7 @@ class RoutingPrototypingDemo {
     
     this.visualizer.createPipeline(steps);
     this.visualizer.createProgressBar('progress-container');
+    return this.visualizer;
   }
 
   async analyzeTask() {
@@ -388,7 +441,7 @@ class RoutingPrototypingDemo {
 
     // Prepare workflow input
     const input = {
-      prompt: `${this.promptInput.value}\n\nRequirements: ${this.requirementsInput.value}`,
+      prompt: this.promptInput.value,
       template: this.selectedTemplate,
       complexity: this.currentComplexity,
       model: this.selectedModel.id,
@@ -403,11 +456,19 @@ class RoutingPrototypingDemo {
       : input;
 
     try {
-      const result = await this.apiClient.executeRouting(enhancedInput, {
-        onProgress: (progress) => {
-          console.log('Generation progress:', progress);
-        }
+      // FORCE HTTP ONLY - bypass any WebSocket caching issues
+      const result = await this.apiClient.request('/workflows/route', {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: enhancedInput.prompt,
+          role: enhancedInput.role || enhancedInput.input?.role,
+          overall_role: enhancedInput.overall_role || enhancedInput.input?.overall_role || 'engineering_agent',
+          ...(enhancedInput.config && { config: enhancedInput.config }),
+          ...(enhancedInput.llm_config && { llm_config: enhancedInput.llm_config })
+        })
       });
+      
+      console.log('Routing HTTP result:', result);
 
       this.generationResult = result;
       this.renderPrototypeResult(result);
@@ -480,8 +541,7 @@ class RoutingPrototypingDemo {
   saveState() {
     const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
     const state = {
-      prompt: this.promptInput.value,
-      requirements: this.requirementsInput.value,
+      prompt: this.promptInput ? this.promptInput.value : '',
       template: this.selectedTemplate,
       model: this.selectedModel ? this.selectedModel.id : null,
       ...agentState
@@ -493,11 +553,12 @@ class RoutingPrototypingDemo {
     const saved = localStorage.getItem('routing-demo-state');
     if (saved) {
       const savedState = JSON.parse(saved);
-      this.promptInput.value = savedState.prompt || '';
-      this.requirementsInput.value = savedState.requirements || '';
+      if (this.promptInput) {
+        this.promptInput.value = savedState.prompt || '';
+        this.analyzeComplexityRealTime(this.promptInput.value);
+      }
       this.selectTemplate(savedState.template || 'landing-page');
       this.selectModel(savedState.model || 'openai_gpt35');
-      this.analyzeComplexityRealTime(this.promptInput.value);
 
       if (this.agentConfigManager) {
         this.agentConfigManager.applyState(savedState);
@@ -507,7 +568,13 @@ class RoutingPrototypingDemo {
 }
 
 // Initialize the demo when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  const demo = new RoutingPrototypingDemo();
-  // The init method is now called within the constructor
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const demo = new RoutingPrototypingDemo();
+    window.demo = demo; // Make it globally accessible for debugging
+    await demo.init();
+    console.log('Routing demo initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize routing demo:', error);
+  }
 });

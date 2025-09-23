@@ -9,6 +9,9 @@ class TerraphimWebSocketClient {
     this.reconnectInterval = options.reconnectInterval || 3000;
     this.maxReconnectAttempts = options.maxReconnectAttempts || 10;
     this.heartbeatInterval = options.heartbeatInterval || 30000;
+    this.baseHeartbeatInterval = this.heartbeatInterval;
+    this.maxHeartbeatInterval = options.maxHeartbeatInterval || 300000; // 5 minutes max
+    this.heartbeatScaleFactor = options.heartbeatScaleFactor || 1.2;
     
     this.ws = null;
     this.isConnected = false;
@@ -48,6 +51,9 @@ class TerraphimWebSocketClient {
       console.log('WebSocket connected:', event);
       this.isConnected = true;
       this.reconnectAttempts = 0;
+      
+      // Reset heartbeat interval on reconnection
+      this.resetHeartbeatInterval();
       this.startHeartbeat();
       this.flushMessageQueue();
       this.emit('connected', { timestamp: new Date() });
@@ -218,7 +224,22 @@ class TerraphimWebSocketClient {
   handlePong(data) {
     // Server responded to our ping
     console.log('Received pong from server:', data);
-    // Update connection health indicator if needed
+    
+    // Adaptive timeout: Increase heartbeat interval on successful ping/pong
+    // This allows for longer-running LLM operations
+    const newInterval = Math.min(
+      this.heartbeatInterval * this.heartbeatScaleFactor,
+      this.maxHeartbeatInterval
+    );
+    
+    if (newInterval !== this.heartbeatInterval) {
+      console.log(`📈 Adaptive timeout: Increasing heartbeat interval from ${this.heartbeatInterval}ms to ${newInterval}ms`);
+      this.heartbeatInterval = newInterval;
+      
+      // Restart heartbeat with new interval
+      this.stopHeartbeat();
+      this.startHeartbeat();
+    }
   }
 
   handleConnectionEstablished(workflowId, sessionId, data) {
@@ -400,6 +421,13 @@ class TerraphimWebSocketClient {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+  }
+  
+  resetHeartbeatInterval() {
+    if (this.heartbeatInterval !== this.baseHeartbeatInterval) {
+      console.log(`🔄 Resetting heartbeat interval from ${this.heartbeatInterval}ms to ${this.baseHeartbeatInterval}ms`);
+      this.heartbeatInterval = this.baseHeartbeatInterval;
     }
   }
 

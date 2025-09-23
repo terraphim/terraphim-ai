@@ -24,7 +24,6 @@ notify = "6.0"
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor" }
 terraphim_agent_messaging = { path = "../terraphim_agent_messaging" }
 terraphim_agent_registry = { path = "../terraphim_agent_registry" }
-terraphim_gen_agent = { path = "../terraphim_gen_agent" }
 terraphim_kg_orchestration = { path = "../terraphim_kg_orchestration" }
 terraphim_kg_agents = { path = "../terraphim_kg_agents" }
 terraphim_task_decomposition = { path = "../terraphim_task_decomposition" }

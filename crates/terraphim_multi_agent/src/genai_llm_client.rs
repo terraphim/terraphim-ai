@@ -11,6 +11,7 @@ use std::time::Duration;
 use crate::{MultiAgentResult, LlmRequest, LlmResponse, TokenUsage, MessageRole, MultiAgentError};
 use chrono::Utc;
 use uuid::Uuid;
+use tiktoken_rs::{cl100k_base, o200k_base, get_chat_completion_max_tokens, ChatCompletionRequestMessage};
 
 /// Direct HTTP LLM client that works with multiple providers
 #[derive(Debug)]
@@ -119,7 +120,7 @@ impl GenAiLlmClient {
     /// Create a new Direct HTTP LLM client
     pub fn new(provider: String, config: ProviderConfig) -> MultiAgentResult<Self> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(300))  // Increased from 30 to 300 seconds for complex workflows
             .build()
             .map_err(|e| MultiAgentError::LlmError(format!("Failed to create HTTP client: {}", e)))?;
         
@@ -164,12 +165,10 @@ impl GenAiLlmClient {
         let end_time = Utc::now();
         let duration_ms = (end_time - start_time).num_milliseconds() as u64;
 
-        // Estimate token usage (rough approximation)
-        let input_tokens = request.messages
-            .iter()
-            .map(|m| m.content.len())
-            .sum::<usize>() as u64 / 4;
-        let output_tokens = (response_content.len() / 4) as u64;
+        // Estimate token usage using tiktoken
+        let (input_tokens, output_tokens) = self.estimate_tokens(&request, &response_content);
+        
+        log::debug!("Token usage - Input: {}, Output: {}, Total: {}", input_tokens, output_tokens, input_tokens + output_tokens);
         
         Ok(LlmResponse {
             content: response_content,
@@ -330,6 +329,66 @@ impl GenAiLlmClient {
     /// Get the provider name
     pub fn provider(&self) -> &str {
         &self.provider
+    }
+
+    /// Estimate token usage using tiktoken with proper chat completion support
+    fn estimate_tokens(&self, request: &LlmRequest, response: &str) -> (u64, u64) {
+        // Try to use the appropriate encoding for the model
+        let encoding = if self.model.contains("gpt-4o") || self.model.contains("gpt-4-turbo") {
+            o200k_base()
+        } else {
+            cl100k_base()
+        };
+        
+        let encoding = match encoding {
+            Ok(enc) => enc,
+            Err(_) => {
+                // Ultimate fallback: rough character-based estimation
+                let input_text: String = request.messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join(" ");
+                let input_tokens = (input_text.len() / 4) as u64;
+                let output_tokens = (response.len() / 4) as u64;
+                log::warn!("Using character-based token estimation fallback");
+                return (input_tokens, output_tokens);
+            }
+        };
+
+        // Get max tokens for this model
+        let tiktoken_messages: Vec<ChatCompletionRequestMessage> = request.messages
+            .iter()
+            .map(|msg| ChatCompletionRequestMessage {
+                content: Some(msg.content.clone()),
+                role: match msg.role {
+                    MessageRole::User => "user".to_string(),
+                    MessageRole::Assistant => "assistant".to_string(),
+                    MessageRole::System => "system".to_string(),
+                    MessageRole::Tool => "user".to_string(), // Map tool to user for tiktoken
+                },
+                name: None,
+                function_call: None,
+            })
+            .collect();
+        
+        let max_tokens = get_chat_completion_max_tokens(&self.model, &tiktoken_messages).unwrap_or(4096);
+        log::debug!("Model {} max tokens: {}", self.model, max_tokens);
+
+        // For input tokens, count all messages properly
+        let input_text: String = request.messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join(" ");
+        let input_tokens = encoding.encode_with_special_tokens(&input_text).len() as u64;
+        
+        // For output tokens, encode the response
+        let output_tokens = encoding.encode_with_special_tokens(response).len() as u64;
+        
+        // Check if we're approaching the token limit
+        let total_tokens = input_tokens + output_tokens;
+        if total_tokens > (max_tokens as u64 * 9 / 10) { // 90% of max
+            log::warn!("Token usage approaching limit: {}/{} tokens for model {}", 
+                      total_tokens, max_tokens, self.model);
+        }
+        
+        log::debug!("Tiktoken estimation - Model: {}, Input: {} tokens, Output: {} tokens, Total: {}/{}", 
+                   self.model, input_tokens, output_tokens, total_tokens, max_tokens);
+        
+        (input_tokens, output_tokens)
     }
 }
 

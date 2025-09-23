@@ -425,24 +425,24 @@ class EvaluatorOptimizerDemo {
     
     try {
       // Execute real optimization workflow with API client
-      const result = await this.apiClient.executeOptimization({
-        prompt: document.getElementById('content-prompt').value,
-        role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'QAEngineer',
-        overall_role: this.terraphimConfig.overallRole,
-        config: {
-          previousContent: previousVersion.content,
-          optimizationPrompt: optimizationPrompt,
-          iteration: this.currentIteration,
-          qualityThreshold: this.qualityThreshold,
-          criteria: this.qualityCriteria.filter(c => c.enabled)
-        }
-      }, {
-        realTime: true,
-        onProgress: (progress) => {
-          const baseProgress = 70 + (this.currentIteration / this.maxIterations) * 30;
-          this.visualizer.updateProgress(baseProgress * (progress.percentage / 100), progress.current);
-        }
+      // FORCE HTTP ONLY - bypass any WebSocket caching issues
+      const result = await this.apiClient.request('/workflows/optimize', {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: document.getElementById('content-prompt').value,
+          role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'QAEngineer',
+          overall_role: this.terraphimConfig.overallRole,
+          config: {
+            previousContent: previousVersion.content,
+            optimizationPrompt: optimizationPrompt,
+            iteration: this.currentIteration,
+            qualityThreshold: this.qualityThreshold,
+            criteria: this.qualityCriteria.filter(c => c.enabled)
+          }
+        })
       });
+      
+      console.log('Optimization HTTP result:', result);
       
       // Extract improved content from API result
       const improvedContent = (result.result && result.result.optimized_content) || (result.result && result.result.final_result) || 'Generated improved content';
@@ -457,6 +457,9 @@ class EvaluatorOptimizerDemo {
         improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
         apiResult: result.result // Store full API result
       };
+      
+      this.contentVersions.push(version);
+      this.qualityHistory.push(qualityScores.overall);
     } catch (error) {
       console.error('API optimization failed, falling back to simulation:', error);
       
@@ -477,11 +480,12 @@ class EvaluatorOptimizerDemo {
         qualityScores: qualityScores,
         feedback: this.generateFeedback(qualityScores),
         improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
-      timestamp: new Date()
-    };
+        timestamp: new Date()
+      };
     
-    this.contentVersions.push(version);
-    this.qualityHistory.push(qualityScores.overall);
+      this.contentVersions.push(version);
+      this.qualityHistory.push(qualityScores.overall);
+    }
     
     // Update best version if this is better
     if (qualityScores.overall > this.bestVersion.qualityScores.overall) {
@@ -732,12 +736,12 @@ This technical specification outlines the core components, implementation requir
 ## Implementation Guidelines
 
 ### Configuration Parameters
-```
+\`\`\`
 max_connections: 1000
 timeout_threshold: 30s
 retry_attempts: 3
 backup_frequency: hourly
-```
+\`\`\`
 
 ### Security Considerations
 - All data transmission encrypted using TLS 1.3

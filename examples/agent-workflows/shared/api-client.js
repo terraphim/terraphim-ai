@@ -12,7 +12,7 @@ class TerraphimApiClient {
     
     // Configuration options
     this.options = {
-      timeout: options.timeout || 30000,
+      timeout: options.timeout || 300000,
       maxRetries: options.maxRetries || 3,
       retryDelay: options.retryDelay || 1000,
       enableWebSocket: options.enableWebSocket !== false,
@@ -203,59 +203,125 @@ class TerraphimApiClient {
 
   // Workflow execution endpoints with WebSocket support
   async executePromptChain(input, options = {}) {
-    if (this.wsClient && options.realTime) {
+    // Enable WebSocket path for real-time updates and better timeout handling
+    console.log('executePromptChain Debug - wsClient:', !!this.wsClient, 'realTime option:', options.realTime);
+    if (this.wsClient && (options.realTime !== false)) {
+      console.log('Using WebSocket path for prompt-chain execution');
       return this.executeWorkflowWithWebSocket('prompt-chain', input, options);
     }
+    console.log('Falling back to HTTP path for prompt-chain execution');
+    
+    // Handle both direct input and agentConfig structures for fallback
+    const request = {
+      prompt: input.input?.prompt || input.prompt || '',
+      role: input.role || input.input?.role,
+      overall_role: input.overall_role || input.input?.overall_role || 'engineering_agent',
+      ...(input.config && { config: input.config }),
+      ...(input.llm_config && { llm_config: input.llm_config }),
+      ...(input.steps && { steps: input.steps })  // Include step configurations
+    };
+    
     return this.request('/workflows/prompt-chain', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(request),
     });
   }
 
   async executeRouting(input, options = {}) {
+    // Temporarily disable WebSocket path due to runtime error
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('routing', input, options);
     }
+    
+    // Handle both direct input and agentConfig structures for fallback
+    const request = {
+      prompt: input.input?.prompt || input.prompt || '',
+      role: input.role || input.input?.role,
+      overall_role: input.overall_role || input.input?.overall_role || 'engineering_agent',
+      ...(input.config && { config: input.config }),
+      ...(input.llm_config && { llm_config: input.llm_config })
+    };
+    
     return this.request('/workflows/route', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(request),
     });
   }
 
   async executeParallel(input, options = {}) {
+    // Temporarily disable WebSocket path due to runtime error
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('parallel', input, options);
     }
+    
+    // Handle both direct input and agentConfig structures for fallback
+    const request = {
+      prompt: input.input?.prompt || input.prompt || '',
+      role: input.role || input.input?.role,
+      overall_role: input.overall_role || input.input?.overall_role || 'engineering_agent',
+      ...(input.config && { config: input.config }),
+      ...(input.llm_config && { llm_config: input.llm_config })
+    };
+    
     return this.request('/workflows/parallel', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(request),
     });
   }
 
   async executeOrchestration(input, options = {}) {
+    // Temporarily disable WebSocket path due to runtime error
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('orchestration', input, options);
     }
+    
+    // Handle both direct input and agentConfig structures for fallback
+    const request = {
+      prompt: input.input?.prompt || input.prompt || '',
+      role: input.role || input.input?.role,
+      overall_role: input.overall_role || input.input?.overall_role || 'engineering_agent',
+      ...(input.config && { config: input.config }),
+      ...(input.llm_config && { llm_config: input.llm_config })
+    };
+    
     return this.request('/workflows/orchestrate', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(request),
     });
   }
 
   async executeOptimization(input, options = {}) {
+    // Temporarily disable WebSocket path due to runtime error
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('optimization', input, options);
     }
+    
+    // Handle both direct input and agentConfig structures for fallback
+    const request = {
+      prompt: input.input?.prompt || input.prompt || '',
+      role: input.role || input.input?.role,
+      overall_role: input.overall_role || input.input?.overall_role || 'engineering_agent',
+      ...(input.config && { config: input.config }),
+      ...(input.llm_config && { llm_config: input.llm_config })
+    };
+    
     return this.request('/workflows/optimize', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(request),
     });
   }
 
   // WebSocket-enabled workflow execution
   async executeWorkflowWithWebSocket(workflowType, input, options = {}) {
-    return new Promise(async (resolve, reject) => {
-      try {
+    console.log('executeWorkflowWithWebSocket called with:', { workflowType, hasInput: !!input, hasOptions: !!options });
+    console.log('=== DEBUG START ===');
+    console.log('Input:', input);
+    console.log('Options:', options);
+    
+    try {
+      return new Promise(async (resolve, reject) => {
+        try {
+          console.log('Inside try block, creating agentConfig...');
         // Enhanced agent configuration
         const agentConfig = {
           input,
@@ -283,19 +349,52 @@ class TerraphimApiClient {
         };
         
         // Flatten the structure to match backend expectations
-        const flattenedRequest = {
-          prompt: input.prompt,
-          role: agentConfig.role,
-          overall_role: agentConfig.overallRole || 'engineering_agent',
-          // Include additional context if needed
-          ...(input.context && { context: input.context })
-        };
+        // Handle different input structures:
+        // 1. Direct input: { prompt: "...", role: "..." }
+        // 2. Nested input: { input: { prompt: "..." } }
+        // 3. Agent config: { role: "...", input: { prompt: "..." } }
+        let flattenedRequest;
+        try {
+          flattenedRequest = {
+            prompt: input.input?.prompt || input.prompt,
+            role: input.role || agentConfig.role,
+            overall_role: input.overall_role || agentConfig.overallRole || 'engineering_agent',
+            // Include additional context if needed
+            ...(input.context && { context: input.context }),
+            ...(input.input?.context && { context: input.input.context }),
+            // Include step configurations for prompt chaining
+            ...(input.steps && { steps: input.steps }),
+            ...(input.config && { config: input.config }),
+            ...(input.llm_config && { llm_config: input.llm_config })
+          };
+        } catch (error) {
+          console.error('Error creating flattened request:', error);
+          console.log('Input that caused error:', JSON.stringify(input, null, 2));
+          console.log('AgentConfig that caused error:', JSON.stringify(agentConfig, null, 2));
+          throw error;
+        }
 
+        // Validate that prompt is present
+        if (!flattenedRequest.prompt) {
+          console.error('Missing prompt in request:', { 
+            workflowType, 
+            input: JSON.stringify(input, null, 2), 
+            agentConfig: JSON.stringify(agentConfig, null, 2), 
+            flattenedRequest: JSON.stringify(flattenedRequest, null, 2) 
+          });
+          throw new Error('Prompt is required for workflow execution');
+        }
+        
         // Execute workflow via HTTP POST first to get workflow ID
+        console.log('About to make HTTP request to:', `/workflows/${this.getWorkflowEndpoint(workflowType)}`);
+        console.log('Request payload:', JSON.stringify(flattenedRequest, null, 2));
+        
         const workflowResponse = await this.request(`/workflows/${this.getWorkflowEndpoint(workflowType)}`, {
           method: 'POST',
           body: JSON.stringify(flattenedRequest),
         });
+        
+        console.log('HTTP response received:', workflowResponse);
         
         // Generate or extract session ID for WebSocket tracking
         const sessionId = workflowResponse.workflow_id || workflowResponse.session_id || this.generateSessionId();
@@ -399,10 +498,14 @@ class TerraphimApiClient {
           }
         }, timeout);
 
-      } catch (error) {
-        reject(error);
-      }
-    });
+        } catch (error) {
+          reject(error);
+        }
+      });
+    } catch (error) {
+      console.error('Error in executeWorkflowWithWebSocket:', error);
+      throw error;
+    }
   }
 
   // Workflow status monitoring
