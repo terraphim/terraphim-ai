@@ -22,7 +22,8 @@ terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", versi
 terraphim_config = { path = "../../crates/terraphim_config", version = "0.2.0", features = ["typescript"] }
 terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.2.0" }
 terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.2.0" }
-terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.2.0" }
+terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.2.0", features = ["onepassword"] }
+terraphim_onepassword_cli = { path = "../../crates/terraphim_onepassword_cli", version = "0.2.0" }
 terraphim_types = { path = "../../crates/terraphim_types", version = "0.2.0", features = ["typescript"] }
 terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.2.0" }
 terraphim_service = { path = "../../crates/terraphim_service", version = "0.2.0" }

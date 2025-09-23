@@ -2462,6 +2462,135 @@ curl -s http://localhost:8000/config | jq '.config.roles | keys'
 
 This comprehensive bug fix demonstrates the value of systematic code review, thorough testing, and careful attention to data flow across component boundaries. The rust-wasm-code-reviewer agent was instrumental in identifying issues that could have persisted indefinitely.
 
+## 1Password Integration Architecture for Terraphim (2025-09-23)
+
+### 🎯 Key Architecture Patterns for Agent Secret Management
+
+1. **Multi-Environment Vault Strategy**
+   - **Lesson**: Separate vaults for development, staging, and production environments enable secure isolation and access control
+   - **Pattern**: Three-vault architecture (Terraphim-Dev, Terraphim-Prod, Terraphim-Shared) with environment-specific secret management
+   - **Implementation**: `op://Terraphim-Dev/OpenRouter/API_KEY` for development, production vaults for deployment secrets
+   - **Benefits**: Granular access control, audit trail, environment isolation without secret exposure
+
+2. **Template-Based Secret Injection**
+   - **Lesson**: Never hardcode secrets, even as placeholders - use template-based injection with 1Password references
+   - **Pattern**: Configuration templates with `op://` references replaced at runtime using `op inject`
+   - **Implementation**: `.env.terraphim.template` with 1Password references, `op inject -i .env.terraphim.template -o .env.terraphim`
+   - **Benefits**: Zero secrets in code, secure CI/CD, automatic secret rotation support
+
+3. **Process Memory vs File-Based Secret Handling**
+   - **Lesson**: Provide two integration methods - memory-only for security, file-based for developer convenience
+   - **Pattern**: Method 1 (environment injection) keeps secrets in process memory, Method 2 (config injection) creates temporary secure files
+   - **Implementation**: `op run --env-file=.env.terraphim -- terraphim_server` vs `op inject` with file-based config loading
+   - **Security**: Method 1 never touches disk, Method 2 uses `chmod 600` and automatic cleanup
+
+### 🔧 Cross-Platform Secret Management Implementation
+
+1. **Service Account Integration for CI/CD**
+   - **Lesson**: 1Password service accounts provide secure, auditable secret access for automated systems
+   - **Pattern**: GitHub Actions with `OP_SERVICE_ACCOUNT_TOKEN` for automated builds and deployments
+   - **Implementation**: Service account tokens in GitHub secrets, `op inject` in CI workflows
+   - **Benefits**: No human credentials in CI, full audit trail, secure automated deployments
+
+2. **Local Development vs Production Secret Flows**
+   - **Lesson**: Optimize secret flows for different use cases - convenience for development, security for production
+   - **Pattern**: Local development uses GUI 1Password integration, production uses service accounts
+   - **Implementation**: `op signin` for local development, service account tokens for production deployment
+   - **Benefits**: Developer productivity without compromising production security
+
+3. **Terraphim-Specific Secret Categories**
+   - **Lesson**: Organize secrets by service category for better management and access control
+   - **Categories**: LLM APIs (OpenRouter, Ollama), Search Services (Perplexity, AtomicServer), Cloud Storage (AWS S3), External APIs (GitHub, ClickUp)
+   - **Implementation**: Separate 1Password items per service with consistent naming conventions
+   - **Benefits**: Clear organization, granular access control, easier secret rotation
+
+### 🏗️ Backend Integration Architecture
+
+1. **Rust Secret Loading Patterns**
+   - **Lesson**: Create centralized secret loading utilities that work with both environment variables and 1Password injection
+   - **Pattern**: `SecretLoader` trait with implementations for different secret sources
+   - **Implementation**: Environment variable fallback with 1Password primary, graceful degradation for missing secrets
+   - **Benefits**: Consistent secret handling across all Rust crates, easy testing with mock secrets
+
+2. **Configuration System Integration**
+   - **Lesson**: Integrate 1Password secrets seamlessly with existing configuration loading without breaking changes
+   - **Pattern**: Enhance existing config loaders to detect and resolve `op://` references
+   - **Implementation**: Update `terraphim_settings` to support 1Password references in TOML files
+   - **Benefits**: Zero breaking changes, gradual migration path, backwards compatibility
+
+3. **Error Handling and Fallback Strategies**
+   - **Lesson**: Provide clear error messages and fallback behaviors when 1Password integration fails
+   - **Pattern**: Detect 1Password availability, provide helpful error messages, graceful degradation
+   - **Implementation**: Check for `op` CLI availability, validate authentication, clear error reporting
+   - **Benefits**: Better developer experience, easier troubleshooting, production reliability
+
+### 🖥️ Frontend Integration Patterns
+
+1. **Tauri Desktop Secret Management**
+   - **Lesson**: Desktop applications can integrate with system 1Password for seamless secret access
+   - **Pattern**: Tauri commands to interact with 1Password CLI through system commands
+   - **Implementation**: Secure bridge between Tauri frontend and 1Password CLI backend
+   - **Benefits**: Native OS integration, secure secret access, user-friendly authentication
+
+2. **Web Application Secret Handling**
+   - **Lesson**: Web applications should never handle production secrets directly - use secure backend proxy
+   - **Pattern**: Backend services load secrets via 1Password, frontend makes authenticated API calls
+   - **Implementation**: Server-side secret loading with client-side authentication for API access
+   - **Benefits**: Web security best practices, no secrets in browser, secure API authentication
+
+3. **Development Environment Setup**
+   - **Lesson**: Streamline developer onboarding with automated 1Password setup scripts
+   - **Pattern**: Setup scripts that create development vaults and populate with template secrets
+   - **Implementation**: `setup-1password-terraphim.sh` script with vault creation and secret initialization
+   - **Benefits**: Fast developer onboarding, consistent development environments, reduced setup errors
+
+### 🚨 Security Best Practices and Risk Mitigation
+
+1. **Principle of Least Privilege**
+   - **Lesson**: Grant minimum necessary access to secrets based on environment and role
+   - **Pattern**: Environment-specific vault access, role-based secret permissions
+   - **Implementation**: Development team access to dev vault only, production access restricted to deployment systems
+   - **Benefits**: Reduced attack surface, compliance with security standards, audit trail clarity
+
+2. **Secret Rotation and Lifecycle Management**
+   - **Lesson**: Design integration to support automatic secret rotation without service disruption
+   - **Pattern**: Secret versioning, graceful secret updates, fallback mechanisms
+   - **Implementation**: Support for multiple valid secrets during rotation, automatic retry logic
+   - **Benefits**: Security compliance, zero-downtime secret rotation, operational resilience
+
+3. **Audit and Monitoring Integration**
+   - **Lesson**: Comprehensive logging of secret access enables security monitoring and compliance
+   - **Pattern**: Log secret access attempts, integrate with monitoring systems, security alert frameworks
+   - **Implementation**: 1Password event logging, integration with security monitoring tools
+   - **Benefits**: Security compliance, threat detection, forensic analysis capabilities
+
+### 📊 Implementation Success Metrics
+
+1. **Developer Experience Metrics**
+   - Setup time reduction from manual secret management to automated 1Password integration
+   - Reduced support tickets related to secret configuration issues
+   - Faster onboarding for new team members
+
+2. **Security Improvement Metrics**
+   - Zero hardcoded secrets in codebase
+   - Complete audit trail for all secret access
+   - Automatic secret rotation capability
+
+3. **Operational Efficiency Metrics**
+   - Reduced deployment time through automated secret injection
+   - Fewer production incidents related to secret configuration
+   - Streamlined CI/CD pipeline with secure secret handling
+
+### 🎯 Architecture Decision Benefits
+
+1. **Scalability**: Architecture supports growing team and expanding service integrations
+2. **Security**: Enterprise-grade secret management with comprehensive audit trails
+3. **Developer Productivity**: Streamlined secret handling reduces configuration overhead
+4. **Compliance**: Meets security compliance requirements for enterprise deployments
+5. **Maintainability**: Centralized secret management reduces operational complexity
+
+This 1Password integration architecture demonstrates how to implement enterprise-grade secret management while maintaining developer productivity and system reliability across all Terraphim AI components.
+
 ---
 
 ## TUI Transparency Implementation Lessons (2025-08-28)

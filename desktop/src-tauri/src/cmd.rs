@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use terraphim_atomic_client::{Agent, Config as AtomicConfig, Store};
 use terraphim_config::{Config, ConfigState};
+use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};
 use terraphim_rolegraph::magic_unpair;
 use terraphim_service::TerraphimService;
 use terraphim_settings::DeviceSettings;
@@ -48,6 +49,12 @@ pub enum TerraphimTauriError {
 
     #[error("Settings error: {0}")]
     Settings(#[from] terraphim_settings::Error),
+
+    #[error("1Password error: {0}")]
+    OnePassword(#[from] terraphim_onepassword_cli::OnePasswordError),
+
+    #[error("JSON serialization error: {0}")]
+    JsonSerialization(#[from] serde_json::Error),
 
     #[error("{0}")]
     Generic(String),
@@ -2037,6 +2044,149 @@ pub async fn add_kg_index_context(
                 status: Status::Error,
                 error: Some(format!("Failed to add KG index context: {}", e)),
             })
+        }
+    }
+}
+
+// ========================
+// 1Password Integration Commands
+// ========================
+
+#[derive(Serialize, Deserialize, Debug, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct OnePasswordStatusResponse {
+    pub status: Status,
+    pub available: bool,
+    pub authenticated: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ResolveSecretRequest {
+    pub reference: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ResolveSecretResponse {
+    pub status: Status,
+    pub value: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ProcessConfigRequest {
+    pub config: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ProcessConfigResponse {
+    pub status: Status,
+    pub config: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Check 1Password CLI availability and authentication status
+#[command]
+pub async fn onepassword_status() -> Result<OnePasswordStatusResponse> {
+    log::debug!("Checking 1Password status");
+
+    let loader = OnePasswordLoader::new();
+    let available = loader.check_cli_installed().await;
+    let authenticated = if available {
+        loader.check_authenticated().await
+    } else {
+        false
+    };
+
+    log::info!(
+        "1Password status: available={}, authenticated={}",
+        available,
+        authenticated
+    );
+
+    Ok(OnePasswordStatusResponse {
+        status: Status::Success,
+        available,
+        authenticated,
+        error: None,
+    })
+}
+
+/// Resolve a single 1Password secret reference
+#[command]
+pub async fn onepassword_resolve_secret(
+    request: ResolveSecretRequest,
+) -> Result<ResolveSecretResponse> {
+    log::debug!("Resolving 1Password secret: {}", request.reference);
+
+    let loader = OnePasswordLoader::new();
+
+    match loader.resolve_secret(&request.reference).await {
+        Ok(value) => {
+            log::info!("Successfully resolved 1Password secret");
+            Ok(ResolveSecretResponse {
+                status: Status::Success,
+                value: Some(value),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to resolve 1Password secret: {}", e);
+            Ok(ResolveSecretResponse {
+                status: Status::Error,
+                value: None,
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+/// Process a configuration string, resolving 1Password references
+#[command]
+pub async fn onepassword_process_config(
+    request: ProcessConfigRequest,
+) -> Result<ProcessConfigResponse> {
+    log::debug!("Processing configuration with 1Password references");
+
+    let loader = OnePasswordLoader::new();
+
+    match loader.process_config(&request.config).await {
+        Ok(processed_config) => {
+            log::info!("Successfully processed configuration with 1Password");
+            Ok(ProcessConfigResponse {
+                status: Status::Success,
+                config: Some(processed_config),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to process configuration with 1Password: {}", e);
+            Ok(ProcessConfigResponse {
+                status: Status::Error,
+                config: None,
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+/// Load device settings with 1Password integration
+#[command]
+pub async fn onepassword_load_settings() -> Result<serde_json::Value> {
+    log::debug!("Loading device settings with 1Password integration");
+
+    match DeviceSettings::load_with_onepassword(None).await {
+        Ok(settings) => {
+            log::info!("Successfully loaded settings with 1Password integration");
+            Ok(serde_json::to_value(settings)?)
+        }
+        Err(e) => {
+            log::error!("Failed to load settings with 1Password: {}", e);
+            Err(TerraphimTauriError::Settings(e))
         }
     }
 }

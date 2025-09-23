@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use twelf::reexports::toml;
 use twelf::{config, Layer};
 
+#[cfg(feature = "onepassword")]
+use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("config error: {0}")]
@@ -14,6 +17,9 @@ pub enum Error {
     IoError(#[from] std::io::Error),
     #[error("env error: {0}")]
     EnvError(#[from] std::env::VarError),
+    #[cfg(feature = "onepassword")]
+    #[error("1Password error: {0}")]
+    OnePasswordError(#[from] terraphim_onepassword_cli::OnePasswordError),
 }
 
 // Need to name it explicitly to avoid conflict with std::Result
@@ -79,6 +85,50 @@ impl DeviceSettings {
     /// Create a new DeviceSettings
     pub fn new() -> Self {
         Self::load_from_env_and_file(None).unwrap()
+    }
+
+    /// Load settings with 1Password secret resolution
+    #[cfg(feature = "onepassword")]
+    pub async fn load_with_onepassword(config_path: Option<PathBuf>) -> DeviceSettingsResult<Self> {
+        log::info!("Loading device settings with 1Password integration...");
+        let config_path = config_path.unwrap_or_else(Self::default_config_path);
+
+        log::debug!("Settings path: {:?}", config_path);
+        let config_file = init_config_file(&config_path)?;
+        log::debug!("Loading config_file: {:?}", config_file);
+
+        // Read the raw configuration file
+        let raw_config = std::fs::read_to_string(&config_file)?;
+
+        // Process 1Password references
+        let loader = OnePasswordLoader::new();
+        let processed_config = if loader.is_available().await {
+            log::info!("1Password CLI available, processing secrets...");
+            loader.process_config(&raw_config).await?
+        } else {
+            log::warn!("1Password CLI not available, using raw configuration");
+            raw_config
+        };
+
+        // Parse the processed configuration
+        let settings: DeviceSettings = toml::from_str(&processed_config).map_err(|e| {
+            Error::IoError(std::io::Error::other(format!("TOML parsing error: {}", e)))
+        })?;
+
+        log::info!("Successfully loaded settings with 1Password integration");
+        Ok(settings)
+    }
+
+    /// Process a configuration string with 1Password secret resolution
+    #[cfg(feature = "onepassword")]
+    pub async fn process_config_with_secrets(config: &str) -> DeviceSettingsResult<String> {
+        let loader = OnePasswordLoader::new();
+        if loader.is_available().await {
+            Ok(loader.process_config(config).await?)
+        } else {
+            log::warn!("1Password CLI not available, returning raw configuration");
+            Ok(config.to_string())
+        }
     }
 
     /// Create default embedded DeviceSettings without filesystem operations
