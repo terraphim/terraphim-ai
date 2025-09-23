@@ -56,6 +56,13 @@
   let providerHint: string = '';
   let renderMarkdown: boolean = false;
 
+  // Debug state
+  let debugMode: boolean = false;
+  let lastRequest: any = null;
+  let lastResponse: any = null;
+  let showDebugRequest: boolean = false;
+  let showDebugResponse: boolean = false;
+
   // Conversation and context management
   let conversationId: string | null = null;
   let contextItems: ContextItem[] = [];
@@ -558,6 +565,16 @@
         requestBody.conversation_id = conversationId;
       }
 
+      // Capture request for debugging
+      lastRequest = {
+        timestamp: new Date().toISOString(),
+        method: $is_tauri ? 'TAURI_INVOKE' : 'HTTP_POST',
+        endpoint: $is_tauri ? 'chat' : `${CONFIG.ServerURL}/chat`,
+        body: JSON.parse(JSON.stringify(requestBody)), // Deep clone for debug
+        context_items_count: contextItems.length,
+        conversation_id: conversationId
+      };
+
       let data: ChatResponse;
       if ($is_tauri) {
         // Tauri mode - use invoke
@@ -575,6 +592,16 @@
         data = await res.json();
       }
 
+      // Capture response for debugging
+      lastResponse = {
+        timestamp: new Date().toISOString(),
+        status: data.status,
+        model_used: data.model_used,
+        message_length: data.message?.length || 0,
+        full_response: JSON.parse(JSON.stringify(data)), // Deep clone for debug
+        error: data.error || null
+      };
+
       modelUsed = data.model_used ?? null;
       if (data.status?.toLowerCase() === 'success' && data.message) {
         messages = [...messages, { role: 'assistant', content: data.message }];
@@ -584,6 +611,13 @@
       }
     } catch (e: any) {
       error = e?.message || String(e);
+      // Capture error in response debug info
+      lastResponse = {
+        timestamp: new Date().toISOString(),
+        status: 'error',
+        error: e?.message || String(e),
+        full_response: null
+      };
     } finally {
       sending = false;
     }
@@ -769,10 +803,20 @@
 
         <div class="chat-window" data-testid="chat-messages">
       <div class="chat-toolbar">
-        <label class="checkbox is-size-7">
-          <input type="checkbox" bind:checked={renderMarkdown} on:change={saveMdPref} />
-          Render markdown
-        </label>
+        <div class="field is-grouped">
+          <div class="control">
+            <label class="checkbox is-size-7">
+              <input type="checkbox" bind:checked={renderMarkdown} on:change={saveMdPref} />
+              Render markdown
+            </label>
+          </div>
+          <div class="control">
+            <label class="checkbox is-size-7">
+              <input type="checkbox" bind:checked={debugMode} />
+              Debug mode
+            </label>
+          </div>
+        </div>
       </div>
       {#each messages as m, i}
         <div class={`msg ${m.role}`}>
@@ -792,6 +836,27 @@
                 <button class="button is-small is-light" title="Save as markdown" on:click={() => saveAsMarkdown(m.content)}>
                   <span class="icon is-small"><i class="fas fa-save"></i></span>
                 </button>
+                {#if debugMode && i === messages.length - 1}
+                  <!-- Debug buttons only for the latest assistant message -->
+                  <button
+                    class="button is-small is-warning"
+                    title="Show debug request (sent to LLM)"
+                    on:click={() => showDebugRequest = true}
+                    disabled={!lastRequest}
+                  >
+                    <span class="icon is-small"><i class="fas fa-bug"></i></span>
+                    <span class="is-size-7">REQ</span>
+                  </button>
+                  <button
+                    class="button is-small is-info"
+                    title="Show debug response (from LLM)"
+                    on:click={() => showDebugResponse = true}
+                    disabled={!lastResponse}
+                  >
+                    <span class="icon is-small"><i class="fas fa-code"></i></span>
+                    <span class="is-size-7">RES</span>
+                  </button>
+                {/if}
               </div>
             {:else}
               <!-- User/system messages: always show as plain text -->
@@ -1050,6 +1115,93 @@
   </div>
 </section>
 
+<!-- Debug Request Modal -->
+{#if showDebugRequest}
+  <div class="modal is-active">
+    <div class="modal-background" on:click={() => showDebugRequest = false}></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">
+          <span class="icon"><i class="fas fa-bug"></i></span>
+          Debug Request (Sent to LLM)
+        </p>
+        <button class="delete" aria-label="close" on:click={() => showDebugRequest = false}></button>
+      </header>
+      <section class="modal-card-body">
+        {#if lastRequest}
+          <div class="content">
+            <p class="has-text-weight-semibold">Request Details:</p>
+            <div class="tags are-medium">
+              <span class="tag is-info">Method: {lastRequest.method}</span>
+              <span class="tag is-primary">Time: {new Date(lastRequest.timestamp).toLocaleTimeString()}</span>
+              <span class="tag is-success">Context Items: {lastRequest.context_items_count}</span>
+            </div>
+            <p class="has-text-weight-semibold mt-4">Full Request JSON:</p>
+            <pre class="debug-json"><code>{JSON.stringify(lastRequest, null, 2)}</code></pre>
+          </div>
+        {:else}
+          <p class="has-text-grey">No request data available</p>
+        {/if}
+      </section>
+      <footer class="modal-card-foot">
+        <button class="button" on:click={() => showDebugRequest = false}>Close</button>
+        {#if lastRequest}
+          <button class="button is-primary" on:click={() => copyAsMarkdown(JSON.stringify(lastRequest, null, 2))}>
+            <span class="icon"><i class="fas fa-copy"></i></span>
+            <span>Copy JSON</span>
+          </button>
+        {/if}
+      </footer>
+    </div>
+  </div>
+{/if}
+
+<!-- Debug Response Modal -->
+{#if showDebugResponse}
+  <div class="modal is-active">
+    <div class="modal-background" on:click={() => showDebugResponse = false}></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">
+          <span class="icon"><i class="fas fa-code"></i></span>
+          Debug Response (From LLM)
+        </p>
+        <button class="delete" aria-label="close" on:click={() => showDebugResponse = false}></button>
+      </header>
+      <section class="modal-card-body">
+        {#if lastResponse}
+          <div class="content">
+            <p class="has-text-weight-semibold">Response Details:</p>
+            <div class="tags are-medium">
+              <span class="tag is-info">Status: {lastResponse.status}</span>
+              <span class="tag is-primary">Time: {new Date(lastResponse.timestamp).toLocaleTimeString()}</span>
+              {#if lastResponse.model_used}
+                <span class="tag is-success">Model: {lastResponse.model_used}</span>
+              {/if}
+              {#if lastResponse.message_length}
+                <span class="tag is-warning">Length: {lastResponse.message_length} chars</span>
+              {/if}
+            </div>
+            <p class="has-text-weight-semibold mt-4">Full Response JSON:</p>
+            <pre class="debug-json"><code>{JSON.stringify(lastResponse, null, 2)}</code></pre>
+          </div>
+        {:else}
+          <p class="has-text-grey">No response data available</p>
+        {/if}
+      </section>
+      <footer class="modal-card-foot">
+        <button class="button" on:click={() => showDebugResponse = false}>Close</button>
+        {#if lastResponse}
+          <button class="button is-primary" on:click={() => copyAsMarkdown(JSON.stringify(lastResponse, null, 2))}>
+            <span class="icon"><i class="fas fa-copy"></i></span>
+            <span>Copy JSON</span>
+          </button>
+        {/if}
+      </footer>
+    </div>
+  </div>
+{/if}
+
 <!-- Context Edit Modal -->
 <ContextEditModal
   bind:active={showContextEditModal}
@@ -1093,7 +1245,8 @@
   }
   .chat-toolbar {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.5rem;
   }
   .markdown-body :global(pre), .markdown-body :global(code) {
@@ -1165,6 +1318,28 @@
   .context-divider {
     margin: 0.5rem 0;
     background-color: #e8e8e8;
+  }
+
+  /* Debug JSON Styling */
+  .debug-json {
+    background-color: #f5f5f5;
+    border: 1px solid #e8e8e8;
+    border-radius: 4px;
+    padding: 1rem;
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    max-height: 60vh;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .debug-json code {
+    background: none;
+    color: #333;
+    font-family: inherit;
+    font-size: inherit;
   }
 
   @media screen and (max-width: 768px) {
