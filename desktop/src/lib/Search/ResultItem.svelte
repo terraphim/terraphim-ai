@@ -46,7 +46,7 @@
   function generateMenuItems() {
     const items = [];
 
-    // Always show download to markdown
+    // Always show download to markdown - downloads file only
     items.push({
       id: 'download-markdown',
       label: 'Download to Markdown',
@@ -69,31 +69,19 @@
       });
     }
 
-    // Show external URL if available
+    // Show external URL if available - opens URL in new tab and article modal
     if (document.url) {
       items.push({
         id: 'external-url',
         label: 'Open URL',
         icon: 'fas fa-link',
-        action: () => window.open(document.url, '_blank'),
+        action: () => openUrlAndModal(),
         visible: true,
-        title: 'Open original URL in new tab',
-        isLink: true,
-        href: document.url
+        title: 'Open original URL in new tab'
       });
     }
 
-    // Show VSCode integration
-    items.push({
-      id: 'open-vscode',
-      label: 'Open in VSCode',
-      icon: 'fas fa-code',
-      action: () => openInVSCode(),
-      visible: true,
-      title: 'Open document in VSCode',
-      isLink: true,
-      href: `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`
-    });
+    // VSCode integration removed as requested
 
     // Add to context for LLM conversation
     items.push({
@@ -397,8 +385,10 @@
     }
   }
 
-  function downloadToMarkdown() {
+  async function downloadToMarkdown() {
     console.log('📥 Downloading document as markdown:', document.title);
+    console.log('📄 Document data:', { title: document.title, bodyLength: document.body?.length, tags: document.tags });
+    console.log('🖥️ Environment check - is_tauri:', $is_tauri);
 
     // Create markdown content
     let markdownContent = `# ${document.title}\n\n`;
@@ -425,18 +415,80 @@
     // Create filename
     const filename = `${document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.md`;
 
-    // Create and download file
-    const blob = new Blob([markdownContent], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    window.document.body.appendChild(a);
-    a.click();
-    window.document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Use the proven saveAsMarkdown implementation from Chat component
+    try {
+      if ($is_tauri) {
+        // Import Tauri APIs dynamically
+        const { save } = await import('@tauri-apps/api/dialog');
+        const { writeTextFile } = await import('@tauri-apps/api/fs');
 
-    console.log('✅ Markdown file downloaded:', filename);
+        console.log('💾 Using Tauri save dialog...');
+        const savePath = await save({
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+          defaultPath: filename
+        });
+
+        if (savePath) {
+          await writeTextFile(savePath as string, markdownContent);
+          console.log('✅ File saved via Tauri:', savePath);
+        } else {
+          console.log('❌ Save dialog cancelled');
+        }
+      } else {
+        // Browser fallback: trigger download
+        console.log('🌐 Using browser download fallback...');
+        const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log('✅ File downloaded via browser:', filename);
+      }
+    } catch (error) {
+      console.error('❌ Download failed:', error);
+
+      // Fallback to browser download even in Tauri if the above fails
+      console.log('🔄 Falling back to browser download...');
+      const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log('✅ Fallback download completed:', filename);
+    }
+  }
+
+  function downloadToMarkdownAndOpenModal() {
+    console.log('🔄 Starting download and modal process...');
+    // First download the markdown file
+    downloadToMarkdown();
+    // Add a small delay before opening modal to ensure download starts
+    setTimeout(() => {
+      console.log('📖 Opening article modal...');
+      onTitleClick();
+    }, 100);
+  }
+
+  function openUrlAndModal() {
+    console.log('🔄 Opening URL in new tab and article modal...');
+    // First open the URL in a new tab
+    if (document.url) {
+      console.log('🔗 Opening URL in new tab:', document.url);
+      window.open(document.url, '_blank');
+    }
+    // Add a small delay before opening modal
+    setTimeout(() => {
+      console.log('📖 Opening article modal...');
+      onTitleClick();
+    }, 100);
   }
 
   function openInVSCode() {
@@ -1210,6 +1262,20 @@
         text-decoration: underline;
       }
     }
+  }
+
+  /* Button spacing for result item menu */
+  .level.is-mobile .level-right {
+    gap: 0.5rem;
+  }
+
+  .level-item.button {
+    margin-left: 0.5rem;
+    margin-right: 0;
+  }
+
+  .level-item.button:first-child {
+    margin-left: 0;
   }
 
   .ai-summary-actions {
