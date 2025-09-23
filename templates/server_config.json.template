@@ -1,0 +1,46 @@
+{
+  "llm": {
+    "openrouter": {
+      "api_key": "op://Terraphim-Dev/OpenRouter/API_KEY",
+      "organization_id": "op://Terraphim-Dev/OpenRouter/ORGANIZATION_ID"
+    },
+    "anthropic": {
+      "api_key": "op://Terraphim-Dev/Anthropic/API_KEY",
+      "model": "op://Terraphim-Dev/Anthropic/MODEL_NAME"
+    },
+    "ollama": {
+      "base_url": "op://Terraphim-Dev/Ollama/BASE_URL",
+      "model": "op://Terraphim-Dev/Ollama/MODEL_NAME"
+    }
+  },
+  "search": {
+    "perplexity": {
+      "api_key": "op://Terraphim-Dev/Perplexity/API_KEY"
+    },
+    "atomic_server": {
+      "url": "op://Terraphim-Dev/AtomicServer/URL",
+      "secret": "op://Terraphim-Dev/AtomicServer/SECRET"
+    },
+    "clickup": {
+      "api_token": "op://Terraphim-Dev/ClickUp/API_TOKEN",
+      "team_id": "op://Terraphim-Dev/ClickUp/TEAM_ID",
+      "list_id": "op://Terraphim-Dev/ClickUp/LIST_ID"
+    }
+  },
+  "storage": {
+    "s3": {
+      "access_key_id": "op://Terraphim-Dev/AWS_S3/ACCESS_KEY_ID",
+      "secret_access_key": "op://Terraphim-Dev/AWS_S3/SECRET_ACCESS_KEY",
+      "bucket": "op://Terraphim-Dev/AWS_S3/BUCKET_NAME",
+      "region": "op://Terraphim-Dev/AWS_S3/REGION"
+    }
+  },
+  "database": {
+    "postgres": {
+      "connection_string": "op://Terraphim-Dev/PostgreSQL/CONNECTION_STRING"
+    },
+    "redis": {
+      "url": "op://Terraphim-Dev/Redis/URL"
+    }
+  }
+}
