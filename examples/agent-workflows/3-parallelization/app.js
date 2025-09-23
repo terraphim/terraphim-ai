@@ -365,12 +365,19 @@ class ParallelizationAnalysisDemo {
       });
 
       // Execute real parallelization workflow with enhanced agent configuration
-      const result = await this.apiClient.executeParallel(agentConfig, {
-        realTime: true,
-        onProgress: (progress) => {
-          // Progress updates handled by interval above
-        }
+      // FORCE HTTP ONLY - bypass any WebSocket caching issues
+      const result = await this.apiClient.request('/workflows/parallel', {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: topic,
+          role: agentConfig.role || agentConfig.input?.role,
+          overall_role: agentConfig.overall_role || agentConfig.input?.overall_role || 'engineering_agent',
+          ...(agentConfig.config && { config: agentConfig.config }),
+          ...(agentConfig.llm_config && { llm_config: agentConfig.llm_config })
+        })
       });
+      
+      console.log('Parallel HTTP result:', result);
       
       clearInterval(progressInterval);
       this.visualizer.updateParallelTask(perspectiveId, 100);

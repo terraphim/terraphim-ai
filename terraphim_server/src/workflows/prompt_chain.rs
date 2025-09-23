@@ -25,10 +25,10 @@ pub async fn execute_prompt_chain(
     let workflow_id = generate_workflow_id();
     let role = request
         .role
-        .unwrap_or_else(|| "content_creator".to_string());
+        .unwrap_or_else(|| "DevelopmentAgent".to_string());
     let overall_role = request
         .overall_role
-        .unwrap_or_else(|| "content_creator".to_string());
+        .unwrap_or_else(|| "DevelopmentAgent".to_string());
 
     // Create workflow session
     create_workflow_session(
@@ -50,6 +50,7 @@ pub async fn execute_prompt_chain(
                 &state.workflow_sessions,
                 &state.websocket_broadcaster,
                 request.llm_config.as_ref(),
+                request.steps.as_ref(),
             )
             .await
             .map_err(|e| e.to_string()),

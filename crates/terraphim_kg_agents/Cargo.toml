@@ -18,7 +18,6 @@ uuid = { version = "1.0", features = ["v4"] }
 terraphim_agent_registry = { path = "../terraphim_agent_registry" }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor" }
 terraphim_automata = { path = "../terraphim_automata" }
-terraphim_gen_agent = { path = "../terraphim_gen_agent" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_task_decomposition = { path = "../terraphim_task_decomposition" }
 terraphim_types = { path = "../terraphim_types" }
