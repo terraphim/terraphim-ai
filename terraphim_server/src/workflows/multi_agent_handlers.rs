@@ -16,11 +16,10 @@ use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
 
 use super::{
-    update_workflow_status, ExecutionStatus, LlmConfig, WebSocketBroadcaster, WorkflowMetadata,
+    update_workflow_status, ExecutionStatus, LlmConfig, StepConfig, WebSocketBroadcaster,
     WorkflowSessions,
 };
-use crate::AppState;
-use terraphim_config::{Config, ConfigState};
+use terraphim_config::ConfigState;
 
 /// Multi-agent workflow executor
 pub struct MultiAgentWorkflowExecutor {
@@ -157,39 +156,55 @@ impl MultiAgentWorkflowExecutor {
         sessions: &WorkflowSessions,
         broadcaster: &WebSocketBroadcaster,
         llm_config: Option<&LlmConfig>,
+        step_configs: Option<&Vec<StepConfig>>,
     ) -> MultiAgentResult<Value> {
-        log::info!("Executing prompt chain workflow with TerraphimAgent");
+        log::info!("Executing prompt chain workflow with per-step specialized agents");
 
-        // Resolve LLM configuration
-        let resolved_config = self.resolve_llm_config(llm_config, role);
-
-        // Create agent for prompt chaining using the specified role
-        log::debug!("🔧 Creating agent using configured role: {}", role);
-        let dev_role = self.get_configured_role(role).await?;
-        let mut dev_agent = TerraphimAgent::new(dev_role, self.persistence.clone(), None).await?;
-        dev_agent.initialize().await?;
-
-        // Define prompt chaining steps
-        let steps = vec![
-            ("requirements", "Create detailed technical specification"),
-            ("architecture", "Design system architecture and components"),
-            (
-                "planning",
-                "Create development plan with tasks and timelines",
-            ),
-            ("implementation", "Generate core implementation code"),
-            ("testing", "Create comprehensive test suite"),
-            (
-                "deployment",
-                "Provide deployment instructions and documentation",
-            ),
-        ];
+        // Use step configurations if provided, otherwise use default steps
+        let steps: Vec<(String, String, String, Option<String>)> = if let Some(configs) =
+            step_configs
+        {
+            log::info!("Using custom step configurations: {} steps", configs.len());
+            configs
+                .iter()
+                .map(|config| {
+                    (
+                        config.id.clone(),
+                        config.name.clone(),
+                        config.prompt.clone(),
+                        config.role.clone(),
+                    )
+                })
+                .collect()
+        } else {
+            log::info!("Using default step configurations");
+            vec![
+                ("requirements".to_string(), "Create detailed technical specification".to_string(), 
+                 "Create detailed technical specification including user stories, API endpoints, data models, and acceptance criteria.".to_string(), 
+                 Some("SystemAnalyst".to_string())),
+                ("architecture".to_string(), "Design system architecture and components".to_string(),
+                 "Design the system architecture, component structure, database schema, and technology integration.".to_string(),
+                 Some("SystemArchitect".to_string())),
+                ("planning".to_string(), "Create development plan with tasks and timelines".to_string(),
+                 "Create a detailed development plan with tasks, priorities, estimated timelines, and milestones.".to_string(),
+                 Some("ProjectManager".to_string())),
+                ("implementation".to_string(), "Generate core implementation code".to_string(),
+                 "Generate the core application code, including backend API, frontend components, and database setup.".to_string(),
+                 Some("SoftwareDeveloper".to_string())),
+                ("testing".to_string(), "Create comprehensive test suite".to_string(),
+                 "Create comprehensive tests including unit tests, integration tests, and quality assurance checklist.".to_string(),
+                 Some("QAEngineer".to_string())),
+                ("deployment".to_string(), "Provide deployment instructions and documentation".to_string(),
+                 "Provide deployment instructions, environment setup, and comprehensive documentation.".to_string(),
+                 Some("DevOpsEngineer".to_string())),
+            ]
+        };
 
         let mut results = Vec::new();
         let mut context = prompt.to_string();
         let total_steps = steps.len();
 
-        for (index, (step_id, step_description)) in steps.iter().enumerate() {
+        for (index, (step_id, step_name, step_description, step_role)) in steps.iter().enumerate() {
             let progress = (index as f64 / total_steps as f64) * 100.0;
 
             update_workflow_status(
@@ -198,19 +213,39 @@ impl MultiAgentWorkflowExecutor {
                 workflow_id,
                 ExecutionStatus::Running,
                 progress,
-                Some(format!("Executing: {}", step_description)),
+                Some(format!("Executing: {}", step_name)),
             )
             .await;
 
-            // Create step prompt with accumulated context
-            let step_prompt = format!(
-                "{}\n\nContext:\n{}\n\nPlease provide detailed output for this step.",
-                step_description, context
+            // Use step-specific role or fallback to main role
+            let agent_role = step_role.as_ref().map(|s| s.as_str()).unwrap_or(role);
+            log::debug!(
+                "🔧 Creating specialized agent for step '{}' using role: {}",
+                step_id,
+                agent_role
             );
+
+            // Create specialized agent for this step
+            let step_role_config = self.get_configured_role(agent_role).await?;
+            let step_agent =
+                TerraphimAgent::new(step_role_config, self.persistence.clone(), None).await?;
+            step_agent.initialize().await?;
+
+            // Create step prompt with accumulated context and step-specific instructions
+            let step_prompt = format!(
+                "Task: {}\n\nProject Context:\n{}\n\nInstructions:\n\
+                - Provide detailed, actionable output for this specific task\n\
+                - Build upon the previous steps' outputs in the context\n\
+                - Be specific and technical in your response as a {}\n\
+                - Focus on practical implementation rather than generic statements\n\n\
+                Please complete the above task with detailed output:",
+                step_description, context, agent_role
+            );
+
             let input = CommandInput::new(step_prompt, CommandType::Generate);
 
-            // Execute with TerraphimAgent
-            let output = dev_agent.process_command(input).await?;
+            // Execute with specialized agent
+            let output = step_agent.process_command(input).await?;
 
             // Update context for next step (prompt chaining)
             context = format!(
@@ -223,16 +258,17 @@ impl MultiAgentWorkflowExecutor {
 
             let step_result = json!({
                 "step_id": step_id,
-                "step_name": step_description,
+                "step_name": step_name,
+                "step_role": agent_role,
                 "role": role,
                 "overall_role": overall_role,
                 "output": output.text,
                 "duration_ms": 2000, // Real execution time would be tracked
                 "success": true,
-                "agent_id": dev_agent.agent_id.to_string(),
+                "agent_id": step_agent.agent_id.to_string(),
                 "tokens_used": {
-                    "input": dev_agent.token_tracker.read().await.total_input_tokens,
-                    "output": dev_agent.token_tracker.read().await.total_output_tokens
+                    "input": step_agent.token_tracker.read().await.total_input_tokens,
+                    "output": step_agent.token_tracker.read().await.total_output_tokens
                 }
             });
 
@@ -242,9 +278,15 @@ impl MultiAgentWorkflowExecutor {
             sleep(Duration::from_millis(500)).await;
         }
 
-        // Get final metrics
-        let token_tracker = dev_agent.token_tracker.read().await;
-        let cost_tracker = dev_agent.cost_tracker.read().await;
+        // Calculate aggregate metrics
+        let total_input_tokens: u64 = results
+            .iter()
+            .filter_map(|r| r["tokens_used"]["input"].as_u64())
+            .sum();
+        let total_output_tokens: u64 = results
+            .iter()
+            .filter_map(|r| r["tokens_used"]["output"].as_u64())
+            .sum();
 
         Ok(json!({
             "pattern": "prompt_chaining",
@@ -255,9 +297,8 @@ impl MultiAgentWorkflowExecutor {
                 "role": role,
                 "overall_role": overall_role,
                 "input_prompt": prompt,
-                "agent_id": dev_agent.agent_id.to_string(),
-                "total_tokens": token_tracker.total_input_tokens + token_tracker.total_output_tokens,
-                "total_cost": cost_tracker.current_month_spending,
+                "specialized_agents": true,
+                "total_tokens": total_input_tokens + total_output_tokens,
                 "multi_agent": true
             }
         }))
@@ -312,13 +353,18 @@ impl MultiAgentWorkflowExecutor {
         } else {
             None // Use role defaults for simple tasks
         };
-        
+
         log::debug!("🔧 Creating routing agent using configured role: {}", role);
         let agent_role = self.get_configured_role(role).await?;
-        let mut selected_agent = TerraphimAgent::new(agent_role, self.persistence.clone(), None).await?;
+        let selected_agent =
+            TerraphimAgent::new(agent_role, self.persistence.clone(), None).await?;
         selected_agent.initialize().await?;
-        
-        let route_id = if complexity > 0.7 { "complex_route" } else { "simple_route" };
+
+        let route_id = if complexity > 0.7 {
+            "complex_route"
+        } else {
+            "simple_route"
+        };
 
         // Execute with selected agent
         update_workflow_status(
@@ -400,18 +446,32 @@ impl MultiAgentWorkflowExecutor {
             .await;
 
             // Get the base role and modify it for the perspective
-            log::debug!("🔧 Creating {} perspective agent using base role: {}", perspective_name, role);
+            log::debug!(
+                "🔧 Creating {} perspective agent using base role: {}",
+                perspective_name,
+                role
+            );
             let mut base_role = self.get_configured_role(role).await?;
-            
+
             // Add perspective information to the role's extra data
-            base_role.extra.insert("perspective".to_string(), serde_json::json!(perspective_name));
-            base_role.extra.insert("perspective_description".to_string(), serde_json::json!(perspective_description));
-            
+            base_role.extra.insert(
+                "perspective".to_string(),
+                serde_json::json!(perspective_name),
+            );
+            base_role.extra.insert(
+                "perspective_description".to_string(),
+                serde_json::json!(perspective_description),
+            );
+
             // Update the role name to reflect the perspective
             base_role.name = format!("{}_{}", role, perspective_name).into();
-            base_role.shortname = Some(format!("{}_{}", base_role.shortname.unwrap_or_default(), perspective_name));
-            
-            let mut agent = TerraphimAgent::new(base_role, self.persistence.clone(), None).await?;
+            base_role.shortname = Some(format!(
+                "{}_{}",
+                base_role.shortname.unwrap_or_default(),
+                perspective_name
+            ));
+
+            let agent = TerraphimAgent::new(base_role, self.persistence.clone(), None).await?;
             agent.initialize().await?;
             agents.push(agent);
         }
@@ -528,7 +588,7 @@ impl MultiAgentWorkflowExecutor {
 
         log::debug!("🔧 Creating orchestrator using configured role: {}", role);
         let orchestrator_role = self.get_configured_role(role).await?;
-        let mut orchestrator =
+        let orchestrator =
             TerraphimAgent::new(orchestrator_role, self.persistence.clone(), None).await?;
         orchestrator.initialize().await?;
 
@@ -554,9 +614,9 @@ impl MultiAgentWorkflowExecutor {
             )
             .await;
 
-            let worker_role = self.create_worker_role(worker_name, worker_description, &resolved_config);
-            let mut worker =
-                TerraphimAgent::new(worker_role, self.persistence.clone(), None).await?;
+            let worker_role =
+                self.create_worker_role(worker_name, worker_description, &resolved_config);
+            let worker = TerraphimAgent::new(worker_role, self.persistence.clone(), None).await?;
             worker.initialize().await?;
             workers.push((worker_name.to_string(), worker));
         }
@@ -697,16 +757,21 @@ impl MultiAgentWorkflowExecutor {
         // Create generator agent using the specified role but with generation focus
         log::debug!("🔧 Creating generator agent based on role: {}", role);
         let mut generator_role = self.get_configured_role(role).await?;
-        generator_role.extra.insert("specialization".to_string(), serde_json::json!("content_generation"));
-        generator_role.extra.insert("focus".to_string(), serde_json::json!("creative_output"));
+        generator_role.extra.insert(
+            "specialization".to_string(),
+            serde_json::json!("content_generation"),
+        );
+        generator_role
+            .extra
+            .insert("focus".to_string(), serde_json::json!("creative_output"));
         generator_role.name = format!("{}_Generator", role).into();
-        let mut generator = TerraphimAgent::new(generator_role, self.persistence.clone(), None).await?;
+        let generator = TerraphimAgent::new(generator_role, self.persistence.clone(), None).await?;
         generator.initialize().await?;
 
         // Create evaluator agent using QAEngineer for evaluation capabilities
         log::debug!("🔧 Creating evaluator using QAEngineer role for evaluation expertise");
         let evaluator_role = self.get_configured_role("QAEngineer").await?;
-        let mut evaluator = TerraphimAgent::new(evaluator_role, self.persistence.clone(), None).await?;
+        let evaluator = TerraphimAgent::new(evaluator_role, self.persistence.clone(), None).await?;
         evaluator.initialize().await?;
 
         let max_iterations = 3;
@@ -811,7 +876,11 @@ impl MultiAgentWorkflowExecutor {
     // Helper methods for creating specialized agent roles
 
     /// Apply LLM configuration to a role's extra fields
-    fn apply_llm_config_to_extra(&self, extra: &mut AHashMap<String, serde_json::Value>, llm_config: &LlmConfig) {
+    fn apply_llm_config_to_extra(
+        &self,
+        extra: &mut AHashMap<String, serde_json::Value>,
+        llm_config: &LlmConfig,
+    ) {
         if let Some(provider) = &llm_config.llm_provider {
             extra.insert("llm_provider".to_string(), serde_json::json!(provider));
         }
@@ -822,7 +891,10 @@ impl MultiAgentWorkflowExecutor {
             extra.insert("llm_base_url".to_string(), serde_json::json!(base_url));
         }
         if let Some(temperature) = llm_config.llm_temperature {
-            extra.insert("llm_temperature".to_string(), serde_json::json!(temperature));
+            extra.insert(
+                "llm_temperature".to_string(),
+                serde_json::json!(temperature),
+            );
         }
     }
 
@@ -844,7 +916,7 @@ impl MultiAgentWorkflowExecutor {
                 "Generate comprehensive documentation"
             ]),
         );
-        
+
         // Apply LLM configuration
         self.apply_llm_config_to_extra(&mut extra, llm_config);
         extra.insert("base_role".to_string(), serde_json::json!(base_role));
@@ -871,34 +943,39 @@ impl MultiAgentWorkflowExecutor {
 
     async fn create_simple_agent(&self) -> MultiAgentResult<TerraphimAgent> {
         log::debug!("🔧 Creating simple agent using configured role: SimpleTaskAgent");
-        
+
         // Use configured role instead of creating ad-hoc role
         let role = self.get_configured_role("SimpleTaskAgent").await?;
-        
-        let mut agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
+
+        let agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
         agent.initialize().await?;
         Ok(agent)
     }
 
     async fn create_complex_agent(&self) -> MultiAgentResult<TerraphimAgent> {
         log::debug!("🔧 Creating complex agent using configured role: ComplexTaskAgent");
-        
+
         // Use configured role instead of creating ad-hoc role
         let role = self.get_configured_role("ComplexTaskAgent").await?;
-        
-        let mut agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
+
+        let agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
         agent.initialize().await?;
         Ok(agent)
     }
 
-    fn create_perspective_role(&self, perspective: &str, description: &str, llm_config: &LlmConfig) -> Role {
+    fn create_perspective_role(
+        &self,
+        perspective: &str,
+        description: &str,
+        llm_config: &LlmConfig,
+    ) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("perspective".to_string(), serde_json::json!(perspective));
         extra.insert("description".to_string(), serde_json::json!(description));
-        
+
         // Apply dynamic LLM configuration
         self.apply_llm_config_to_extra(&mut extra, llm_config);
-        
+
         // Set default temperature if not configured
         if !extra.contains_key("llm_temperature") {
             extra.insert("llm_temperature".to_string(), serde_json::json!(0.5));
@@ -927,10 +1004,10 @@ impl MultiAgentWorkflowExecutor {
     fn create_orchestrator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("orchestrator"));
-        
+
         // Apply dynamic LLM configuration
         self.apply_llm_config_to_extra(&mut extra, llm_config);
-        
+
         // Set default temperature if not configured
         if !extra.contains_key("llm_temperature") {
             extra.insert("llm_temperature".to_string(), serde_json::json!(0.3));
@@ -956,14 +1033,19 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
-    fn create_worker_role(&self, worker_name: &str, description: &str, llm_config: &LlmConfig) -> Role {
+    fn create_worker_role(
+        &self,
+        worker_name: &str,
+        description: &str,
+        llm_config: &LlmConfig,
+    ) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("worker_type".to_string(), serde_json::json!(worker_name));
         extra.insert("description".to_string(), serde_json::json!(description));
-        
+
         // Apply dynamic LLM configuration
         self.apply_llm_config_to_extra(&mut extra, llm_config);
-        
+
         // Set default temperature if not configured
         if !extra.contains_key("llm_temperature") {
             extra.insert("llm_temperature".to_string(), serde_json::json!(0.4));
@@ -992,10 +1074,10 @@ impl MultiAgentWorkflowExecutor {
     fn create_generator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("generator"));
-        
+
         // Apply dynamic LLM configuration
         self.apply_llm_config_to_extra(&mut extra, llm_config);
-        
+
         // Set default temperature if not configured
         if !extra.contains_key("llm_temperature") {
             extra.insert("llm_temperature".to_string(), serde_json::json!(0.6));
@@ -1024,10 +1106,10 @@ impl MultiAgentWorkflowExecutor {
     fn create_evaluator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("evaluator"));
-        
+
         // Apply dynamic LLM configuration
         self.apply_llm_config_to_extra(&mut extra, llm_config);
-        
+
         // Set default temperature if not configured
         if !extra.contains_key("llm_temperature") {
             extra.insert("llm_temperature".to_string(), serde_json::json!(0.2));
@@ -1104,16 +1186,25 @@ impl MultiAgentWorkflowExecutor {
 
     /// Get configured role from config state
     async fn get_configured_role(&self, role_name: &str) -> MultiAgentResult<Role> {
-        let config_state = self.config_state.as_ref()
-            .ok_or_else(|| MultiAgentError::InvalidRoleConfig("No config state available".to_string()))?;
-        
+        let config_state = self.config_state.as_ref().ok_or_else(|| {
+            MultiAgentError::InvalidRoleConfig("No config state available".to_string())
+        })?;
+
         // Access roles from the actual Config, not from config_state.roles which contains RoleGraphSync
         let config = config_state.config.lock().await;
         let role_key = role_name.to_string().into(); // Convert to RoleName
-        let role = config.roles.get(&role_key)
-            .ok_or_else(|| MultiAgentError::InvalidRoleConfig(format!("Role '{}' not found in configuration", role_name)))?;
-        
-        log::debug!("🎯 Using configured role: {} with LLM config: {:?}", role_name, role.extra);
+        let role = config.roles.get(&role_key).ok_or_else(|| {
+            MultiAgentError::InvalidRoleConfig(format!(
+                "Role '{}' not found in configuration",
+                role_name
+            ))
+        })?;
+
+        log::debug!(
+            "🎯 Using configured role: {} with LLM config: {:?}",
+            role_name,
+            role.extra
+        );
         Ok(role.clone())
     }
 }

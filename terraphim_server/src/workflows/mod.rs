@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State, WebSocketUpgrade},
+    extract::{Path, State},
     http::StatusCode,
     response::Json,
     routing::{get, post},
@@ -40,6 +40,17 @@ impl Default for LlmConfig {
     }
 }
 
+// Step configuration for per-step customization
+#[derive(Debug, Deserialize, Clone)]
+pub struct StepConfig {
+    pub id: String,
+    pub name: String,
+    pub prompt: String,
+    pub role: Option<String>,
+    pub system_prompt: Option<String>,
+    pub llm_config: Option<LlmConfig>,
+}
+
 // Workflow execution request/response types
 #[derive(Debug, Deserialize)]
 pub struct WorkflowRequest {
@@ -48,6 +59,7 @@ pub struct WorkflowRequest {
     pub overall_role: Option<String>,
     pub config: Option<serde_json::Value>,
     pub llm_config: Option<LlmConfig>,
+    pub steps: Option<Vec<StepConfig>>, // Per-step configuration
 }
 
 #[derive(Debug, Serialize)]

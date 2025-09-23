@@ -196,6 +196,12 @@ class OrchestratorWorkersDemo {
   }
 
   setupEventListeners() {
+    // Initialize element references first
+    this.queryInput = document.getElementById('analysis-query');
+    this.startButton = document.getElementById('start-pipeline');
+    this.pauseButton = document.getElementById('pause-pipeline');
+    this.resetButton = document.getElementById('reset-pipeline');
+
     // Data source selection
     document.addEventListener('click', (e) => {
       if (e.target.closest('.source-card')) {
@@ -204,21 +210,21 @@ class OrchestratorWorkersDemo {
       }
     });
 
-    // Input elements
-    this.queryInput = document.getElementById('analysis-query');
+    // Control button event listeners
+    if (this.startButton) {
+      this.startButton.addEventListener('click', () => this.startOrchestration());
+    }
+    if (this.pauseButton) {
+      this.pauseButton.addEventListener('click', () => this.pauseOrchestration());
+    }
+    if (this.resetButton) {
+      this.resetButton.addEventListener('click', () => this.resetOrchestration());
+    }
 
-    // Agent config is managed by AgentConfigManager
-
-    // Control buttons
-    this.startButton = document.getElementById('start-pipeline');
-    this.pauseButton = document.getElementById('pause-pipeline');
-    this.resetButton = document.getElementById('reset-pipeline');
-
-    this.startButton.addEventListener('click', () => this.startOrchestration());
-    this.pauseButton.addEventListener('click', () => this.pauseOrchestration());
-    this.resetButton.addEventListener('click', () => this.resetOrchestration());
-
-    this.queryInput.addEventListener('input', () => this.analyzeQuery(this.queryInput.value));
+    // Query input event listener
+    if (this.queryInput) {
+      this.queryInput.addEventListener('input', () => this.analyzeQuery(this.queryInput.value));
+    }
   }
 
   initializeConnectionStatus() {
@@ -475,23 +481,22 @@ class OrchestratorWorkersDemo {
     
     // Execute real orchestration workflow with API client
     try {
-      const result = await this.apiClient.executeOrchestration({
-        prompt: `Execute ${stage.name} stage with workers: ${stage.workers.join(', ')}`,
-        role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'OrchestratorAgent',
-        overall_role: 'data_science_pipeline_coordinator',
-        config: {
-          stage: stage.id,
-          workers: stage.workers,
-          dataSources: Array.from(this.selectedSources)
-        }
-      }, {
-        realTime: true,
-        onProgress: (progress) => {
-          stage.workers.forEach(workerId => {
-            this.updateWorkerProgress(workerId, progress.percentage || 0);
-          });
-        }
+      // FORCE HTTP ONLY - bypass any WebSocket caching issues
+      const result = await this.apiClient.request('/workflows/orchestrate', {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: `Execute ${stage.name} stage with workers: ${stage.workers.join(', ')}`,
+          role: this.agentConfigManager ? this.agentConfigManager.getState().selectedRole : 'OrchestratorAgent',
+          overall_role: 'data_science_pipeline_coordinator',
+          config: {
+            stage: stage.id,
+            workers: stage.workers,
+            dataSources: Array.from(this.selectedSources)
+          }
+        })
       });
+      
+      console.log('Orchestration HTTP result:', result);
       
       // Store API result for later use
       this.stageResults.set(stage.id, result.result || result);

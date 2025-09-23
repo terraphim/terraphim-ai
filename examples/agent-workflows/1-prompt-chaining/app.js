@@ -323,10 +323,21 @@ class PromptChainingDemo {
   createStepEditors() {
     this.stepEditorsContainer.innerHTML = '';
     
+    // Define available roles for each step type
+    const availableRoles = [
+      'SystemAnalyst', 'SystemArchitect', 'ProjectManager', 'SoftwareDeveloper', 
+      'QAEngineer', 'DevOpsEngineer', 'TechnicalWriter', 'UXDesigner'
+    ];
+    
     this.steps.forEach((step, index) => {
       const stepEditor = document.createElement('div');
       stepEditor.className = 'step-editor';
       stepEditor.id = `step-editor-${step.id}`;
+      
+      // Initialize step role if not set
+      if (!step.role) {
+        step.role = this.getDefaultRoleForStep(step.id);
+      }
       
       stepEditor.innerHTML = `
         <div class="step-title">
@@ -334,15 +345,41 @@ class PromptChainingDemo {
             <span class="step-number">${index + 1}</span>
             ${step.name}
           </div>
-          <button class="btn" onclick="window.promptChainDemo.editStep('${step.id}')">Edit</button>
+          <button class="btn" onclick="window.promptChainDemo.editStep('${step.id}')">Save</button>
         </div>
-        <div class="step-description">
-          <textarea 
-            class="form-input" 
-            placeholder="Step prompt..."
-            rows="3"
-            id="prompt-${step.id}"
-          >${step.prompt}</textarea>
+        <div class="step-config">
+          <div class="config-row">
+            <label for="role-${step.id}">Agent Role:</label>
+            <select 
+              class="form-input" 
+              id="role-${step.id}"
+              onchange="window.promptChainDemo.updateStepRole('${step.id}', this.value)"
+            >
+              ${availableRoles.map(role => 
+                `<option value="${role}" ${step.role === role ? 'selected' : ''}>${role}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="config-row">
+            <label for="system-prompt-${step.id}">System Prompt (optional):</label>
+            <textarea 
+              class="form-input" 
+              placeholder="Custom system prompt for this step..."
+              rows="2"
+              id="system-prompt-${step.id}"
+              onchange="window.promptChainDemo.updateStepSystemPrompt('${step.id}', this.value)"
+            >${step.system_prompt || ''}</textarea>
+          </div>
+          <div class="config-row">
+            <label for="prompt-${step.id}">Step Instructions:</label>
+            <textarea 
+              class="form-input" 
+              placeholder="Step prompt..."
+              rows="3"
+              id="prompt-${step.id}"
+              onchange="window.promptChainDemo.updateStepPrompt('${step.id}', this.value)"
+            >${step.prompt}</textarea>
+          </div>
         </div>
       `;
       
@@ -350,12 +387,55 @@ class PromptChainingDemo {
     });
   }
 
-  editStep(stepId) {
+  getDefaultRoleForStep(stepId) {
+    const roleMap = {
+      'specification': 'SystemAnalyst',
+      'requirements': 'SystemAnalyst',
+      'architecture': 'SystemArchitect',
+      'planning': 'ProjectManager',
+      'implementation': 'SoftwareDeveloper',
+      'testing': 'QAEngineer',
+      'deployment': 'DevOpsEngineer'
+    };
+    return roleMap[stepId] || 'SoftwareDeveloper';
+  }
+
+  updateStepRole(stepId, role) {
     const step = this.steps.find(s => s.id === stepId);
-    const textarea = document.getElementById(`prompt-${stepId}`);
-    
-    if (step && textarea) {
-      step.prompt = textarea.value;
+    if (step) {
+      step.role = role;
+      this.saveState();
+    }
+  }
+
+  updateStepSystemPrompt(stepId, systemPrompt) {
+    const step = this.steps.find(s => s.id === stepId);
+    if (step) {
+      step.system_prompt = systemPrompt;
+      this.saveState();
+    }
+  }
+
+  updateStepPrompt(stepId, prompt) {
+    const step = this.steps.find(s => s.id === stepId);
+    if (step) {
+      step.prompt = prompt;
+      this.saveState();
+    }
+  }
+
+  editStep(stepId) {
+    // Save all current step values
+    const step = this.steps.find(s => s.id === stepId);
+    if (step) {
+      const promptTextarea = document.getElementById(`prompt-${stepId}`);
+      const roleSelect = document.getElementById(`role-${stepId}`);
+      const systemPromptTextarea = document.getElementById(`system-prompt-${stepId}`);
+      
+      if (promptTextarea) step.prompt = promptTextarea.value;
+      if (roleSelect) step.role = roleSelect.value;
+      if (systemPromptTextarea) step.system_prompt = systemPromptTextarea.value;
+      
       this.saveState();
     }
   }
@@ -416,58 +496,95 @@ class PromptChainingDemo {
   }
 
   async executePromptChain(input) {
-    const steps = this.steps;
     const startTime = Date.now();
     
-    for (let i = 0; i < steps.length; i++) {
-      if (this.isPaused) {
-        await this.waitForResume();
+    try {
+      // Prepare step configurations for backend
+      const stepConfigs = this.steps.map(step => ({
+        id: step.id,
+        name: step.name,
+        prompt: step.prompt,
+        role: step.role,
+        system_prompt: step.system_prompt
+      }));
+
+      const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
+      
+      // Execute the entire prompt chain workflow with step configurations
+      console.log('Executing prompt chain with step configs:', stepConfigs);
+      const result = await this.apiClient.executePromptChain({
+        prompt: input.prompt,
+        role: agentState.selectedRole || 'SoftwareDeveloper',
+        overall_role: 'engineering_agent',
+        steps: stepConfigs,  // Send step configurations
+        config: input.config,
+        llm_config: input.llm_config
+      });
+      
+      console.log('Prompt chain result:', result);
+      
+      // Process results and update UI step by step
+      if (result.result && result.result.steps) {
+        for (let i = 0; i < result.result.steps.length; i++) {
+          const stepResult = result.result.steps[i];
+          const step = this.steps[i];
+          
+          if (step) {
+            // Update visualization
+            this.visualizer.updateStepStatus(step.id, 'active');
+            this.visualizer.updateProgress(
+              ((i + 1) / this.steps.length) * 100,
+              `Completed: ${step.name}`
+            );
+            
+            // Highlight current step editor
+            this.highlightCurrentStep(step.id);
+            
+            // Add output to UI
+            this.addStepOutput(step, {
+              output: stepResult.output,
+              duration: stepResult.duration_ms || 2000,
+              metadata: stepResult
+            });
+            
+            // Mark as completed
+            this.visualizer.updateStepStatus(step.id, 'completed', {
+              duration: stepResult.duration_ms || 2000
+            });
+            
+            // Small delay for visual effect
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
       }
       
-      const step = steps[i];
-      this.currentStepIndex = i;
+      // Completion
+      this.updateStatus('success');
+      this.startButton.disabled = false;
+      this.pauseButton.disabled = true;
+      this.resetButton.disabled = false;
       
-      // Update visualization
-      this.visualizer.updateStepStatus(step.id, 'active');
-      this.visualizer.updateProgress(
-        ((i + 1) / steps.length) * 100,
-        `Executing: ${step.name}`
-      );
+      // Show metrics
+      const executionSummary = result.result?.execution_summary || {};
+      this.showMetrics({
+        totalTime: Date.now() - startTime,
+        stepsCompleted: executionSummary.total_steps || this.steps.length,
+        totalTokens: executionSummary.total_tokens || 0,
+        specializedAgents: executionSummary.specialized_agents || false,
+        linesOfCode: Math.floor(Math.random() * 500 + 200),
+        filesGenerated: this.steps.length + Math.floor(Math.random() * 5),
+      });
       
-      // Highlight current step editor
-      this.highlightCurrentStep(step.id);
+    } catch (error) {
+      console.error('Prompt chain execution failed:', error);
+      this.updateStatus('error');
+      this.showError(error.message);
       
-      try {
-        // Execute step (simulate with API client)
-        const stepResult = await this.executeStep(step, input, i);
-        
-        // Update visualization
-        this.visualizer.updateStepStatus(step.id, 'completed', {
-          duration: stepResult.duration
-        });
-        
-        // Add output
-        this.addStepOutput(step, stepResult);
-        
-      } catch (error) {
-        this.visualizer.updateStepStatus(step.id, 'error');
-        throw error;
-      }
+      this.startButton.disabled = false;
+      this.pauseButton.disabled = true;
+      this.resetButton.disabled = false;
+      throw error;
     }
-    
-    // Completion
-    this.updateStatus('success');
-    this.startButton.disabled = false;
-    this.pauseButton.disabled = true;
-    this.resetButton.disabled = false;
-    
-    // Show metrics
-    this.showMetrics({
-      totalTime: Date.now() - startTime,
-      stepsCompleted: steps.length,
-      linesOfCode: Math.floor(Math.random() * 500 + 200),
-      filesGenerated: steps.length + Math.floor(Math.random() * 5),
-    });
   }
 
   async executeStep(step, input, stepIndex) {
@@ -499,23 +616,56 @@ class PromptChainingDemo {
       }
     });
     
+    // Build the full prompt with context from previous steps
+    const fullPrompt = input.context ? `${input.context}\n\nCurrent Task: ${stepInput.prompt}` : stepInput.prompt;
+    
+    console.log(`Step ${stepIndex + 1} Debug Info:`);
+    console.log('- Step Prompt:', stepInput.prompt);
+    console.log('- Accumulated Context:', input.context || 'None');
+    console.log('- Full Prompt Being Sent:', fullPrompt);
+    console.log('- Agent Role:', agentConfig.role || agentConfig.input?.role);
+    
     // Execute real prompt chain workflow with enhanced agent configuration
-    const result = await this.apiClient.executePromptChain(agentConfig, {
-      realTime: true,
-      onProgress: (progress) => {
-        console.log(`Step ${stepIndex + 1} progress:`, progress);
-        // Update progress within step
-        const baseProgress = (stepIndex / this.steps.length) * 100;
-        const stepProgress = (progress.percentage / 100) * (100 / this.steps.length);
-        this.visualizer.updateProgress(baseProgress + stepProgress, progress.current);
-      },
-      onAgentUpdate: (agentData) => {
-        console.log(`Agent update for step ${stepIndex + 1}:`, agentData);
-      }
+    // Use WebSocket path for better timeout handling and real-time updates
+    const result = await this.apiClient.executePromptChain({
+      prompt: fullPrompt,
+      role: agentConfig.role || agentConfig.input?.role,
+      overall_role: agentConfig.overall_role || agentConfig.input?.overall_role || 'engineering_agent',
+      ...(agentConfig.config && { config: agentConfig.config }),
+      ...(agentConfig.llm_config && { llm_config: agentConfig.llm_config })
     });
     
+    console.log(`Step ${stepIndex + 1} HTTP result:`, result);
+    // Extract text content from response
+    let extractedOutput;
+    if (result.result) {
+      if (typeof result.result === 'string') {
+        extractedOutput = result.result;
+      } else if (result.result.content) {
+        extractedOutput = result.result.content;
+      } else if (result.result.text) {
+        extractedOutput = result.result.text;
+      } else {
+        extractedOutput = JSON.stringify(result.result);
+      }
+    } else if (result.output) {
+      if (typeof result.output === 'string') {
+        extractedOutput = result.output;
+      } else if (result.output.content) {
+        extractedOutput = result.output.content;
+      } else if (result.output.text) {
+        extractedOutput = result.output.text;
+      } else {
+        extractedOutput = JSON.stringify(result.output);
+      }
+    } else {
+      extractedOutput = this.generateStepOutput(step, input);
+    }
+    
+    console.log(`Step ${stepIndex + 1} Extracted Output:`, extractedOutput);
+    
     return {
-      output: (result.result.steps && result.result.steps[stepIndex] && result.result.steps[stepIndex].output) || this.generateStepOutput(step, input),
+      output: extractedOutput,
       duration: 2000 + Math.random() * 3000,
       metadata: result.metadata
     };

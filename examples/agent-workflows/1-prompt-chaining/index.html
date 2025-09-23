@@ -47,7 +47,7 @@
             color: var(--text);
             margin-bottom: 0.5rem;
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
         }
         
@@ -96,6 +96,41 @@
         .editable-step:hover {
             border-color: var(--primary);
             background: #f8faff;
+        }
+
+        .step-config {
+            margin-top: 1rem;
+        }
+
+        .config-row {
+            margin-bottom: 1rem;
+        }
+
+        .config-row label {
+            display: block;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+        }
+
+        .config-row select,
+        .config-row textarea {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-editor select {
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: white;
+            font-size: 0.875rem;
+        }
+
+        .step-editor textarea {
+            resize: vertical;
+            min-height: 3rem;
         }
         
         .chain-controls {
@@ -236,15 +271,15 @@
     </main>
 
     <!-- Scripts -->
-    <script src="../shared/websocket-client.js"></script>
-    <script src="../shared/api-client.js"></script>
-    <script src="../shared/server-discovery.js"></script>
-    <script src="../shared/settings-manager.js"></script>
-    <script src="../shared/settings-ui.js"></script>
-    <script src="../shared/settings-integration.js"></script>
-    <script src="../shared/workflow-visualizer.js"></script>
-    <script src="../shared/connection-status.js"></script>
-    <script src="../shared/agent-config-manager.js"></script>
-    <script src="app.js"></script>
+    <script src="../shared/websocket-client.js?v=2025092102"></script>
+    <script src="../shared/api-client.js?v=2025092102"></script>
+    <script src="../shared/server-discovery.js?v=2025092102"></script>
+    <script src="../shared/settings-manager.js?v=2025092102"></script>
+    <script src="../shared/settings-ui.js?v=2025092102"></script>
+    <script src="../shared/settings-integration.js?v=2025092102"></script>
+    <script src="../shared/workflow-visualizer.js?v=2025092102"></script>
+    <script src="../shared/connection-status.js?v=2025092102"></script>
+    <script src="../shared/agent-config-manager.js?v=2025092102"></script>
+    <script src="app.js?v=2025092102"></script>
 </body>
 </html>
