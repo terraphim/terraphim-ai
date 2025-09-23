@@ -54,6 +54,8 @@
 
 [v2.0.1] Premium Setup: Created private local repos for jmap and atlassian haystacks with dependencies on public haystack_core
 
+[v2.0.2] 1Password Integration Architecture: Comprehensive proposal for enterprise-grade secret management across all Terraphim AI components. Three-vault strategy (Dev/Prod/Shared) with template-based secret injection using `op://` references. Dual integration methods: Method 1 (process memory via `op run`) for maximum security, Method 2 (secure file injection via `op inject`) for developer convenience. Backend integration through enhanced `terraphim_settings` and centralized `SecretLoader` trait. Frontend support via Tauri desktop integration and secure web proxy patterns. CI/CD integration using 1Password service accounts with GitHub Actions. Security features include environment isolation, automatic secret rotation support, comprehensive audit trails, and principle of least privilege access control. Implementation targets developer productivity improvement, zero hardcoded secrets, and enterprise compliance requirements.
+
 ## Current Project Status (2025-01-31)
 
 ### MCP Server Implementation Status

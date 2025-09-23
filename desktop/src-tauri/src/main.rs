@@ -391,7 +391,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // KG search commands
             cmd::search_kg_terms,
             cmd::add_kg_term_context,
-            cmd::add_kg_index_context
+            cmd::add_kg_index_context,
+            // 1Password integration commands
+            cmd::onepassword_status,
+            cmd::onepassword_resolve_secret,
+            cmd::onepassword_process_config,
+            cmd::onepassword_load_settings
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();
