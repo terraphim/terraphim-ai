@@ -27,10 +27,10 @@ TESTS_TOTAL=0
 run_test() {
     local test_name="$1"
     local test_command="$2"
-    
+
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
     echo -n "Testing $test_name... "
-    
+
     if eval "$test_command" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ PASS${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -43,10 +43,10 @@ run_test() {
 run_test_verbose() {
     local test_name="$1"
     local test_command="$2"
-    
+
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
     echo "Testing $test_name..."
-    
+
     if eval "$test_command"; then
         echo -e "${GREEN}✅ PASS: $test_name${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
