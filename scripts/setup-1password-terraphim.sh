@@ -91,22 +91,22 @@ log_header() {
 # Check if 1Password CLI is installed and authenticated
 check_prerequisites() {
     log_header "Checking Prerequisites"
-    
+
     if ! command -v op &> /dev/null; then
         log_error "1Password CLI (op) is not installed"
         log_info "Please install it from: https://developer.1password.com/docs/cli/get-started/"
         exit 1
     fi
-    
+
     # Check if authenticated
     if ! op account list &> /dev/null; then
         log_error "Not authenticated with 1Password CLI"
         log_info "Please run: op signin"
         exit 1
     fi
-    
+
     log_success "1Password CLI is installed and authenticated"
-    
+
     # Show current account
     local account=$(op account list --format=json | jq -r '.[0].user_name' 2>/dev/null || echo "Unknown")
     log_info "Current account: $account"
@@ -116,14 +116,14 @@ check_prerequisites() {
 create_vault() {
     local vault_name="$1"
     local description="$2"
-    
+
     log_info "Checking vault: $vault_name"
-    
+
     if op vault list --format=json | jq -e --arg name "$vault_name" '.[] | select(.name == $name)' > /dev/null; then
         log_warning "Vault '$vault_name' already exists"
         return 0
     fi
-    
+
     log_info "Creating vault: $vault_name"
     if op vault create "$vault_name" --description "$description"; then
         log_success "Created vault: $vault_name"
@@ -138,18 +138,18 @@ create_secret_item() {
     local vault="$1"
     local item_name="$2"
     local fields="$3"
-    
+
     log_info "Creating secret item: $item_name in $vault"
-    
+
     # Check if item already exists
     if op item get "$item_name" --vault="$vault" &> /dev/null; then
         log_warning "Item '$item_name' already exists in vault '$vault'"
         return 0
     fi
-    
+
     # Build the op item create command
     local cmd="op item create --vault='$vault' --category='API Credential' --title='$item_name'"
-    
+
     # Add fields
     IFS=' ' read -ra FIELD_ARRAY <<< "$fields"
     for field in "${FIELD_ARRAY[@]}"; do
@@ -164,10 +164,10 @@ create_secret_item() {
                 ;;
         esac
     done
-    
+
     # Add notes
     cmd="$cmd --notes='Created by Terraphim 1Password setup script. Please update placeholder values with actual credentials.'"
-    
+
     if eval "$cmd" > /dev/null; then
         log_success "Created item: $item_name"
     else
@@ -180,9 +180,9 @@ create_secret_item() {
 setup_environment_secrets() {
     local env="$1"
     local vault_name="$(get_vault_name "$env")"
-    
+
     log_header "Setting up $env environment secrets in vault: $vault_name"
-    
+
     # Create vault
     case "$env" in
         "dev")
@@ -195,7 +195,7 @@ setup_environment_secrets() {
             create_vault "$vault_name" "Terraphim AI Shared Environment Secrets"
             ;;
     esac
-    
+
     # Get secrets for this environment and create them
     local secrets_func="get_${env}_secrets"
     if command -v "$secrets_func" >/dev/null 2>&1; then
@@ -206,17 +206,17 @@ setup_environment_secrets() {
         log_error "Unknown environment: $env"
         return 1
     fi
-    
+
     log_success "Completed setup for $env environment"
 }
 
 # Generate configuration templates
 generate_templates() {
     log_header "Generating Configuration Templates"
-    
+
     local templates_dir="$PROJECT_ROOT/templates"
     mkdir -p "$templates_dir"
-    
+
     # Environment template
     cat > "$templates_dir/.env.terraphim.template" << 'EOF'
 # Terraphim AI Environment Configuration Template
@@ -361,38 +361,38 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Install 1Password CLI
       uses: 1password/install-cli-action@v1
-    
+
     - name: Load secrets from 1Password
       run: |
         # Inject secrets into environment file
         op inject -i templates/.env.terraphim.template -o .env.terraphim
-        
+
         # Inject secrets into configuration
         op inject -i templates/server_config.json.template -o server_config.json
-        
+
         # Set permissions
         chmod 600 .env.terraphim server_config.json
-    
+
     - name: Setup Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
-    
+
     - name: Build with secrets
       run: |
         # Source environment variables
         set -a && source .env.terraphim && set +a
-        
+
         # Build project
         cargo build --release
-    
+
     - name: Cleanup secrets
       if: always()
       run: |
@@ -405,10 +405,10 @@ EOF
 # Generate usage documentation
 generate_documentation() {
     log_header "Generating Documentation"
-    
+
     local docs_dir="$PROJECT_ROOT/docs"
     mkdir -p "$docs_dir"
-    
+
     cat > "$docs_dir/1PASSWORD_INTEGRATION.md" << 'EOF'
 # Terraphim AI 1Password Integration
 
@@ -419,7 +419,7 @@ This document describes how to use 1Password for secure secret management in Ter
 Terraphim AI uses 1Password for enterprise-grade secret management with three vaults:
 
 - **Terraphim-Dev**: Development environment secrets
-- **Terraphim-Prod**: Production environment secrets  
+- **Terraphim-Prod**: Production environment secrets
 - **Terraphim-Shared**: Cross-environment shared secrets
 
 ## Setup
@@ -430,7 +430,7 @@ Terraphim AI uses 1Password for enterprise-grade secret management with three va
    ```bash
    # macOS
    brew install --cask 1password-cli
-   
+
    # Linux
    curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | tee /etc/apt/sources.list.d/1password.list
@@ -450,7 +450,7 @@ Run the setup script to create vaults and initial secret structure:
 # Setup development environment
 ./scripts/setup-1password-terraphim.sh dev
 
-# Setup production environment  
+# Setup production environment
 ./scripts/setup-1password-terraphim.sh prod
 
 # Setup all environments
@@ -535,7 +535,7 @@ Use different vault references for different environments:
 # Development
 OPENROUTER_API_KEY="op://Terraphim-Dev/OpenRouter/API_KEY"
 
-# Production  
+# Production
 OPENROUTER_API_KEY="op://Terraphim-Prod/OpenRouter/API_KEY"
 ```
 
@@ -596,7 +596,7 @@ USAGE:
 
 ENVIRONMENTS:
     dev         Setup development environment only (default)
-    prod        Setup production environment only  
+    prod        Setup production environment only
     shared      Setup shared environment only
     all         Setup all environments
 
@@ -657,10 +657,10 @@ parse_args() {
 main() {
     log_header "Terraphim AI 1Password Integration Setup"
     log_info "Environment: $ENVIRONMENT"
-    
+
     # Check prerequisites
     check_prerequisites
-    
+
     # Setup based on environment choice
     case "$ENVIRONMENT" in
         "dev")
@@ -683,11 +683,11 @@ main() {
             exit 1
             ;;
     esac
-    
+
     # Generate templates and documentation
     generate_templates
     generate_documentation
-    
+
     log_header "Setup Complete!"
     log_success "1Password vaults and secrets have been created"
     log_info "Next steps:"
@@ -695,7 +695,7 @@ main() {
     echo "  2. Review generated templates in ./templates/"
     echo "  3. Read documentation in ./docs/1PASSWORD_INTEGRATION.md"
     echo "  4. Test integration with: op inject -i templates/.env.terraphim.template"
-    
+
     log_warning "Remember to update placeholder values with real secrets!"
 }
 
