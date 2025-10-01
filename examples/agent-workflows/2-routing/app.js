@@ -98,6 +98,7 @@ class RoutingPrototypingDemo {
     this.generateButton = document.getElementById('generate-btn');
     this.analyzeButton = document.getElementById('analyze-btn');
     this.refineButton = document.getElementById('refine-btn');
+    this.outputFrame = document.getElementById('output-frame');
     
     // Initialize settings system first
     await this.initializeSettings();
@@ -148,20 +149,55 @@ class RoutingPrototypingDemo {
     }
   }
 
+  // Helper methods to manage both button sets
+  setGenerateButtonState(disabled) {
+    if (this.generateButton) {
+      this.generateButton.disabled = disabled;
+    }
+    const sidebarGenerateBtn = document.getElementById('sidebar-generate-btn');
+    if (sidebarGenerateBtn) {
+      sidebarGenerateBtn.disabled = disabled;
+    }
+  }
+
+  setRefineButtonState(disabled) {
+    if (this.refineButton) {
+      this.refineButton.disabled = disabled;
+    }
+    const sidebarRefineBtn = document.getElementById('sidebar-refine-btn');
+    if (sidebarRefineBtn) {
+      sidebarRefineBtn.disabled = disabled;
+    }
+  }
+
   setupEventListeners() {
-    // Analyze Task button event listener
+    // Main canvas button event listeners
     if (this.analyzeButton) {
       this.analyzeButton.addEventListener('click', () => this.analyzeTask());
     }
     
-    // Generate Prototype button event listener  
     if (this.generateButton) {
       this.generateButton.addEventListener('click', () => this.generatePrototype());
     }
     
-    // Refine button event listener
     if (this.refineButton) {
       this.refineButton.addEventListener('click', () => this.refinePrototype());
+    }
+    
+    // Sidebar button event listeners (duplicates)
+    const sidebarAnalyzeBtn = document.getElementById('sidebar-analyze-btn');
+    if (sidebarAnalyzeBtn) {
+      sidebarAnalyzeBtn.addEventListener('click', () => this.analyzeTask());
+    }
+    
+    const sidebarGenerateBtn = document.getElementById('sidebar-generate-btn');
+    if (sidebarGenerateBtn) {
+      sidebarGenerateBtn.addEventListener('click', () => this.generatePrototype());
+    }
+    
+    const sidebarRefineBtn = document.getElementById('sidebar-refine-btn');
+    if (sidebarRefineBtn) {
+      sidebarRefineBtn.addEventListener('click', () => this.refinePrototype());
     }
     
     // Template selection event listeners
@@ -190,6 +226,28 @@ class RoutingPrototypingDemo {
 
   getModels() {
     return [
+      {
+        id: 'ollama_gemma3_270m',
+        name: 'Gemma3 270M (Local)',
+        speed: 'Very Fast',
+        capability: 'Basic',
+        cost: 0.0,
+        costLabel: 'Free (Local)',
+        maxComplexity: 0.3,
+        description: 'Ultra-fast local model for simple tasks',
+        color: '#16a34a'
+      },
+      {
+        id: 'ollama_llama32_3b',
+        name: 'Llama3.2 3B (Local)',
+        speed: 'Fast',
+        capability: 'Balanced',
+        cost: 0.0,
+        costLabel: 'Free (Local)',
+        maxComplexity: 0.7,
+        description: 'Balanced local model for moderate complexity tasks',
+        color: '#059669'
+      },
       {
         id: 'openai_gpt35',
         name: 'GPT-3.5 Turbo',
@@ -282,7 +340,7 @@ class RoutingPrototypingDemo {
   }
 
   selectDefaultModel() {
-    this.selectModel('openai_gpt35');
+    this.selectModel('ollama_gemma3_270m');
   }
 
   analyzeComplexityRealTime(prompt) {
@@ -387,10 +445,10 @@ class RoutingPrototypingDemo {
   }
 
   async analyzeTask() {
-    this.generateButton.disabled = true;
+    this.setGenerateButtonState(true);
 
     const pipeline = this.createWorkflowPipeline();
-    pipeline.updateStepStatus('task-analysis', 'active');
+    pipeline.updateStepStatus('analyze', 'active');
     
     // Simulate analysis delay
     await this.delay(500);
@@ -404,21 +462,21 @@ class RoutingPrototypingDemo {
     const recommendedModel = this.recommendModel(complexity);
     this.selectModel(recommendedModel.id);
 
-    pipeline.updateStepStatus('task-analysis', 'completed');
-    pipeline.updateStepStatus('routing', 'active');
+    pipeline.updateStepStatus('analyze', 'completed');
+    pipeline.updateStepStatus('route', 'active');
     
     // Simulate routing delay
     await this.delay(300);
 
     this.createRoutingVisualization(this.selectedModel, complexity);
-    pipeline.updateStepStatus('routing', 'completed');
-    pipeline.updateStepStatus('generation', 'pending');
+    pipeline.updateStepStatus('route', 'completed');
+    pipeline.updateStepStatus('generate', 'pending');
 
-    this.generateButton.disabled = false;
+    this.setGenerateButtonState(false);
   }
 
   createRoutingVisualization(selectedModel, complexity) {
-    const visualizer = new WorkflowVisualizer('routing-visualizer');
+    const visualizer = new WorkflowVisualizer('routing-visualization');
     visualizer.clear();
     
     const routes = this.getModels().map(model => ({
@@ -435,7 +493,7 @@ class RoutingPrototypingDemo {
     this.refineButton.disabled = true;
 
     const pipeline = this.createWorkflowPipeline();
-    pipeline.updateStepStatus('generation', 'active');
+    pipeline.updateStepStatus('generate', 'active');
 
     const agentState = this.agentConfigManager.getState();
 
@@ -474,14 +532,14 @@ class RoutingPrototypingDemo {
       this.renderPrototypeResult(result);
       this.displayGenerationResults(result);
       
-      pipeline.updateStepStatus('generation', 'completed');
-      this.refineButton.disabled = false;
+      pipeline.updateStepStatus('generate', 'completed');
+      this.setRefineButtonState(false);
 
     } catch (error) {
       console.error('Generation failed:', error);
-      pipeline.updateStepStatus('generation', 'error');
+      pipeline.updateStepStatus('generate', 'error');
     } finally {
-      this.generateButton.disabled = false;
+      this.setGenerateButtonState(false);
     }
   }
 
@@ -520,13 +578,13 @@ class RoutingPrototypingDemo {
     const container = document.getElementById('results-container');
     container.innerHTML = '';
     
-    const visualizer = new WorkflowVisualizer();
+    const visualizer = new WorkflowVisualizer('results-container');
     visualizer.createResultsDisplay({
       'Selected Model': this.selectedModel.name,
       'Task Complexity': `${(this.currentComplexity * 100).toFixed(0)}%`,
       'Estimated Cost': `$${(Math.random() * 0.1).toFixed(4)}`,
       'Execution Time': `${(result.duration || 2500 / 1000).toFixed(2)}s`
-    }, 'results-container');
+    });
   }
 
   async refinePrototype() {
