@@ -17,6 +17,7 @@ async fn test_query_rs_haystack_integration() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
     };
 
     // Test queries
@@ -96,6 +97,7 @@ async fn test_query_rs_service_type_integration() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
     };
 
     assert_eq!(haystack.service, ServiceType::QueryRs);
@@ -118,6 +120,7 @@ async fn test_query_rs_document_format() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
     };
 
     // Test with a simple query

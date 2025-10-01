@@ -17,6 +17,7 @@
           "location": "docs/src",
           "service": "Ripgrep",
           "read_only": true,
+          "weight": 2.0,
           "atomic_server_secret": null,
           "extra_parameters": {}
         }
@@ -46,6 +47,7 @@
           "location": "docs/src",
           "service": "Ripgrep",
           "read_only": true,
+          "weight": 2.0,
           "atomic_server_secret": null,
           "extra_parameters": {}
         }
@@ -78,6 +80,7 @@
           "location": "docs/src",
           "service": "Ripgrep",
           "read_only": true,
+          "weight": 2.0,
           "atomic_server_secret": null,
           "extra_parameters": {}
         }
@@ -100,6 +103,7 @@
           "location": "https://query.rs",
           "service": "QueryRs",
           "read_only": true,
+          "weight": 0.8,
           "atomic_server_secret": null,
           "extra_parameters": {}
         }

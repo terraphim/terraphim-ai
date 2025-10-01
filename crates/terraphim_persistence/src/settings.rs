@@ -645,6 +645,7 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
 
         // Save document to each operator to verify they work

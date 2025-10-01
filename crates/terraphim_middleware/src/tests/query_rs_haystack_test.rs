@@ -12,6 +12,7 @@ async fn test_query_rs_haystack_indexer() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
     };
 
     // Test searching for Rust-related terms
@@ -47,6 +48,7 @@ async fn test_query_rs_reddit_search() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
     };
 
     // Test searching for Reddit posts
@@ -82,6 +84,7 @@ async fn test_query_rs_crates_search() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
     };
 
     // Test searching for crates - using "graph" since that's what was failing with 404s

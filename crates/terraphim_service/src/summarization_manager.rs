@@ -431,10 +431,11 @@ mod tests {
             body: "This is a test document for summarization with enough content to make it interesting.".to_string(),
             url: "http://example.com".to_string(),
             description: None,
-        summarization: None,
+            summarization: None,
             stub: None,
             tags: Some(vec![]),
             rank: None,
+            source_haystack: None,
         }
     }
 

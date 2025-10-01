@@ -1,5 +1,6 @@
 # Terraphim Settings Configuration Template with 1Password Integration
 # Usage: op inject -i settings.toml.template -o settings.toml
+# pragma: allowlist secret
 
 server_hostname = "127.0.0.1:8000"
 api_endpoint = "http://localhost:8000/api"
