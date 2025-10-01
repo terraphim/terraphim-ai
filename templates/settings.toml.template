@@ -17,7 +17,7 @@ enable_virtual_host_style = "off"
 [profiles.memory]
 type = "memory"
 
-[profiles.sqlite] 
+[profiles.sqlite]
 type = "sqlite"
 datadir = "./data/sqlite"
 connection_string = "./data/sqlite/terraphim.db"
