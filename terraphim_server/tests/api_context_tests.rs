@@ -112,6 +112,7 @@ fn create_test_documents() -> Vec<Document> {
             stub: None,
             tags: Some(vec!["rust".to_string(), "programming".to_string()]),
             rank: Some(95),
+            source_haystack: None,
         },
         Document {
             id: "doc-2".to_string(),
@@ -124,6 +125,7 @@ fn create_test_documents() -> Vec<Document> {
             stub: None,
             tags: Some(vec!["async".to_string(), "tokio".to_string()]),
             rank: Some(87),
+            source_haystack: None,
         },
         Document {
             id: "doc-3".to_string(),
@@ -135,6 +137,7 @@ fn create_test_documents() -> Vec<Document> {
             stub: None,
             tags: Some(vec!["web".to_string(), "axum".to_string()]),
             rank: Some(72),
+            source_haystack: None,
         },
     ]
 }

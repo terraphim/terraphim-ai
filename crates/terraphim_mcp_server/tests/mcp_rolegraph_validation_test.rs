@@ -97,6 +97,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
         }],
         #[cfg(feature = "openrouter")]
         openrouter_enabled: false,

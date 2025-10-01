@@ -1449,6 +1449,54 @@ impl TerraphimService {
         Ok(search_result.documents)
     }
 
+    /// Apply haystack weights to documents based on their source
+    async fn apply_haystack_weights(
+        &self,
+        mut documents: Vec<Document>,
+        search_query: &SearchQuery,
+    ) -> Result<Vec<Document>> {
+        let config = self.config_state.config.lock().await.clone();
+        let search_query_role = search_query.role.clone().unwrap_or(config.default_role);
+
+        let role = config.roles.get(&search_query_role).ok_or_else(|| {
+            ServiceError::Config(format!("Role '{}' not found", search_query_role))
+        })?;
+
+        // Create a map of haystack location to weight for quick lookup
+        let haystack_weights: std::collections::HashMap<String, f64> = role
+            .haystacks
+            .iter()
+            .map(|h| (h.location.clone(), h.weight))
+            .collect();
+
+        // Apply weights to document ranks
+        for document in &mut documents {
+            if let (Some(source), Some(current_rank)) = (&document.source_haystack, document.rank) {
+                let weight = haystack_weights.get(source).unwrap_or(&1.0);
+                let weighted_rank = (current_rank as f64 * weight).round() as u64;
+                document.rank = Some(weighted_rank);
+
+                log::trace!(
+                    "Applied weight {} to document '{}' from haystack '{}': rank {} -> {}",
+                    weight,
+                    document.title,
+                    source,
+                    current_rank,
+                    weighted_rank
+                );
+            }
+        }
+
+        // Re-sort documents by their new weighted ranks (highest rank first)
+        documents.sort_by(|a, b| {
+            let rank_a = a.rank.unwrap_or(0);
+            let rank_b = b.rank.unwrap_or(0);
+            rank_b.cmp(&rank_a)
+        });
+
+        Ok(documents)
+    }
+
     /// Search for documents in the haystacks
     pub async fn search(&mut self, search_query: &SearchQuery) -> Result<SearchResult> {
         // Initialize task IDs collection for async summarization tracking
@@ -1596,6 +1644,11 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
+                // Apply haystack weights to improve ranking of high-priority sources
+                docs_ranked = self
+                    .apply_haystack_weights(docs_ranked, search_query)
+                    .await?;
+
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
                 // Submit documents for async summarization instead of blocking
                 let should_use_openrouter = {
@@ -1715,6 +1768,11 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
+                // Apply haystack weights to improve ranking of high-priority sources
+                docs_ranked = self
+                    .apply_haystack_weights(docs_ranked, search_query)
+                    .await?;
+
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
                 let should_use_openrouter = {
                     #[cfg(feature = "openrouter")]
@@ -1828,6 +1886,11 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
+                // Apply haystack weights to improve ranking of high-priority sources
+                docs_ranked = self
+                    .apply_haystack_weights(docs_ranked, search_query)
+                    .await?;
+
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
                 let should_use_openrouter = {
                     #[cfg(feature = "openrouter")]
@@ -1940,6 +2003,11 @@ impl TerraphimService {
                     document.rank = Some(rank);
                     docs_ranked.push(document);
                 }
+
+                // Apply haystack weights to improve ranking of high-priority sources
+                docs_ranked = self
+                    .apply_haystack_weights(docs_ranked, search_query)
+                    .await?;
 
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
                 let should_use_openrouter = {
@@ -2165,6 +2233,7 @@ impl TerraphimService {
                                                 stub: None,
                                                 tags: document.tags.clone(),
                                                 rank: document.rank,
+                                                source_haystack: document.source_haystack.clone(),
                                             };
 
                                             // Save to persistence for future use
@@ -2395,6 +2464,9 @@ impl TerraphimService {
                         .await?;
                     all_task_ids.extend(task_ids);
                 }
+
+                // Apply haystack weights to improve ranking of high-priority sources
+                documents = self.apply_haystack_weights(documents, search_query).await?;
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
                 if role.terraphim_it {
@@ -2989,6 +3061,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                weight: 1.0,
             }],
             kg: None,
             terraphim_it: false,
@@ -3057,6 +3130,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                weight: 1.0,
             }],
             kg: None,
             terraphim_it: false,
@@ -3095,6 +3169,7 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
 
         // Test 1: Save Atomic Data document to persistence
@@ -3169,6 +3244,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                weight: 1.0,
             }],
             kg: Some(KnowledgeGraph {
                 automata_path: None,
@@ -3215,6 +3291,7 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
 
         // Save the Atomic Data document to persistence
@@ -3293,6 +3370,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                weight: 1.0,
             }],
             kg: Some(terraphim_config::KnowledgeGraph {
                 automata_path: Some(terraphim_automata::AutomataPath::local_example()),
@@ -3337,6 +3415,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "first".to_string()]),
                 rank: None, // Should be assigned by the function
+                source_haystack: None,
             },
             Document {
                 id: "test-doc-2".to_string(),
@@ -3348,6 +3427,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "second".to_string()]),
                 rank: None, // Should be assigned by the function
+                source_haystack: None,
             },
             Document {
                 id: "test-doc-3".to_string(),
@@ -3359,6 +3439,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "third".to_string()]),
                 rank: None, // Should be assigned by the function
+                source_haystack: None,
             },
         ];
 

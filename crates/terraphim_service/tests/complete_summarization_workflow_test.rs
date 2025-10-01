@@ -296,6 +296,7 @@ fn create_test_config_with_auto_summarization(dir: &tempfile::TempDir) -> Result
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: HashMap::new(),
+            weight: 1.0,
         }],
         extra: ahash::AHashMap::new(),
         ..Default::default()
@@ -421,6 +422,7 @@ async fn test_summarization_error_handling() -> Result<()> {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let task_id = manager
@@ -450,6 +452,7 @@ async fn test_summarization_error_handling() -> Result<()> {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let task_id = manager

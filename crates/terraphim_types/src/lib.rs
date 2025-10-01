@@ -218,6 +218,8 @@ pub struct Document {
     pub tags: Option<Vec<String>>,
     /// Rank of the document in the search results
     pub rank: Option<u64>,
+    /// Source haystack location that this document came from
+    pub source_haystack: Option<String>,
 }
 
 impl fmt::Display for Document {
@@ -238,6 +240,19 @@ impl fmt::Display for Document {
         }
 
         Ok(())
+    }
+}
+
+impl Document {
+    /// Set the source haystack for this document
+    pub fn with_source_haystack(mut self, haystack_location: String) -> Self {
+        self.source_haystack = Some(haystack_location);
+        self
+    }
+
+    /// Get the source haystack location
+    pub fn get_source_haystack(&self) -> Option<&String> {
+        self.source_haystack.as_ref()
     }
 }
 

@@ -1,4 +1,5 @@
 {
+  "_comment": "pragma: allowlist secret - This is a 1Password template file with op:// references",
   "llm": {
     "openrouter": {
       "api_key": "op://Terraphim-Dev/OpenRouter/API_KEY",

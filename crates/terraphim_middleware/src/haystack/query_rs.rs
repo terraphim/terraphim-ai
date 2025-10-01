@@ -163,6 +163,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                                 stub: None,
                                 tags: Some(vec!["queryrs".to_string(), "cache".to_string()]),
                                 rank: None,
+                                source_haystack: None,
                             };
                             if let Err(e) = cache_doc.save().await {
                                 log::warn!(
@@ -308,6 +309,7 @@ impl QueryRsHaystackIndexer {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
         let normalized = dummy_doc.normalize_key(original_id);
 
@@ -865,6 +867,7 @@ impl QueryRsHaystackIndexer {
                             "community".to_string(),
                         ]),
                         rank: Some(score),
+                        source_haystack: None,
                     });
                 }
             }
@@ -914,6 +917,7 @@ impl QueryRsHaystackIndexer {
                                         stub: None,
                                         tags: Some(tags),
                                         rank: None,
+                                        source_haystack: None,
                                     });
                                 }
                             }
@@ -999,6 +1003,7 @@ impl QueryRsHaystackIndexer {
                                 "package".to_string(),
                             ]),
                             rank: Some(downloads),
+                            source_haystack: None,
                         });
                     }
                 }
@@ -1040,6 +1045,7 @@ impl QueryRsHaystackIndexer {
                                     "documentation".to_string(),
                                 ]),
                                 rank: None,
+                                source_haystack: None,
                             });
                         }
                     }

@@ -100,6 +100,7 @@ This document provides a comprehensive overview of advanced Rust programming tec
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
         }],
         extra: ahash::AHashMap::new(),
         ..Default::default()

@@ -17,6 +17,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["programming".to_string(), "rust".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
             Document {
                 id: "doc2".to_string(),
@@ -28,6 +29,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["programming".to_string(), "python".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
             Document {
                 id: "doc3".to_string(),
@@ -40,6 +42,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["ai".to_string(), "ml".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
         ]
     }

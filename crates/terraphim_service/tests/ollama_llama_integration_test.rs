@@ -258,6 +258,7 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
         }],
         extra: AHashMap::new(),
         ..Default::default()

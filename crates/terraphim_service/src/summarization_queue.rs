@@ -502,6 +502,7 @@ mod tests {
             stub: None,
             tags: Some(vec![]),
             rank: None,
+            source_haystack: None,
         }
     }
 

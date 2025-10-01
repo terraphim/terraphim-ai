@@ -25,6 +25,7 @@ impl AtomicHaystackIndexer {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
         dummy_doc.normalize_key(original_id)
     }
@@ -170,6 +171,7 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                     stub: None,
                                     tags: None,
                                     rank: None,
+                                    source_haystack: None,
                                 };
 
                                 log::debug!(
@@ -221,6 +223,7 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                         stub: None,
                                         tags: None,
                                         rank: None,
+                                        source_haystack: None,
                                     };
 
                                     log::debug!(
@@ -272,6 +275,7 @@ impl IndexMiddleware for AtomicHaystackIndexer {
                                 stub: None,
                                 tags: None,
                                 rank: None,
+                                source_haystack: None,
                             };
 
                             log::debug!(

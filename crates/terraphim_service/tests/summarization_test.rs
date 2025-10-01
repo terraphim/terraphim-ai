@@ -31,6 +31,7 @@ fn create_test_document(id: &str, body: &str) -> Document {
         stub: None,
         tags: Some(vec!["test".to_string()]),
         rank: Some(100),
+        source_haystack: None,
     }
 }
 
@@ -76,6 +77,7 @@ fn create_comprehensive_test_document() -> Document {
             "guide".to_string(),
         ]),
         rank: Some(200),
+        source_haystack: None,
     }
 }
 

@@ -634,6 +634,7 @@ impl ReplHandler {
                     stub: None,
                     tags: Some(vec![]),
                     rank: None,
+                    source_haystack: None,
                 };
 
                 match api_client

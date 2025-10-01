@@ -124,6 +124,7 @@ fn create_test_config() -> String {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: 1.0,
                     }];
                 }
                 break;
@@ -139,6 +140,7 @@ fn create_test_config() -> String {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                weight: 1.0,
             }];
         }
     }

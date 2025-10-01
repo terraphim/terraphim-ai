@@ -74,7 +74,7 @@ impl From<terraphim_persistence::Error> for TerraphimConfigError {
 ///
 /// It contains a user's knowledge graph, a list of haystacks, as
 /// well as preferences for the relevance function and theme
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Role {
@@ -206,7 +206,7 @@ pub enum ServiceType {
 ///
 /// One user can have multiple haystacks
 /// Each haystack is indexed using a specific service
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq, JsonSchema)]
+#[derive(Debug, Deserialize, Clone, PartialEq, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Haystack {
@@ -228,6 +228,15 @@ pub struct Haystack {
     /// For Atomic: can include additional API parameters.
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub extra_parameters: std::collections::HashMap<String, String>,
+    /// Weight for ranking documents from this haystack. Higher weights mean higher priority.
+    /// Local haystacks typically have higher weights (faster access, more trusted content).
+    /// Defaults to 1.0 for backward compatibility.
+    #[serde(default = "default_haystack_weight")]
+    pub weight: f64,
+}
+
+pub fn default_haystack_weight() -> f64 {
+    1.0
 }
 
 impl Serialize for Haystack {
@@ -238,7 +247,7 @@ impl Serialize for Haystack {
         use serde::ser::SerializeStruct;
 
         // Determine how many fields to include based on service type
-        let mut field_count = 3; // location, service, read_only
+        let mut field_count = 4; // location, service, read_only, weight
 
         // Include atomic_server_secret only for Atomic service and if it's present
         let include_atomic_secret =
@@ -256,6 +265,7 @@ impl Serialize for Haystack {
         state.serialize_field("location", &self.location)?;
         state.serialize_field("service", &self.service)?;
         state.serialize_field("read_only", &self.read_only)?;
+        state.serialize_field("weight", &self.weight)?;
 
         // Only include atomic_server_secret for Atomic service
         if include_atomic_secret {
@@ -280,6 +290,7 @@ impl Haystack {
             read_only,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
         }
     }
 
@@ -310,6 +321,17 @@ impl Haystack {
     /// Get a reference to extra parameters for this service type
     pub fn get_extra_parameters(&self) -> &std::collections::HashMap<String, String> {
         &self.extra_parameters
+    }
+
+    /// Set the weight for this haystack
+    pub fn with_weight(mut self, weight: f64) -> Self {
+        self.weight = weight;
+        self
+    }
+
+    /// Get the weight for this haystack
+    pub fn get_weight(&self) -> f64 {
+        self.weight
     }
 }
 
@@ -410,6 +432,7 @@ impl ConfigBuilder {
                     read_only: true,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
+                    weight: default_haystack_weight(),
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
@@ -454,6 +477,7 @@ impl ConfigBuilder {
                     read_only: true,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
@@ -490,6 +514,7 @@ impl ConfigBuilder {
                     read_only: true,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
@@ -560,6 +585,7 @@ impl ConfigBuilder {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -602,6 +628,7 @@ impl ConfigBuilder {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -644,6 +671,7 @@ impl ConfigBuilder {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -688,6 +716,7 @@ impl ConfigBuilder {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -739,6 +768,7 @@ impl ConfigBuilder {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -782,6 +812,7 @@ impl ConfigBuilder {
                         read_only: true,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+            weight: default_haystack_weight(),
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -1291,6 +1322,7 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: default_haystack_weight(),
                     }],
                     extra: AHashMap::new(),
                     #[cfg(feature = "openrouter")]
@@ -1325,6 +1357,7 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: default_haystack_weight(),
                     }],
                     extra: AHashMap::new(),
                     #[cfg(feature = "openrouter")]
@@ -1367,6 +1400,7 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: default_haystack_weight(),
                     }],
                     extra: AHashMap::new(),
                     #[cfg(feature = "openrouter")]
@@ -1431,6 +1465,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                weight: default_haystack_weight(),
             }],
             extra: AHashMap::new(),
             #[cfg(feature = "openrouter")]
