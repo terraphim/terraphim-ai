@@ -35,6 +35,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             stub: None,
             tags: Some(vec!["haystack".to_string(), "service".to_string()]),
             rank: None,
+            source_haystack: None,
         },
         Document {
             id: "service_doc".to_string(),
@@ -46,6 +47,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             stub: None,
             tags: Some(vec!["service".to_string()]),
             rank: None,
+            source_haystack: None,
         },
         Document {
             id: "terraphim_graph_doc".to_string(),
@@ -57,6 +59,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             stub: None,
             tags: Some(vec!["terraphim-graph".to_string(), "knowledge-graph".to_string()]),
             rank: None,
+            source_haystack: None,
         },
     ];
 
@@ -100,6 +103,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
         }],
         kg: Some(KnowledgeGraph {
             automata_path: None,
@@ -295,6 +299,7 @@ async fn test_persistence_fallback_behavior() -> Result<(), Box<dyn std::error::
         stub: None,
         tags: Some(vec!["fallback".to_string(), "test".to_string()]),
         rank: None,
+        source_haystack: None,
     };
 
     // Save to all profiles

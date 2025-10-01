@@ -17,6 +17,7 @@ fn create_test_role() -> Role {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
         }],
         extra: ahash::AHashMap::new(),
         ..Default::default()
@@ -41,6 +42,7 @@ async fn test_indexer() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
     };
     let indexer = RipgrepIndexer::default();
     let _index = indexer.index("test", &haystack).await.unwrap();
@@ -56,6 +58,7 @@ async fn test_search_graph() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
     };
     let indexer = RipgrepIndexer::default();
     let _index = indexer.index("graph", &haystack).await.unwrap();
@@ -71,6 +74,7 @@ async fn test_search_machine_learning() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
     };
 
     let indexer = RipgrepIndexer::default();

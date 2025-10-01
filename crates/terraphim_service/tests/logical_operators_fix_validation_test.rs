@@ -25,6 +25,7 @@ mod logical_operators_fix_validation_tests {
                 tags: None,
                 summarization: None,
                 stub: None,
+                source_haystack: None,
             },
             Document {
                 id: "2".to_string(),
@@ -36,6 +37,7 @@ mod logical_operators_fix_validation_tests {
                 tags: None,
                 summarization: None,
                 stub: None,
+                source_haystack: None,
             },
             Document {
                 id: "3".to_string(),
@@ -47,6 +49,7 @@ mod logical_operators_fix_validation_tests {
                 tags: None,
                 summarization: None,
                 stub: None,
+                source_haystack: None,
             },
             Document {
                 id: "4".to_string(),
@@ -58,6 +61,7 @@ mod logical_operators_fix_validation_tests {
                 tags: None,
                 summarization: None,
                 stub: None,
+                source_haystack: None,
             },
         ]
     }
@@ -245,6 +249,7 @@ mod logical_operators_fix_validation_tests {
                 tags: None,
                 summarization: None,
                 stub: None,
+                source_haystack: None,
             },
             Document {
                 id: "2".to_string(),
@@ -256,6 +261,7 @@ mod logical_operators_fix_validation_tests {
                 tags: None,
                 summarization: None,
                 stub: None,
+                source_haystack: None,
             },
         ];
 

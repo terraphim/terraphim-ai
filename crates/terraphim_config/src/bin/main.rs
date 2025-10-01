@@ -2,7 +2,8 @@ use ahash::AHashMap;
 
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
+    default_haystack_weight, ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType,
+    TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
 use terraphim_types::RelevanceFunction;
@@ -35,6 +36,7 @@ async fn main() -> Result<()> {
                     read_only: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
+                    weight: default_haystack_weight(),
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
