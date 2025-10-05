@@ -3,7 +3,7 @@ use regex::Regex;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::{replace_matches, LinkType};
-use terraphim_config::{ConfigState, Role};
+pub use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
@@ -176,10 +176,12 @@ impl SearchResult {
 }
 
 pub struct TerraphimService {
-    config_state: ConfigState,
+    pub config_state: ConfigState,
     summarization_manager: Option<
         std::sync::Arc<tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>>,
     >,
+    /// Track processed documents to prevent duplicate KG preprocessing
+    pub processed_documents: std::collections::HashMap<String, bool>,
 }
 
 impl TerraphimService {
@@ -193,6 +195,7 @@ impl TerraphimService {
         Self {
             config_state,
             summarization_manager: Some(summarization_manager),
+            processed_documents: std::collections::HashMap::new(),
         }
     }
 
@@ -216,12 +219,19 @@ impl TerraphimService {
         Self {
             config_state,
             summarization_manager,
+            processed_documents: std::collections::HashMap::new(),
         }
     }
 
     /// Build a thesaurus from the haystack and update the knowledge graph automata URL
     async fn build_thesaurus(&mut self, search_query: &SearchQuery) -> Result<()> {
         Ok(build_thesaurus_from_haystack(&mut self.config_state, search_query).await?)
+    }
+
+    /// Clear the processed documents cache (useful when configuration changes)
+    pub fn clear_processed_documents_cache(&mut self) {
+        self.processed_documents.clear();
+        log::debug!("Cleared processed documents cache");
     }
     /// load thesaurus from config object and if absent make sure it's loaded from automata_url
     pub async fn ensure_thesaurus_loaded(&mut self, role_name: &RoleName) -> Result<Thesaurus> {
@@ -1015,7 +1025,10 @@ impl TerraphimService {
     /// This helper method checks if the selected role has terraphim_it enabled
     /// and applies KG term preprocessing accordingly. It prevents double processing
     /// by checking if KG links already exist in the document.
-    async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
+    pub async fn apply_kg_preprocessing_if_needed(
+        &mut self,
+        document: Document,
+    ) -> Result<Document> {
         let role = {
             let config = self.config_state.config.lock().await;
             let selected_role = &config.selected_role;
@@ -1050,6 +1063,19 @@ impl TerraphimService {
             return Ok(document);
         }
 
+        // Create a unique key for this document and role combination
+        let processing_key = format!("{}::{}", document.id, role.name);
+
+        // Check if we've already processed this document with this role
+        if self.processed_documents.contains_key(&processing_key) {
+            log::debug!(
+                "Document '{}' already processed for role '{}', skipping to prevent duplicate processing",
+                document.title,
+                role.name
+            );
+            return Ok(document);
+        }
+
         log::info!(
             "🧠 Applying KG preprocessing to document '{}' for role '{}' (terraphim_it enabled)",
             document.title,
@@ -1058,6 +1084,9 @@ impl TerraphimService {
 
         // Apply KG preprocessing
         let processed_doc = self.preprocess_document_content(document, &role).await?;
+
+        // Mark this document as processed for this role
+        self.processed_documents.insert(processing_key, true);
 
         log::debug!(
             "✅ KG preprocessing completed for document '{}'",
