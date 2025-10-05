@@ -163,12 +163,14 @@ class EvaluatorOptimizerDemo {
 
     // Real-time prompt analysis
     const promptInput = document.getElementById('content-prompt');
-    promptInput.addEventListener('input', () => {
-      this.analyzePrompt(promptInput.value);
-    });
+    if (promptInput) {
+      promptInput.addEventListener('input', () => {
+        this.analyzePrompt(promptInput.value);
+      });
+    }
 
     // Input elements
-    this.promptInput = document.getElementById('generation-prompt');
+    this.promptInput = document.getElementById('content-prompt');
 
     // Agent config is managed by AgentConfigManager
 
@@ -178,7 +180,9 @@ class EvaluatorOptimizerDemo {
     this.stopButton = document.getElementById('stop-btn');
     this.resetButton = document.getElementById('reset-btn');
 
-    this.promptInput.addEventListener('input', () => this.analyzePrompt(this.promptInput.value));
+    if (this.promptInput) {
+      this.promptInput.addEventListener('input', () => this.analyzePrompt(this.promptInput.value));
+    }
   }
 
   initializeConnectionStatus() {
@@ -423,6 +427,10 @@ class EvaluatorOptimizerDemo {
     const previousVersion = this.contentVersions[this.contentVersions.length - 1];
     const optimizationPrompt = this.buildOptimizationPrompt(previousVersion);
     
+    let version;
+    let qualityScores;
+    let improvedContent;
+    
     try {
       // Execute real optimization workflow with API client
       // FORCE HTTP ONLY - bypass any WebSocket caching issues
@@ -445,11 +453,11 @@ class EvaluatorOptimizerDemo {
       console.log('Optimization HTTP result:', result);
       
       // Extract improved content from API result
-      const improvedContent = (result.result && result.result.optimized_content) || (result.result && result.result.final_result) || 'Generated improved content';
-      const qualityScores = (result.result && result.result.quality_metrics) || await this.evaluateContent(improvedContent, document.getElementById('content-prompt').value);
+      improvedContent = (result.result && result.result.optimized_content) || (result.result && result.result.final_result) || 'Generated improved content';
+      qualityScores = (result.result && result.result.quality_metrics) || await this.evaluateContent(improvedContent, document.getElementById('content-prompt').value);
       
       // Create new version with API results
-      const version = {
+      version = {
         iteration: this.currentIteration,
         content: improvedContent,
         qualityScores: qualityScores,
@@ -460,21 +468,35 @@ class EvaluatorOptimizerDemo {
       
       this.contentVersions.push(version);
       this.qualityHistory.push(qualityScores.overall);
+      
+      // Update best version if this is better
+      if (qualityScores.overall > this.bestVersion.qualityScores.overall) {
+        this.bestVersion = version;
+        this.updateBestVersionInfo();
+      }
+      
     } catch (error) {
       console.error('API optimization failed, falling back to simulation:', error);
       
-      // Fallback to original simulation if API fails
-      const improvedContent = await this.generateContent(
-        document.getElementById('content-prompt').value,
-        optimizationPrompt
-      );
+      // Ensure all variables are properly initialized in catch block
+      try {
+        improvedContent = await this.generateContent(
+          document.getElementById('content-prompt').value,
+          optimizationPrompt
+        );
+        
+        qualityScores = await this.evaluateContent(
+          improvedContent, 
+          document.getElementById('content-prompt').value
+        );
+      } catch (fallbackError) {
+        // Ultimate fallback - use previous version's data
+        console.error('Fallback simulation also failed:', fallbackError);
+        improvedContent = previousVersion.content + '\n\n[Optimization iteration failed - using previous version]';
+        qualityScores = { ...previousVersion.qualityScores };
+      }
       
-      const qualityScores = await this.evaluateContent(
-        improvedContent, 
-        document.getElementById('content-prompt').value
-      );
-      
-      const version = {
+      version = {
         iteration: this.currentIteration,
         content: improvedContent,
         qualityScores: qualityScores,
@@ -485,15 +507,15 @@ class EvaluatorOptimizerDemo {
     
       this.contentVersions.push(version);
       this.qualityHistory.push(qualityScores.overall);
+      
+      // Update best version if this is better
+      if (qualityScores.overall > this.bestVersion.qualityScores.overall) {
+        this.bestVersion = version;
+        this.updateBestVersionInfo();
+      }
     }
     
-    // Update best version if this is better
-    if (qualityScores.overall > this.bestVersion.qualityScores.overall) {
-      this.bestVersion = version;
-      this.updateBestVersionInfo();
-    }
-    
-    // Update UI
+    // Update UI - all variables are guaranteed to be defined at this point
     this.renderContentVersion(version);
     this.renderIterationHistory();
     this.renderCurrentMetrics();
@@ -1264,13 +1286,17 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
   }
 
   saveState() {
-    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
-    const state = {
-      prompt: this.promptInput.value,
-      selectedCriteria: Array.from(this.selectedCriteria),
-      ...agentState
-    };
-    localStorage.setItem('optimizer-demo-state', JSON.stringify(state));
+    try {
+      const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
+      const state = {
+        prompt: this.promptInput ? this.promptInput.value : '',
+        selectedCriteria: Array.from(this.selectedCriteria || []),
+        ...agentState
+      };
+      localStorage.setItem('optimizer-demo-state', JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save state:', error);
+    }
   }
 
   loadSavedState() {

@@ -100,7 +100,7 @@ impl AgentRegistry {
     pub async fn list_all_agents(&self) -> Vec<AgentInfo> {
         let agents = self.agents.read().await;
         let mut result = Vec::new();
-        
+
         for (id, agent) in agents.iter() {
             let status = agent.status.read().await.clone();
             result.push(AgentInfo {
@@ -110,7 +110,7 @@ impl AgentRegistry {
                 status,
             });
         }
-        
+
         result
     }
 

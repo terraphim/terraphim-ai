@@ -1,5 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::Json};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::time::Instant;
 use tokio::time::{sleep, Duration};
 
@@ -184,7 +184,8 @@ pub async fn execute_optimization(
         .unwrap_or_else(|| "Quality Optimizer".to_string());
 
     // Use real multi-agent execution instead of simulation
-    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await {
+    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await
+    {
         Ok(executor) => {
             match executor
                 .execute_optimization(
@@ -207,7 +208,7 @@ pub async fn execute_optimization(
                         error_msg.clone(),
                     )
                     .await;
-                    
+
                     let execution_time = start_time.elapsed().as_millis() as u64;
                     return Ok(Json(WorkflowResponse {
                         workflow_id,
@@ -235,7 +236,7 @@ pub async fn execute_optimization(
                 error_msg.clone(),
             )
             .await;
-            
+
             let execution_time = start_time.elapsed().as_millis() as u64;
             return Ok(Json(WorkflowResponse {
                 workflow_id,
@@ -283,6 +284,7 @@ pub async fn execute_optimization(
     Ok(Json(response))
 }
 
+#[allow(dead_code)]
 async fn create_evaluator_agent(prompt: &str) -> EvaluatorAgent {
     let content_type = analyze_content_type(prompt);
 
@@ -346,6 +348,7 @@ async fn create_evaluator_agent(prompt: &str) -> EvaluatorAgent {
     }
 }
 
+#[allow(dead_code)]
 async fn create_optimizer_agent(prompt: &str) -> OptimizerAgent {
     let optimization_focus = analyze_optimization_focus(prompt);
 
@@ -405,6 +408,7 @@ async fn create_optimizer_agent(prompt: &str) -> OptimizerAgent {
     }
 }
 
+#[allow(dead_code)]
 async fn execute_iterative_optimization(
     evaluator: &EvaluatorAgent,
     optimizer: &OptimizerAgent,
@@ -517,6 +521,7 @@ async fn execute_iterative_optimization(
     }
 }
 
+#[allow(dead_code)]
 async fn generate_content_variants(
     prompt: &str,
     iteration: usize,
@@ -575,6 +580,7 @@ async fn generate_content_variants(
     variants
 }
 
+#[allow(dead_code)]
 async fn generate_conservative_variant(prompt: &str, current_best: &f64) -> String {
     format!(
         "Conservative approach to '{}': Focus on proven methodologies with incremental improvements. \

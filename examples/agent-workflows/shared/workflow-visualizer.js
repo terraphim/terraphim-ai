@@ -314,15 +314,18 @@ class WorkflowVisualizer {
     taskTimelines.style.position = 'relative';
     
     tasks.forEach((task, index) => {
-      // Task label
+      // Task label with icon
       const label = document.createElement('div');
       label.className = 'task-label';
-      label.textContent = task.name;
+      label.innerHTML = `${task.icon || '⚙️'} ${task.name}`;
       label.style.cssText = `
         padding: 0.5rem;
         margin-bottom: 1rem;
         font-weight: 500;
         color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
       `;
       taskLabels.appendChild(label);
       
@@ -337,19 +340,37 @@ class WorkflowVisualizer {
         margin-bottom: 1rem;
         position: relative;
         overflow: hidden;
+        border: 2px solid ${task.color || 'var(--border)'};
       `;
       
       const progressBar = document.createElement('div');
       progressBar.className = 'timeline-progress';
+      const taskColor = task.color || 'var(--primary)';
       progressBar.style.cssText = `
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        background: linear-gradient(90deg, ${taskColor}, ${taskColor}aa);
         border-radius: var(--radius-sm);
         transition: width 0.3s ease;
       `;
       
+      // Add status text overlay
+      const statusText = document.createElement('div');
+      statusText.className = 'timeline-status';
+      statusText.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 8px;
+        transform: translateY(-50%);
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        z-index: 2;
+      `;
+      statusText.textContent = 'Ready';
+      
       timelineBar.appendChild(progressBar);
+      timelineBar.appendChild(statusText);
       taskTimelines.appendChild(timelineBar);
     });
     
@@ -361,10 +382,28 @@ class WorkflowVisualizer {
   }
 
   // Update parallel task progress
-  updateParallelTask(taskId, percentage) {
-    const progressBar = document.querySelector(`#timeline-${taskId} .timeline-progress`);
-    if (progressBar) {
-      progressBar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+  updateParallelTask(taskId, percentage, status = null) {
+    const timelineElement = document.querySelector(`#timeline-${taskId}`);
+    if (timelineElement) {
+      const progressBar = timelineElement.querySelector('.timeline-progress');
+      const statusText = timelineElement.querySelector('.timeline-status');
+      
+      if (progressBar) {
+        progressBar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+      }
+      
+      if (statusText && status) {
+        statusText.textContent = status;
+      } else if (statusText) {
+        // Update based on percentage
+        if (percentage === 0) {
+          statusText.textContent = 'Ready';
+        } else if (percentage === 100) {
+          statusText.textContent = 'Completed';
+        } else {
+          statusText.textContent = 'Running...';
+        }
+      }
     }
   }
 

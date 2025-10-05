@@ -80,7 +80,10 @@ impl MemoryEvolutionViewer {
 
         // Create events from memory consolidations (if any occurred in the time range)
         let memory_state = &evolution_system.memory.current_state;
-        if memory_state.metadata.last_updated >= start && memory_state.metadata.last_updated <= end && memory_state.metadata.total_consolidations > 0 {
+        if memory_state.metadata.last_updated >= start
+            && memory_state.metadata.last_updated <= end
+            && memory_state.metadata.total_consolidations > 0
+        {
             events.push(EvolutionEvent {
                 timestamp: memory_state.metadata.last_updated,
                 event_type: EventType::MemoryConsolidation,

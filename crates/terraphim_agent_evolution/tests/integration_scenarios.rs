@@ -564,5 +564,3 @@ async fn test_evolution_viewer_integration() {
 }
 
 // Helper functions for integration testing
-
-

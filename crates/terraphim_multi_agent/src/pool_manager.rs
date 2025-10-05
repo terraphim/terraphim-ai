@@ -35,7 +35,7 @@ impl Default for PoolManagerConfig {
             default_pool_config: PoolConfig::default(),
             max_pools: 20,
             create_pools_on_demand: true,
-            cleanup_interval_seconds: 300, // 5 minutes
+            cleanup_interval_seconds: 300,        // 5 minutes
             pool_max_idle_duration_seconds: 1800, // 30 minutes
         }
     }
@@ -100,7 +100,7 @@ impl PoolManager {
         config: Option<PoolManagerConfig>,
     ) -> MultiAgentResult<Self> {
         let config = config.unwrap_or_default();
-        
+
         let pools = Arc::new(RwLock::new(HashMap::new()));
         let pool_info = Arc::new(RwLock::new(HashMap::new()));
         let global_stats = Arc::new(RwLock::new(GlobalStats::default()));
@@ -126,7 +126,7 @@ impl PoolManager {
     /// Get or create a pool for a specific role
     pub async fn get_pool(&self, role: &Role) -> MultiAgentResult<Arc<AgentPool>> {
         let role_name = role.name.to_string();
-        
+
         // Check if pool already exists
         {
             let pools = self.pools.read().await;
@@ -138,14 +138,14 @@ impl PoolManager {
                         info.last_used = Utc::now();
                     }
                 }
-                
+
                 // Record pool hit
                 {
                     let mut stats = self.global_stats.write().await;
                     stats.total_pool_hits += 1;
                     stats.last_updated = Utc::now();
                 }
-                
+
                 return Ok(pool.clone());
             }
         }
@@ -167,7 +167,7 @@ impl PoolManager {
 
         // Create new pool
         log::info!("Creating new agent pool for role: {}", role_name);
-        
+
         let pool = Arc::new(
             AgentPool::new(
                 role.clone(),
@@ -218,24 +218,24 @@ impl PoolManager {
     ) -> MultiAgentResult<CommandOutput> {
         let pool = self.get_pool(role).await?;
         let start_time = std::time::Instant::now();
-        
+
         let result = pool.execute_command(input).await;
-        
+
         // Update global statistics
         let duration = start_time.elapsed();
         {
             let mut stats = self.global_stats.write().await;
             stats.total_operations += 1;
-            
+
             let duration_ms = duration.as_millis() as f64;
             if stats.average_operation_time_ms == 0.0 {
                 stats.average_operation_time_ms = duration_ms;
             } else {
                 // Exponential moving average
-                stats.average_operation_time_ms = 
+                stats.average_operation_time_ms =
                     0.95 * stats.average_operation_time_ms + 0.05 * duration_ms;
             }
-            
+
             stats.last_updated = Utc::now();
         }
 
@@ -246,11 +246,13 @@ impl PoolManager {
     pub async fn get_agent(&self, role: &Role) -> MultiAgentResult<Arc<TerraphimAgent>> {
         let pool = self.get_pool(role).await?;
         let handle = pool.get_agent().await?;
-        
+
         if let Some(agent) = handle.agent() {
             Ok(agent.clone())
         } else {
-            Err(MultiAgentError::PoolError("Agent handle is empty".to_string()))
+            Err(MultiAgentError::PoolError(
+                "Agent handle is empty".to_string(),
+            ))
         }
     }
 
@@ -273,18 +275,18 @@ impl PoolManager {
     /// Get global statistics
     pub async fn get_global_stats(&self) -> GlobalStats {
         let mut stats = self.global_stats.read().await.clone();
-        
+
         // Update current totals
         let pools = self.pools.read().await;
         stats.total_pools = pools.len();
-        
+
         let mut total_agents = 0;
         for pool in pools.values() {
             let pool_stats = pool.get_stats().await;
             total_agents += pool_stats.current_pool_size + pool_stats.current_busy_agents;
         }
         stats.total_agents = total_agents;
-        
+
         stats
     }
 
@@ -297,7 +299,7 @@ impl PoolManager {
 
         if let Some(pool) = pool {
             pool.shutdown().await?;
-            
+
             // Update pool info
             {
                 let mut pool_info = self.pool_info.write().await;
@@ -322,7 +324,7 @@ impl PoolManager {
     /// Shutdown all pools
     pub async fn shutdown_all(&self) -> MultiAgentResult<()> {
         log::info!("Shutting down all agent pools");
-        
+
         let pool_names: Vec<String> = {
             let pools = self.pools.read().await;
             pools.keys().cloned().collect()
@@ -353,28 +355,28 @@ impl PoolManager {
         config: PoolManagerConfig,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                std::time::Duration::from_secs(config.cleanup_interval_seconds)
-            );
-            
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                config.cleanup_interval_seconds,
+            ));
+
             loop {
                 interval.tick().await;
-                
-                let max_idle_duration = std::time::Duration::from_secs(
-                    config.pool_max_idle_duration_seconds
-                );
-                
+
+                let max_idle_duration =
+                    std::time::Duration::from_secs(config.pool_max_idle_duration_seconds);
+
                 // Find idle pools to clean up
                 let pools_to_cleanup = {
                     let pool_info_guard = pool_info.read().await;
                     let now = Utc::now();
-                    
+
                     pool_info_guard
                         .iter()
                         .filter_map(|(name, info)| {
                             let idle_duration = now - info.last_used;
-                            if idle_duration.to_std().unwrap_or_default() > max_idle_duration 
-                                && info.is_active {
+                            if idle_duration.to_std().unwrap_or_default() > max_idle_duration
+                                && info.is_active
+                            {
                                 Some(name.clone())
                             } else {
                                 None
@@ -386,7 +388,7 @@ impl PoolManager {
                 // Clean up idle pools
                 for pool_name in pools_to_cleanup {
                     log::info!("Cleaning up idle pool: {}", pool_name);
-                    
+
                     // Remove from active pools
                     {
                         let mut pools_guard = pools.write().await;
@@ -442,7 +444,7 @@ mod tests {
 
         let manager = PoolManager::new(storage, None).await.unwrap();
         let stats = manager.get_global_stats().await;
-        
+
         assert_eq!(stats.total_pools, 0);
         assert_eq!(stats.total_agents, 0);
     }
@@ -459,15 +461,15 @@ mod tests {
 
         let manager = PoolManager::new(storage, None).await.unwrap();
         let role = create_test_role();
-        
+
         // First call should create the pool
         let pool1 = manager.get_pool(&role).await.unwrap();
         assert!(pool1.get_stats().await.current_pool_size > 0);
-        
+
         // Second call should return the same pool
         let pool2 = manager.get_pool(&role).await.unwrap();
         assert!(Arc::ptr_eq(&pool1, &pool2));
-        
+
         let stats = manager.get_global_stats().await;
         assert_eq!(stats.total_pools, 1);
         assert_eq!(stats.total_pool_hits, 1);
@@ -486,11 +488,11 @@ mod tests {
 
         let manager = PoolManager::new(storage, None).await.unwrap();
         let role = create_test_role();
-        
+
         let _pool = manager.get_pool(&role).await.unwrap();
         assert_eq!(manager.get_global_stats().await.total_pools, 1);
-        
-        manager.shutdown_pool(&role.name).await.unwrap();
+
+        manager.shutdown_pool(&role.name.to_string()).await.unwrap();
         assert_eq!(manager.get_global_stats().await.total_pools, 0);
     }
 }

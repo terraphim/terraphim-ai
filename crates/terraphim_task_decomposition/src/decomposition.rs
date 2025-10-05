@@ -175,7 +175,7 @@ impl KnowledgeGraphTaskDecomposer {
 
         match extract_paragraphs_from_automata(&self.automata, &text, 10) {
             Ok(paragraphs) => {
-                let concepts: Vec<String> = paragraphs
+                let mut concepts: Vec<String> = paragraphs
                     .into_iter()
                     .flat_map(|p| {
                         p.split_whitespace()
@@ -185,6 +185,38 @@ impl KnowledgeGraphTaskDecomposer {
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect();
+
+                // Enhance with role graph related concepts
+                let mut related_concepts = HashSet::new();
+                for concept in &concepts {
+                    // Find related concepts through role graph connectivity
+                    if self.role_graph.is_all_terms_connected_by_path(concept) {
+                        let node_ids = self.role_graph.find_matching_node_ids(concept);
+                        for _node_id in node_ids.iter().take(3) {
+                            // Use role graph to find related documents
+                            let documents = self.role_graph.find_document_ids_for_term(concept);
+                            for doc_id in documents.iter().take(2) {
+                                if let Some(document) = self.role_graph.get_document(doc_id) {
+                                    // Extract concepts from document tags and ID
+                                    for tag in &document.tags {
+                                        if !tag.is_empty() && tag.len() > 2 {
+                                            related_concepts.insert(tag.to_lowercase());
+                                        }
+                                    }
+                                    // Extract concepts from document ID
+                                    if !doc_id.is_empty() && doc_id.len() > 2 {
+                                        related_concepts.insert(doc_id.to_lowercase());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Add related concepts to the main list
+                concepts.extend(related_concepts.into_iter());
+                concepts.sort();
+                concepts.dedup();
 
                 debug!(
                     "Extracted {} concepts from task {}",
@@ -457,7 +489,7 @@ impl KnowledgeGraphTaskDecomposer {
 
         score += complexity_score * 0.3;
 
-        score.min(1.0).max(0.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Calculate parallelism factor
@@ -611,7 +643,7 @@ impl TaskDecomposer for KnowledgeGraphTaskDecomposer {
         let mut rec_stack = HashSet::new();
 
         for subtask in &result.subtasks {
-            if self.has_circular_dependency(
+            if has_circular_dependency(
                 &subtask.task_id,
                 &result.dependencies,
                 &mut visited,
@@ -630,33 +662,32 @@ impl TaskDecomposer for KnowledgeGraphTaskDecomposer {
     }
 }
 
-impl KnowledgeGraphTaskDecomposer {
-    /// Check for circular dependencies using DFS
-    fn has_circular_dependency(
-        &self,
-        task_id: &str,
-        dependencies: &HashMap<TaskId, Vec<TaskId>>,
-        visited: &mut HashSet<String>,
-        rec_stack: &mut HashSet<String>,
-    ) -> bool {
-        visited.insert(task_id.to_string());
-        rec_stack.insert(task_id.to_string());
+impl KnowledgeGraphTaskDecomposer {}
 
-        if let Some(deps) = dependencies.get(task_id) {
-            for dep in deps {
-                if !visited.contains(dep) {
-                    if self.has_circular_dependency(dep, dependencies, visited, rec_stack) {
-                        return true;
-                    }
-                } else if rec_stack.contains(dep) {
+/// Check for circular dependencies using DFS - standalone function
+fn has_circular_dependency(
+    task_id: &str,
+    dependencies: &HashMap<TaskId, Vec<TaskId>>,
+    visited: &mut HashSet<String>,
+    rec_stack: &mut HashSet<String>,
+) -> bool {
+    visited.insert(task_id.to_string());
+    rec_stack.insert(task_id.to_string());
+
+    if let Some(deps) = dependencies.get(task_id) {
+        for dep in deps {
+            if !visited.contains(dep) {
+                if has_circular_dependency(dep, dependencies, visited, rec_stack) {
                     return true;
                 }
+            } else if rec_stack.contains(dep) {
+                return true;
             }
         }
-
-        rec_stack.remove(task_id);
-        false
     }
+
+    rec_stack.remove(task_id);
+    false
 }
 
 #[cfg(test)]

@@ -128,7 +128,7 @@ class PromptChainingDemo {
     return {
       'web-app': {
         description: 'Build a task management web application with user authentication, CRUD operations for tasks, and a clean responsive UI',
-        techStack: 'React, Node.js, Express, MongoDB, JWT',
+        techStack: 'JavaScript, Bun, Express, SQLite, JWT',
         requirements: 'Mobile-responsive design, user authentication, data persistence, search functionality',
         steps: [
           {
@@ -323,10 +323,10 @@ class PromptChainingDemo {
   createStepEditors() {
     this.stepEditorsContainer.innerHTML = '';
     
-    // Define available roles for each step type
+    // Define available roles for each step type (matching backend config)
     const availableRoles = [
-      'SystemAnalyst', 'SystemArchitect', 'ProjectManager', 'SoftwareDeveloper', 
-      'QAEngineer', 'DevOpsEngineer', 'TechnicalWriter', 'UXDesigner'
+      'BusinessAnalyst', 'BackendArchitect', 'ProductManager', 'DevelopmentAgent',
+      'QAEngineer', 'DevOpsEngineer', 'TechnicalWriter', 'SvelteFrontendDeveloper'
     ];
     
     this.steps.forEach((step, index) => {
@@ -389,15 +389,15 @@ class PromptChainingDemo {
 
   getDefaultRoleForStep(stepId) {
     const roleMap = {
-      'specification': 'SystemAnalyst',
-      'requirements': 'SystemAnalyst',
-      'architecture': 'SystemArchitect',
-      'planning': 'ProjectManager',
-      'implementation': 'SoftwareDeveloper',
+      'specification': 'BusinessAnalyst',
+      'requirements': 'BusinessAnalyst',
+      'architecture': 'BackendArchitect',
+      'planning': 'ProductManager',
+      'implementation': 'DevelopmentAgent',
       'testing': 'QAEngineer',
       'deployment': 'DevOpsEngineer'
     };
-    return roleMap[stepId] || 'SoftwareDeveloper';
+    return roleMap[stepId] || 'DevelopmentAgent';
   }
 
   updateStepRole(stepId, role) {
@@ -739,7 +739,7 @@ User: {
 ## High-Level Architecture
 - Frontend: React SPA with React Router
 - Backend: Node.js REST API with Express
-- Database: MongoDB with Mongoose ODM
+- Database: SQLite with direct SQL queries
 - Authentication: JWT tokens
 
 ## Component Structure

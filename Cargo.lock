@@ -7398,7 +7398,6 @@ dependencies = [
  "terraphim_agent_messaging",
  "terraphim_agent_registry",
  "terraphim_agent_supervisor",
- "terraphim_gen_agent",
  "terraphim_goal_alignment",
  "terraphim_kg_agents",
  "terraphim_kg_orchestration",
@@ -7473,7 +7472,6 @@ dependencies = [
  "terraphim_agent_messaging",
  "terraphim_agent_supervisor",
  "terraphim_automata",
- "terraphim_gen_agent",
  "terraphim_rolegraph",
  "terraphim_types",
  "thiserror 1.0.69",
@@ -7613,30 +7611,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "terraphim_gen_agent"
-version = "0.1.0"
-dependencies = [
- "ahash 0.8.12",
- "async-trait",
- "chrono",
- "criterion",
- "env_logger",
- "futures-util",
- "log",
- "serde",
- "serde_json",
- "serial_test",
- "tempfile",
- "terraphim_agent_messaging",
- "terraphim_agent_supervisor",
- "terraphim_types",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "uuid",
-]
-
-[[package]]
 name = "terraphim_goal_alignment"
 version = "0.1.0"
 dependencies = [
@@ -7655,7 +7629,6 @@ dependencies = [
  "tempfile",
  "terraphim_agent_registry",
  "terraphim_automata",
- "terraphim_gen_agent",
  "terraphim_rolegraph",
  "terraphim_types",
  "thiserror 1.0.69",
@@ -7674,7 +7647,6 @@ dependencies = [
  "terraphim_agent_registry",
  "terraphim_agent_supervisor",
  "terraphim_automata",
- "terraphim_gen_agent",
  "terraphim_rolegraph",
  "terraphim_task_decomposition",
  "terraphim_types",

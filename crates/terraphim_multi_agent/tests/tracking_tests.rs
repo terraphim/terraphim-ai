@@ -8,7 +8,10 @@ async fn test_token_usage_tracking_accuracy() {
     agent.initialize().await.unwrap();
 
     // Process a command and verify token tracking
-    let input = CommandInput::new("Generate a simple Rust function".to_string(), CommandType::Generate);
+    let input = CommandInput::new(
+        "Generate a simple Rust function".to_string(),
+        CommandType::Generate,
+    );
     let result = agent.process_command(input).await;
     assert!(result.is_ok());
 
@@ -47,7 +50,10 @@ async fn test_cost_tracking_accuracy() {
     };
 
     // Process a command
-    let input = CommandInput::new("What is the capital of France?".to_string(), CommandType::Answer);
+    let input = CommandInput::new(
+        "What is the capital of France?".to_string(),
+        CommandType::Answer,
+    );
     let result = agent.process_command(input).await;
     assert!(result.is_ok());
 
@@ -182,8 +188,7 @@ async fn test_concurrent_tracking() {
     for i in 0..5 {
         let agent_clone = agent.clone();
         join_set.spawn(async move {
-            let input =
-                CommandInput::new(format!("Generate content {}", i), CommandType::Generate);
+            let input = CommandInput::new(format!("Generate content {}", i), CommandType::Generate);
             agent_clone.process_command(input).await
         });
     }
@@ -285,7 +290,10 @@ async fn test_tracking_add_record_methods() {
     }
 
     let token_tracker = agent.token_tracker.read().await;
-    assert_eq!(token_tracker.total_input_tokens + token_tracker.total_output_tokens, 150);
+    assert_eq!(
+        token_tracker.total_input_tokens + token_tracker.total_output_tokens,
+        150
+    );
     assert_eq!(token_tracker.total_input_tokens, 100);
     assert_eq!(token_tracker.total_output_tokens, 50);
     assert_eq!(token_tracker.records.len(), 1);

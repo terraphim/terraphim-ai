@@ -25,8 +25,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // Re-export core types
+pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};
 pub use terraphim_agent_supervisor::{AgentSpec, RestartStrategy};
-pub use terraphim_gen_agent::{AgentPid, GenAgentResult, SupervisorId};
+
+// Define GenAgentResult locally since we removed gen_agent dependency
+pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 pub use terraphim_types::*;
 
 pub mod capabilities;

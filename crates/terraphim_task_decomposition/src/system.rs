@@ -191,7 +191,7 @@ impl TerraphimTaskDecompositionSystem {
             + decomposition.metadata.confidence_score * decomposition_weight
             + execution_plan.metadata.confidence_score * planning_weight;
 
-        weighted_score.min(1.0).max(0.0)
+        weighted_score.clamp(0.0, 1.0)
     }
 
     /// Validate that the workflow meets quality thresholds

@@ -5,15 +5,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{RwLock, Semaphore};
+use tokio::sync::RwLock;
 use tokio::time::{interval, Instant};
 
 use terraphim_config::Role;
 use terraphim_persistence::DeviceStorage;
 
 use crate::{
-    AgentId, CommandInput, CommandOutput, LoadMetrics, MultiAgentError,
-    MultiAgentResult, TerraphimAgent,
+    AgentId, CommandInput, CommandOutput, LoadMetrics, MultiAgentError, MultiAgentResult,
+    TerraphimAgent,
 };
 
 /// Configuration for agent pooling
@@ -74,48 +74,28 @@ struct PooledAgent {
     agent: Arc<TerraphimAgent>,
     /// When the agent was last used
     last_used: Instant,
-    /// When the agent was created
-    created_at: Instant,
     /// Current number of active operations
     active_operations: u32,
     /// Total operations processed
     total_operations: u64,
     /// Agent load metrics
     load_metrics: LoadMetrics,
-    /// Semaphore for controlling concurrent operations
-    operation_semaphore: Arc<Semaphore>,
 }
 
 impl PooledAgent {
-    fn new(agent: Arc<TerraphimAgent>, max_concurrent_operations: usize) -> Self {
+    fn new(agent: Arc<TerraphimAgent>, _max_concurrent_operations: usize) -> Self {
         let now = Instant::now();
         Self {
             agent,
             last_used: now,
-            created_at: now,
             active_operations: 0,
             total_operations: 0,
             load_metrics: LoadMetrics::new(),
-            operation_semaphore: Arc::new(Semaphore::new(max_concurrent_operations)),
         }
-    }
-
-    fn is_available(&self) -> bool {
-        self.operation_semaphore.available_permits() > 0
     }
 
     fn is_idle(&self, max_idle_duration: Duration) -> bool {
         self.last_used.elapsed() > max_idle_duration && self.active_operations == 0
-    }
-
-    async fn acquire_operation(&mut self) -> Option<tokio::sync::SemaphorePermit> {
-        if let Ok(permit) = self.operation_semaphore.try_acquire() {
-            self.active_operations += 1;
-            self.last_used = Instant::now();
-            Some(permit)
-        } else {
-            None
-        }
     }
 
     fn release_operation(&mut self, duration: Duration, success: bool) {
@@ -123,38 +103,28 @@ impl PooledAgent {
             self.active_operations -= 1;
         }
         self.total_operations += 1;
-        
+
         // Update load metrics
         let duration_ms = duration.as_millis() as f64;
         if self.load_metrics.average_response_time_ms == 0.0 {
             self.load_metrics.average_response_time_ms = duration_ms;
         } else {
             // Exponential moving average
-            self.load_metrics.average_response_time_ms = 
+            self.load_metrics.average_response_time_ms =
                 0.9 * self.load_metrics.average_response_time_ms + 0.1 * duration_ms;
         }
-        
+
         // Update success rate
         let total_ops = self.total_operations as f64;
         if success {
-            self.load_metrics.success_rate = 
+            self.load_metrics.success_rate =
                 ((total_ops - 1.0) * self.load_metrics.success_rate + 1.0) / total_ops;
         } else {
-            self.load_metrics.success_rate = 
+            self.load_metrics.success_rate =
                 ((total_ops - 1.0) * self.load_metrics.success_rate) / total_ops;
         }
-        
-        self.load_metrics.last_updated = Utc::now();
-    }
 
-    fn calculate_load_score(&self) -> f64 {
-        // Lower score = better choice
-        let utilization = self.active_operations as f64 / 
-            (self.operation_semaphore.available_permits() + self.active_operations as usize) as f64;
-        let response_time_factor = self.load_metrics.average_response_time_ms / 1000.0; // normalize to seconds
-        let success_factor = 1.0 - self.load_metrics.success_rate;
-        
-        utilization * 0.4 + response_time_factor * 0.4 + success_factor * 0.2
+        self.load_metrics.last_updated = Utc::now();
     }
 }
 
@@ -214,7 +184,7 @@ impl AgentPool {
         config: Option<PoolConfig>,
     ) -> MultiAgentResult<Self> {
         let config = config.unwrap_or_default();
-        
+
         let pool = Self {
             config: config.clone(),
             role_config,
@@ -249,12 +219,15 @@ impl AgentPool {
 
     /// Warm up the pool by creating minimum number of agents
     async fn warm_up_pool(&self) -> MultiAgentResult<()> {
-        log::info!("Warming up agent pool with {} agents", self.config.min_pool_size);
-        
+        log::info!(
+            "Warming up agent pool with {} agents",
+            self.config.min_pool_size
+        );
+
         for _ in 0..self.config.min_pool_size {
             let agent = self.create_new_agent().await?;
             let pooled_agent = PooledAgent::new(agent, self.config.max_concurrent_operations);
-            
+
             let mut available = self.available_agents.write().await;
             available.push_back(pooled_agent);
         }
@@ -274,8 +247,7 @@ impl AgentPool {
         // Try to get an available agent first
         if let Some(pooled_agent) = self.get_available_agent().await {
             return Ok(PooledAgentHandle::new(
-                pooled_agent, 
-                self.busy_agents.clone(),
+                pooled_agent,
                 self.available_agents.clone(),
                 self.stats.clone(),
             ));
@@ -291,20 +263,20 @@ impl AgentPool {
         if current_total_size < self.config.max_pool_size {
             let agent = self.create_new_agent().await?;
             let pooled_agent = PooledAgent::new(agent, self.config.max_concurrent_operations);
-            
+
             // Update stats
             {
                 let mut stats = self.stats.write().await;
                 stats.total_agents_created += 1;
                 stats.current_pool_size = current_total_size + 1;
-                stats.pool_hit_rate = (stats.pool_hit_rate * stats.total_operations_processed as f64) / 
-                    (stats.total_operations_processed + 1) as f64;
+                stats.pool_hit_rate = (stats.pool_hit_rate
+                    * stats.total_operations_processed as f64)
+                    / (stats.total_operations_processed + 1) as f64;
                 stats.last_updated = Utc::now();
             }
 
             return Ok(PooledAgentHandle::new(
                 pooled_agent,
-                self.busy_agents.clone(),
                 self.available_agents.clone(),
                 self.stats.clone(),
             ));
@@ -317,7 +289,7 @@ impl AgentPool {
     /// Get an available agent using the configured load balancing strategy
     async fn get_available_agent(&self) -> Option<PooledAgent> {
         let mut available = self.available_agents.write().await;
-        
+
         if available.is_empty() {
             return None;
         }
@@ -329,26 +301,23 @@ impl AgentPool {
                 *counter = (*counter + 1) % available.len();
                 idx
             }
-            LoadBalancingStrategy::LeastConnections => {
-                available
-                    .iter()
-                    .enumerate()
-                    .min_by_key(|(_, agent)| agent.active_operations)
-                    .map(|(idx, _)| idx)
-                    .unwrap_or(0)
-            }
-            LoadBalancingStrategy::FastestResponse => {
-                available
-                    .iter()
-                    .enumerate()
-                    .min_by(|(_, a), (_, b)| {
-                        a.load_metrics.average_response_time_ms
-                            .partial_cmp(&b.load_metrics.average_response_time_ms)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .map(|(idx, _)| idx)
-                    .unwrap_or(0)
-            }
+            LoadBalancingStrategy::LeastConnections => available
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, agent)| agent.active_operations)
+                .map(|(idx, _)| idx)
+                .unwrap_or(0),
+            LoadBalancingStrategy::FastestResponse => available
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    a.load_metrics
+                        .average_response_time_ms
+                        .partial_cmp(&b.load_metrics.average_response_time_ms)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|(idx, _)| idx)
+                .unwrap_or(0),
             LoadBalancingStrategy::Random => {
                 use rand::Rng;
                 rand::thread_rng().gen_range(0..available.len())
@@ -376,11 +345,7 @@ impl AgentPool {
     async fn create_new_agent(&self) -> MultiAgentResult<Arc<TerraphimAgent>> {
         let agent = tokio::time::timeout(
             self.config.agent_creation_timeout,
-            TerraphimAgent::new(
-                self.role_config.clone(),
-                self.persistence.clone(),
-                None,
-            ),
+            TerraphimAgent::new(self.role_config.clone(), self.persistence.clone(), None),
         )
         .await
         .map_err(|_| MultiAgentError::AgentCreationTimeout)?
@@ -388,15 +353,6 @@ impl AgentPool {
 
         agent.initialize().await?;
         Ok(Arc::new(agent))
-    }
-
-    /// Return an agent to the pool
-    async fn return_agent(&self, mut pooled_agent: PooledAgent) {
-        // Reset the agent state if needed
-        pooled_agent.last_used = Instant::now();
-        
-        let mut available = self.available_agents.write().await;
-        available.push_back(pooled_agent);
     }
 
     /// Start the maintenance task
@@ -408,21 +364,21 @@ impl AgentPool {
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
             let mut maintenance_interval = interval(config.maintenance_interval);
-            
+
             loop {
                 maintenance_interval.tick().await;
-                
+
                 // Clean up idle agents
                 let mut removed_count = 0;
                 {
                     let mut available = available_agents.write().await;
                     let original_len = available.len();
                     let min_pool_size = config.min_pool_size;
-                    
+
                     // Keep only agents that are not idle or if we're at minimum pool size
                     available.retain(|agent| {
-                        let should_keep = !agent.is_idle(config.max_idle_duration) || 
-                                        original_len <= min_pool_size;
+                        let should_keep = !agent.is_idle(config.max_idle_duration)
+                            || original_len <= min_pool_size;
                         if !should_keep {
                             removed_count += 1;
                         }
@@ -434,16 +390,22 @@ impl AgentPool {
                 if removed_count > 0 {
                     let mut stats = stats.write().await;
                     stats.total_agents_destroyed += removed_count;
-                    stats.current_pool_size = stats.current_pool_size.saturating_sub(removed_count as usize);
+                    stats.current_pool_size = stats
+                        .current_pool_size
+                        .saturating_sub(removed_count as usize);
                     stats.last_updated = Utc::now();
-                    
+
                     log::debug!("Pool maintenance: removed {} idle agents", removed_count);
                 }
 
                 // Log pool status
                 let available_count = available_agents.read().await.len();
                 let busy_count = busy_agents.read().await.len();
-                log::debug!("Pool status: {} available, {} busy agents", available_count, busy_count);
+                log::debug!(
+                    "Pool status: {} available, {} busy agents",
+                    available_count,
+                    busy_count
+                );
             }
         })
     }
@@ -465,13 +427,13 @@ impl AgentPool {
     /// Shutdown the pool gracefully
     pub async fn shutdown(&self) -> MultiAgentResult<()> {
         log::info!("Shutting down agent pool");
-        
+
         // Clear all agents
         {
             let mut available = self.available_agents.write().await;
             available.clear();
         }
-        
+
         {
             let mut busy = self.busy_agents.write().await;
             busy.clear();
@@ -493,7 +455,6 @@ impl AgentPool {
 /// Handle for a pooled agent that automatically returns the agent to the pool when dropped
 pub struct PooledAgentHandle {
     pooled_agent: Option<PooledAgent>,
-    busy_agents: Arc<RwLock<HashMap<AgentId, PooledAgent>>>,
     available_agents: Arc<RwLock<VecDeque<PooledAgent>>>,
     stats: Arc<RwLock<PoolStats>>,
     operation_start: Instant,
@@ -502,13 +463,11 @@ pub struct PooledAgentHandle {
 impl PooledAgentHandle {
     fn new(
         pooled_agent: PooledAgent,
-        busy_agents: Arc<RwLock<HashMap<AgentId, PooledAgent>>>,
         available_agents: Arc<RwLock<VecDeque<PooledAgent>>>,
         stats: Arc<RwLock<PoolStats>>,
     ) -> Self {
         Self {
             pooled_agent: Some(pooled_agent),
-            busy_agents,
             available_agents,
             stats,
             operation_start: Instant::now(),
@@ -526,7 +485,7 @@ impl PooledAgentHandle {
                 Some(())
             } {
                 let result = pooled_agent.agent.process_command(input).await;
-                
+
                 // Update stats
                 {
                     let mut stats = self.stats.write().await;
@@ -539,7 +498,9 @@ impl PooledAgentHandle {
                 Err(MultiAgentError::AgentBusy(pooled_agent.agent.agent_id))
             }
         } else {
-            Err(MultiAgentError::PoolError("Agent handle is empty".to_string()))
+            Err(MultiAgentError::PoolError(
+                "Agent handle is empty".to_string(),
+            ))
         }
     }
 
@@ -554,7 +515,7 @@ impl Drop for PooledAgentHandle {
         if let Some(mut pooled_agent) = self.pooled_agent.take() {
             let duration = self.operation_start.elapsed();
             pooled_agent.release_operation(duration, true); // Assume success for now
-            
+
             // Return agent to available pool
             let available_agents = self.available_agents.clone();
             tokio::spawn(async move {
@@ -591,7 +552,7 @@ mod tests {
 
         let pool = AgentPool::new(role, storage, Some(config)).await.unwrap();
         let stats = pool.get_stats().await;
-        
+
         assert_eq!(stats.current_pool_size, 2);
         assert_eq!(stats.total_agents_created, 2);
     }
@@ -608,16 +569,16 @@ mod tests {
 
         let role = create_test_role();
         let pool = AgentPool::new(role, storage, None).await.unwrap();
-        
+
         let agent_handle = pool.get_agent().await.unwrap();
         assert!(agent_handle.agent().is_some());
-        
+
         // Agent should be returned to pool when handle is dropped
         drop(agent_handle);
-        
+
         // Give time for async return
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         let stats = pool.get_stats().await;
         assert!(stats.current_pool_size > 0);
     }
@@ -641,11 +602,11 @@ mod tests {
         };
 
         let pool = AgentPool::new(role, storage, Some(config)).await.unwrap();
-        
+
         // Acquire all available agents
         let _handle1 = pool.get_agent().await.unwrap();
         let _handle2 = pool.get_agent().await.unwrap();
-        
+
         // Next acquisition should create a new agent (up to max)
         let result = pool.get_agent().await;
         assert!(result.is_err());
