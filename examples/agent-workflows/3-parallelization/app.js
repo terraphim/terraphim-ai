@@ -193,6 +193,9 @@ class ParallelizationAnalysisDemo {
     ['analytical', 'practical', 'creative'].forEach(id => {
       this.togglePerspective(id);
     });
+    
+    // Create parallel timeline visualization immediately
+    this.updateParallelTimeline();
   }
 
   toggleDomain(domain) {
@@ -217,6 +220,9 @@ class ParallelizationAnalysisDemo {
       this.selectedPerspectives.add(perspectiveId);
       card.classList.add('selected');
     }
+    
+    // Update parallel timeline when perspectives change
+    this.updateParallelTimeline();
   }
 
   analyzeTopic(topic) {
@@ -307,6 +313,36 @@ class ParallelizationAnalysisDemo {
     }));
     
     this.visualizer.createParallelTimeline(tasks, 'parallel-timeline-container');
+  }
+
+  updateParallelTimeline() {
+    // Clear existing timeline
+    const container = document.getElementById('parallel-timeline-container');
+    if (container) {
+      container.innerHTML = '';
+    }
+
+    // Create new timeline if perspectives are selected
+    if (this.selectedPerspectives.size > 0) {
+      const tasks = Array.from(this.selectedPerspectives).map(id => ({
+        id,
+        name: this.perspectives[id].name,
+        color: this.perspectives[id].color,
+        icon: this.perspectives[id].icon
+      }));
+      
+      this.visualizer.createParallelTimeline(tasks, 'parallel-timeline-container');
+      
+      // Update timeline status
+      document.getElementById('timeline-status').textContent = 
+        `${this.selectedPerspectives.size} perspectives selected`;
+    } else {
+      // Show empty state
+      if (container) {
+        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Select perspectives to see parallel execution timeline</div>';
+      }
+      document.getElementById('timeline-status').textContent = 'No perspectives selected';
+    }
   }
 
   async executeParallelTasks(topic) {

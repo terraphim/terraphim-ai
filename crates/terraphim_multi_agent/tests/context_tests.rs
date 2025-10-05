@@ -151,7 +151,10 @@ async fn test_context_automatic_enrichment() {
     }
 
     // Process a command - this should use the context
-    let input = CommandInput::new("Create a web API endpoint".to_string(), CommandType::Generate);
+    let input = CommandInput::new(
+        "Create a web API endpoint".to_string(),
+        CommandType::Generate,
+    );
     let result = agent.process_command(input).await;
     assert!(result.is_ok());
 
@@ -405,7 +408,10 @@ async fn test_context_integration_with_agent_memory() {
     }
 
     // Process a command that should pull from memory into context
-    let input = CommandInput::new("How should I write this function?".to_string(), CommandType::Answer);
+    let input = CommandInput::new(
+        "How should I write this function?".to_string(),
+        CommandType::Answer,
+    );
     let result = agent.process_command(input).await;
     assert!(result.is_ok());
 

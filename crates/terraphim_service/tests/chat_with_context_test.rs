@@ -10,7 +10,12 @@ async fn test_ollama_chat_with_context_real() {
     // Skip if Ollama is not running
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
-    if client.get(&format!("{}/api/tags", ollama_url)).send().await.is_err() {
+    if client
+        .get(&format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
         eprintln!("Skipping test: Ollama not running on {}", ollama_url);
         return;
     }
@@ -84,17 +89,25 @@ async fn test_ollama_chat_with_context_real() {
         .expect("Chat completion should succeed");
 
     // Verify we got a response (content may vary with real LLM)
-    assert!(!response.is_empty(), "Should get non-empty response from Ollama");
+    assert!(
+        !response.is_empty(),
+        "Should get non-empty response from Ollama"
+    );
 }
 
 /// Test chat completion with multiple contexts using real Ollama
 #[tokio::test]
-#[ignore] // Only run when Ollama is available  
+#[ignore] // Only run when Ollama is available
 async fn test_ollama_multi_context_chat() {
     // Skip if Ollama is not running
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
-    if client.get(&format!("{}/api/tags", ollama_url)).send().await.is_err() {
+    if client
+        .get(&format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
         eprintln!("Skipping test: Ollama not running on {}", ollama_url);
         return;
     }
@@ -159,7 +172,10 @@ async fn test_ollama_multi_context_chat() {
         .expect("Chat completion should succeed");
 
     // Verify we got a response (content may vary with real LLM)
-    assert!(!response.is_empty(), "Should get non-empty response from Ollama");
+    assert!(
+        !response.is_empty(),
+        "Should get non-empty response from Ollama"
+    );
 }
 
 /// Test that context is properly formatted for LLM consumption
@@ -253,7 +269,6 @@ async fn test_empty_context_handling() {
 }
 
 // Helper functions
-
 
 fn create_test_ollama_role(base_url: &str) -> terraphim_config::Role {
     let mut role = terraphim_config::Role {

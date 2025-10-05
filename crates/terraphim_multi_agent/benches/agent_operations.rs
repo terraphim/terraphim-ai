@@ -1,17 +1,16 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use terraphim_multi_agent::{
-    TerraphimAgent, AgentRegistry, CommandInput, CommandType, CommandOutput,
-    test_utils::{create_test_agent_simple},
-    MultiAgentError, MultiAgentResult
+    test_utils::create_test_agent_simple, AgentRegistry, CommandInput, CommandOutput, CommandType,
+    MultiAgentError, MultiAgentResult, TerraphimAgent,
 };
 
 /// Benchmark agent creation time
 fn bench_agent_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("agent_creation", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -25,7 +24,7 @@ fn bench_agent_creation(c: &mut Criterion) {
 /// Benchmark agent initialization
 fn bench_agent_initialization(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("agent_initialization", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -40,7 +39,7 @@ fn bench_agent_initialization(c: &mut Criterion) {
 /// Benchmark command processing for different command types
 fn bench_command_processing(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let command_types = vec![
         CommandType::Generate,
         CommandType::Answer,
@@ -48,7 +47,7 @@ fn bench_command_processing(c: &mut Criterion) {
         CommandType::Create,
         CommandType::Review,
     ];
-    
+
     for command_type in command_types {
         let group_name = format!("command_processing_{:?}", command_type);
         c.bench_with_input(
@@ -59,13 +58,13 @@ fn bench_command_processing(c: &mut Criterion) {
                     rt.block_on(async {
                         let agent = create_test_agent_simple().await.unwrap();
                         agent.initialize().await.unwrap();
-                        
+
                         let input = CommandInput {
                             command_type: cmd_type.clone(),
                             text: "Test command for benchmarking".to_string(),
                             metadata: std::collections::HashMap::new(),
                         };
-                        
+
                         let result = agent.process_command(black_box(input)).await;
                         black_box(result)
                     })
@@ -78,32 +77,32 @@ fn bench_command_processing(c: &mut Criterion) {
 /// Benchmark agent registry operations
 fn bench_registry_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("registry_register_agent", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let mut registry = AgentRegistry::new();
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let result = registry.register_agent(Arc::new(agent)).await;
                 black_box(result)
             })
         })
     });
-    
+
     c.bench_function("registry_find_by_capability", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let mut registry = AgentRegistry::new();
-                
+
                 // Pre-populate with test agents
                 for i in 0..10 {
                     let agent = create_test_agent_simple().await.unwrap();
                     agent.initialize().await.unwrap();
                     registry.register_agent(Arc::new(agent)).await.unwrap();
                 }
-                
+
                 let result = registry.find_agents_by_capability("test_capability").await;
                 black_box(result)
             })
@@ -114,13 +113,13 @@ fn bench_registry_operations(c: &mut Criterion) {
 /// Benchmark memory operations
 fn bench_memory_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("memory_context_enrichment", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 // Simulate context enrichment operation
                 let query = "test query for context enrichment";
                 let result = agent.get_enriched_context_for_query(query).await;
@@ -128,13 +127,13 @@ fn bench_memory_operations(c: &mut Criterion) {
             })
         })
     });
-    
+
     c.bench_function("memory_save_state", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let result = agent.save_state().await;
                 black_box(result)
             })
@@ -145,9 +144,9 @@ fn bench_memory_operations(c: &mut Criterion) {
 /// Benchmark batch operations
 fn bench_batch_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let batch_sizes = vec![1, 5, 10, 20, 50];
-    
+
     for batch_size in batch_sizes {
         c.bench_with_input(
             BenchmarkId::new("batch_command_processing", batch_size),
@@ -157,20 +156,20 @@ fn bench_batch_operations(c: &mut Criterion) {
                     rt.block_on(async {
                         let agent = create_test_agent_simple().await.unwrap();
                         agent.initialize().await.unwrap();
-                        
+
                         let mut results = Vec::new();
-                        
+
                         for i in 0..size {
                             let input = CommandInput {
                                 command_type: CommandType::Generate,
                                 text: format!("Batch command {}", i),
                                 metadata: std::collections::HashMap::new(),
                             };
-                            
+
                             let result = agent.process_command(input).await;
                             results.push(result);
                         }
-                        
+
                         black_box(results)
                     })
                 })
@@ -182,9 +181,9 @@ fn bench_batch_operations(c: &mut Criterion) {
 /// Benchmark concurrent operations
 fn bench_concurrent_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     let concurrency_levels = vec![1, 2, 4, 8];
-    
+
     for concurrency in concurrency_levels {
         c.bench_with_input(
             BenchmarkId::new("concurrent_command_processing", concurrency),
@@ -193,23 +192,23 @@ fn bench_concurrent_operations(c: &mut Criterion) {
                 b.iter(|| {
                     rt.block_on(async {
                         let mut tasks = Vec::new();
-                        
+
                         for i in 0..level {
                             let task = tokio::spawn(async move {
                                 let agent = create_test_agent_simple().await.unwrap();
                                 agent.initialize().await.unwrap();
-                                
+
                                 let input = CommandInput {
                                     command_type: CommandType::Answer,
                                     text: format!("Concurrent command {}", i),
                                     metadata: std::collections::HashMap::new(),
                                 };
-                                
+
                                 agent.process_command(input).await
                             });
                             tasks.push(task);
                         }
-                        
+
                         let results = futures::future::join_all(tasks).await;
                         black_box(results)
                     })
@@ -222,13 +221,13 @@ fn bench_concurrent_operations(c: &mut Criterion) {
 /// Benchmark knowledge graph operations
 fn bench_knowledge_graph_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("rolegraph_query", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 // Test knowledge graph query operation
                 let query = "test knowledge query";
                 let result = agent.rolegraph.query_graph(query, Some(5), None);
@@ -236,26 +235,26 @@ fn bench_knowledge_graph_operations(c: &mut Criterion) {
             })
         })
     });
-    
+
     c.bench_function("rolegraph_find_matching_nodes", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let query = "test node matching";
                 let result = agent.rolegraph.find_matching_node_ids(query);
                 black_box(result)
             })
         })
     });
-    
+
     c.bench_function("rolegraph_path_connectivity", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let query = "test path connectivity";
                 let result = agent.rolegraph.is_all_terms_connected_by_path(query);
                 black_box(result)
@@ -267,13 +266,13 @@ fn bench_knowledge_graph_operations(c: &mut Criterion) {
 /// Benchmark automata operations
 fn bench_automata_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("automata_autocomplete", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 // Test autocomplete operation
                 let prefix = "test";
                 let result = agent.automata.autocomplete_terms(prefix, Some(10));
@@ -281,13 +280,13 @@ fn bench_automata_operations(c: &mut Criterion) {
             })
         })
     });
-    
+
     c.bench_function("automata_find_matches", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let text = "test text for finding matches";
                 let result = agent.automata.find_matches(text);
                 black_box(result)
@@ -299,17 +298,17 @@ fn bench_automata_operations(c: &mut Criterion) {
 /// Benchmark LLM client operations
 fn bench_llm_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("llm_simple_generation", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
-                let messages = vec![
-                    terraphim_multi_agent::LlmMessage::user("Test message for benchmarking".to_string())
-                ];
-                
+
+                let messages = vec![terraphim_multi_agent::LlmMessage::user(
+                    "Test message for benchmarking".to_string(),
+                )];
+
                 let request = terraphim_multi_agent::LlmRequest::new(messages);
                 let result = agent.llm_client.generate(request).await;
                 black_box(result)
@@ -321,13 +320,13 @@ fn bench_llm_operations(c: &mut Criterion) {
 /// Benchmark tracking operations
 fn bench_tracking_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("token_usage_tracking", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let record = terraphim_multi_agent::TokenUsageRecord::new(
                     agent.agent_id,
                     "test-model".to_string(),
@@ -336,25 +335,25 @@ fn bench_tracking_operations(c: &mut Criterion) {
                     0.01,
                     1000,
                 );
-                
+
                 let mut tracker = agent.token_tracker.write().await;
                 tracker.record_usage(black_box(record));
-                
+
                 let stats = tracker.get_today_usage();
                 black_box(stats)
             })
         })
     });
-    
+
     c.bench_function("cost_tracking", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let agent = create_test_agent_simple().await.unwrap();
                 agent.initialize().await.unwrap();
-                
+
                 let mut cost_tracker = agent.cost_tracker.write().await;
                 cost_tracker.record_spending(agent.agent_id, black_box(0.01));
-                
+
                 let result = cost_tracker.check_budget_limits(agent.agent_id, 0.001);
                 black_box(result)
             })

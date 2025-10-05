@@ -81,7 +81,7 @@ This interactive example demonstrates a step-by-step software development workfl
 
 ### Web Application
 Full-stack web application with authentication, CRUD operations, and responsive UI.
-- **Stack**: React, Node.js, Express, MongoDB
+- **Stack**: JavaScript, Bun, Express, SQLite
 - **Features**: User auth, task management, responsive design
 
 ### REST API Service

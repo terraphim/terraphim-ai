@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create GenAI LLM client for Ollama
     let client = GenAiLlmClient::new_ollama(Some("gemma3:270m".to_string()))?;
-    
+
     println!("✅ Created GenAI Ollama client");
     println!("   Model: {}", client.model());
     println!("   Provider: {}", client.provider());
@@ -19,21 +19,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Simple test prompt
     let prompt = "What is 2+2?";
     println!("🤖 Asking: '{}'", prompt);
-    
+
     // Create request
     let messages = vec![
-        LlmMessage::system("You are a helpful assistant that gives concise, accurate answers.".to_string()),
+        LlmMessage::system(
+            "You are a helpful assistant that gives concise, accurate answers.".to_string(),
+        ),
         LlmMessage::user(prompt.to_string()),
     ];
     let request = LlmRequest::new(messages);
-    
+
     // Make LLM call
     match client.generate(request).await {
         Ok(response) => {
             println!("✅ Response: {}", response.content);
             println!("   Model: {}", response.model);
             println!("   Duration: {}ms", response.duration_ms);
-            println!("   Tokens: {} in / {} out", response.usage.input_tokens, response.usage.output_tokens);
+            println!(
+                "   Tokens: {} in / {} out",
+                response.usage.input_tokens, response.usage.output_tokens
+            );
             println!("🎉 Basic agent usage successful!");
         }
         Err(e) => {

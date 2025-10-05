@@ -98,6 +98,12 @@ pub struct ChatSession {
     pub title: Option<String>,
 }
 
+impl Default for ChatSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChatSession {
     pub fn new() -> Self {
         Self {
@@ -141,14 +147,16 @@ impl ChatAgent {
     ) -> MultiAgentResult<Self> {
         // Extract LLM configuration from the agent's role
         let role = &terraphim_agent.role_config;
-        
+
         // Create LLM client based on role configuration
         let llm_client = if let Some(provider) = role.extra.get("llm_provider") {
             let provider_str = provider.as_str().unwrap_or("ollama");
-            let model = role.extra.get("llm_model")
+            let model = role
+                .extra
+                .get("llm_model")
                 .and_then(|m| m.as_str())
                 .map(|s| s.to_string());
-            
+
             Arc::new(GenAiLlmClient::from_config(provider_str, model)?)
         } else {
             // Default to Ollama with gemma3:270m
@@ -178,7 +186,7 @@ impl ChatAgent {
     pub fn start_new_session(&mut self) -> Uuid {
         let session = ChatSession::new();
         let session_id = session.id;
-        
+
         // Add system message if configured
         if let Some(system_prompt) = &self.config.system_prompt {
             let mut session = session;
@@ -215,7 +223,7 @@ impl ChatAgent {
 
         // Get session ID for later updates
         let session_id = self.current_session.as_ref().unwrap().id;
-        
+
         // Add user message to session
         let user_msg = ChatMessage::user(user_message);
         if let Some(session) = self.current_session.as_mut() {
@@ -227,7 +235,10 @@ impl ChatAgent {
         let messages = self.prepare_llm_context(&current_session)?;
 
         // Use context window from role config, fallback to config default
-        let max_tokens = self.terraphim_agent.role_config.llm_context_window
+        let max_tokens = self
+            .terraphim_agent
+            .role_config
+            .llm_context_window
             .map(|cw| (cw / 2).min(4000)) // Use 1/2 of context window, max 4000 for chat responses
             .unwrap_or(self.config.max_response_tokens);
 
@@ -238,7 +249,7 @@ impl ChatAgent {
 
         debug!("Sending chat request to LLM");
         let response = self.llm_client.generate(request).await?;
-        
+
         // Add assistant response to session
         let assistant_msg = ChatMessage::assistant(response.content.clone());
         if let Some(session) = self.current_session.as_mut() {
@@ -253,26 +264,31 @@ impl ChatAgent {
         }
 
         // Manage context size - extract session temporarily to avoid borrow conflicts
-        let session_needs_management = self.current_session.as_ref()
+        let session_needs_management = self
+            .current_session
+            .as_ref()
             .map(|s| s.messages.len() > self.config.max_context_messages * 2)
             .unwrap_or(false);
-        
+
         if session_needs_management {
             let mut session = self.current_session.take().unwrap();
             self.manage_context_size(&mut session).await?;
             self.current_session = Some(session);
         }
 
-        info!("Generated chat response of {} characters", response.content.len());
+        info!(
+            "Generated chat response of {} characters",
+            response.content.len()
+        );
         Ok(response.content.trim().to_string())
     }
 
     /// Prepare LLM context from chat session
     fn prepare_llm_context(&self, session: &ChatSession) -> MultiAgentResult<Vec<LlmMessage>> {
         let recent_messages = session.get_recent_messages(self.config.max_context_messages);
-        
+
         let mut llm_messages = Vec::new();
-        
+
         for msg in recent_messages {
             let llm_msg = match msg.role {
                 ChatMessageRole::System => LlmMessage::system(msg.content.clone()),
@@ -293,48 +309,58 @@ impl ChatAgent {
 
         if session.messages.len() > self.config.max_context_messages * 2 {
             info!("Context size exceeded, performing summarization");
-            
+
             // Keep system message and recent messages, summarize the middle
-            let system_msgs: Vec<_> = session.messages.iter()
+            let system_msgs: Vec<_> = session
+                .messages
+                .iter()
                 .filter(|m| m.role == ChatMessageRole::System)
                 .cloned()
                 .collect();
-            
-            let recent_msgs: Vec<_> = session.messages.iter()
+
+            let recent_msgs: Vec<_> = session
+                .messages
+                .iter()
                 .rev()
                 .take(self.config.max_context_messages / 2)
                 .cloned()
                 .collect();
 
             // Summarize older messages
-            let older_msgs: Vec<_> = session.messages.iter()
+            let older_msgs: Vec<_> = session
+                .messages
+                .iter()
                 .skip(system_msgs.len())
                 .take(session.messages.len() - system_msgs.len() - recent_msgs.len())
                 .collect();
 
             if !older_msgs.is_empty() {
                 let summary = self.summarize_conversation(&older_msgs).await?;
-                
+
                 // Rebuild message queue
                 let mut new_messages = VecDeque::new();
-                
+
                 // Add system messages
                 for msg in system_msgs {
                     new_messages.push_back(msg);
                 }
-                
+
                 // Add summary
                 new_messages.push_back(ChatMessage::system(format!(
-                    "Previous conversation summary: {}", summary
+                    "Previous conversation summary: {}",
+                    summary
                 )));
-                
+
                 // Add recent messages (reverse order since we took them reversed)
                 for msg in recent_msgs.into_iter().rev() {
                     new_messages.push_back(msg);
                 }
-                
+
                 session.messages = new_messages;
-                info!("Context summarized, new message count: {}", session.messages.len());
+                info!(
+                    "Context summarized, new message count: {}",
+                    session.messages.len()
+                );
             }
         }
 
@@ -343,15 +369,19 @@ impl ChatAgent {
 
     /// Summarize a portion of the conversation
     async fn summarize_conversation(&self, messages: &[&ChatMessage]) -> MultiAgentResult<String> {
-        let conversation_text = messages.iter()
-            .map(|msg| format!("{}: {}", 
-                match msg.role {
-                    ChatMessageRole::User => "User",
-                    ChatMessageRole::Assistant => "Assistant", 
-                    ChatMessageRole::System => "System",
-                }, 
-                msg.content
-            ))
+        let conversation_text = messages
+            .iter()
+            .map(|msg| {
+                format!(
+                    "{}: {}",
+                    match msg.role {
+                        ChatMessageRole::User => "User",
+                        ChatMessageRole::Assistant => "Assistant",
+                        ChatMessageRole::System => "System",
+                    },
+                    msg.content
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -414,7 +444,7 @@ mod tests {
     async fn test_chat_agent_creation() {
         let agent = create_test_agent().await.unwrap();
         let chat_agent = ChatAgent::new(agent, None).await.unwrap();
-        
+
         assert_eq!(chat_agent.config.max_context_messages, 20);
         assert_eq!(chat_agent.llm_client.provider(), "ollama");
         assert!(chat_agent.current_session.is_none());
@@ -424,14 +454,14 @@ mod tests {
     async fn test_session_management() {
         let agent = create_test_agent().await.unwrap();
         let mut chat_agent = ChatAgent::new(agent, None).await.unwrap();
-        
+
         let session_id = chat_agent.start_new_session();
         assert!(chat_agent.current_session.is_some());
         assert!(chat_agent.sessions.contains_key(&session_id));
-        
+
         let session2_id = chat_agent.start_new_session();
         assert_ne!(session_id, session2_id);
-        
+
         chat_agent.switch_to_session(session_id).unwrap();
         assert_eq!(chat_agent.current_session.as_ref().unwrap().id, session_id);
     }
@@ -441,7 +471,7 @@ mod tests {
         let user_msg = ChatMessage::user("Hello".to_string());
         assert_eq!(user_msg.role, ChatMessageRole::User);
         assert_eq!(user_msg.content, "Hello");
-        
+
         let assistant_msg = ChatMessage::assistant("Hi there!".to_string());
         assert_eq!(assistant_msg.role, ChatMessageRole::Assistant);
         assert_eq!(assistant_msg.content, "Hi there!");

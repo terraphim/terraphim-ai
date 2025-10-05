@@ -50,7 +50,10 @@ fn create_specialized_roles() -> Vec<Role> {
                     ]),
                 );
                 extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
-                extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
+                extra.insert(
+                    "ollama_base_url".to_string(),
+                    serde_json::json!("http://127.0.0.1:11434"),
+                );
                 extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
                 extra.insert("llm_temperature".to_string(), serde_json::json!(0.3)); // Focused analysis
                 extra
@@ -87,7 +90,10 @@ fn create_specialized_roles() -> Vec<Role> {
                     ]),
                 );
                 extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
-                extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
+                extra.insert(
+                    "ollama_base_url".to_string(),
+                    serde_json::json!("http://127.0.0.1:11434"),
+                );
                 extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
                 extra.insert("llm_temperature".to_string(), serde_json::json!(0.5)); // Balanced creativity
                 extra
@@ -124,7 +130,10 @@ fn create_specialized_roles() -> Vec<Role> {
                     ]),
                 );
                 extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
-                extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
+                extra.insert(
+                    "ollama_base_url".to_string(),
+                    serde_json::json!("http://127.0.0.1:11434"),
+                );
                 extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
                 extra.insert("llm_temperature".to_string(), serde_json::json!(0.4)); // Technical precision
                 extra
@@ -167,19 +176,15 @@ async fn example_agent_registry() -> MultiAgentResult<()> {
         // Register agent using the new API
         let agent_arc = Arc::new(agent);
         registry.register_agent(agent_arc).await?;
-        
+
         println!("✅ Registered agent: {} (ID: {})", role_name, agent_id);
     }
 
     // Discover agents by capability using the new API
-    let code_review_agents = registry
-        .find_agents_by_capability("code_review")
-        .await;
+    let code_review_agents = registry.find_agents_by_capability("code_review").await;
     println!("🔍 Code review agents: {:?}", code_review_agents);
 
-    let documentation_agents = registry
-        .find_agents_by_capability("documentation")
-        .await;
+    let documentation_agents = registry.find_agents_by_capability("documentation").await;
     println!("🔍 Documentation agents: {:?}", documentation_agents);
 
     let performance_agents = registry
@@ -300,7 +305,9 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
 
     // Step 4: Performance analysis (using performance agents)
     println!("⚡ Step 4: Performance Analysis");
-    let perf_agents = registry.find_agents_by_capability("performance_analysis").await;
+    let perf_agents = registry
+        .find_agents_by_capability("performance_analysis")
+        .await;
     if !perf_agents.is_empty() {
         if let Some(perf_agent) = registry.get_agent(&perf_agents[0]).await {
             let perf_input = CommandInput::new(

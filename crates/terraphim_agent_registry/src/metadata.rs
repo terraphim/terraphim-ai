@@ -235,6 +235,8 @@ pub struct KnowledgeContext {
     pub extraction_patterns: Vec<String>,
     /// Semantic similarity thresholds
     pub similarity_thresholds: HashMap<String, f64>,
+    /// Keywords for semantic matching
+    pub keywords: Vec<String>,
 }
 
 impl Default for KnowledgeContext {
@@ -245,6 +247,7 @@ impl Default for KnowledgeContext {
             relationships: Vec::new(),
             extraction_patterns: Vec::new(),
             similarity_thresholds: HashMap::new(),
+            keywords: Vec::new(),
         }
     }
 }
@@ -417,6 +420,13 @@ impl AgentMetadata {
         } else {
             self.statistics.tasks_completed as f64 / total_tasks as f64
         }
+    }
+
+    /// Get agent experience level based on completed tasks and success rate
+    pub fn get_experience_level(&self) -> f64 {
+        let base_experience = (self.statistics.tasks_completed as f64 * 0.1).min(1.0);
+        let success_modifier = self.get_success_rate();
+        (base_experience * success_modifier).max(0.1) // Minimum experience of 0.1
     }
 
     /// Check if agent can handle a specific knowledge domain

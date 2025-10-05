@@ -1,12 +1,12 @@
 use axum::{extract::State, http::StatusCode, response::Json};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::time::Instant;
 use tokio::time::{sleep, Duration};
 
 use super::{
     complete_workflow_session, create_workflow_session, fail_workflow_session,
-    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
-    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
+    generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, WorkflowMetadata,
+    WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -181,7 +181,8 @@ pub async fn execute_orchestration(
         .unwrap_or_else(|| "Workflow Coordinator".to_string());
 
     // Use real multi-agent execution instead of simulation
-    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await {
+    let result = match MultiAgentWorkflowExecutor::new_with_config(state.config_state.clone()).await
+    {
         Ok(executor) => {
             match executor
                 .execute_orchestration(
@@ -204,7 +205,7 @@ pub async fn execute_orchestration(
                         error_msg.clone(),
                     )
                     .await;
-                    
+
                     let execution_time = start_time.elapsed().as_millis() as u64;
                     return Ok(Json(WorkflowResponse {
                         workflow_id,
@@ -232,7 +233,7 @@ pub async fn execute_orchestration(
                 error_msg.clone(),
             )
             .await;
-            
+
             let execution_time = start_time.elapsed().as_millis() as u64;
             return Ok(Json(WorkflowResponse {
                 workflow_id,

@@ -1058,11 +1058,11 @@ impl TerraphimService {
             Some(client) => {
                 eprintln!("✅ LLM client successfully created: {}", client.name());
                 client
-            },
+            }
             None => {
                 eprintln!("❌ No LLM client available for role: {}", role.name);
                 return Ok(documents);
-            },
+            }
         };
 
         log::info!(
@@ -1426,7 +1426,10 @@ impl TerraphimService {
                         .await?;
                 } else {
                     // Always apply LLM AI summarization if LLM client is available
-                    eprintln!("📋 Entering LLM AI summarization branch for role: {}", role.name);
+                    eprintln!(
+                        "📋 Entering LLM AI summarization branch for role: {}",
+                        role.name
+                    );
                     log::debug!(
                         "Applying LLM AI summarization to {} search results for role '{}'",
                         docs_ranked.len(),

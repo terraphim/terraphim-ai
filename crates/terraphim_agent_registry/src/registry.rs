@@ -305,6 +305,7 @@ impl AgentRegistry for KnowledgeGraphAgentRegistry {
         }
 
         // Register the agent
+        let agent_id = metadata.agent_id.clone();
         {
             let mut agents = self.agents.write().await;
 
@@ -313,13 +314,13 @@ impl AgentRegistry for KnowledgeGraphAgentRegistry {
                 return Err(RegistryError::AgentAlreadyExists(metadata.agent_id.clone()));
             }
 
-            agents.insert(metadata.agent_id.clone(), metadata);
+            agents.insert(agent_id.clone(), metadata);
         }
 
         // Update statistics
         self.update_statistics().await?;
 
-        log::info!("Agent {} registered successfully", metadata.agent_id);
+        log::info!("Agent {} registered successfully", agent_id);
         Ok(())
     }
 

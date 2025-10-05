@@ -64,7 +64,7 @@ pub type MultiAgentResult<T> = Result<T, MultiAgentError>;
 pub type AgentId = uuid::Uuid;
 
 // Test utilities using real Ollama with gemma3:270m model
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
     use super::*;
     use std::sync::Arc;
@@ -76,15 +76,20 @@ pub mod test_utils {
         role.shortname = Some("test".to_string());
         role.relevance_function = terraphim_types::RelevanceFunction::BM25;
         // Use rust-genai with Ollama for local testing with gemma3:270m
-        role.extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
-        role.extra.insert("llm_model".to_string(), serde_json::json!("gemma3:270m"));
-        role.extra.insert("ollama_base_url".to_string(), serde_json::json!("http://127.0.0.1:11434"));
+        role.extra
+            .insert("llm_provider".to_string(), serde_json::json!("ollama"));
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("gemma3:270m"));
+        role.extra.insert(
+            "ollama_base_url".to_string(),
+            serde_json::json!("http://127.0.0.1:11434"),
+        );
         role
     }
 
     pub async fn create_test_agent_simple() -> Result<TerraphimAgent, MultiAgentError> {
         use terraphim_persistence::memory::create_memory_only_device_settings;
-        
+
         let _settings = create_memory_only_device_settings()
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
@@ -101,7 +106,7 @@ pub mod test_utils {
         use std::ptr;
         let storage_copy = unsafe { ptr::read(storage_ref) };
         let persistence = Arc::new(storage_copy);
-        
+
         let role = create_test_role();
         TerraphimAgent::new(role, persistence, None).await
     }
@@ -109,6 +114,61 @@ pub mod test_utils {
     // For now, alias the simpler version for tests
     pub async fn create_test_agent() -> Result<TerraphimAgent, MultiAgentError> {
         create_test_agent_simple().await
+    }
+
+    /// Create memory storage for testing
+    pub async fn create_memory_storage() -> Result<Arc<DeviceStorage>, MultiAgentError> {
+        use terraphim_persistence::memory::create_memory_only_device_settings;
+
+        let _settings = create_memory_only_device_settings()
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
+
+        // Initialize memory storage
+        DeviceStorage::init_memory_only()
+            .await
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
+
+        let storage_ref = DeviceStorage::instance()
+            .await
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
+
+        // Use the same unsafe pattern from the examples
+        use std::ptr;
+        let storage_copy = unsafe { ptr::read(storage_ref) };
+        Ok(Arc::new(storage_copy))
+    }
+
+    /// Create test rolegraph for testing
+    pub async fn create_test_rolegraph(
+    ) -> Result<Arc<terraphim_rolegraph::RoleGraph>, MultiAgentError> {
+        // Create a simple test rolegraph with empty thesaurus
+        use terraphim_types::Thesaurus;
+        let empty_thesaurus = Thesaurus::new("test_thesaurus".to_string());
+        let rolegraph = terraphim_rolegraph::RoleGraph::new("TestRole".into(), empty_thesaurus)
+            .await
+            .map_err(|e| {
+                MultiAgentError::KnowledgeGraphError(format!(
+                    "Failed to create test rolegraph: {}",
+                    e
+                ))
+            })?;
+        Ok(Arc::new(rolegraph))
+    }
+
+    /// Create test automata for testing
+    pub fn create_test_automata(
+    ) -> Result<Arc<terraphim_automata::AutocompleteIndex>, MultiAgentError> {
+        // Create a simple test automata index with empty thesaurus
+        use terraphim_types::Thesaurus;
+        let empty_thesaurus = Thesaurus::new("test_thesaurus".to_string());
+        let automata = terraphim_automata::build_autocomplete_index(empty_thesaurus, None)
+            .map_err(|e| {
+                MultiAgentError::KnowledgeGraphError(format!(
+                    "Failed to create test automata: {}",
+                    e
+                ))
+            })?;
+        Ok(Arc::new(automata))
     }
 }
 

@@ -1,6 +1,6 @@
+use ahash::AHashMap;
 use serial_test::serial;
 use terraphim_service::llm::{build_llm_from_role, ChatOptions, SummarizeOptions};
-use ahash::AHashMap;
 
 /// Test LLM client integration with real Ollama
 #[tokio::test]
@@ -10,7 +10,12 @@ async fn test_llm_client_integration() {
     // Check if Ollama is running
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
-    if client.get(&format!("{}/api/tags", ollama_url)).send().await.is_err() {
+    if client
+        .get(&format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
         eprintln!("Skipping test: Ollama not running on {}", ollama_url);
         return;
     }
@@ -58,7 +63,7 @@ async fn test_llm_client_integration() {
     // Test chat completion
     let messages = vec![
         serde_json::json!({"role": "system", "content": "You are a helpful assistant."}),
-        serde_json::json!({"role": "user", "content": "What is 2+2?"})
+        serde_json::json!({"role": "user", "content": "What is 2+2?"}),
     ];
 
     let chat_response = tokio::time::timeout(
@@ -75,7 +80,10 @@ async fn test_llm_client_integration() {
     .expect("Chat should not timeout")
     .expect("Chat should succeed");
 
-    assert!(!chat_response.is_empty(), "Chat response should not be empty");
+    assert!(
+        !chat_response.is_empty(),
+        "Chat response should not be empty"
+    );
     println!("Chat response: {}", chat_response);
 }
 
@@ -103,8 +111,10 @@ async fn test_llm_client_error_handling() {
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
-    role.extra
-        .insert("ollama_base_url".to_string(), serde_json::json!("http://invalid-url:9999"));
+    role.extra.insert(
+        "ollama_base_url".to_string(),
+        serde_json::json!("http://invalid-url:9999"),
+    );
 
     let llm_client = build_llm_from_role(&role).expect("Should build LLM client");
 
@@ -147,7 +157,10 @@ async fn test_role_validation() {
 
     // Should return error for disabled LLM
     let result = build_llm_from_role(&role_without_llm);
-    assert!(result.is_err(), "Should fail to build LLM client when disabled");
+    assert!(
+        result.is_err(),
+        "Should fail to build LLM client when disabled"
+    );
 
     // Test role with missing provider
     let mut role_missing_provider = role_without_llm.clone();

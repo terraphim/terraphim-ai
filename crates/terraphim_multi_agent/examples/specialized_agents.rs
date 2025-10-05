@@ -41,8 +41,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         responsible and aligned with human values.
     "#;
 
-    println!("📄 Original article length: {} characters", sample_article.len());
-    
+    println!(
+        "📄 Original article length: {} characters",
+        sample_article.len()
+    );
+
     match summarization_agent.summarize(sample_article).await {
         Ok(summary) => {
             println!("✅ Generated summary ({} characters):", summary.len());
@@ -61,7 +64,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let base_agent2 = test_utils::create_test_agent().await?;
     let chat_config = ChatConfig {
         max_context_messages: 10,
-        system_prompt: Some("You are a helpful AI assistant specialized in technology topics.".to_string()),
+        system_prompt: Some(
+            "You are a helpful AI assistant specialized in technology topics.".to_string(),
+        ),
         temperature: 0.7,
         max_response_tokens: 200,
         enable_context_summarization: true,
@@ -80,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let questions = vec![
         "What is Rust programming language?",
         "How does Rust compare to Python for system programming?",
-        "What are the main benefits of using Rust?"
+        "What are the main benefits of using Rust?",
     ];
 
     for (i, question) in questions.iter().enumerate() {
@@ -88,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match chat_agent.chat(question.to_string()).await {
             Ok(response) => {
                 println!("🤖 Assistant: {}", response);
-                
+
                 if let Some(session) = chat_agent.get_chat_history() {
                     println!("   💾 Session has {} messages", session.messages.len());
                 }

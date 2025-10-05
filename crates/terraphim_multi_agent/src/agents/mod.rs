@@ -10,4 +10,4 @@ pub use chat_agent::*;
 pub use summarization_agent::*;
 
 // Re-export commonly used types
-pub use crate::{TerraphimAgent, GenAiLlmClient, MultiAgentResult, MultiAgentError};
+pub use crate::{GenAiLlmClient, MultiAgentError, MultiAgentResult, TerraphimAgent};

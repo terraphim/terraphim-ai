@@ -464,7 +464,8 @@ impl Parallelization {
                             .partial_cmp(&score_b)
                             .unwrap_or(std::cmp::Ordering::Equal)
                     })
-                    .and_then(|r| r.result.as_ref()).cloned()
+                    .and_then(|r| r.result.as_ref())
+                    .cloned()
                     .unwrap_or_else(|| "No valid result found".to_string());
                 Ok(best_result)
             }
@@ -502,7 +503,8 @@ impl Parallelization {
                             .filter_map(|r| r.result.as_ref())
                             .filter(|r| r == result)
                             .count()
-                    }).cloned()
+                    })
+                    .cloned()
                     .unwrap_or_else(|| "No consensus reached".to_string());
                 Ok(most_common)
             }

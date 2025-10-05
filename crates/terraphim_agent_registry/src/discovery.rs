@@ -108,7 +108,7 @@ impl DiscoveryAlgorithmImpl for ExactMatchAlgorithm {
         let mut matches = Vec::new();
 
         for agent in agents {
-            let mut match_score = 0.0;
+            let mut match_score: f64 = 0.0;
             let mut matches_count = 0;
             let mut total_requirements = 0;
 
@@ -289,15 +289,15 @@ impl DiscoveryAlgorithmImpl for FuzzyMatchAlgorithm {
         let mut matches = Vec::new();
 
         for agent in agents {
-            let mut role_score = 0.0;
-            let mut capability_score = 0.0;
-            let mut domain_score = 0.0;
+            let mut role_score: f64 = 0.0;
+            let mut capability_score: f64 = 0.0;
+            let mut domain_score: f64 = 0.0;
 
             // Calculate fuzzy role matching
             if !query.required_roles.is_empty() {
-                let mut total_role_score = 0.0;
+                let mut total_role_score: f64 = 0.0;
                 for required_role in &query.required_roles {
-                    let mut best_role_score = 0.0;
+                    let mut best_role_score: f64 = 0.0;
 
                     // Check primary role
                     best_role_score = best_role_score
@@ -322,9 +322,9 @@ impl DiscoveryAlgorithmImpl for FuzzyMatchAlgorithm {
 
             // Calculate fuzzy capability matching
             if !query.required_capabilities.is_empty() {
-                let mut total_capability_score = 0.0;
+                let mut total_capability_score: f64 = 0.0;
                 for required_capability in &query.required_capabilities {
-                    let mut best_capability_score = 0.0;
+                    let mut best_capability_score: f64 = 0.0;
 
                     for agent_capability in &agent.capabilities {
                         let id_similarity = self.string_similarity(
@@ -352,9 +352,9 @@ impl DiscoveryAlgorithmImpl for FuzzyMatchAlgorithm {
 
             // Calculate fuzzy domain matching
             if !query.required_domains.is_empty() {
-                let mut total_domain_score = 0.0;
+                let mut total_domain_score: f64 = 0.0;
                 for required_domain in &query.required_domains {
-                    let mut best_domain_score = 0.0;
+                    let mut best_domain_score: f64 = 0.0;
 
                     for agent_domain in &agent.knowledge_context.domains {
                         let domain_similarity =
@@ -497,9 +497,10 @@ impl DiscoveryEngine {
                         algorithm: algorithm.clone(),
                         ..self.context.clone()
                     };
+                    // Create a temporary engine with empty algorithms since we're using a specific algorithm
                     let temp_engine = DiscoveryEngine {
                         context: temp_context,
-                        algorithms: self.algorithms.clone(), // This is inefficient but works for now
+                        algorithms: HashMap::new(),
                     };
                     let mut algorithm_matches = temp_engine.discover(query, agents)?;
                     all_matches.append(&mut algorithm_matches.matches);
@@ -520,7 +521,8 @@ impl DiscoveryEngine {
 
                         agent_scores.insert(agent_id, (updated_match, new_total_score, new_count));
                     } else {
-                        agent_scores.insert(agent_id, (agent_match, agent_match.match_score, 1));
+                        let match_score = agent_match.match_score;
+                        agent_scores.insert(agent_id, (agent_match, match_score, 1));
                     }
                 }
 

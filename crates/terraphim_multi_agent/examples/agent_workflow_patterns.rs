@@ -738,15 +738,12 @@ fn create_software_development_role() -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.3)); // Precise technical content
 
-    Role {
-        shortname: Some("SoftwareDev".to_string()),
-        name: "SoftwareDeveloper".into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new("SoftwareDeveloper");
+        role.shortname = Some("SoftwareDev".to_string());
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 
@@ -767,15 +764,12 @@ fn create_simple_task_role() -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.2)); // Low creativity, fast
 
-    Role {
-        shortname: Some("SimpleTask".to_string()),
-        name: "SimpleTaskAgent".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new("SimpleTaskAgent");
+        role.shortname = Some("SimpleTask".to_string());
+        role.relevance_function = RelevanceFunction::TitleScorer;
+        role.extra = extra;
+        role
     }
 }
 
@@ -797,15 +791,12 @@ fn create_complex_task_role() -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.4)); // Balanced for analysis
 
-    Role {
-        shortname: Some("ComplexTask".to_string()),
-        name: "ComplexTaskAgent".into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new("ComplexTaskAgent");
+        role.shortname = Some("ComplexTask".to_string());
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 
@@ -827,15 +818,12 @@ fn create_creative_task_role() -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.7)); // High creativity
 
-    Role {
-        shortname: Some("CreativeTask".to_string()),
-        name: "CreativeTaskAgent".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new("CreativeTaskAgent");
+        role.shortname = Some("CreativeTask".to_string());
+        role.relevance_function = RelevanceFunction::TitleScorer;
+        role.extra = extra;
+        role
     }
 }
 
@@ -857,15 +845,12 @@ fn create_perspective_role(perspective_name: &str, perspective_description: &str
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.5)); // Balanced
 
-    Role {
-        shortname: Some(format!("{}Perspective", perspective_name)),
-        name: format!("{}PerspectiveAgent", perspective_name).into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new(format!("{}PerspectiveAgent", perspective_name));
+        role.shortname = Some(format!("{}Perspective", perspective_name));
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 
@@ -887,15 +872,12 @@ fn create_orchestrator_role() -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.3)); // Strategic planning
 
-    Role {
-        shortname: Some("Orchestrator".to_string()),
-        name: "OrchestratorAgent".into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new("OrchestratorAgent");
+        role.shortname = Some("Orchestrator".to_string());
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 
@@ -917,15 +899,12 @@ fn create_worker_role(worker_name: &str, worker_description: &str) -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.4)); // Focused work
 
-    Role {
-        shortname: Some(format!("{}Worker", worker_name)),
-        name: format!("{}WorkerAgent", worker_name).into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new(format!("{}WorkerAgent", worker_name));
+        role.shortname = Some(format!("{}Worker", worker_name));
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 
@@ -947,15 +926,12 @@ fn create_content_generator_role() -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.6)); // Creative but focused
 
-    Role {
-        shortname: Some("ContentGen".to_string()),
-        name: "ContentGeneratorAgent".into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new("ContentGeneratorAgent");
+        role.shortname = Some("ContentGen".to_string());
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 
@@ -977,15 +953,12 @@ fn create_evaluator_role(eval_name: &str, eval_description: &str) -> Role {
     extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.2)); // Precise evaluation
 
-    Role {
-        shortname: Some(format!("{}Eval", eval_name)),
-        name: format!("{}EvaluatorAgent", eval_name).into(),
-        relevance_function: RelevanceFunction::BM25,
-        terraphim_it: false,
-        theme: "default".to_string(),
-        kg: None,
-        haystacks: vec![],
-        extra,
+    {
+        let mut role = Role::new(format!("{}EvaluatorAgent", eval_name));
+        role.shortname = Some(format!("{}Eval", eval_name));
+        role.relevance_function = RelevanceFunction::BM25;
+        role.extra = extra;
+        role
     }
 }
 

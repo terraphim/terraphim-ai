@@ -100,8 +100,7 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create different agents for different complexity levels
-    let simple_agent =
-        TerraphimAgent::new(create_simple_role(), persistence.clone(), None).await?;
+    let simple_agent = TerraphimAgent::new(create_simple_role(), persistence.clone(), None).await?;
     simple_agent.initialize().await?;
 
     let complex_agent =
@@ -110,11 +109,11 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
 
     println!("✅ Created simple and complex task agents");
 
-    // Test routing based on task complexity  
+    // Test routing based on task complexity
     let tasks = vec![
         ("Say hello", 0.2, &simple_agent),
         (
-            "Design distributed system architecture", 
+            "Design distributed system architecture",
             0.9,
             &complex_agent,
         ),

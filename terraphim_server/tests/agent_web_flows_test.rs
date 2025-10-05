@@ -1,8 +1,8 @@
 use axum::http::StatusCode;
 use axum_test::TestServer;
+use futures::future;
 use serde_json::json;
 use terraphim_server::build_router_for_tests;
-use futures::future;
 
 /// Comprehensive web-based agent workflow tests that simulate real frontend interactions
 /// These tests verify the complete flow from web interface to backend agent processing
@@ -31,22 +31,25 @@ async fn test_prompt_chain_web_flow() {
 
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
-    
+
     // Verify web-compatible response structure
     assert!(body["success"].as_bool().unwrap());
     assert!(body["workflow_id"].as_str().is_some());
-    assert_eq!(body["metadata"]["pattern"].as_str().unwrap(), "prompt_chaining");
-    
+    assert_eq!(
+        body["metadata"]["pattern"].as_str().unwrap(),
+        "prompt_chaining"
+    );
+
     // Verify rich result structure for web display
     let result = &body["result"];
     assert!(result["steps"].as_array().is_some());
     assert!(result["final_result"].is_object());
     assert!(result["execution_summary"].is_object());
-    
+
     // Verify steps contain displayable content
     let steps = result["steps"].as_array().unwrap();
     assert!(steps.len() >= 5); // Should have multiple steps for complex request
-    
+
     for step in steps {
         assert!(step["step_name"].as_str().is_some());
         assert!(step["output"].as_str().is_some());
@@ -89,31 +92,28 @@ async fn test_routing_web_flow_with_complexity_analysis() {
             }
         });
 
-        let response = server
-            .post("/workflows/route")
-            .json(&web_request)
-            .await;
+        let response = server.post("/workflows/route").json(&web_request).await;
 
         assert_eq!(response.status_code(), StatusCode::OK);
         let body = response.json::<serde_json::Value>();
-        
+
         assert!(body["success"].as_bool().unwrap());
         assert_eq!(body["metadata"]["pattern"].as_str().unwrap(), "routing");
-        
+
         // Verify routing analysis for web display
         let result = &body["result"];
         assert!(result["task_analysis"].is_object());
         assert!(result["selected_route"].is_object());
-        
+
         let task_analysis = &result["task_analysis"];
         let complexity = task_analysis["complexity"].as_f64().unwrap();
         assert!(complexity >= 0.0 && complexity <= 1.0);
-        
+
         let selected_route = &result["selected_route"];
         assert!(selected_route["agent_id"].as_str().is_some());
         assert!(selected_route["reasoning"].as_str().is_some());
         assert!(selected_route["confidence"].as_f64().unwrap() > 0.5);
-        
+
         // Verify the route contains web-displayable information
         assert!(selected_route["reasoning"].as_str().unwrap().len() > 10);
     }
@@ -126,7 +126,7 @@ async fn test_parallel_web_flow_with_perspectives() {
 
     let web_request = json!({
         "prompt": "Analyze the business impact of implementing AI-powered customer service chatbots",
-        "role": "Business Analyst", 
+        "role": "Business Analyst",
         "overall_role": "Strategic Planning Lead",
         "config": {
             "agent_count": 3,
@@ -135,25 +135,25 @@ async fn test_parallel_web_flow_with_perspectives() {
         }
     });
 
-    let response = server
-        .post("/workflows/parallel")
-        .json(&web_request)
-        .await;
+    let response = server.post("/workflows/parallel").json(&web_request).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
-    
+
     assert!(body["success"].as_bool().unwrap());
-    assert_eq!(body["metadata"]["pattern"].as_str().unwrap(), "Parallelization");
-    
+    assert_eq!(
+        body["metadata"]["pattern"].as_str().unwrap(),
+        "Parallelization"
+    );
+
     // Verify parallel execution results for web dashboard
     let result = &body["result"];
     assert!(result["parallel_tasks"].as_array().is_some());
     assert!(result["execution_summary"].is_object());
-    
+
     let parallel_tasks = result["parallel_tasks"].as_array().unwrap();
     assert_eq!(parallel_tasks.len(), 3); // Should have 3 perspectives
-    
+
     // Verify each perspective contains rich data for web display
     for task in parallel_tasks {
         assert!(task["agent_id"].as_str().is_some());
@@ -161,16 +161,22 @@ async fn test_parallel_web_flow_with_perspectives() {
         assert!(task["result"].as_str().is_some());
         assert!(task["cost"].as_f64().is_some());
         assert!(task["tokens_used"].as_u64().is_some());
-        
+
         // Verify substantial content for web display
         let result_text = task["result"].as_str().unwrap();
-        assert!(result_text.len() > 50, "Result should contain substantial content");
+        assert!(
+            result_text.len() > 50,
+            "Result should contain substantial content"
+        );
     }
-    
+
     // Verify aggregated result for web summary
     assert!(result["aggregated_result"].as_str().is_some());
     let aggregated = result["aggregated_result"].as_str().unwrap();
-    assert!(aggregated.len() > 100, "Aggregated result should be comprehensive");
+    assert!(
+        aggregated.len() > 100,
+        "Aggregated result should be comprehensive"
+    );
 }
 
 #[tokio::test]
@@ -196,20 +202,23 @@ async fn test_orchestration_web_flow_with_workers() {
 
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
-    
+
     assert!(body["success"].as_bool().unwrap());
-    assert_eq!(body["metadata"]["pattern"].as_str().unwrap(), "Orchestration");
-    
+    assert_eq!(
+        body["metadata"]["pattern"].as_str().unwrap(),
+        "Orchestration"
+    );
+
     // Verify orchestration results for web workflow display
     let result = &body["result"];
     assert!(result["orchestrator_plan"].as_str().is_some());
     assert!(result["worker_results"].as_array().is_some());
     assert!(result["final_synthesis"].as_str().is_some());
     assert!(result["execution_summary"].is_object());
-    
+
     let worker_results = result["worker_results"].as_array().unwrap();
     assert!(worker_results.len() >= 1, "Should have worker results");
-    
+
     // Verify worker results contain web-displayable data
     for worker_result in worker_results {
         assert!(worker_result["worker_name"].as_str().is_some());
@@ -217,12 +226,15 @@ async fn test_orchestration_web_flow_with_workers() {
         assert!(worker_result["result"].as_str().is_some());
         assert!(worker_result["agent_id"].as_str().is_some());
         assert!(worker_result["cost"].as_f64().is_some());
-        
+
         // Verify meaningful content for web display
         let result_text = worker_result["result"].as_str().unwrap();
-        assert!(result_text.len() > 30, "Worker result should contain meaningful content");
+        assert!(
+            result_text.len() > 30,
+            "Worker result should contain meaningful content"
+        );
     }
-    
+
     // Verify execution summary for web metrics
     let exec_summary = &result["execution_summary"];
     assert!(exec_summary["orchestrator_id"].as_str().is_some());
@@ -247,27 +259,27 @@ async fn test_optimization_web_flow_with_iterations() {
         }
     });
 
-    let response = server
-        .post("/workflows/optimize")
-        .json(&web_request)
-        .await;
+    let response = server.post("/workflows/optimize").json(&web_request).await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
-    
+
     assert!(body["success"].as_bool().unwrap());
-    assert_eq!(body["metadata"]["pattern"].as_str().unwrap(), "Optimization");
-    
+    assert_eq!(
+        body["metadata"]["pattern"].as_str().unwrap(),
+        "Optimization"
+    );
+
     // Verify optimization results for web progress tracking
     let result = &body["result"];
     assert!(result["iterations"].as_array().is_some());
     assert!(result["final_content"].as_str().is_some());
     assert!(result["execution_summary"].is_object());
-    
+
     let iterations = result["iterations"].as_array().unwrap();
     assert!(iterations.len() >= 1, "Should have optimization iterations");
     assert!(iterations.len() <= 3, "Should not exceed max iterations");
-    
+
     // Verify iteration data for web progress visualization
     for (i, iteration) in iterations.iter().enumerate() {
         assert_eq!(iteration["iteration"].as_u64().unwrap(), (i + 1) as u64);
@@ -276,16 +288,19 @@ async fn test_optimization_web_flow_with_iterations() {
         assert!(iteration["quality_score"].as_f64().is_some());
         assert!(iteration["generator_tokens"].as_u64().is_some());
         assert!(iteration["evaluator_tokens"].as_u64().is_some());
-        
+
         // Verify quality progression for web charts
         let quality_score = iteration["quality_score"].as_f64().unwrap();
         assert!(quality_score >= 1.0 && quality_score <= 10.0);
-        
+
         // Verify substantial content for web display
         let generated_content = iteration["generated_content"].as_str().unwrap();
-        assert!(generated_content.len() > 20, "Generated content should be substantial");
+        assert!(
+            generated_content.len() > 20,
+            "Generated content should be substantial"
+        );
     }
-    
+
     // Verify execution summary for web dashboard
     let exec_summary = &result["execution_summary"];
     assert!(exec_summary["generator_id"].as_str().is_some());
@@ -293,10 +308,13 @@ async fn test_optimization_web_flow_with_iterations() {
     assert!(exec_summary["iterations_completed"].as_u64().is_some());
     assert!(exec_summary["best_quality_score"].as_f64().is_some());
     assert!(exec_summary["quality_threshold"].as_f64().unwrap() == 8.0);
-    
+
     // Verify final optimized content
     let final_content = result["final_content"].as_str().unwrap();
-    assert!(final_content.len() > 50, "Final content should be comprehensive");
+    assert!(
+        final_content.len() > 50,
+        "Final content should be comprehensive"
+    );
 }
 
 #[tokio::test]
@@ -309,12 +327,12 @@ async fn test_web_error_handling_and_validation() {
         .post("/workflows/route")
         .json(&json!({"invalid": "request"}))
         .await;
-    
+
     // Should still return OK with proper error structure for web handling
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
     assert!(body["success"].as_bool().unwrap()); // Gracefully handles missing prompt
-    
+
     // Test empty prompt
     let response = server
         .post("/workflows/parallel")
@@ -323,7 +341,7 @@ async fn test_web_error_handling_and_validation() {
             "role": "Test Role"
         }))
         .await;
-    
+
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
     assert!(body["success"].as_bool().unwrap()); // Gracefully handles empty prompt
@@ -354,13 +372,13 @@ async fn test_web_workflow_status_monitoring() {
 
     assert_eq!(status_response.status_code(), StatusCode::OK);
     let status_body = status_response.json::<serde_json::Value>();
-    
+
     // Verify status structure for web monitoring
     assert_eq!(status_body["id"].as_str().unwrap(), workflow_id);
     assert!(status_body["status"].as_str().is_some());
     assert!(status_body["progress"].as_f64().is_some());
     assert!(status_body["started_at"].as_str().is_some());
-    
+
     // Test execution trace for web debugging
     let trace_response = server
         .get(&format!("/workflows/{}/trace", workflow_id))
@@ -368,12 +386,14 @@ async fn test_web_workflow_status_monitoring() {
 
     assert_eq!(trace_response.status_code(), StatusCode::OK);
     let trace_body = trace_response.json::<serde_json::Value>();
-    
+
     // Verify trace structure for web debugging interface
     assert_eq!(trace_body["workflow_id"].as_str().unwrap(), workflow_id);
     assert!(trace_body["timeline"].is_object());
     assert!(trace_body["performance"].is_object());
-    assert!(trace_body["performance"]["execution_time_ms"].as_i64().is_some());
+    assert!(trace_body["performance"]["execution_time_ms"]
+        .as_i64()
+        .is_some());
 }
 
 #[tokio::test]
@@ -423,7 +443,7 @@ async fn test_web_agent_role_integration() {
     // Test that web interface can specify custom roles and configurations
     let custom_role_request = json!({
         "prompt": "Design a blockchain-based supply chain system",
-        "role": "Blockchain Architect", 
+        "role": "Blockchain Architect",
         "overall_role": "Technical Consultant",
         "config": {
             "include_smart_contracts": true,
@@ -439,12 +459,18 @@ async fn test_web_agent_role_integration() {
 
     assert_eq!(response.status_code(), StatusCode::OK);
     let body = response.json::<serde_json::Value>();
-    
+
     assert!(body["success"].as_bool().unwrap());
-    
+
     // Verify that role information is preserved in the response for web display
-    assert_eq!(body["metadata"]["role"].as_str().unwrap(), "Task Orchestrator");
-    assert_eq!(body["metadata"]["overall_role"].as_str().unwrap(), "Workflow Coordinator");
+    assert_eq!(
+        body["metadata"]["role"].as_str().unwrap(),
+        "Task Orchestrator"
+    );
+    assert_eq!(
+        body["metadata"]["overall_role"].as_str().unwrap(),
+        "Workflow Coordinator"
+    );
 }
 
 #[tokio::test]
@@ -455,13 +481,13 @@ async fn test_web_concurrent_workflow_handling() {
     // Simulate concurrent web requests (common in web applications)
     let concurrent_requests = vec![
         ("prompt-chain", "Create API documentation"),
-        ("route", "Implement user authentication"), 
+        ("route", "Implement user authentication"),
         ("parallel", "Analyze market trends"),
         ("optimize", "Write product descriptions"),
     ];
 
     let mut handles = vec![];
-    
+
     for (workflow_type, prompt) in concurrent_requests {
         let base_url = format!("http://{}", server.server_address().unwrap());
         let client = reqwest::Client::new();
@@ -485,7 +511,7 @@ async fn test_web_concurrent_workflow_handling() {
     for result in results {
         let response = result.unwrap().unwrap();
         assert_eq!(response.status(), reqwest::StatusCode::OK);
-        
+
         let body = response.json::<serde_json::Value>().await.unwrap();
         assert!(body["success"].as_bool().unwrap());
         assert!(body["workflow_id"].as_str().is_some());

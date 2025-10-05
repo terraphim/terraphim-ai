@@ -12,8 +12,8 @@ use terraphim_persistence::{DeviceStorage, Persistable};
 use terraphim_rolegraph::RoleGraph;
 
 use crate::{
-    AgentContext, AgentId, CommandHistory, CommandInput, CommandOutput,
-    CommandRecord, CommandType, ContextItem, ContextItemType, CostTracker, GenAiLlmClient, LlmMessage, LlmRequest,
+    AgentContext, AgentId, CommandHistory, CommandInput, CommandOutput, CommandRecord, CommandType,
+    ContextItem, ContextItemType, CostTracker, GenAiLlmClient, LlmMessage, LlmRequest,
     MultiAgentError, MultiAgentResult, TokenUsageTracker,
 };
 
@@ -222,22 +222,32 @@ impl TerraphimAgent {
         let cost_tracker = Arc::new(RwLock::new(CostTracker::new()));
 
         // Initialize LLM client using role configuration
-        let provider = role_config.extra.get("llm_provider")
+        let provider = role_config
+            .extra
+            .get("llm_provider")
             .and_then(|v| v.as_str())
             .unwrap_or("ollama");
-        let model = role_config.extra.get("llm_model")
+        let model = role_config
+            .extra
+            .get("llm_model")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let base_url = role_config.extra.get("llm_base_url")
+        let base_url = role_config
+            .extra
+            .get("llm_base_url")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        
-        log::debug!("🤖 TerraphimAgent::new - LLM config: provider={}, model={:?}, base_url={:?}", 
-                   provider, model, base_url);
-        
-        let llm_client = Arc::new(
-            GenAiLlmClient::from_config_with_url(provider, model, base_url)?
+
+        log::debug!(
+            "🤖 TerraphimAgent::new - LLM config: provider={}, model={:?}, base_url={:?}",
+            provider,
+            model,
+            base_url
         );
+
+        let llm_client = Arc::new(GenAiLlmClient::from_config_with_url(
+            provider, model, base_url,
+        )?);
 
         let now = Utc::now();
 
@@ -285,10 +295,7 @@ impl TerraphimAgent {
     }
 
     /// Process a command using Rig framework
-    pub async fn process_command(
-        &self,
-        input: CommandInput,
-    ) -> MultiAgentResult<CommandOutput> {
+    pub async fn process_command(&self, input: CommandInput) -> MultiAgentResult<CommandOutput> {
         {
             let status = self.status.read().await;
             if *status != AgentStatus::Ready {
@@ -414,8 +421,7 @@ impl TerraphimAgent {
         };
 
         let key = format!("agent_state:{}", self.agent_id);
-        let serialized =
-            serde_json::to_vec(&state).map_err(MultiAgentError::SerializationError)?;
+        let serialized = serde_json::to_vec(&state).map_err(MultiAgentError::SerializationError)?;
 
         // Use DeviceStorage write method
         self.persistence
@@ -435,8 +441,8 @@ impl TerraphimAgent {
 
         match self.persistence.fastest_op.read(&key).await {
             Ok(data) => {
-                let state: AgentState = serde_json::from_slice(&data)
-                    .map_err(MultiAgentError::SerializationError)?;
+                let state: AgentState =
+                    serde_json::from_slice(&data).map_err(MultiAgentError::SerializationError)?;
 
                 // Restore state
                 // TODO: Implement proper state loading with interior mutability
@@ -481,25 +487,29 @@ impl TerraphimAgent {
         let mut context = self.context.write().await;
 
         // Add system prompt - use configured prompt if available, otherwise use generic
-        let system_prompt = if let Some(configured_prompt) = self.role_config.extra.get("llm_system_prompt") {
-            configured_prompt.as_str().unwrap_or("").to_string()
-        } else {
-            format!(
-                "You are {}, a specialized AI agent with the following capabilities: {}. \
+        let system_prompt =
+            if let Some(configured_prompt) = self.role_config.extra.get("llm_system_prompt") {
+                configured_prompt.as_str().unwrap_or("").to_string()
+            } else {
+                format!(
+                    "You are {}, a specialized AI agent with the following capabilities: {}. \
                  Your global goal is: {}. Your individual goals are: {}.",
-                self.role_config.name,
-                self.get_capabilities().join(", "),
-                self.goals.global_goal,
-                self.goals.individual_goals.join(", ")
-            )
-        };
-        
-        log::debug!("🎯 Agent {} using system prompt: {}", self.role_config.name, 
-                   if system_prompt.len() > 100 { 
-                       format!("{}...", &system_prompt[..100]) 
-                   } else { 
-                       system_prompt.clone() 
-                   });
+                    self.role_config.name,
+                    self.get_capabilities().join(", "),
+                    self.goals.global_goal,
+                    self.goals.individual_goals.join(", ")
+                )
+            };
+
+        log::debug!(
+            "🎯 Agent {} using system prompt: {}",
+            self.role_config.name,
+            if system_prompt.len() > 100 {
+                format!("{}...", &system_prompt[..100])
+            } else {
+                system_prompt.clone()
+            }
+        );
 
         let mut system_item = ContextItem::new(
             ContextItemType::System,
@@ -762,7 +772,7 @@ impl TerraphimAgent {
 
         let thesaurus = Thesaurus::new("default".to_string());
         build_autocomplete_index(thesaurus, Some(AutocompleteConfig::default()))
-                .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
     }
 
     fn extract_individual_goals(role_config: &Role) -> Vec<String> {

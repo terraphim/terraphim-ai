@@ -8,10 +8,12 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use crate::{MultiAgentResult, LlmRequest, LlmResponse, TokenUsage, MessageRole, MultiAgentError};
+use crate::{LlmRequest, LlmResponse, MessageRole, MultiAgentError, MultiAgentResult, TokenUsage};
 use chrono::Utc;
+use tiktoken_rs::{
+    cl100k_base, get_chat_completion_max_tokens, o200k_base, ChatCompletionRequestMessage,
+};
 use uuid::Uuid;
-use tiktoken_rs::{cl100k_base, o200k_base, get_chat_completion_max_tokens, ChatCompletionRequestMessage};
 
 /// Direct HTTP LLM client that works with multiple providers
 #[derive(Debug)]
@@ -74,7 +76,6 @@ struct OllamaMessage {
 #[derive(Debug, Deserialize)]
 struct OllamaResponse {
     message: OllamaResponseMessage,
-    done: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,7 +102,6 @@ struct OpenAiMessage {
 #[derive(Debug, Deserialize)]
 struct OpenAiResponse {
     choices: Vec<OpenAiChoice>,
-    usage: Option<OpenAiUsage>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,21 +109,16 @@ struct OpenAiChoice {
     message: OpenAiMessage,
 }
 
-#[derive(Debug, Deserialize)]
-struct OpenAiUsage {
-    prompt_tokens: u64,
-    completion_tokens: u64,
-    total_tokens: u64,
-}
-
 impl GenAiLlmClient {
     /// Create a new Direct HTTP LLM client
     pub fn new(provider: String, config: ProviderConfig) -> MultiAgentResult<Self> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(300))  // Increased from 30 to 300 seconds for complex workflows
+            .timeout(Duration::from_secs(300)) // Increased from 30 to 300 seconds for complex workflows
             .build()
-            .map_err(|e| MultiAgentError::LlmError(format!("Failed to create HTTP client: {}", e)))?;
-        
+            .map_err(|e| {
+                MultiAgentError::LlmError(format!("Failed to create HTTP client: {}", e))
+            })?;
+
         Ok(Self {
             client,
             provider,
@@ -154,12 +149,17 @@ impl GenAiLlmClient {
     pub async fn generate(&self, request: LlmRequest) -> MultiAgentResult<LlmResponse> {
         let start_time = Utc::now();
         let request_id = Uuid::new_v4();
-        
+
         let response_content = match self.provider.as_str() {
             "ollama" => self.call_ollama(&request).await?,
             "openai" => self.call_openai(&request).await?,
             "anthropic" => self.call_anthropic(&request).await?,
-            _ => return Err(MultiAgentError::LlmError(format!("Unsupported provider: {}", self.provider))),
+            _ => {
+                return Err(MultiAgentError::LlmError(format!(
+                    "Unsupported provider: {}",
+                    self.provider
+                )))
+            }
         };
 
         let end_time = Utc::now();
@@ -167,9 +167,14 @@ impl GenAiLlmClient {
 
         // Estimate token usage using tiktoken
         let (input_tokens, output_tokens) = self.estimate_tokens(&request, &response_content);
-        
-        log::debug!("Token usage - Input: {}, Output: {}, Total: {}", input_tokens, output_tokens, input_tokens + output_tokens);
-        
+
+        log::debug!(
+            "Token usage - Input: {}, Output: {}, Total: {}",
+            input_tokens,
+            output_tokens,
+            input_tokens + output_tokens
+        );
+
         Ok(LlmResponse {
             content: response_content,
             model: self.model.clone(),
@@ -183,7 +188,8 @@ impl GenAiLlmClient {
 
     /// Call Ollama API
     async fn call_ollama(&self, request: &LlmRequest) -> MultiAgentResult<String> {
-        let messages: Vec<OllamaMessage> = request.messages
+        let messages: Vec<OllamaMessage> = request
+            .messages
             .iter()
             .map(|msg| OllamaMessage {
                 role: match msg.role {
@@ -203,20 +209,25 @@ impl GenAiLlmClient {
         };
 
         let url = format!("{}/api/chat", self.base_url);
-        
+
         // Debug logging - log the request details
         log::debug!("🤖 LLM Request to Ollama: {} at {}", self.model, url);
         log::debug!("📋 Messages ({}):", ollama_request.messages.len());
         for (i, msg) in ollama_request.messages.iter().enumerate() {
-            log::debug!("  [{}] {}: {}", i + 1, msg.role, 
-                if msg.content.len() > 200 { 
-                    format!("{}...", &msg.content[..200]) 
-                } else { 
-                    msg.content.clone() 
-                });
+            log::debug!(
+                "  [{}] {}: {}",
+                i + 1,
+                msg.role,
+                if msg.content.len() > 200 {
+                    format!("{}...", &msg.content[..200])
+                } else {
+                    msg.content.clone()
+                }
+            );
         }
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post(&url)
             .json(&ollama_request)
             .send()
@@ -228,34 +239,41 @@ impl GenAiLlmClient {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             log::error!("❌ Ollama API error {}: {}", status, text);
-            return Err(MultiAgentError::LlmError(format!("Ollama API error {}: {}", status, text)));
+            return Err(MultiAgentError::LlmError(format!(
+                "Ollama API error {}: {}",
+                status, text
+            )));
         }
 
-        let ollama_response: OllamaResponse = response
-            .json()
-            .await
-            .map_err(|e| {
-                log::error!("❌ Failed to parse Ollama response: {}", e);
-                MultiAgentError::LlmError(format!("Failed to parse Ollama response: {}", e))
-            })?;
+        let ollama_response: OllamaResponse = response.json().await.map_err(|e| {
+            log::error!("❌ Failed to parse Ollama response: {}", e);
+            MultiAgentError::LlmError(format!("Failed to parse Ollama response: {}", e))
+        })?;
 
         // Debug logging - log the response
         let response_content = &ollama_response.message.content;
-        log::debug!("✅ LLM Response from {}: {}", self.model, 
-            if response_content.len() > 200 { 
-                format!("{}...", &response_content[..200]) 
-            } else { 
-                response_content.clone() 
-            });
+        log::debug!(
+            "✅ LLM Response from {}: {}",
+            self.model,
+            if response_content.len() > 200 {
+                format!("{}...", &response_content[..200])
+            } else {
+                response_content.clone()
+            }
+        );
 
         Ok(ollama_response.message.content)
     }
 
     /// Call OpenAI API (placeholder - requires API key setup)
     async fn call_openai(&self, request: &LlmRequest) -> MultiAgentResult<String> {
-        let messages: Vec<OpenAiMessage> = request.messages
+        let messages: Vec<OpenAiMessage> = request
+            .messages
             .iter()
             .map(|msg| OpenAiMessage {
                 role: match msg.role {
@@ -276,18 +294,18 @@ impl GenAiLlmClient {
         };
 
         let url = format!("{}/chat/completions", self.base_url);
-        
+
         // TODO: Add API key from environment or config
-        let mut request_builder = self.client
-            .post(&url)
-            .json(&openai_request);
+        let mut request_builder = self.client.post(&url).json(&openai_request);
 
         if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
             request_builder = request_builder.bearer_auth(api_key);
         } else {
-            return Err(MultiAgentError::LlmError("OpenAI API key not found in OPENAI_API_KEY environment variable".to_string()));
+            return Err(MultiAgentError::LlmError(
+                "OpenAI API key not found in OPENAI_API_KEY environment variable".to_string(),
+            ));
         }
-        
+
         let response = request_builder
             .send()
             .await
@@ -295,16 +313,22 @@ impl GenAiLlmClient {
 
         if !response.status().is_success() {
             let status = response.status();
-            let text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(MultiAgentError::LlmError(format!("OpenAI API error {}: {}", status, text)));
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(MultiAgentError::LlmError(format!(
+                "OpenAI API error {}: {}",
+                status, text
+            )));
         }
 
-        let openai_response: OpenAiResponse = response
-            .json()
-            .await
-            .map_err(|e| MultiAgentError::LlmError(format!("Failed to parse OpenAI response: {}", e)))?;
+        let openai_response: OpenAiResponse = response.json().await.map_err(|e| {
+            MultiAgentError::LlmError(format!("Failed to parse OpenAI response: {}", e))
+        })?;
 
-        Ok(openai_response.choices
+        Ok(openai_response
+            .choices
             .first()
             .map(|choice| choice.message.content.clone())
             .unwrap_or_else(|| "No response".to_string()))
@@ -313,7 +337,9 @@ impl GenAiLlmClient {
     /// Call Anthropic API (placeholder - requires API key setup)
     async fn call_anthropic(&self, _request: &LlmRequest) -> MultiAgentResult<String> {
         // TODO: Implement Anthropic API call
-        Err(MultiAgentError::LlmError("Anthropic API not implemented yet".to_string()))
+        Err(MultiAgentError::LlmError(
+            "Anthropic API not implemented yet".to_string(),
+        ))
     }
 
     /// Get the model name
@@ -339,12 +365,17 @@ impl GenAiLlmClient {
         } else {
             cl100k_base()
         };
-        
+
         let encoding = match encoding {
             Ok(enc) => enc,
             Err(_) => {
                 // Ultimate fallback: rough character-based estimation
-                let input_text: String = request.messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join(" ");
+                let input_text: String = request
+                    .messages
+                    .iter()
+                    .map(|m| m.content.clone())
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 let input_tokens = (input_text.len() / 4) as u64;
                 let output_tokens = (response.len() / 4) as u64;
                 log::warn!("Using character-based token estimation fallback");
@@ -353,7 +384,8 @@ impl GenAiLlmClient {
         };
 
         // Get max tokens for this model
-        let tiktoken_messages: Vec<ChatCompletionRequestMessage> = request.messages
+        let tiktoken_messages: Vec<ChatCompletionRequestMessage> = request
+            .messages
             .iter()
             .map(|msg| ChatCompletionRequestMessage {
                 content: Some(msg.content.clone()),
@@ -367,27 +399,44 @@ impl GenAiLlmClient {
                 function_call: None,
             })
             .collect();
-        
-        let max_tokens = get_chat_completion_max_tokens(&self.model, &tiktoken_messages).unwrap_or(4096);
+
+        let max_tokens =
+            get_chat_completion_max_tokens(&self.model, &tiktoken_messages).unwrap_or(4096);
         log::debug!("Model {} max tokens: {}", self.model, max_tokens);
 
         // For input tokens, count all messages properly
-        let input_text: String = request.messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join(" ");
+        let input_text: String = request
+            .messages
+            .iter()
+            .map(|m| m.content.clone())
+            .collect::<Vec<_>>()
+            .join(" ");
         let input_tokens = encoding.encode_with_special_tokens(&input_text).len() as u64;
-        
+
         // For output tokens, encode the response
         let output_tokens = encoding.encode_with_special_tokens(response).len() as u64;
-        
+
         // Check if we're approaching the token limit
         let total_tokens = input_tokens + output_tokens;
-        if total_tokens > (max_tokens as u64 * 9 / 10) { // 90% of max
-            log::warn!("Token usage approaching limit: {}/{} tokens for model {}", 
-                      total_tokens, max_tokens, self.model);
+        if total_tokens > (max_tokens as u64 * 9 / 10) {
+            // 90% of max
+            log::warn!(
+                "Token usage approaching limit: {}/{} tokens for model {}",
+                total_tokens,
+                max_tokens,
+                self.model
+            );
         }
-        
-        log::debug!("Tiktoken estimation - Model: {}, Input: {} tokens, Output: {} tokens, Total: {}/{}", 
-                   self.model, input_tokens, output_tokens, total_tokens, max_tokens);
-        
+
+        log::debug!(
+            "Tiktoken estimation - Model: {}, Input: {} tokens, Output: {} tokens, Total: {}/{}",
+            self.model,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            max_tokens
+        );
+
         (input_tokens, output_tokens)
     }
 }
@@ -415,7 +464,11 @@ impl GenAiLlmClient {
     }
 
     /// Create client from provider configuration with custom base URL
-    pub fn from_config_with_url(provider: &str, model: Option<String>, base_url: Option<String>) -> MultiAgentResult<Self> {
+    pub fn from_config_with_url(
+        provider: &str,
+        model: Option<String>,
+        base_url: Option<String>,
+    ) -> MultiAgentResult<Self> {
         match provider.to_lowercase().as_str() {
             "ollama" => {
                 let mut config = ProviderConfig::ollama(model);
@@ -440,7 +493,10 @@ impl GenAiLlmClient {
             }
             _ => {
                 // Default to Ollama if unknown provider
-                log::warn!("Unknown provider '{}', defaulting to Ollama with custom URL", provider);
+                log::warn!(
+                    "Unknown provider '{}', defaulting to Ollama with custom URL",
+                    provider
+                );
                 let mut config = ProviderConfig::ollama(model);
                 if let Some(url) = base_url {
                     config.base_url = url;
@@ -485,14 +541,14 @@ mod tests {
     #[test]
     fn test_message_conversion() {
         let client = GenAiLlmClient::new_ollama(None).unwrap();
-        
+
         let messages = vec![
             LlmMessage::system("You are a helpful assistant.".to_string()),
             LlmMessage::user("Hello!".to_string()),
         ];
-        
+
         let request = LlmRequest::new(messages);
-        
+
         // This test just checks that the conversion doesn't panic
         // Actual LLM calls would require Ollama to be running
         assert_eq!(request.messages.len(), 2);

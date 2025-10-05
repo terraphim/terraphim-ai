@@ -5,6 +5,10 @@ edition = "2021"
 description = "Multi-agent system for Terraphim built on roles with Rig framework integration"
 license = "MIT"
 
+[features]
+default = []
+test-utils = []
+
 [dependencies]
 # Workspace dependencies
 tokio = { workspace = true }

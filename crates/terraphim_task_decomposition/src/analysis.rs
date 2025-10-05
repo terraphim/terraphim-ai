@@ -381,8 +381,25 @@ impl KnowledgeGraphTaskAnalyzer {
             capabilities.insert(format!("{}_expertise", domain.to_lowercase()));
         }
 
-        // Infer capabilities from concepts (simplified heuristic)
+        // Use role graph to identify capabilities from concepts
         for concept in concepts {
+            // Query role graph for related concepts and capabilities
+            if let Ok(query_results) = self.role_graph.query_graph(concept, None, Some(5)) {
+                for (doc_id, _document) in query_results.iter().take(3) {
+                    // Extract capability hints from document ID and tags
+                    if doc_id.contains("analysis") || doc_id.contains("analytical") {
+                        capabilities.insert("analytical_thinking".to_string());
+                    }
+                    if doc_id.contains("design") || doc_id.contains("creative") {
+                        capabilities.insert("design_thinking".to_string());
+                    }
+                    if doc_id.contains("programming") || doc_id.contains("coding") {
+                        capabilities.insert("programming".to_string());
+                    }
+                }
+            }
+
+            // Fallback to simple heuristics if role graph doesn't provide insights
             if concept.contains("analysis") || concept.contains("analyze") {
                 capabilities.insert("analytical_thinking".to_string());
             }
@@ -516,7 +533,7 @@ impl KnowledgeGraphTaskAnalyzer {
             / 30.0; // Normalize by expected total
         score += context_richness.min(1.0) * 0.3;
 
-        score.min(1.0).max(0.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Estimate effort in hours based on complexity and factors

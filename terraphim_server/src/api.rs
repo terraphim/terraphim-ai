@@ -859,10 +859,7 @@ pub(crate) async fn summarize_document(
             })?
         };
 
-        let model = role
-            .llm_model
-            .as_deref()
-            .unwrap_or("openai/gpt-3.5-turbo");
+        let model = role.llm_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
         let max_length = request.max_length.unwrap_or(250);
         let force_regenerate = request.force_regenerate.unwrap_or(false);
 
@@ -1001,8 +998,7 @@ pub(crate) async fn get_summarization_status(
     #[cfg(feature = "openrouter")]
     {
         let llm_enabled = role.llm_enabled;
-        let llm_configured =
-            role.has_llm_config() || std::env::var("OPENROUTER_KEY").is_ok();
+        let llm_configured = role.has_llm_config() || std::env::var("OPENROUTER_KEY").is_ok();
         let model = role.get_llm_model().map(|s| s.to_string());
 
         // Note: For now, we'll set cached_summaries_count to 0

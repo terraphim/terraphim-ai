@@ -197,10 +197,12 @@ class OrchestratorWorkersDemo {
 
   setupEventListeners() {
     // Initialize element references first
-    this.queryInput = document.getElementById('analysis-query');
+    this.queryInput = document.getElementById('research-query');
     this.startButton = document.getElementById('start-pipeline');
     this.pauseButton = document.getElementById('pause-pipeline');
     this.resetButton = document.getElementById('reset-pipeline');
+    this.roleSelector = document.getElementById('role-selector');
+    this.systemPrompt = document.getElementById('system-prompt');
 
     // Data source selection
     document.addEventListener('click', (e) => {
@@ -249,6 +251,8 @@ class OrchestratorWorkersDemo {
   }
 
   populateRoleSelector() {
+    if (!this.roleSelector) return;
+    
     this.roleSelector.innerHTML = '';
     for (const roleName in this.roles) {
       const option = document.createElement('option');
@@ -260,6 +264,8 @@ class OrchestratorWorkersDemo {
   }
 
   onRoleChange() {
+    if (!this.roleSelector || !this.systemPrompt) return;
+    
     const selectedRoleName = this.roleSelector.value;
     const role = this.roles[selectedRoleName];
 
@@ -364,6 +370,11 @@ class OrchestratorWorkersDemo {
   }
 
   async startOrchestration() {
+    if (!this.queryInput) {
+      alert('Query input not found. Please refresh the page.');
+      return;
+    }
+    
     const query = this.queryInput.value.trim();
     
     if (!query) {
@@ -435,10 +446,10 @@ class OrchestratorWorkersDemo {
     await this.delay(1500);
     
     // Simulate task analysis and worker assignment optimization
-    const query = this.queryInput.value;
+    const query = this.queryInput ? this.queryInput.value : '';
     const complexity = this.analyzeQueryComplexity(query);
 
-    const agentState = this.agentConfigManager.getState();
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
 
     const input = {
       prompt: query,
@@ -668,8 +679,12 @@ class OrchestratorWorkersDemo {
   }
 
   updateControlsState() {
-    this.startButton.disabled = this.isRunning;
-    this.pauseButton.disabled = !this.isRunning;
+    if (this.startButton) {
+      this.startButton.disabled = this.isRunning;
+    }
+    if (this.pauseButton) {
+      this.pauseButton.disabled = !this.isRunning;
+    }
   }
 
   pauseOrchestration() {
@@ -727,13 +742,17 @@ class OrchestratorWorkersDemo {
   }
 
   saveState() {
-    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
-    const state = {
-      query: this.queryInput.value,
-      activeDataSources: Array.from(this.selectedSources),
-      ...agentState
-    };
-    localStorage.setItem('orchestrator-demo-state', JSON.stringify(state));
+    try {
+      const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
+      const state = {
+        query: this.queryInput ? this.queryInput.value : '',
+        activeDataSources: Array.from(this.selectedSources),
+        ...agentState
+      };
+      localStorage.setItem('orchestrator-demo-state', JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save state:', error);
+    }
   }
 
   loadSavedState() {
@@ -741,10 +760,12 @@ class OrchestratorWorkersDemo {
     if (saved) {
       try {
         const savedState = JSON.parse(saved);
-        this.queryInput.value = savedState.query || '';
+        if (this.queryInput) {
+          this.queryInput.value = savedState.query || '';
+          this.analyzeQuery(this.queryInput.value);
+        }
         this.selectedSources = new Set(savedState.activeDataSources || []);
         this.renderDataSources();
-        this.analyzeQuery(this.queryInput.value);
 
         if (this.agentConfigManager) {
           this.agentConfigManager.applyState(savedState);
