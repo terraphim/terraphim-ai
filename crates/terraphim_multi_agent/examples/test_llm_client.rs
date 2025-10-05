@@ -1,8 +1,10 @@
 //! Test LLM Client directly to isolate the segfault
 
-use terraphim_multi_agent::{LlmClientConfig, RigLlmClient, AgentId, TokenUsageTracker, CostTracker};
-use tokio::sync::RwLock;
 use std::sync::Arc;
+use terraphim_multi_agent::{
+    AgentId, CostTracker, LlmClientConfig, RigLlmClient, TokenUsageTracker,
+};
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,17 +36,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match RigLlmClient::new(config, agent_id, token_tracker, cost_tracker).await {
         Ok(client) => {
             println!("✅ Created RigLlmClient successfully");
-            
+
             // Test a simple prompt
             println!("🤖 Testing prompt...");
-            
+
             let request = terraphim_multi_agent::LlmRequest {
-                messages: vec![
-                    terraphim_multi_agent::LlmMessage {
-                        role: "user".to_string(),
-                        content: "What is 2+2?".to_string(),
-                    }
-                ],
+                messages: vec![terraphim_multi_agent::LlmMessage {
+                    role: "user".to_string(),
+                    content: "What is 2+2?".to_string(),
+                }],
                 temperature: Some(0.7),
                 max_tokens: Some(100),
             };

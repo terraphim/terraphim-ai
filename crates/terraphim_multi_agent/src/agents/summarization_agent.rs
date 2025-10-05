@@ -58,21 +58,26 @@ impl SummarizationAgent {
     ) -> MultiAgentResult<Self> {
         // Extract LLM configuration from the agent's role
         let role = &terraphim_agent.role_config;
-        
+
         // Create LLM client based on role configuration
         let llm_client = if let Some(provider) = role.extra.get("llm_provider") {
             let provider_str = provider.as_str().unwrap_or("ollama");
-            let model = role.extra.get("llm_model")
+            let model = role
+                .extra
+                .get("llm_model")
                 .and_then(|m| m.as_str())
                 .map(|s| s.to_string());
-            
+
             Arc::new(GenAiLlmClient::from_config(provider_str, model)?)
         } else {
             // Default to Ollama with gemma3:270m
             Arc::new(GenAiLlmClient::new_ollama(Some("gemma3:270m".to_string()))?)
         };
 
-        info!("Created SummarizationAgent with provider: {}", llm_client.provider());
+        info!(
+            "Created SummarizationAgent with provider: {}",
+            llm_client.provider()
+        );
 
         Ok(Self {
             terraphim_agent,
@@ -83,8 +88,11 @@ impl SummarizationAgent {
 
     /// Generate a summary for the given text
     pub async fn summarize(&self, content: &str) -> MultiAgentResult<String> {
-        info!("Generating summary for content of {} characters", content.len());
-        
+        info!(
+            "Generating summary for content of {} characters",
+            content.len()
+        );
+
         let system_prompt = self.create_system_prompt();
         let user_prompt = self.create_user_prompt(content);
 
@@ -94,7 +102,10 @@ impl SummarizationAgent {
         ];
 
         // Use context window from role config, fallback to reasonable default for summaries
-        let max_tokens = self.terraphim_agent.role_config.llm_context_window
+        let max_tokens = self
+            .terraphim_agent
+            .role_config
+            .llm_context_window
             .map(|cw| (cw / 4).min(1000)) // Use 1/4 of context window, max 1000 for summaries
             .unwrap_or(500); // Default fallback
 
@@ -104,15 +115,18 @@ impl SummarizationAgent {
 
         debug!("Sending summarization request to LLM");
         let response = self.llm_client.generate(request).await?;
-        
+
         info!("Generated summary of {} characters", response.content.len());
         Ok(response.content.trim().to_string())
     }
 
     /// Summarize multiple documents and create a consolidated summary
     pub async fn summarize_multiple(&self, documents: &[(&str, &str)]) -> MultiAgentResult<String> {
-        info!("Generating consolidated summary for {} documents", documents.len());
-        
+        info!(
+            "Generating consolidated summary for {} documents",
+            documents.len()
+        );
+
         // Generate individual summaries first
         let mut individual_summaries = Vec::new();
         for (title, content) in documents {
@@ -123,7 +137,7 @@ impl SummarizationAgent {
         // Create consolidated summary
         let consolidated_content = individual_summaries.join("\n\n");
         let system_prompt = "You are an expert at creating consolidated summaries. Take multiple document summaries and create a cohesive overview that identifies common themes, key insights, and important differences.";
-        
+
         let user_prompt = format!(
             "Create a consolidated summary from these individual document summaries:\n\n{}\n\nProvide a cohesive overview that highlights:\n1. Common themes across documents\n2. Key insights and findings\n3. Important differences or contrasts\n4. Overall conclusions\n\nKeep the consolidated summary to approximately {} words.",
             consolidated_content,
@@ -159,7 +173,10 @@ impl SummarizationAgent {
         };
 
         let focus_instruction = if !self.config.focus_areas.is_empty() {
-            format!(" Pay special attention to these areas: {}.", self.config.focus_areas.join(", "))
+            format!(
+                " Pay special attention to these areas: {}.",
+                self.config.focus_areas.join(", ")
+            )
         } else {
             String::new()
         };
@@ -212,7 +229,7 @@ mod tests {
     async fn test_summarization_agent_creation() {
         let agent = create_test_agent().await.unwrap();
         let summarization_agent = SummarizationAgent::new(agent, None).await.unwrap();
-        
+
         assert_eq!(summarization_agent.config.max_summary_words, 200);
         assert_eq!(summarization_agent.llm_client.provider(), "ollama");
     }
@@ -223,10 +240,10 @@ mod tests {
         let mut config = SummarizationConfig::default();
         config.include_quotes = true;
         config.focus_areas = vec!["technology".to_string(), "innovation".to_string()];
-        
+
         let summarization_agent = SummarizationAgent::new(agent, Some(config)).await.unwrap();
         let prompt = summarization_agent.create_system_prompt();
-        
+
         assert!(prompt.contains("200 words"));
         assert!(prompt.contains("key quotes"));
         assert!(prompt.contains("technology, innovation"));

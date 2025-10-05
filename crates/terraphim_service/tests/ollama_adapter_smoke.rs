@@ -8,7 +8,12 @@ async fn test_ollama_summarize_real() {
     // Check if Ollama is running
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
-    if client.get(&format!("{}/api/tags", ollama_url)).send().await.is_err() {
+    if client
+        .get(&format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
         eprintln!("Skipping test: Ollama not running on {}", ollama_url);
         return;
     }
@@ -37,7 +42,7 @@ async fn test_ollama_summarize_real() {
         .insert("ollama_base_url".into(), serde_json::json!(ollama_url));
 
     let llm_client = llm::build_llm_from_role(&role).expect("Should build Ollama client");
-    
+
     // Test summarization with real Ollama
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(30), // Give more time for real LLM

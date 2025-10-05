@@ -267,14 +267,46 @@ impl TerraphimKnowledgeGraph {
                         .collect();
 
                     for concept in paragraph_concepts {
-                        // Simple similarity calculation (could be enhanced)
+                        // Enhanced similarity calculation using role graph
                         let similarity = self.calculate_concept_similarity(&concept, terms);
+
+                        // Use role graph to find related domains and metadata
+                        let mut domains = vec!["general".to_string()];
+                        let mut metadata = HashMap::new();
+
+                        // Query role graph for concept context
+                        if let Ok(query_results) =
+                            self.role_graph.query_graph(&concept, None, Some(3))
+                        {
+                            if !query_results.is_empty() {
+                                // Extract domain information from role graph results
+                                for (doc_id, document) in query_results.iter().take(2) {
+                                    // Extract domains from document tags
+                                    if !document.tags.is_empty() {
+                                        domains.extend(document.tags.clone());
+                                    }
+                                    metadata.insert(
+                                        "source_documents".to_string(),
+                                        serde_json::Value::String(doc_id.clone()),
+                                    );
+                                    metadata.insert(
+                                        "document_rank".to_string(),
+                                        serde_json::Value::String(document.rank.to_string()),
+                                    );
+                                }
+                            }
+                        }
+
+                        // Remove duplicates and limit domains
+                        domains.sort();
+                        domains.dedup();
+                        domains.truncate(3);
 
                         concepts.push(ConceptResult {
                             concept: concept.clone(),
                             similarity,
-                            domains: vec!["general".to_string()], // TODO: Implement domain detection
-                            metadata: HashMap::new(),
+                            domains,
+                            metadata,
                         });
                     }
                 }

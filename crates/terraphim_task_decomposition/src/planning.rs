@@ -371,7 +371,7 @@ impl KnowledgeGraphExecutionPlanner {
         let complexity_score = 1.0 / (1.0 + complexity_variance);
         score += complexity_score * 0.3;
 
-        score.min(1.0).max(0.0)
+        score.clamp(0.0, 1.0)
     }
 }
 

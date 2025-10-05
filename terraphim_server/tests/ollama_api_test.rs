@@ -8,7 +8,12 @@ async fn test_chat_endpoint_with_ollama() {
     // Check if Ollama is running
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
-    if client.get(&format!("{}/api/tags", ollama_url)).send().await.is_err() {
+    if client
+        .get(&format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
         eprintln!("Skipping test: Ollama not running on {}", ollama_url);
         return;
     }
@@ -18,7 +23,7 @@ async fn test_chat_endpoint_with_ollama() {
     let app = terraphim_server::create_app(config_path.to_string())
         .await
         .expect("Failed to create app");
-    
+
     let server = TestServer::new(app).expect("Failed to create test server");
 
     // Test chat request
@@ -29,18 +34,15 @@ async fn test_chat_endpoint_with_ollama() {
         ]
     });
 
-    let response = server
-        .post("/chat")
-        .json(&payload)
-        .await;
+    let response = server.post("/chat").json(&payload).await;
 
     // Verify response
     response.assert_status_ok();
-    
+
     let json: serde_json::Value = response.json();
     assert_eq!(json["status"], "Success");
     assert!(json["message"].is_string());
-    
+
     let message = json["message"].as_str().unwrap();
     assert!(!message.is_empty(), "Response should not be empty");
 }
@@ -52,7 +54,7 @@ async fn test_chat_endpoint_invalid_role() {
     let app = terraphim_server::create_app(config_path.to_string())
         .await
         .expect("Failed to create app");
-    
+
     let server = TestServer::new(app).expect("Failed to create test server");
 
     let payload = json!({
@@ -62,23 +64,20 @@ async fn test_chat_endpoint_invalid_role() {
         ]
     });
 
-    let response = server
-        .post("/chat")
-        .json(&payload)
-        .await;
+    let response = server.post("/chat").json(&payload).await;
 
     // Should return error for invalid role
     response.assert_status_bad_request();
 }
 
 /// Test /chat endpoint with empty messages
-#[tokio::test] 
+#[tokio::test]
 async fn test_chat_endpoint_empty_messages() {
     let config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::create_app(config_path.to_string())
         .await
         .expect("Failed to create app");
-    
+
     let server = TestServer::new(app).expect("Failed to create test server");
 
     let payload = json!({
@@ -86,10 +85,7 @@ async fn test_chat_endpoint_empty_messages() {
         "messages": []
     });
 
-    let response = server
-        .post("/chat")
-        .json(&payload)
-        .await;
+    let response = server.post("/chat").json(&payload).await;
 
     // Should handle empty messages gracefully
     response.assert_status_bad_request();

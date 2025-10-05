@@ -145,11 +145,8 @@ impl Role {
 
     /// Check if LLM is properly configured for this role
     pub fn has_llm_config(&self) -> bool {
-        self.llm_enabled
-            && self.llm_api_key.is_some()
-            && self.llm_model.is_some()
+        self.llm_enabled && self.llm_api_key.is_some() && self.llm_model.is_some()
     }
-
 
     /// Get the LLM model name, providing a sensible default
     pub fn get_llm_model(&self) -> Option<&str> {
@@ -381,9 +378,8 @@ impl ConfigBuilder {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
-        
-        self = self.add_role("Default", default_role
-        );
+
+        self = self.add_role("Default", default_role);
 
         // Add Terraphim Engineer role with knowledge graph
         let mut terraphim_role = Role::new("Terraphim Engineer");
@@ -407,9 +403,8 @@ impl ConfigBuilder {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
-        
-        self = self.add_role("Terraphim Engineer", terraphim_role
-        );
+
+        self = self.add_role("Terraphim Engineer", terraphim_role);
 
         // Add Rust Engineer role with QueryRs
         let mut rust_engineer_role = Role::new("Rust Engineer");
@@ -422,7 +417,7 @@ impl ConfigBuilder {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
-        
+
         self = self.add_role("Rust Engineer", rust_engineer_role);
 
         // Set Terraphim Engineer as default and selected role

@@ -26,7 +26,14 @@ use thiserror::Error;
 
 // Re-export core types
 pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};
-pub use terraphim_gen_agent::{GenAgent, GenAgentError, GenAgentResult};
+// Define GenAgent types locally since we removed gen_agent dependency
+pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum GenAgentError {
+    #[error("Execution error: {0}")]
+    ExecutionError(String),
+}
 pub use terraphim_types::*;
 
 pub mod coordination;
