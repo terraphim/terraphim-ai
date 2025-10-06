@@ -39,6 +39,9 @@ pub mod error;
 // Context management for LLM conversations
 pub mod context;
 
+// Conversation service for chat session history
+pub mod conversation_service;
+
 #[cfg(test)]
 mod context_tests;
 

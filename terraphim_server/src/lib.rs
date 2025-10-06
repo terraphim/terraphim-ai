@@ -116,6 +116,7 @@ fn create_document_description(content: &str) -> Option<String> {
 }
 
 mod api;
+mod api_conversations;
 mod error;
 
 use api::{
@@ -505,6 +506,43 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route(
             "/conversations/:id/context/kg/index",
             post(api::add_kg_index_context),
+        )
+        // Persistent conversation management routes (new)
+        .route(
+            "/api/conversations",
+            get(api_conversations::list_persistent_conversations),
+        )
+        .route(
+            "/api/conversations",
+            post(api_conversations::create_persistent_conversation),
+        )
+        .route(
+            "/api/conversations/search",
+            get(api_conversations::search_persistent_conversations),
+        )
+        .route(
+            "/api/conversations/statistics",
+            get(api_conversations::get_conversation_statistics),
+        )
+        .route(
+            "/api/conversations/:id",
+            get(api_conversations::get_persistent_conversation),
+        )
+        .route(
+            "/api/conversations/:id",
+            axum::routing::put(api_conversations::update_persistent_conversation),
+        )
+        .route(
+            "/api/conversations/:id",
+            delete(api_conversations::delete_persistent_conversation),
+        )
+        .route(
+            "/api/conversations/:id/export",
+            post(api_conversations::export_persistent_conversation),
+        )
+        .route(
+            "/api/conversations/import",
+            post(api_conversations::import_persistent_conversation),
         )
         .fallback(static_handler)
         .with_state(config_state)

@@ -3,7 +3,6 @@ use terraphim_automata::AutomataPath;
 use terraphim_config::{KnowledgeGraph, KnowledgeGraphLocal, Role};
 use terraphim_service::{ConfigState, TerraphimService};
 use terraphim_types::{Document, KnowledgeGraphInputType, RoleName};
-use tokio;
 
 /// Test to verify that KG preprocessing happens exactly once per document-role combination
 /// This is a comprehensive test that focuses on the HashMap tracking functionality
