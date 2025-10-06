@@ -40,4 +40,52 @@ const roles = writable<Role[]>([]);
 let input = writable<string>("");
 const typeahead = writable<boolean>(false);
 
-export { configStore, input, is_tauri, role, roles, serverUrl, theme, typeahead, thesaurus, isInitialSetupComplete };
+// Conversation management stores
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  role: string;
+  message_count: number;
+  preview: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationStatistics = {
+  total_conversations: number;
+  total_messages: number;
+  conversations_by_role: Record<string, number>;
+};
+
+// Store for persistent conversations list
+const persistentConversations = writable<ConversationSummary[]>([]);
+
+// Store for current persistent conversation ID
+const currentPersistentConversationId = writable<string | null>(null);
+
+// Store for conversation statistics
+const conversationStatistics = writable<ConversationStatistics>({
+  total_conversations: 0,
+  total_messages: 0,
+  conversations_by_role: {}
+});
+
+// Store for showing/hiding session list panel
+const showSessionList = writable<boolean>(false);
+
+export {
+  configStore,
+  input,
+  is_tauri,
+  role,
+  roles,
+  serverUrl,
+  theme,
+  typeahead,
+  thesaurus,
+  isInitialSetupComplete,
+  persistentConversations,
+  currentPersistentConversationId,
+  conversationStatistics,
+  showSessionList
+};

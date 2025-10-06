@@ -377,7 +377,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::find_documents_for_kg_term,
             cmd::save_article_to_atomic,
             cmd::get_autocomplete_suggestions,
-            // Conversation management commands
+            // Conversation management commands (in-memory)
             cmd::create_conversation,
             cmd::list_conversations,
             cmd::get_conversation,
@@ -386,6 +386,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::add_search_context_to_conversation,
             cmd::delete_context,
             cmd::update_context,
+            // Persistent conversation management commands
+            cmd::list_persistent_conversations,
+            cmd::get_persistent_conversation,
+            cmd::create_persistent_conversation,
+            cmd::update_persistent_conversation,
+            cmd::delete_persistent_conversation,
+            cmd::search_persistent_conversations,
+            cmd::export_persistent_conversation,
+            cmd::import_persistent_conversation,
+            cmd::get_conversation_statistics,
             // Chat command
             cmd::chat,
             // KG search commands
