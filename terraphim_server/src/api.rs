@@ -572,6 +572,37 @@ pub(crate) async fn chat_completion(
 
     // Clone role data to use after releasing the lock
     let role = role_ref.clone();
+
+    // Check if VM execution is enabled BEFORE role is consumed
+    log::info!(
+        "Checking VM execution for role: {}, extra keys: {:?}",
+        role.name,
+        role.extra.keys().collect::<Vec<_>>()
+    );
+    let has_vm_execution = role
+        .extra
+        .get("vm_execution")
+        .or_else(|| {
+            // Handle nested extra field (serialization quirk similar to llm.rs)
+            role.extra
+                .get("extra")
+                .and_then(|nested| nested.get("vm_execution"))
+        })
+        .and_then(|vm_config| {
+            log::info!("Found vm_execution config: {:?}", vm_config);
+            vm_config.get("enabled")
+        })
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    log::info!("VM execution enabled: {}", has_vm_execution);
+
+    // Clone role again for VM execution if needed
+    let role_for_vm = if has_vm_execution {
+        Some(role.clone())
+    } else {
+        None
+    };
+
     drop(config);
 
     // Try to build an LLM client from the role configuration
@@ -694,14 +725,84 @@ pub(crate) async fn chat_completion(
         temperature: request.temperature.or(Some(0.7)),
     };
 
-    // Call the LLM client
+    // Call the LLM client FIRST
     match llm_client.chat_completion(messages_json, chat_opts).await {
-        Ok(reply) => Ok(Json(ChatResponse {
-            status: Status::Success,
-            message: Some(reply),
-            model_used: Some(model_name),
-            error: None,
-        })),
+        Ok(mut reply) => {
+            // Check for code blocks in LLM response AFTER getting the reply
+            let vm_execution_result = if let Some(role_for_vm) = role_for_vm.clone() {
+                if reply.contains("```") {
+                    use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
+                    use terraphim_persistence::DeviceStorage;
+
+                    log::info!("Detected code blocks in LLM response, attempting VM execution");
+                    log::info!(
+                        "LLM response length: {}, contains backticks: {}",
+                        reply.len(),
+                        reply.matches("```").count()
+                    );
+
+                    // Create in-memory persistence for this chat session
+                    match DeviceStorage::arc_memory_only().await {
+                        Ok(persistence) => {
+                            match TerraphimAgent::new(role_for_vm, persistence, None).await {
+                                Ok(agent) => {
+                                    if let Ok(()) = agent.initialize().await {
+                                        // Execute code blocks from LLM response
+                                        let execute_input =
+                                            CommandInput::new(reply.clone(), CommandType::Execute);
+
+                                        match agent.process_command(execute_input).await {
+                                            Ok(vm_result) => {
+                                                log::info!("VM execution completed successfully");
+                                                // Return execution results, not "no code found" messages
+                                                if !vm_result
+                                                    .text
+                                                    .contains("No executable code found")
+                                                {
+                                                    Some(vm_result.text)
+                                                } else {
+                                                    None
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::warn!("VM execution failed: {}", e);
+                                                Some(format!("VM Execution Error: {}", e))
+                                            }
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                }
+                                Err(e) => {
+                                    log::warn!("Failed to create agent for VM execution: {}", e);
+                                    None
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to create persistence for VM execution: {}", e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            // Append VM execution results if available
+            if let Some(vm_output) = vm_execution_result {
+                reply = format!("{}\n\n--- VM Execution Results ---\n{}", reply, vm_output);
+            }
+
+            Ok(Json(ChatResponse {
+                status: Status::Success,
+                message: Some(reply),
+                model_used: Some(model_name),
+                error: None,
+            }))
+        }
         Err(e) => Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
