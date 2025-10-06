@@ -68,7 +68,7 @@ async fn test_agent_restart_on_failure() {
     // Verify agent is running
     let children = supervisor.get_children().await;
     assert_eq!(children.len(), 1);
-    let original_start_time = children.get(&agent_id).unwrap().start_time;
+    let _original_start_time = children.get(&agent_id).unwrap().start_time;
 
     // Simulate agent failure
     supervisor
@@ -111,9 +111,9 @@ async fn test_restart_strategy_one_for_all() {
     let spec2 = AgentSpec::new("test".to_string(), json!({}));
     let spec3 = AgentSpec::new("test".to_string(), json!({}));
 
-    let agent_id1 = supervisor.spawn_agent(spec1).await.unwrap();
+    let _agent_id1 = supervisor.spawn_agent(spec1).await.unwrap();
     let agent_id2 = supervisor.spawn_agent(spec2).await.unwrap();
-    let agent_id3 = supervisor.spawn_agent(spec3).await.unwrap();
+    let _agent_id3 = supervisor.spawn_agent(spec3).await.unwrap();
 
     // Verify all agents are running
     let children = supervisor.get_children().await;

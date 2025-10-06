@@ -130,7 +130,13 @@
         "llm_base_url": "http://127.0.0.1:11434",
         "llm_auto_summarize": true,
         "llm_description": "Agent specialized for development tasks and code analysis",
-        "llm_system_prompt": "You are a DevelopmentAgent specialized in software development, code analysis, and architecture design. Focus on creating professional software solutions, following best practices, and generating comprehensive documentation. Always provide clear, well-structured code and explain your reasoning."
+        "llm_system_prompt": "You are a DevelopmentAgent specialized in software development, code analysis, and architecture design. Focus on creating professional software solutions, following best practices, and generating comprehensive documentation. Always provide clear, well-structured code and explain your reasoning.",
+        "vm_execution": {
+          "enabled": true,
+          "api_base_url": "http://localhost:8080",
+          "default_vm_type": "focal-optimized",
+          "allowed_languages": ["python", "javascript", "bash", "rust"]
+        }
       }
     },
     "SimpleTaskAgent": {

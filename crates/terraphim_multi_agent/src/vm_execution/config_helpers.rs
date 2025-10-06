@@ -5,7 +5,14 @@ use super::models::VmExecutionConfig;
 
 /// Extract VM execution configuration from role extra parameters
 pub fn extract_vm_config_from_role(role: &Role) -> Option<VmExecutionConfig> {
-    role.extra.get("vm_execution").and_then(|vm_value| {
+    // First try direct vm_execution key, then try nested extra field (handles serialization quirk)
+    let vm_value = role.extra.get("vm_execution").or_else(|| {
+        role.extra
+            .get("extra")
+            .and_then(|nested| nested.get("vm_execution"))
+    });
+
+    vm_value.and_then(|vm_value| {
         match vm_value {
             Value::Object(vm_obj) => {
                 // Extract VM execution configuration from role extra

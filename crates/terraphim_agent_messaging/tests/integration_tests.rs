@@ -62,8 +62,10 @@ async fn test_message_priorities() {
     ];
 
     for (i, priority) in priorities.into_iter().enumerate() {
-        let mut options = DeliveryOptions::default();
-        options.priority = priority;
+        let options = DeliveryOptions {
+            priority,
+            ..Default::default()
+        };
 
         let envelope = MessageEnvelope::new(
             agent_id.clone(),
