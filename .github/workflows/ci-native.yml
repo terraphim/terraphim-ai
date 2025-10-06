@@ -55,7 +55,7 @@ jobs:
           fi
 
   lint-and-format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: setup
 
     steps:
@@ -325,7 +325,7 @@ jobs:
         run: cargo test --workspace --doc
 
   test-desktop:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [setup, build-frontend]
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'desktop')
 
