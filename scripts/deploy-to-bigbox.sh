@@ -81,7 +81,7 @@ phase2_firecracker() {
     
     # Transfer firecracker-rust directory
     log_info "Transferring firecracker-rust code to bigbox..."
-    rsync -avz --progress \
+    rsync -avz --progress --delete \
         --exclude 'target' \
         "$PROJECT_ROOT/scratchpad/firecracker-rust/" \
         "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud/firecracker-rust/"
