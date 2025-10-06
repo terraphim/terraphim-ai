@@ -4,7 +4,7 @@ use terraphim_types::{RelevanceFunction, SearchQuery};
 
 /// Live MCP haystack test using SSE server-everything
 ///
-/// Requires MCP_SERVER_URL (e.g., http://127.0.0.1:3001)
+/// Requires MCP_SERVER_URL (e.g., http://127.0.0.1:8001)
 #[tokio::test]
 #[ignore]
 async fn mcp_live_haystack_smoke() {
