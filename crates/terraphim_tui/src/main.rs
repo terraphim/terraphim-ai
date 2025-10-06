@@ -127,6 +127,13 @@ enum Command {
         #[arg(long, default_value_t = false)]
         exclude_term: bool,
     },
+    Replace {
+        text: String,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        format: Option<String>,
+    },
     Interactive,
 
     /// Start REPL (Read-Eval-Print-Loop) interface
@@ -357,6 +364,27 @@ async fn run_offline_command(command: Command) -> Result<()> {
                     println!("{}", paragraph);
                 }
             }
+
+            Ok(())
+        }
+        Command::Replace { text, role, format } => {
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+
+            let link_type = match format.as_deref() {
+                Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
+                Some("wiki") => terraphim_automata::LinkType::WikiLinks,
+                Some("html") => terraphim_automata::LinkType::HTMLLinks,
+                _ => terraphim_automata::LinkType::PlainText,
+            };
+
+            let result = service
+                .replace_matches(&role_name, &text, link_type)
+                .await?;
+            println!("{}", result);
 
             Ok(())
         }
@@ -616,6 +644,10 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                     std::process::exit(1);
                 }
             }
+        }
+        Command::Replace { .. } => {
+            eprintln!("Replace command is only available in offline mode");
+            std::process::exit(1);
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
