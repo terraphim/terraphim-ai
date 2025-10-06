@@ -7762,6 +7762,7 @@ dependencies = [
  "futures",
  "log",
  "rand 0.8.5",
+ "regex",
  "reqwest 0.12.23",
  "serde",
  "serde_json",
@@ -7776,6 +7777,7 @@ dependencies = [
  "tiktoken-rs",
  "tokio",
  "tokio-test",
+ "tracing",
  "uuid",
 ]
 

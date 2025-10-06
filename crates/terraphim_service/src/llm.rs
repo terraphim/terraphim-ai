@@ -155,7 +155,7 @@ fn has_ollama_hints(extra: &AHashMap<String, Value>) -> bool {
 
 #[cfg(feature = "openrouter")]
 fn role_has_openrouter_config(role: &terraphim_config::Role) -> bool {
-    role.has_openrouter_config()
+    role.has_llm_config()
 }
 
 #[cfg(not(feature = "openrouter"))]
