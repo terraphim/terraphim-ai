@@ -517,6 +517,186 @@ jobs:
 
 This migration demonstrates successful transformation from proprietary cloud services to native platform solutions, achieving cost savings while maintaining feature parity and improving long-term maintainability.
 
+## CLI Command Implementation Patterns (2025-10-06)
+
+### 🎯 Terraphim TUI Command Implementation Strategy
+
+**Key Learning**: Following existing patterns in Terraphim CLI ensures clean implementation with minimal compilation errors.
+
+**Implementation Pattern**:
+```rust
+// 1. Add command variant to Command enum
+#[derive(Parser)]
+enum Command {
+    Replace {
+        text: String,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        format: Option<String>,
+    },
+}
+
+// 2. Implement in run_offline_command()
+Command::Replace { text, role, format } => {
+    let role_name = if let Some(role) = role {
+        RoleName::new(&role)
+    } else {
+        service.get_selected_role().await
+    };
+
+    let link_type = match format.as_deref() {
+        Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
+        // ... other formats
+        _ => terraphim_automata::LinkType::PlainText,
+    };
+
+    let result = service.replace_matches(&role_name, &text, link_type).await?;
+    println!("{}", result);
+    Ok(())
+}
+
+// 3. Add stub in run_server_command()
+Command::Replace { .. } => {
+    eprintln!("Replace command is only available in offline mode");
+    std::process::exit(1);
+}
+```
+
+**Benefits**: Clean separation between offline and server commands, reuse of existing service methods, minimal new code.
+
+### 🔧 Aho-Corasick LeftmostLongest Matching Behavior
+
+**Critical Insight**: Aho-Corasick's LeftmostLongest strategy ensures most specific patterns match first.
+
+**How It Works**:
+- Longer patterns take precedence over shorter ones
+- "pnpm install" matches before "pnpm" alone
+- Prevents double replacements ("pnpm install" → "bun" not "bun install")
+- Documented in knowledge graph files for user awareness
+
+**Example Pattern**:
+```markdown
+# docs/src/kg/bun.md
+Note: The Aho-Corasick matcher uses LeftmostLongest strategy, so "pnpm install"
+will match before "pnpm" alone, ensuring the most specific replacement wins.
+
+synonyms:: pnpm install, npm install, yarn install, pnpm, npm, yarn
+```
+
+### 🧪 CLI Test Infrastructure Patterns
+
+**Key Learning**: Create helper functions to filter noisy log output in CLI tests.
+
+**Test Pattern**:
+```rust
+fn extract_clean_output(output: &str) -> String {
+    output
+        .lines()
+        .filter(|line| {
+            !line.contains("INFO")
+                && !line.contains("WARN")
+                && !line.contains("DEBUG")
+                && !line.contains("OpenDal")
+                && !line.trim().is_empty()
+        })
+        .collect::<Vec<&str>>()
+        .join("\n")
+}
+
+#[test]
+fn test_replace_npm_to_bun() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "-p", "terraphim_tui", "--", "replace", "npm"])
+        .output()
+        .expect("Failed to execute command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let clean_output = extract_clean_output(&stdout);
+
+    assert!(clean_output.contains("bun"));
+}
+```
+
+**Benefits**: Tests focus on actual output, not logging noise; consistent across all test scenarios.
+
+### ⚠️ OpenDAL Memory Backend Warnings Understanding
+
+**Critical Context**: OpenDAL warnings in CLI offline mode are expected and non-blocking.
+
+**Warning Pattern**:
+```
+[WARN opendal::services] service=memory operation=stat path=embedded_config.json -> NotFound
+[ERROR terraphim_service] Failed to load thesaurus: OpenDal(NotFound)
+```
+
+**Root Cause**: CLI runs in offline mode without pre-built knowledge graph files
+- OpenDAL memory backend attempts to load `embedded_config.json` and thesaurus files
+- Files don't exist in offline mode
+- System falls back to building thesaurus from markdown files at runtime
+
+**Resolution**: Functionality works correctly despite warnings
+- Thesaurus builds from `docs/src/kg/*.md` files dynamically
+- Replace command successfully performs text replacement
+- Warnings are informational only, indicating fallback behavior
+
+**Key Insight**: Don't treat these warnings as errors - they indicate expected fallback behavior in offline mode.
+
+### 🏗️ Knowledge Graph CLI Integration Architecture
+
+**Key Learning**: Terraphim CLI integrates with knowledge graph system through multiple layers.
+
+**Architecture Flow**:
+```
+CLI Command (terraphim-tui replace "npm")
+    ↓
+TerraphimService::replace_matches()
+    ↓
+Load/Build Thesaurus (from docs/src/kg/)
+    ↓
+Aho-Corasick Automata (with LeftmostLongest)
+    ↓
+Text Replacement with LinkType formatting
+    ↓
+Output (PlainText, MarkdownLinks, WikiLinks, HTMLLinks)
+```
+
+**Key Components**:
+1. **Knowledge Graph Files**: Markdown files in `docs/src/kg/` with `synonyms::` syntax
+2. **Thesaurus Builder**: Parses markdown files and builds Aho-Corasick automata
+3. **Replace Service**: Uses automata for efficient multi-pattern text replacement
+4. **LinkType Formatting**: Configurable output format for different use cases
+
+**Benefits**: Reuses existing knowledge graph infrastructure, no new dependencies, consistent behavior across interfaces.
+
+### 📝 Offline vs Server Command Separation Strategy
+
+**Key Learning**: Terraphim CLI supports both offline and server-connected modes with clear separation.
+
+**Implementation Strategy**:
+```rust
+// Commands available in offline mode only
+Command::Replace { .. } => {
+    // Offline implementation
+    let result = service.replace_matches(&role_name, &text, link_type).await?;
+    println!("{}", result);
+    Ok(())
+}
+
+// Server mode - provide clear error message
+Command::Replace { .. } => {
+    eprintln!("Replace command is only available in offline mode");
+    std::process::exit(1);
+}
+```
+
+**Design Rationale**:
+- Some commands work with local data only (e.g., Replace with local thesaurus)
+- Server mode commands connect to running Terraphim server
+- Clear separation prevents confusion about expected behavior
+
+**User Experience**: Error messages guide users to correct usage patterns.
+
 ## Performance Analysis and Optimization Strategy (2025-01-31)
 
 ### 🎯 Expert Agent-Driven Performance Analysis

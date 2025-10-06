@@ -142,11 +142,51 @@
 
 **Error Handling Strategy**: Implemented intelligent distinction between code errors (fail) and account issues (pass with warning) using `is_account_issue()` helper detecting 401/403/"User not found"/"insufficient credits".
 
-**Summarization Test Status**: 
+**Summarization Test Status**:
 - `proof_summarization_works.rs` (1/1 ✅)
-- `complete_summarization_workflow_test.rs` (3/3 ✅)  
+- `complete_summarization_workflow_test.rs` (3/3 ✅)
 - `openrouter_integration_test.rs` (7/7 ✅)
 
 **Documentation**: Created comprehensive `docs/OPENROUTER_TESTING_PLAN.md` with architecture diagrams, test execution instructions, and success criteria.
 
 **Impact**: OpenRouter integration is production-ready with real API validation, comprehensive error handling, and graceful degradation for account limitations.
+
+## [v2.0.5] Replace CLI Command Implementation (2025-10-06)
+
+**Phase 1 - CLI/TUI Implementation**: Successfully implemented Replace command for the CLI interface, enabling package manager replacement functionality (Bun replacing npm/yarn/pnpm) using Terraphim's knowledge graph infrastructure.
+
+**Core Implementation**:
+- **Command Structure**: Added `Replace { text, role, format }` variant to Command enum in `crates/terraphim_tui/src/main.rs`
+- **Offline Mode Handler**: Implemented handler in `run_offline_command()` (lines 370-388) with support for multiple output formats (PlainText, MarkdownLinks, WikiLinks, HTMLLinks)
+- **Server Mode Stub**: Added handler in `run_server_command()` with proper error message indicating Replace is offline-only
+- **Knowledge Graph Integration**: Used existing `TerraphimService::replace_matches()` method with thesaurus-based text replacement
+
+**Test Suite**: Created `crates/terraphim_tui/tests/replace_feature_tests.rs` (213 lines) with 8 comprehensive test scenarios:
+- Basic replacements (npm→bun, yarn→bun, pnpm→bun)
+- Multi-word replacements (npm install→bun, yarn install→bun, pnpm install→bun)
+- Format options validation (markdown format)
+- Helper function validation (`extract_clean_output`)
+
+**LeftmostLongest Matching**: Verified and documented Aho-Corasick LeftmostLongest matching strategy in `docs/src/kg/bun.md`:
+- "pnpm install" correctly matches before "pnpm" alone
+- Ensures most specific replacement wins (longer patterns take precedence)
+- Updated documentation with explanation note
+
+**OpenDAL Warnings Investigation**: Analyzed and documented warnings appearing during CLI execution:
+- `OpenDal(NotFound)` warnings for `embedded_config.json` and `thesaurus_terraphim_engineer.json`
+- Expected behavior when running CLI in offline mode without pre-built knowledge graph
+- Replace functionality works correctly by building thesaurus from `docs/src/kg/bun.md` at runtime
+- Warnings are informational only, not blocking
+
+**Build Success**: All changes compiled successfully on first try (after adding missing match arm), demonstrating clean implementation following existing patterns.
+
+**Files Modified**:
+- `crates/terraphim_tui/src/main.rs` - Added Replace command and handlers
+- `crates/terraphim_tui/tests/replace_feature_tests.rs` - Created comprehensive test suite
+- `docs/src/kg/bun.md` - Added LeftmostLongest matching documentation
+
+**Future Enhancements** (Not implemented):
+- Tauri Desktop: Replace command requires `replace_text` Tauri command in `desktop/src-tauri/src/cmd.rs`
+- Server HTTP API: Replace endpoint needs implementation in `terraphim_server`
+
+**Impact**: CLI users can now use intelligent text replacement with knowledge graph synonyms, enabling package manager migrations and other domain-specific text transformations directly from the command line.
