@@ -14,6 +14,70 @@
 
 ---
 
+## ✅ COMPLETED: Replace CLI Command Implementation - (2025-10-06)
+
+**Task**: Implement Replace command for CLI/TUI interface to enable package manager replacement (Bun replacing npm/yarn/pnpm).
+
+**Status**: ✅ **IMPLEMENTATION COMPLETE**
+
+### Implementation Details:
+
+**Files Modified**:
+1. `crates/terraphim_tui/src/main.rs`:
+   - Added `Replace { text, role, format }` variant to Command enum (lines 130-136)
+   - Implemented offline handler in `run_offline_command()` (lines 370-388)
+   - Added server mode stub in `run_server_command()` (lines 646-649)
+
+2. `crates/terraphim_tui/tests/replace_feature_tests.rs`:
+   - Created comprehensive test suite (213 lines)
+   - 8 test scenarios covering all functionality
+   - Helper function `extract_clean_output()` for filtering logs
+
+3. `docs/src/kg/bun.md`:
+   - Added note about LeftmostLongest matching strategy
+   - Documents why "pnpm install" matches before "pnpm"
+
+### Test Results:
+✅ test_replace_npm_to_bun
+✅ test_replace_yarn_to_bun
+✅ test_replace_pnpm_install_to_bun
+✅ test_replace_yarn_install_to_bun
+✅ test_replace_with_markdown_format
+✅ test_replace_help_output
+✅ test_extract_clean_output_helper
+✅ test_extract_clean_output_multiline
+
+### Functionality Verified:
+- ✅ Basic replacements (npm→bun, yarn→bun, pnpm→bun)
+- ✅ Multi-word replacements (pnpm install→bun)
+- ✅ Format options (PlainText, MarkdownLinks, WikiLinks, HTMLLinks)
+- ✅ LeftmostLongest matching (longer patterns win)
+- ✅ Help text includes replace command
+- ✅ Build succeeds with no compilation errors
+
+### OpenDAL Warnings Analysis:
+**Status**: ⚠️ **INFORMATIONAL ONLY**
+
+Warnings observed:
+```
+[2025-10-06T19:41:18Z WARN  opendal::services] service=memory operation=stat path=embedded_config.json -> NotFound (permanent)
+[2025-10-06T19:41:18Z ERROR terraphim_service] Failed to load thesaurus: OpenDal(NotFound)
+```
+
+**Root Cause**: CLI runs in offline mode without pre-built knowledge graph files
+**Impact**: None - Replace functionality works correctly
+**Resolution**: Thesaurus builds from `docs/src/kg/bun.md` at runtime
+
+### Architecture Notes:
+**Three Interfaces**:
+1. ✅ **CLI/TUI**: Implemented (this task)
+2. ⏳ **Tauri Desktop**: Requires `replace_text` command in `desktop/src-tauri/src/cmd.rs`
+3. ⏳ **Server HTTP API**: Requires endpoint in `terraphim_server`
+
+**Build Status**: ✅ All builds successful
+
+---
+
 ## ✅ COMPLETED: Chat & Session History Implementation - (2025-10-05)
 
 **Task**: Implement comprehensive chat and session history functionality for Terraphim AI covering both backend and frontend.
