@@ -451,12 +451,12 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/rolegraph", get(get_rolegraph))
         .route("/rolegraph/", get(get_rolegraph))
         .route(
-            "/roles/:role_name/kg_search",
+            "/roles/{role_name}/kg_search",
             get(find_documents_by_kg_term),
         )
-        .route("/thesaurus/:role_name", get(api::get_thesaurus))
+        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
         .route(
-            "/autocomplete/:role_name/:query",
+            "/autocomplete/{role_name}/{query}",
             get(api::get_autocomplete),
         )
         // Conversation management routes
@@ -464,47 +464,47 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/conversations", get(api::list_conversations))
         .route("/conversations/", post(api::create_conversation))
         .route("/conversations/", get(api::list_conversations))
-        .route("/conversations/:id", get(api::get_conversation))
-        .route("/conversations/:id/", get(api::get_conversation))
+        .route("/conversations/{id}", get(api::get_conversation))
+        .route("/conversations/{id}/", get(api::get_conversation))
         .route(
-            "/conversations/:id/messages",
+            "/conversations/{id}/messages",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/messages/",
+            "/conversations/{id}/messages/",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/context",
+            "/conversations/{id}/context",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/",
+            "/conversations/{id}/context/",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context",
+            "/conversations/{id}/search-context",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context/",
+            "/conversations/{id}/search-context/",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/:context_id",
+            "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         // KG Context Management routes
         .route(
-            "/conversations/:id/context/kg/search",
+            "/conversations/{id}/context/kg/search",
             get(api::search_kg_terms),
         )
         .route(
-            "/conversations/:id/context/kg/term",
+            "/conversations/{id}/context/kg/term",
             post(api::add_kg_term_context),
         )
         .route(
-            "/conversations/:id/context/kg/index",
+            "/conversations/{id}/context/kg/index",
             post(api::add_kg_index_context),
         )
         // Persistent conversation management routes (new)
@@ -525,19 +525,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             get(api_conversations::get_conversation_statistics),
         )
         .route(
-            "/api/conversations/:id",
+            "/api/conversations/{id}",
             get(api_conversations::get_persistent_conversation),
         )
         .route(
-            "/api/conversations/:id",
+            "/api/conversations/{id}",
             axum::routing::put(api_conversations::update_persistent_conversation),
         )
         .route(
-            "/api/conversations/:id",
+            "/api/conversations/{id}",
             delete(api_conversations::delete_persistent_conversation),
         )
         .route(
-            "/api/conversations/:id/export",
+            "/api/conversations/{id}/export",
             post(api_conversations::export_persistent_conversation),
         )
         .route(
@@ -681,12 +681,12 @@ pub async fn build_router_for_tests() -> Router {
         .route("/rolegraph", get(get_rolegraph))
         .route("/rolegraph/", get(get_rolegraph))
         .route(
-            "/roles/:role_name/kg_search",
+            "/roles/{role_name}/kg_search",
             get(find_documents_by_kg_term),
         )
-        .route("/thesaurus/:role_name", get(api::get_thesaurus))
+        .route("/thesaurus/{role_name}", get(api::get_thesaurus))
         .route(
-            "/autocomplete/:role_name/:query",
+            "/autocomplete/{role_name}/{query}",
             get(api::get_autocomplete),
         )
         // Conversation management routes
@@ -694,34 +694,34 @@ pub async fn build_router_for_tests() -> Router {
         .route("/conversations", get(api::list_conversations))
         .route("/conversations/", post(api::create_conversation))
         .route("/conversations/", get(api::list_conversations))
-        .route("/conversations/:id", get(api::get_conversation))
-        .route("/conversations/:id/", get(api::get_conversation))
+        .route("/conversations/{id}", get(api::get_conversation))
+        .route("/conversations/{id}/", get(api::get_conversation))
         .route(
-            "/conversations/:id/messages",
+            "/conversations/{id}/messages",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/messages/",
+            "/conversations/{id}/messages/",
             post(api::add_message_to_conversation),
         )
         .route(
-            "/conversations/:id/context",
+            "/conversations/{id}/context",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/",
+            "/conversations/{id}/context/",
             post(api::add_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context",
+            "/conversations/{id}/search-context",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/search-context/",
+            "/conversations/{id}/search-context/",
             post(api::add_search_context_to_conversation),
         )
         .route(
-            "/conversations/:id/context/:context_id",
+            "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         .with_state(config_state)
