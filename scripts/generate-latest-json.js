@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * generate-latest-json.js - Generate updater manifest for Terraphim Desktop
- * 
+ *
  * This script creates the latest.json file required by Tauri's updater.
  * It uses 1Password CLI to sign the update packages.
  */
@@ -80,7 +80,7 @@ function findBundleFiles() {
     if (fs.existsSync(macOSDir)) {
         const macFiles = fs.readdirSync(macOSDir);
         const dmgFiles = macFiles.filter(f => f.endsWith('.dmg'));
-        
+
         for (const dmg of dmgFiles) {
             if (dmg.includes('x64') || dmg.includes('x86_64')) {
                 files['darwin-x86_64'] = path.join(macOSDir, dmg);
@@ -252,12 +252,12 @@ function generateManifest() {
 function main() {
     try {
         log('🚀 Tauri Updater Manifest Generator', 'bright');
-        
+
         const manifest = generateManifest();
-        
+
         // Output summary
         console.log('\n' + JSON.stringify(manifest, null, 2));
-        
+
         success('Updater manifest generated successfully!');
     } catch (err) {
         error(`Failed to generate manifest: ${err.message}`);

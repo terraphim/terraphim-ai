@@ -19,9 +19,9 @@
   let selectedSuggestion: KGSuggestion | null = null;
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Typeahead state (reuses autocomplete behavior from Search.svelte)
-  let typeaheadSuggestions: string[] = [];
-  let typeaheadIndex: number = -1;
+  // Autocomplete state (matches Search.svelte pattern)
+  let autocompleteSuggestions: string[] = [];
+  let suggestionIndex: number = -1;
 
   // Input element reference for focus management
   let searchInput: HTMLInputElement;
@@ -43,12 +43,19 @@
     error?: string;
   }
 
-  // Initialize query when modal opens
-  $: if (active && initialQuery !== query) {
+  // Initialize query when modal opens (only once)
+  let modalInitialized = false;
+  $: if (active && !modalInitialized) {
     query = initialQuery;
+    modalInitialized = true;
     if (query.trim()) {
       searchKGTerms();
     }
+  }
+
+  // Reset when modal closes
+  $: if (!active) {
+    modalInitialized = false;
   }
 
   // Focus input when modal opens and clear any errors
@@ -75,10 +82,10 @@
     }, 300);
   }
 
-  // Get KG term suggestions (autocomplete)
+  // Get KG term suggestions (autocomplete) - matches Search.svelte pattern
   async function getTermSuggestions(q: string): Promise<string[]> {
     const trimmed = q.trim();
-    if (!trimmed) return [];
+    if (!trimmed || trimmed.length < 2) return [];
     try {
       if ($is_tauri) {
         const resp: any = await invoke("get_autocomplete_suggestions", {
@@ -99,45 +106,74 @@
         }
       }
     } catch (e) {
-      console.warn('KG typeahead failed', e);
+      console.warn('KG autocomplete failed', e);
     }
     return [];
   }
 
-  async function updateTypeaheadSuggestions() {
-    if (query.trim().length < 1) {
-      typeaheadSuggestions = [];
-      typeaheadIndex = -1;
+  // Update autocomplete suggestions - matches Search.svelte pattern
+  async function updateAutocompleteSuggestions() {
+    const inputValue = query.trim();
+    if (inputValue.length < 2) {
+      autocompleteSuggestions = [];
+      suggestionIndex = -1;
       return;
     }
-    typeaheadSuggestions = await getTermSuggestions(query);
-    typeaheadIndex = -1;
+
+    try {
+      const suggestions = await getTermSuggestions(inputValue);
+      autocompleteSuggestions = suggestions;
+      suggestionIndex = -1;
+    } catch (error) {
+      console.warn('Failed to get autocomplete suggestions:', error);
+      autocompleteSuggestions = [];
+      suggestionIndex = -1;
+    }
   }
 
-  async function applyTypeaheadSuggestion(s: string) {
-    // When a user picks an autocomplete item, immediately add the KG term
-    // to the conversation context (not a document search)
-    selectedSuggestion = { term: s, score: 1.0 } as KGSuggestion;
-    typeaheadSuggestions = [];
-    typeaheadIndex = -1;
-    await addTermToContext();
+  // Apply autocomplete suggestion
+  function applySuggestion(suggestion: string) {
+    query = suggestion;
+    autocompleteSuggestions = [];
+    suggestionIndex = -1;
+
+    // Trigger search for the selected term
+    if (query.trim().length >= 2) {
+      searchKGTerms();
+    }
   }
 
-  function handleTypeaheadKeydown(event: KeyboardEvent) {
-    if (typeaheadSuggestions.length > 0) {
+  // Handle input changes - matches Search.svelte pattern
+  async function handleInput(event: Event) {
+    // Don't interfere with normal text input
+    handleQueryChange(); // For debounced KG search
+    await updateAutocompleteSuggestions(); // For autocomplete
+  }
+
+  // Handle keyboard navigation - matches Search.svelte pattern
+  function handleKeydown(event: KeyboardEvent) {
+    if (autocompleteSuggestions.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        typeaheadIndex = (typeaheadIndex + 1) % typeaheadSuggestions.length;
+        suggestionIndex = (suggestionIndex + 1) % autocompleteSuggestions.length;
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
-        typeaheadIndex = (typeaheadIndex - 1 + typeaheadSuggestions.length) % typeaheadSuggestions.length;
-      } else if ((event.key === 'Enter' || event.key === 'Tab') && typeaheadIndex !== -1) {
+        suggestionIndex = (suggestionIndex - 1 + autocompleteSuggestions.length) % autocompleteSuggestions.length;
+      } else if ((event.key === 'Enter' || event.key === 'Tab') && suggestionIndex !== -1) {
         event.preventDefault();
-        applyTypeaheadSuggestion(typeaheadSuggestions[typeaheadIndex]);
+        applySuggestion(autocompleteSuggestions[suggestionIndex]);
       } else if (event.key === 'Escape') {
-        typeaheadSuggestions = [];
-        typeaheadIndex = -1;
+        event.preventDefault();
+        autocompleteSuggestions = [];
+        suggestionIndex = -1;
       }
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (selectedSuggestion) {
+        addTermToContext();
+      }
+    } else if (event.key === 'Escape') {
+      handleClose();
     }
   }
 
@@ -331,6 +367,8 @@
     selectedSuggestion = null;
     searchError = null;
     isSearching = false;
+    autocompleteSuggestions = [];
+    suggestionIndex = -1;
 
     if (searchTimeout) {
       clearTimeout(searchTimeout);
@@ -338,47 +376,6 @@
     }
   }
 
-  // Handle keyboard navigation
-  function handleKeydown(event: KeyboardEvent) {
-    switch (event.key) {
-      case 'Escape':
-        handleClose();
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        navigateSuggestions(1);
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        navigateSuggestions(-1);
-        break;
-      case 'Enter':
-        event.preventDefault();
-        if (selectedSuggestion) {
-          addTermToContext();
-        }
-        break;
-    }
-  }
-
-  // Navigate through suggestions with keyboard
-  function navigateSuggestions(direction: number) {
-    if (suggestions.length === 0) return;
-
-    const currentIndex = selectedSuggestion
-      ? suggestions.findIndex(s => s.term === selectedSuggestion?.term)
-      : -1;
-
-    let newIndex = currentIndex + direction;
-
-    if (newIndex < 0) {
-      newIndex = suggestions.length - 1;
-    } else if (newIndex >= suggestions.length) {
-      newIndex = 0;
-    }
-
-    selectedSuggestion = suggestions[newIndex];
-  }
 
   // Clean up timeout on component destruction
   onDestroy(() => {
@@ -707,8 +704,8 @@
             <Input
               bind:element={searchInput}
               bind:value={query}
-              on:input={() => { handleQueryChange(); updateTypeaheadSuggestions(); }}
-              on:keydown={handleTypeaheadKeydown}
+              on:input={handleInput}
+              on:keydown={handleKeydown}
               placeholder="Search knowledge graph terms..."
               type="search"
               disabled={isSearching}
@@ -717,25 +714,25 @@
               autofocus
               data-testid="kg-search-input"
             />
-            {#if typeaheadSuggestions.length > 0}
-              <ul class="suggestions" data-testid="kg-typeahead-list">
-                {#each typeaheadSuggestions as s, index}
+            {#if autocompleteSuggestions.length > 0}
+              <ul class="suggestions" data-testid="kg-autocomplete-list">
+                {#each autocompleteSuggestions as suggestion, index}
                   <li
-                    class:active={index === typeaheadIndex}
-                    on:click={() => applyTypeaheadSuggestion(s)}
+                    class:active={index === suggestionIndex}
+                    on:click={() => applySuggestion(suggestion)}
                     on:keydown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        applyTypeaheadSuggestion(s);
+                        applySuggestion(suggestion);
                       }
                     }}
                     tabindex="0"
                     role="option"
-                    aria-selected={index === typeaheadIndex}
-                    aria-label={`Apply suggestion: ${s}`}
-                    data-testid="kg-typeahead-item"
+                    aria-selected={index === suggestionIndex}
+                    aria-label={`Apply suggestion: ${suggestion}`}
+                    data-testid="kg-autocomplete-item"
                   >
-                    {s}
+                    {suggestion}
                   </li>
                 {/each}
               </ul>

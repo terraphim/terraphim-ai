@@ -8,6 +8,7 @@
   import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
   import RoleGraphVisualization from "./lib/RoleGraphVisualization.svelte";
   import Chat from "./lib/Chat/Chat.svelte";
+  import logo from "/assets/terraphim_gray.png";
 
   let visible = "is-hidden";
   function toggleVissible() {
@@ -16,6 +17,15 @@
 
   function navigateTo(path: string) {
     router.goto(path);
+  }
+
+  function goBack() {
+    // Try to go back in browser history, fallback to home
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      router.goto('/');
+    }
   }
 </script>
 
@@ -28,27 +38,43 @@
   <main class="main-content">
     <div class="top-controls">
       <div class="main-navigation">
-        <div class="tabs is-boxed">
-          <ul>
-            <li>
-              <a href="/" use:active data-exact data-testid="search-tab">
-                <span class="icon is-small"><i class="fas fa-search"></i></span>
-                <span>Search</span>
-              </a>
-            </li>
-            <li>
-              <a href="/chat" use:active data-testid="chat-tab">
-                <span class="icon is-small"><i class="fas fa-comments"></i></span>
-                <span>Chat</span>
-              </a>
-            </li>
-            <li>
-              <a href="/graph" use:active data-testid="graph-tab">
-                <span class="icon is-small"><i class="fas fa-project-diagram"></i></span>
-                <span>Graph</span>
-              </a>
-            </li>
-          </ul>
+        <div class="navigation-row">
+          <button
+            class="logo-back-button"
+            on:click={goBack}
+            on:keydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                goBack();
+              }
+            }}
+            title="Go back"
+            aria-label="Go back"
+          >
+            <img src={logo} alt="Terraphim" class="logo-image" />
+          </button>
+          <div class="tabs is-boxed">
+            <ul>
+              <li>
+                <a href="/" use:active data-exact data-testid="search-tab">
+                  <span class="icon is-small"><i class="fas fa-search"></i></span>
+                  <span>Search</span>
+                </a>
+              </li>
+              <li>
+                <a href="/chat" use:active data-testid="chat-tab">
+                  <span class="icon is-small"><i class="fas fa-comments"></i></span>
+                  <span>Chat</span>
+                </a>
+              </li>
+              <li>
+                <a href="/graph" use:active data-testid="graph-tab">
+                  <span class="icon is-small"><i class="fas fa-project-diagram"></i></span>
+                  <span>Graph</span>
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       <div class="role-selector">
@@ -113,6 +139,57 @@
   }
   .main-navigation {
     flex: 1;
+  }
+  .navigation-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .navigation-row .tabs {
+    flex: 1;
+    margin-bottom: 0;
+  }
+
+  .logo-back-button {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    margin-right: 1rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-back-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .logo-back-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .logo-image {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .logo-back-button {
+      margin-right: 0.5rem;
+      padding: 0.25rem;
+    }
+    .logo-image {
+      height: 28px;
+    }
   }
   .role-selector {
     min-width: 200px;

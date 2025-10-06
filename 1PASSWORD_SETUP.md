@@ -15,7 +15,7 @@ Terraphim AI uses 1Password to securely manage:
    ```bash
    # macOS
    brew install --cask 1password-cli
-   
+
    # Linux
    curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
      sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
@@ -213,7 +213,7 @@ Rotate signing keys every 6 months or if compromised:
    ```bash
    # Check vault exists
    op vault list
-   
+
    # Verify permissions
    op vault get "Terraphim-Deployment"
    ```
@@ -222,7 +222,7 @@ Rotate signing keys every 6 months or if compromised:
    ```bash
    # Check template file exists
    ls desktop/src-tauri/tauri.conf.json.template
-   
+
    # Verify secret references
    op item get "Tauri Update Signing" --vault "Terraphim-Deployment"
    ```

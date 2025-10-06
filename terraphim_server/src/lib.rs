@@ -416,19 +416,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             post(api::batch_summarize_documents),
         )
         .route(
-            "/summarization/task/:task_id/status",
+            "/summarization/task/{task_id}/status",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/status/",
+            "/summarization/task/{task_id}/status/",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/cancel",
+            "/summarization/task/{task_id}/cancel",
             post(api::cancel_task),
         )
         .route(
-            "/summarization/task/:task_id/cancel/",
+            "/summarization/task/{task_id}/cancel/",
             post(api::cancel_task),
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
@@ -609,19 +609,19 @@ pub async fn build_router_for_tests() -> Router {
             post(api::batch_summarize_documents),
         )
         .route(
-            "/summarization/task/:task_id/status",
+            "/summarization/task/{task_id}/status",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/status/",
+            "/summarization/task/{task_id}/status/",
             get(api::get_task_status),
         )
         .route(
-            "/summarization/task/:task_id/cancel",
+            "/summarization/task/{task_id}/cancel",
             post(api::cancel_task),
         )
         .route(
-            "/summarization/task/:task_id/cancel/",
+            "/summarization/task/{task_id}/cancel/",
             post(api::cancel_task),
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))

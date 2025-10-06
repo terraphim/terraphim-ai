@@ -62,15 +62,13 @@
 
 <style>
 	.back-button {
-		/* Positioning */
-		position: fixed;
-		top: 1rem;
-		left: 1rem;
-		z-index: 1000;
-		/* Layout */
+		/* Layout - no fixed positioning */
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
+		margin-right: 1rem;
+		/* Ensure proper spacing */
+		flex-shrink: 0;
 	}
 
 	/* Hover/active effects layer on top of Bulma button styles */
@@ -95,8 +93,7 @@
 	/* Responsive design */
 	@media (max-width: 768px) {
 		.back-button {
-			top: 0.5rem;
-			left: 0.5rem;
+			margin-right: 0.5rem;
 		}
 		.back-button .back-text {
 			display: none;
