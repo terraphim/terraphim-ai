@@ -89,6 +89,8 @@ pub struct AgentConfig {
     pub default_timeout_ms: u64,
     /// Quality threshold for learning
     pub quality_threshold: f64,
+    /// VM execution configuration
+    pub vm_execution: Option<crate::vm_execution::VmExecutionConfig>,
 }
 
 impl Default for AgentConfig {
@@ -102,6 +104,7 @@ impl Default for AgentConfig {
             auto_save_interval_seconds: 300, // 5 minutes
             default_timeout_ms: 30000,       // 30 seconds
             quality_threshold: 0.7,
+            vm_execution: None, // Disabled by default
         }
     }
 }
@@ -141,6 +144,9 @@ pub struct TerraphimAgent {
     // LLM Client
     pub llm_client: Arc<GenAiLlmClient>,
 
+    // VM Execution Client (optional)
+    pub vm_execution_client: Option<Arc<crate::vm_execution::VmExecutionClient>>,
+
     // Metadata
     pub created_at: DateTime<Utc>,
     pub last_active: Arc<RwLock<DateTime<Utc>>>,
@@ -165,6 +171,7 @@ impl Clone for TerraphimAgent {
             cost_tracker: self.cost_tracker.clone(),
             persistence: self.persistence.clone(),
             llm_client: self.llm_client.clone(),
+            vm_execution_client: self.vm_execution_client.clone(),
             created_at: self.created_at,
             last_active: self.last_active.clone(),
         }
@@ -179,7 +186,8 @@ impl TerraphimAgent {
         config: Option<AgentConfig>,
     ) -> MultiAgentResult<Self> {
         let agent_id = AgentId::new_v4();
-        let config = config.unwrap_or_default();
+        let config =
+            crate::vm_execution::create_agent_config_with_vm_execution(&role_config, config);
 
         // Initialize knowledge graph components
         let rolegraph = Arc::new(Self::load_rolegraph(&role_config).await?);
@@ -249,6 +257,16 @@ impl TerraphimAgent {
             provider, model, base_url,
         )?);
 
+        // Initialize VM execution client if enabled
+        let vm_execution_client = if let Some(vm_config) = &config.vm_execution {
+            log::debug!("Initializing VM execution client for agent {}", agent_id);
+            Some(Arc::new(crate::vm_execution::VmExecutionClient::new(
+                vm_config,
+            )))
+        } else {
+            None
+        };
+
         let now = Utc::now();
 
         Ok(Self {
@@ -268,6 +286,7 @@ impl TerraphimAgent {
             cost_tracker,
             persistence,
             llm_client,
+            vm_execution_client,
             created_at: now,
             last_active: Arc::new(RwLock::new(now)),
         })
@@ -669,10 +688,101 @@ impl TerraphimAgent {
 
     async fn handle_execute_command(
         &self,
-        _input: &CommandInput,
+        input: &CommandInput,
     ) -> MultiAgentResult<CommandOutput> {
-        // TODO: Implement task execution
-        Ok(CommandOutput::new("Execution placeholder".to_string()))
+        // Check if VM execution is enabled
+        if let Some(vm_client) = &self.vm_execution_client {
+            // Try to extract and execute code from the input
+            let code_extractor = crate::vm_execution::CodeBlockExtractor::new();
+            let code_blocks = code_extractor.extract_code_blocks(&input.text);
+
+            if code_blocks.is_empty() {
+                // No code blocks found, check execution intent
+                let intent = code_extractor.detect_execution_intent(&input.text);
+                if intent.confidence < 0.3 {
+                    // Low confidence, treat as regular command
+                    return Ok(CommandOutput::new(
+                        "No executable code found in input".to_string(),
+                    ));
+                }
+            }
+
+            // Execute code blocks with sufficient confidence
+            let mut results = Vec::new();
+            for code_block in code_blocks {
+                if code_block.execution_confidence > 0.5 {
+                    // Validate code before execution
+                    if let Err(validation_error) = code_extractor.validate_code(&code_block) {
+                        results.push(format!(
+                            "Validation failed for {} code: {}",
+                            code_block.language, validation_error
+                        ));
+                        continue;
+                    }
+
+                    log::info!(
+                        "Executing {} code block with confidence {}",
+                        code_block.language,
+                        code_block.execution_confidence
+                    );
+
+                    // Execute the code
+                    let execute_request = crate::vm_execution::VmExecuteRequest {
+                        agent_id: self.agent_id.to_string(),
+                        language: code_block.language.clone(),
+                        code: code_block.code.clone(),
+                        vm_id: None, // Auto-provision
+                        requirements: vec![],
+                        timeout_seconds: Some(30),
+                        working_dir: None,
+                        metadata: None,
+                    };
+
+                    match vm_client.execute_code(execute_request).await {
+                        Ok(response) => {
+                            let result = format!(
+                                "Executed {} code (exit code: {}):\n{}\n{}",
+                                code_block.language,
+                                response.exit_code,
+                                if !response.stdout.is_empty() {
+                                    &response.stdout
+                                } else {
+                                    "(no output)"
+                                },
+                                if !response.stderr.is_empty() {
+                                    format!("Errors: {}", response.stderr)
+                                } else {
+                                    String::new()
+                                }
+                            );
+                            results.push(result);
+                        }
+                        Err(e) => {
+                            let error_msg =
+                                format!("Failed to execute {} code: {}", code_block.language, e);
+                            log::error!("{}", error_msg);
+                            results.push(error_msg);
+                        }
+                    }
+                } else {
+                    results.push(format!(
+                        "Skipped {} code block (low confidence: {})",
+                        code_block.language, code_block.execution_confidence
+                    ));
+                }
+            }
+
+            if results.is_empty() {
+                Ok(CommandOutput::new("No code was executed".to_string()))
+            } else {
+                Ok(CommandOutput::new(results.join("\n\n")))
+            }
+        } else {
+            // VM execution not enabled
+            Ok(CommandOutput::new(
+                "VM execution is not enabled for this agent".to_string(),
+            ))
+        }
     }
 
     async fn handle_create_command(&self, input: &CommandInput) -> MultiAgentResult<CommandOutput> {

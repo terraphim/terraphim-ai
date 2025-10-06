@@ -29,6 +29,8 @@ ahash = { version = "0.8.8", features = ["serde"] }
 futures = "0.3"
 rand = "0.8"
 tiktoken-rs = "0.6"
+tracing = "0.1"
+regex = "1.10"
 
 # Terraphim dependencies
 terraphim_types = { path = "../terraphim_types" }
@@ -37,6 +39,10 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
+
+# Firecracker VM dependencies (optional, feature-gated)
+# Note: fcctl-repl has its own workspace dependencies that may conflict
+# For now, we'll keep the integration minimal with optional features
 
 [dev-dependencies]
 tokio-test = "0.4"

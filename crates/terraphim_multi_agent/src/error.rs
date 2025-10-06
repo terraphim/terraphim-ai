@@ -116,6 +116,10 @@ pub enum MultiAgentError {
     /// Pool error
     #[error("Pool error: {0}")]
     PoolError(String),
+
+    /// External service error (VM execution, API calls, etc)
+    #[error("External service error: {0}")]
+    External(String),
 }
 
 impl From<anyhow::Error> for MultiAgentError {
