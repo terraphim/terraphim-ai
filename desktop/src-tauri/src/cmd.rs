@@ -1276,17 +1276,39 @@ pub async fn chat(
 
     // Check for LLM provider configuration in role.extra
     log::debug!("Role extra settings: {:?}", role_config.extra);
+    log::debug!(
+        "Role extra keys: {:?}",
+        role_config.extra.keys().collect::<Vec<_>>()
+    );
 
+    // First check top-level fields (flattened), then fall back to extra for backward compatibility
     let llm_provider = role_config
         .extra
         .get("llm_provider")
         .and_then(|v| v.as_str())
+        .or_else(|| {
+            // Check if it's directly in extra as a nested object
+            role_config
+                .extra
+                .get("extra")
+                .and_then(|extra_obj| extra_obj.as_object())
+                .and_then(|obj| obj.get("llm_provider"))
+                .and_then(|v| v.as_str())
+        })
         .unwrap_or("");
 
     let openrouter_enabled = role_config
         .extra
         .get("openrouter_enabled")
         .and_then(|v| v.as_bool())
+        .or_else(|| {
+            role_config
+                .extra
+                .get("extra")
+                .and_then(|extra_obj| extra_obj.as_object())
+                .and_then(|obj| obj.get("openrouter_enabled"))
+                .and_then(|v| v.as_bool())
+        })
         .unwrap_or(false);
 
     log::debug!("LLM provider from extra: '{}'", llm_provider);
@@ -1300,6 +1322,8 @@ pub async fn chat(
     } else {
         "".to_string()
     };
+
+    log::debug!("Final provider determined: '{}'", provider);
 
     if provider.is_empty() {
         return Ok(ChatResponse {

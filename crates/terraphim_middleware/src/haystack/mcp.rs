@@ -18,7 +18,7 @@ impl IndexMiddleware for McpHaystackIndexer {
     ) -> impl std::future::Future<Output = Result<Index>> + Send {
         // Placeholder SSE client: verify MCP server is reachable and return empty index.
         // Configuration:
-        // - base_url: from haystack.location or extra_parameters["base_url"] (default http://127.0.0.1:3001)
+        // - base_url: from haystack.location or extra_parameters["base_url"] (default http://127.0.0.1:8001)
         let base = if !haystack.location.is_empty() {
             haystack.location.clone()
         } else {
@@ -26,7 +26,7 @@ impl IndexMiddleware for McpHaystackIndexer {
                 .get_extra_parameters()
                 .get("base_url")
                 .cloned()
-                .unwrap_or_else(|| "http://127.0.0.1:3001".to_string())
+                .unwrap_or_else(|| "http://127.0.0.1:8001".to_string())
         };
         let base = base.trim_end_matches('/').to_string();
         let _needle = needle.to_string();
