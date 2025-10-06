@@ -135,7 +135,7 @@ pub use error::{Result, Status};
 static INDEX_HTML: &str = "index.html";
 
 #[derive(RustEmbed)]
-#[folder = "../desktop/dist"]
+#[folder = "./dist"]
 struct Assets;
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {

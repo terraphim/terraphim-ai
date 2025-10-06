@@ -29,6 +29,18 @@ fn main() -> std::io::Result<()> {
     };
     println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
 
+    // Ensure dist directory exists for RustEmbed even if desktop is not built
+    if !dirs.js_dist_tmp.exists() {
+        p!("Creating dist directory for RustEmbed: {}", dirs.js_dist_tmp.display());
+        fs::create_dir_all(&dirs.js_dist_tmp)?;
+        // Create minimal placeholder index.html if source doesn't exist
+        let index_path = dirs.js_dist_tmp.join("index.html");
+        if !index_path.exists() && !dirs.js_dist_source.exists() {
+            fs::write(index_path, "<!DOCTYPE html><html><body>Terraphim Server</body></html>")?;
+            p!("Created placeholder index.html for RustEmbed");
+        }
+    }
+
     if should_build(&dirs) {
         build_js(&dirs);
         let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
@@ -36,12 +48,16 @@ fn main() -> std::io::Result<()> {
     } else if dirs.js_dist_tmp.exists() {
         p!("Found {}, skipping copy", dirs.js_dist_tmp.display());
     } else {
-        p!(
-            "Could not find {} , copying from {}",
-            dirs.js_dist_tmp.display(),
-            dirs.js_dist_source.display()
-        );
-        dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        if dirs.js_dist_source.exists() {
+            p!(
+                "Could not find {} , copying from {}",
+                dirs.js_dist_tmp.display(),
+                dirs.js_dist_source.display()
+            );
+            dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        } else {
+            p!("Neither source nor tmp dist found, using placeholder");
+        }
     }
 
     // Makes the static files available for compilation
