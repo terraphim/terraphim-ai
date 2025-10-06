@@ -1,13 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { role, is_tauri, configStore } from '../stores';
+  import {
+    role,
+    is_tauri,
+    configStore,
+    showSessionList,
+    currentPersistentConversationId
+  } from '../stores';
   import { CONFIG } from '../../config';
   import { invoke } from '@tauri-apps/api/tauri';
   import ContextEditModal from './ContextEditModal.svelte';
   import KGSearchModal from '../Search/KGSearchModal.svelte';
   import KGContextItem from '../Search/KGContextItem.svelte';
   import ArticleModal from '../Search/ArticleModal.svelte';
+  import SessionList from './SessionList.svelte';
   import Markdown from 'svelte-markdown';
   // Tauri APIs for saving files (only used in desktop)
   let tauriDialog: any = null;
@@ -788,18 +795,168 @@
       console.warn('Save markdown failed', e);
     }
   }
+
+  // ============================================================================
+  // Persistent Conversation Management
+  // ============================================================================
+
+  // Load a persistent conversation
+  async function loadPersistentConversation(conversationIdToLoad: string) {
+    try {
+      if ($is_tauri) {
+        const result = await invoke('get_persistent_conversation', {
+          conversationId: conversationIdToLoad
+        });
+
+        if (result.status === 'success' && result.conversation) {
+          const conv = result.conversation;
+
+          // Update conversation ID
+          conversationId = conv.id;
+          currentPersistentConversationId.set(conv.id);
+
+          // Load messages
+          messages = conv.messages || [];
+
+          // Load context
+          contextItems = conv.global_context || [];
+
+          // Update UI state
+          error = null;
+
+          console.log('✅ Loaded persistent conversation:', conv.title);
+          saveChatState();
+        } else {
+          error = result.error || 'Failed to load conversation';
+          console.error('❌ Failed to load persistent conversation:', error);
+        }
+      }
+    } catch (e) {
+      console.error('❌ Error loading persistent conversation:', e);
+      error = String(e);
+    }
+  }
+
+  // Save current conversation as persistent
+  async function savePersistentConversation() {
+    if (!conversationId) {
+      console.warn('⚠️ No conversation ID to save');
+      return;
+    }
+
+    try {
+      if ($is_tauri) {
+        // Get the current conversation
+        const result = await invoke('get_conversation', { conversationId });
+
+        if (result.status === 'success' && result.conversation) {
+          const conv = result.conversation;
+
+          // Save as persistent
+          const saveResult = await invoke('create_persistent_conversation', {
+            title: conv.title || 'Chat Conversation',
+            role: conv.role
+          });
+
+          if (saveResult.status === 'success' && saveResult.conversation) {
+            const persistentConv = saveResult.conversation;
+
+            // Update the persistent conversation with current messages and context
+            const updateResult = await invoke('update_persistent_conversation', {
+              conversation: {
+                ...persistentConv,
+                messages: conv.messages,
+                global_context: conv.global_context
+              }
+            });
+
+            if (updateResult.status === 'success') {
+              currentPersistentConversationId.set(persistentConv.id);
+              console.log('✅ Saved persistent conversation:', persistentConv.id);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('❌ Error saving persistent conversation:', e);
+    }
+  }
+
+  // Handle session list selection
+  function handleSessionSelect(conversationIdToLoad: string) {
+    loadPersistentConversation(conversationIdToLoad);
+  }
+
+  // Handle new conversation from session list
+  function handleNewConversation() {
+    // Clear current state
+    messages = [];
+    contextItems = [];
+    conversationId = null;
+    currentPersistentConversationId.set(null);
+    error = null;
+
+    // Create new conversation
+    createNewConversation();
+
+    console.log('🆕 Started new conversation');
+  }
+
+  // Toggle session list panel
+  function toggleSessionList() {
+    showSessionList.update(v => !v);
+  }
 </script>
 
 <section class="section" data-testid="chat-interface">
   <div class="container">
     <div class="columns">
+      <!-- Session List Sidebar (conditionally shown) -->
+      {#if $showSessionList}
+        <div class="column is-3 session-list-column">
+          <SessionList
+            currentConversationId={$currentPersistentConversationId}
+            onSelectConversation={handleSessionSelect}
+            onNewConversation={handleNewConversation}
+          />
+        </div>
+      {/if}
+
       <!-- Main Chat Area -->
-      <div class="column is-8">
-        <h2 class="title is-4">Chat</h2>
-        <p class="subtitle is-6">Role: {get(role)}</p>
-        {#if conversationId}
-          <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
-        {/if}
+      <div class="column" class:is-8={!$showSessionList} class:is-12={$showSessionList}>
+        <div class="chat-header">
+          <div>
+            <h2 class="title is-4">Chat</h2>
+            <p class="subtitle is-6">Role: {get(role)}</p>
+            {#if conversationId}
+              <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
+            {/if}
+          </div>
+          <div class="chat-header-actions">
+            <button
+              class="button is-small"
+              on:click={toggleSessionList}
+              title={$showSessionList ? 'Hide session list' : 'Show session list'}
+            >
+              <span class="icon is-small">
+                <i class="fas fa-{$showSessionList ? 'angle-left' : 'bars'}"></i>
+              </span>
+              <span>{$showSessionList ? 'Hide' : 'History'}</span>
+            </button>
+            {#if conversationId && !$currentPersistentConversationId}
+              <button
+                class="button is-small is-success"
+                on:click={savePersistentConversation}
+                title="Save this conversation"
+              >
+                <span class="icon is-small">
+                  <i class="fas fa-save"></i>
+                </span>
+                <span>Save</span>
+              </button>
+            {/if}
+          </div>
+        </div>
 
         <div class="chat-window" data-testid="chat-messages">
       <div class="chat-toolbar">
@@ -1234,6 +1391,25 @@
 {/if}
 
 <style>
+  .session-list-column {
+    padding-right: 0;
+    border-right: 1px solid var(--bs-border-color);
+    max-height: 80vh;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .chat-header-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .chat-window {
     border: 1px solid #ececec;
     border-radius: 6px;
