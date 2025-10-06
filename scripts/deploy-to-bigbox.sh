@@ -2,7 +2,7 @@
 set -e
 
 # Terraphim AI Deployment Script for Bigbox
-# Deploys to: /home/alex/infrastructure/terraphim-private-cloud/
+# Deploys to: /home/alex/infrastructure/terraphim-private-cloud-new/
 # User: alex (in sudoers)
 # Usage: ./deploy-to-bigbox.sh [phase|all]
 
@@ -45,8 +45,8 @@ phase1_environment() {
 set -e
 
 # Create directory structure
-mkdir -p /home/alex/infrastructure/terraphim-private-cloud/{firecracker-rust,agent-system,workflows,data,logs}
-mkdir -p /home/alex/infrastructure/terraphim-private-cloud/data/{knowledge-graph,documents,sessions}
+mkdir -p /home/alex/infrastructure/terraphim-private-cloud-new/{firecracker-rust,agent-system,workflows,data,logs}
+mkdir -p /home/alex/infrastructure/terraphim-private-cloud-new/data/{knowledge-graph,documents,sessions}
 
 # Install system dependencies
 sudo apt-get update
@@ -84,12 +84,12 @@ phase2_firecracker() {
     rsync -avz --progress --delete \
         --exclude 'target' \
         "$PROJECT_ROOT/scratchpad/firecracker-rust/" \
-        "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud/firecracker-rust/"
+        "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud-new/firecracker-rust/"
     
     # Build and configure on bigbox
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
-cd /home/alex/infrastructure/terraphim-private-cloud/firecracker-rust
+cd /home/alex/infrastructure/terraphim-private-cloud-new/firecracker-rust
 
 # Build (only fcctl-web binary needed)
 source $HOME/.cargo/env
@@ -110,7 +110,7 @@ fi
 ./build-focal-fast.sh
 
 # Create network setup script
-cat > /home/alex/infrastructure/terraphim-private-cloud/setup-vm-network.sh << 'EOF'
+cat > /home/alex/infrastructure/terraphim-private-cloud-new/setup-vm-network.sh << 'EOF'
 #!/bin/bash
 sudo ip link add br0 type bridge 2>/dev/null || true
 sudo ip addr add 172.16.0.1/24 dev br0 2>/dev/null || true
@@ -120,8 +120,8 @@ sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || true
 echo "VM network bridge configured"
 EOF
 
-chmod +x /home/alex/infrastructure/terraphim-private-cloud/setup-vm-network.sh
-/home/alex/infrastructure/terraphim-private-cloud/setup-vm-network.sh
+chmod +x /home/alex/infrastructure/terraphim-private-cloud-new/setup-vm-network.sh
+/home/alex/infrastructure/terraphim-private-cloud-new/setup-vm-network.sh
 
 # Create fcctl-web systemd service
 sudo tee /etc/systemd/system/fcctl-web.service << 'EOF'
@@ -132,11 +132,11 @@ After=network.target redis.service
 [Service]
 Type=simple
 User=alex
-WorkingDirectory=/home/alex/infrastructure/terraphim-private-cloud/firecracker-rust
+WorkingDirectory=/home/alex/infrastructure/terraphim-private-cloud-new/firecracker-rust
 Environment="RUST_LOG=info"
-Environment="FIRECRACKER_PATH=/home/alex/infrastructure/terraphim-private-cloud/firecracker-rust/firecracker-ci-artifacts/firecracker"
-ExecStartPre=/home/alex/infrastructure/terraphim-private-cloud/setup-vm-network.sh
-ExecStart=/home/alex/infrastructure/terraphim-private-cloud/firecracker-rust/target/release/fcctl-web --host 127.0.0.1 --port 8080
+Environment="FIRECRACKER_PATH=/home/alex/infrastructure/terraphim-private-cloud-new/firecracker-rust/firecracker-ci-artifacts/firecracker"
+ExecStartPre=/home/alex/infrastructure/terraphim-private-cloud-new/setup-vm-network.sh
+ExecStart=/home/alex/infrastructure/terraphim-private-cloud-new/firecracker-rust/target/release/fcctl-web --host 127.0.0.1 --port 8080
 Restart=always
 RestartSec=10
 
@@ -168,12 +168,12 @@ phase3_agent_system() {
         --exclude 'node_modules' \
         --exclude '.git' \
         "$PROJECT_ROOT/" \
-        "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud/agent-system/"
+        "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud-new/agent-system/"
     
     # Build and configure on bigbox
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
-cd /home/alex/infrastructure/terraphim-private-cloud/agent-system
+cd /home/alex/infrastructure/terraphim-private-cloud-new/agent-system
 
 # Build agent system
 source $HOME/.cargo/env
@@ -201,14 +201,14 @@ cat > terraphim_server/default/bigbox_config.json << 'EOF'
     "automata_path": null,
     "knowledge_graph_local": {
       "input_type": "markdown",
-      "path": "/home/alex/infrastructure/terraphim-private-cloud/data/knowledge-graph"
+      "path": "/home/alex/infrastructure/terraphim-private-cloud-new/data/knowledge-graph"
     },
     "public": false,
     "publish": false
   },
   "haystacks": [
     {
-      "location": "/home/alex/infrastructure/terraphim-private-cloud/data/documents",
+      "location": "/home/alex/infrastructure/terraphim-private-cloud-new/data/documents",
       "service": "Ripgrep",
       "read_only": true,
       "atomic_server_secret": null,
@@ -253,10 +253,10 @@ After=network.target fcctl-web.service ollama.service
 [Service]
 Type=simple
 User=alex
-WorkingDirectory=/home/alex/infrastructure/terraphim-private-cloud/agent-system
+WorkingDirectory=/home/alex/infrastructure/terraphim-private-cloud-new/agent-system
 Environment="RUST_LOG=info"
-Environment="TERRAPHIM_DATA_DIR=/home/alex/infrastructure/terraphim-private-cloud/data"
-ExecStart=/home/alex/infrastructure/terraphim-private-cloud/agent-system/target/release/terraphim_server --config /home/alex/infrastructure/terraphim-private-cloud/agent-system/terraphim_server/default/bigbox_config.json
+Environment="TERRAPHIM_DATA_DIR=/home/alex/infrastructure/terraphim-private-cloud-new/data"
+ExecStart=/home/alex/infrastructure/terraphim-private-cloud-new/agent-system/target/release/terraphim_server --config /home/alex/infrastructure/terraphim-private-cloud-new/agent-system/terraphim_server/default/bigbox_config.json
 Restart=always
 RestartSec=10
 
@@ -299,7 +299,7 @@ vm.terraphim.cloud {
     authorize with mypolicy
     reverse_proxy 127.0.0.1:8080
     log {
-        output file /home/alex/infrastructure/terraphim-private-cloud/logs/vm-api.log {
+        output file /home/alex/infrastructure/terraphim-private-cloud-new/logs/vm-api.log {
             roll_size 10MiB
             roll_keep 10
             roll_keep_for 168h
@@ -318,7 +318,7 @@ agents.terraphim.cloud {
     }
     reverse_proxy @websockets 127.0.0.1:3000
     log {
-        output file /home/alex/infrastructure/terraphim-private-cloud/logs/agents-api.log {
+        output file /home/alex/infrastructure/terraphim-private-cloud-new/logs/agents-api.log {
             roll_size 10MiB
             roll_keep 10
             roll_keep_for 168h
@@ -330,7 +330,7 @@ agents.terraphim.cloud {
 workflows.terraphim.cloud {
     import tls_config
     authorize with mypolicy
-    root * /home/alex/infrastructure/terraphim-private-cloud/workflows
+    root * /home/alex/infrastructure/terraphim-private-cloud-new/workflows
     file_server
     handle /api/* {
         reverse_proxy 127.0.0.1:3000
@@ -344,7 +344,7 @@ workflows.terraphim.cloud {
         reverse_proxy 127.0.0.1:8080
     }
     log {
-        output file /home/alex/infrastructure/terraphim-private-cloud/logs/workflows.log {
+        output file /home/alex/infrastructure/terraphim-private-cloud-new/logs/workflows.log {
             roll_size 10MiB
             roll_keep 10
             roll_keep_for 168h
@@ -372,19 +372,19 @@ set -e
 
 # Copy parallelization workflow
 cp -r /home/alex/infrastructure/terraphim-private-cloud/agent-system/examples/agent-workflows/3-parallelization \
-      /home/alex/infrastructure/terraphim-private-cloud/workflows/parallelization
+      /home/alex/infrastructure/terraphim-private-cloud-new/workflows/parallelization
 
 # Set permissions
-chmod -R 755 /home/alex/infrastructure/terraphim-private-cloud/workflows/
+chmod -R 755 /home/alex/infrastructure/terraphim-private-cloud-new/workflows/
 
 # Update API endpoints
-cd /home/alex/infrastructure/terraphim-private-cloud/workflows/parallelization
+cd /home/alex/infrastructure/terraphim-private-cloud-new/workflows/parallelization
 find . -type f \( -name "*.js" -o -name "*.html" \) -exec sed -i \
   -e 's|http://localhost:3000|https://agents.terraphim.cloud|g' \
   -e 's|ws://localhost:8080|wss://vm.terraphim.cloud|g' {} \;
 
 # Create index page
-cat > /home/alex/infrastructure/terraphim-private-cloud/workflows/index.html << 'EOF'
+cat > /home/alex/infrastructure/terraphim-private-cloud-new/workflows/index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -425,7 +425,7 @@ phase6_testing() {
 set -e
 
 # Create health check script
-cat > /home/alex/infrastructure/terraphim-private-cloud/health-check.sh << 'EOF'
+cat > /home/alex/infrastructure/terraphim-private-cloud-new/health-check.sh << 'EOF'
 #!/bin/bash
 echo "=== Terraphim Infrastructure Health Check ==="
 echo "[1/5] Redis"
@@ -440,13 +440,13 @@ echo "[5/5] Caddy"
 sudo systemctl is-active --quiet caddy && echo "✓ OK" || echo "✗ FAILED"
 EOF
 
-chmod +x /home/alex/infrastructure/terraphim-private-cloud/health-check.sh
+chmod +x /home/alex/infrastructure/terraphim-private-cloud-new/health-check.sh
 
 # Run health check
-/home/alex/infrastructure/terraphim-private-cloud/health-check.sh
+/home/alex/infrastructure/terraphim-private-cloud-new/health-check.sh
 
 # Run unit tests
-cd /home/alex/infrastructure/terraphim-private-cloud/agent-system
+cd /home/alex/infrastructure/terraphim-private-cloud-new/agent-system
 ./scripts/test-vm-features.sh unit
 
 echo "Phase 6 complete"
@@ -462,25 +462,25 @@ phase7_security() {
 set -e
 
 # Create backup script
-cat > /home/alex/infrastructure/terraphim-private-cloud/backup.sh << 'EOF'
+cat > /home/alex/infrastructure/terraphim-private-cloud-new/backup.sh << 'EOF'
 #!/bin/bash
 BACKUP_DIR=/home/alex/infrastructure/backups/terraphim-private-cloud
 DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p $BACKUP_DIR
 
 tar -czf $BACKUP_DIR/terraphim-private-cloud_$DATE.tar.gz \
-  /home/alex/infrastructure/terraphim-private-cloud/data \
-  /home/alex/infrastructure/terraphim-private-cloud/workflows \
+  /home/alex/infrastructure/terraphim-private-cloud-new/data \
+  /home/alex/infrastructure/terraphim-private-cloud-new/workflows \
   /home/alex/infrastructure/terraphim-private-cloud/agent-system/terraphim_server/default/bigbox_config.json
 
 find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
 echo "Backup completed: $DATE"
 EOF
 
-chmod +x /home/alex/infrastructure/terraphim-private-cloud/backup.sh
+chmod +x /home/alex/infrastructure/terraphim-private-cloud-new/backup.sh
 
 # Add to cron
-(crontab -l 2>/dev/null; echo "0 2 * * * /home/alex/infrastructure/terraphim-private-cloud/backup.sh >> /home/alex/infrastructure/terraphim-private-cloud/logs/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 2 * * * /home/alex/infrastructure/terraphim-private-cloud-new/backup.sh >> /home/alex/infrastructure/terraphim-private-cloud-new/logs/backup.log 2>&1") | crontab -
 
 echo "Phase 7 complete"
 ENDSSH
@@ -515,7 +515,7 @@ main() {
     local phase="${1:-all}"
     
     log_info "Starting deployment to $BIGBOX_HOST"
-    log_info "Target path: /home/alex/infrastructure/terraphim-private-cloud/"
+    log_info "Target path: /home/alex/infrastructure/terraphim-private-cloud-new/"
     log_info "Phase: $phase"
     
     check_ssh_connection
