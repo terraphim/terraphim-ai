@@ -45,7 +45,7 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} libayatana-appindicator3-dev librsvg2-dev pkg-config
+          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
 
       - name: Install and Build Application
         run: yarn install && yarn build
