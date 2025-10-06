@@ -1253,6 +1253,363 @@ pub async fn update_context(
     }
 }
 
+// ============================================================================
+// Persistent Conversation Management Commands
+// ============================================================================
+
+/// Response for listing persistent conversations
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ListPersistentConversationsResponse {
+    pub status: Status,
+    pub conversations: Vec<terraphim_types::ConversationSummary>,
+    pub total: usize,
+    pub error: Option<String>,
+}
+
+/// Response for getting a persistent conversation
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct GetPersistentConversationResponse {
+    pub status: Status,
+    pub conversation: Option<terraphim_types::Conversation>,
+    pub error: Option<String>,
+}
+
+/// Response for creating/updating a persistent conversation
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct SavePersistentConversationResponse {
+    pub status: Status,
+    pub conversation: Option<terraphim_types::Conversation>,
+    pub error: Option<String>,
+}
+
+/// Response for deleting a persistent conversation
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct DeletePersistentConversationResponse {
+    pub status: Status,
+    pub error: Option<String>,
+}
+
+/// Response for conversation statistics
+#[derive(Debug, Serialize, Deserialize, Clone, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct ConversationStatisticsResponse {
+    pub status: Status,
+    pub total_conversations: usize,
+    pub total_messages: usize,
+    pub conversations_by_role: HashMap<String, usize>,
+    pub error: Option<String>,
+}
+
+/// List persistent conversations with optional filtering
+#[command]
+pub async fn list_persistent_conversations(
+    role: Option<String>,
+    limit: Option<usize>,
+) -> Result<ListPersistentConversationsResponse> {
+    use terraphim_service::conversation_service::{ConversationFilter, ConversationService};
+
+    log::debug!(
+        "Listing persistent conversations with role: {:?}, limit: {:?}",
+        role,
+        limit
+    );
+
+    let service = ConversationService::new();
+
+    let filter = ConversationFilter {
+        role: role.map(|r| r.into()),
+        limit,
+        ..Default::default()
+    };
+
+    match service.list_conversations(filter).await {
+        Ok(conversations) => {
+            let total = conversations.len();
+            log::debug!("Found {} persistent conversations", total);
+            Ok(ListPersistentConversationsResponse {
+                status: Status::Success,
+                conversations,
+                total,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to list conversations: {}", e);
+            Ok(ListPersistentConversationsResponse {
+                status: Status::Error,
+                conversations: vec![],
+                total: 0,
+                error: Some(format!("Failed to list conversations: {}", e)),
+            })
+        }
+    }
+}
+
+/// Get a specific persistent conversation by ID
+#[command]
+pub async fn get_persistent_conversation(
+    conversation_id: String,
+) -> Result<GetPersistentConversationResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!("Getting persistent conversation: {}", conversation_id);
+
+    let service = ConversationService::new();
+
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    match service.get_conversation(&conv_id).await {
+        Ok(conversation) => {
+            log::debug!("Found persistent conversation: {}", conversation.title);
+            Ok(GetPersistentConversationResponse {
+                status: Status::Success,
+                conversation: Some(conversation),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to get conversation: {}", e);
+            Ok(GetPersistentConversationResponse {
+                status: Status::Error,
+                conversation: None,
+                error: Some(format!("Failed to get conversation: {}", e)),
+            })
+        }
+    }
+}
+
+/// Create a new persistent conversation
+#[command]
+pub async fn create_persistent_conversation(
+    title: String,
+    role: String,
+) -> Result<SavePersistentConversationResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!(
+        "Creating persistent conversation '{}' with role '{}'",
+        title,
+        role
+    );
+
+    let service = ConversationService::new();
+
+    let role_name = role.into();
+
+    match service.create_conversation(title, role_name).await {
+        Ok(conversation) => {
+            log::debug!(
+                "Created persistent conversation with ID: {}",
+                conversation.id.as_str()
+            );
+            Ok(SavePersistentConversationResponse {
+                status: Status::Success,
+                conversation: Some(conversation),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to create conversation: {}", e);
+            Ok(SavePersistentConversationResponse {
+                status: Status::Error,
+                conversation: None,
+                error: Some(format!("Failed to create conversation: {}", e)),
+            })
+        }
+    }
+}
+
+/// Update an existing persistent conversation
+#[command]
+pub async fn update_persistent_conversation(
+    conversation: terraphim_types::Conversation,
+) -> Result<SavePersistentConversationResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!(
+        "Updating persistent conversation: {}",
+        conversation.id.as_str()
+    );
+
+    let service = ConversationService::new();
+
+    match service.update_conversation(conversation).await {
+        Ok(updated) => {
+            log::debug!("Updated persistent conversation: {}", updated.id.as_str());
+            Ok(SavePersistentConversationResponse {
+                status: Status::Success,
+                conversation: Some(updated),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to update conversation: {}", e);
+            Ok(SavePersistentConversationResponse {
+                status: Status::Error,
+                conversation: None,
+                error: Some(format!("Failed to update conversation: {}", e)),
+            })
+        }
+    }
+}
+
+/// Delete a persistent conversation
+#[command]
+pub async fn delete_persistent_conversation(
+    conversation_id: String,
+) -> Result<DeletePersistentConversationResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!("Deleting persistent conversation: {}", conversation_id);
+
+    let service = ConversationService::new();
+
+    let conv_id = ConversationId::from_string(conversation_id);
+
+    match service.delete_conversation(&conv_id).await {
+        Ok(_) => {
+            log::debug!("Deleted persistent conversation: {}", conv_id.as_str());
+            Ok(DeletePersistentConversationResponse {
+                status: Status::Success,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to delete conversation: {}", e);
+            Ok(DeletePersistentConversationResponse {
+                status: Status::Error,
+                error: Some(format!("Failed to delete conversation: {}", e)),
+            })
+        }
+    }
+}
+
+/// Search persistent conversations
+#[command]
+pub async fn search_persistent_conversations(
+    query: String,
+) -> Result<ListPersistentConversationsResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!("Searching persistent conversations with query: {}", query);
+
+    let service = ConversationService::new();
+
+    match service.search_conversations(&query).await {
+        Ok(conversations) => {
+            let total = conversations.len();
+            log::debug!("Found {} conversations matching '{}'", total, query);
+            Ok(ListPersistentConversationsResponse {
+                status: Status::Success,
+                conversations,
+                total,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to search conversations: {}", e);
+            Ok(ListPersistentConversationsResponse {
+                status: Status::Error,
+                conversations: vec![],
+                total: 0,
+                error: Some(format!("Failed to search conversations: {}", e)),
+            })
+        }
+    }
+}
+
+/// Export a conversation to JSON
+#[command]
+pub async fn export_persistent_conversation(conversation_id: String) -> Result<String> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!("Exporting persistent conversation: {}", conversation_id);
+
+    let service = ConversationService::new();
+    let conv_id = ConversationId::from_string(conversation_id);
+    let json = service.export_conversation(&conv_id).await?;
+
+    Ok(json)
+}
+
+/// Import a conversation from JSON
+#[command]
+pub async fn import_persistent_conversation(
+    json: String,
+) -> Result<SavePersistentConversationResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!(
+        "Importing persistent conversation from JSON ({} bytes)",
+        json.len()
+    );
+
+    let service = ConversationService::new();
+
+    match service.import_conversation(&json).await {
+        Ok(conversation) => {
+            log::debug!(
+                "Imported persistent conversation: {}",
+                conversation.id.as_str()
+            );
+            Ok(SavePersistentConversationResponse {
+                status: Status::Success,
+                conversation: Some(conversation),
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to import conversation: {}", e);
+            Ok(SavePersistentConversationResponse {
+                status: Status::Error,
+                conversation: None,
+                error: Some(format!("Failed to import conversation: {}", e)),
+            })
+        }
+    }
+}
+
+/// Get conversation statistics
+#[command]
+pub async fn get_conversation_statistics() -> Result<ConversationStatisticsResponse> {
+    use terraphim_service::conversation_service::ConversationService;
+
+    log::debug!("Getting conversation statistics");
+
+    let service = ConversationService::new();
+
+    match service.get_statistics().await {
+        Ok(stats) => {
+            log::debug!(
+                "Retrieved statistics: {} conversations, {} messages",
+                stats.total_conversations,
+                stats.total_messages
+            );
+            Ok(ConversationStatisticsResponse {
+                status: Status::Success,
+                total_conversations: stats.total_conversations,
+                total_messages: stats.total_messages,
+                conversations_by_role: stats.conversations_by_role,
+                error: None,
+            })
+        }
+        Err(e) => {
+            log::error!("Failed to get statistics: {}", e);
+            Ok(ConversationStatisticsResponse {
+                status: Status::Error,
+                total_conversations: 0,
+                total_messages: 0,
+                conversations_by_role: HashMap::new(),
+                error: Some(format!("Failed to get statistics: {}", e)),
+            })
+        }
+    }
+}
+
 /// Chat endpoint for LLM interactions
 #[command]
 pub async fn chat(

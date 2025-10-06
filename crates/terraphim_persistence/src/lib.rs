@@ -1,3 +1,4 @@
+pub mod conversation;
 pub mod document;
 pub mod error;
 pub mod memory;
