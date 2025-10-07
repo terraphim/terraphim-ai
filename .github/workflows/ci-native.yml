@@ -56,11 +56,17 @@ jobs:
 
   lint-and-format:
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, build-frontend]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
 
       - name: Install build dependencies
         run: |
