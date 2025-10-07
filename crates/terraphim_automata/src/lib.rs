@@ -114,13 +114,20 @@ impl AutomataPath {
     /// Full Local example for testing
     pub fn local_example_full() -> Self {
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let full_path = if cwd.ends_with("terraphim_automata") {
-            "../../test-fixtures/term_to_id.json"
-        } else if cwd.file_name().is_some_and(|name| name == "terraphim-ai") {
-            "test-fixtures/term_to_id.json"
-        } else {
-            "data/term_to_id.json" // fallback to old path
-        };
+        
+        // Try multiple possible paths for the test fixtures
+        let possible_paths = [
+            "test-fixtures/term_to_id.json",      // from workspace root
+            "../../test-fixtures/term_to_id.json", // from crate dir
+            "../test-fixtures/term_to_id.json",    // from crates/ dir
+            "data/term_to_id.json",                // legacy fallback
+        ];
+        
+        let full_path = possible_paths
+            .iter()
+            .find(|path| cwd.join(path).exists())
+            .unwrap_or(&"test-fixtures/term_to_id.json");
+            
         AutomataPath::from_local(full_path)
     }
 
