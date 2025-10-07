@@ -4,7 +4,6 @@
 //! and capability-based agent discovery.
 
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +39,7 @@ pub struct CapabilityQuery {
 }
 
 /// Input/output type requirements
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct IORequirements {
     /// Required input types
     pub input_types: Vec<String>,
@@ -48,16 +47,6 @@ pub struct IORequirements {
     pub output_types: Vec<String>,
     /// Input/output compatibility matrix
     pub compatibility_matrix: HashMap<String, Vec<String>>,
-}
-
-impl Default for IORequirements {
-    fn default() -> Self {
-        Self {
-            input_types: Vec::new(),
-            output_types: Vec::new(),
-            compatibility_matrix: HashMap::new(),
-        }
-    }
 }
 
 /// Capability matching result
@@ -128,7 +117,7 @@ impl CapabilityRegistry {
         // Add to category
         self.categories
             .entry(capability.category.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(capability_id.clone());
 
         // Register dependencies
@@ -243,7 +232,7 @@ impl CapabilityRegistry {
 
         // Check required capabilities
         let mut requirement_score = 0.0;
-        let mut total_requirements = query.required_capabilities.len();
+        let total_requirements = query.required_capabilities.len();
 
         for required_cap in &query.required_capabilities {
             if capability.capability_id == *required_cap {
@@ -575,13 +564,13 @@ impl CapabilityRegistry {
     pub fn set_capability_compatibility(&mut self, cap1: &str, cap2: &str, similarity: f64) {
         self.compatibility
             .entry(cap1.to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(cap2.to_string(), similarity);
 
         // Set reverse compatibility
         self.compatibility
             .entry(cap2.to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(cap1.to_string(), similarity);
     }
 

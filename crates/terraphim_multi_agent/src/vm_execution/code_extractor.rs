@@ -470,7 +470,7 @@ impl CodeBlockExtractor {
         text.contains("```")
             || text
                 .lines()
-                .any(|line| line.starts_with("    ") && line.trim().len() > 0)
+                .any(|line| line.starts_with("    ") && !line.trim().is_empty())
     }
 }
 

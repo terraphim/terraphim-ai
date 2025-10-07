@@ -6,13 +6,12 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use terraphim_automata::extract_paragraphs_from_automata;
 use terraphim_rolegraph::RoleGraph;
 
-use crate::{AgentCapability, AgentMetadata, AgentPid, AgentRole, RegistryError, RegistryResult};
+use crate::{AgentMetadata, RegistryError, RegistryResult};
 
 /// Knowledge graph-based agent discovery and matching
 pub struct KnowledgeGraphIntegration {
