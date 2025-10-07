@@ -18,6 +18,7 @@ pub struct FcctlBridge {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct VmSession {
     vm_id: String,
     agent_id: String,
