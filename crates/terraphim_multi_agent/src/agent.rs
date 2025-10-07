@@ -604,7 +604,18 @@ impl TerraphimAgent {
         let system_prompt = if let Some(configured_prompt) =
             self.role_config.extra.get("llm_system_prompt")
         {
-            configured_prompt.as_str().unwrap_or("").to_string()
+            let raw_prompt = configured_prompt.as_str().unwrap_or("");
+            let sanitized = crate::prompt_sanitizer::sanitize_system_prompt(raw_prompt);
+
+            if sanitized.was_modified {
+                tracing::warn!(
+                    "System prompt was sanitized for agent {}. Warnings: {:?}",
+                    self.agent_id,
+                    sanitized.warnings
+                );
+            }
+
+            sanitized.content
         } else {
             format!(
                 "You are {}, a specialized AI agent with expertise in software development, architecture, and technical implementation. \
@@ -1105,14 +1116,7 @@ mod tests {
 
         DeviceStorage::init_memory_only().await.unwrap();
         // Use test utility function which handles storage correctly
-        let persistence = {
-            DeviceStorage::init_memory_only().await.unwrap();
-            let storage_ref = DeviceStorage::instance().await.unwrap();
-            // Create new owned storage to avoid lifetime issues
-            use std::ptr;
-            let storage_copy = unsafe { ptr::read(storage_ref) };
-            Arc::new(storage_copy)
-        };
+        let persistence = DeviceStorage::arc_memory_only().await.unwrap();
         let agent = TerraphimAgent::new(role, persistence, None).await.unwrap();
 
         assert_eq!(agent.role_config.name, "Test Agent".into());
@@ -1137,14 +1141,7 @@ mod tests {
 
         DeviceStorage::init_memory_only().await.unwrap();
         // Use test utility function which handles storage correctly
-        let persistence = {
-            DeviceStorage::init_memory_only().await.unwrap();
-            let storage_ref = DeviceStorage::instance().await.unwrap();
-            // Create new owned storage to avoid lifetime issues
-            use std::ptr;
-            let storage_copy = unsafe { ptr::read(storage_ref) };
-            Arc::new(storage_copy)
-        };
+        let persistence = DeviceStorage::arc_memory_only().await.unwrap();
         let agent = TerraphimAgent::new(role, persistence, None).await.unwrap();
 
         let capabilities = agent.get_capabilities();

@@ -435,12 +435,7 @@ mod tests {
     #[tokio::test]
     async fn test_pool_manager_creation() {
         DeviceStorage::init_memory_only().await.unwrap();
-        let storage = {
-            let storage_ref = DeviceStorage::instance().await.unwrap();
-            use std::ptr;
-            let storage_copy = unsafe { ptr::read(storage_ref) };
-            Arc::new(storage_copy)
-        };
+        let storage = DeviceStorage::arc_memory_only().await.unwrap();
 
         let manager = PoolManager::new(storage, None).await.unwrap();
         let stats = manager.get_global_stats().await;
@@ -452,12 +447,7 @@ mod tests {
     #[tokio::test]
     async fn test_pool_creation_on_demand() {
         DeviceStorage::init_memory_only().await.unwrap();
-        let storage = {
-            let storage_ref = DeviceStorage::instance().await.unwrap();
-            use std::ptr;
-            let storage_copy = unsafe { ptr::read(storage_ref) };
-            Arc::new(storage_copy)
-        };
+        let storage = DeviceStorage::arc_memory_only().await.unwrap();
 
         let manager = PoolManager::new(storage, None).await.unwrap();
         let role = create_test_role();
@@ -479,12 +469,7 @@ mod tests {
     #[tokio::test]
     async fn test_pool_shutdown() {
         DeviceStorage::init_memory_only().await.unwrap();
-        let storage = {
-            let storage_ref = DeviceStorage::instance().await.unwrap();
-            use std::ptr;
-            let storage_copy = unsafe { ptr::read(storage_ref) };
-            Arc::new(storage_copy)
-        };
+        let storage = DeviceStorage::arc_memory_only().await.unwrap();
 
         let manager = PoolManager::new(storage, None).await.unwrap();
         let role = create_test_role();
