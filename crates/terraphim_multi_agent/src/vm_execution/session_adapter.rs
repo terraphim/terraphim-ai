@@ -8,6 +8,7 @@ use tracing::{debug, info};
 use super::models::*;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct DirectSessionAdapter {
     sessions: Arc<RwLock<HashMap<String, SessionHandle>>>,
     data_dir: PathBuf,

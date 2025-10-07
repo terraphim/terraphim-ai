@@ -34,6 +34,7 @@ pub mod error;
 pub mod genai_llm_client;
 pub mod history;
 pub mod llm_types;
+pub mod prompt_sanitizer;
 pub mod vm_execution;
 // pub mod llm_client;      // Disabled - uses rig-core
 // pub mod simple_llm_client; // Disabled - uses rig-core
@@ -50,6 +51,7 @@ pub use error::*;
 pub use genai_llm_client::*;
 pub use history::*;
 pub use llm_types::*;
+pub use prompt_sanitizer::*;
 // pub use llm_client::*;      // Disabled - uses rig-core
 // pub use simple_llm_client::*; // Disabled - uses rig-core
 pub use pool::*;
@@ -94,19 +96,9 @@ pub mod test_utils {
         let _settings = create_memory_only_device_settings()
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        // Initialize memory storage
-        DeviceStorage::init_memory_only()
+        let persistence = DeviceStorage::arc_memory_only()
             .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-        let storage_ref = DeviceStorage::instance()
-            .await
-            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-        // Use the same unsafe pattern from the examples
-        use std::ptr;
-        let storage_copy = unsafe { ptr::read(storage_ref) };
-        let persistence = Arc::new(storage_copy);
 
         let role = create_test_role();
         TerraphimAgent::new(role, persistence, None).await
@@ -124,19 +116,9 @@ pub mod test_utils {
         let _settings = create_memory_only_device_settings()
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
 
-        // Initialize memory storage
-        DeviceStorage::init_memory_only()
+        DeviceStorage::arc_memory_only()
             .await
-            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-        let storage_ref = DeviceStorage::instance()
-            .await
-            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))?;
-
-        // Use the same unsafe pattern from the examples
-        use std::ptr;
-        let storage_copy = unsafe { ptr::read(storage_ref) };
-        Ok(Arc::new(storage_copy))
+            .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
     }
 
     /// Create test rolegraph for testing
