@@ -27,6 +27,22 @@ async fn mcp_live_haystack_smoke() {
         haystacks: vec![Haystack::new(base_url.clone(), ServiceType::Mcp, true)
             .with_extra_parameter("base_url".into(), base_url.clone())
             .with_extra_parameter("transport".into(), "sse".into())],
+        #[cfg(feature = "openrouter")]
+        llm_enabled: false,
+        #[cfg(feature = "openrouter")]
+        llm_api_key: None,
+        #[cfg(feature = "openrouter")]
+        llm_model: None,
+        #[cfg(feature = "openrouter")]
+        llm_auto_summarize: false,
+        #[cfg(feature = "openrouter")]
+        llm_chat_enabled: false,
+        #[cfg(feature = "openrouter")]
+        llm_chat_system_prompt: None,
+        #[cfg(feature = "openrouter")]
+        llm_chat_model: None,
+        #[cfg(feature = "openrouter")]
+        llm_context_window: None,
         extra: ahash::AHashMap::new(),
     };
 
