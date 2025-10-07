@@ -693,8 +693,26 @@ impl TerraphimAgent {
         // Check if VM execution is enabled
         if let Some(vm_client) = &self.vm_execution_client {
             // Try to extract and execute code from the input
+            log::info!("VM execution enabled, extracting code blocks from input");
+            log::info!(
+                "Input text length: {}, content: {:?}",
+                input.text.len(),
+                &input.text[..input.text.len().min(200)]
+            );
+
             let code_extractor = crate::vm_execution::CodeBlockExtractor::new();
             let code_blocks = code_extractor.extract_code_blocks(&input.text);
+
+            log::info!("Extracted {} code blocks", code_blocks.len());
+            for (i, block) in code_blocks.iter().enumerate() {
+                log::info!(
+                    "Block {}: language={}, confidence={}, code_len={}",
+                    i,
+                    block.language,
+                    block.execution_confidence,
+                    block.code.len()
+                );
+            }
 
             if code_blocks.is_empty() {
                 // No code blocks found, check execution intent

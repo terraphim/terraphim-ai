@@ -176,9 +176,7 @@ pub async fn execute_optimization(
     )
     .await;
 
-    let role = request
-        .role
-        .unwrap_or_else(|| "GeneratorAgent".to_string());
+    let role = request.role.unwrap_or_else(|| "GeneratorAgent".to_string());
     let overall_role = request
         .overall_role
         .unwrap_or_else(|| "Quality Optimizer".to_string());

@@ -1207,4 +1207,103 @@ impl MultiAgentWorkflowExecutor {
         );
         Ok(role.clone())
     }
+
+    pub async fn execute_vm_execution_demo(
+        &self,
+        workflow_id: &str,
+        prompt: &str,
+        role: &str,
+        overall_role: &str,
+        sessions: &WorkflowSessions,
+        broadcaster: &WebSocketBroadcaster,
+    ) -> MultiAgentResult<Value> {
+        log::info!("Executing VM execution demo workflow with code generation and execution");
+
+        update_workflow_status(
+            sessions,
+            broadcaster,
+            workflow_id,
+            ExecutionStatus::Running,
+            10.0,
+            Some("Creating code generation agent".to_string()),
+        )
+        .await;
+
+        let agent_role = self.get_configured_role(role).await?;
+        let mut extra = agent_role.extra.clone();
+        extra.insert("vm_execution_enabled".to_string(), serde_json::json!(true));
+        extra.insert("vm_base_url".to_string(), serde_json::json!("http://127.0.0.1:8080"));
+        
+        let mut vm_role = agent_role.clone();
+        vm_role.extra = extra;
+
+        let agent = TerraphimAgent::new(vm_role, self.persistence.clone(), None).await?;
+        agent.initialize().await?;
+
+        update_workflow_status(
+            sessions,
+            broadcaster,
+            workflow_id,
+            ExecutionStatus::Running,
+            30.0,
+            Some("Requesting LLM to generate code".to_string()),
+        )
+        .await;
+
+        let code_gen_prompt = format!(
+            "{}\n\nPlease provide your solution as executable code. \
+            Include complete, runnable code that can be executed directly. \
+            Use code blocks with language specification (e.g., ```python, ```bash, ```rust).",
+            prompt
+        );
+
+        let input = CommandInput::new(code_gen_prompt, CommandType::Generate);
+        let llm_output = agent.process_command(input).await?;
+
+        update_workflow_status(
+            sessions,
+            broadcaster,
+            workflow_id,
+            ExecutionStatus::Running,
+            60.0,
+            Some("Executing generated code in VM".to_string()),
+        )
+        .await;
+
+        let exec_input = CommandInput::new(llm_output.text.clone(), CommandType::Execute);
+        let exec_output = agent.process_command(exec_input).await?;
+
+        update_workflow_status(
+            sessions,
+            broadcaster,
+            workflow_id,
+            ExecutionStatus::Running,
+            90.0,
+            Some("Collecting execution results".to_string()),
+        )
+        .await;
+
+        let token_tracker = agent.token_tracker.read().await;
+        let cost_tracker = agent.cost_tracker.read().await;
+
+        let code_blocks_count = llm_output.text.matches("```").count() / 2;
+
+        Ok(json!({
+            "pattern": "vm_execution",
+            "llm_generated_code": llm_output.text,
+            "execution_output": exec_output.text,
+            "execution_summary": {
+                "role": role,
+                "overall_role": overall_role,
+                "input_prompt": prompt,
+                "agent_id": agent.agent_id.to_string(),
+                "code_blocks_generated": code_blocks_count,
+                "code_blocks_executed": if exec_output.text.contains("No code was executed") { 0 } else { code_blocks_count },
+                "vm_execution_enabled": true,
+                "tokens_used": token_tracker.total_input_tokens + token_tracker.total_output_tokens,
+                "cost": cost_tracker.current_month_spending,
+                "multi_agent": true
+            }
+        }))
+    }
 }

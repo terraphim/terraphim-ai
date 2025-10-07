@@ -18,6 +18,7 @@ pub mod orchestration;
 pub mod parallel;
 pub mod prompt_chain;
 pub mod routing;
+pub mod vm_execution;
 pub mod websocket;
 
 // LLM configuration for workflow execution
@@ -133,6 +134,10 @@ pub fn create_router() -> Router<AppState> {
         .route(
             "/workflows/optimize",
             post(optimization::execute_optimization),
+        )
+        .route(
+            "/workflows/vm-execution-demo",
+            post(vm_execution::execute_vm_execution_demo),
         )
         // Workflow monitoring endpoints
         .route("/workflows/{id}/status", get(get_workflow_status))
