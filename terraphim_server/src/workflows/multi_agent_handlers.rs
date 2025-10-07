@@ -1216,6 +1216,7 @@ impl MultiAgentWorkflowExecutor {
         overall_role: &str,
         sessions: &WorkflowSessions,
         broadcaster: &WebSocketBroadcaster,
+        custom_config: Option<serde_json::Value>,
     ) -> MultiAgentResult<Value> {
         log::info!("Executing VM execution demo workflow with code generation and execution");
 
@@ -1232,8 +1233,19 @@ impl MultiAgentWorkflowExecutor {
         let agent_role = self.get_configured_role(role).await?;
         let mut extra = agent_role.extra.clone();
         extra.insert("vm_execution_enabled".to_string(), serde_json::json!(true));
-        extra.insert("vm_base_url".to_string(), serde_json::json!("http://127.0.0.1:8080"));
-        
+        extra.insert(
+            "vm_base_url".to_string(),
+            serde_json::json!("http://127.0.0.1:8080"),
+        );
+
+        // Apply custom system prompt if provided
+        if let Some(config) = custom_config {
+            if let Some(system_prompt) = config.get("llm_system_prompt") {
+                extra.insert("llm_system_prompt".to_string(), system_prompt.clone());
+                log::info!("Using custom system prompt for VM execution");
+            }
+        }
+
         let mut vm_role = agent_role.clone();
         vm_role.extra = extra;
 
@@ -1251,9 +1263,20 @@ impl MultiAgentWorkflowExecutor {
         .await;
 
         let code_gen_prompt = format!(
-            "{}\n\nPlease provide your solution as executable code. \
-            Include complete, runnable code that can be executed directly. \
-            Use code blocks with language specification (e.g., ```python, ```bash, ```rust).",
+            "{}\n\n\
+            IMPORTANT: Provide ONLY complete, runnable, executable code - NO placeholders, NO TODO comments, NO explanatory text outside code blocks.\n\
+            Write actual working code that can be executed immediately.\n\
+            Use code blocks with language specification (e.g., ```python, ```bash, ```rust).\n\
+            Example good response:\n\
+            ```python\n\
+            def factorial(n):\n\
+                if n <= 1:\n\
+                    return 1\n\
+                return n * factorial(n - 1)\n\
+            \n\
+            result = factorial(5)\n\
+            print(f\"Factorial of 5 is: {{result}}\")\n\
+            ```",
             prompt
         );
 
