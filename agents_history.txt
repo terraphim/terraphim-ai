@@ -89,3 +89,31 @@
 
   Updated @scratchpad.md to reflect completion of VM execution system documentation.
 
+
+=== VM Execution Chat API Integration Debugging - 2025-10-06 21:50 ===
+
+ISSUE: VM execution not triggering via /chat endpoint despite correct config
+
+CURRENT FINDINGS:
+1. Config correctly loaded: vm_execution.enabled=true in DevelopmentAgent role ✓
+2. Source code modified with debug logging at api.rs:577 ✓
+3. Binary built (21:47) and deployed (21:48) ✓  
+4. Debug logs NOT appearing → code path not being reached ✗
+5. LLM responds normally, only explains code instead of executing ✗
+
+ROOT CAUSE HYPOTHESIS:
+- The /chat endpoint may not be routing through the modified chat_completion function
+- Logs show emoji output from LLM client building, but not from VM execution check
+- Suggests code path diverges before reaching VM execution logic
+
+DEBUGGING PLAN:
+1. Verify /chat endpoint routing in terraphim_server/src/main.rs or routes
+2. Add file-based debug logging to bypass systemd journal filtering
+3. Test with direct VM execution API endpoint to isolate issue
+4. Check if there's middleware intercepting before VM execution check
+
+FILES MODIFIED:
+- terraphim_server/src/api.rs:576-593 (VM execution check with logging)
+- terraphim_server/default/ollama_llama_config.json (vm_execution config)
+
+STATUS: Need to identify where /chat endpoint diverges from expected code path
