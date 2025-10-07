@@ -8,8 +8,8 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AgentCapability, AgentDiscoveryQuery, AgentDiscoveryResult, AgentMatch, AgentMetadata,
-    AgentRole, ConnectivityResult, QueryAnalysis, RegistryError, RegistryResult, ScoreBreakdown,
+    AgentDiscoveryQuery, AgentDiscoveryResult, AgentMatch, AgentMetadata, ConnectivityResult,
+    QueryAnalysis, RegistryError, RegistryResult, ScoreBreakdown,
 };
 
 /// Discovery algorithm types

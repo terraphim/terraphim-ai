@@ -17,13 +17,6 @@
 //! - **Dynamic Discovery**: Real-time agent discovery based on evolving requirements
 //! - **Performance Optimization**: Efficient indexing and caching for fast lookups
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
 // Re-export core types
 pub use terraphim_agent_supervisor::{AgentPid, SupervisorId};
 pub use terraphim_agent_supervisor::{AgentSpec, RestartStrategy};

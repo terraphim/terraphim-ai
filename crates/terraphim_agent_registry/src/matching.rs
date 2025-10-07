@@ -11,7 +11,6 @@ use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 
 use terraphim_rolegraph::RoleGraph;
-use terraphim_types::*;
 
 // Temporary mock functions until dependencies are fixed
 fn extract_paragraphs_from_automata(
@@ -46,10 +45,7 @@ fn is_all_terms_connected_by_path(
 pub struct MockAutomata;
 pub type Automata = MockAutomata;
 
-use crate::{
-    AgentCapability, AgentDiscoveryQuery, AgentMatch, AgentMetadata, RegistryError, RegistryResult,
-    ScoreBreakdown,
-};
+use crate::{AgentCapability, AgentMetadata, RegistryResult};
 
 /// Task representation for matching
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -759,7 +755,7 @@ impl KnowledgeGraphAgentMatcher for TerraphimKnowledgeGraphMatcher {
                 // Track agent assignments
                 agent_assignments
                     .entry(assigned_agent)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(step_id);
 
                 // Update total duration (sequential execution for now)
@@ -773,7 +769,7 @@ impl KnowledgeGraphAgentMatcher for TerraphimKnowledgeGraphMatcher {
         }
 
         // Calculate parallelism factor (simplified)
-        let parallelism_factor = if tasks.len() > 0 {
+        let parallelism_factor = if !tasks.is_empty() {
             let unique_agents = agent_assignments.keys().len();
             (unique_agents as f64 / tasks.len() as f64).min(1.0)
         } else {

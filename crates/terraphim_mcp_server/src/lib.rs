@@ -8,7 +8,7 @@ use rmcp::{
         ListToolsResult, ReadResourceRequestParam, ReadResourceResult, ServerInfo, Tool,
     },
     service::RequestContext,
-    Error as McpError, RoleServer, ServerHandler,
+    RoleServer, ServerHandler,
 };
 use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{
@@ -32,7 +32,7 @@ pub enum TerraphimMcpError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
     #[error("MCP error: {0}")]
-    Mcp(#[from] McpError),
+    Mcp(#[from] ErrorData),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Anyhow error: {0}")]
@@ -107,7 +107,7 @@ impl McpService {
         role: Option<String>,
         limit: Option<i32>,
         skip: Option<i32>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let mut service = self
             .terraphim_service()
             .await
@@ -159,7 +159,10 @@ impl McpService {
     }
 
     /// Update the Terraphim configuration
-    pub async fn update_config_tool(&self, config_str: String) -> Result<CallToolResult, McpError> {
+    pub async fn update_config_tool(
+        &self,
+        config_str: String,
+    ) -> Result<CallToolResult, ErrorData> {
         match serde_json::from_str::<Config>(&config_str) {
             Ok(new_config) => match self.update_config(new_config).await {
                 Ok(()) => {
@@ -185,7 +188,7 @@ impl McpService {
     pub async fn build_autocomplete_index(
         &self,
         role: Option<String>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let mut service = self
             .terraphim_service()
             .await
@@ -292,7 +295,7 @@ impl McpService {
         query: String,
         limit: Option<usize>,
         role: Option<String>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         // Determine which role to use (provided role or selected role)
         let _role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
@@ -384,7 +387,7 @@ impl McpService {
         query: String,
         limit: Option<usize>,
         role: Option<String>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         // Determine which role to use (provided role or selected role)
         let _role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
@@ -472,7 +475,7 @@ impl McpService {
         query: String,
         similarity: Option<f64>,
         limit: Option<usize>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -522,7 +525,7 @@ impl McpService {
         query: String,
         max_edit_distance: Option<usize>,
         limit: Option<usize>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -573,7 +576,7 @@ impl McpService {
         query: String,
         similarity: Option<f64>,
         limit: Option<usize>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -619,7 +622,7 @@ impl McpService {
     }
 
     /// Serialize autocomplete index to bytes for storage/transmission
-    pub async fn serialize_autocomplete_index(&self) -> Result<CallToolResult, McpError> {
+    pub async fn serialize_autocomplete_index(&self) -> Result<CallToolResult, ErrorData> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -658,7 +661,7 @@ impl McpService {
     pub async fn deserialize_autocomplete_index(
         &self,
         base64_data: String,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         // Decode base64 data
         let bytes = match base64::engine::general_purpose::STANDARD.decode(&base64_data) {
             Ok(data) => data,
@@ -697,7 +700,7 @@ impl McpService {
         text: String,
         role: Option<String>,
         return_positions: Option<bool>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let mut service = self
             .terraphim_service()
             .await
@@ -772,7 +775,7 @@ impl McpService {
         text: String,
         role: Option<String>,
         link_type: String,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let mut service = self
             .terraphim_service()
             .await
@@ -849,7 +852,7 @@ impl McpService {
         text: String,
         role: Option<String>,
         include_term: Option<bool>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let mut service = self
             .terraphim_service()
             .await
@@ -914,7 +917,7 @@ impl McpService {
     }
 
     /// Parse Logseq JSON output using terraphim_automata
-    pub async fn json_decode(&self, jsonlines: String) -> Result<CallToolResult, McpError> {
+    pub async fn json_decode(&self, jsonlines: String) -> Result<CallToolResult, ErrorData> {
         match json_decode(&jsonlines) {
             Ok(messages) => {
                 let mut contents = Vec::new();
@@ -937,7 +940,7 @@ impl McpService {
     }
 
     /// Load thesaurus from automata path (local file or remote URL)
-    pub async fn load_thesaurus(&self, automata_path: String) -> Result<CallToolResult, McpError> {
+    pub async fn load_thesaurus(&self, automata_path: String) -> Result<CallToolResult, ErrorData> {
         // Parse the automata path
         let path = if automata_path.starts_with("http://") || automata_path.starts_with("https://")
         {
@@ -988,7 +991,7 @@ impl McpService {
     pub async fn load_thesaurus_from_json(
         &self,
         json_str: String,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         match terraphim_automata::load_thesaurus_from_json(&json_str) {
             Ok(thesaurus) => {
                 let mut contents = Vec::new();
@@ -1031,7 +1034,7 @@ impl McpService {
         &self,
         text: String,
         role: Option<String>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResult, ErrorData> {
         let mut service = self
             .terraphim_service()
             .await

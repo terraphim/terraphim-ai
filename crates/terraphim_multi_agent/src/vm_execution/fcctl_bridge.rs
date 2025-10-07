@@ -120,10 +120,8 @@ impl FcctlBridge {
     fn should_create_snapshot(&self, exit_code: i32) -> bool {
         if self.config.snapshot_on_execution {
             true
-        } else if self.config.snapshot_on_failure && exit_code != 0 {
-            true
         } else {
-            false
+            self.config.snapshot_on_failure && exit_code != 0
         }
     }
 
