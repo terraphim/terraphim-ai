@@ -84,7 +84,13 @@ impl Default for DeviceSettings {
 impl DeviceSettings {
     /// Create a new DeviceSettings
     pub fn new() -> Self {
-        Self::load_from_env_and_file(None).unwrap()
+        Self::load_from_env_and_file(None).unwrap_or_else(|e| {
+            log::warn!(
+                "Failed to load device settings from file: {:?}, using defaults",
+                e
+            );
+            Self::default_embedded()
+        })
     }
 
     /// Load settings with 1Password secret resolution
