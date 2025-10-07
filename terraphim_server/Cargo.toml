@@ -75,7 +75,7 @@ dircpy = "0.3.15"
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"
 copyright = "2024, Terraphim Contributors"
-license-file = ["../LICENSE", "4"]
+license-file = ["../LICENSE-Apache-2.0", "4"]
 extended-description = """
 Terraphim AI Server - Privacy-first AI assistant backend.
 Provides HTTP API for semantic search and knowledge graphs.
