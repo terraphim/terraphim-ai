@@ -58,3 +58,5 @@ mcp-sse = ["reqwest-eventsource"]
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
 mcp-rust-sdk = ["mcp-client", "mcp-spec", "mcp-sse"]
+# OpenRouter LLM provider support
+openrouter = []
