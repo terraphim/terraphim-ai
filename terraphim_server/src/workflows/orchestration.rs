@@ -175,7 +175,7 @@ pub async fn execute_orchestration(
 
     let role = request
         .role
-        .unwrap_or_else(|| "Task Orchestrator".to_string());
+        .unwrap_or_else(|| "OrchestratorAgent".to_string());
     let overall_role = request
         .overall_role
         .unwrap_or_else(|| "Workflow Coordinator".to_string());
