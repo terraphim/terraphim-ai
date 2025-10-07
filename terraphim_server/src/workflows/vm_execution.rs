@@ -39,6 +39,7 @@ pub async fn execute_vm_execution_demo(
                 &overall_role,
                 &state.workflow_sessions,
                 &state.websocket_broadcaster,
+                request.config.clone(),
             )
             .await
             .map_err(|e| e.to_string()),
