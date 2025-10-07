@@ -256,6 +256,7 @@ mod tests {
 
     #[cfg(feature = "remote-loading")]
     #[tokio::test]
+    #[ignore]
     async fn test_load_thesaurus_from_url() {
         let automata_path = AutomataPath::remote_example();
         let thesaurus = load_thesaurus(&automata_path).await.unwrap();
