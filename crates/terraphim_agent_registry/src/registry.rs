@@ -13,9 +13,8 @@ use tokio::sync::RwLock;
 use terraphim_rolegraph::RoleGraph;
 
 use crate::{
-    AgentCapability, AgentDiscoveryQuery, AgentDiscoveryResult, AgentMetadata, AgentPid, AgentRole,
-    AutomataConfig, KnowledgeGraphIntegration, RegistryError, RegistryResult, SimilarityThresholds,
-    SupervisorId,
+    AgentDiscoveryQuery, AgentDiscoveryResult, AgentMetadata, AgentPid, AutomataConfig,
+    KnowledgeGraphIntegration, RegistryError, RegistryResult, SimilarityThresholds, SupervisorId,
 };
 
 /// Agent registry trait for different implementations

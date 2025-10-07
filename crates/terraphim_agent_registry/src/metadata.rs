@@ -4,7 +4,7 @@
 //! role-based specialization using the existing terraphim_rolegraph infrastructure.
 
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -223,7 +223,7 @@ impl Default for AgentLifecycle {
 }
 
 /// Knowledge graph context for the agent
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct KnowledgeContext {
     /// Knowledge domains the agent operates in
     pub domains: Vec<String>,
@@ -237,19 +237,6 @@ pub struct KnowledgeContext {
     pub similarity_thresholds: HashMap<String, f64>,
     /// Keywords for semantic matching
     pub keywords: Vec<String>,
-}
-
-impl Default for KnowledgeContext {
-    fn default() -> Self {
-        Self {
-            domains: Vec::new(),
-            concepts: Vec::new(),
-            relationships: Vec::new(),
-            extraction_patterns: Vec::new(),
-            similarity_thresholds: HashMap::new(),
-            keywords: Vec::new(),
-        }
-    }
 }
 
 /// Agent performance and usage statistics

@@ -728,7 +728,7 @@ impl SupervisionOrchestration for SupervisionTreeOrchestrator {
         };
 
         // Start workflow execution
-        let execution_result = self
+        let _execution_result = self
             .coordinator
             .execute_workflow(scheduled_workflow)
             .await?;
@@ -808,7 +808,7 @@ impl SupervisionOrchestration for SupervisionTreeOrchestrator {
         &self,
         agent_id: &AgentPid,
         workflow_id: &str,
-        reason: ExitReason,
+        _reason: ExitReason,
     ) -> OrchestrationResult<RecoveryAction> {
         warn!(
             "Handling agent failure: {} in workflow {}",

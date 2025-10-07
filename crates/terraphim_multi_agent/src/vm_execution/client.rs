@@ -156,12 +156,9 @@ impl VmExecutionClient {
 
             let post_decision = self.hook_manager.run_post_tool(&post_context).await?;
 
-            match post_decision {
-                HookDecision::Block { reason } => {
-                    warn!("Execution output blocked by hook: {}", reason);
-                    return Err(VmExecutionError::ValidationFailed(reason));
-                }
-                _ => {}
+            if let HookDecision::Block { reason } = post_decision {
+                warn!("Execution output blocked by hook: {}", reason);
+                return Err(VmExecutionError::ValidationFailed(reason));
             }
 
             if let Some(ref bridge) = self.history_bridge {
