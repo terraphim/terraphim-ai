@@ -53,8 +53,10 @@ async fn test_agent_restart_on_failure() {
     env_logger::try_init().ok();
 
     // Create supervisor with lenient restart policy
-    let mut config = SupervisorConfig::default();
-    config.restart_policy = RestartPolicy::lenient_one_for_one();
+    let config = SupervisorConfig {
+        restart_policy: RestartPolicy::lenient_one_for_one(),
+        ..Default::default()
+    };
 
     let factory = Arc::new(TestAgentFactory);
     let mut supervisor = AgentSupervisor::new(config, factory);
@@ -143,11 +145,13 @@ async fn test_restart_intensity_limits() {
     env_logger::try_init().ok();
 
     // Create supervisor with strict restart policy (max 3 restarts)
-    let mut config = SupervisorConfig::default();
-    config.restart_policy = RestartPolicy::new(
-        RestartStrategy::OneForOne,
-        RestartIntensity::new(2, Duration::from_secs(60)), // Only 2 restarts allowed
-    );
+    let config = SupervisorConfig {
+        restart_policy: RestartPolicy::new(
+            RestartStrategy::OneForOne,
+            RestartIntensity::new(2, Duration::from_secs(60)), // Only 2 restarts allowed
+        ),
+        ..Default::default()
+    };
 
     let factory = Arc::new(TestAgentFactory);
     let mut supervisor = AgentSupervisor::new(config, factory);
@@ -185,10 +189,12 @@ async fn test_restart_intensity_limits() {
 async fn test_supervisor_configuration() {
     env_logger::try_init().ok();
 
-    let mut config = SupervisorConfig::default();
-    config.max_children = 2;
-    config.agent_timeout = Duration::from_secs(5);
-    config.health_check_interval = Duration::from_secs(30);
+    let config = SupervisorConfig {
+        max_children: 2,
+        agent_timeout: Duration::from_secs(5),
+        health_check_interval: Duration::from_secs(30),
+        ..Default::default()
+    };
 
     let factory = Arc::new(TestAgentFactory);
     let mut supervisor = AgentSupervisor::new(config, factory);
