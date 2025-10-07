@@ -601,24 +601,32 @@ impl TerraphimAgent {
     ) -> MultiAgentResult<CommandOutput> {
         let context_items = self.get_enriched_context_for_query(&input.text).await?;
 
-        let messages = vec![
-            LlmMessage::system(format!(
+        let system_prompt = if let Some(configured_prompt) =
+            self.role_config.extra.get("llm_system_prompt")
+        {
+            configured_prompt.as_str().unwrap_or("").to_string()
+        } else {
+            format!(
                 "You are {}, a specialized AI agent with expertise in software development, architecture, and technical implementation. \
                 Your role is to provide detailed, actionable, and technically accurate responses. \
-                When generating code, ensure it's complete and functional. \
+                When generating code, ensure it's complete and functional - write actual working code, not placeholders or TODO comments. \
                 When creating plans, provide specific numbered steps. \
                 When writing documentation, be comprehensive and clear. \
                 Focus on practical implementation and avoid generic responses.",
                 self.role_config.name
-            )),
+            )
+        };
+
+        let messages = vec![
+            LlmMessage::system(system_prompt),
             LlmMessage::user(format!(
                 "Context: {}\n\nRequest: {}",
-                context_items,
-                input.text
-            ))
+                context_items, input.text
+            )),
         ];
 
         let request = LlmRequest::new(messages)
+            .with_temperature(0.7)
             .with_metadata("command_type".to_string(), "generate".to_string())
             .with_metadata("agent_id".to_string(), self.agent_id.to_string());
 
