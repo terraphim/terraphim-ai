@@ -503,8 +503,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_deduplication() {
-        let mut config = DeliveryConfig::default();
-        config.guarantee = DeliveryGuarantee::ExactlyOnce;
+        let config = DeliveryConfig {
+            guarantee: DeliveryGuarantee::ExactlyOnce,
+            ..Default::default()
+        };
         let manager = DeliveryManager::new(config);
 
         let envelope = MessageEnvelope::new(

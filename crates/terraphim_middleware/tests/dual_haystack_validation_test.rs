@@ -166,6 +166,8 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                #[cfg(feature = "openrouter")]
+                llm_context_window: None,
                 extra: AHashMap::new(),
             },
         )
@@ -211,6 +213,8 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                #[cfg(feature = "openrouter")]
+                llm_context_window: None,
                 extra: AHashMap::new(),
             },
         )
@@ -245,6 +249,8 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                #[cfg(feature = "openrouter")]
+                llm_context_window: None,
                 extra: AHashMap::new(),
             },
         )
@@ -281,6 +287,8 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                #[cfg(feature = "openrouter")]
+                llm_context_window: None,
                 extra: AHashMap::new(),
             },
         )
@@ -780,6 +788,8 @@ async fn test_source_differentiation_validation() {
                 llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                #[cfg(feature = "openrouter")]
+                llm_context_window: None,
                 extra: AHashMap::new(),
             },
         )

@@ -464,8 +464,10 @@ mod tests {
     #[tokio::test]
     async fn test_bounded_mailbox() {
         let agent_id = AgentPid::new();
-        let mut config = MailboxConfig::default();
-        config.max_messages = 2; // Limit to 2 messages
+        let config = MailboxConfig {
+            max_messages: 2, // Limit to 2 messages
+            ..Default::default()
+        };
 
         let mailbox = AgentMailbox::new(agent_id.clone(), config);
 
