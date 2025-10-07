@@ -6,18 +6,42 @@ const MAX_PROMPT_LENGTH: usize = 10_000;
 
 lazy_static! {
     static ref SUSPICIOUS_PATTERNS: Vec<Regex> = vec![
-        Regex::new(r"(?i)ignore\s+(previous|above|prior)\s+(instructions|prompts?)").unwrap(),
-        Regex::new(r"(?i)disregard\s+(previous|above|all)\s+(instructions|prompts?)").unwrap(),
-        Regex::new(r"(?i)system\s*:\s*you\s+are\s+now").unwrap(),
+        Regex::new(r"(?i)ignore\s+\s*(previous|above|prior)\s+\s*(instructions|prompts?)").unwrap(),
+        Regex::new(r"(?i)disregard\s+\s*(previous|above|all)\s+\s*(instructions|prompts?)").unwrap(),
+        Regex::new(r"(?i)system\s*:\s*you\s+\s*are\s+\s*now").unwrap(),
         Regex::new(r"(?i)<\|?im_start\|?>").unwrap(),
         Regex::new(r"(?i)<\|?im_end\|?>").unwrap(),
         Regex::new(r"(?i)###\s*instruction").unwrap(),
-        Regex::new(r"(?i)forget\s+(everything|all|previous)").unwrap(),
+        Regex::new(r"(?i)forget\s+\s*(everything|all|previous)").unwrap(),
         Regex::new(r"\x00").unwrap(),
         Regex::new(r"[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]").unwrap(),
     ];
     static ref CONTROL_CHAR_PATTERN: Regex =
         Regex::new(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]").unwrap();
+    
+    // Unicode special characters that can be used for obfuscation or attacks
+    static ref UNICODE_SPECIAL_CHARS: Vec<char> = vec![
+        '\u{202E}', // RIGHT-TO-LEFT OVERRIDE
+        '\u{202D}', // LEFT-TO-RIGHT OVERRIDE
+        '\u{202C}', // POP DIRECTIONAL FORMATTING
+        '\u{202A}', // LEFT-TO-RIGHT EMBEDDING
+        '\u{202B}', // RIGHT-TO-LEFT EMBEDDING
+        '\u{200B}', // ZERO WIDTH SPACE
+        '\u{200C}', // ZERO WIDTH NON-JOINER
+        '\u{200D}', // ZERO WIDTH JOINER
+        '\u{FEFF}', // ZERO WIDTH NO-BREAK SPACE (BOM)
+        '\u{2060}', // WORD JOINER
+        '\u{2061}', // FUNCTION APPLICATION
+        '\u{2062}', // INVISIBLE TIMES
+        '\u{2063}', // INVISIBLE SEPARATOR
+        '\u{2064}', // INVISIBLE PLUS
+        '\u{206A}', // INHIBIT SYMMETRIC SWAPPING
+        '\u{206B}', // ACTIVATE SYMMETRIC SWAPPING
+        '\u{206C}', // INHIBIT ARABIC FORM SHAPING
+        '\u{206D}', // ACTIVATE ARABIC FORM SHAPING
+        '\u{206E}', // NATIONAL DIGIT SHAPES
+        '\u{206F}', // NOMINAL DIGIT SHAPES
+    ];
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +74,20 @@ pub fn sanitize_system_prompt(prompt: &str) -> SanitizedPrompt {
     } else {
         prompt.to_string()
     };
+
+    // Check for Unicode special characters before other processing
+    let has_unicode_special: bool = UNICODE_SPECIAL_CHARS.iter().any(|&ch| content.contains(ch));
+    if has_unicode_special {
+        warn!("Unicode special characters detected in system prompt");
+        warnings.push("Unicode obfuscation characters detected and removed".to_string());
+        was_modified = true;
+    }
+
+    // Remove Unicode special characters
+    let content: String = content
+        .chars()
+        .filter(|ch| !UNICODE_SPECIAL_CHARS.contains(ch))
+        .collect();
 
     for pattern in SUSPICIOUS_PATTERNS.iter() {
         if pattern.is_match(&content) {

@@ -77,6 +77,8 @@ EXCLUDE_PATTERNS=(
     "*.tmp"
     "test-fixtures/"
     "scripts/check-api-keys.sh"  # Exclude this script itself
+    "*/tests/*_test.rs"  # Exclude test files (function names can be long)
+    "tests/"  # Exclude test directories
 )
 
 # Function to check if file should be excluded
