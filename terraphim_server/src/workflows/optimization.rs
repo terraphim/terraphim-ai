@@ -178,7 +178,7 @@ pub async fn execute_optimization(
 
     let role = request
         .role
-        .unwrap_or_else(|| "Optimization Specialist".to_string());
+        .unwrap_or_else(|| "GeneratorAgent".to_string());
     let overall_role = request
         .overall_role
         .unwrap_or_else(|| "Quality Optimizer".to_string());
@@ -354,7 +354,7 @@ async fn create_optimizer_agent(prompt: &str) -> OptimizerAgent {
 
     let (name, strategies, focus, capability) = match optimization_focus.as_str() {
         "performance_optimization" => (
-            "Performance Optimization Specialist".to_string(),
+            "EvaluatorAgent".to_string(),
             vec![
                 "Algorithm efficiency improvement".to_string(),
                 "Resource utilization optimization".to_string(),
