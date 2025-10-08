@@ -259,6 +259,7 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
             weight: 1.0,
+            fetch_content: false,
         }],
         extra: AHashMap::new(),
         ..Default::default()

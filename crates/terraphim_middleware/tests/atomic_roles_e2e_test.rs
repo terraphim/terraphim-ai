@@ -769,6 +769,7 @@ async fn test_atomic_haystack_role_comparison() {
                     atomic_server_secret: atomic_secret.clone(),
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -803,6 +804,7 @@ async fn test_atomic_haystack_role_comparison() {
                     atomic_server_secret: atomic_secret.clone(),
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -974,6 +976,7 @@ async fn test_atomic_roles_config_validation() {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -1025,6 +1028,7 @@ async fn test_atomic_roles_config_validation() {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -1196,6 +1200,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     atomic_server_secret: atomic_secret.clone(),
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -1231,6 +1236,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                     atomic_server_secret: atomic_secret.clone(),
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -1259,6 +1265,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                         atomic_server_secret: atomic_secret.clone(),
                         extra_parameters: std::collections::HashMap::new(),
                         weight: 1.0,
+                        fetch_content: false,
                     },
                     Haystack {
                         location: "docs/src".to_string(),
@@ -1267,6 +1274,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                         weight: 1.0,
+                        fetch_content: false,
                     },
                 ],
                 extra: ahash::AHashMap::new(),
@@ -1304,6 +1312,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                         atomic_server_secret: atomic_secret.clone(),
                         extra_parameters: std::collections::HashMap::new(),
                         weight: 1.0,
+                        fetch_content: false,
                     },
                     Haystack {
                         location: "docs/src".to_string(),
@@ -1312,6 +1321,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                         weight: 1.0,
+                        fetch_content: false,
                     },
                 ],
                 extra: ahash::AHashMap::new(),
@@ -1533,6 +1543,7 @@ async fn test_atomic_haystack_error_handling() {
                     atomic_server_secret: Some("invalid_secret".to_string()),
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()
@@ -1577,6 +1588,7 @@ async fn test_atomic_haystack_error_handling() {
                     atomic_server_secret: None, // No authentication secret
                     extra_parameters: std::collections::HashMap::new(),
                     weight: 1.0,
+                    fetch_content: false,
                 }],
                 extra: ahash::AHashMap::new(),
                 ..Default::default()

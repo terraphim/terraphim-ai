@@ -297,6 +297,7 @@ fn create_test_config_with_auto_summarization(dir: &tempfile::TempDir) -> Result
             atomic_server_secret: None,
             extra_parameters: HashMap::new(),
             weight: 1.0,
+            fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
         ..Default::default()

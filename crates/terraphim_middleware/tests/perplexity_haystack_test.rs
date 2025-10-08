@@ -29,6 +29,7 @@ async fn test_perplexity_config_parsing() {
         atomic_server_secret: None,
         extra_parameters: extra_params,
         weight: 1.0,
+        fetch_content: false,
     };
 
     println!("✅ Haystack configuration created successfully");
@@ -80,6 +81,7 @@ async fn test_perplexity_service_type_integration() {
         atomic_server_secret: None,
         extra_parameters: extra_params,
         weight: 1.0,
+        fetch_content: false,
     };
 
     assert_eq!(haystack.service, ServiceType::Perplexity);
@@ -162,6 +164,7 @@ async fn test_perplexity_document_format() {
             atomic_server_secret: None,
             extra_parameters: extra_params,
             weight: 1.0,
+            fetch_content: false,
         };
 
         // Verify the configuration is valid
@@ -188,6 +191,7 @@ async fn test_perplexity_missing_api_key() {
         atomic_server_secret: None,
         extra_parameters: HashMap::new(), // No API key
         weight: 1.0,
+        fetch_content: false,
     };
 
     let role = Role {
@@ -300,6 +304,7 @@ async fn perplexity_live_api_test() {
             atomic_server_secret: None,
             extra_parameters: extra_params,
             weight: 1.0,
+            fetch_content: false,
         }],
         #[cfg(feature = "openrouter")]
         openrouter_enabled: false,
