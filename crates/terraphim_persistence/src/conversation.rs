@@ -112,8 +112,8 @@ impl OpenDALConversationPersistence {
 
         match storage.fastest_op.read(&key).await {
             Ok(data) => {
-                let index: ConversationIndex =
-                    serde_json::from_slice(&data).map_err(|e| Error::Serde(e.to_string()))?;
+                let index: ConversationIndex = serde_json::from_slice(&data.to_vec())
+                    .map_err(|e| Error::Serde(e.to_string()))?;
 
                 // Update cache
                 {
@@ -216,7 +216,7 @@ impl ConversationPersistence for OpenDALConversationPersistence {
             .map_err(|e| Error::OpenDal(Box::new(e)))?;
 
         let conversation: Conversation =
-            serde_json::from_slice(&data).map_err(|e| Error::Serde(e.to_string()))?;
+            serde_json::from_slice(&data.to_vec()).map_err(|e| Error::Serde(e.to_string()))?;
 
         log::debug!("Successfully loaded conversation: {}", id.as_str());
         Ok(conversation)
