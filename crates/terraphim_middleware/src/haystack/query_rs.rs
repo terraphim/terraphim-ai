@@ -4,6 +4,8 @@ use async_trait::async_trait;
 use reqwest::Client;
 use scraper::{Html, Selector};
 use serde_json::Value;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, Index};
@@ -49,6 +51,8 @@ impl PersistenceStats {
 #[derive(Debug, Clone)]
 pub struct QueryRsHaystackIndexer {
     client: Client,
+    /// Track fetched URLs to prevent duplicate fetches within an indexing session
+    fetched_urls: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Default for QueryRsHaystackIndexer {
@@ -60,7 +64,42 @@ impl Default for QueryRsHaystackIndexer {
             .build()
             .unwrap_or_else(|_| Client::new());
 
-        Self { client }
+        Self {
+            client,
+            fetched_urls: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+}
+
+impl QueryRsHaystackIndexer {
+    /// Check if URL should be fetched. Returns true if URL hasn't been fetched yet.
+    /// If URL is new, adds it to the cache and returns true.
+    /// Thread-safe for concurrent access.
+    pub(crate) fn should_fetch_url(&self, url: &str) -> bool {
+        let mut cache = self.fetched_urls.lock().unwrap();
+        if cache.contains(url) {
+            log::debug!("⏭️  Skipping already fetched URL: {}", url);
+            false
+        } else {
+            cache.insert(url.to_string());
+            log::trace!("📝 Registered new URL for fetching: {}", url);
+            true
+        }
+    }
+
+    /// Clear the URL cache. Call this at the start of a new indexing session.
+    pub(crate) fn clear_url_cache(&self) {
+        let mut cache = self.fetched_urls.lock().unwrap();
+        let count = cache.len();
+        cache.clear();
+        if count > 0 {
+            log::debug!("🗑️  Cleared {} URLs from fetch cache", count);
+        }
+    }
+
+    /// Get the number of unique URLs that have been fetched
+    pub(crate) fn get_fetched_count(&self) -> usize {
+        self.fetched_urls.lock().unwrap().len()
     }
 }
 
@@ -70,10 +109,19 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
     fn index(
         &self,
         needle: &str,
-        _haystack: &Haystack,
+        haystack: &Haystack,
     ) -> impl std::future::Future<Output = Result<Index>> + Send {
         async move {
-            log::warn!("QueryRs: Starting index for search term: '{}'", needle);
+            let fetch_content = haystack.fetch_content;
+            log::warn!(
+                "QueryRs: Starting index for search term: '{}' (fetch_content: {})",
+                needle,
+                fetch_content
+            );
+
+            // Clear URL cache at start of new indexing session
+            self.clear_url_cache();
+
             let mut documents = Vec::new();
             let mut persistence_stats = PersistenceStats::new();
 
@@ -247,7 +295,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                 };
 
                 // Check if content enhancement is disabled via configuration
-                let disable_content_enhancement = _haystack
+                let disable_content_enhancement = haystack
                     .extra_parameters
                     .get("disable_content_enhancement")
                     .map(|v| v == "true")
@@ -294,10 +342,13 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                     enhanced_documents.push(enhanced_doc);
                 } else {
                     // Legacy content fetching (disabled by default)
-                    if !enhanced_doc.url.is_empty()
+                    // Only fetch content if enabled and URL hasn't been fetched yet
+                    if fetch_content
+                        && !enhanced_doc.url.is_empty()
                         && enhanced_doc.url.starts_with("http")
                         && !enhanced_doc.url.contains("crates.io/crates/")
                         && enhanced_doc.body.len() < 200
+                        && self.should_fetch_url(&enhanced_doc.url)
                     {
                         match self.fetch_and_scrape_content(&enhanced_doc).await {
                             Ok(fetched_doc) => {
@@ -337,15 +388,20 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                         }
                     } else {
                         fetch_stats.skipped += 1;
+                        if !fetch_content {
+                            log::trace!("Skipping content fetch (fetch_content=false): {}", enhanced_doc.url);
+                        }
                         enhanced_documents.push(enhanced_doc);
                     }
                 }
             }
 
             // Log comprehensive summary statistics
+            let unique_urls_fetched = self.get_fetched_count();
             log::info!(
-                "QueryRs processing complete: {} documents (fetch: {} successful, {} failed, {} skipped) | (cache: {} search hits, {} search misses, {} doc hits, {} doc misses)",
+                "QueryRs processing complete: {} documents, {} unique URLs fetched (fetch: {} successful, {} failed, {} skipped) | (cache: {} search hits, {} search misses, {} doc hits, {} doc misses)",
                 enhanced_documents.len(),
+                unique_urls_fetched,
                 fetch_stats.successful, fetch_stats.failed, fetch_stats.skipped,
                 persistence_stats.cache_hits, persistence_stats.cache_misses,
                 persistence_stats.document_cache_hits, persistence_stats.document_cache_misses
@@ -500,6 +556,17 @@ impl QueryRsHaystackIndexer {
     /// Fetch and scrape content from a document's URL with retry logic for critical URLs
     async fn fetch_and_scrape_content(&self, doc: &Document) -> Result<Document> {
         let mut enhanced_doc = doc.clone();
+
+        // For Reddit posts, try API first before scraping
+        if doc.url.contains("reddit.com") {
+            if let Some(api_content) = self.fetch_reddit_api_content(&doc.url).await {
+                enhanced_doc.body = api_content;
+                log::info!("✅ Fetched Reddit content via API: {}", doc.url);
+                return Ok(enhanced_doc);
+            }
+            log::debug!("Reddit API fetch failed, falling back to scraping");
+        }
+
         let is_critical = self.is_critical_url(&doc.url);
         let max_retries = if is_critical { 2 } else { 0 };
 
@@ -685,6 +752,72 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Scrape content from Reddit pages
+    /// Fetch Reddit post content via JSON API
+    /// This provides structured data instead of scraping HTML
+    async fn fetch_reddit_api_content(&self, url: &str) -> Option<String> {
+        // Extract post ID from Reddit URL
+        // URLs like: https://www.reddit.com/r/rust/comments/abc123/title/
+        let post_id = url
+            .split("/comments/")
+            .nth(1)?
+            .split('/')
+            .next()?;
+
+        let json_url = format!("https://www.reddit.com/comments/{}.json", post_id);
+
+        log::debug!("Fetching Reddit API for post: {}", post_id);
+
+        match self.client
+            .get(&json_url)
+            .header("User-Agent", "Terraphim/1.0 (https://terraphim.ai)")
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                match response.json::<Value>().await {
+                    Ok(json_data) => {
+                        // Parse Reddit JSON structure: array with post and comments
+                        if let Some(post_data) = json_data.get(0)
+                            .and_then(|v| v.get("data"))
+                            .and_then(|v| v.get("children"))
+                            .and_then(|v| v.get(0))
+                            .and_then(|v| v.get("data"))
+                        {
+                            let title = post_data.get("title")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let selftext = post_data.get("selftext")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let author = post_data.get("author")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let score = post_data.get("score")
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0);
+                            let num_comments = post_data.get("num_comments")
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0);
+
+                            let content = format!(
+                                "Title: {}\n\nAuthor: u/{}\nScore: {} | Comments: {}\n\n{}",
+                                title, author, score, num_comments, selftext
+                            );
+
+                            log::debug!("✅ Fetched Reddit API content ({} chars)", content.len());
+                            return Some(content);
+                        }
+                    }
+                    Err(e) => log::debug!("Failed to parse Reddit JSON: {}", e),
+                }
+            }
+            Err(e) => log::debug!("Failed to fetch Reddit API: {}", e),
+            _ => {}
+        }
+
+        None
+    }
+
     fn scrape_reddit_content(&self, document: &Html) -> String {
         let mut content = String::new();
 
