@@ -1,7 +1,7 @@
 # CI Status for PR #179 - OpenRouter and Axum Fix
 
-**PR**: https://github.com/terraphim/terraphim-ai/pull/179  
-**Branch**: `chat_history` → `weighted_haystack`  
+**PR**: https://github.com/terraphim/terraphim-ai/pull/179
+**Branch**: `chat_history` → `weighted_haystack`
 **Last Updated**: 2025-10-06 14:56
 
 ## Summary
@@ -29,7 +29,7 @@
 ## Issues Identified
 
 ### 1. lint-and-format Still Failing
-**Problem**: Despite adding GTK dependencies, still failing  
+**Problem**: Despite adding GTK dependencies, still failing
 **Possible Causes**:
 - TypeScript/JavaScript errors (`TypeError: fetch failed`)
 - Git errors (`git failed with exit code 128`)
@@ -38,8 +38,8 @@
 **Next Steps**: Need to see full log to identify root cause
 
 ### 2. test-tauri Failures
-**Problem**: Tauri tests failing on multiple platforms  
-**Platforms Affected**: Windows, Ubuntu 22.04, Ubuntu 24.04  
+**Problem**: Tauri tests failing on multiple platforms
+**Platforms Affected**: Windows, Ubuntu 22.04, Ubuntu 24.04
 **Duration**: Quick failures (1-6 minutes)
 
 **Likely Causes**:
@@ -48,7 +48,7 @@
 - Playwright/test setup problems
 
 ### 3. earthly-success Failure
-**Status**: Legacy/deprecated check  
+**Status**: Legacy/deprecated check
 **Action**: Can be ignored (Earthly deprecated)
 
 ## Fixes Applied So Far
@@ -107,4 +107,3 @@ Workflows triggered on PR:
 - ❌ **Earthly** - Deprecated, can ignore
 
 **Key Insight**: The main compilation and build steps are passing. Failures are in the test execution phase, which may indicate pre-existing test infrastructure issues rather than problems with our code changes.
-
