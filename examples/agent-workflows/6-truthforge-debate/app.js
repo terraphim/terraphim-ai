@@ -5,21 +5,56 @@ class TruthForgeDebateApp {
         this.apiClient = null;
         this.visualizer = null;
         this.currentRole = null;
-        
+        this.debugPanel = null;
+
         this.init();
     }
     
     async init() {
-        document.getElementById('start-analysis').addEventListener('click', () => this.startAnalysis());
-        document.getElementById('reset-analysis').addEventListener('click', () => this.resetAnalysis());
-        
-        const narrativeInput = document.getElementById('crisis-narrative');
-        narrativeInput.value = 'Our company experienced a data breach affecting 10,000 customer records. We discovered unauthorized access to our customer database on March 15th due to an unpatched security vulnerability in our legacy system. We have notified affected customers and are offering free credit monitoring services for 12 months.';
-        
+        // Initialize DOM-based components first
         this.initializeWorkflowVisualizer();
+        this.initializeDebugPanel();
+
+        // Initialize async settings and API client
         await this.initializeSettings();
-        
+
+        // Setup debug mode integration after both apiClient and debugPanel are ready
+        this.setupDebugMode();
+
+        // Set default narrative
+        const narrativeInput = document.getElementById('crisis-narrative');
+        if (narrativeInput) {
+            narrativeInput.value = 'Our company experienced a data breach affecting 10,000 customer records. We discovered unauthorized access to our customer database on March 15th due to an unpatched security vulnerability in our legacy system. We have notified affected customers and are offering free credit monitoring services for 12 months.';
+        }
+
+        // Attach event listeners after everything is initialized
+        document.getElementById('start-analysis')?.addEventListener('click', () => this.startAnalysis());
+        document.getElementById('reset-analysis')?.addEventListener('click', () => this.resetAnalysis());
+
         console.log('TruthForge Debate Arena initialized');
+    }
+
+    initializeDebugPanel() {
+        if (typeof DebugPanel === 'undefined') {
+            console.warn('DebugPanel component not loaded');
+            return;
+        }
+
+        try {
+            this.debugPanel = new DebugPanel('debug-panel-container');
+            // Hide by default
+            const container = document.getElementById('debug-panel-container');
+            if (container && this.debugPanel.container) {
+                container.style.display = 'none';
+                console.log('Debug panel initialized');
+            } else {
+                console.warn('Debug panel container not found in DOM');
+                this.debugPanel = null;
+            }
+        } catch (error) {
+            console.error('Failed to initialize debug panel:', error);
+            this.debugPanel = null;
+        }
     }
     
     async initializeSettings() {
@@ -27,17 +62,63 @@ class TruthForgeDebateApp {
             console.warn('Settings components not loaded');
             return;
         }
-        
+
         try {
             this.settingsManager = new TerraphimSettingsManager();
             this.settingsUI = new TerraphimSettingsUI(this.settingsManager);
-            
+
             const serverUrl = this.settingsManager.getServerUrl() || 'https://truthforge-api.terraphim.cloud';
             this.apiClient = new TerraphimApiClient(serverUrl);
-            
+
             await this.loadRoles();
         } catch (error) {
             console.error('Failed to initialize settings:', error);
+        }
+    }
+
+    setupDebugMode() {
+        if (!this.settingsManager || !this.apiClient) {
+            console.warn('Settings manager or API client not initialized, skipping debug mode setup');
+            return;
+        }
+
+        // Listen for debug mode changes
+        this.settingsManager.on('debugModeChanged', (enabled) => {
+            const isEnabled = Boolean(enabled);
+            console.log(`Debug mode ${isEnabled ? 'enabled' : 'disabled'}`);
+
+            // Show/hide debug panel
+            this.setDebugPanelVisibility(isEnabled);
+
+            // Enable debug logging in API client
+            if (this.apiClient && typeof this.apiClient.setDebugMode === 'function') {
+                this.apiClient.setDebugMode(isEnabled);
+            }
+        });
+
+        // Connect API client debug logs to panel
+        if (this.apiClient && this.debugPanel && typeof this.apiClient.onDebugLog === 'function') {
+            this.apiClient.onDebugLog((entry) => {
+                if (this.debugPanel) {
+                    this.debugPanel.addEntry(entry);
+                }
+            });
+        }
+
+        // Set initial debug state from saved settings
+        const isDebugEnabled = this.settingsManager.isDebugMode();
+        if (isDebugEnabled) {
+            this.setDebugPanelVisibility(true);
+            if (this.apiClient && typeof this.apiClient.setDebugMode === 'function') {
+                this.apiClient.setDebugMode(true);
+            }
+        }
+    }
+
+    setDebugPanelVisibility(visible) {
+        const container = document.getElementById('debug-panel-container');
+        if (container) {
+            container.style.display = visible ? 'block' : 'none';
         }
     }
     
