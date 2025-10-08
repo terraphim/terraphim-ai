@@ -18,7 +18,7 @@ lazy_static! {
     ];
     static ref CONTROL_CHAR_PATTERN: Regex =
         Regex::new(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]").unwrap();
-    
+
     // Unicode special characters that can be used for obfuscation or attacks
     static ref UNICODE_SPECIAL_CHARS: Vec<char> = vec![
         '\u{202E}', // RIGHT-TO-LEFT OVERRIDE

@@ -56,6 +56,14 @@ impl ProviderConfig {
             requires_auth: true,
         }
     }
+
+    pub fn openrouter(model: Option<String>) -> Self {
+        Self {
+            base_url: "https://openrouter.ai/api/v1".to_string(),
+            model: model.unwrap_or_else(|| "anthropic/claude-3.5-sonnet".to_string()),
+            requires_auth: true,
+        }
+    }
 }
 
 /// Request format for Ollama API
@@ -145,6 +153,12 @@ impl GenAiLlmClient {
         Self::new("anthropic".to_string(), config)
     }
 
+    /// Create a new client for OpenRouter
+    pub fn new_openrouter(model_name: Option<String>) -> MultiAgentResult<Self> {
+        let config = ProviderConfig::openrouter(model_name);
+        Self::new("openrouter".to_string(), config)
+    }
+
     /// Generate response using the HTTP client
     pub async fn generate(&self, request: LlmRequest) -> MultiAgentResult<LlmResponse> {
         let start_time = Utc::now();
@@ -153,6 +167,7 @@ impl GenAiLlmClient {
         let response_content = match self.provider.as_str() {
             "ollama" => self.call_ollama(&request).await?,
             "openai" => self.call_openai(&request).await?,
+            "openrouter" => self.call_openrouter(&request).await?,
             "anthropic" => self.call_anthropic(&request).await?,
             _ => {
                 return Err(MultiAgentError::LlmError(format!(
@@ -332,6 +347,99 @@ impl GenAiLlmClient {
             .first()
             .map(|choice| choice.message.content.clone())
             .unwrap_or_else(|| "No response".to_string()))
+    }
+
+    /// Call OpenRouter API
+    async fn call_openrouter(&self, request: &LlmRequest) -> MultiAgentResult<String> {
+        let messages: Vec<OpenAiMessage> = request
+            .messages
+            .iter()
+            .map(|msg| OpenAiMessage {
+                role: match msg.role {
+                    MessageRole::User => "user".to_string(),
+                    MessageRole::Assistant => "assistant".to_string(),
+                    MessageRole::System => "system".to_string(),
+                    MessageRole::Tool => "tool".to_string(),
+                },
+                content: msg.content.clone(),
+            })
+            .collect();
+
+        let openrouter_request = OpenAiRequest {
+            model: self.model.clone(),
+            messages,
+            max_tokens: request.max_tokens.map(|t| t as u32),
+            temperature: request.temperature,
+        };
+
+        let url = format!("{}/chat/completions", self.base_url);
+
+        log::debug!("🤖 LLM Request to OpenRouter: {} at {}", self.model, url);
+        log::debug!("📋 Messages ({}):", openrouter_request.messages.len());
+        for (i, msg) in openrouter_request.messages.iter().enumerate() {
+            log::debug!(
+                "  [{}] {}: {}",
+                i + 1,
+                msg.role,
+                if msg.content.len() > 200 {
+                    format!("{}...", &msg.content[..200])
+                } else {
+                    msg.content.clone()
+                }
+            );
+        }
+
+        let mut request_builder = self.client.post(&url).json(&openrouter_request);
+
+        if let Ok(api_key) = std::env::var("OPENROUTER_API_KEY") {
+            request_builder = request_builder.bearer_auth(api_key);
+        } else {
+            return Err(MultiAgentError::LlmError(
+                "OpenRouter API key not found in OPENROUTER_API_KEY environment variable"
+                    .to_string(),
+            ));
+        }
+
+        let response = request_builder.send().await.map_err(|e| {
+            log::error!("❌ OpenRouter API request failed: {}", e);
+            MultiAgentError::LlmError(format!("OpenRouter API request failed: {}", e))
+        })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            log::error!("❌ OpenRouter API error {}: {}", status, text);
+            return Err(MultiAgentError::LlmError(format!(
+                "OpenRouter API error {}: {}",
+                status, text
+            )));
+        }
+
+        let openrouter_response: OpenAiResponse = response.json().await.map_err(|e| {
+            log::error!("❌ Failed to parse OpenRouter response: {}", e);
+            MultiAgentError::LlmError(format!("Failed to parse OpenRouter response: {}", e))
+        })?;
+
+        let response_content = openrouter_response
+            .choices
+            .first()
+            .map(|choice| choice.message.content.clone())
+            .unwrap_or_else(|| "No response".to_string());
+
+        log::debug!(
+            "✅ LLM Response from {}: {}",
+            self.model,
+            if response_content.len() > 200 {
+                format!("{}...", &response_content[..200])
+            } else {
+                response_content.clone()
+            }
+        );
+
+        Ok(response_content)
     }
 
     /// Call Anthropic API (placeholder - requires API key setup)
