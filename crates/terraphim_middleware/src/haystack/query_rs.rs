@@ -389,7 +389,10 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                     } else {
                         fetch_stats.skipped += 1;
                         if !fetch_content {
-                            log::trace!("Skipping content fetch (fetch_content=false): {}", enhanced_doc.url);
+                            log::trace!(
+                                "Skipping content fetch (fetch_content=false): {}",
+                                enhanced_doc.url
+                            );
                         }
                         enhanced_documents.push(enhanced_doc);
                     }
@@ -757,17 +760,14 @@ impl QueryRsHaystackIndexer {
     async fn fetch_reddit_api_content(&self, url: &str) -> Option<String> {
         // Extract post ID from Reddit URL
         // URLs like: https://www.reddit.com/r/rust/comments/abc123/title/
-        let post_id = url
-            .split("/comments/")
-            .nth(1)?
-            .split('/')
-            .next()?;
+        let post_id = url.split("/comments/").nth(1)?.split('/').next()?;
 
         let json_url = format!("https://www.reddit.com/comments/{}.json", post_id);
 
         log::debug!("Fetching Reddit API for post: {}", post_id);
 
-        match self.client
+        match self
+            .client
             .get(&json_url)
             .header("User-Agent", "Terraphim/1.0 (https://terraphim.ai)")
             .send()
@@ -777,25 +777,29 @@ impl QueryRsHaystackIndexer {
                 match response.json::<Value>().await {
                     Ok(json_data) => {
                         // Parse Reddit JSON structure: array with post and comments
-                        if let Some(post_data) = json_data.get(0)
+                        if let Some(post_data) = json_data
+                            .get(0)
                             .and_then(|v| v.get("data"))
                             .and_then(|v| v.get("children"))
                             .and_then(|v| v.get(0))
                             .and_then(|v| v.get("data"))
                         {
-                            let title = post_data.get("title")
+                            let title = post_data
+                                .get("title")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("");
-                            let selftext = post_data.get("selftext")
+                            let selftext = post_data
+                                .get("selftext")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("");
-                            let author = post_data.get("author")
+                            let author = post_data
+                                .get("author")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("");
-                            let score = post_data.get("score")
-                                .and_then(|v| v.as_i64())
-                                .unwrap_or(0);
-                            let num_comments = post_data.get("num_comments")
+                            let score =
+                                post_data.get("score").and_then(|v| v.as_i64()).unwrap_or(0);
+                            let num_comments = post_data
+                                .get("num_comments")
                                 .and_then(|v| v.as_i64())
                                 .unwrap_or(0);
 
