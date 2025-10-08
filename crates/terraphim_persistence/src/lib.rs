@@ -203,7 +203,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
 
         // First try the fastest operator as before
         match fastest_op.read(key).await {
-            Ok(bs) => match serde_json::from_slice(&bs) {
+            Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
                 Ok(obj) => {
                     log::debug!("✅ Loaded '{}' from fastest operator", key);
                     return Ok(obj);
@@ -242,7 +242,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
             );
 
             match op.read(key).await {
-                Ok(bs) => match serde_json::from_slice(&bs) {
+                Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
                     Ok(obj) => {
                         log::info!(
                             "✅ Successfully loaded '{}' from fallback profile '{}'",
@@ -273,7 +273,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
 
         // If all operators failed, return the original error from the fastest operator
         let bs = fastest_op.read(key).await?;
-        let obj = serde_json::from_slice(&bs)?;
+        let obj = serde_json::from_slice(&bs.to_vec())?;
         Ok(obj)
     }
 

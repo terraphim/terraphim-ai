@@ -625,6 +625,7 @@ mod tests {
             atomic_server_secret: None,
             extra_parameters: extra_params,
             weight: 1.0,
+            fetch_content: false,
         };
 
         let indexer = PerplexityHaystackIndexer::from_haystack_config(&haystack).unwrap();
