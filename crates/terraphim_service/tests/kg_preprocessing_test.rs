@@ -25,6 +25,7 @@ async fn test_kg_preprocessing_basic_functionality() {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
             weight: 1.0,
+            fetch_content: false,
         }],
         kg: Some(KnowledgeGraph {
             automata_path: None,
