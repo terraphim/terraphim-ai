@@ -233,6 +233,11 @@ pub struct Haystack {
     /// Defaults to 1.0 for backward compatibility.
     #[serde(default = "default_haystack_weight")]
     pub weight: f64,
+    /// Controls whether to fetch full content from external sources (e.g., crates.io API, Reddit).
+    /// When false (default), only metadata and minimal content is indexed (faster, lightweight).
+    /// When true, fetches comprehensive data from APIs (slower, more detailed).
+    #[serde(default)]
+    pub fetch_content: bool,
 }
 
 pub fn default_haystack_weight() -> f64 {
@@ -291,6 +296,7 @@ impl Haystack {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+            fetch_content: false, // Default to lightweight mode
         }
     }
 
@@ -433,6 +439,7 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                     weight: default_haystack_weight(),
+                    fetch_content: false,
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
@@ -478,6 +485,7 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                    fetch_content: false,
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
@@ -515,6 +523,7 @@ impl ConfigBuilder {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                    fetch_content: false,
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
@@ -586,6 +595,7 @@ impl ConfigBuilder {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -629,6 +639,7 @@ impl ConfigBuilder {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -672,6 +683,7 @@ impl ConfigBuilder {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -717,6 +729,7 @@ impl ConfigBuilder {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -769,6 +782,7 @@ impl ConfigBuilder {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -813,6 +827,7 @@ impl ConfigBuilder {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
             weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -1323,6 +1338,7 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                         weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     extra: AHashMap::new(),
                     #[cfg(feature = "openrouter")]
@@ -1358,6 +1374,7 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                         weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     extra: AHashMap::new(),
                     #[cfg(feature = "openrouter")]
@@ -1401,6 +1418,7 @@ mod tests {
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                         weight: default_haystack_weight(),
+                        fetch_content: false,
                     }],
                     extra: AHashMap::new(),
                     #[cfg(feature = "openrouter")]
@@ -1466,6 +1484,7 @@ mod tests {
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
                 weight: default_haystack_weight(),
+                fetch_content: false,
             }],
             extra: AHashMap::new(),
             #[cfg(feature = "openrouter")]
