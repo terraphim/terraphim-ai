@@ -522,3 +522,4 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
    cd crates/terraphim_mcp_server
    ./start_local_dev.sh
    ```
+- Don't use svelte, use examples worflows for UI
