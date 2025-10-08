@@ -8,9 +8,9 @@ stop_service() {
     local service_name=$1
     local pid_file=$2
     local process_pattern=$3
-    
+
     echo "Stopping $service_name..."
-    
+
     # Try to stop using PID file first
     if [ -f "$pid_file" ]; then
         local pid=$(cat "$pid_file")
@@ -18,7 +18,7 @@ stop_service() {
             echo "  • Stopping $service_name (PID: $pid)"
             kill "$pid" 2>/dev/null
             sleep 2
-            
+
             # Force kill if still running
             if kill -0 "$pid" 2>/dev/null; then
                 echo "  • Force stopping $service_name"
@@ -29,7 +29,7 @@ stop_service() {
     else
         echo "  • No PID file found for $service_name"
     fi
-    
+
     # Fallback: kill by process pattern
     if [ -n "$process_pattern" ]; then
         pkill -f "$process_pattern" 2>/dev/null && echo "  • Stopped remaining $service_name processes"
@@ -39,7 +39,7 @@ stop_service() {
 # Stop Terraphim Server
 stop_service "Terraphim Server" "/tmp/terraphim.pid" "terraphim_server"
 
-# Stop MCP Server  
+# Stop MCP Server
 stop_service "MCP Server" "/tmp/mcp.pid" "terraphim_mcp_server"
 
 # Stop Atomic Server

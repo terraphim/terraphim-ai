@@ -232,16 +232,25 @@
     try {
       if ($is_tauri) {
         console.log('📱 Loading context via Tauri...');
-        const result = await invoke('get_conversation', { conversationId });
+
+        // Check if this is a persistent conversation
+        const isPersistent = $currentPersistentConversationId === conversationId;
+        const command = isPersistent ? 'get_persistent_conversation' : 'get_conversation';
+
+        console.log(`Using ${command} for ${isPersistent ? 'persistent' : 'in-memory'} conversation`);
+
+        const result = await invoke(command, {
+          conversationId: isPersistent ? conversationId : conversationId
+        });
 
         console.log('📥 Tauri response:', result);
 
         if (result.status === 'success' && result.conversation) {
           const newContextItems = result.conversation.global_context || [];
           contextItems = newContextItems;
-          console.log(`✅ Loaded ${newContextItems.length} context items via Tauri`);
+          console.log(`✅ Loaded ${newContextItems.length} context items via Tauri (${isPersistent ? 'persistent' : 'in-memory'})`);
         } else {
-          console.error('❌ Failed to get conversation via Tauri:', result.error || 'Unknown error');
+          console.error(`❌ Failed to get conversation via Tauri (${command}):`, result.error || 'Unknown error');
           contextItems = [];
         }
       } else {
@@ -910,10 +919,10 @@
 
 <section class="section" data-testid="chat-interface">
   <div class="container">
-    <div class="columns">
+    <div class="chat-layout-grid" class:sidebar-hidden={!$showSessionList}>
       <!-- Session List Sidebar (conditionally shown) -->
       {#if $showSessionList}
-        <div class="column is-3 session-list-column">
+        <div class="session-list-column">
           <SessionList
             currentConversationId={$currentPersistentConversationId}
             onSelectConversation={handleSessionSelect}
@@ -923,11 +932,11 @@
       {/if}
 
       <!-- Main Chat Area -->
-      <div class="column" class:is-8={!$showSessionList} class:is-12={$showSessionList}>
+      <div class="main-chat-area">
         <div class="chat-header">
           <div>
             <h2 class="title is-4">Chat</h2>
-            <p class="subtitle is-6">Role: {get(role)}</p>
+            <p class="subtitle is-6">Role: {typeof get(role) === 'object' ? get(role).original : get(role)}</p>
             {#if conversationId}
               <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
             {/if}
@@ -1052,19 +1061,13 @@
       </div>
 
       <!-- Context Panel -->
-      <div class="column is-4">
+      <div class="context-panel-column">
         <div class="box context-panel" data-testid="context-panel">
+          <h4 class="title is-5 mb-3">Context</h4>
           <div class="level is-mobile">
             <div class="level-left">
               <div class="level-item">
-  <h4 class="title is-5">Context</h4>
                 <div class="buttons has-addons">
-                  <button class="button is-small is-primary" data-testid="show-add-context-button" on:click={toggleAddContextForm}>
-                    <span class="icon is-small">
-                      <i class="fas fa-plus"></i>
-                    </span>
-                    <span>Add</span>
-                  </button>
                   <button class="button is-small is-info" data-testid="kg-search-button" on:click={openKGSearch}>
                     <span class="icon is-small">
                       <i class="fas fa-sitemap"></i>
@@ -1391,11 +1394,39 @@
 {/if}
 
 <style>
+  /* CSS Grid Layout for Chat Interface */
+  .chat-layout-grid {
+    display: grid;
+    grid-template-columns: 1fr minmax(300px, 400px);
+    gap: 0;
+    min-height: calc(100vh - 200px);
+    transition: grid-template-columns 0.3s ease;
+  }
+
+  .chat-layout-grid:not(.sidebar-hidden) {
+    grid-template-columns: minmax(280px, 350px) 1fr minmax(300px, 400px);
+  }
+
   .session-list-column {
-    padding-right: 0;
     border-right: 1px solid var(--bs-border-color);
-    max-height: 80vh;
+    height: 100%;
     overflow: hidden;
+    background: var(--bs-body-bg);
+  }
+
+  .main-chat-area {
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Prevents flex item from overflowing */
+    height: 100%;
+  }
+
+  .context-panel-column {
+    border-left: 1px solid var(--bs-border-color);
+    height: 100%;
+    overflow: hidden;
+    background: var(--bs-body-bg);
+    padding: 0;
   }
 
   .chat-header {
@@ -1414,10 +1445,13 @@
     border: 1px solid #ececec;
     border-radius: 6px;
     padding: 0.75rem;
-    height: 50vh;
+    flex: 1;
+    min-height: 0;
     overflow: auto;
     background: #fff;
     margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
   }
   .chat-toolbar {
     display: flex;
@@ -1442,13 +1476,34 @@
   .assistant .bubble { background: #f5f5f5; color: #333; }
   .bubble pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; font-family: inherit; }
   .loading { display: inline-flex; gap: 0.5rem; align-items: center; }
-  .chat-input { align-items: flex-end; }
+  .chat-input {
+    align-items: flex-end;
+    flex-shrink: 0;
+    margin-top: auto;
+  }
+
+  .chat-input .control.is-expanded {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-input .control.is-expanded .textarea {
+    resize: vertical;
+    min-height: 3rem;
+    max-height: 8rem;
+    width: 100%;
+  }
+
+  .chat-input .control:not(.is-expanded) {
+    flex-shrink: 0;
+  }
 
   /* Context Panel Styles */
   .context-panel {
-    max-height: 70vh;
+    height: 100%;
     overflow-y: auto;
     background: #fafafa;
+    margin: 0;
   }
 
   .context-items {
@@ -1518,14 +1573,77 @@
     font-size: inherit;
   }
 
+  /* Responsive Design */
+  @media screen and (max-width: 1024px) {
+    .chat-layout-grid {
+      grid-template-columns: 1fr minmax(280px, 350px);
+    }
+
+    .chat-layout-grid:not(.sidebar-hidden) {
+      grid-template-columns: minmax(250px, 300px) 1fr minmax(280px, 350px);
+    }
+  }
+
   @media screen and (max-width: 768px) {
-    .columns {
-      display: block;
+    .chat-layout-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      min-height: calc(100vh - 150px);
+    }
+
+    .chat-layout-grid:not(.sidebar-hidden) .session-list-column {
+      max-height: 30vh;
+      border-right: none;
+      border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .chat-layout-grid:not(.sidebar-hidden) .main-chat-area {
+      min-height: 50vh;
+    }
+
+    .context-panel-column {
+      border-left: none;
+      border-top: 1px solid var(--bs-border-color);
+      max-height: 30vh;
+    }
+
+    .chat-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+
+    .chat-header-actions {
+      justify-content: center;
     }
 
     .context-panel {
       margin-top: 1rem;
       max-height: 40vh;
+    }
+
+    .chat-input .control.is-expanded .textarea {
+      min-height: 4rem;
+    }
+  }
+
+  @media screen and (max-width: 480px) {
+    .chat-layout-grid {
+      min-height: calc(100vh - 120px);
+    }
+
+    .chat-header-actions {
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .chat-header-actions .button {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .bubble {
+      max-width: 90%;
     }
   }
 </style>

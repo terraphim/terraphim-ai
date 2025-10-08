@@ -38,12 +38,12 @@ if curl -s -f "${SERVER_URL}/health" > /dev/null 2>&1; then
 else
     echo -e "${YELLOW}⚠️  Server not running, attempting to start...${NC}"
     cd "$(dirname "$0")/.."
-    
+
     # Start server in background
     OPENROUTER_API_KEY="$OPENROUTER_API_KEY" cargo run --package terraphim_server --features openrouter > server_e2e_test.log 2>&1 &
     SERVER_PID=$!
     echo "Server PID: $SERVER_PID"
-    
+
     # Wait for server to start
     echo "Waiting for server to start..."
     for i in {1..30}; do
@@ -54,7 +54,7 @@ else
         sleep 1
         echo -n "."
     done
-    
+
     if ! curl -s -f "${SERVER_URL}/health" > /dev/null 2>&1; then
         echo -e "${RED}❌ Server failed to start${NC}"
         cat server_e2e_test.log
@@ -94,7 +94,7 @@ if [ "$TOTAL_RESULTS" -gt 0 ]; then
     echo "First document: ${FIRST_DOC_TITLE} (ID: ${FIRST_DOC_ID})"
 else
     echo -e "${YELLOW}⚠️  No search results found, creating test document...${NC}"
-    
+
     # Create a test document
     CREATE_RESPONSE=$(curl -s -X POST "${SERVER_URL}/documents" \
         -H "Content-Type: application/json" \
@@ -105,7 +105,7 @@ else
             "url": "test://rust",
             "tags": ["rust", "programming"]
         }')
-    
+
     FIRST_DOC_ID="test-rust-doc"
     FIRST_DOC_TITLE="Rust Programming Language"
     echo -e "${GREEN}✅ Test document created${NC}"
@@ -152,7 +152,7 @@ else
     echo -e "${RED}❌ Summarization failed${NC}"
     echo "Status: ${SUMMARY_STATUS}"
     echo "Error: ${SUMMARY_ERROR}"
-    
+
     if [ -n "$SERVER_PID" ]; then
         kill $SERVER_PID 2>/dev/null || true
     fi
@@ -216,4 +216,3 @@ echo "  ✅ Summary saved and appears in search results"
 echo "  ✅ Status endpoint working"
 echo ""
 echo -e "${BLUE}OpenRouter E2E test complete!${NC}"
-

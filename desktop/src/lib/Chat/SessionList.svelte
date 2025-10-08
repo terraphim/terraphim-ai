@@ -43,7 +43,7 @@
 
   // Computed
   $: filteredConversations = conversations.filter(conv => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (conv.preview && conv.preview.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesRole = !filterRole || conv.role === filterRole;
@@ -59,13 +59,13 @@
   async function loadConversations() {
     loading = true;
     error = null;
-    
+
     try {
       const response = await invoke<ListPersistentConversationsResponse>(
         'list_persistent_conversations',
-        { 
+        {
           role: filterRole,
-          limit: 100 
+          limit: 100
         }
       );
 
@@ -126,7 +126,7 @@
         // Remove from local list
         conversations = conversations.filter(c => c.id !== conversationId);
         showDeleteConfirm = null;
-        
+
         // If we deleted the current conversation, trigger new conversation
         if (currentConversationId === conversationId) {
           onNewConversation();
@@ -155,7 +155,7 @@
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return date.toLocaleDateString();
   }
 
@@ -178,8 +178,8 @@
   <!-- Header -->
   <div class="session-list-header">
     <h3>Chat History</h3>
-    <button 
-      class="btn btn-sm btn-primary new-chat-btn" 
+    <button
+      class="btn btn-sm btn-primary new-chat-btn"
       on:click={onNewConversation}
       title="Start new conversation"
     >
@@ -201,8 +201,8 @@
     </div>
 
     <div class="filter-box">
-      <select 
-        class="form-select form-select-sm" 
+      <select
+        class="form-select form-select-sm"
         bind:value={filterRole}
         on:change={handleRoleFilterChange}
       >
@@ -216,9 +216,9 @@
   {#if error}
     <div class="alert alert-danger alert-sm" role="alert">
       {error}
-      <button 
-        type="button" 
-        class="btn-close btn-close-sm" 
+      <button
+        type="button"
+        class="btn-close btn-close-sm"
         on:click={() => error = null}
       ></button>
     </div>
@@ -246,7 +246,7 @@
       </div>
     {:else}
       {#each filteredConversations as conversation (conversation.id)}
-        <div 
+        <div
           class="conversation-item"
           class:active={currentConversationId === conversation.id}
           on:click={() => onSelectConversation(conversation.id)}
@@ -307,8 +307,8 @@
     <small class="text-muted">
       {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
     </small>
-    <button 
-      class="btn btn-sm btn-ghost" 
+    <button
+      class="btn btn-sm btn-ghost"
       on:click={loadConversations}
       title="Refresh"
     >
@@ -323,7 +323,7 @@
     flex-direction: column;
     height: 100%;
     background: var(--bs-body-bg);
-    border-right: 1px solid var(--bs-border-color);
+    overflow: hidden;
   }
 
   .session-list-header {
@@ -480,6 +480,7 @@
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
   }
 
@@ -529,5 +530,41 @@
 
   .conversation-list::-webkit-scrollbar-thumb:hover {
     background: var(--bs-secondary);
+  }
+
+  /* Responsive adjustments for mobile */
+  @media screen and (max-width: 768px) {
+    .session-list-header {
+      padding: 0.75rem;
+    }
+
+    .session-list-header h3 {
+      font-size: 1.1rem;
+    }
+
+    .new-chat-btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .session-list-controls {
+      padding: 0.5rem 0.75rem;
+    }
+
+    .conversation-item {
+      padding: 0.5rem;
+    }
+
+    .conversation-title {
+      font-size: 0.85rem;
+    }
+
+    .conversation-meta {
+      font-size: 0.7rem;
+    }
+
+    .session-list-footer {
+      padding: 0.5rem 0.75rem;
+    }
   }
 </style>
