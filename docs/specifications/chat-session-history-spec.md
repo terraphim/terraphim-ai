@@ -1,7 +1,7 @@
 # Chat and Session History Specification
 
-**Version**: 1.0.0  
-**Date**: 2025-10-05  
+**Version**: 1.0.0
+**Date**: 2025-10-05
 **Status**: Draft
 
 ## Table of Contents
@@ -55,14 +55,14 @@ graph TB
         ContextUI[Context Manager UI]
         Store[Svelte Stores]
     end
-    
+
     subgraph Backend["Backend Layer (Rust)"]
         API[API Endpoints]
         Commands[Tauri Commands]
         Service[Conversation Service]
         Manager[Context Manager]
     end
-    
+
     subgraph Persistence["Persistence Layer"]
         OpenDAL[OpenDAL Abstraction]
         SQLite[(SQLite DB)]
@@ -70,7 +70,7 @@ graph TB
         Memory[(Memory)]
         S3[(S3 Optional)]
     end
-    
+
     UI --> Store
     SessionList --> Store
     ContextUI --> Store
@@ -90,7 +90,7 @@ graph TB
 
 1. **User Input Flow**:
    - User enters message → Frontend validates → Store updates → Backend processes → LLM generates response → Store updates → UI refreshes
-   
+
 2. **Session Load Flow**:
    - User selects session → Frontend requests → Backend loads from persistence → Deserializes conversation → Returns to frontend → UI renders
 
@@ -164,50 +164,50 @@ impl ConversationService {
         title: String,
         role: RoleName,
     ) -> Result<Conversation>;
-    
+
     /// Load a conversation by ID
     pub async fn get_conversation(
         &mut self,
         id: &ConversationId,
     ) -> Result<Conversation>;
-    
+
     /// Update an existing conversation
     pub async fn update_conversation(
         &mut self,
         conversation: &Conversation,
     ) -> Result<()>;
-    
+
     /// Delete a conversation
     pub async fn delete_conversation(
         &mut self,
         id: &ConversationId,
     ) -> Result<()>;
-    
+
     /// List all conversations with optional filtering
     pub async fn list_conversations(
         &self,
         filter: ConversationFilter,
     ) -> Result<Vec<ConversationSummary>>;
-    
+
     /// Search conversations by content
     pub async fn search_conversations(
         &self,
         query: &str,
         limit: usize,
     ) -> Result<Vec<ConversationSummary>>;
-    
+
     /// Export conversation to JSON
     pub async fn export_conversation(
         &self,
         id: &ConversationId,
     ) -> Result<String>;
-    
+
     /// Import conversation from JSON
     pub async fn import_conversation(
         &mut self,
         json_data: &str,
     ) -> Result<Conversation>;
-    
+
     /// Get conversation statistics
     pub fn get_statistics(&self) -> ConversationStatistics;
 }
@@ -224,16 +224,16 @@ use async_trait::async_trait;
 pub trait ConversationPersistence {
     /// Save a conversation
     async fn save(&self, conversation: &Conversation) -> Result<()>;
-    
+
     /// Load a conversation
     async fn load(&self, id: &ConversationId) -> Result<Conversation>;
-    
+
     /// Delete a conversation
     async fn delete(&self, id: &ConversationId) -> Result<()>;
-    
+
     /// List all conversation IDs
     async fn list_ids(&self) -> Result<Vec<ConversationId>>;
-    
+
     /// Check if a conversation exists
     async fn exists(&self, id: &ConversationId) -> Result<bool>;
 }
@@ -246,11 +246,11 @@ pub struct OpenDALConversationPersistence {
 
 impl OpenDALConversationPersistence {
     pub fn new() -> Result<Self>;
-    
+
     fn conversation_key(id: &ConversationId) -> String {
         format!("conversations/{}.json", id.as_str())
     }
-    
+
     fn index_key() -> String {
         "conversations/index.json".to_string()
     }
@@ -262,30 +262,30 @@ impl ConversationPersistence for OpenDALConversationPersistence {
         // Serialize conversation
         let json = serde_json::to_string(conversation)?;
         let key = Self::conversation_key(&conversation.id);
-        
+
         // Save to all operators
         let storage = DeviceStorage::instance().await?;
         for (op, _time) in storage.ops.values() {
             op.write(&key, json.clone()).await?;
         }
-        
+
         // Update index
         self.update_index(conversation).await?;
-        
+
         Ok(())
     }
-    
+
     async fn load(&self, id: &ConversationId) -> Result<Conversation> {
         let key = Self::conversation_key(id);
         let storage = DeviceStorage::instance().await?;
-        
+
         // Load from fastest operator
         let data = storage.fastest_op.read(&key).await?;
         let conversation = serde_json::from_slice(&data)?;
-        
+
         Ok(conversation)
     }
-    
+
     // ... other implementations
 }
 ```
@@ -302,20 +302,20 @@ impl ContextManager {
         &mut self,
         id: &ConversationId,
     ) -> Result<()>;
-    
+
     /// Restore archived conversation
     pub async fn restore_conversation(
         &mut self,
         id: &ConversationId,
     ) -> Result<()>;
-    
+
     /// Get conversation by date range
     pub async fn get_conversations_by_date(
         &self,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<ConversationSummary>>;
-    
+
     /// Clone conversation for branching
     pub async fn clone_conversation(
         &mut self,
@@ -491,12 +491,12 @@ export const filteredConversations = derived(
   [conversationList, sessionFilter],
   ([$list, $filter]) => {
     let filtered = [...$list];
-    
+
     // Filter by role
     if ($filter.role) {
       filtered = filtered.filter(c => c.role === $filter.role);
     }
-    
+
     // Filter by date range
     if ($filter.dateRange) {
       filtered = filtered.filter(c => {
@@ -504,16 +504,16 @@ export const filteredConversations = derived(
         return date >= $filter.dateRange.start && date <= $filter.dateRange.end;
       });
     }
-    
+
     // Filter by search query
     if ($filter.searchQuery) {
       const query = $filter.searchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         c.title.toLowerCase().includes(query) ||
         c.preview?.toLowerCase().includes(query)
       );
     }
-    
+
     return filtered;
   }
 );
@@ -521,7 +521,7 @@ export const filteredConversations = derived(
 // Auto-save functionality
 export function setupAutoSave() {
   let saveTimeout: NodeJS.Timeout;
-  
+
   currentConversation.subscribe(conversation => {
     if (conversation) {
       clearTimeout(saveTimeout);
@@ -560,24 +560,24 @@ async function saveConversation(conversation: Conversation) {
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/tauri';
   import { is_tauri } from '../stores';
-  import { 
-    conversationList, 
+  import {
+    conversationList,
     currentConversation,
     filteredConversations,
     sessionFilter,
-    loadingConversations 
+    loadingConversations
   } from '../stores';
   import { CONFIG } from '../../config';
-  
+
   let showArchived = false;
   let searchQuery = '';
   let selectedRole: string | null = null;
-  
+
   // Load conversations on mount
   onMount(async () => {
     await loadConversations();
   });
-  
+
   async function loadConversations() {
     loadingConversations.set(true);
     try {
@@ -601,13 +601,13 @@ async function saveConversation(conversation: Conversation) {
       loadingConversations.set(false);
     }
   }
-  
+
   async function selectConversation(id: string) {
     try {
       let response;
       if ($is_tauri) {
-        response = await invoke('load_conversation', { 
-          conversation_id: id 
+        response = await invoke('load_conversation', {
+          conversation_id: id
         });
       } else {
         const res = await fetch(`${CONFIG.ServerURL}/conversations/${id}`);
@@ -618,7 +618,7 @@ async function saveConversation(conversation: Conversation) {
       console.error('Failed to load conversation:', error);
     }
   }
-  
+
   async function createNewConversation() {
     try {
       let response;
@@ -644,16 +644,16 @@ async function saveConversation(conversation: Conversation) {
       console.error('Failed to create conversation:', error);
     }
   }
-  
+
   async function deleteConversation(id: string) {
     if (!confirm('Are you sure you want to delete this conversation?')) {
       return;
     }
-    
+
     try {
       if ($is_tauri) {
-        await invoke('delete_conversation_by_id', { 
-          conversation_id: id 
+        await invoke('delete_conversation_by_id', {
+          conversation_id: id
         });
       } else {
         await fetch(`${CONFIG.ServerURL}/conversations/${id}`, {
@@ -668,7 +668,7 @@ async function saveConversation(conversation: Conversation) {
       console.error('Failed to delete conversation:', error);
     }
   }
-  
+
   function formatDate(dateString: string): string {
     const date = new Date(dateString);
     const now = new Date();
@@ -676,7 +676,7 @@ async function saveConversation(conversation: Conversation) {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
@@ -687,21 +687,21 @@ async function saveConversation(conversation: Conversation) {
 <div class="session-list">
   <div class="session-list-header">
     <h3>Conversations</h3>
-    <button 
-      class="button is-primary is-small" 
+    <button
+      class="button is-primary is-small"
       on:click={createNewConversation}
     >
       <span class="icon"><i class="fas fa-plus"></i></span>
       <span>New</span>
     </button>
   </div>
-  
+
   <div class="session-filters">
     <div class="field">
       <div class="control has-icons-left">
-        <input 
-          class="input is-small" 
-          type="text" 
+        <input
+          class="input is-small"
+          type="text"
           placeholder="Search conversations..."
           bind:value={searchQuery}
           on:input={() => sessionFilter.update(f => ({ ...f, searchQuery }))}
@@ -711,7 +711,7 @@ async function saveConversation(conversation: Conversation) {
         </span>
       </div>
     </div>
-    
+
     <div class="field">
       <label class="checkbox">
         <input type="checkbox" bind:checked={showArchived} on:change={loadConversations} />
@@ -719,7 +719,7 @@ async function saveConversation(conversation: Conversation) {
       </label>
     </div>
   </div>
-  
+
   {#if $loadingConversations}
     <div class="loading-spinner">
       <span class="icon">
@@ -737,8 +737,8 @@ async function saveConversation(conversation: Conversation) {
   {:else}
     <div class="session-items">
       {#each $filteredConversations as conversation (conversation.id.0)}
-        <div 
-          class="session-item" 
+        <div
+          class="session-item"
           class:active={$currentConversation?.id.0 === conversation.id.0}
           on:click={() => selectConversation(conversation.id.0)}
           on:keydown={(e) => e.key === 'Enter' && selectConversation(conversation.id.0)}
@@ -764,7 +764,7 @@ async function saveConversation(conversation: Conversation) {
             </div>
           </div>
           <div class="session-actions">
-            <button 
+            <button
               class="button is-small is-danger is-outlined"
               on:click|stopPropagation={() => deleteConversation(conversation.id.0)}
               title="Delete conversation"
@@ -788,7 +788,7 @@ async function saveConversation(conversation: Conversation) {
     border-right: 1px solid var(--border-color);
     background: var(--background);
   }
-  
+
   .session-list-header {
     display: flex;
     justify-content: space-between;
@@ -796,18 +796,18 @@ async function saveConversation(conversation: Conversation) {
     padding: 1rem;
     border-bottom: 1px solid var(--border-color);
   }
-  
+
   .session-filters {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);
   }
-  
+
   .session-items {
     flex: 1;
     overflow-y: auto;
     padding: 0.5rem;
   }
-  
+
   .session-item {
     display: flex;
     align-items: center;
@@ -818,21 +818,21 @@ async function saveConversation(conversation: Conversation) {
     transition: background-color 0.2s;
     border: 1px solid var(--border-color);
   }
-  
+
   .session-item:hover {
     background-color: var(--hover-background);
   }
-  
+
   .session-item.active {
     background-color: var(--primary-light);
     border-color: var(--primary);
   }
-  
+
   .session-item-content {
     flex: 1;
     min-width: 0;
   }
-  
+
   .session-title {
     font-weight: 600;
     font-size: 0.95rem;
@@ -841,7 +841,7 @@ async function saveConversation(conversation: Conversation) {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .session-preview {
     font-size: 0.85rem;
     color: var(--text-light);
@@ -850,24 +850,24 @@ async function saveConversation(conversation: Conversation) {
     text-overflow: ellipsis;
     margin-bottom: 0.5rem;
   }
-  
+
   .session-meta {
     display: flex;
     gap: 0.75rem;
     font-size: 0.75rem;
     color: var(--text-light);
   }
-  
+
   .session-meta span {
     display: flex;
     align-items: center;
     gap: 0.25rem;
   }
-  
+
   .session-actions {
     margin-left: 0.5rem;
   }
-  
+
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -877,7 +877,7 @@ async function saveConversation(conversation: Conversation) {
     text-align: center;
     color: var(--text-light);
   }
-  
+
   .loading-spinner {
     display: flex;
     align-items: center;
@@ -898,13 +898,13 @@ async function saveConversation(conversation: Conversation) {
   // ... existing imports
   import SessionList from './SessionList.svelte';
   import { currentConversation, setupAutoSave } from '../stores';
-  
+
   // Setup auto-save on mount
   onMount(() => {
     setupAutoSave();
     // ... existing mount logic
   });
-  
+
   // Load from current conversation if set
   $: if ($currentConversation) {
     conversationId = $currentConversation.id.0;
@@ -921,11 +921,11 @@ async function saveConversation(conversation: Conversation) {
   <div class="session-sidebar" class:hidden={!showSessions}>
     <SessionList />
   </div>
-  
+
   <!-- Main chat area -->
   <div class="chat-main">
     <!-- Toggle session list button -->
-    <button 
+    <button
       class="button is-small session-toggle"
       on:click={() => showSessions = !showSessions}
     >
@@ -933,7 +933,7 @@ async function saveConversation(conversation: Conversation) {
         <i class="fas fa-bars"></i>
       </span>
     </button>
-    
+
     <!-- Existing chat UI -->
     <!-- ... -->
   </div>
@@ -944,24 +944,24 @@ async function saveConversation(conversation: Conversation) {
     display: flex;
     height: 100%;
   }
-  
+
   .session-sidebar {
     width: 300px;
     transition: transform 0.3s ease;
   }
-  
+
   .session-sidebar.hidden {
     transform: translateX(-100%);
     width: 0;
   }
-  
+
   .chat-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     position: relative;
   }
-  
+
   .session-toggle {
     position: absolute;
     top: 1rem;
@@ -1204,10 +1204,10 @@ conversations/
 async fn test_save_and_load_conversation() {
     let persistence = OpenDALConversationPersistence::new().unwrap();
     let conversation = create_test_conversation();
-    
+
     // Save
     persistence.save(&conversation).await.unwrap();
-    
+
     // Load
     let loaded = persistence.load(&conversation.id).await.unwrap();
     assert_eq!(conversation.id, loaded.id);
@@ -1217,7 +1217,7 @@ async fn test_save_and_load_conversation() {
 #[tokio::test]
 async fn test_list_conversations() {
     let service = ConversationService::new().await.unwrap();
-    
+
     // Create multiple conversations
     for i in 0..5 {
         service.create_conversation(
@@ -1225,25 +1225,25 @@ async fn test_list_conversations() {
             RoleName::new("Test Role"),
         ).await.unwrap();
     }
-    
+
     // List
     let list = service.list_conversations(
         ConversationFilter::default()
     ).await.unwrap();
-    
+
     assert_eq!(list.len(), 5);
 }
 
 #[tokio::test]
 async fn test_search_conversations() {
     let service = ConversationService::new().await.unwrap();
-    
+
     // Search
     let results = service.search_conversations(
         "machine learning",
         10,
     ).await.unwrap();
-    
+
     assert!(results.len() > 0);
 }
 ```
@@ -1258,29 +1258,29 @@ import SessionList from '../src/lib/Chat/SessionList.svelte';
 describe('SessionList', () => {
   it('loads conversations on mount', async () => {
     const { getByText } = render(SessionList);
-    
+
     await waitFor(() => {
       expect(getByText(/Test Conversation/)).toBeInTheDocument();
     });
   });
-  
+
   it('creates new conversation', async () => {
     const { getByText } = render(SessionList);
     const newButton = getByText(/New/);
-    
+
     await fireEvent.click(newButton);
-    
+
     await waitFor(() => {
       expect(getByText(/New Conversation/)).toBeInTheDocument();
     });
   });
-  
+
   it('filters conversations by search', async () => {
     const { getByPlaceholderText, queryByText } = render(SessionList);
     const search = getByPlaceholderText(/Search conversations/);
-    
+
     await fireEvent.input(search, { target: { value: 'machine learning' } });
-    
+
     expect(queryByText(/Machine Learning Discussion/)).toBeInTheDocument();
     expect(queryByText(/Rust Tutorial/)).not.toBeInTheDocument();
   });
@@ -1385,6 +1385,6 @@ This specification provides a comprehensive blueprint for implementing robust ch
 
 ---
 
-**Document Version**: 1.0.0  
-**Last Updated**: 2025-10-05  
+**Document Version**: 1.0.0
+**Last Updated**: 2025-10-05
 **Status**: Ready for Review

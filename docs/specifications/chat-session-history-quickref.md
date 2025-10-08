@@ -318,5 +318,5 @@ For questions or issues during implementation:
 
 ---
 
-**Quick Ref Version**: 1.0.0  
+**Quick Ref Version**: 1.0.0
 **Last Updated**: 2025-10-05

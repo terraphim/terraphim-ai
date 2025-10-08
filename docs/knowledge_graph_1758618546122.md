@@ -380,4 +380,3 @@ async fn test_kg_integration() {
 3. **Graph neural networks**: Deep learning for graph analysis
 4. **Temporal graphs**: Time-aware graph structures
 5. **Heterogeneous graphs**: Multi-type node and edge support
-
