@@ -40,12 +40,19 @@ This guide walks you through setting up a development environment for contributi
    ./scripts/install-hooks.sh
    ```
 
+4. **Configure Git remotes** (if working with private code):
+   ```bash
+   # Add private repository remote
+   git remote add private git@github.com:zestic-ai/terraphim-private.git
+   ```
+
 This script will automatically:
 - Detect available hook managers (prek, lefthook, pre-commit)
 - Install appropriate hooks
 - Set up Biome for JavaScript/TypeScript formatting
 - Create secrets detection baseline
 - Install native Git hooks as fallback
+- Set up branch protection validation
 
 ## Pre-commit Hooks Overview
 
@@ -66,6 +73,105 @@ Our pre-commit hooks enforce code quality and security standards:
 ### Commit Standards
 - **Conventional commits**: Enforces structured commit messages
 - **Message validation**: Checks format and content
+
+## Branch Protection System
+
+Terraphim AI uses a **dual-repository approach** with comprehensive branch protection:
+
+### Repository Structure
+- **Public Repository** (`terraphim/terraphim-ai`): Open-source code only
+- **Private Repository** (`zestic-ai/terraphim-private`): Proprietary and sensitive code
+
+### Pre-Push Hook Protection
+
+The repository includes a pre-push hook that automatically validates:
+
+#### Branch Naming Validation
+**Blocked patterns** (will be rejected):
+```bash
+private-*, private_*          # Use private repository
+internal-*, internal_*        # Use private repository
+client-*, client_*            # Use private repository
+secret-*, secret_*            # Use private repository
+wip-private-*, wip-private_*  # Use private repository
+customer-*, customer_*        # Use private repository
+proprietary-*, proprietary_*  # Use private repository
+confidential-*, confidential_* # Use private repository
+```
+
+**Allowed patterns**:
+```bash
+feat/new-feature
+fix/bug-fix
+docs/update-readme
+refactor/cleanup
+test/add-tests
+wip/experimental
+experimental/new-algorithm
+```
+
+#### Content Validation
+- **Commit message scanning**: Blocks `[PRIVATE]`, `[INTERNAL]`, `private:`, etc.
+- **Sensitive keyword detection**: Scans for `truthforge`, `private.*cloud`, etc.
+- **File pattern validation**: Uses `.gitprivateignore` for custom patterns
+
+### Working with Private Code
+
+If you need to work with private or sensitive code:
+
+1. **Switch to private repository**:
+   ```bash
+   git remote set-url origin git@github.com:zestic-ai/terraphim-private.git
+   ```
+
+2. **Create private branch**:
+   ```bash
+   git checkout -b private-feature
+   ```
+
+3. **Develop and push normally**:
+   ```bash
+   git add .
+   git commit -m "feat: add private feature"
+   git push origin private-feature
+   ```
+
+4. **Switch back to public** (when ready):
+   ```bash
+   git remote set-url origin https://github.com/terraphim/terraphim-ai.git
+   ```
+
+### Troubleshooting Branch Protection
+
+#### "Branch matches private pattern" Error
+```bash
+✗ Branch 'private_tf' matches private pattern '^private_'
+Private branches should not be pushed to public remotes.
+Push to private remote instead: git push private private_tf
+```
+
+**Solution:**
+```bash
+# Configure branch for private remote
+git config branch.private_tf.remote private
+git config branch.private_tf.pushRemote private
+
+# Push to private repository
+git push private private_tf
+```
+
+#### "Sensitive keyword found" Error
+```bash
+✗ Sensitive keyword 'truthforge' found in file changes
+Remove sensitive content before pushing to public remote.
+```
+
+**Solution:**
+- Remove or replace sensitive content
+- Use private repository for sensitive development
+- Update `.gitprivateignore` if false positive
+
+For detailed information, see [Branch Protection and Security](./branch-protection.md).
 
 ## Hook Manager Options
 
