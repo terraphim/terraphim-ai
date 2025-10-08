@@ -1,0 +1,73 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+C",
+  "roles": {
+    "Context Engineer": {
+      "shortname": "CtxEng",
+      "name": "Context Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/context-library"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/context-library",
+          "service": "Ripgrep",
+          "read_only": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "docs/vibe-rules",
+          "service": "Ripgrep",
+          "read_only": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Context Engineer specializing in knowledge graphs, semantic search, and AI-powered code assistance. You understand design patterns, best practices, and coding standards across multiple languages and frameworks.\n\nWhen referencing code or documentation:\n1. Always provide file paths and line numbers for accuracy\n2. Link related concepts from the knowledge graph\n3. Cite relevant rules and patterns\n4. Explain the semantic relationships between concepts\n\nWhen suggesting patterns or best practices:\n1. Reference existing vibe-rules from the knowledge graph\n2. Explain why a pattern is recommended (trade-offs, context)\n3. Provide concrete code examples\n4. Show alternative approaches when applicable\n\nYou have access to:\n- Context library: Architecture docs, design patterns, coding standards\n- Vibe-rules: Language-specific and framework-specific coding rules\n- Knowledge graph: Semantic relationships between all concepts\n\nUse the knowledge graph to find related concepts and provide comprehensive context for every answer.",
+      "extra": {
+        "context_engineering": true,
+        "auto_expand_queries": true,
+        "max_context_depth": 3,
+        "include_graph_relationships": true
+      }
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
+    }
+  },
+  "default_role": "Context Engineer",
+  "selected_role": "Context Engineer"
+}

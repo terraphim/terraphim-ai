@@ -9,21 +9,21 @@ use serde_json;
 async fn test_local_services_available() {
     // Load environment variables from .env.test if available
     dotenvy::dotenv().ok();
-    
+
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     println!("🧪 Testing Local Service Availability");
     println!("====================================");
-    
+
     // Check Ollama
     println!("\n1️⃣ Testing Ollama (port 11434)...");
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
-    
+
     match reqwest::get(&format!("{}/api/tags", ollama_url)).await {
         Ok(resp) => {
             if resp.status().is_success() {
                 println!("   ✅ Ollama is running and responding");
-                
+
                 // Check if required model is available
                 if let Ok(text) = resp.text().await {
                     if text.contains("llama3.2:3b") {
@@ -41,11 +41,11 @@ async fn test_local_services_available() {
             panic!("Ollama is required for tests but is not available");
         }
     }
-    
+
     // Check Atomic Server (optional)
     println!("\n2️⃣ Testing Atomic Server (port 9883)...");
     let atomic_url = env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
-    
+
     match reqwest::get(&atomic_url).await {
         Ok(resp) => {
             if resp.status().is_success() {
@@ -59,11 +59,11 @@ async fn test_local_services_available() {
             println!("   ℹ️ This is optional - tests will skip Atomic Server functionality");
         }
     }
-    
+
     // Check MCP Server (may not respond to HTTP in stdio mode)
     println!("\n3️⃣ Testing MCP Server (port 8001)...");
     let mcp_url = env::var("MCP_SERVER_URL").unwrap_or_else(|_| "http://localhost:8001".to_string());
-    
+
     match reqwest::get(&mcp_url).await {
         Ok(resp) => {
             println!("   ✅ MCP Server is responding to HTTP on port 8001");
@@ -73,12 +73,12 @@ async fn test_local_services_available() {
             println!("   ℹ️ This is normal if MCP is in stdio mode");
         }
     }
-    
+
     // Check Terraphim Server
     println!("\n4️⃣ Testing Terraphim Server (port 8000)...");
-    let terraphim_url = format!("http://localhost:{}/health", 
+    let terraphim_url = format!("http://localhost:{}/health",
         env::var("TERRAPHIM_SERVER_PORT").unwrap_or_else(|_| "8000".to_string()));
-    
+
     match reqwest::get(&terraphim_url).await {
         Ok(resp) => {
             if resp.status().is_success() {
@@ -92,7 +92,7 @@ async fn test_local_services_available() {
             panic!("Terraphim Server is required for tests but is not available");
         }
     }
-    
+
     println!("\n✅ Local service validation complete!");
 }
 
@@ -102,17 +102,17 @@ async fn test_local_services_available() {
 async fn test_ollama_model_functionality() {
     dotenvy::dotenv().ok();
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     println!("🧠 Testing Ollama Model Functionality");
     println!("====================================");
-    
+
     let ollama_url = env::var("OLLAMA_BASE_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
     let model = env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2:3b".to_string());
-    
+
     let client = reqwest::Client::new();
-    
+
     println!("Testing model: {}", model);
-    
+
     let request_body = serde_json::json!({
         "model": model,
         "prompt": "Hello, respond with just 'OK'",
@@ -122,7 +122,7 @@ async fn test_ollama_model_functionality() {
             "temperature": 0.1
         }
     });
-    
+
     match client
         .post(&format!("{}/api/generate", ollama_url))
         .json(&request_body)
@@ -156,15 +156,15 @@ async fn test_ollama_model_functionality() {
 async fn test_terraphim_api_endpoints() {
     dotenvy::dotenv().ok();
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     println!("🌐 Testing Terraphim API Endpoints");
     println!("=================================");
-    
-    let base_url = format!("http://localhost:{}", 
+
+    let base_url = format!("http://localhost:{}",
         env::var("TERRAPHIM_SERVER_PORT").unwrap_or_else(|_| "8000".to_string()));
-    
+
     let client = reqwest::Client::new();
-    
+
     // Test health endpoint
     println!("\n📡 Testing /health endpoint...");
     match client.get(&format!("{}/health", base_url)).send().await {
@@ -179,7 +179,7 @@ async fn test_terraphim_api_endpoints() {
             println!("   ❌ Health endpoint failed: {}", e);
         }
     }
-    
+
     // Test config endpoint
     println!("\n⚙️ Testing /config endpoint...");
     match client.get(&format!("{}/config", base_url)).send().await {
@@ -201,7 +201,7 @@ async fn test_terraphim_api_endpoints() {
             println!("   ❌ Config endpoint failed: {}", e);
         }
     }
-    
+
     // Test roles endpoint
     println!("\n👤 Testing /roles endpoint...");
     match client.get(&format!("{}/roles", base_url)).send().await {
@@ -216,7 +216,7 @@ async fn test_terraphim_api_endpoints() {
             println!("   ❌ Roles endpoint failed: {}", e);
         }
     }
-    
+
     println!("\n✅ API endpoint testing complete!");
 }
 
@@ -226,18 +226,18 @@ async fn test_terraphim_api_endpoints() {
 async fn test_haystack_types() {
     dotenvy::dotenv().ok();
     let _ = env_logger::builder().is_test(true).try_init();
-    
+
     println!("📚 Testing Haystack Types");
     println!("========================");
-    
+
     // This test validates that different haystack types can be configured
     // It doesn't actually search them (that would be integration testing)
-    
+
     use terraphim_config::{Haystack, ServiceType};
     use std::collections::HashMap;
-    
+
     let mut extra_params = HashMap::new();
-    
+
     // Test Ripgrep haystack
     println!("\n1️⃣ Testing Ripgrep Haystack configuration...");
     let ripgrep_haystack = Haystack {
@@ -249,7 +249,7 @@ async fn test_haystack_types() {
     };
     assert_eq!(ripgrep_haystack.service, ServiceType::Ripgrep);
     println!("   ✅ Ripgrep haystack configured");
-    
+
     // Test Atomic haystack
     println!("\n2️⃣ Testing Atomic Haystack configuration...");
     let atomic_url = env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
@@ -262,7 +262,7 @@ async fn test_haystack_types() {
     };
     assert_eq!(atomic_haystack.service, ServiceType::Atomic);
     println!("   ✅ Atomic haystack configured");
-    
+
     // Test MCP haystack
     println!("\n3️⃣ Testing MCP Haystack configuration...");
     let mcp_url = env::var("MCP_SERVER_URL").unwrap_or_else(|_| "http://localhost:8001".to_string());
@@ -276,7 +276,7 @@ async fn test_haystack_types() {
     };
     assert_eq!(mcp_haystack.service, ServiceType::Mcp);
     println!("   ✅ MCP haystack configured");
-    
+
     // Test QueryRs haystack
     println!("\n4️⃣ Testing QueryRs Haystack configuration...");
     let queryrs_haystack = Haystack {
@@ -288,6 +288,6 @@ async fn test_haystack_types() {
     };
     assert_eq!(queryrs_haystack.service, ServiceType::QueryRs);
     println!("   ✅ QueryRs haystack configured");
-    
+
     println!("\n✅ All haystack types can be configured!");
 }

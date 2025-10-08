@@ -38,7 +38,7 @@ wait_for_service() {
     local url=$1
     local name=$2
     local max_attempts=30
-    
+
     echo "⏳ Waiting for $name to be ready..."
     for i in $(seq 1 $max_attempts); do
         if curl -s "$url" > /dev/null 2>&1; then
@@ -57,7 +57,7 @@ wait_for_service() {
 echo ""
 echo "🛑 Stopping existing Terraphim services..."
 pkill -f atomic-server 2>/dev/null || true
-pkill -f terraphim_mcp_server 2>/dev/null || true  
+pkill -f terraphim_mcp_server 2>/dev/null || true
 pkill -f terraphim_server 2>/dev/null || true
 
 # Clean up old PID files
@@ -111,7 +111,7 @@ if [ -n "$ATOMIC_BINARY" ]; then
         nohup ./atomic-server --port 9883 --initialize > /tmp/atomic-server.log 2>&1 &
         echo $! > /tmp/atomic-server.pid
         cd "$PROJECT_ROOT"
-        
+
         # Wait for Atomic Server with timeout
         if wait_for_service "http://localhost:9883" "Atomic Server"; then
             echo "   ✅ Atomic Server started successfully"
@@ -136,7 +136,7 @@ else
     nohup cargo run --release -- --sse --bind 127.0.0.1:8001 > /tmp/mcp.log 2>&1 &
     echo $! > /tmp/mcp.pid
     cd "$PROJECT_ROOT"
-    
+
     # Wait a moment for MCP server to start
     sleep 3
     echo "   ✅ MCP Server started (check /tmp/mcp.log for details)"
@@ -153,7 +153,7 @@ else
     echo "   🚀 Starting Terraphim Server..."
     nohup cargo run --release -p terraphim_server -- --config terraphim_server/default/terraphim_engineer_config.json > /tmp/terraphim.log 2>&1 &
     echo $! > /tmp/terraphim.pid
-    
+
     # Wait for Terraphim Server
     if wait_for_service "http://localhost:8000/health" "Terraphim Server"; then
         echo "   ✅ Terraphim Server started successfully"

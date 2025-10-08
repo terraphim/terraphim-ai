@@ -53,9 +53,9 @@ pub struct QueryRsHaystackIndexer {
 
 impl Default for QueryRsHaystackIndexer {
     fn default() -> Self {
-        // Create optimized client for API calls with shorter timeout
+        // Create optimized client for API calls with reasonable timeout
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(10))
             .user_agent("Terraphim/1.0 (https://terraphim.ai)")
             .build()
             .unwrap_or_else(|_| Client::new());
@@ -73,6 +73,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
         _haystack: &Haystack,
     ) -> impl std::future::Future<Output = Result<Index>> + Send {
         async move {
+            log::warn!("QueryRs: Starting index for search term: '{}'", needle);
             let mut documents = Vec::new();
             let mut persistence_stats = PersistenceStats::new();
 
@@ -124,6 +125,10 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
             };
 
             if !use_cached_results {
+                log::warn!(
+                    "QueryRs: No cached results found, executing fresh search for '{}'",
+                    needle
+                );
                 // Search across all query.rs endpoints concurrently
                 let (reddit_results, suggest_results, crates_results, docs_results) = tokio::join!(
                     self.search_reddit_posts(needle),
@@ -195,7 +200,18 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
             let mut enhanced_documents = Vec::new();
             let mut fetch_stats = FetchStats::new();
 
+            log::warn!(
+                "QueryRs: Processing {} documents from search results",
+                documents.len()
+            );
+
             for doc in documents {
+                log::warn!(
+                    "QueryRs: Processing document '{}' - title: '{}'",
+                    doc.id,
+                    doc.title
+                );
+
                 // First, check if we have a cached version of this document with enhanced content
                 let mut doc_placeholder = Document {
                     id: doc.id.clone(),
@@ -214,7 +230,12 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                                 cached_doc.body.len(),
                                 doc.body.len()
                             );
-                            cached_doc
+                            // Clear any existing summaries to ensure fresh AI summarization
+                            let mut fresh_doc = cached_doc;
+                            fresh_doc.summarization = None;
+                            fresh_doc.description = None;
+                            log::debug!("Cleared existing summaries from cached document '{}' for fresh AI summarization", fresh_doc.id);
+                            fresh_doc
                         } else {
                             doc
                         }
@@ -225,53 +246,99 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                     }
                 };
 
-                // If document has URL and needs content enhancement, try to fetch it
-                if !enhanced_doc.url.is_empty()
-                    && enhanced_doc.url.starts_with("http")
-                    && !enhanced_doc.url.contains("crates.io/crates/")
-                    && enhanced_doc.body.len() < 200
-                // Only fetch if content is limited
-                {
-                    match self.fetch_and_scrape_content(&enhanced_doc).await {
-                        Ok(fetched_doc) => {
-                            fetch_stats.successful += 1;
-                            // Save the enhanced document to persistence for future use
-                            if let Err(e) = fetched_doc.save().await {
-                                log::warn!(
-                                    "Failed to save enhanced document '{}': {}",
-                                    fetched_doc.title,
-                                    e
-                                );
-                            } else {
-                                log::debug!(
-                                    "Saved enhanced document '{}' to persistence",
-                                    fetched_doc.title
-                                );
-                            }
-                            enhanced_documents.push(fetched_doc);
+                // Check if content enhancement is disabled via configuration
+                let disable_content_enhancement = _haystack
+                    .extra_parameters
+                    .get("disable_content_enhancement")
+                    .map(|v| v == "true")
+                    .unwrap_or(true); // Default to disabled for performance
+
+                log::warn!(
+                    "QueryRs: disable_content_enhancement = {} for document '{}'",
+                    disable_content_enhancement,
+                    enhanced_doc.id
+                );
+
+                if disable_content_enhancement {
+                    // Skip aggressive content fetching to improve performance
+                    // The QueryRs API already provides good summaries and metadata
+                    fetch_stats.skipped += 1;
+
+                    log::warn!(
+                        "QueryRs: Processing document '{}' for persistence saving",
+                        enhanced_doc.id
+                    );
+
+                    // Still save documents to persistence for summarization to work
+                    log::warn!(
+                        "QueryRs: Attempting to save document '{}' to persistence",
+                        enhanced_doc.id
+                    );
+                    match enhanced_doc.save().await {
+                        Ok(_) => {
+                            log::warn!(
+                            "QueryRs: Successfully saved document '{}' to persistence for summarization",
+                            enhanced_doc.id
+                        );
                         }
                         Err(e) => {
-                            fetch_stats.failed += 1;
-                            if self.is_critical_url(&enhanced_doc.url) {
-                                log::warn!(
-                                    "Failed to fetch critical URL {}: {}",
-                                    enhanced_doc.url,
-                                    e
-                                );
-                            } else {
-                                log::debug!(
-                                    "Failed to fetch non-critical URL {}: {}",
-                                    enhanced_doc.url,
-                                    e
-                                );
-                            }
-                            enhanced_documents.push(enhanced_doc);
+                            log::error!(
+                                "QueryRs: Failed to save document '{}' to persistence: {}",
+                                enhanced_doc.id,
+                                e
+                            );
+                            // Continue processing even if save fails
                         }
                     }
-                } else {
-                    fetch_stats.skipped += 1;
-                    // Skip fetching for crates.io URLs or documents that already have content
+
                     enhanced_documents.push(enhanced_doc);
+                } else {
+                    // Legacy content fetching (disabled by default)
+                    if !enhanced_doc.url.is_empty()
+                        && enhanced_doc.url.starts_with("http")
+                        && !enhanced_doc.url.contains("crates.io/crates/")
+                        && enhanced_doc.body.len() < 200
+                    {
+                        match self.fetch_and_scrape_content(&enhanced_doc).await {
+                            Ok(fetched_doc) => {
+                                fetch_stats.successful += 1;
+                                // Save the enhanced document to persistence for future use
+                                if let Err(e) = fetched_doc.save().await {
+                                    log::warn!(
+                                        "Failed to save enhanced document '{}': {}",
+                                        fetched_doc.title,
+                                        e
+                                    );
+                                } else {
+                                    log::debug!(
+                                        "Saved enhanced document '{}' to persistence",
+                                        fetched_doc.title
+                                    );
+                                }
+                                enhanced_documents.push(fetched_doc);
+                            }
+                            Err(e) => {
+                                fetch_stats.failed += 1;
+                                if self.is_critical_url(&enhanced_doc.url) {
+                                    log::warn!(
+                                        "Failed to fetch critical URL {}: {}",
+                                        enhanced_doc.url,
+                                        e
+                                    );
+                                } else {
+                                    log::debug!(
+                                        "Failed to fetch non-critical URL {}: {}",
+                                        enhanced_doc.url,
+                                        e
+                                    );
+                                }
+                                enhanced_documents.push(enhanced_doc);
+                            }
+                        }
+                    } else {
+                        fetch_stats.skipped += 1;
+                        enhanced_documents.push(enhanced_doc);
+                    }
                 }
             }
 

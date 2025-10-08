@@ -21,11 +21,11 @@ run_test() {
     local test_name="$1"
     local test_command="$2"
     local optional="${3:-false}"
-    
+
     echo -e "${BLUE}▶️ $test_name${NC}"
     echo "Command: $test_command"
     echo ""
-    
+
     if eval "$test_command"; then
         echo -e "${GREEN}✅ $test_name - PASSED${NC}"
         return 0
@@ -44,7 +44,7 @@ run_test() {
 check_service() {
     local service_name="$1"
     local url="$2"
-    
+
     if curl -s "$url" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ $service_name is ready${NC}"
         return 0
@@ -114,34 +114,34 @@ done
 if [ "$SETUP_ENV" = "true" ]; then
     echo -e "${BLUE}🚀 Setting up test environment...${NC}"
     ./scripts/test_env_setup_local.sh
-    
+
     # Wait for services to stabilize
     echo ""
     echo -e "${BLUE}⏳ Waiting for services to stabilize...${NC}"
     sleep 5
-    
+
     # Verify critical services
     echo ""
     echo -e "${BLUE}🔍 Verifying critical services...${NC}"
     services_ready=true
-    
+
     if ! check_service "Ollama" "http://localhost:11434/api/tags"; then
         services_ready=false
     fi
-    
+
     if ! check_service "Terraphim Server" "http://localhost:8000/health"; then
         services_ready=false
     fi
-    
+
     # Optional services
     check_service "Atomic Server" "http://localhost:9883" || echo -e "${YELLOW}ℹ️ Atomic Server optional${NC}"
     check_service "MCP Server" "http://localhost:8001" || echo -e "${YELLOW}ℹ️ MCP Server may be in stdio mode${NC}"
-    
+
     if [ "$services_ready" = "false" ]; then
         echo -e "${RED}❌ Critical services are not ready. Exiting.${NC}"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ All critical services are ready!${NC}"
 else
     echo -e "${YELLOW}⚠️ Skipping environment setup (--no-setup specified)${NC}"
@@ -171,9 +171,9 @@ if [ "$RUN_UNIT" = "true" ]; then
     echo -e "${BLUE}1️⃣ UNIT TESTS${NC}"
     echo -e "${BLUE}=============${NC}"
     echo ""
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 4))
-    
+
     # Core library tests
     if run_test "Core Libraries Unit Tests" "cargo test --lib --all-features $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -181,7 +181,7 @@ if [ "$RUN_UNIT" = "true" ]; then
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     # Specific crate tests
     if run_test "TerraphimGraph Unit Tests" "cargo test -p terraphim_rolegraph $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -189,14 +189,14 @@ if [ "$RUN_UNIT" = "true" ]; then
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     if run_test "Service Layer Unit Tests" "cargo test -p terraphim_service --lib $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     if run_test "Middleware Unit Tests" "cargo test -p terraphim_middleware --lib $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
@@ -210,9 +210,9 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
     echo -e "${BLUE}2️⃣ INTEGRATION TESTS${NC}"
     echo -e "${BLUE}===================${NC}"
     echo ""
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 6))
-    
+
     # Service validation
     if run_test "Local Service Validation" "cargo test test_local_services_available --ignored $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -220,7 +220,7 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     # Ollama functionality
     if run_test "Ollama Model Functionality" "cargo test test_ollama_model_functionality --ignored $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -228,7 +228,7 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     # API endpoints
     if run_test "Terraphim API Endpoints" "cargo test test_terraphim_api_endpoints --ignored $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -236,7 +236,7 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     # Haystack configuration
     if run_test "Haystack Configuration Tests" "cargo test test_haystack_types --ignored $CARGO_VERBOSE"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -244,7 +244,7 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
     echo ""
-    
+
     # TerraphimGraph functionality (if implemented)
     if run_test "TerraphimGraph Search Validation" "cargo test -p terraphim_service terraphim_graph $CARGO_VERBOSE" "true"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -253,7 +253,7 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
     fi
     echo ""
-    
+
     # MCP integration (optional)
     if run_test "MCP Integration Tests" "cargo test -p terraphim_middleware mcp_haystack_test --ignored $CARGO_VERBOSE" "true"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -269,9 +269,9 @@ if [ "$RUN_E2E" = "true" ]; then
     echo -e "${BLUE}3️⃣ END-TO-END TESTS${NC}"
     echo -e "${BLUE}==================${NC}"
     echo ""
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 2))
-    
+
     # Frontend E2E (if available)
     if [ -d "desktop" ] && [ -f "desktop/package.json" ]; then
         cd desktop
@@ -286,7 +286,7 @@ if [ "$RUN_E2E" = "true" ]; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
     fi
     echo ""
-    
+
     # Full system integration
     if run_test "Full System Integration" "cargo test --workspace --test '*integration*' $CARGO_VERBOSE" "true"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -367,7 +367,7 @@ fi
 echo ""
 echo -e "${BLUE}📝 Additional Information:${NC}"
 echo "• Service logs: /tmp/*.log"
-echo "• Test environment config: .env.test" 
+echo "• Test environment config: .env.test"
 echo "• Re-run with: ./scripts/run_all_tests.sh"
 echo "• Help: ./scripts/run_all_tests.sh --help"
 
