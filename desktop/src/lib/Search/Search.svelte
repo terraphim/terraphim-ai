@@ -689,7 +689,7 @@
   <p class="error">{error}</p>
 {:else if results.length}
   {#each results as item}
-    <ResultItem document={item} />
+    <ResultItem {item} />
   {/each}
 {:else}
   <section class="section">
