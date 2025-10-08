@@ -9,7 +9,7 @@ class TerraphimApiClient {
     this.headers = {
       'Content-Type': 'application/json',
     };
-    
+
     // Configuration options
     this.options = {
       timeout: options.timeout || 300000,
@@ -19,10 +19,14 @@ class TerraphimApiClient {
       autoReconnect: options.autoReconnect !== false,
       ...options
     };
-    
+
+    // Debug mode
+    this.debugMode = false;
+    this.debugCallbacks = [];
+
     // WebSocket integration
     this.wsClient = null;
-    
+
     if (this.options.enableWebSocket && typeof TerraphimWebSocketClient !== 'undefined') {
       this.initializeWebSocket();
     }
@@ -92,11 +96,108 @@ class TerraphimApiClient {
       this.wsClient.disconnect();
       this.wsClient = null;
     }
-    
+
     // Initialize new WebSocket if enabled
     if (this.options.enableWebSocket && typeof TerraphimWebSocketClient !== 'undefined') {
       this.initializeWebSocket();
     }
+  }
+
+  // Debug mode methods
+  setDebugMode(enabled) {
+    this.debugMode = Boolean(enabled);
+    console.log(`🐛 API Client Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
+  }
+
+  onDebugLog(callback) {
+    if (typeof callback !== 'function') {
+      console.warn('Debug callback must be a function');
+      return;
+    }
+
+    // Wrap callback with timeout protection
+    const DEBUG_CALLBACK_TIMEOUT = 1000; // 1 second max
+    const wrappedCallback = (debugEntry) => {
+      const timeoutId = setTimeout(() => {
+        console.error('Debug callback timeout exceeded (1s limit)');
+      }, DEBUG_CALLBACK_TIMEOUT);
+
+      try {
+        callback(debugEntry);
+      } catch (error) {
+        console.error('Debug callback error:', error);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    this.debugCallbacks.push(wrappedCallback);
+  }
+
+  sanitizeForLogging(text) {
+    if (!text) return '';
+    let sanitized = String(text);
+
+    // Remove email addresses
+    sanitized = sanitized.replace(/[\w.-]+@[\w.-]+\.\w+/g, '[EMAIL]');
+    // Remove potential API keys
+    sanitized = sanitized.replace(/\b(sk|api|token|key)[-_]?[\w]{20,}/gi, '[KEY]');
+    // Remove passwords
+    sanitized = sanitized.replace(/password[:\s=]+\S+/gi, 'password:[REDACTED]');
+    // Remove potential tokens
+    sanitized = sanitized.replace(/bearer\s+[\w.-]{20,}/gi, 'bearer [TOKEN]');
+
+    return sanitized;
+  }
+
+  logDebug(type, data) {
+    if (!this.debugMode) return;
+
+    const debugEntry = {
+      timestamp: new Date().toISOString(),
+      type,
+      ...data
+    };
+
+    // Console logging with sanitization
+    const icon = type === 'request' ? '→' : '←';
+    console.group(`🐛 ${icon} LLM ${type.toUpperCase()}`);
+    console.log('Timestamp:', debugEntry.timestamp);
+
+    if (type === 'request') {
+      console.log('Endpoint:', data.endpoint);
+      console.log('Role:', data.role || 'default');
+      console.log('Model:', data.model || 'default');
+      if (data.prompt) {
+        const safePrompt = String(data.prompt || '');
+        const sanitizedPrompt = this.sanitizeForLogging(safePrompt);
+        console.log('Prompt Preview:', sanitizedPrompt.substring(0, 200) + (sanitizedPrompt.length > 200 ? '...' : ''));
+      }
+      console.log('Full Request:', data.payload);
+    } else if (type === 'response') {
+      console.log('Status:', data.status);
+      if (data.modelUsed) console.log('Model Used:', data.modelUsed);
+      if (data.tokens) {
+        const safeTokens = typeof data.tokens === 'object' ? data.tokens : { total: Math.max(0, Number(data.tokens) || 0) };
+        console.log('Tokens:', safeTokens);
+      }
+      if (data.duration !== undefined) {
+        console.log('Duration:', Math.max(0, Number(data.duration) || 0) + 'ms');
+      }
+      if (data.output) {
+        const safeOutput = String(data.output || '');
+        const sanitizedOutput = this.sanitizeForLogging(safeOutput);
+        console.log('Output Preview:', sanitizedOutput.substring(0, 200) + (sanitizedOutput.length > 200 ? '...' : ''));
+      }
+      if (data.error) console.error('Error:', data.error);
+    }
+
+    console.groupEnd();
+
+    // Notify UI callbacks (already wrapped with timeout in onDebugLog)
+    this.debugCallbacks.forEach(cb => {
+      cb(debugEntry);
+    });
   }
 
   // Generic request method with retry logic
@@ -195,10 +296,56 @@ class TerraphimApiClient {
 
   // Chat completion
   async chatCompletion(messages, options = {}) {
-    return this.request('/chat', {
-      method: 'POST',
-      body: JSON.stringify({ messages, ...options }),
-    });
+    const startTime = Date.now();
+    const prompt = Array.isArray(messages) ? messages.map(m => m.content || '').join('\n') : String(messages);
+
+    // Log request (with sanitization)
+    if (this.debugMode) {
+      const sanitizedPrompt = this.sanitizeForLogging(prompt);
+      this.logDebug('request', {
+        endpoint: '/chat',
+        role: options.role,
+        model: options.llm_config?.llm_model,
+        prompt: sanitizedPrompt,
+        payload: { messages, ...options }
+      });
+    }
+
+    try {
+      const response = await this.request('/chat', {
+        method: 'POST',
+        body: JSON.stringify({ messages, ...options }),
+      });
+
+      // Log response (with validation and sanitization)
+      if (this.debugMode) {
+        const duration = Math.max(0, Date.now() - startTime);
+        const output = response.output || response.content || '';
+        const sanitizedOutput = this.sanitizeForLogging(String(output));
+
+        this.logDebug('response', {
+          status: 'success',
+          modelUsed: response.model_used || response.model,
+          tokens: response.tokens || {},
+          duration: duration,
+          output: sanitizedOutput,
+          fullResponse: response
+        });
+      }
+
+      return response;
+    } catch (error) {
+      // Log error
+      if (this.debugMode) {
+        const duration = Math.max(0, Date.now() - startTime);
+        this.logDebug('response', {
+          status: 'error',
+          error: error.message,
+          duration: duration
+        });
+      }
+      throw error;
+    }
   }
 
   // Workflow execution endpoints with WebSocket support
