@@ -68,6 +68,11 @@ jobs:
           name: frontend-dist
           path: desktop/dist
 
+      - name: Copy dist to terraphim_server
+        run: |
+          mkdir -p terraphim_server/dist
+          cp -r desktop/dist/* terraphim_server/dist/
+
       - name: Install build dependencies
         run: |
           sudo apt-get update -qq
