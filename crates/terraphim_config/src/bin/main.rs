@@ -37,6 +37,7 @@ async fn main() -> Result<()> {
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                     weight: default_haystack_weight(),
+                    fetch_content: false,
                 }],
                 #[cfg(feature = "openrouter")]
                 openrouter_enabled: false,
