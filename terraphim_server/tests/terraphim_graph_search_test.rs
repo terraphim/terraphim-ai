@@ -104,6 +104,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
             weight: 1.0,
+            fetch_content: false,
         }],
         kg: Some(KnowledgeGraph {
             automata_path: None,

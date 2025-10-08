@@ -13,16 +13,16 @@ use thiserror::Error;
 pub enum ServiceError {
     #[error("Database connection failed: {0}")]
     DatabaseConnection(#[from] sqlx::Error),
-    
+
     #[error("User not found: {user_id}")]
     UserNotFound { user_id: u64 },
-    
+
     #[error("Invalid configuration: {field} is missing")]
     InvalidConfig { field: String },
-    
+
     #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
-    
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -62,13 +62,13 @@ use anyhow::{Result, Context};
 async fn process_user_request(user_id: u64) -> Result<Response> {
     let user = fetch_user(user_id).await
         .context("Failed to fetch user data")?;
-    
+
     let permissions = fetch_permissions(&user).await
         .context("Failed to fetch user permissions")?;
-    
+
     let data = generate_response(&user, &permissions)
         .context("Failed to generate response")?;
-    
+
     Ok(data)
 }
 ```
@@ -100,7 +100,7 @@ async fn fetch_with_fallback(primary_url: &str, fallback_url: &str) -> Result<Da
         Ok(data) => Ok(data),
         Err(primary_error) => {
             log::warn!("Primary fetch failed: {}, trying fallback", primary_error);
-            
+
             fetch_data(fallback_url).await
                 .map_err(|fallback_error| {
                     anyhow::anyhow!(
@@ -141,21 +141,21 @@ Validate inputs early and return errors before expensive operations.
 ```rust
 fn process_order(order: Order) -> Result<Receipt> {
     if order.items.is_empty() {
-        return Err(ServiceError::InvalidOrder { 
-            reason: "Order has no items".into() 
+        return Err(ServiceError::InvalidOrder {
+            reason: "Order has no items".into()
         });
     }
-    
+
     if order.total_amount <= 0.0 {
-        return Err(ServiceError::InvalidOrder { 
-            reason: "Order total must be positive".into() 
+        return Err(ServiceError::InvalidOrder {
+            reason: "Order total must be positive".into()
         });
     }
-    
+
     let validated = validate_inventory(&order)?;
     let processed = charge_customer(&validated)?;
     let receipt = generate_receipt(&processed)?;
-    
+
     Ok(receipt)
 }
 ```
@@ -166,13 +166,13 @@ fn process_order(order: Order) -> Result<Receipt> {
 fn process_order_bad(order: Order) -> Result<Receipt> {
     let processed = charge_customer(&order)?;
     let receipt = generate_receipt(&processed)?;
-    
+
     if order.items.is_empty() {
-        return Err(ServiceError::InvalidOrder { 
-            reason: "Order has no items".into() 
+        return Err(ServiceError::InvalidOrder {
+            reason: "Order has no items".into()
         });
     }
-    
+
     Ok(receipt)
 }
 ```
@@ -193,7 +193,7 @@ use tracing::{error, warn, debug, instrument};
 #[instrument(skip(db))]
 async fn process_batch(db: &Database, batch_id: u64) -> Result<()> {
     debug!("Starting batch processing");
-    
+
     let items = match db.fetch_batch(batch_id).await {
         Ok(items) => items,
         Err(e) => {
@@ -205,7 +205,7 @@ async fn process_batch(db: &Database, batch_id: u64) -> Result<()> {
             return Err(e.into());
         }
     };
-    
+
     for item in items {
         if let Err(e) = process_item(&item).await {
             warn!(
@@ -215,7 +215,7 @@ async fn process_batch(db: &Database, batch_id: u64) -> Result<()> {
             );
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -229,13 +229,13 @@ async fn process_batch_bad(db: &Database, batch_id: u64) -> Result<()> {
             println!("Error: {}", e);  // println! instead of logger
             e
         })?;
-    
+
     for item in items {
         if let Err(e) = process_item(&item).await {
             error!("Error: {}", e);  // Missing context
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -261,7 +261,7 @@ Choose between `Result` and `Option` based on whether absence is an error.
 fn parse_config(path: &Path) -> Result<Config> {
     let content = fs::read_to_string(path)
         .context("Failed to read config file")?;
-    
+
     serde_json::from_str(&content)
         .context("Failed to parse config JSON")
 }

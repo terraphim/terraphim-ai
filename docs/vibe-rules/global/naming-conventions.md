@@ -76,7 +76,7 @@ MAX_RETRIES = 3
 class UserSession:
     def _validate_token(self):
         pass
-    
+
 def fetch_user_data(user_id: int) -> dict:
     pass
 

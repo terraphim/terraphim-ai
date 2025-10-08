@@ -43,13 +43,13 @@ use tokio::sync::mpsc;
 
 async fn producer_consumer() {
     let (tx, mut rx) = mpsc::channel(100);
-    
+
     tokio::spawn(async move {
         for i in 0..1000 {
             tx.send(i).await.unwrap();
         }
     });
-    
+
     while let Some(msg) = rx.recv().await {
         process(msg).await;
     }
@@ -167,11 +167,11 @@ use tokio;
 
 async fn parallel_fetch(urls: Vec<String>) -> Result<Vec<Data>> {
     let mut futures = Vec::new();
-    
+
     for url in urls {
         futures.push(fetch_data(&url));
     }
-    
+
     // All futures complete together
     let results = tokio::try_join_all(futures).await?;
     Ok(results)

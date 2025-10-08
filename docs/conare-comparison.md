@@ -482,14 +482,14 @@ use tokio::sync::mpsc;
 #[tokio::main]
 async fn main() {
     let (tx, mut rx) = mpsc::channel(100);
-    
+
     // Producer
     tokio::spawn(async move {
         for i in 0..10 {
             tx.send(i).await.unwrap();
         }
     });
-    
+
     // Consumer
     while let Some(msg) = rx.recv().await {
         println!("Received: {}", msg);
