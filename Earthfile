@@ -119,6 +119,7 @@ source-native:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
+  COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
