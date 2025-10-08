@@ -160,7 +160,7 @@ I found several async patterns in the knowledge graph:
 
 1. **Tokio Spawn Pattern** (docs/vibe-rules/rust/async-patterns.md:5)
    Use `tokio::spawn` for concurrent tasks that don't share state.
-   
+
    Example:
    ```rust
    tokio::spawn(async move {

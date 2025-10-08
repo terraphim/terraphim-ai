@@ -252,7 +252,7 @@ console.log(`Found pattern at ${doc.url}:${paragraphs[0].start_line}`);
 
 **Claude's Response**:
 > Here's the recommended async cancellation pattern from `docs/vibe-rules/rust/async-patterns.md:42-48`:
-> 
+>
 > ```rust
 > tokio::select! {
 >     result = long_task() => {
@@ -307,7 +307,7 @@ for (const match of matches.matches) {
     query: match.term,
     role: "Context Engineer"
   });
-  
+
   // 4. Compare code to best practice
   // Report violations or confirm compliance
 }
@@ -315,7 +315,7 @@ for (const match of matches.matches) {
 
 **Claude's Response**:
 > I found 3 async patterns in your code:
-> 
+>
 > 1. Line 42: `tokio::spawn` - ✅ Follows best practice (see `async-patterns.md:15`)
 > 2. Line 67: Unbounded channel - ⚠️ Consider using bounded channel (see `async-patterns.md:45`)
 > 3. Line 89: No cancellation handling - ❌ Missing cancellation (see `async-patterns.md:78`)
@@ -343,13 +343,13 @@ pub fn extract_paragraphs_from_automata(
 ) -> Vec<ParagraphResult> {
     let lines: Vec<&str> = text.lines().collect();
     let mut results = Vec::new();
-    
+
     for (line_num, line) in lines.iter().enumerate() {
         if line.contains(term) {
             // Extract paragraph around match
             let start = line_num.saturating_sub(2);
             let end = (line_num + 3).min(lines.len());
-            
+
             results.push(ParagraphResult {
                 content: lines[start..end].join("\n"),
                 start_line: start + 1,  // 1-indexed
@@ -358,7 +358,7 @@ pub fn extract_paragraphs_from_automata(
             });
         }
     }
-    
+
     results
 }
 ```

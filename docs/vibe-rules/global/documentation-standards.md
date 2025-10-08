@@ -114,32 +114,32 @@ def search(
     limit: int = 10
 ) -> SearchResults:
     """Search for documents matching the given query.
-    
+
     This function performs semantic search using the knowledge graph
     to expand queries with related concepts.
-    
+
     Args:
         query: The search term to look for
         role: The role context for search (uses default if None)
         limit: Maximum number of results to return
-    
+
     Returns:
         SearchResults containing documents with relevance scores
-    
+
     Raises:
         ValueError: If the role does not exist
         ServiceError: If the search backend is unavailable
-    
+
     Examples:
         >>> service = TerraphimService(config)
         >>> results = service.search("async patterns", role="Rust Engineer")
         >>> for doc in results.documents:
         ...     print(f"{doc.url}: {doc.description}")
-    
+
     Note:
         This function typically completes in 50-200ms depending on
         knowledge graph size and result caching.
-    
+
     See Also:
         - autocomplete_terms: For term suggestions
         - find_related_concepts: For graph traversal
@@ -286,23 +286,23 @@ pub struct ServiceConfig {
     /// The role name for this configuration.
     /// Must match an entry in the roles map.
     pub role: RoleName,
-    
+
     /// Knowledge graph configuration.
     /// If None, knowledge graph features are disabled.
     pub kg: Option<KnowledgeGraphConfig>,
-    
+
     /// Data sources for search and indexing.
     /// At least one haystack is required for search to work.
     pub haystacks: Vec<HaystackConfig>,
-    
+
     /// LLM provider: "ollama", "openrouter", or custom.
     pub llm_provider: String,
-    
+
     /// Base URL for LLM API.
     /// For Ollama: "http://127.0.0.1:11434"
     /// For OpenRouter: "https://openrouter.ai/api/v1"
     pub llm_base_url: String,
-    
+
     /// Model identifier.
     /// Examples: "llama3.2:3b", "anthropic/claude-3-opus"
     pub llm_model: String,
@@ -323,31 +323,31 @@ interface ServiceConfig {
    * Must match an entry in the roles map.
    */
   role: string;
-  
+
   /**
    * Knowledge graph configuration.
    * If undefined, knowledge graph features are disabled.
    */
   kg?: KnowledgeGraphConfig;
-  
+
   /**
    * Data sources for search and indexing.
    * At least one haystack is required for search to work.
    */
   haystacks: HaystackConfig[];
-  
+
   /**
    * LLM provider: "ollama", "openrouter", or custom.
    */
   llmProvider: string;
-  
+
   /**
    * Base URL for LLM API.
    * - For Ollama: "http://127.0.0.1:11434"
    * - For OpenRouter: "https://openrouter.ai/api/v1"
    */
   llmBaseUrl: string;
-  
+
   /**
    * Model identifier.
    * Examples: "llama3.2:3b", "anthropic/claude-3-opus"
@@ -481,11 +481,11 @@ use terraphim_service::TerraphimService;
 async fn main() -> Result<()> {
     let service = TerraphimService::new(config);
     let results = service.search("async patterns").await?;
-    
+
     for doc in results.documents {
         println!("{}", doc.description);
     }
-    
+
     Ok(())
 }
 \`\`\`

@@ -20,7 +20,7 @@ synonyms:: pnpm install, npm install, yarn install, pnpm, npm, yarn
 
 This creates a thesaurus mapping:
 - `pnpm install` → `bun install`
-- `npm install` → `bun install`  
+- `npm install` → `bun install`
 - `yarn install` → `bun install`
 - `pnpm` → `bun`
 - `npm` → `bun`
@@ -51,7 +51,7 @@ cargo run --release -p terraphim_tui --bin terraphim-tui --features repl,repl-mc
 /replace "pnpm install dependencies"
 # Output: bun install dependencies
 
-/replace "npm install && yarn build"  
+/replace "npm install && yarn build"
 # Output: bun install && bun build
 
 /replace "PNPM INSTALL"
@@ -147,7 +147,7 @@ bun test
 {
   "scripts": {
     "install": "pnpm install",
-    "build": "npm run build",  
+    "build": "npm run build",
     "test": "yarn test"
   }
 }

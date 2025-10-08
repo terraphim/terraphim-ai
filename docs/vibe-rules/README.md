@@ -316,7 +316,7 @@ Now Claude can:
 User: "How should I handle async cancellation in Rust?"
 
 Claude: [Searches vibe-rules for #async #cancellation]
-According to the async patterns rule, you should use tokio::select! 
+According to the async patterns rule, you should use tokio::select!
 for cancellation. Here's the recommended pattern:
 
 [Shows example from async-patterns.md with file path and line numbers]
@@ -458,7 +458,7 @@ cat ~/Library/Application\ Support/Claude/claude_desktop_config.json
 
 When rules conflict:
 1. Project-specific overrides framework-specific
-2. Framework-specific overrides language-specific  
+2. Framework-specific overrides language-specific
 3. Language-specific overrides global
 4. Document exceptions in rule
 

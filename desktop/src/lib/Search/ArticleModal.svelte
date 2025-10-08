@@ -320,6 +320,7 @@
       <div
         class="content-viewer"
         on:click={handleContentClick}
+        on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleContentClick(e)}
         tabindex="0"
         role="button"
         aria-label="KG document content - click KG links to explore further"

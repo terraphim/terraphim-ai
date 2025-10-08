@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Chat Layout Responsive Design Test Runner
-# 
+#
 # This script runs comprehensive tests for the chat layout responsive design fixes.
 # It includes E2E tests, visual regression tests, and performance validation.
 
@@ -120,55 +120,55 @@ done
 # Function to check prerequisites
 check_prerequisites() {
     print_status "Checking prerequisites..."
-    
+
     # Check if we're in the right directory
     if [[ ! -f "$PROJECT_ROOT/package.json" ]]; then
         print_error "package.json not found. Please run this script from the desktop directory."
         exit 1
     fi
-    
+
     # Check if node_modules exists
     if [[ ! -d "$PROJECT_ROOT/node_modules" ]]; then
         print_error "node_modules not found. Please run 'yarn install' first."
         exit 1
     fi
-    
+
     # Check if Playwright is installed
     if ! command -v npx &> /dev/null; then
         print_error "npx not found. Please install Node.js and npm/yarn."
         exit 1
     fi
-    
+
     # Check if test files exist
     if [[ "$RUN_E2E" == true && ! -f "$E2E_TESTS" ]]; then
         print_error "E2E test file not found: $E2E_TESTS"
         exit 1
     fi
-    
+
     if [[ "$RUN_VISUAL" == true && ! -f "$VISUAL_TESTS" ]]; then
         print_error "Visual test file not found: $VISUAL_TESTS"
         exit 1
     fi
-    
+
     print_success "Prerequisites check passed"
 }
 
 # Function to setup test environment
 setup_test_environment() {
     print_status "Setting up test environment..."
-    
+
     cd "$PROJECT_ROOT"
-    
+
     # Install Playwright browsers if needed
     if [[ ! -d "$PROJECT_ROOT/node_modules/@playwright" ]]; then
         print_status "Installing Playwright browsers..."
         npx playwright install
     fi
-    
+
     # Build the application
     print_status "Building application..."
     yarn build
-    
+
     print_success "Test environment setup complete"
 }
 
@@ -177,27 +177,27 @@ run_e2e_tests() {
     if [[ "$RUN_E2E" != true ]]; then
         return 0
     fi
-    
+
     print_status "Running E2E tests..."
-    
+
     local cmd="npx playwright test $E2E_TESTS"
-    
+
     if [[ "$HEADLESS" == false ]]; then
         cmd="$cmd --headed"
     fi
-    
+
     if [[ "$VERBOSE" == true ]]; then
         cmd="$cmd --reporter=list"
     else
         cmd="$cmd --reporter=line"
     fi
-    
+
     if [[ "$COVERAGE" == true ]]; then
         cmd="$cmd --reporter=html"
     fi
-    
+
     print_status "Executing: $cmd"
-    
+
     if eval "$cmd"; then
         print_success "E2E tests passed"
         return 0
@@ -212,28 +212,28 @@ run_visual_tests() {
     if [[ "$RUN_VISUAL" != true ]]; then
         return 0
     fi
-    
+
     print_status "Running visual regression tests..."
-    
+
     local cmd="npx playwright test $VISUAL_TESTS"
-    
+
     if [[ "$HEADLESS" == false ]]; then
         cmd="$cmd --headed"
     fi
-    
+
     if [[ "$UPDATE_SNAPSHOTS" == true ]]; then
         cmd="$cmd --update-snapshots"
         print_warning "Updating visual regression snapshots"
     fi
-    
+
     if [[ "$VERBOSE" == true ]]; then
         cmd="$cmd --reporter=list"
     else
         cmd="$cmd --reporter=line"
     fi
-    
+
     print_status "Executing: $cmd"
-    
+
     if eval "$cmd"; then
         print_success "Visual regression tests passed"
         return 0
@@ -248,12 +248,12 @@ run_performance_tests() {
     if [[ "$RUN_PERFORMANCE" != true ]]; then
         return 0
     fi
-    
+
     print_status "Running performance tests..."
-    
+
     # Performance tests are included in the E2E test suite
     # This function can be extended for dedicated performance testing
-    
+
     print_success "Performance tests completed"
     return 0
 }
@@ -263,14 +263,14 @@ generate_test_report() {
     if [[ "$COVERAGE" != true ]]; then
         return 0
     fi
-    
+
     print_status "Generating test report..."
-    
+
     # Generate HTML report if available
     if [[ -d "$PROJECT_ROOT/playwright-report" ]]; then
         print_status "Test report available at: $PROJECT_ROOT/playwright-report/index.html"
     fi
-    
+
     # Generate coverage report if available
     if [[ -d "$PROJECT_ROOT/coverage" ]]; then
         print_status "Coverage report available at: $PROJECT_ROOT/coverage/index.html"
@@ -280,10 +280,10 @@ generate_test_report() {
 # Function to cleanup
 cleanup() {
     print_status "Cleaning up test artifacts..."
-    
+
     # Remove temporary files if needed
     # This function can be extended for cleanup tasks
-    
+
     print_success "Cleanup complete"
 }
 
@@ -291,26 +291,26 @@ cleanup() {
 main() {
     print_status "Starting Chat Layout Responsive Design Tests"
     print_status "============================================="
-    
+
     local exit_code=0
-    
+
     # Check prerequisites
     check_prerequisites
-    
+
     # Setup test environment
     setup_test_environment
-    
+
     # Run tests
     run_e2e_tests || exit_code=1
     run_visual_tests || exit_code=1
     run_performance_tests || exit_code=1
-    
+
     # Generate reports
     generate_test_report
-    
+
     # Cleanup
     cleanup
-    
+
     # Final status
     if [[ $exit_code -eq 0 ]]; then
         print_success "All tests completed successfully!"
@@ -319,7 +319,7 @@ main() {
         print_error "Some tests failed. Please check the output above."
         print_status "Chat layout responsive design validation failed"
     fi
-    
+
     exit $exit_code
 }
 
