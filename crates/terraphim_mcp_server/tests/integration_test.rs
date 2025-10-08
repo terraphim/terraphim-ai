@@ -213,6 +213,25 @@ async fn test_mcp_server_integration() -> Result<()> {
 
 #[tokio::test]
 async fn test_search_with_different_roles() -> Result<()> {
+    let command = setup_server_command().await?;
+    let transport = TokioChildProcess::new(command)?;
+    let service = ().serve(transport).await?;
+    println!("Connected to server: {:?}", service.peer_info());
+
+    // Update configuration to use test fixtures
+    let test_config = create_test_config();
+    let config_result = service
+        .call_tool(CallToolRequestParam {
+            name: "update_config_tool".into(),
+            arguments: serde_json::json!({
+                "config": test_config
+            })
+            .as_object()
+            .cloned(),
+        })
+        .await?;
+    println!("Config update result: {:?}", config_result);
+
     // Test search with different roles
     let role_queries = vec![
         ("Default", "terraphim"),
@@ -254,6 +273,25 @@ async fn test_search_with_different_roles() -> Result<()> {
 
 #[tokio::test]
 async fn test_resource_uri_mapping() -> Result<()> {
+    let command = setup_server_command().await?;
+    let transport = TokioChildProcess::new(command)?;
+    let service = ().serve(transport).await?;
+    println!("Connected to server: {:?}", service.peer_info());
+
+    // Update configuration to use test fixtures
+    let test_config = create_test_config();
+    let config_result = service
+        .call_tool(CallToolRequestParam {
+            name: "update_config_tool".into(),
+            arguments: serde_json::json!({
+                "config": test_config
+            })
+            .as_object()
+            .cloned(),
+        })
+        .await?;
+    println!("Config update result: {:?}", config_result);
+
     // List available resources
     let resources = service.list_resources(Default::default()).await?;
     println!("Available resources: {:#?}", resources);
@@ -288,11 +326,31 @@ async fn test_resource_uri_mapping() -> Result<()> {
         .await;
     // Should return an error for invalid URI
     assert!(invalid_result.is_err());
+    service.cancel().await?;
     Ok(())
 }
 
 #[tokio::test]
 async fn test_simple_search_with_debug() -> Result<()> {
+    let command = setup_server_command().await?;
+    let transport = TokioChildProcess::new(command)?;
+    let service = ().serve(transport).await?;
+    println!("Connected to server: {:?}", service.peer_info());
+
+    // Update configuration to use test fixtures
+    let test_config = create_test_config();
+    let config_result = service
+        .call_tool(CallToolRequestParam {
+            name: "update_config_tool".into(),
+            arguments: serde_json::json!({
+                "config": test_config
+            })
+            .as_object()
+            .cloned(),
+        })
+        .await?;
+    println!("Config update result: {:?}", config_result);
+
     // Test with a simple search term that should definitely match
     let search_terms = vec![
         "Machine Learning", // Should match machine_learning.md
@@ -335,6 +393,7 @@ async fn test_simple_search_with_debug() -> Result<()> {
             }
         }
     }
+    service.cancel().await?;
     Ok(())
 }
 
