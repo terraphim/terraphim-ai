@@ -3094,6 +3094,7 @@ mod tests {
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
                 weight: 1.0,
+                fetch_content: false,
             }],
             kg: None,
             terraphim_it: false,
@@ -3163,6 +3164,7 @@ mod tests {
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
                 weight: 1.0,
+                fetch_content: false,
             }],
             kg: None,
             terraphim_it: false,
@@ -3277,6 +3279,7 @@ mod tests {
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
                 weight: 1.0,
+                fetch_content: false,
             }],
             kg: Some(KnowledgeGraph {
                 automata_path: None,
@@ -3403,6 +3406,7 @@ mod tests {
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
                 weight: 1.0,
+                fetch_content: false,
             }],
             kg: Some(terraphim_config::KnowledgeGraph {
                 automata_path: Some(terraphim_automata::AutomataPath::local_example()),
