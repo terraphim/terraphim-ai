@@ -319,13 +319,13 @@ pub(crate) async fn find_documents_by_kg_term(
     let search_result = terraphim_service
         .find_documents_for_kg_term(&role_name, &query.term)
         .await?;
-    let total = search_result.documents.len();
+    let total = search_result.len();
 
     log::debug!("Found {} documents for KG term '{}'", total, query.term);
 
     Ok(Json(SearchResponse {
         status: Status::Success,
-        results: search_result.documents,
+        results: search_result,
         total,
     }))
 }
@@ -623,7 +623,7 @@ pub(crate) async fn chat_completion(
     let system_prompt = {
         #[cfg(feature = "openrouter")]
         {
-            role.llm_chat_system_prompt.or_else(|| {
+            role.llm_system_prompt.or_else(|| {
                 // Try generic system prompt from extra
                 role.extra
                     .get("system_prompt")
@@ -696,9 +696,9 @@ pub(crate) async fn chat_completion(
         .or_else(|| {
             #[cfg(feature = "openrouter")]
             {
-                role.llm_chat_model
+                role.openrouter_model
                     .clone()
-                    .or_else(|| role.llm_model.clone())
+                    .or_else(|| role.openrouter_model.clone())
             }
             #[cfg(not(feature = "openrouter"))]
             {
@@ -846,7 +846,7 @@ pub(crate) async fn list_openrouter_models(
         // Determine API key preference: request -> role -> env
         let api_key = if let Some(k) = &req.api_key {
             k.clone()
-        } else if let Some(k) = &role.llm_api_key {
+        } else if let Some(k) = &role.openrouter_api_key {
             k.clone()
         } else {
             match std::env::var("OPENROUTER_KEY") {
@@ -863,7 +863,7 @@ pub(crate) async fn list_openrouter_models(
 
         // Any valid model string works for constructing the client
         let seed_model = role
-            .llm_model
+            .openrouter_model
             .clone()
             .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
 
@@ -934,7 +934,12 @@ pub(crate) async fn summarize_document(
     // Check if OpenRouter is enabled and configured for this role
     #[cfg(feature = "openrouter")]
     {
-        if !role_ref.has_llm_config() {
+        #[cfg(feature = "openrouter")]
+        let has_llm = role_ref.openrouter_enabled && role_ref.openrouter_api_key.is_some();
+        #[cfg(not(feature = "openrouter"))]
+        let has_llm = false;
+
+        if !has_llm {
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
@@ -949,7 +954,7 @@ pub(crate) async fn summarize_document(
         let role = role_ref.clone();
 
         // Get the API key from environment variable if not set in role
-        let api_key = if let Some(key) = &role.llm_api_key {
+        let api_key = if let Some(key) = &role.openrouter_api_key {
             key.clone()
         } else {
             std::env::var("OPENROUTER_KEY").map_err(|_| {
@@ -960,7 +965,10 @@ pub(crate) async fn summarize_document(
             })?
         };
 
-        let model = role.llm_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
+        let model = role
+            .openrouter_model
+            .as_deref()
+            .unwrap_or("openai/gpt-3.5-turbo");
         let max_length = request.max_length.unwrap_or(250);
         let force_regenerate = request.force_regenerate.unwrap_or(false);
 
@@ -1098,9 +1106,17 @@ pub(crate) async fn get_summarization_status(
 
     #[cfg(feature = "openrouter")]
     {
-        let llm_enabled = role.llm_enabled;
-        let llm_configured = role.has_llm_config() || std::env::var("OPENROUTER_KEY").is_ok();
-        let model = role.get_llm_model().map(|s| s.to_string());
+        let llm_enabled = role.openrouter_enabled;
+        #[cfg(feature = "openrouter")]
+        let llm_configured = (role.openrouter_enabled && role.openrouter_api_key.is_some())
+            || std::env::var("OPENROUTER_KEY").is_ok();
+        #[cfg(not(feature = "openrouter"))]
+        let llm_configured = std::env::var("OPENROUTER_KEY").is_ok();
+
+        #[cfg(feature = "openrouter")]
+        let model = role.openrouter_model.clone();
+        #[cfg(not(feature = "openrouter"))]
+        let model = None;
 
         // Note: For now, we'll set cached_summaries_count to 0
         // In the future, this could query the persistence layer for documents with summaries

@@ -110,7 +110,7 @@ impl SummarizationAgent {
             .get("llm_context_window")
             .and_then(|v| v.as_u64())
             .map(|v| v as usize);
-        
+
         let max_tokens = context_window
             .map(|cw| ((cw / 4).min(1000)) as u64) // Use 1/4 of context window, max 1000 for summaries
             .unwrap_or(500); // Default fallback

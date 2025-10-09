@@ -460,8 +460,8 @@ impl TerraphimAgent {
 
         match self.persistence.fastest_op.read(&key).await {
             Ok(data) => {
-                let state: AgentState =
-                    serde_json::from_slice(&data.to_vec()).map_err(MultiAgentError::SerializationError)?;
+                let state: AgentState = serde_json::from_slice(&data.to_vec())
+                    .map_err(MultiAgentError::SerializationError)?;
 
                 // Restore state
                 // TODO: Implement proper state loading with interior mutability
