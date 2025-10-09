@@ -3,6 +3,9 @@ resolver = "2"
 members = ["crates/*", "terraphim_server", "desktop/src-tauri", "crates/terraphim_onepassword_cli", "crates/terraphim_tui"]
 default-members = ["terraphim_server"]
 
+[workspace.package]
+edition = "2024"
+
 [workspace.dependencies]
 # OpenRouter AI integration dependencies
 tokio = { version = "1.0", features = ["full"] }

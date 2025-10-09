@@ -210,7 +210,7 @@ pub struct GoalConflict {
 }
 
 /// Types of goal conflicts
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ConflictType {
     /// Resource conflicts
     Resource,
