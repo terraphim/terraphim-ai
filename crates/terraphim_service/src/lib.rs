@@ -1109,7 +1109,7 @@ impl TerraphimService {
         mut documents: Vec<Document>,
         role: &Role,
     ) -> Result<Vec<Document>> {
-        use crate::llm::{build_llm_for_summarization, SummarizeOptions};
+        use crate::llm::{build_llm_from_role, SummarizeOptions};
 
         log::debug!(
             "[DEBUGGER:enhance_ai:{}] enhance_descriptions_with_ai called for role '{}' with {} documents",
@@ -1127,7 +1127,7 @@ impl TerraphimService {
             config.default_model_provider
         );
 
-        let llm = match build_llm_for_summarization(role, Some(&config)) {
+        let llm = match build_llm_from_role(role) {
             Some(client) => {
                 log::debug!(
                     "[DEBUGGER:enhance_ai:{}] LLM client built successfully: {}",

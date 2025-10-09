@@ -8413,6 +8413,7 @@ dependencies = [
  "dircpy",
  "dotenv",
  "env_logger",
+ "futures-util",
  "log",
  "mime_guess",
  "portpicker",
@@ -8428,6 +8429,7 @@ dependencies = [
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
+ "terraphim_multi_agent",
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_service",
@@ -8442,6 +8444,7 @@ dependencies = [
  "ulid",
  "url 2.5.7",
  "urlencoding",
+ "uuid",
  "walkdir",
  "wiremock 0.6.4",
 ]
