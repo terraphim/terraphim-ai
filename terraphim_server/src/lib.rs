@@ -26,6 +26,14 @@ use tokio::sync::{broadcast::channel, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
+/// Application state for workflow execution
+#[derive(Clone)]
+pub struct AppState {
+    pub config_state: ConfigState,
+    pub workflow_sessions: Arc<workflows::WorkflowSessions>,
+    pub websocket_broadcaster: workflows::WebSocketBroadcaster,
+}
+
 /// Create a proper description from document content
 /// Collects multiple meaningful sentences to create informative descriptions
 fn create_document_description(content: &str) -> Option<String> {
@@ -118,6 +126,7 @@ fn create_document_description(content: &str) -> Option<String> {
 mod api;
 mod api_conversations;
 mod error;
+pub mod workflows;
 
 use api::{
     create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
@@ -436,8 +445,9 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
-        .route("/summarization/stream", get(api::stream_task_status))
-        .route("/summarization/stream/", get(api::stream_task_status))
+        // TODO: Re-enable streaming when stream_task_status is implemented
+        // .route("/summarization/stream", get(api::stream_task_status))
+        // .route("/summarization/stream/", get(api::stream_task_status))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))
@@ -495,18 +505,19 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
         // KG Context Management routes
-        .route(
-            "/conversations/{id}/context/kg/search",
-            get(api::search_kg_terms),
-        )
-        .route(
-            "/conversations/{id}/context/kg/term",
-            post(api::add_kg_term_context),
-        )
-        .route(
-            "/conversations/{id}/context/kg/index",
-            post(api::add_kg_index_context),
-        )
+        // TODO: Re-enable KG context routes when API functions are implemented
+        // .route(
+        //     "/conversations/{id}/context/kg/search",
+        //     get(api::search_kg_terms),
+        // )
+        // .route(
+        //     "/conversations/{id}/context/kg/term",
+        //     post(api::add_kg_term_context),
+        // )
+        // .route(
+        //     "/conversations/{id}/context/kg/index",
+        //     post(api::add_kg_index_context),
+        // )
         // Persistent conversation management routes (new)
         .route(
             "/api/conversations",
@@ -666,8 +677,9 @@ pub async fn build_router_for_tests() -> Router {
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
-        .route("/summarization/stream", get(api::stream_task_status))
-        .route("/summarization/stream/", get(api::stream_task_status))
+        // TODO: Re-enable streaming when stream_task_status is implemented
+        // .route("/summarization/stream", get(api::stream_task_status))
+        // .route("/summarization/stream/", get(api::stream_task_status))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))

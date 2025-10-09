@@ -80,12 +80,12 @@ pub(crate) async fn search_documents(
     log::debug!("search_document called with {:?}", search_query);
 
     let mut terraphim_service = TerraphimService::new(app_state.config_state);
-    let results = terraphim_service.search(&search_query.0).await?;
-    let total = results.len();
+    let search_result = terraphim_service.search(&search_query.0).await?;
+    let total = search_result.documents.len();
 
     Ok(Json(SearchResponse {
         status: Status::Success,
-        results,
+        results: search_result.documents,
         total,
     }))
 }
@@ -99,8 +99,8 @@ pub(crate) async fn search_documents_post(
     log::debug!("POST Searching documents with query: {search_query:?}");
 
     let mut terraphim_service = TerraphimService::new(app_state.config_state);
-    let results = terraphim_service.search(&search_query).await?;
-    let total = results.len();
+    let search_result = terraphim_service.search(&search_query).await?;
+    let total = search_result.documents.len();
 
     if total == 0 {
         log::debug!("No documents found");
@@ -110,7 +110,7 @@ pub(crate) async fn search_documents_post(
 
     Ok(Json(SearchResponse {
         status: Status::Success,
-        results,
+        results: search_result.documents,
         total,
     }))
 }
@@ -316,16 +316,16 @@ pub(crate) async fn find_documents_by_kg_term(
     let role_name = RoleName::new(&role_name);
     let mut terraphim_service = TerraphimService::new(app_state.config_state);
 
-    let results = terraphim_service
+    let search_result = terraphim_service
         .find_documents_for_kg_term(&role_name, &query.term)
         .await?;
-    let total = results.len();
+    let total = search_result.documents.len();
 
     log::debug!("Found {} documents for KG term '{}'", total, query.term);
 
     Ok(Json(SearchResponse {
         status: Status::Success,
-        results,
+        results: search_result.documents,
         total,
     }))
 }
