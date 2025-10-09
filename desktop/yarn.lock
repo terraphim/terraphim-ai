@@ -4717,10 +4717,10 @@ robust-predicates@^3.0.2:
   resolved "https://registry.npmjs.org/robust-predicates/-/robust-predicates-3.0.2.tgz"
   integrity sha512-IXgzBWvWQwE6PrDI05OvmXUIruQTcoMDzRsOd5CDvHCVLcLHMTSYvOK5Cm46kWqlV3yAbuSpBZdJ5oP5OUoStg==
 
-rollup-plugin-css-only@^4.5.2:
-  version "4.5.2"
-  resolved "https://registry.npmjs.org/rollup-plugin-css-only/-/rollup-plugin-css-only-4.5.2.tgz"
-  integrity sha512-7rj9+jB17Pz8LNcPgtMUb16JcgD8lxQMK9HcGfAVhMK3na/WXes3oGIo5QsrQQVqtgAU6q6KnQNXJrYunaUIQQ==
+rollup-plugin-css-only@^4.5.5:
+  version "4.5.5"
+  resolved "https://registry.yarnpkg.com/rollup-plugin-css-only/-/rollup-plugin-css-only-4.5.5.tgz#e13a8d5e1e2cf88af69457553297e986fa796b65"
+  integrity sha512-O2m2Sj8qsAtjUVqZyGTDXJypaOFFNV4knz8OlS6wJBws6XEICIiLsXmI56SbQEmWDqYU5TgRgWmslGj4THofJQ==
   dependencies:
     "@rollup/pluginutils" "5"
 
