@@ -89,7 +89,7 @@ fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Resu
     let connection = rusqlite::Connection::open(db_path).map_err(|e| {
         Error::OpenDal(Box::new(opendal::Error::new(
             opendal::ErrorKind::Unexpected,
-            &format!("Failed to open SQLite database '{}': {}", db_path, e),
+            format!("Failed to open SQLite database '{}': {}", db_path, e),
         )))
     })?;
 
@@ -99,7 +99,7 @@ fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Resu
         .map_err(|e| {
             Error::OpenDal(Box::new(opendal::Error::new(
                 opendal::ErrorKind::Unexpected,
-                &format!("Failed to enable WAL mode: {}", e),
+                format!("Failed to enable WAL mode: {}", e),
             )))
         })?;
 
@@ -109,7 +109,7 @@ fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Resu
         .map_err(|e| {
             Error::OpenDal(Box::new(opendal::Error::new(
                 opendal::ErrorKind::Unexpected,
-                &format!("Failed to set synchronous mode: {}", e),
+                format!("Failed to set synchronous mode: {}", e),
             )))
         })?;
 
@@ -122,7 +122,7 @@ fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Resu
     connection.execute(&create_table_sql, []).map_err(|e| {
         Error::OpenDal(Box::new(opendal::Error::new(
             opendal::ErrorKind::Unexpected,
-            &format!("Failed to create SQLite table '{}': {}", table_name, e),
+            format!("Failed to create SQLite table '{}': {}", table_name, e),
         )))
     })?;
 
@@ -188,7 +188,7 @@ pub async fn parse_profile(
                 std::fs::create_dir_all(root).map_err(|e| {
                     Error::OpenDal(Box::new(opendal::Error::new(
                         opendal::ErrorKind::Unexpected,
-                        &format!("Failed to create directory '{}': {}", root, e),
+                        format!("Failed to create directory '{}': {}", root, e),
                     )))
                 })?;
             }
@@ -199,9 +199,10 @@ pub async fn parse_profile(
                 .layer(LoggingLayer::default())
                 .finish()
         }
-        #[cfg(feature = "services-atomicserver")]
+        // atomicserver feature removed in opendal 0.54
         Scheme::Atomicserver => {
-            Operator::from_map::<services::Atomicserver>(profile.clone())?.finish()
+            log::warn!("Atomic Server not supported in opendal 0.54+");
+            create_memory_operator()?
         }
         Scheme::Gcs => {
             log::warn!("Google Cloud Storage not supported in this build");
@@ -216,7 +217,7 @@ pub async fn parse_profile(
             create_memory_operator()?
         }
         #[cfg(feature = "services-ipfs")]
-        Scheme::Ipfs => Operator::from_map::<services::Ipfs>(profile.clone())?.finish(),
+        Scheme::Ipfs => Operator::from_iter::<services::Ipfs>(profile.clone())?.finish(),
         Scheme::Ipmfs => {
             log::warn!("IPFS MFS not supported in this build");
             create_memory_operator()?
@@ -230,9 +231,9 @@ pub async fn parse_profile(
             create_memory_operator()?
         }
         #[cfg(feature = "services-redis")]
-        Scheme::Redis => Operator::from_map::<services::Redis>(profile.clone())?.finish(),
+        Scheme::Redis => Operator::from_iter::<services::Redis>(profile.clone())?.finish(),
         #[cfg(feature = "services-rocksdb")]
-        Scheme::Rocksdb => Operator::from_map::<services::Rocksdb>(profile.clone())?.finish(),
+        Scheme::Rocksdb => Operator::from_iter::<services::Rocksdb>(profile.clone())?.finish(),
         #[cfg(feature = "services-redb")]
         Scheme::Redb => {
             // Ensure parent directory exists for ReDB database file
@@ -243,13 +244,13 @@ pub async fn parse_profile(
                         std::fs::create_dir_all(&*parent_str).map_err(|e| {
                             Error::OpenDal(Box::new(opendal::Error::new(
                                 opendal::ErrorKind::Unexpected,
-                                &format!("Failed to create directory '{}': {}", parent_str, e),
+                                format!("Failed to create directory '{}': {}", parent_str, e),
                             )))
                         })?;
                     }
                 }
             }
-            Operator::from_map::<services::Redb>(profile.clone())?.finish()
+            Operator::from_iter::<services::Redb>(profile.clone())?.finish()
         }
         #[cfg(feature = "services-sqlite")]
         Scheme::Sqlite => {
@@ -258,7 +259,7 @@ pub async fn parse_profile(
                 std::fs::create_dir_all(datadir).map_err(|e| {
                     Error::OpenDal(Box::new(opendal::Error::new(
                         opendal::ErrorKind::Unexpected,
-                        &format!("Failed to create directory '{}': {}", datadir, e),
+                        format!("Failed to create directory '{}': {}", datadir, e),
                     )))
                 })?;
             }
@@ -284,10 +285,10 @@ pub async fn parse_profile(
                 sqlite_profile.insert("value_field".to_string(), "value".to_string());
             }
 
-            Operator::from_map::<services::Sqlite>(sqlite_profile)?.finish()
+            Operator::from_iter::<services::Sqlite>(sqlite_profile)?.finish()
         }
         #[cfg(feature = "s3")]
-        Scheme::S3 => match Operator::from_map::<services::S3>(profile.clone()) {
+        Scheme::S3 => match Operator::from_iter::<services::S3>(profile.clone()) {
             Ok(builder) => builder.finish(),
             Err(e) => {
                 log::warn!("Failed to create S3 operator: {:?}", e);
@@ -645,6 +646,7 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
 
         // Save document to each operator to verify they work
@@ -652,7 +654,7 @@ mod tests {
             let key = format!("document_{}.json", test_doc.id);
             let data = serde_json::to_string(&test_doc)?;
             match op.write(&key, data).await {
-                Ok(()) => log::info!("✅ Successfully saved test document to {}", name),
+                Ok(_metadata) => log::info!("✅ Successfully saved test document to {}", name),
                 Err(e) => log::warn!("Failed to save to {}: {:?}", name, e),
             }
         }

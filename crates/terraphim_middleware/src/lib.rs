@@ -10,8 +10,8 @@ pub mod thesaurus;
 pub use haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer};
 pub use indexer::{search_haystacks, RipgrepIndexer};
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests; // Removed - no tests module
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

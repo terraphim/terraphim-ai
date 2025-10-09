@@ -4,18 +4,25 @@ use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
 use terraphim_types::{RelevanceFunction, RoleName};
 
 fn create_test_role() -> Role {
-    let mut role = Role::new("Test");
-    role.shortname = Some("Test".to_string());
-    role.relevance_function = RelevanceFunction::TitleScorer;
-    role.theme = "default".to_string();
-    role.haystacks = vec![Haystack {
-        location: "test_data".to_string(),
-        service: ServiceType::Ripgrep,
-        read_only: true,
-        atomic_server_secret: None,
-        extra_parameters: std::collections::HashMap::new(),
-    }];
-    role
+    Role {
+        shortname: Some("Test".to_string()),
+        name: "Test".into(),
+        relevance_function: RelevanceFunction::TitleScorer,
+        terraphim_it: false,
+        theme: "default".to_string(),
+        kg: None,
+        haystacks: vec![Haystack {
+            location: "test_data".to_string(),
+            service: ServiceType::Ripgrep,
+            read_only: true,
+            atomic_server_secret: None,
+            extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
+            fetch_content: false,
+        }],
+        extra: ahash::AHashMap::new(),
+        ..Default::default()
+    }
 }
 
 fn create_test_config() -> terraphim_config::Config {
@@ -36,6 +43,8 @@ async fn test_indexer() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
     let indexer = RipgrepIndexer::default();
     let _index = indexer.index("test", &haystack).await.unwrap();
@@ -51,6 +60,8 @@ async fn test_search_graph() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
     let indexer = RipgrepIndexer::default();
     let _index = indexer.index("graph", &haystack).await.unwrap();
@@ -66,6 +77,8 @@ async fn test_search_machine_learning() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
 
     let indexer = RipgrepIndexer::default();
