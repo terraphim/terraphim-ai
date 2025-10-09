@@ -135,15 +135,18 @@ impl NarrativeMapperAgent {
             content
         };
 
-        let llm_response: LlmNarrativeMappingResponse =
-            serde_json::from_str(json_str).map_err(|e| {
+        // Try JSON parsing first
+        let llm_response: LlmNarrativeMappingResponse = match serde_json::from_str(json_str) {
+            Ok(response) => response,
+            Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content: {}", &content[..content.len().min(500)]);
-                TruthForgeError::ParseError(format!(
-                    "Failed to parse narrative mapping JSON: {}",
-                    e
-                ))
-            })?;
+                warn!("Raw content preview: {}", &content[..content.len().min(300)]);
+                info!("Attempting markdown fallback parsing...");
+
+                // Fallback to markdown parsing
+                return self.parse_mapping_from_markdown(content);
+            }
+        };
 
         let stakeholders: Vec<Stakeholder> = llm_response
             .stakeholders
@@ -183,6 +186,116 @@ impl NarrativeMapperAgent {
             scct_classification,
             attribution,
         })
+    }
+
+    fn parse_mapping_from_markdown(&self, content: &str) -> Result<NarrativeMapping> {
+        info!("Parsing narrative mapping from markdown format");
+
+        let mut stakeholders = Vec::new();
+        let mut scct_classification = SCCTClassification::Accidental;
+        let mut responsibility_level = "Medium".to_string();
+        let mut attribution_clarity = "Not specified".to_string();
+
+        // Parse stakeholders section
+        if let Some(stakeholders_section) = self.extract_section(content, "# Stakeholders") {
+            for line in stakeholders_section.lines() {
+                let line = line.trim();
+                if line.starts_with('-') || line.starts_with('*') {
+                    let line = line.trim_start_matches('-').trim_start_matches('*').trim();
+                    if !line.is_empty() {
+                        // Parse format: [Name] (Type: primary/secondary/influencer) - [Role]
+                        let parts: Vec<&str> = line.splitn(2, '-').collect();
+                        let name_type = parts.get(0).unwrap_or(&"").trim();
+                        let role = parts.get(1).map(|s| s.trim()).unwrap_or("Not specified");
+
+                        let name = if let Some(bracket_pos) = name_type.find('(') {
+                            name_type[..bracket_pos].trim()
+                        } else {
+                            name_type
+                        };
+
+                        stakeholders.push(Stakeholder {
+                            name: name.to_string(),
+                            role: role.to_string(),
+                            frame: "Extracted from markdown".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Parse SCCT Classification
+        if let Some(scct_section) = self.extract_section(content, "# SCCT Classification") {
+            let classification_line = scct_section.lines().next().unwrap_or("").trim().to_lowercase();
+            scct_classification = if classification_line.contains("victim") {
+                SCCTClassification::Victim
+            } else if classification_line.contains("preventable") {
+                SCCTClassification::Preventable
+            } else {
+                SCCTClassification::Accidental
+            };
+        }
+
+        // Parse Attribution Analysis
+        if let Some(attribution_section) = self.extract_section(content, "# Attribution Analysis") {
+            for line in attribution_section.lines() {
+                let line = line.trim();
+                if line.starts_with("**Responsibility Level:**") {
+                    responsibility_level = line
+                        .trim_start_matches("**Responsibility Level:**")
+                        .trim()
+                        .to_string();
+                } else if line.starts_with("**Accountability:**") {
+                    attribution_clarity = line
+                        .trim_start_matches("**Accountability:**")
+                        .trim()
+                        .to_string();
+                }
+            }
+        }
+
+        info!(
+            "Parsed markdown: {} stakeholders, classification: {:?}, responsibility: {}",
+            stakeholders.len(),
+            scct_classification,
+            responsibility_level
+        );
+
+        Ok(NarrativeMapping {
+            stakeholders,
+            scct_classification,
+            attribution: AttributionAnalysis {
+                responsibility_level,
+                attribution_type: "Markdown extracted".to_string(),
+                key_factors: vec!["Extracted from markdown response".to_string()],
+            },
+        })
+    }
+
+    fn extract_section(&self, content: &str, header: &str) -> Option<String> {
+        let lines: Vec<&str> = content.lines().collect();
+        let mut in_section = false;
+        let mut section_lines = Vec::new();
+
+        for line in lines {
+            if line.trim().starts_with(header) {
+                in_section = true;
+                continue;
+            }
+            if in_section {
+                // Stop at next section header
+                if line.trim().starts_with("# ") && !line.trim().starts_with(header) {
+                    break;
+                }
+                section_lines.push(line);
+            }
+        }
+
+        if section_lines.is_empty() {
+            None
+        } else {
+            Some(section_lines.join("\n"))
+        }
     }
 
     pub async fn map_narrative_mock(

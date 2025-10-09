@@ -273,11 +273,47 @@ Response:
 - 1Password CLI requires session authentication for service integration
 - Manual Caddy process running (PID 2736229) - systemd service ready for next restart
 
-### Next Steps (Phase 6)
-1. ⏳ **Configure API Key**: Set OPENROUTER_API_KEY for real LLM analysis
-2. ⏳ **Test with Real Backend**: Submit test narrative through UI
-3. ⏳ **User Acceptance Testing**: K-Partners pilot preparation
-4. ⏳ **Monitoring Setup**: Log aggregation and alerting
+### Phase 6 Complete Summary (2025-10-09) ✅
+
+**Public URL Deployment with Three Authentication Methods**:
+1. ✅ **Backend Running**: TruthForge backend on 127.0.0.1:8090 with OpenRouter API integration
+2. ✅ **Public Access**: https://alpha.truthforge.terraphim.cloud with three authentication methods
+3. ✅ **Caddy Systemd Service**: Running with EnvironmentFile properly loading GitHub secrets
+   - Service: `caddy-terraphim.service` (active and running)
+   - EnvironmentFile: `/home/alex/caddy_terraphim/caddy_complete.env`
+   - GitHub Client ID: `6182d53553cf86b0faf2` (verified loaded)
+   - Logs confirm: `"client_id":"6182d53553cf86b0faf2"` (not ERROR_REPLACEMENT)
+4. ✅ **Three Authentication Methods Configured**:
+   - **GitHub OAuth**: Working (HTTP 302 redirect verified)
+   - **Username/Password Basic Auth**: Configured with bcrypt hashed credentials
+   - **JWT Bearer Tokens**: Infrastructure complete with token generation script
+
+**Authentication Flow**:
+- User visits https://alpha.truthforge.terraphim.cloud
+- Caddy redirects to https://auth.terraphim.cloud/oauth2/github for OAuth
+- GitHub authentication → JWT token issued by Caddy
+- JWT token stored in browser cookie (domain: .terraphim.cloud)
+- Subsequent API calls include JWT token automatically via `credentials: 'include'`
+- Caddy validates token and proxies to backend at 127.0.0.1:8090
+
+**Configuration Files**:
+- `/home/alex/caddy_terraphim/conf/Caddyfile_auth` - Caddy OAuth + JWT + Basic Auth configuration
+- `/home/alex/caddy_terraphim/caddy_complete.env` - GitHub secrets (loaded via systemd EnvironmentFile)
+- `/etc/systemd/system/caddy-terraphim.service` - Caddy systemd service with EnvironmentFile
+- `/home/alex/.config/systemd/user/truthforge-backend.service` - Backend systemd service
+- `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/AUTH_GUIDE.md` - Authentication guide
+- `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/DEPLOYMENT_SUMMARY.md` - Complete deployment docs
+
+**Logs**:
+- Backend: `/home/alex/truthforge-backend.log`
+- Caddy: `/home/alex/caddy_terraphim/log/truthforge-alpha.log`
+- Systemd: `sudo journalctl -u caddy-terraphim.service -f`
+
+### Next Steps (Phase 7)
+1. ⏳ **End-to-End Testing**: Test full workflow via public URL with authenticated user
+2. ⏳ **User Acceptance Testing**: K-Partners pilot preparation
+3. ⏳ **Monitoring Setup**: Log aggregation and alerting
+4. ⏳ **Documentation**: Update memories.md and lessons-learned.md with Phase 6 completion
 
 ### Validation Checklist
 - [x] UI matches agent-workflows pattern (vanilla JS, no framework)
@@ -287,17 +323,22 @@ Response:
 - [x] README.md updated with correct deployment instructions
 - [x] Deployed to bigbox (production)
 - [x] Backend service running on port 8090
-- [x] Caddy configuration complete with auth
+- [x] Caddy configuration complete with three auth methods (OAuth, Basic Auth, JWT)
 - [x] auth.terraphim.cloud functioning correctly
-- [x] GitHub OAuth credentials loaded via EnvironmentFile
+- [x] GitHub OAuth credentials loaded via systemd EnvironmentFile
+- [x] Caddy systemd service running with GitHub secrets properly loaded
+- [x] GitHub Client ID verified: 6182d53553cf86b0faf2 (not ERROR_REPLACEMENT)
+- [x] OAuth redirect working (HTTP 302 to auth.terraphim.cloud/oauth2/github)
 - [x] Correct TruthForge-enabled backend compiled and deployed
 - [x] Health endpoint returns JSON (verified)
 - [x] TruthForge API workflow tested end-to-end with mock LLM
-- [x] Systemd services created (backend + Caddy)
-- [x] Scratchpad.md updated with deployment complete
-- [ ] OPENROUTER_API_KEY configured (pending)
-- [ ] End-to-end workflow tested with real LLM (pending)
-- [ ] Documentation updated (memories.md, lessons-learned.md)
+- [x] Systemd services created and running (backend + Caddy)
+- [x] Scratchpad.md updated with Phase 6 complete
+- [x] OPENROUTER_API_KEY configured in systemd service
+- [x] JWT bearer token infrastructure complete
+- [x] Public hostname exposed (alpha.truthforge.terraphim.cloud)
+- [ ] End-to-end workflow tested with real LLM via public URL (pending)
+- [ ] Documentation updated (memories.md, lessons-learned.md with Phase 6)
 # Current Work: Terraphim Multi-Role Agent System Testing & Production 🚀
 
 ## **CURRENT STATUS: VM Execution System Complete - All Tests and Documentation Delivered** ✅

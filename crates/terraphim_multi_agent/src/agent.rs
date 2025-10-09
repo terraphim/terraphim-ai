@@ -1007,7 +1007,7 @@ impl TerraphimAgent {
     }
 
     /// Enhanced context enrichment using rolegraph and haystack search
-    async fn get_enriched_context_for_query(&self, query: &str) -> MultiAgentResult<String> {
+    pub async fn get_enriched_context_for_query(&self, query: &str) -> MultiAgentResult<String> {
         let mut enriched_context = String::new();
 
         // 1. Get knowledge graph node IDs that match the query

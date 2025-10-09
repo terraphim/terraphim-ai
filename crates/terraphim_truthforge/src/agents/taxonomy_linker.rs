@@ -142,12 +142,15 @@ impl TaxonomyLinkerAgent {
             content
         };
 
-        let llm_response: LlmTaxonomyLinkingResponse =
-            serde_json::from_str(json_str).map_err(|e| {
+        let llm_response: LlmTaxonomyLinkingResponse = match serde_json::from_str(json_str) {
+            Ok(response) => response,
+            Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content: {}", &content[..content.len().min(500)]);
-                TruthForgeError::ParseError(format!("Failed to parse taxonomy linking JSON: {}", e))
-            })?;
+                warn!("Raw content preview: {}", &content[..content.len().min(200)]);
+                info!("Falling back to markdown parsing");
+                return self.parse_linking_from_markdown(content);
+            }
+        };
 
         let primary_function = llm_response
             .primary_function
@@ -176,6 +179,108 @@ impl TaxonomyLinkerAgent {
             primary_function,
             secondary_functions,
             subfunctions: llm_response.subfunctions,
+            lifecycle_stage,
+            recommended_playbooks,
+        })
+    }
+
+    fn parse_linking_from_markdown(&self, content: &str) -> Result<TaxonomyLinking> {
+        info!("Parsing taxonomy linking from markdown format");
+        let mut primary_function = "issue_crisis_management".to_string();
+        let mut secondary_functions = Vec::new();
+        let mut subfunctions = Vec::new();
+        let mut lifecycle_stage = "assess_and_classify".to_string();
+        let mut recommended_playbooks = Vec::new();
+
+        for line in content.lines() {
+            let line = line.trim();
+            let lower = line.to_lowercase();
+
+            // Extract primary function/domain
+            if lower.contains("primary") && (lower.contains("function") || lower.contains("domain")) {
+                if let Some(value) = line.split(':').nth(1) {
+                    let value = value.trim().trim_matches('"').to_string();
+                    if !value.is_empty() && value.len() < 100 {
+                        primary_function = value;
+                    }
+                }
+            }
+            // Extract secondary functions
+            else if lower.contains("secondary") && lower.contains("function") {
+                if let Some(value) = line.split(':').nth(1) {
+                    let value = value.trim();
+                    // Handle both array format and comma-separated
+                    for func in value.split(',') {
+                        let func = func.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+                        if !func.is_empty() && func.len() < 100 {
+                            secondary_functions.push(func.to_string());
+                        }
+                    }
+                }
+            }
+            // Extract subfunctions
+            else if lower.contains("subfunction") {
+                if let Some(value) = line.split(':').nth(1) {
+                    let value = value.trim();
+                    for subf in value.split(',') {
+                        let subf = subf.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+                        if !subf.is_empty() && subf.len() < 100 {
+                            subfunctions.push(subf.to_string());
+                        }
+                    }
+                }
+            }
+            // Extract lifecycle stage
+            else if lower.contains("lifecycle") && lower.contains("stage") {
+                if let Some(value) = line.split(':').nth(1) {
+                    let value = value.trim().trim_matches('"').to_string();
+                    if !value.is_empty() && value.len() < 100 {
+                        lifecycle_stage = value;
+                    }
+                }
+            }
+            // Extract recommended playbooks
+            else if lower.contains("playbook") {
+                if let Some(value) = line.split(':').nth(1) {
+                    let value = value.trim();
+                    for playbook in value.split(',') {
+                        let playbook = playbook.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+                        if !playbook.is_empty() && playbook.len() < 200 {
+                            recommended_playbooks.push(playbook.to_string());
+                        }
+                    }
+                }
+                // Also extract playbooks from lines like "- Playbook Name"
+                else if line.starts_with('-') || line.starts_with('*') {
+                    let playbook = line.trim_start_matches(|c| c == '-' || c == '*' || c == ' ');
+                    if !playbook.is_empty() && playbook.len() < 200 {
+                        recommended_playbooks.push(playbook.to_string());
+                    }
+                }
+            }
+        }
+
+        // Ensure we have at least one subfunction
+        if subfunctions.is_empty() {
+            subfunctions.push("risk_assessment".to_string());
+        }
+
+        // Ensure we have at least one playbook
+        if recommended_playbooks.is_empty() {
+            recommended_playbooks.push("SCCT_response_matrix".to_string());
+        }
+
+        info!(
+            "Extracted taxonomy from markdown: primary={}, {} subfunctions, stage={}",
+            primary_function,
+            subfunctions.len(),
+            lifecycle_stage
+        );
+
+        Ok(TaxonomyLinking {
+            primary_function,
+            secondary_functions,
+            subfunctions,
             lifecycle_stage,
             recommended_playbooks,
         })

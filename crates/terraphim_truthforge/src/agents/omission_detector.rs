@@ -187,12 +187,18 @@ impl OmissionDetectorAgent {
             content
         };
 
-        let llm_omissions: Vec<LlmOmissionResponse> =
-            serde_json::from_str(json_str).map_err(|e| {
+        // Try JSON parsing first
+        let llm_omissions: Vec<LlmOmissionResponse> = match serde_json::from_str(json_str) {
+            Ok(omissions) => omissions,
+            Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content: {}", &content[..content.len().min(500)]);
-                TruthForgeError::ParseError(format!("Failed to parse omissions JSON: {}", e))
-            })?;
+                warn!("Raw content preview: {}", &content[..content.len().min(300)]);
+                info!("Attempting markdown fallback parsing...");
+
+                // Fallback to markdown parsing
+                return self.parse_omissions_from_markdown(content);
+            }
+        };
 
         let omissions: Vec<Omission> = llm_omissions
             .into_iter()
@@ -298,6 +304,222 @@ impl OmissionDetectorAgent {
 
         let catalog = OmissionCatalog::new(omissions);
         Ok(catalog)
+    }
+
+    fn parse_omissions_from_markdown(&self, content: &str) -> Result<Vec<Omission>> {
+        info!("Parsing omissions from markdown format");
+
+        let mut omissions = Vec::new();
+
+        // Parse omissions by looking for numbered sections or headers
+        if let Some(omissions_section) = self.extract_section(content, "# Omissions Detected") {
+            let mut current_omission = OmissionBuilder::default();
+            let mut has_content = false;
+
+            for line in omissions_section.lines() {
+                let line = line.trim();
+
+                // Check for omission number or bullet point
+                if line.starts_with("##") || line.starts_with("**Omission") {
+                    // Save previous omission if we have one
+                    if has_content {
+                        if let Some(omission) = current_omission.build() {
+                            omissions.push(omission);
+                        }
+                        current_omission = OmissionBuilder::default();
+                        has_content = false;
+                    }
+                    has_content = true;
+                    continue;
+                }
+
+                // Extract category
+                if line.starts_with("**Category:**") || line.starts_with("Category:") {
+                    let category_str = line
+                        .trim_start_matches("**Category:**")
+                        .trim_start_matches("Category:")
+                        .trim();
+                    current_omission.category = Some(self.parse_category(category_str));
+                }
+
+                // Extract description
+                if line.starts_with("**Description:**") || line.starts_with("Description:") {
+                    let desc = line
+                        .trim_start_matches("**Description:**")
+                        .trim_start_matches("Description:")
+                        .trim();
+                    current_omission.description = Some(desc.to_string());
+                } else if has_content && !line.is_empty() && !line.starts_with("**") && current_omission.description.is_none() {
+                    current_omission.description = Some(line.to_string());
+                }
+
+                // Extract severity
+                if line.starts_with("**Severity:**") || line.starts_with("Severity:") {
+                    if let Some(value) = self.extract_float(line) {
+                        current_omission.severity = Some(value);
+                    }
+                }
+
+                // Extract exploitability
+                if line.starts_with("**Exploitability:**") || line.starts_with("Exploitability:") {
+                    if let Some(value) = self.extract_float(line) {
+                        current_omission.exploitability = Some(value);
+                    }
+                }
+
+                // Extract confidence
+                if line.starts_with("**Confidence:**") || line.starts_with("Confidence:") {
+                    if let Some(value) = self.extract_float(line) {
+                        current_omission.confidence = Some(value);
+                    }
+                }
+
+                // Extract text reference
+                if line.starts_with("**Text Reference:**") || line.starts_with("Text Reference:") {
+                    let text = line
+                        .trim_start_matches("**Text Reference:**")
+                        .trim_start_matches("Text Reference:")
+                        .trim();
+                    current_omission.text_reference = Some(text.to_string());
+                }
+
+                // Extract suggested addition
+                if line.starts_with("**Suggested Addition:**") || line.starts_with("Suggested Addition:") {
+                    let text = line
+                        .trim_start_matches("**Suggested Addition:**")
+                        .trim_start_matches("Suggested Addition:")
+                        .trim();
+                    current_omission.suggested_addition = Some(text.to_string());
+                }
+            }
+
+            // Don't forget the last omission
+            if has_content {
+                if let Some(omission) = current_omission.build() {
+                    omissions.push(omission);
+                }
+            }
+        }
+
+        // If we didn't find any omissions in the structured format, try a simpler parse
+        if omissions.is_empty() {
+            warn!("No structured omissions found, creating a single omission from content");
+            omissions.push(Omission {
+                id: uuid::Uuid::new_v4(),
+                category: OmissionCategory::ContextGap,
+                description: content.chars().take(500).collect(),
+                severity: 0.5,
+                exploitability: 0.5,
+                composite_risk: 0.25,
+                text_reference: "Extracted from markdown response".to_string(),
+                confidence: 0.5,
+                suggested_addition: Some("LLM response did not follow expected format".to_string()),
+            });
+        }
+
+        info!(
+            "Parsed {} omissions from markdown: {:?}",
+            omissions.len(),
+            omissions.iter().map(|o| &o.category).collect::<Vec<_>>()
+        );
+
+        Ok(omissions)
+    }
+
+    fn extract_section(&self, content: &str, header: &str) -> Option<String> {
+        let lines: Vec<&str> = content.lines().collect();
+        let mut in_section = false;
+        let mut section_lines = Vec::new();
+
+        for line in lines {
+            if line.trim().starts_with(header) {
+                in_section = true;
+                continue;
+            }
+            if in_section {
+                // Stop at next section header
+                if line.trim().starts_with("# ") && !line.trim().starts_with(header) {
+                    break;
+                }
+                section_lines.push(line);
+            }
+        }
+
+        if section_lines.is_empty() {
+            None
+        } else {
+            Some(section_lines.join("\n"))
+        }
+    }
+
+    fn parse_category(&self, category_str: &str) -> OmissionCategory {
+        let category_lower = category_str.to_lowercase();
+        if category_lower.contains("evidence") {
+            OmissionCategory::MissingEvidence
+        } else if category_lower.contains("assumption") {
+            OmissionCategory::UnstatedAssumption
+        } else if category_lower.contains("stakeholder") {
+            OmissionCategory::AbsentStakeholder
+        } else if category_lower.contains("context") {
+            OmissionCategory::ContextGap
+        } else if category_lower.contains("counter") {
+            OmissionCategory::UnaddressedCounterargument
+        } else {
+            warn!("Unknown category '{}', defaulting to ContextGap", category_str);
+            OmissionCategory::ContextGap
+        }
+    }
+
+    fn extract_float(&self, line: &str) -> Option<f64> {
+        // Try to extract a float from the line (e.g., "Severity: 0.85" or "Severity: 85%")
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() < 2 {
+            return None;
+        }
+
+        let value_str = parts[1].trim().replace("%", "");
+        if let Ok(mut value) = value_str.parse::<f64>() {
+            // If value is > 1, assume it's a percentage and divide by 100
+            if value > 1.0 {
+                value = value / 100.0;
+            }
+            Some(value.clamp(0.0, 1.0))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Default)]
+struct OmissionBuilder {
+    category: Option<OmissionCategory>,
+    description: Option<String>,
+    severity: Option<f64>,
+    exploitability: Option<f64>,
+    confidence: Option<f64>,
+    text_reference: Option<String>,
+    suggested_addition: Option<String>,
+}
+
+impl OmissionBuilder {
+    fn build(self) -> Option<Omission> {
+        let category = self.category.unwrap_or(OmissionCategory::ContextGap);
+        let description = self.description?;
+        let severity = self.severity.unwrap_or(0.5).clamp(0.0, 1.0);
+        let exploitability = self.exploitability.unwrap_or(0.5).clamp(0.0, 1.0);
+        let confidence = self.confidence.unwrap_or(0.7).clamp(0.0, 1.0);
+
+        Some(Omission {
+            id: uuid::Uuid::new_v4(),
+            category,
+            description,
+            severity,
+            exploitability,
+            composite_risk: (severity * exploitability).clamp(0.0, 1.0),
+            text_reference: self.text_reference.unwrap_or_else(|| "Extracted from markdown".to_string()),
+            confidence,
+            suggested_addition: self.suggested_addition,
+        })
     }
 }
 

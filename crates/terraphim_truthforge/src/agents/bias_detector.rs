@@ -164,11 +164,16 @@ impl BiasDetectorAgent {
             content
         };
 
-        let llm_response: LlmBiasResponse = serde_json::from_str(json_str).map_err(|e| {
-            warn!("Failed to parse LLM response as JSON: {}", e);
-            warn!("Raw content: {}", &content[..content.len().min(500)]);
-            TruthForgeError::ParseError(format!("Failed to parse bias JSON: {}", e))
-        })?;
+        // Try JSON parsing first
+        let llm_response: LlmBiasResponse = match serde_json::from_str(json_str) {
+            Ok(response) => response,
+            Err(e) => {
+                warn!("Failed to parse LLM response as JSON: {}", e);
+                warn!("Raw content preview: {}", &content[..content.len().min(200)]);
+                info!("Falling back to markdown parsing");
+                return self.parse_bias_from_markdown(content);
+            }
+        };
 
         let biases: Vec<BiasPattern> = llm_response
             .biases
@@ -193,6 +198,109 @@ impl BiasDetectorAgent {
         Ok(BiasAnalysis {
             biases,
             overall_bias_score,
+            confidence,
+        })
+    }
+
+    fn parse_bias_from_markdown(&self, content: &str) -> Result<BiasAnalysis> {
+        info!("Parsing bias analysis from markdown format");
+        let mut biases = Vec::new();
+        let mut overall_score = 0.6; // Default moderate bias
+
+        // Look for "Overall Bias Score:" or similar
+        for line in content.lines() {
+            if line.to_lowercase().contains("overall") && line.to_lowercase().contains("score") {
+                // Try to extract score from line like "Overall Bias Score: 0.7" or "Overall Score: 70%"
+                if let Some(score_str) = line.split(':').nth(1) {
+                    let score_str = score_str.trim().replace('%', "");
+                    if let Ok(score) = score_str.parse::<f64>() {
+                        overall_score = if score > 1.0 { score / 100.0 } else { score };
+                        overall_score = overall_score.clamp(0.0, 1.0);
+                    }
+                }
+            }
+        }
+
+        // Extract bias patterns from markdown sections
+        let mut current_type = String::new();
+        let mut current_text = String::new();
+        let mut current_explanation = String::new();
+        let mut in_explanation = false;
+
+        for line in content.lines() {
+            let line = line.trim();
+
+            // Check for bias type headers (like "1. Loaded Language:" or "### Loaded Language")
+            if line.starts_with('#') || (line.chars().next().map(|c| c.is_numeric()).unwrap_or(false) && line.contains(':')) {
+                // Save previous bias if we have one
+                if !current_type.is_empty() && !current_text.is_empty() {
+                    biases.push(BiasPattern {
+                        bias_type: current_type.clone(),
+                        text: current_text.clone(),
+                        explanation: current_explanation.clone(),
+                    });
+                }
+
+                // Extract new type
+                current_type = line
+                    .trim_start_matches(|c: char| c.is_numeric() || c == '.' || c == ' ' || c == '#')
+                    .split(':')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                current_text = String::new();
+                current_explanation = String::new();
+                in_explanation = false;
+            }
+            // Check for "Text:" or "Quote:"
+            else if line.to_lowercase().starts_with("text:") || line.to_lowercase().starts_with("quote:") {
+                current_text = line.split(':').nth(1).unwrap_or("").trim().trim_matches('"').to_string();
+            }
+            // Check for "Explanation:"
+            else if line.to_lowercase().starts_with("explanation:") {
+                current_explanation = line.split(':').nth(1).unwrap_or("").trim().to_string();
+                in_explanation = true;
+            }
+            // Continue explanation if we're in it
+            else if in_explanation && !line.is_empty() && !line.starts_with("**") {
+                if !current_explanation.is_empty() {
+                    current_explanation.push(' ');
+                }
+                current_explanation.push_str(line);
+            }
+        }
+
+        // Add the last bias if we have one
+        if !current_type.is_empty() && !current_text.is_empty() {
+            biases.push(BiasPattern {
+                bias_type: current_type,
+                text: current_text,
+                explanation: current_explanation,
+            });
+        }
+
+        // If we couldn't extract any structured biases, create a generic one from the content
+        if biases.is_empty() {
+            warn!("Could not extract structured bias patterns from markdown, creating generic pattern");
+            biases.push(BiasPattern {
+                bias_type: "General Bias".to_string(),
+                text: "See full analysis".to_string(),
+                explanation: content[..content.len().min(500)].to_string(),
+            });
+        }
+
+        let confidence = if biases.len() > 1 { 0.75 } else { 0.6 };
+
+        info!(
+            "Extracted {} bias patterns from markdown (overall score: {:.2})",
+            biases.len(),
+            overall_score
+        );
+
+        Ok(BiasAnalysis {
+            biases,
+            overall_bias_score: overall_score,
             confidence,
         })
     }

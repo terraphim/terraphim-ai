@@ -1624,23 +1624,39 @@ impl ResponseGenerator {
         omission_catalog: &OmissionCatalog,
     ) -> Result<ResponseStrategy> {
         let content = content.trim();
-        let json_str = if content.starts_with("```json") {
-            content
-                .trim_start_matches("```json")
-                .trim_end_matches("```")
-                .trim()
-        } else if content.starts_with("```") {
-            content
-                .trim_start_matches("```")
-                .trim_end_matches("```")
-                .trim()
+
+        // Try to extract JSON from response (Python-style)
+        let json_str = if let Some(json_start) = content.find('{') {
+            if let Some(json_end) = content.rfind('}') {
+                if json_end > json_start {
+                    &content[json_start..=json_end]
+                } else {
+                    content
+                }
+            } else {
+                content
+            }
         } else {
             content
         };
 
-        let llm_response: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
-            TruthForgeError::ParseError(format!("Failed to parse response strategy JSON: {}", e))
-        })?;
+        // Try to parse as JSON, fallback to text extraction if it fails
+        let llm_response: serde_json::Value = match serde_json::from_str(json_str) {
+            Ok(json) => json,
+            Err(e) => {
+                warn!("Failed to parse response strategy JSON. Content preview: {}",
+                      &content[..content.len().min(200)]);
+                warn!("Falling back to markdown-based strategy extraction");
+
+                // Parse structured markdown content
+                return self.parse_response_strategy_from_markdown(
+                    content,
+                    strategy_type,
+                    tone_guidance,
+                    omission_catalog,
+                );
+            }
+        };
 
         let revised_narrative = llm_response["revised_narrative"]
             .as_str()
@@ -1762,6 +1778,170 @@ impl ResponseGenerator {
             tone_guidance,
             vulnerabilities_addressed,
         })
+    }
+
+    fn parse_response_strategy_from_markdown(
+        &self,
+        content: &str,
+        strategy_type: StrategyType,
+        tone_guidance: ToneGuidance,
+        omission_catalog: &OmissionCatalog,
+    ) -> Result<ResponseStrategy> {
+        info!("Parsing response strategy from markdown format");
+
+        let mut strategic_rationale = String::new();
+        let mut social_media = String::new();
+        let mut press_statement = String::new();
+        let mut internal_memo = String::new();
+        let mut qa_brief = Vec::new();
+        let mut potential_backfire = Vec::new();
+
+        let mut current_section = String::new();
+        let mut current_content = String::new();
+
+        // Extract intro/rationale from first paragraph
+        let first_para_end = content.find("\n\n").unwrap_or(content.len().min(500));
+        strategic_rationale = content[..first_para_end].to_string();
+
+        for line in content.lines() {
+            let line = line.trim();
+            let lower = line.to_lowercase();
+
+            // Detect section headers
+            if line.starts_with('#') || line.starts_with("**") && line.ends_with("**") ||
+               (line.chars().next().map(|c| c.is_numeric()).unwrap_or(false) && line.contains('.')) {
+
+                // Save previous section content
+                if !current_section.is_empty() && !current_content.is_empty() {
+                    self.assign_section_content(&current_section, &current_content,
+                        &mut social_media, &mut press_statement, &mut internal_memo,
+                        &mut qa_brief, &mut potential_backfire);
+                }
+
+                // Start new section
+                current_section = line.trim_matches(|c: char| c == '#' || c == '*' || c.is_numeric() || c == '.' || c == ' ').to_lowercase();
+                current_content = String::new();
+            }
+            // Extract Q&A pairs
+            else if line.starts_with("Q:") || lower.starts_with("question:") {
+                let question = line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().to_string();
+                // Next line should be answer
+                current_content.push_str(&format!("Q: {}\n", question));
+            }
+            else if line.starts_with("A:") || lower.starts_with("answer:") {
+                let answer = line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().to_string();
+                current_content.push_str(&format!("A: {}\n", answer));
+                // Try to extract as Q&A pair from recent content
+                let recent_lines: Vec<&str> = current_content.lines().rev().take(2).collect();
+                if recent_lines.len() >= 2 {
+                    let last_two = format!("{}\n{}", recent_lines[1], recent_lines[0]);
+                    if let Some(qa_text) = last_two.strip_prefix("Q: ") {
+                        if let Some((q, a)) = qa_text.split_once("\nA: ") {
+                            qa_brief.push(QAPair {
+                                question: q.to_string(),
+                                answer: a.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+            // Collect content for current section
+            else if !line.is_empty() && !current_section.is_empty() {
+                if !current_content.is_empty() {
+                    current_content.push('\n');
+                }
+                current_content.push_str(line);
+            }
+        }
+
+        // Save last section
+        if !current_section.is_empty() && !current_content.is_empty() {
+            self.assign_section_content(&current_section, &current_content,
+                &mut social_media, &mut press_statement, &mut internal_memo,
+                &mut qa_brief, &mut potential_backfire);
+        }
+
+        // Use defaults if sections weren't found
+        if social_media.is_empty() {
+            social_media = content[..content.len().min(280)].to_string();
+        }
+        if press_statement.is_empty() {
+            press_statement = content[..content.len().min(1000)].to_string();
+        }
+        if internal_memo.is_empty() {
+            internal_memo = "See full analysis for internal guidance".to_string();
+        }
+        if potential_backfire.is_empty() {
+            potential_backfire.push("Markdown parsing fallback - manual review recommended".to_string());
+        }
+
+        let vulnerabilities_count = match strategy_type {
+            StrategyType::Reframe => 3,
+            StrategyType::CounterArgue => 5,
+            StrategyType::Bridge => 4,
+        };
+
+        let media_risk = match strategy_type {
+            StrategyType::Reframe => 0.4,
+            StrategyType::CounterArgue => 0.7,
+            StrategyType::Bridge => 0.3,
+        };
+
+        info!("Extracted {} sections from markdown, {} Q&A pairs",
+              vec![&social_media, &press_statement, &internal_memo].iter().filter(|s| !s.is_empty()).count(),
+              qa_brief.len());
+
+        Ok(ResponseStrategy {
+            strategy_type,
+            strategic_rationale,
+            drafts: ResponseDrafts {
+                social_media,
+                press_statement,
+                internal_memo,
+                qa_brief,
+            },
+            risk_assessment: RiskAssessment {
+                potential_backfire,
+                stakeholder_reaction: StakeholderReaction {
+                    supporters: "Will appreciate thoughtful approach".to_string(),
+                    skeptics: "May remain unconvinced".to_string(),
+                    media: "Moderate coverage expected".to_string(),
+                },
+                media_amplification_risk: media_risk,
+            },
+            tone_guidance,
+            vulnerabilities_addressed: omission_catalog.prioritized.iter().take(vulnerabilities_count).copied().collect(),
+        })
+    }
+
+    fn assign_section_content(
+        &self,
+        section: &str,
+        content: &str,
+        social_media: &mut String,
+        press_statement: &mut String,
+        internal_memo: &mut String,
+        qa_brief: &mut Vec<QAPair>,
+        potential_backfire: &mut Vec<String>,
+    ) {
+        let section_lower = section.to_lowercase();
+
+        if section_lower.contains("social") || section_lower.contains("talking point") || section_lower.contains("rapid response") {
+            *social_media = content.to_string();
+        } else if section_lower.contains("rebuttal") || section_lower.contains("press") || section_lower.contains("statement") {
+            *press_statement = content.to_string();
+        } else if section_lower.contains("memo") || section_lower.contains("stakeholder") || section_lower.contains("engagement") || section_lower.contains("bridge") || section_lower.contains("letter") {
+            *internal_memo = content.to_string();
+        } else if section_lower.contains("q&a") || section_lower.contains("question") {
+            // Q&A pairs should be extracted during line-by-line parsing
+        } else if section_lower.contains("risk") || section_lower.contains("backfire") || section_lower.contains("caution") {
+            for line in content.lines() {
+                let line = line.trim().trim_start_matches(|c: char| c == '-' || c == '*' || c == ' ');
+                if !line.is_empty() && line.len() < 500 {
+                    potential_backfire.push(line.to_string());
+                }
+            }
+        }
     }
 
     async fn generate_reframe_strategy_mock(

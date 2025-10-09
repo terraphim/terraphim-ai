@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     error::{Result, Status},
+    truthforge_context::TruthForgeContextEnricher,
     workflows::WebSocketMessage,
     AppState,
 };
@@ -102,7 +103,7 @@ pub async fn analyze_narrative(
 
     let session_id = Uuid::new_v4();
 
-    let narrative = NarrativeInput {
+    let mut narrative = NarrativeInput {
         session_id,
         text: request.text,
         context: NarrativeContext {
@@ -114,6 +115,131 @@ pub async fn analyze_narrative(
         },
         submitted_at: chrono::Utc::now(),
     };
+
+    // Enrich narrative with semantic context from Terraphim knowledge graph
+    log::info!("TruthForge: Enriching narrative with Terraphim context management...");
+
+    // Create persistence for context enrichment
+    let persistence = match terraphim_persistence::DeviceStorage::arc_memory_only().await {
+        Ok(storage) => storage,
+        Err(e) => {
+            log::warn!("TruthForge: Failed to create persistence: {}, skipping context enrichment", e);
+            // Continue without enrichment - use original narrative
+            log::info!("TruthForge: Checking for OPENROUTER_API_KEY environment variable...");
+            let api_key_present = std::env::var("OPENROUTER_API_KEY").is_ok();
+            log::info!(
+                "TruthForge: OPENROUTER_API_KEY present: {}",
+                api_key_present
+            );
+
+            let llm_client = if api_key_present {
+                log::info!("TruthForge: Attempting to create OpenRouter client...");
+                match GenAiLlmClient::new_openrouter(None) {
+                    Ok(client) => {
+                        log::info!("TruthForge: Successfully created OpenRouter LLM client");
+                        Some(Arc::new(client))
+                    }
+                    Err(e) => {
+                        log::error!("TruthForge: Failed to create OpenRouter client: {}", e);
+                        None
+                    }
+                }
+            } else {
+                log::warn!("TruthForge: OPENROUTER_API_KEY not set, using mock implementation");
+                None
+            };
+
+            let workflow = if let Some(client) = llm_client {
+                TwoPassDebateWorkflow::new().with_llm_client(client)
+            } else {
+                TwoPassDebateWorkflow::new()
+            };
+
+            let session_store = app_state.truthforge_sessions.clone();
+            let broadcaster = app_state.websocket_broadcaster.clone();
+
+            tokio::spawn(async move {
+                emit_progress(
+                    &broadcaster,
+                    session_id,
+                    "started",
+                    serde_json::json!({
+                        "message": "Analysis workflow initiated",
+                        "narrative_length": narrative.text.len()
+                    }),
+                );
+
+                match workflow.execute(&narrative).await {
+                    Ok(result) => {
+                        log::info!(
+                            "TruthForge analysis complete for session {}: {} omissions, {} strategies",
+                            session_id,
+                            result.omission_catalog.omissions.len(),
+                            result.response_strategies.len()
+                        );
+
+                        emit_progress(
+                            &broadcaster,
+                            session_id,
+                            "completed",
+                            serde_json::json!({
+                                "omissions_count": result.omission_catalog.omissions.len(),
+                                "strategies_count": result.response_strategies.len(),
+                                "total_risk_score": result.omission_catalog.total_risk_score,
+                                "processing_time_ms": result.processing_time_ms
+                            }),
+                        );
+
+                        session_store.store(result).await;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "TruthForge analysis failed for session {}: {}",
+                            session_id,
+                            e
+                        );
+
+                        emit_progress(
+                            &broadcaster,
+                            session_id,
+                            "failed",
+                            serde_json::json!({
+                                "error": e.to_string()
+                            }),
+                        );
+                    }
+                }
+            });
+
+            return Ok(Json(AnalyzeNarrativeResponse {
+                status: Status::Success,
+                session_id,
+                analysis_url: format!("/api/v1/truthforge/{}", session_id),
+            }));
+        }
+    };
+
+    let enricher = TruthForgeContextEnricher::new(
+        Arc::new(app_state.config_state.clone()),
+        persistence,
+    );
+
+    match enricher.enrich_narrative(&mut narrative).await {
+        Ok(enriched_text) => {
+            log::info!(
+                "TruthForge: Context enrichment successful ({} chars → {} chars)",
+                narrative.text.len(),
+                enriched_text.len()
+            );
+            narrative.text = enriched_text;
+        }
+        Err(e) => {
+            log::warn!(
+                "TruthForge: Context enrichment failed, using original narrative: {}",
+                e
+            );
+        }
+    }
 
     log::info!("TruthForge: Checking for OPENROUTER_API_KEY environment variable...");
     let api_key_present = std::env::var("OPENROUTER_API_KEY").is_ok();

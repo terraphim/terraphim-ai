@@ -120,6 +120,7 @@ fn create_document_description(content: &str) -> Option<String> {
 mod api;
 mod error;
 mod truthforge_api;
+mod truthforge_context;
 pub mod workflows;
 
 use api::{
