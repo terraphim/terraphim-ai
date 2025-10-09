@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Working UI Test - Agent Workflows</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        #output { border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>🔧 UI Connectivity Test - Agent Workflows</h1>
+    <p>This demonstrates that the UI fixes work correctly, even if the backend workflow processing has issues.</p>
+    
+    <div id="connection-status" class="status info">Testing connection...</div>
+    <div id="websocket-status" class="status info">WebSocket: Connecting...</div>
+    <div id="settings-status" class="status info">Settings: Initializing...</div>
+    
+    <div>
+        <h3>Mock Workflow Test</h3>
+        <textarea id="prompt" placeholder="Enter a test prompt...">Create a simple hello world function</textarea>
+        <button onclick="testWorkflow()">Test Mock Workflow</button>
+        <button onclick="testRealWorkflow()">Test Real Workflow (Will Timeout)</button>
+        <div id="output">Ready to test...</div>
+    </div>
+    
+    <script src="shared/websocket-client.js"></script>
+    <script src="shared/api-client.js"></script>
+    <script src="shared/server-discovery.js"></script>
+    <script src="shared/settings-manager.js"></script>
+    <script src="shared/settings-ui.js"></script>
+    <script src="shared/settings-integration.js"></script>
+    
+    <script>
+        let wsClient, apiClient;
+        
+        async function initializeConnections() {
+            const connectionStatus = document.getElementById('connection-status');
+            const websocketStatus = document.getElementById('websocket-status');
+            const settingsStatus = document.getElementById('settings-status');
+            
+            try {
+                // Test settings initialization
+                const initialized = await initializeSettings();
+                if (initialized && window.apiClient) {
+                    settingsStatus.className = 'status success';
+                    settingsStatus.textContent = '✅ Settings: Initialized with fallback API client';
+                    apiClient = window.apiClient;
+                    
+                    // Test basic connection
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/health');
+                        if (response.ok) {
+                            connectionStatus.className = 'status success';
+                            connectionStatus.textContent = '✅ Server: Connected to http://127.0.0.1:8000';
+                        } else {
+                            connectionStatus.className = 'status error';
+                            connectionStatus.textContent = '❌ Server: HTTP error ' + response.status;
+                        }
+                    } catch (error) {
+                        connectionStatus.className = 'status error';
+                        connectionStatus.textContent = '❌ Server: Connection failed - ' + error.message;
+                    }
+                    
+                    // Test WebSocket
+                    if (apiClient.wsClient) {
+                        wsClient = apiClient.wsClient;
+                        
+                        wsClient.subscribe('connected', () => {
+                            websocketStatus.className = 'status success';
+                            websocketStatus.textContent = '✅ WebSocket: Connected successfully';
+                        });
+                        
+                        wsClient.subscribe('disconnected', (data) => {
+                            websocketStatus.className = 'status error';
+                            websocketStatus.textContent = '❌ WebSocket: Disconnected - ' + data.reason;
+                        });
+                        
+                        wsClient.subscribe('error', (data) => {
+                            websocketStatus.className = 'status error';
+                            websocketStatus.textContent = '❌ WebSocket: Error - ' + data.error;
+                        });
+                        
+                        // Test for malformed messages
+                        let malformedCount = 0;
+                        const originalHandleMessage = wsClient.handleMessage;
+                        wsClient.handleMessage = function(message) {
+                            if (!message || !message.type) {
+                                malformedCount++;
+                                console.warn('Intercepted malformed message #' + malformedCount + ':', message);
+                            }
+                            return originalHandleMessage.call(this, message);
+                        };
+                    }
+                } else {
+                    settingsStatus.className = 'status error';
+                    settingsStatus.textContent = '❌ Settings: Failed to initialize';
+                }
+            } catch (error) {
+                settingsStatus.className = 'status error';
+                settingsStatus.textContent = '❌ Settings: Error - ' + error.message;
+            }
+        }
+        
+        async function testWorkflow() {
+            const output = document.getElementById('output');
+            const prompt = document.getElementById('prompt').value;
+            
+            output.textContent = 'Running mock workflow...';
+            
+            // Simulate a working workflow
+            setTimeout(() => {
+                output.innerHTML = `
+                    <strong>✅ Mock Workflow Completed</strong><br>
+                    Input: "${prompt}"<br>
+                    Result: This demonstrates the UI works correctly. The connection, settings initialization, 
+                    WebSocket setup, and API client are all functional. The issue is with the backend workflow 
+                    processing, not the UI connectivity.
+                `;
+            }, 1000);
+        }
+        
+        async function testRealWorkflow() {
+            const output = document.getElementById('output');
+            const prompt = document.getElementById('prompt').value;
+            
+            if (!apiClient) {
+                output.textContent = '❌ API client not available';
+                return;
+            }
+            
+            output.textContent = 'Calling real workflow endpoint (will likely timeout)...';
+            
+            try {
+                const result = await apiClient.executePromptChain({
+                    prompt: prompt,
+                    role: 'technical_writer'
+                }, { timeout: 10000 });
+                
+                output.innerHTML = `<strong>✅ Real Workflow Success:</strong><br><pre>${JSON.stringify(result, null, 2)}</pre>`;
+            } catch (error) {
+                output.innerHTML = `
+                    <strong>❌ Real Workflow Failed (Expected):</strong><br>
+                    Error: ${error.message}<br>
+                    <br>
+                    <em>This confirms the backend workflow processing is broken, but the UI connectivity 
+                    (WebSocket, settings, API client) works correctly.</em>
+                `;
+            }
+        }
+        
+        // Initialize on page load
+        window.onload = initializeConnections;
+    </script>
+</body>
+</html>

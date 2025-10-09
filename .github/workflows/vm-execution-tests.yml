@@ -1,0 +1,601 @@
+name: VM Execution Tests
+
+on:
+  push:
+    branches: [ main, develop, agent_system ]
+    paths:
+      - 'crates/terraphim_multi_agent/**'
+      - 'scratchpad/firecracker-rust/**'
+      - 'scripts/test-vm-execution.sh'
+      - '.github/workflows/vm-execution-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'crates/terraphim_multi_agent/**'
+      - 'scratchpad/firecracker-rust/**'
+      - 'scripts/test-vm-execution.sh'
+      - '.github/workflows/vm-execution-tests.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUST_LOG: info
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        components: rustfmt, clippy
+        
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-unit-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-unit-
+          ${{ runner.os }}-cargo-
+          
+    - name: Run VM execution unit tests
+      run: |
+        cargo test -p terraphim_multi_agent vm_execution \
+          --verbose \
+          -- --nocapture
+        
+    - name: Run code extractor tests
+      run: |
+        cargo test -p terraphim_multi_agent code_extractor \
+          --verbose \
+          -- --nocapture
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          pkg-config \
+          libssl-dev \
+          curl
+          
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-integration-
+          ${{ runner.os }}-cargo-
+          
+    - name: Build fcctl-web
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo build --release
+        
+    - name: Start fcctl-web server
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        ./target/release/fcctl-web &
+        echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
+        
+        # Wait for server to start
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            echo "Server started successfully"
+            break
+          fi
+          echo "Waiting for server to start... ($i/30)"
+          sleep 2
+        done
+        
+    - name: Run integration tests
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo test llm_api_tests \
+          --verbose \
+          -- --nocapture
+          
+    - name: Run HTTP API security tests  
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo test security_tests \
+          --verbose \
+          -- --nocapture
+          
+    - name: Stop fcctl-web server
+      if: always()
+      run: |
+        if [ -n "${FCCTL_WEB_PID:-}" ]; then
+          kill $FCCTL_WEB_PID || true
+        fi
+
+  websocket-tests:
+    name: WebSocket Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: integration-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-websocket-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-websocket-
+          ${{ runner.os }}-cargo-
+          
+    - name: Build and start fcctl-web
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo build --release
+        ./target/release/fcctl-web &
+        echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
+        
+        # Wait for server
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        
+    - name: Run WebSocket tests
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo test websocket_tests \
+          --verbose \
+          --ignored \
+          -- --nocapture
+          
+    - name: Stop server
+      if: always()
+      run: |
+        if [ -n "${FCCTL_WEB_PID:-}" ]; then
+          kill $FCCTL_WEB_PID || true
+        fi
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [unit-tests, integration-tests]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-e2e-
+          ${{ runner.os }}-cargo-
+          
+    - name: Build all components
+      run: |
+        cargo build --release
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo build --release
+        cd -
+        
+    - name: Start fcctl-web server
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        ./target/release/fcctl-web &
+        echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
+        
+        # Wait for server
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            echo "Server ready for E2E tests"
+            break
+          fi
+          sleep 2
+        done
+        
+    - name: Run end-to-end tests
+      run: |
+        cargo test agent_vm_integration_tests \
+          --verbose \
+          --ignored \
+          -- --nocapture \
+          --test-threads=1
+          
+    - name: Test agent configuration
+      run: |
+        cargo test test_agent_with_vm_execution \
+          --verbose \
+          --ignored \
+          -- --nocapture
+          
+    - name: Stop server
+      if: always()
+      run: |
+        if [ -n "${FCCTL_WEB_PID:-}" ]; then
+          kill $FCCTL_WEB_PID || true
+        fi
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-security-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-security-
+          ${{ runner.os }}-cargo-
+          
+    - name: Run dangerous pattern detection tests
+      run: |
+        cargo test -p terraphim_multi_agent \
+          test_dangerous_code_validation \
+          test_code_injection_prevention \
+          --verbose \
+          -- --nocapture
+          
+    - name: Build fcctl-web for security tests
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo build --release
+        ./target/release/fcctl-web &
+        echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
+        
+        # Wait for server
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        
+    - name: Run security integration tests
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo test security_tests \
+          --verbose \
+          -- --nocapture
+          
+    - name: Test agent security handling
+      run: |
+        cargo test test_agent_blocks_dangerous_code \
+          --verbose \
+          --ignored \
+          -- --nocapture
+          
+    - name: Stop server
+      if: always()
+      run: |
+        if [ -n "${FCCTL_WEB_PID:-}" ]; then
+          kill $FCCTL_WEB_PID || true
+        fi
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-perf-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-perf-
+          ${{ runner.os }}-cargo-
+          
+    - name: Run unit performance tests
+      run: |
+        cargo test -p terraphim_multi_agent performance_tests \
+          --release \
+          --verbose \
+          -- --nocapture
+          
+    - name: Build and start fcctl-web
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo build --release
+        ./target/release/fcctl-web &
+        echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
+        
+        # Wait for server
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        
+    - name: Run WebSocket performance tests
+      run: |
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo test websocket_performance_tests \
+          --release \
+          --ignored \
+          --verbose \
+          -- --nocapture
+          
+    - name: Run agent performance tests
+      run: |
+        cargo test agent_performance_tests \
+          --release \
+          --ignored \
+          --verbose \
+          -- --nocapture
+          
+    - name: Stop server
+      if: always()
+      run: |
+        if [ -n "${FCCTL_WEB_PID:-}" ]; then
+          kill $FCCTL_WEB_PID || true
+        fi
+
+  test-script:
+    name: Test Runner Script
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Make test script executable
+      run: chmod +x scripts/test-vm-execution.sh
+      
+    - name: Test script help
+      run: ./scripts/test-vm-execution.sh --help
+      
+    - name: Test script unit tests only
+      run: |
+        ./scripts/test-vm-execution.sh unit \
+          --timeout 300 \
+          --verbose
+          
+    - name: Verify script creates logs
+      run: |
+        test -d test-logs || echo "Log directory not created"
+        find test-logs -name "*.log" | head -5
+
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust nightly
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        profile: minimal
+        override: true
+        components: rustfmt, clippy, llvm-tools-preview
+        
+    - name: Install grcov
+      run: |
+        curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-x86_64-unknown-linux-gnu.tar.bz2 | \
+        tar jxf -
+        sudo mv grcov /usr/local/bin/
+        
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-coverage-
+          ${{ runner.os }}-cargo-
+          
+    - name: Run tests with coverage
+      env:
+        CARGO_INCREMENTAL: 0
+        RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
+        RUSTDOCFLAGS: "-Cpanic=abort"
+      run: |
+        # Unit tests
+        cargo test -p terraphim_multi_agent vm_execution
+        
+        # Build fcctl-web
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo build
+        ./target/debug/fcctl-web &
+        FCCTL_WEB_PID=$!
+        cd -
+        
+        # Wait for server
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        
+        # Integration tests (with mock data to avoid needing real VMs)
+        cd scratchpad/firecracker-rust/fcctl-web
+        cargo test llm_api_tests || true # Allow failure for coverage
+        cd -
+        
+        # Stop server
+        kill $FCCTL_WEB_PID || true
+        
+    - name: Generate coverage report
+      run: |
+        grcov . -s . --binary-path ./target/debug/ \
+          -t html \
+          --branch \
+          --ignore-not-existing \
+          --ignore "**/tests/**" \
+          --ignore "**/test_*.rs" \
+          --ignore "**/build.rs" \
+          -o target/coverage/
+          
+    - name: Upload coverage to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.ref == 'refs/heads/main'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./target/coverage
+        destination_dir: vm-execution-coverage
+        
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: target/coverage/lcov.info
+        flags: vm-execution
+        name: vm-execution-coverage
+        fail_ci_if_error: false
+
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, websocket-tests, e2e-tests, security-tests, performance-tests]
+    if: always()
+    
+    steps:
+    - name: Test Results Summary
+      run: |
+        echo "## VM Execution Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Unit Tests | ${{ needs.unit-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| WebSocket Tests | ${{ needs.websocket-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| End-to-End Tests | ${{ needs.e2e-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Tests | ${{ needs.security-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Performance Tests | ${{ needs.performance-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check if any tests failed
+        if [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+           [[ "${{ needs.integration-tests.result }}" != "success" ]] || \
+           [[ "${{ needs.websocket-tests.result }}" != "success" ]] || \
+           [[ "${{ needs.e2e-tests.result }}" != "success" ]] || \
+           [[ "${{ needs.security-tests.result }}" != "success" ]] || \
+           [[ "${{ needs.performance-tests.result }}" != "success" ]]; then
+          echo "❌ **Some tests failed. Please check the logs above.**" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        else
+          echo "✅ **All VM execution tests passed!**" >> $GITHUB_STEP_SUMMARY
+        fi

@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terraphim AI - Simple Workflow Test Runner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f8f9fa;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .status-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0 0.5rem;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover { background: #0056b3; }
+        .btn:disabled { background: #6c757d; opacity: 0.6; cursor: not-allowed; }
+        .btn-success { background: #28a745; }
+        .btn-danger { background: #dc3545; }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .test-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #6c757d;
+        }
+        
+        .test-card.testing { border-left-color: #ffc107; }
+        .test-card.success { border-left-color: #28a745; }
+        .test-card.error { border-left-color: #dc3545; }
+        
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+        
+        .status-indicator.testing { background: #ffc107; }
+        .status-indicator.success { background: #28a745; }
+        .status-indicator.error { background: #dc3545; }
+        
+        .test-results {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .summary {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-top: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Terraphim AI Multi-Agent System</h1>
+        <h2>Simple Workflow Test Runner</h2>
+        <p>Direct API testing without complex settings integration</p>
+    </div>
+
+    <div class="status-panel">
+        <h3>🌐 Server Connection Status</h3>
+        <p><strong>Backend URL:</strong> <span id="backend-url">http://127.0.0.1:8000</span></p>
+        <p><strong>Health Status:</strong> <span id="health-status">Checking...</span></p>
+        <p><strong>Ready for Testing:</strong> <span id="ready-status">Initializing...</span></p>
+    </div>
+
+    <div class="controls">
+        <button id="run-all-tests" class="btn">🚀 Run All Tests</button>
+        <button id="run-selected-tests" class="btn">▶️ Run Selected</button>
+        <button id="stop-tests" class="btn btn-danger" disabled>⏹️ Stop Tests</button>
+        <button id="clear-results" class="btn">🧹 Clear Results</button>
+    </div>
+
+    <div class="test-grid">
+        <!-- Prompt Chain Test -->
+        <div class="test-card" id="test-prompt-chain">
+            <div class="test-header">
+                <h3>🔗 Prompt Chain Workflow</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="status-indicator" id="status-prompt-chain"></div>
+                    <span id="status-text-prompt-chain">Ready</span>
+                    <label style="margin-left: 1rem;">
+                        <input type="checkbox" id="enable-prompt-chain" checked> Enable
+                    </label>
+                </div>
+            </div>
+            <p><strong>Endpoint:</strong> <code>POST /workflows/prompt-chain</code></p>
+            <p><strong>Test:</strong> Multi-step software development workflow</p>
+            <div class="test-results" id="results-prompt-chain">Awaiting test execution...</div>
+        </div>
+
+        <!-- Parallel Test -->
+        <div class="test-card" id="test-parallel">
+            <div class="test-header">
+                <h3>⚡ Parallel Workflow</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="status-indicator" id="status-parallel"></div>
+                    <span id="status-text-parallel">Ready</span>
+                    <label style="margin-left: 1rem;">
+                        <input type="checkbox" id="enable-parallel" checked> Enable
+                    </label>
+                </div>
+            </div>
+            <p><strong>Endpoint:</strong> <code>POST /workflows/parallel</code></p>
+            <p><strong>Test:</strong> Multi-perspective analysis with aggregation</p>
+            <div class="test-results" id="results-parallel">Awaiting test execution...</div>
+        </div>
+
+        <!-- Routing Test -->
+        <div class="test-card" id="test-routing">
+            <div class="test-header">
+                <h3>🎯 Routing Workflow</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="status-indicator" id="status-routing"></div>
+                    <span id="status-text-routing">Ready</span>
+                    <label style="margin-left: 1rem;">
+                        <input type="checkbox" id="enable-routing" checked> Enable
+                    </label>
+                </div>
+            </div>
+            <p><strong>Endpoint:</strong> <code>POST /workflows/route</code></p>
+            <p><strong>Test:</strong> Smart agent routing based on task complexity</p>
+            <div class="test-results" id="results-routing">Awaiting test execution...</div>
+        </div>
+
+        <!-- Orchestration Test -->
+        <div class="test-card" id="test-orchestration">
+            <div class="test-header">
+                <h3>🎼 Orchestration Workflow</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="status-indicator" id="status-orchestration"></div>
+                    <span id="status-text-orchestration">Ready</span>
+                    <label style="margin-left: 1rem;">
+                        <input type="checkbox" id="enable-orchestration" checked> Enable
+                    </label>
+                </div>
+            </div>
+            <p><strong>Endpoint:</strong> <code>POST /workflows/orchestrate</code></p>
+            <p><strong>Test:</strong> Hierarchical coordination and worker management</p>
+            <div class="test-results" id="results-orchestration">Awaiting test execution...</div>
+        </div>
+
+        <!-- Optimization Test -->
+        <div class="test-card" id="test-optimization">
+            <div class="test-header">
+                <h3>🔧 Optimization Workflow</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="status-indicator" id="status-optimization"></div>
+                    <span id="status-text-optimization">Ready</span>
+                    <label style="margin-left: 1rem;">
+                        <input type="checkbox" id="enable-optimization" checked> Enable
+                    </label>
+                </div>
+            </div>
+            <p><strong>Endpoint:</strong> <code>POST /workflows/optimize</code></p>
+            <p><strong>Test:</strong> Iterative improvement and quality evaluation</p>
+            <div class="test-results" id="results-optimization">Awaiting test execution...</div>
+        </div>
+
+        <!-- Dynamic Model Selection Test -->
+        <div class="test-card" id="test-model-selection">
+            <div class="test-header">
+                <h3>🎛️ Dynamic Model Selection</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="status-indicator" id="status-model-selection"></div>
+                    <span id="status-text-model-selection">Ready</span>
+                    <label style="margin-left: 1rem;">
+                        <input type="checkbox" id="enable-model-selection" checked> Enable
+                    </label>
+                </div>
+            </div>
+            <p><strong>Test:</strong> Model override via llm_config parameter</p>
+            <p><strong>Validates:</strong> Request-level model configuration</p>
+            <div class="test-results" id="results-model-selection">Awaiting test execution...</div>
+        </div>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3>📊 Test Summary</h3>
+        <div class="summary-stats" id="summary-stats"></div>
+        <div id="detailed-results"></div>
+    </div>
+
+    <script>
+        class SimpleTestRunner {
+            constructor() {
+                this.baseUrl = 'http://127.0.0.1:8000';
+                this.isRunning = false;
+                this.results = new Map();
+                
+                this.init();
+            }
+
+            async init() {
+                await this.checkServerHealth();
+                this.setupEventListeners();
+            }
+
+            async checkServerHealth() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/health`);
+                    if (response.ok) {
+                        document.getElementById('health-status').innerHTML = '✅ Online';
+                        document.getElementById('ready-status').innerHTML = '✅ Ready for Testing';
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                } catch (error) {
+                    document.getElementById('health-status').innerHTML = '❌ Offline';
+                    document.getElementById('ready-status').innerHTML = '❌ Server Unavailable';
+                    console.error('Health check failed:', error);
+                }
+            }
+
+            setupEventListeners() {
+                document.getElementById('run-all-tests').addEventListener('click', () => this.runAllTests());
+                document.getElementById('run-selected-tests').addEventListener('click', () => this.runSelectedTests());
+                document.getElementById('stop-tests').addEventListener('click', () => this.stopTests());
+                document.getElementById('clear-results').addEventListener('click', () => this.clearResults());
+            }
+
+            getEnabledTests() {
+                const tests = ['prompt-chain', 'parallel', 'routing', 'orchestration', 'optimization', 'model-selection'];
+                return tests.filter(test => document.getElementById(`enable-${test}`).checked);
+            }
+
+            async runAllTests() {
+                const enabledTests = this.getEnabledTests();
+                await this.executeTests(enabledTests);
+            }
+
+            async runSelectedTests() {
+                const enabledTests = this.getEnabledTests();
+                if (enabledTests.length === 0) {
+                    alert('No tests selected. Please enable at least one test.');
+                    return;
+                }
+                await this.executeTests(enabledTests);
+            }
+
+            async executeTests(tests) {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.results.clear();
+                this.updateControls();
+
+                let passed = 0;
+                let failed = 0;
+
+                for (const test of tests) {
+                    if (!this.isRunning) break;
+                    
+                    try {
+                        await this.runSingleTest(test);
+                        passed++;
+                    } catch (error) {
+                        failed++;
+                        console.error(`Test ${test} failed:`, error);
+                    }
+                }
+
+                this.showSummary(passed, failed);
+                this.isRunning = false;
+                this.updateControls();
+            }
+
+            async runSingleTest(testName) {
+                const statusElement = document.getElementById(`status-${testName}`);
+                const textElement = document.getElementById(`status-text-${testName}`);
+                const resultsElement = document.getElementById(`results-${testName}`);
+                const cardElement = document.getElementById(`test-${testName}`);
+
+                // Update UI to testing state
+                statusElement.className = 'status-indicator testing';
+                textElement.textContent = 'Testing...';
+                cardElement.className = 'test-card testing';
+                resultsElement.textContent = 'Executing test...';
+
+                try {
+                    const startTime = Date.now();
+                    let result;
+
+                    switch (testName) {
+                        case 'prompt-chain':
+                            result = await this.testPromptChain();
+                            break;
+                        case 'parallel':
+                            result = await this.testParallel();
+                            break;
+                        case 'routing':
+                            result = await this.testRouting();
+                            break;
+                        case 'orchestration':
+                            result = await this.testOrchestration();
+                            break;
+                        case 'optimization':
+                            result = await this.testOptimization();
+                            break;
+                        case 'model-selection':
+                            result = await this.testModelSelection();
+                            break;
+                        default:
+                            throw new Error(`Unknown test: ${testName}`);
+                    }
+
+                    const duration = Date.now() - startTime;
+
+                    // Success
+                    statusElement.className = 'status-indicator success';
+                    textElement.textContent = 'Passed';
+                    cardElement.className = 'test-card success';
+                    
+                    const successMessage = `✅ Test passed in ${duration}ms\n\n` +
+                        `Workflow ID: ${result.workflow_id}\n` +
+                        `Success: ${result.success}\n` +
+                        `Pattern: ${result.result?.pattern || 'N/A'}\n` +
+                        `Execution Time: ${result.result?.execution_summary?.total_cost || 0} tokens`;
+                    
+                    resultsElement.textContent = successMessage;
+                    this.results.set(testName, { success: true, duration, result });
+
+                } catch (error) {
+                    // Failure
+                    statusElement.className = 'status-indicator error';
+                    textElement.textContent = 'Failed';
+                    cardElement.className = 'test-card error';
+                    
+                    const errorMessage = `❌ Test failed: ${error.message}`;
+                    resultsElement.textContent = errorMessage;
+                    this.results.set(testName, { success: false, error: error.message });
+                    
+                    throw error;
+                }
+            }
+
+            async makeRequest(endpoint, data) {
+                const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            }
+
+            async testPromptChain() {
+                return await this.makeRequest('/workflows/prompt-chain', {
+                    prompt: "Create a simple REST API for user management",
+                    role: "Llama Rust Engineer",
+                    overall_role: "full_stack_developer"
+                });
+            }
+
+            async testParallel() {
+                return await this.makeRequest('/workflows/parallel', {
+                    prompt: "Evaluate different approaches to containerized deployment",
+                    role: "Llama Rust Engineer",
+                    overall_role: "devops_specialist"
+                });
+            }
+
+            async testRouting() {
+                return await this.makeRequest('/workflows/route', {
+                    prompt: "Analyze the complexity of implementing real-time analytics",
+                    role: "Llama Rust Engineer",
+                    overall_role: "technical_architect"
+                });
+            }
+
+            async testOrchestration() {
+                return await this.makeRequest('/workflows/orchestrate', {
+                    prompt: "Coordinate development of a microservices monitoring system",
+                    role: "Llama Rust Engineer",
+                    overall_role: "engineering_manager"
+                });
+            }
+
+            async testOptimization() {
+                return await this.makeRequest('/workflows/optimize', {
+                    prompt: "Optimize this API documentation for better developer experience",
+                    role: "Llama Rust Engineer",
+                    overall_role: "technical_writer"
+                });
+            }
+
+            async testModelSelection() {
+                // Test with explicit model override
+                return await this.makeRequest('/workflows/prompt-chain', {
+                    prompt: "Quick test of dynamic model selection",
+                    role: "Llama Rust Engineer",
+                    overall_role: "system_tester",
+                    llm_config: {
+                        llm_model: "gemma2:2b",
+                        llm_temperature: 0.7
+                    }
+                });
+            }
+
+            stopTests() {
+                this.isRunning = false;
+                this.updateControls();
+            }
+
+            clearResults() {
+                const tests = ['prompt-chain', 'parallel', 'routing', 'orchestration', 'optimization', 'model-selection'];
+                
+                tests.forEach(test => {
+                    document.getElementById(`status-${test}`).className = 'status-indicator';
+                    document.getElementById(`status-text-${test}`).textContent = 'Ready';
+                    document.getElementById(`test-${test}`).className = 'test-card';
+                    document.getElementById(`results-${test}`).textContent = 'Awaiting test execution...';
+                });
+
+                document.getElementById('summary').style.display = 'none';
+                this.results.clear();
+            }
+
+            updateControls() {
+                document.getElementById('run-all-tests').disabled = this.isRunning;
+                document.getElementById('run-selected-tests').disabled = this.isRunning;
+                document.getElementById('stop-tests').disabled = !this.isRunning;
+            }
+
+            showSummary(passed, failed) {
+                const total = passed + failed;
+                const successRate = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
+
+                const statsHtml = `
+                    <div class="stat">
+                        <div class="stat-value">${total}</div>
+                        <div>Total Tests</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value success">${passed}</div>
+                        <div>Passed</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value error">${failed}</div>
+                        <div>Failed</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${successRate}%</div>
+                        <div>Success Rate</div>
+                    </div>
+                `;
+
+                document.getElementById('summary-stats').innerHTML = statsHtml;
+
+                let detailedHtml = '<h4>Detailed Results:</h4>';
+                this.results.forEach((result, testName) => {
+                    const status = result.success ? '✅' : '❌';
+                    const duration = result.duration ? ` (${result.duration}ms)` : '';
+                    detailedHtml += `<p>${status} ${testName}${duration}</p>`;
+                });
+
+                document.getElementById('detailed-results').innerHTML = detailedHtml;
+                document.getElementById('summary').style.display = 'block';
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.testRunner = new SimpleTestRunner();
+        });
+    </script>
+</body>
+</html>

@@ -61,7 +61,10 @@
     "test:persistence": "playwright test tests/e2e/state-persistence.spec.ts",
     "test:persistence:ci": "CI=true playwright test tests/e2e/state-persistence.spec.ts --reporter=line --workers=1 --retries=3",
     "test:persistence:headed": "playwright test tests/e2e/state-persistence.spec.ts --headed",
-    "test:unit:persistence": "vitest tests/unit/persistence.test.ts"
+    "test:unit:persistence": "vitest tests/unit/persistence.test.ts",
+    "benchmark": "vitest --config vitest.benchmark.config.ts --run",
+    "benchmark:watch": "vitest --config vitest.benchmark.config.ts",
+    "benchmark:ui": "vitest --config vitest.benchmark.config.ts --ui"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
