@@ -235,11 +235,17 @@ impl ChatAgent {
         let messages = self.prepare_llm_context(&current_session)?;
 
         // Use context window from role config, fallback to config default
-        let max_tokens = self
+        // Get context window from role extra config or use default
+        let context_window = self
             .terraphim_agent
             .role_config
-            .llm_context_window
-            .map(|cw| (cw / 2).min(4000)) // Use 1/2 of context window, max 4000 for chat responses
+            .extra
+            .get("llm_context_window")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+        
+        let max_tokens = context_window
+            .map(|cw| ((cw / 2).min(4000)) as u64) // Use 1/2 of context window, max 4000 for chat responses
             .unwrap_or(self.config.max_response_tokens);
 
         // Generate response
