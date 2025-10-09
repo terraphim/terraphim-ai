@@ -71,6 +71,15 @@ Throughout all user interactions, maintain three key files:
 
 ## Best Practices and Development Workflow
 
+### Pre-commit Quality Assurance
+- **Pre-commit Hook Integration**: All commits must pass pre-commit checks including format, lint, and compilation
+- **Struct Evolution Management**: When adding fields to existing structs, update all initialization sites systematically
+- **Feature Gate Handling**: Use `#[cfg(feature = "openrouter")]` for optional fields with proper imports (ahash::AHashMap)
+- **Trait Object Compliance**: Always use `dyn` keyword for trait objects (e.g., `Arc<dyn StateManager>`)
+- **Import Hygiene**: Remove unused imports regularly to prevent maintenance burden
+- **Error Resolution Process**: Group similar compilation errors (E0063, E0782) and fix in batches
+- **Clean Commits**: Commit only relevant changes with clear technical descriptions, avoid unnecessary attribution
+
 ### Async Programming Patterns
 - Separate UI rendering from network operations using bounded channels
 - Use `tokio::select!` for managing multiple async tasks

@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-ai-desktop"
-version = "0.2.0"
+version = "0.1.0"
 description = "Desktop app for Terraphim, a privacy preserving AI assistant: Take control of the relevance"
 authors = ["Terraphim Contributors"]
 license = "Apache-2.0"
@@ -10,11 +10,14 @@ repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["personal-assistant", "ai", "privacy", "tauri", "desktop"]
 readme = "../../README.md"
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.87"
 
+[[bin]]
+name = "generate-bindings"
+path = "src/bin/generate-bindings.rs"
 
 [build-dependencies]
-tauri-build = { version = "1.5.1", features = [] }
+tauri-build = { version = "1.5.5", features = [] }
 
 [dependencies]
 terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
@@ -34,19 +37,17 @@ log = "0.4.21"
 env_logger = "0.11.8"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
-tauri = { version = "1.7.1", features = [
+tauri = { version = "1.7.1", features = [ "updater",
     "dialog-all",
     "path-all",
     "fs-all",
     "global-shortcut-all",
     "system-tray",
-    "updater",
 ] }
 serde_json = "1.0.104"
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
 ahash = "0.8.11"
-lru = "0.12"
 schemars = { version = "0.8.22", features = ["derive"] }
 tsify = { version = "0.5", features = ["js"] }
 wasm-bindgen = "0.2"
@@ -72,8 +73,6 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 # OpenRouter AI integration feature
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
-# Ollama AI integration feature
-ollama = ["terraphim_service/ollama"]
 # Optional database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
 rocksdb = ["terraphim_persistence/services-rocksdb"]

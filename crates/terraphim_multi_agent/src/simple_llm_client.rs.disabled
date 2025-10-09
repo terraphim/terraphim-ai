@@ -1,0 +1,81 @@
+//! Simple LLM Client - Direct Rig Integration
+//!
+//! This is a simplified version that directly uses the working Rig pattern
+//! to avoid memory management issues in the complex wrapper.
+
+use rig::providers::ollama;
+use rig::client::CompletionClient;
+use rig::completion::Prompt;
+use rig::agent::Agent;
+
+use crate::{MultiAgentResult, LlmRequest, LlmResponse, TokenUsage, MessageRole};
+use chrono::Utc;
+use uuid::Uuid;
+
+/// Simplified LLM client that works directly with Rig
+pub struct SimpleLlmClient {
+    agent: Agent<ollama::CompletionModel>,
+}
+
+impl SimpleLlmClient {
+    /// Create a new simple LLM client using Ollama
+    pub fn new() -> MultiAgentResult<Self> {
+        // Create Ollama client (matching basic_agent_usage.rs exactly)
+        let client = ollama::Client::new();
+        
+        // Create agent (matching basic_agent_usage.rs exactly)
+        let agent = client
+            .agent("gemma3:270m")
+            .preamble("You are a helpful assistant.")
+            .build();
+        
+        Ok(Self { agent })
+    }
+
+    /// Generate response using the simplified client
+    pub async fn generate(&self, request: LlmRequest) -> MultiAgentResult<LlmResponse> {
+        let start_time = Utc::now();
+        let request_id = Uuid::new_v4();
+        
+        // Convert messages to a simple prompt (like basic example)
+        let prompt = request.messages
+            .iter()
+            .map(|msg| match msg.role {
+                MessageRole::User => format!("User: {}", msg.content),
+                MessageRole::Assistant => format!("Assistant: {}", msg.content),
+                MessageRole::System => format!("System: {}", msg.content),
+                MessageRole::Tool => format!("Tool: {}", msg.content),
+            })
+            .collect::<Vec<_>>()
+            .join("\\n");
+
+        // Make LLM call (exactly like basic_agent_usage.rs)
+        let response_content = self.agent
+            .prompt(&prompt)
+            .await
+            .map_err(|e| anyhow::anyhow!("Rig agent prompt error: {}", e))?;
+
+        let end_time = Utc::now();
+        let duration_ms = (end_time - start_time).num_milliseconds() as u64;
+
+        // Estimate token usage
+        let input_tokens = (prompt.len() / 4) as u64;
+        let output_tokens = (response_content.len() / 4) as u64;
+        
+        Ok(LlmResponse {
+            content: response_content,
+            model: "gemma3:270m".to_string(),
+            usage: TokenUsage::new(input_tokens, output_tokens),
+            request_id,
+            timestamp: start_time,
+            duration_ms,
+            finish_reason: "completed".to_string(),
+        })
+    }
+}
+
+impl Default for SimpleLlmClient {
+    fn default() -> Self {
+        Self::new().unwrap()
+    }
+}

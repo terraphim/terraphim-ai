@@ -1,0 +1,55 @@
+[package]
+name = "terraphim_multi_agent"
+version = "0.2.0"
+edition = "2021"
+description = "Multi-agent system for Terraphim built on roles with Rig framework integration"
+license = "MIT"
+
+[features]
+default = []
+test-utils = []
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+
+# Direct HTTP client approach (like Goose) for LLM communication
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# Additional dependencies
+ahash = { version = "0.8.8", features = ["serde"] }
+futures = "0.3"
+rand = "0.8"
+tiktoken-rs = "0.6"
+tracing = "0.1"
+regex = "1.10"
+lazy_static = "1.4"
+
+# Terraphim dependencies
+terraphim_types = { path = "../terraphim_types" }
+terraphim_config = { path = "../terraphim_config", features = ["openrouter"] }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_automata = { path = "../terraphim_automata" }
+terraphim_persistence = { path = "../terraphim_persistence" }
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
+
+# Firecracker VM dependencies (optional, feature-gated)
+# Note: fcctl-repl has its own workspace dependencies that may conflict
+# For now, we'll keep the integration minimal with optional features
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "agent_operations"
+harness = false

@@ -8,7 +8,9 @@ pub use autocomplete::{
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
     AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
 };
-pub use matcher::{find_matches, replace_matches, LinkType, Matched};
+pub use matcher::{
+    extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,
+};
 
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
 pub mod autocomplete_helpers {

@@ -1,17 +1,28 @@
+use ahash::AHashMap;
 use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
 
-/// Example demonstrating how to configure Terraphim with atomic server haystacks
+// Import multi-agent system for enhanced functionality
+#[cfg(feature = "multi_agent")]
+use std::sync::Arc;
+#[cfg(feature = "multi_agent")]
+use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
+#[cfg(feature = "multi_agent")]
+use terraphim_persistence::DeviceStorage;
+
+/// Enhanced Atomic Server Configuration with Multi-Agent Intelligence
 ///
-/// This example shows how to create a complete Terraphim configuration that includes
-/// both traditional ripgrep haystacks and atomic server haystacks for hybrid search.
+/// This example demonstrates the evolution from traditional Role configurations
+/// to intelligent autonomous agents that can utilize atomic servers for enhanced search.
+/// Shows both classic configuration patterns and new multi-agent enhancements.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     env_logger::init();
 
-    // Example 1: Basic atomic server haystack configuration
-    println!("📋 Example 1: Basic Atomic Server Haystack Configuration");
+    // Example 1: Traditional atomic server configuration
+    println!("📋 Example 1: Traditional Atomic Server Configuration");
+    println!("============================================");
 
     let basic_config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
@@ -30,31 +41,83 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     true,
                 )
                 .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
-                extra: ahash::AHashMap::new(),
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: Some(32768),
+                extra: {
+                    let mut extra = AHashMap::new();
+
+                    // Multi-agent system configuration - enables intelligent capabilities
+                    extra.insert(
+                        "agent_capabilities".to_string(),
+                        serde_json::json!([
+                            "atomic_data_access",
+                            "semantic_search",
+                            "knowledge_retrieval"
+                        ]),
+                    );
+                    extra.insert(
+                        "agent_goals".to_string(),
+                        serde_json::json!([
+                            "Efficient atomic data access",
+                            "Maintain data consistency",
+                            "Provide intelligent responses"
+                        ]),
+                    );
+
+                    // LLM integration for AI-enhanced search
+                    extra.insert("llm_provider".to_string(), serde_json::json!("ollama"));
+                    extra.insert(
+                        "ollama_base_url".to_string(),
+                        serde_json::json!("http://127.0.0.1:11434"),
+                    );
+                    extra.insert("ollama_model".to_string(), serde_json::json!("gemma3:270m"));
+                    extra.insert("llm_temperature".to_string(), serde_json::json!(0.4));
+
+                    // Context enrichment settings
+                    extra.insert(
+                        "context_enrichment_enabled".to_string(),
+                        serde_json::json!(true),
+                    );
+                    extra.insert("max_context_tokens".to_string(), serde_json::json!(16000));
+                    extra.insert(
+                        "knowledge_graph_integration".to_string(),
+                        serde_json::json!(true),
+                    );
+
+                    extra
+                },
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                llm_system_prompt: None,
+                llm_chat_model: None,
             },
         )
         .build()
         .expect("Failed to build basic config");
 
-    println!("✅ Basic atomic server config created successfully");
+    println!("✅ Traditional atomic server config created successfully");
     println!("   Server URL: http://localhost:9883");
     println!("   Authentication: Required (secret provided)");
     println!("   Read-only: true");
+    println!("   Multi-agent capabilities: Enabled (agent_capabilities, agent_goals)");
+    println!("   LLM integration: Ollama with gemma3:270m");
+    println!("   Context enrichment: Enabled (knowledge graph integration)");
 
     // Example 2: Hybrid configuration with both ripgrep and atomic server
     println!("\n📋 Example 2: Hybrid Ripgrep + Atomic Server Configuration");
@@ -87,20 +150,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ],
                 extra: ahash::AHashMap::new(),
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                llm_system_prompt: None,
+                llm_chat_model: None,
             },
         )
         .add_role(
@@ -129,20 +191,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ],
                 extra: ahash::AHashMap::new(),
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                llm_system_prompt: None,
+                llm_chat_model: None,
             },
         )
         .build()
@@ -177,20 +238,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )],
                 extra: ahash::AHashMap::new(),
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                llm_system_prompt: None,
+                llm_chat_model: None,
             },
         )
         .build()
@@ -232,20 +292,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ],
                 extra: ahash::AHashMap::new(),
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                llm_system_prompt: None,
+                llm_chat_model: None,
             },
         )
         .build()
@@ -304,6 +363,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("     ✓ Confidential knowledge bases");
     println!("     ✓ Team-specific resources");
 
+    // Example 6: Multi-Agent System Integration (if feature enabled)
+    #[cfg(feature = "multi_agent")]
+    {
+        println!("\n🤖 Example 6: Multi-Agent System Integration");
+        println!("============================================");
+
+        // This would create an intelligent agent from the role
+        let persistence = create_test_storage().await?;
+        let role = basic_config.roles.values().next().unwrap();
+        let mut agent = TerraphimAgent::new(role.clone(), persistence, None).await?;
+        agent.initialize().await?;
+
+        println!("✅ Intelligent agent created from configuration:");
+        println!("   Agent ID: {}", agent.agent_id);
+        println!("   Status: {:?}", agent.status);
+        println!("   Capabilities: {:?}", agent.get_capabilities());
+
+        // Demonstrate intelligent query processing
+        let query = "Find resources about atomic data modeling best practices";
+        let input = CommandInput::new(query.to_string(), CommandType::Answer);
+        let output = agent.process_command(input).await?;
+
+        println!("\n🔍 Intelligent Query Processing:");
+        println!("   Query: {}", query);
+        println!("   AI Response: {}", output.text);
+        println!("   Metadata: {:?}", output.metadata);
+
+        // Show tracking information
+        let token_tracker = agent.token_tracker.read().await;
+        let cost_tracker = agent.cost_tracker.read().await;
+
+        println!("\n📊 Tracking Information:");
+        println!(
+            "   Tokens: {} in / {} out",
+            token_tracker.total_input_tokens, token_tracker.total_output_tokens
+        );
+        println!("   Cost: ${:.6}", cost_tracker.current_month_spending);
+    }
+
+    #[cfg(not(feature = "multi_agent"))]
+    {
+        println!("\n💡 Multi-Agent System Available");
+        println!("====================================");
+        println!("To see the multi-agent system in action:");
+        println!("   1. Add 'multi_agent' feature flag");
+        println!("   2. The role configuration automatically becomes an intelligent agent");
+        println!("   3. All queries become AI-powered with context enrichment");
+        println!("   4. Performance tracking and learning capabilities are enabled");
+        println!("\n   Example: cargo run --features multi_agent --example atomic_server_config");
+    }
+
+    println!("\n🎉 Configuration Evolution Complete!");
+    println!("\n✅ Key Benefits:");
+    println!("   • Seamless evolution from traditional roles to intelligent agents");
+    println!("   • AI-powered query understanding and response generation");
+    println!("   • Context-aware processing with knowledge graph integration");
+    println!("   • Goal-aligned behavior for better user experiences");
+    println!("   • Performance tracking and continuous optimization");
+    println!("   • Backward compatibility with existing configurations");
+
     Ok(())
 }
 
@@ -335,23 +454,31 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                     .with_atomic_secret(secret)],
                 extra: ahash::AHashMap::new(),
                 #[cfg(feature = "openrouter")]
-                openrouter_enabled: false,
+                llm_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_api_key: None,
+                llm_api_key: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_model: None,
+                llm_model: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_auto_summarize: false,
+                llm_auto_summarize: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_enabled: false,
+                llm_chat_enabled: false,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_system_prompt: None,
+                llm_chat_system_prompt: None,
                 #[cfg(feature = "openrouter")]
-                openrouter_chat_model: None,
-                llm_system_prompt: None,
+                llm_chat_model: None,
             },
         )
         .build()?;
 
     Ok(config)
+}
+
+/// Helper function to create test storage (would be imported from multi-agent crate)
+#[cfg(feature = "multi_agent")]
+async fn create_test_storage(
+) -> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
+    // Use the safe Arc method instead of unsafe ptr::read
+    let storage = DeviceStorage::arc_memory_only().await?;
+    Ok(storage)
 }

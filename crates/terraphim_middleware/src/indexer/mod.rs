@@ -75,19 +75,19 @@ pub async fn search_haystacks(
                 // Search via MCP client
                 let mcp = McpHaystackIndexer;
                 mcp.index(needle, haystack).await?
-            }
-            ServiceType::Perplexity => {
-                // Search using Perplexity AI-powered web search
-                let perplexity = match PerplexityHaystackIndexer::from_haystack_config(haystack) {
-                    Ok(indexer) => indexer,
-                    Err(e) => {
-                        log::error!("Failed to create Perplexity indexer: {}", e);
-                        // Return empty index to allow graceful degradation
-                        return Ok(Index::new());
-                    }
-                };
-                perplexity.index(needle, haystack).await?
-            }
+            } // TODO: Re-enable Perplexity support when ServiceType enum includes it
+              // ServiceType::Perplexity => {
+              //     // Search using Perplexity AI-powered web search
+              //     let perplexity = match PerplexityHaystackIndexer::from_haystack_config(haystack) {
+              //         Ok(indexer) => indexer,
+              //         Err(e) => {
+              //             log::error!("Failed to create Perplexity indexer: {}", e);
+              //             // Return empty index to allow graceful degradation
+              //             return Ok(Index::new());
+              //         }
+              //     };
+              //     perplexity.index(needle, haystack).await?
+              // }
         };
 
         for indexed_doc in index.values() {

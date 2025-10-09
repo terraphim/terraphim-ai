@@ -570,11 +570,10 @@ impl SummarizationWorker {
             }
         }
 
-        // Build LLM client from role with config fallback
-        let llm = crate::llm::build_llm_for_summarization(&task.role, task.config.as_ref())
-            .ok_or_else(|| {
-                ServiceError::Config("No LLM provider configured for role".to_string())
-            })?;
+        // Build LLM client from role
+        let llm = crate::llm::build_llm_from_role(&task.role).ok_or_else(|| {
+            ServiceError::Config("No LLM provider configured for role".to_string())
+        })?;
 
         // Note: Rate limiting removed - not needed for sequential task processing
 

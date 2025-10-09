@@ -1,0 +1,194 @@
+<!-- Settings Modal Template -->
+<div id="settings-overlay" class="settings-overlay">
+  <div class="settings-modal">
+    <header class="settings-header">
+      <h2 class="settings-title">
+        <svg class="settings-icon" viewBox="0 0 20 20">
+          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+          <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        Terraphim Settings
+      </h2>
+      <button id="settings-close" class="settings-close" aria-label="Close settings">
+        <svg class="settings-icon" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/>
+        </svg>
+      </button>
+    </header>
+
+    <div class="settings-content">
+      <!-- Connection Status -->
+      <div id="connection-status" class="connection-status connecting">
+        <div class="connection-indicator connecting"></div>
+        <span id="connection-message">Connecting to server...</span>
+      </div>
+
+      <!-- Server Configuration -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">
+          <svg class="settings-icon" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm14 1a1 1 0 11-2 0 1 1 0 012 0zM2 13a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zm14 1a1 1 0 11-2 0 1 1 0 012 0z"/>
+          </svg>
+          Server Configuration
+        </h3>
+
+        <div class="settings-field">
+          <label for="server-url" class="settings-label">Server URL</label>
+          <input type="url" id="server-url" class="settings-input" placeholder="http://localhost:8000" />
+          <div class="settings-help">The base URL of your Terraphim server</div>
+        </div>
+
+        <div class="settings-field">
+          <button id="test-connection" class="settings-button settings-button-secondary">
+            <svg class="settings-icon" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z"/>
+            </svg>
+            Test Connection
+          </button>
+          <button id="discover-servers" class="settings-button settings-button-secondary">
+            <svg class="settings-icon" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
+            </svg>
+            Discover Servers
+          </button>
+        </div>
+
+        <!-- Discovery Progress -->
+        <div id="discovery-progress" class="discovery-progress" style="display: none;">
+          <div id="discovery-progress-bar" class="discovery-progress-bar" style="width: 0%"></div>
+        </div>
+        <div id="discovery-status" class="settings-help" style="display: none;"></div>
+
+        <!-- Discovered Servers -->
+        <div id="discovered-servers-container" style="display: none;">
+          <label class="settings-label">Discovered Servers</label>
+          <div id="discovered-servers" class="discovered-servers">
+            <!-- Server items will be populated here -->
+          </div>
+        </div>
+      </section>
+
+      <!-- API Configuration -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">
+          <svg class="settings-icon" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"/>
+          </svg>
+          API Configuration
+        </h3>
+
+        <div class="settings-field">
+          <label for="api-timeout" class="settings-label">API Timeout (ms)</label>
+          <input type="number" id="api-timeout" class="settings-input" min="1000" max="300000" step="1000" />
+          <div class="settings-help">How long to wait for API responses</div>
+        </div>
+
+        <div class="settings-field">
+          <label for="max-retries" class="settings-label">Max Retries</label>
+          <input type="number" id="max-retries" class="settings-input" min="0" max="10" step="1" />
+          <div class="settings-help">Maximum number of retry attempts</div>
+        </div>
+
+        <div class="settings-checkbox-field">
+          <input type="checkbox" id="enable-websocket" class="settings-checkbox" />
+          <label for="enable-websocket" class="settings-label">Enable WebSocket</label>
+        </div>
+
+        <div class="settings-checkbox-field">
+          <input type="checkbox" id="auto-reconnect" class="settings-checkbox" />
+          <label for="auto-reconnect" class="settings-label">Auto-reconnect</label>
+        </div>
+      </section>
+
+      <!-- Default Roles -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">
+          <svg class="settings-icon" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+          </svg>
+          Default Roles
+        </h3>
+
+        <div class="settings-field">
+          <label for="selected-role" class="settings-label">Selected Role</label>
+          <select id="selected-role" class="settings-select">
+            <option value="Technical Writer">Technical Writer</option>
+            <option value="Business Analyst">Business Analyst</option>
+            <option value="Data Scientist">Data Scientist</option>
+            <option value="Content Creator">Content Creator</option>
+            <option value="Developer">Developer</option>
+          </select>
+        </div>
+
+        <div class="settings-field">
+          <label for="overall-role" class="settings-label">Overall Role</label>
+          <select id="overall-role" class="settings-select">
+            <option value="Software Development Lead">Software Development Lead</option>
+            <option value="ML Engineering Lead">ML Engineering Lead</option>
+            <option value="Content Creator">Content Creator</option>
+            <option value="Business Strategy Lead">Business Strategy Lead</option>
+            <option value="Parallel Processing Coordinator">Parallel Processing Coordinator</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Profile Management -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">
+          <svg class="settings-icon" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
+          </svg>
+          Profiles
+        </h3>
+
+        <div class="settings-field">
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <input type="text" id="profile-name" class="settings-input" placeholder="Profile name" style="flex-grow: 1;" />
+            <button id="save-profile" class="settings-button settings-button-secondary">Save Profile</button>
+          </div>
+        </div>
+
+        <div id="profiles-list">
+          <!-- Profile items will be populated here -->
+        </div>
+      </section>
+    </div>
+
+    <footer class="settings-buttons">
+      <button id="reset-settings" class="settings-button settings-button-danger">
+        <svg class="settings-icon" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"/>
+        </svg>
+        Reset
+      </button>
+      <button id="export-settings" class="settings-button settings-button-secondary">
+        <svg class="settings-icon" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/>
+        </svg>
+        Export
+      </button>
+      <button id="import-settings" class="settings-button settings-button-secondary">
+        <svg class="settings-icon" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 11-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"/>
+        </svg>
+        Import
+      </button>
+      <button id="save-settings" class="settings-button settings-button-primary">
+        <svg class="settings-icon" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+        </svg>
+        Save Settings
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- Settings Toggle Button -->
+<button id="settings-toggle" class="settings-toggle" aria-label="Open settings" title="Settings (Ctrl+,)">
+  <svg class="settings-icon" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/>
+  </svg>
+</button>
+
+<!-- Hidden file input for importing settings -->
+<input type="file" id="import-file" accept=".json" style="display: none;" />
