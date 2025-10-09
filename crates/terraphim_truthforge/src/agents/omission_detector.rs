@@ -258,7 +258,11 @@ impl OmissionDetectorAgent {
         }
 
         if (narrative.contains("cost")
-            || narrative.contains("profit") || narrative.contains("benefit")) && !narrative.to_lowercase().contains("employee") && !narrative.to_lowercase().contains("worker") {
+            || narrative.contains("profit")
+            || narrative.contains("benefit"))
+            && !narrative.to_lowercase().contains("employee")
+            && !narrative.to_lowercase().contains("worker")
+        {
             omissions.push(Omission {
                 id: uuid::Uuid::new_v4(),
                 category: OmissionCategory::AbsentStakeholder,
