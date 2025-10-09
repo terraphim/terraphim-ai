@@ -40,6 +40,8 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: 1.0,
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -82,6 +84,8 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: 1.0,
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,
@@ -124,6 +128,8 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        weight: 1.0,
+                        fetch_content: false,
                     }],
                     #[cfg(feature = "openrouter")]
                     openrouter_enabled: false,

@@ -13,6 +13,8 @@ async fn test_ripgrep_haystack_security_no_atomic_secret_exposed() {
         read_only: true,
         atomic_server_secret: Some("secret-that-should-not-be-serialized".to_string()),
         extra_parameters: HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
 
     // Serialize the haystack
@@ -42,6 +44,8 @@ async fn test_atomic_haystack_includes_secret_when_present() {
         read_only: true,
         atomic_server_secret: Some("valid-atomic-secret".to_string()),
         extra_parameters: HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
 
     // Serialize the haystack
@@ -63,6 +67,8 @@ async fn test_atomic_haystack_excludes_none_secret() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
 
     // Serialize the haystack
@@ -91,6 +97,8 @@ async fn test_ripgrep_extra_parameters_tag_filtering() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: extra_params,
+        weight: 1.0,
+        fetch_content: false,
     };
 
     // Test parameter parsing
@@ -154,6 +162,8 @@ async fn test_extra_parameters_serialization() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: extra_params,
+        weight: 1.0,
+        fetch_content: false,
     };
 
     let serialized = serde_json::to_string(&haystack).unwrap();
@@ -176,6 +186,8 @@ async fn test_empty_extra_parameters_excluded() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     };
 
     let serialized = serde_json::to_string(&haystack).unwrap();
@@ -254,6 +266,8 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: extra_params,
+            weight: 1.0,
+            fetch_content: false,
         }],
         #[cfg(feature = "openrouter")]
         llm_enabled: false,

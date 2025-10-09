@@ -557,17 +557,20 @@ impl SummarizationWorker {
                     return Ok(existing_summary.clone());
                 }
             }
-        }
 
-        // Check if document already has summarization (caching)
-        if let Some(existing_summary) = &task.document.summarization {
-            if !task.force_regenerate {
+            // Check if document already has summarization (caching)
+            if let Some(existing_summary) = &task.document.summarization {
                 log::info!(
                     "Worker bypassing LLM: Using cached summarization for document '{}' (length: {})",
                     task.document.id, existing_summary.len()
                 );
                 return Ok(existing_summary.clone());
             }
+        } else {
+            log::info!(
+                "Worker forcing regeneration: Skipping cached summaries for document '{}' (force_regenerate=true)",
+                task.document.id
+            );
         }
 
         // Build LLM client from role
@@ -630,10 +633,11 @@ mod tests {
             body: "This is a test document for summarization with enough content to make it interesting.".to_string(),
             url: "http://example.com".to_string(),
             description: None,
-        summarization: None,
+            summarization: None,
             stub: None,
             tags: Some(vec![]),
             rank: None,
+            source_haystack: None,
         }
     }
 
