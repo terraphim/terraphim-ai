@@ -402,6 +402,15 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     )));
     log::info!("Initialized summarization manager with default configuration");
 
+    // Initialize AppState for workflow execution
+    let workflow_sessions = Arc::new(workflows::WorkflowSessions::default());
+    let (websocket_broadcaster, _) = tokio::sync::broadcast::channel(100);
+    let app_state = AppState {
+        config_state: config_state.clone(),
+        workflow_sessions,
+        websocket_broadcaster: websocket_broadcaster.clone(),
+    };
+
     let app = Router::new()
         .route("/health", get(health))
         // .route("/documents", get(list_documents))
@@ -556,7 +565,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             post(api_conversations::import_persistent_conversation),
         )
         .fallback(static_handler)
-        .with_state(config_state)
+        .with_state(app_state.clone())
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
         .layer(
@@ -635,6 +644,15 @@ pub async fn build_router_for_tests() -> Router {
     let summarization_manager = Arc::new(Mutex::new(SummarizationManager::new(
         QueueConfig::default(),
     )));
+
+    // Initialize AppState for workflow execution
+    let workflow_sessions = Arc::new(workflows::WorkflowSessions::default());
+    let (websocket_broadcaster, _) = tokio::sync::broadcast::channel(100);
+    let app_state = AppState {
+        config_state: config_state.clone(),
+        workflow_sessions,
+        websocket_broadcaster: websocket_broadcaster.clone(),
+    };
 
     Router::new()
         .route("/health", get(health))
@@ -736,7 +754,7 @@ pub async fn build_router_for_tests() -> Router {
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
-        .with_state(config_state)
+        .with_state(app_state.clone())
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
         .layer(
