@@ -98,6 +98,7 @@ impl RipgrepIndexer {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
         // Create a meaningful ID from the file path
         let original_id = format!("ripgrep_{}", file_path);

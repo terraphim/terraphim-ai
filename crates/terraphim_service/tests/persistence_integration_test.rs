@@ -55,6 +55,7 @@ async fn test_service_document_persistence_integration() {
         stub: None,
         tags: Some(vec!["service".to_string(), "persistence".to_string(), "integration".to_string()]),
         rank: Some(95),
+        source_haystack: None,
     };
 
     let created_doc = service
@@ -148,6 +149,7 @@ async fn test_service_document_persistence_integration() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let _created_special_doc = new_service
@@ -475,6 +477,7 @@ async fn test_unicode_persistence_in_service() {
         stub: None,
         tags: Some(vec!["unicode".to_string(), "测试".to_string(), "тест".to_string()]),
         rank: Some(100),
+        source_haystack: None,
     };
 
     // Create document through service
@@ -566,6 +569,7 @@ async fn test_large_content_persistence_in_service() {
         stub: None,
         tags: Some(vec!["large".to_string(), "performance".to_string()]),
         rank: Some(50),
+        source_haystack: None,
     };
 
     println!(

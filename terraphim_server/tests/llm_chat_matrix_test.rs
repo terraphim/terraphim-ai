@@ -68,6 +68,8 @@ fn create_test_role(name: &str, provider: &str) -> Role {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
+        weight: 1.0,
+        fetch_content: false,
     }];
 
     role

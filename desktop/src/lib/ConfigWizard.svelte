@@ -36,6 +36,7 @@
     service: ServiceType;
     atomic_server_secret?: string;
     extra_parameters: { [key: string]: string };
+    weight: number;
   };
 
   type KnowledgeGraphForm = {
@@ -178,7 +179,8 @@
                 read_only: h.read_only ?? false,
                 service: h.service || "Ripgrep",
                 atomic_server_secret: h.atomic_server_secret || "",
-                extra_parameters: h.extra_parameters || {}
+                extra_parameters: h.extra_parameters || {},
+                weight: h.weight ?? 1.0
               })),
               kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false },
               openrouter_enabled: r.openrouter_enabled ?? false,
@@ -294,7 +296,8 @@ async function fetchLlmModels(roleIdx: number) {
         read_only:false,
         service: "Ripgrep",
         atomic_server_secret: "",
-        extra_parameters: {}
+        extra_parameters: {},
+        weight: 1.0
       });
       return d;
     });
@@ -370,7 +373,8 @@ async function fetchLlmModels(roleIdx: number) {
           service: h.service,
           read_only: h.read_only,
           atomic_server_secret: h.service === "Atomic" ? h.atomic_server_secret : undefined,
-          extra_parameters: h.extra_parameters || {}
+          extra_parameters: h.extra_parameters || {},
+          weight: h.weight ?? 1.0
         })),
         kg: r.kg.url || r.kg.local_path ? {
           automata_path: r.kg.url ? { Remote: r.kg.url } : null,
@@ -722,6 +726,24 @@ async function fetchLlmModels(roleIdx: number) {
                 <input id={`haystack-readonly-${idx}-${hIdx}`} type="checkbox" bind:checked={$draft.roles[idx].haystacks[hIdx].read_only} />
                 &nbsp;Read-only
               </label>
+            </div>
+
+            <!-- Weight field -->
+            <div class="field">
+              <label class="label" for={`haystack-weight-${idx}-${hIdx}`}>Ranking Weight</label>
+              <div class="control">
+                <input
+                  class="input"
+                  id={`haystack-weight-${idx}-${hIdx}`}
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  placeholder="1.0"
+                  bind:value={$draft.roles[idx].haystacks[hIdx].weight}
+                />
+              </div>
+              <p class="help">Weight for ranking results (1.0 = normal, &gt;1.0 = higher priority, &lt;1.0 = lower priority)</p>
             </div>
 
             <!-- Remove haystack button -->

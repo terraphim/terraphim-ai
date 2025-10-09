@@ -36,6 +36,7 @@ mod tests {
             stub: None,
             tags: Some(vec!["test".to_string(), "document".to_string()]),
             rank: Some(1),
+            source_haystack: None,
         }
     }
 
@@ -51,6 +52,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec![format!("tag-{}", i), "test".to_string()]),
                 rank: Some(i as u64),
+                source_haystack: None,
             })
             .collect()
     }

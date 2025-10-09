@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Serialization error: {0}")]
+    Serde(String),
 }
 
 impl From<opendal::Error> for Error {

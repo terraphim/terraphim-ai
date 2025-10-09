@@ -46,6 +46,7 @@ pub enum LinkType {
     WikiLinks,
     HTMLLinks,
     MarkdownLinks,
+    PlainText,
 }
 
 // // This function replacing instead of matching patterns
@@ -73,6 +74,10 @@ pub fn replace_matches(text: &str, thesaurus: Thesaurus, link_type: LinkType) ->
                     value.clone().value,
                     value.clone().url.unwrap_or_default()
                 ));
+            }
+            LinkType::PlainText => {
+                patterns.push(key.to_string());
+                replace_with.push(value.value.to_string());
             }
         }
     }

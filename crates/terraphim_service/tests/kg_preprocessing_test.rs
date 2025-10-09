@@ -24,6 +24,8 @@ async fn test_kg_preprocessing_basic_functionality() {
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            weight: 1.0,
+            fetch_content: false,
         }],
         kg: Some(KnowledgeGraph {
             automata_path: None,
@@ -71,6 +73,7 @@ async fn test_kg_preprocessing_basic_functionality() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     // Basic test: just verify the service can be created and document is preserved
@@ -169,6 +172,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     // Basic test: just verify we can create services with different terraphim_it settings
@@ -244,6 +248,7 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let original_body = pre_processed_document.body.clone();

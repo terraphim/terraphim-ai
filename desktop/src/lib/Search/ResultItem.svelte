@@ -12,7 +12,7 @@
   import type { DocumentListResponse, Role, Haystack } from "../generated/types";
   import SvelteMarkdown from 'svelte-markdown';
 
-  export let document: Document;
+  export let item: Document;
   let showModal = false;
   let showKgModal = false;
   let showAtomicSaveModal = false;
@@ -46,7 +46,7 @@
   function generateMenuItems() {
     const items = [];
 
-    // Always show download to markdown
+    // Always show download to markdown - downloads file only
     items.push({
       id: 'download-markdown',
       label: 'Download to Markdown',
@@ -69,31 +69,19 @@
       });
     }
 
-    // Show external URL if available
-    if (document.url) {
+    // Show external URL if available - opens URL in new tab and article modal
+    if (item.url) {
       items.push({
         id: 'external-url',
         label: 'Open URL',
         icon: 'fas fa-link',
-        action: () => window.open(document.url, '_blank'),
+        action: () => openUrlAndModal(),
         visible: true,
-        title: 'Open original URL in new tab',
-        isLink: true,
-        href: document.url
+        title: 'Open original URL in new tab'
       });
     }
 
-    // Show VSCode integration
-    items.push({
-      id: 'open-vscode',
-      label: 'Open in VSCode',
-      icon: 'fas fa-code',
-      action: () => openInVSCode(),
-      visible: true,
-      title: 'Open document in VSCode',
-      isLink: true,
-      href: `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`
-    });
+    // VSCode integration removed as requested
 
     // Add to context for LLM conversation
     items.push({
@@ -175,7 +163,7 @@
   };
 
   const onAtomicSaveClick = () => {
-    console.log('🔄 Opening atomic save modal for document:', document.title);
+    console.log('🔄 Opening atomic save modal for document:', item.title);
     showAtomicSaveModal = true;
   };
 
@@ -300,19 +288,19 @@
   }
 
   async function generateSummary() {
-    if (summaryLoading || !document.id || !$role) return;
+    if (summaryLoading || !item.id || !$role) return;
 
     summaryLoading = true;
     summaryError = null;
 
     console.log('🤖 AI Summary Debug Info:');
-    console.log('  Document ID:', document.id);
+    console.log('  Document ID:', item.id);
     console.log('  Current role:', $role);
     console.log('  Is Tauri mode:', $is_tauri);
 
     try {
       const requestBody = {
-        document_id: document.id,
+        document_id: item.id,
         role: $role,
         max_length: 250,
         force_regenerate: false
@@ -377,7 +365,7 @@
       console.error('  Error type:', error.constructor.name);
       console.error('  Error message:', error.message || error);
       console.error('  Request details:', {
-        document_id: document.id,
+        document_id: item.id,
         role: $role,
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()
@@ -397,55 +385,119 @@
     }
   }
 
-  function downloadToMarkdown() {
-    console.log('📥 Downloading document as markdown:', document.title);
+  async function downloadToMarkdown() {
+    console.log('📥 Downloading document as markdown:', item.title);
+    console.log('📄 Document data:', { title: item.title, bodyLength: item.body?.length, tags: item.tags });
+    console.log('🖥️ Environment check - is_tauri:', $is_tauri);
 
     // Create markdown content
-    let markdownContent = `# ${document.title}\n\n`;
+    let markdownContent = `# ${item.title}\n\n`;
 
     // Add metadata
     markdownContent += `**Source:** Terraphim Search\n`;
-    markdownContent += `**Rank:** ${document.rank || 'N/A'}\n`;
-    if (document.url) {
-      markdownContent += `**URL:** ${document.url}\n`;
+    markdownContent += `**Rank:** ${item.rank || 'N/A'}\n`;
+    if (item.url) {
+      markdownContent += `**URL:** ${item.url}\n`;
     }
-    if (document.tags && document.tags.length > 0) {
-      markdownContent += `**Tags:** ${document.tags.join(', ')}\n`;
+    if (item.tags && item.tags.length > 0) {
+      markdownContent += `**Tags:** ${item.tags.join(', ')}\n`;
     }
     markdownContent += `**Downloaded:** ${new Date().toISOString()}\n\n`;
 
     // Add description if available
-    if (document.description) {
-      markdownContent += `## Description\n\n${document.description}\n\n`;
+    if (item.description) {
+      markdownContent += `## Description\n\n${item.description}\n\n`;
     }
 
     // Add main content
-    markdownContent += `## Content\n\n${document.body}\n`;
+    markdownContent += `## Content\n\n${item.body}\n`;
 
     // Create filename
-    const filename = `${document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.md`;
+    const filename = `${item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.md`;
 
-    // Create and download file
-    const blob = new Blob([markdownContent], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    window.document.body.appendChild(a);
-    a.click();
-    window.document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Use the proven saveAsMarkdown implementation from Chat component
+    try {
+      if ($is_tauri) {
+        // Import Tauri APIs dynamically
+        const { save } = await import('@tauri-apps/api/dialog');
+        const { writeTextFile } = await import('@tauri-apps/api/fs');
 
-    console.log('✅ Markdown file downloaded:', filename);
+        console.log('💾 Using Tauri save dialog...');
+        const savePath = await save({
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+          defaultPath: filename
+        });
+
+        if (savePath) {
+          await writeTextFile(savePath as string, markdownContent);
+          console.log('✅ File saved via Tauri:', savePath);
+        } else {
+          console.log('❌ Save dialog cancelled');
+        }
+      } else {
+        // Browser fallback: trigger download
+        console.log('🌐 Using browser download fallback...');
+        const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log('✅ File downloaded via browser:', filename);
+      }
+    } catch (error) {
+      console.error('❌ Download failed:', error);
+
+      // Fallback to browser download even in Tauri if the above fails
+      console.log('🔄 Falling back to browser download...');
+      const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      item.body.appendChild(a);
+      a.click();
+      item.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log('✅ Fallback download completed:', filename);
+    }
+  }
+
+  function downloadToMarkdownAndOpenModal() {
+    console.log('🔄 Starting download and modal process...');
+    // First download the markdown file
+    downloadToMarkdown();
+    // Add a small delay before opening modal to ensure download starts
+    setTimeout(() => {
+      console.log('📖 Opening article modal...');
+      onTitleClick();
+    }, 100);
+  }
+
+  function openUrlAndModal() {
+    console.log('🔄 Opening URL in new tab and article modal...');
+    // First open the URL in a new tab
+    if (item.url) {
+      console.log('🔗 Opening URL in new tab:', item.url);
+      window.open(item.url, '_blank');
+    }
+    // Add a small delay before opening modal
+    setTimeout(() => {
+      console.log('📖 Opening article modal...');
+      onTitleClick();
+    }, 100);
   }
 
   function openInVSCode() {
-    const vscodeUrl = `vscode://${encodeURIComponent(document.title)}.md?${encodeURIComponent(document.body)}`;
+    const vscodeUrl = `vscode://${encodeURIComponent(item.title)}.md?${encodeURIComponent(item.body)}`;
     window.open(vscodeUrl, '_blank');
   }
 
   async function addToContext() {
-    console.log('📝 Adding document to LLM context:', document.title);
+    console.log('📝 Adding document to LLM context:', item.title);
 
     // Reset state and show loading
     addingToContext = true;
@@ -486,18 +538,18 @@
         // Use Tauri command for desktop app
         const metadata = {
           source_type: 'document',
-          document_id: document.id,
+          document_id: item.id,
         };
 
-        if (document.url) metadata.url = document.url;
-        if (document.tags && document.tags.length > 0) metadata.tags = document.tags.join(', ');
-        if (document.rank !== undefined) metadata.rank = document.rank.toString();
+        if (item.url) metadata.url = item.url;
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+        if (item.rank !== undefined) metadata.rank = item.rank.toString();
 
         const contextResult = await invoke('add_context_to_conversation', {
           conversationId: conversationId,
           contextType: 'document',
-          title: document.title,
-          content: document.body,
+          title: item.title,
+          content: item.body,
           metadata: metadata
         });
 
@@ -552,14 +604,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             context_type: 'document',
-            title: document.title,
-            content: document.body,
+            title: item.title,
+            content: item.body,
             metadata: {
               source_type: 'document',
-              document_id: document.id,
-              url: document.url || '',
-              tags: document.tags ? document.tags.join(', ') : '',
-              rank: document.rank ? document.rank.toString() : '0'
+              document_id: item.id,
+              url: item.url || '',
+              tags: item.tags ? item.tags.join(', ') : '',
+              rank: item.rank ? item.rank.toString() : '0'
             }
           })
         });
@@ -631,7 +683,7 @@
   }
 
   async function addToContextAndChat() {
-    console.log('💬 Adding document to context and opening chat:', document.title);
+    console.log('💬 Adding document to context and opening chat:', item.title);
 
     // Reset state and show loading
     chattingWithDocument = true;
@@ -672,18 +724,18 @@
         // Use Tauri command for desktop app
         const metadata = {
           source_type: 'document',
-          document_id: document.id,
+          document_id: item.id,
         };
 
-        if (document.url) metadata.url = document.url;
-        if (document.tags && document.tags.length > 0) metadata.tags = document.tags.join(', ');
-        if (document.rank !== undefined) metadata.rank = document.rank.toString();
+        if (item.url) metadata.url = item.url;
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+        if (item.rank !== undefined) metadata.rank = item.rank.toString();
 
         const contextResult = await invoke('add_context_to_conversation', {
           conversationId: conversationId,
           contextType: 'document',
-          title: document.title,
-          content: document.body,
+          title: item.title,
+          content: item.body,
           metadata: metadata
         });
 
@@ -738,14 +790,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             context_type: 'document',
-            title: document.title,
-            content: document.body,
+            title: item.title,
+            content: item.body,
             metadata: {
               source_type: 'document',
-              document_id: document.id,
-              url: document.url || '',
-              tags: document.tags ? document.tags.join(', ') : '',
-              rank: document.rank ? document.rank.toString() : '0'
+              document_id: item.id,
+              url: item.url || '',
+              tags: item.tags ? item.tags.join(', ') : '',
+              rank: item.rank ? item.rank.toString() : '0'
             }
           })
         });
@@ -831,9 +883,9 @@
     <div class="media-content">
       <div class="content">
         <div class="level-right">
-          {#if document.tags}
+          {#if item.tags}
           <Taglist>
-              {#each document.tags as tag}
+              {#each item.tags as tag}
                 <button
                   class="tag-button"
                   on:click={() => handleTagClick(tag)}
@@ -848,20 +900,20 @@
         </div>
           <div class="level-right">
           <Taglist>
-            <Tag rounded>Rank {document.rank || 0}</Tag>
+            <Tag rounded>Rank {item.rank || 0}</Tag>
           </Taglist>
         </div>
         <div transition:fade>
           <button on:click={onTitleClick}>
             <h2 class="title">
-              {document.title}
+              {item.title}
             </h2>
           </button>
           <div class="description">
             <small class="description-label">Description:</small>
             <div class="description-content">
-              {#if document.description}
-                <SvelteMarkdown source={document.description} />
+              {#if item.description}
+                <SvelteMarkdown source={item.description} />
               {:else}
                 <small class="no-description">No description available</small>
               {/if}
@@ -1017,7 +1069,7 @@
 </div>
 
 <!-- Original document modal -->
-<ArticleModal bind:active={showModal} item={document} />
+<ArticleModal bind:active={showModal} item={item} />
 
 <!-- KG document modal -->
 {#if kgDocument}
@@ -1033,7 +1085,7 @@
 {#if hasAtomicServer}
   <AtomicSaveModal
     bind:active={showAtomicSaveModal}
-    document={document}
+    document={item}
   />
 {/if}
 
@@ -1210,6 +1262,20 @@
         text-decoration: underline;
       }
     }
+  }
+
+  /* Button spacing for result item menu */
+  .level.is-mobile .level-right {
+    gap: 0.5rem;
+  }
+
+  .level-item.button {
+    margin-left: 0.5rem;
+    margin-right: 0;
+  }
+
+  .level-item.button:first-child {
+    margin-left: 0;
   }
 
   .ai-summary-actions {

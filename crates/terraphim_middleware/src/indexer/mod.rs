@@ -90,7 +90,15 @@ pub async fn search_haystacks(
               // }
         };
 
-        for indexed_doc in index.values() {
+        // Tag all documents from this haystack with their source
+        let mut tagged_index = Index::new();
+        for (doc_id, mut document) in index {
+            // Set the source haystack for this document
+            document.source_haystack = Some(haystack.location.clone());
+            tagged_index.insert(doc_id, document);
+        }
+
+        for indexed_doc in tagged_index.values() {
             if let Err(e) = config_state.add_to_roles(indexed_doc).await {
                 log::warn!(
                     "Failed to insert document `{}` ({}): {e:?}",
@@ -100,7 +108,7 @@ pub async fn search_haystacks(
             }
         }
 
-        full_index.extend(index);
+        full_index.extend(tagged_index);
     }
     Ok(full_index)
 }
