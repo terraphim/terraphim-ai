@@ -23,7 +23,8 @@ use terraphim_config::{ConfigBuilder, ConfigId};
 use terraphim_persistence::Persistable;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::DeviceSettings;
-use terraphim_update::{check_for_updates, update_binary};
+// TODO: Re-enable auto-update when terraphim_update is added to workspace
+// use terraphim_update::{check_for_updates, update_binary};
 
 /// Terraphim AI server with role-based deployment support
 #[derive(Parser, Debug)]
@@ -65,37 +66,10 @@ async fn main() -> Result<()> {
 }
 
 /// Handle update-related commands
-async fn handle_update_commands(args: &Args) -> Result<()> {
-    // Initialize basic logging for update operations
-    env_logger::init();
-
-    if args.check_update {
-        println!("🔍 Checking for terraphim_server updates...");
-        match check_for_updates("terraphim_server").await {
-            Ok(status) => {
-                println!("{status}");
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("❌ Failed to check for updates: {e}");
-                std::process::exit(1);
-            }
-        }
-    } else if args.update {
-        println!("🚀 Updating terraphim_server...");
-        match update_binary("terraphim_server").await {
-            Ok(status) => {
-                println!("{status}");
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("❌ Update failed: {e}");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        Ok(())
-    }
+async fn handle_update_commands(_args: &Args) -> Result<()> {
+    // TODO: Re-enable when terraphim_update is added to workspace
+    eprintln!("Auto-update feature temporarily disabled");
+    std::process::exit(1);
 }
 
 #[allow(clippy::too_many_lines)]

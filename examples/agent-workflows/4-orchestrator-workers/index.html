@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Orchestrator-Workers - Data Science Pipeline</title>
+    <link rel="stylesheet" href="../shared/styles.css">
+    <style>
+        .pipeline-environment {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .orchestrator-panel {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            height: fit-content;
+        }
+        
+        .pipeline-workspace {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            min-height: 700px;
+        }
+        
+        .research-input {
+            margin-bottom: 2rem;
+        }
+        
+        .data-sources {
+            margin-bottom: 2rem;
+        }
+        
+        .source-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        
+        .source-card {
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .source-card:hover {
+            border-color: var(--primary);
+            background: #f8faff;
+        }
+        
+        .source-card.selected {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+        
+        .source-icon {
+            font-size: 1.2rem;
+        }
+        
+        .source-details {
+            flex: 1;
+        }
+        
+        .source-name {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+        
+        .source-description {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .worker-pool {
+            margin-bottom: 2rem;
+        }
+        
+        .worker-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        
+        .worker-card {
+            padding: 1rem;
+            background: var(--surface-2);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+        }
+        
+        .worker-card.active {
+            border-color: var(--warning);
+            background: #fef3c7;
+        }
+        
+        .worker-card.completed {
+            border-color: var(--success);
+            background: #d1fae5;
+        }
+        
+        .worker-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .worker-icon {
+            font-size: 1rem;
+        }
+        
+        .worker-name {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+        
+        .worker-status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .worker-progress {
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        
+        .worker-progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .orchestration-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .pipeline-stages {
+            display: grid;
+            gap: 1.5rem;
+        }
+        
+        .pipeline-stage {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        
+        .stage-header {
+            padding: 1rem 1.5rem;
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .stage-title {
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .stage-icon {
+            font-size: 1.2rem;
+        }
+        
+        .stage-status {
+            font-size: 0.875rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+        }
+        
+        .stage-status.pending {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .stage-status.active {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .stage-status.completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .stage-content {
+            padding: 1.5rem;
+        }
+        
+        .stage-description {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        
+        .stage-workers {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .assigned-worker {
+            padding: 0.75rem;
+            background: #f8faff;
+            border: 1px solid #dbeafe;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+        }
+        
+        .worker-task {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .worker-role {
+            color: var(--text-muted);
+        }
+        
+        .stage-results {
+            background: #f9fafb;
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .stage-results.visible {
+            display: block;
+        }
+        
+        .results-summary {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+        
+        .results-details {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .knowledge-graph {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--primary);
+        }
+        
+        .graph-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .graph-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .graph-visualization {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            text-align: center;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 2px dashed var(--border);
+        }
+        
+        .graph-nodes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        
+        .graph-node {
+            padding: 0.75rem 1rem;
+            background: var(--primary);
+            color: white;
+            border-radius: var(--radius-full);
+            font-size: 0.875rem;
+            font-weight: 600;
+            position: relative;
+        }
+        
+        .graph-connections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .connection-item {
+            padding: 0.75rem;
+            background: white;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            font-size: 0.875rem;
+        }
+        
+        .connection-type {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .connection-description {
+            color: var(--text-muted);
+        }
+        
+        @media (max-width: 968px) {
+            .pipeline-environment {
+                grid-template-columns: 1fr;
+            }
+            
+            .orchestrator-panel {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>🕸️ AI Orchestrator-Workers</h1>
+            <p>Data Science Pipeline - Hierarchical task decomposition with knowledge graph enrichment</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Workflow Status -->
+        <div class="workflow-container">
+            <div class="workflow-header">
+                <h2 class="workflow-title">Data Science Orchestration Pipeline</h2>
+                <span id="workflow-status" class="workflow-status idle">Ready to Process</span>
+            </div>
+            
+            <!-- Pipeline Visualization -->
+            <div id="pipeline-container"></div>
+            
+            <!-- Progress Bar -->
+            <div id="progress-container"></div>
+        </div>
+
+        <!-- Main Interface -->
+        <div class="pipeline-environment">
+            <!-- Orchestrator Panel -->
+            <div class="orchestrator-panel">
+                <h3>🎯 Research Orchestrator</h3>
+                
+                <!-- Research Input -->
+                <div class="research-input">
+                    <label class="form-label" for="research-query">Research Query:</label>
+                    <textarea 
+                        id="research-query" 
+                        class="form-input form-textarea" 
+                        placeholder="Example: Analyze the impact of machine learning on healthcare outcomes, including recent research papers, methodologies, and clinical applications"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <!-- Data Sources -->
+                <div class="data-sources">
+                    <h4>Data Sources</h4>
+                    <div class="source-grid" id="source-grid">
+                        <!-- Data sources will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Worker Pool -->
+                <div class="worker-pool">
+                    <h4>Specialized Workers</h4>
+                    <div class="worker-grid" id="worker-grid">
+                        <!-- Workers will be populated here -->
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <div class="form-group">
+                        <label class="form-label" for="role-selector">Select Orchestrator Role:</label>
+                        <select id="role-selector" class="form-input" data-testid="role-selector"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="system-prompt">System Prompt:</label>
+                        <textarea 
+                            id="system-prompt" 
+                            class="form-input form-textarea" 
+                            rows="5"
+                            placeholder="The orchestrator's system prompt will appear here. You can edit it."
+                            data-testid="system-prompt"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">🚀 Actions</h3>
+                    <div class="controls">
+                        <button id="start-pipeline" class="btn primary">Start Pipeline</button>
+                        <button id="pause-pipeline" class="btn" disabled>Pause</button>
+                        <button id="reset-pipeline" class="btn">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pipeline Workspace -->
+            <div class="pipeline-workspace">
+                <h3 id="workspace-title">Data Science Pipeline Stages</h3>
+                
+                <!-- Initial State -->
+                <div id="initial-state" class="text-center" style="padding: 3rem;">
+                    <div style="color: var(--text-muted);">
+                        <h4>🧪 Ready for Data Science Research</h4>
+                        <p>Configure your research query and data sources, then watch as the orchestrator intelligently assigns specialized workers to different pipeline stages.</p>
+                        <p style="font-size: 0.875rem; margin-top: 1rem;">The system will analyze scientific papers, extract insights, and build a knowledge graph of relationships.</p>
+                    </div>
+                </div>
+
+                <!-- Pipeline Stages -->
+                <div id="pipeline-stages" class="pipeline-stages" style="display: none;">
+                    <!-- Pipeline stages will be populated here -->
+                </div>
+
+                <!-- Knowledge Graph -->
+                <div id="knowledge-graph" class="knowledge-graph" style="display: none;">
+                    <div class="graph-header">
+                        <span style="font-size: 2rem;">🧠</span>
+                        <div>
+                            <div class="graph-title">Knowledge Graph Enrichment</div>
+                            <div style="color: var(--text-muted); font-size: 0.875rem;">Semantic relationships and concept mapping</div>
+                        </div>
+                    </div>
+                    
+                    <div class="graph-visualization" id="graph-visualization">
+                        <div style="color: var(--text-muted);">
+                            <h4>🔗 Concept Relationships</h4>
+                            <p>Knowledge graph will be populated during pipeline execution</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" style="display: none; margin-top: 2rem;">
+            <div class="workflow-container">
+                <div class="workflow-header">
+                    <h3>📊 Pipeline Results & Analytics</h3>
+                </div>
+                <div id="results-content"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="../shared/api-client.js"></script>
+    <script src="../shared/server-discovery.js"></script>
+    <script src="../shared/settings-manager.js"></script>
+    <script src="../shared/settings-ui.js"></script>
+    <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/workflow-visualizer.js"></script>
+    <script src="../shared/connection-status.js"></script>
+    <script src="../shared/agent-config-manager.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
