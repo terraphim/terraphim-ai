@@ -1,7 +1,7 @@
 # Bigbox Deployment Plan: Firecracker-Rust + Terraphim Multi-Agent System
 
-**Target Server**: bigbox (SSH access required)
-**Date**: 2025-10-06
+**Target Server**: bigbox (SSH access required)  
+**Date**: 2025-10-06  
 **Objective**: Deploy complete Terraphim AI multi-agent system with Firecracker VM execution, integrated with existing Caddy infrastructure
 
 ---
@@ -355,7 +355,7 @@ Type=simple
 User=$CURRENT_USER
 WorkingDirectory=/home/alex/infrastructure/terraphim-private-cloud/agent-system
 Environment="RUST_LOG=info"
-Environment="TERRAPHIM_DATA_DIR=/home/alex/infrastructure/terraphim-private-cloud/data"  # pragma: allowlist secret
+Environment="TERRAPHIM_DATA_DIR=/home/alex/infrastructure/terraphim-private-cloud/data"
 ExecStart=/home/alex/infrastructure/terraphim-private-cloud/agent-system/target/release/terraphim_server --config /home/alex/infrastructure/terraphim-private-cloud/agent-system/terraphim_server/default/bigbox_config.json
 Restart=always
 RestartSec=10
@@ -397,9 +397,9 @@ sudo tee -a /etc/caddy/Caddyfile << EOF
 vm.terraphim.cloud {
     import tls_config
     authorize with mypolicy
-
+    
     reverse_proxy 127.0.0.1:8080
-
+    
     log {
         output file /home/alex/infrastructure/terraphim-private-cloud/logs/vm-api.log {
             roll_size 10MiB
@@ -414,16 +414,16 @@ vm.terraphim.cloud {
 agents.terraphim.cloud {
     import tls_config
     authorize with mypolicy
-
+    
     reverse_proxy 127.0.0.1:3000
-
+    
     # WebSocket support for streaming responses
     @websockets {
         header Connection *Upgrade*
         header Upgrade websocket
     }
     reverse_proxy @websockets 127.0.0.1:3000
-
+    
     log {
         output file /home/alex/infrastructure/terraphim-private-cloud/logs/agents-api.log {
             roll_size 10MiB
@@ -438,16 +438,16 @@ agents.terraphim.cloud {
 workflows.terraphim.cloud {
     import tls_config
     authorize with mypolicy
-
+    
     # Serve static workflow files
     root * /home/alex/infrastructure/terraphim-private-cloud/workflows
     file_server
-
+    
     # API proxy for workflow backend
     handle /api/* {
         reverse_proxy 127.0.0.1:3000
     }
-
+    
     # WebSocket for VM execution real-time updates
     @ws {
         path /ws
@@ -457,7 +457,7 @@ workflows.terraphim.cloud {
     handle @ws {
         reverse_proxy 127.0.0.1:8080
     }
-
+    
     log {
         output file /home/alex/infrastructure/terraphim-private-cloud/logs/workflows.log {
             roll_size 10MiB
@@ -527,21 +527,21 @@ cat > /home/alex/infrastructure/terraphim-private-cloud/workflows/index.html << 
             <p class="subtitle">Multi-Agent System Demonstrations</p>
         </div>
     </section>
-
+    
     <section class="section">
         <div class="container">
             <h2 class="title is-3">Available Workflows</h2>
-
+            
             <div class="box">
                 <h3 class="title is-4">⚡ Parallelization - Multi-Perspective Analysis</h3>
                 <p class="content">
-                    Demonstrates concurrent execution of multiple AI agents analyzing
-                    a topic from different perspectives (Analytical, Creative, Practical,
+                    Demonstrates concurrent execution of multiple AI agents analyzing 
+                    a topic from different perspectives (Analytical, Creative, Practical, 
                     Critical, Strategic, User-Centered).
                 </p>
                 <a href="/parallelization/" class="button is-primary">Launch Workflow</a>
             </div>
-
+            
             <div class="box">
                 <h3 class="title is-4">🔧 Agent API</h3>
                 <p class="content">
@@ -654,7 +654,7 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw enable
 
-# All internal services (fcctl-web:8080, terraphim:3000, ollama:11434)
+# All internal services (fcctl-web:8080, terraphim:3000, ollama:11434) 
 # are bound to 127.0.0.1 only - not exposed externally
 ```
 

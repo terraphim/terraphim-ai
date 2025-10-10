@@ -17,6 +17,9 @@ class TerraphimSettingsManager {
       enableWebSocket: true,
       autoReconnect: true,
       autoDiscovery: true,
+      enableDebugMode: false,
+      debugLogToConsole: true,
+      debugShowInUI: true,
       theme: 'auto', // 'light', 'dark', 'auto'
       discoveredServers: [],
       userProfiles: [],
@@ -336,12 +339,24 @@ class TerraphimSettingsManager {
     }
   }
 
+  // Check if debug mode is enabled
+  isDebugMode() {
+    return this.currentSettings.enableDebugMode === true;
+  }
+
+  // Toggle debug mode
+  toggleDebugMode(enabled) {
+    this.updateSettings({ enableDebugMode: enabled });
+    this.emit('debugModeChanged', enabled);
+    return enabled;
+  }
+
   // Reset to defaults
   resetToDefaults() {
     const oldSettings = { ...this.currentSettings };
     this.currentSettings = { ...this.defaultSettings };
     this.saveSettings();
-    
+
     this.emit('settingsReset', { oldSettings, newSettings: this.currentSettings });
     return this.currentSettings;
   }

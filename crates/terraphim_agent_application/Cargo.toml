@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent_application"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 description = "OTP-style application behavior for Terraphim agent system"
 license = "MIT OR Apache-2.0"

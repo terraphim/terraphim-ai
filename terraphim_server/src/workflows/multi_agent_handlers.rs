@@ -929,17 +929,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            llm_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_enabled: false,
-            openrouter_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -992,17 +989,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            llm_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_enabled: false,
-            openrouter_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -1027,17 +1021,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            llm_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_enabled: false,
-            openrouter_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -1068,17 +1059,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            llm_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_enabled: false,
-            openrouter_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -1103,17 +1091,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            llm_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_enabled: false,
-            openrouter_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }
@@ -1138,17 +1123,14 @@ impl MultiAgentWorkflowExecutor {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
-            openrouter_enabled: false,
-            openrouter_api_key: None,
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            llm_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            openrouter_chat_enabled: false,
-            openrouter_model: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: Some(32768),
             extra,
         }
     }

@@ -69,6 +69,19 @@ Throughout all user interactions, maintain three key files:
 - **@lessons-learned.md**: Knowledge retention and technical insights
 - **@scratchpad.md**: Active task management and current work
 
+### Consolidated Agent Instructions
+
+For comprehensive project knowledge, patterns, and best practices, refer to:
+- **@agents_instructions_v2.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
+  - Contains project context, status, and active features
+  - Critical lessons on deployment patterns, UI development, security, Rust development, and TruthForge
+  - Complete architecture overview with all crates and components
+  - Development commands and workflows
+  - Best practices for Rust, frontend, deployment, testing, and security
+  - Common patterns for extending the system
+  - Troubleshooting guide and recent achievements
+  - Use this as your primary reference for understanding project patterns and established practices
+
 ## Best Practices and Development Workflow
 
 ### Pre-commit Quality Assurance
@@ -522,3 +535,4 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
    cd crates/terraphim_mcp_server
    ./start_local_dev.sh
    ```
+- Don't use svelte, use examples worflows for UI

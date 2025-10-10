@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent_messaging"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Erlang-style asynchronous message passing system for AI agents"
@@ -12,8 +12,8 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "0.2.0" }
-terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "0.1.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.1.0" }
 
 # Core async runtime and utilities
 tokio = { workspace = true }
