@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::tempdir;
 use terraphim_multi_agent::vm_execution::*;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 #[cfg(test)]
 mod direct_session_unit_tests {

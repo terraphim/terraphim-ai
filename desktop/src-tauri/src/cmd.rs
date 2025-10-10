@@ -120,7 +120,7 @@ pub async fn search(
     let results = terraphim_service.search(&search_query).await?;
     Ok(SearchResponse {
         status: Status::Success,
-        results: results.documents,
+        results,
     })
 }
 

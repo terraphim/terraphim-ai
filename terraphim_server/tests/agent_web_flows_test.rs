@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use axum_test::TestServer;
-use futures::future;
+use futures_util::future;
 use serde_json::json;
 use terraphim_server::build_router_for_tests;
 
@@ -505,7 +505,7 @@ async fn test_web_concurrent_workflow_handling() {
     }
 
     // Wait for all concurrent requests to complete
-    let results = futures::future::join_all(handles).await;
+    let results = future::join_all(handles).await;
 
     // Verify all concurrent requests succeeded
     for result in results {

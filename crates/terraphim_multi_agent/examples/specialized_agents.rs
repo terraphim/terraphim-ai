@@ -4,7 +4,7 @@
 //! that leverage the generic LLM interface instead of OpenRouter-specific code.
 
 use terraphim_multi_agent::{
-    test_utils, ChatAgent, ChatConfig, SummarizationAgent, SummarizationConfig, SummaryStyle,
+    ChatAgent, ChatConfig, SummarizationAgent, SummarizationConfig, SummaryStyle, test_utils,
 };
 
 #[tokio::main]
@@ -111,9 +111,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("==========================================");
 
     let documents = vec![
-        ("AI in Healthcare", "AI is transforming healthcare through improved diagnostics, personalized treatment plans, and drug discovery. Machine learning models can analyze medical images with high accuracy and identify patterns that human doctors might miss."),
-        ("AI in Finance", "The financial sector leverages AI for fraud detection, algorithmic trading, risk assessment, and customer service automation. AI systems can process vast amounts of financial data in real-time to make split-second decisions."),
-        ("AI Ethics", "As AI becomes more prevalent, questions about bias, fairness, transparency, and accountability become increasingly important. Developing ethical AI requires careful consideration of how these systems impact different groups of people."),
+        (
+            "AI in Healthcare",
+            "AI is transforming healthcare through improved diagnostics, personalized treatment plans, and drug discovery. Machine learning models can analyze medical images with high accuracy and identify patterns that human doctors might miss.",
+        ),
+        (
+            "AI in Finance",
+            "The financial sector leverages AI for fraud detection, algorithmic trading, risk assessment, and customer service automation. AI systems can process vast amounts of financial data in real-time to make split-second decisions.",
+        ),
+        (
+            "AI Ethics",
+            "As AI becomes more prevalent, questions about bias, fairness, transparency, and accountability become increasingly important. Developing ethical AI requires careful consideration of how these systems impact different groups of people.",
+        ),
     ];
 
     match summarization_agent.summarize_multiple(&documents).await {
