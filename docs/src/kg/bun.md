@@ -4,4 +4,4 @@ Bun is a modern JavaScript runtime and package manager that aims to be a drop-in
 
 Note: The Aho-Corasick matcher uses LeftmostLongest strategy, so "pnpm install" will match before "pnpm" alone, ensuring the most specific replacement wins.
 
-synonyms:: pnpm install, npm install, yarn install, pnpm, npm, yarn
+synonyms:: pnpm, npm, yarn
