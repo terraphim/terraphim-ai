@@ -146,7 +146,10 @@ impl TaxonomyLinkerAgent {
             Ok(response) => response,
             Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content preview: {}", &content[..content.len().min(200)]);
+                warn!(
+                    "Raw content preview: {}",
+                    &content[..content.len().min(200)]
+                );
                 info!("Falling back to markdown parsing");
                 return self.parse_linking_from_markdown(content);
             }
@@ -197,7 +200,8 @@ impl TaxonomyLinkerAgent {
             let lower = line.to_lowercase();
 
             // Extract primary function/domain
-            if lower.contains("primary") && (lower.contains("function") || lower.contains("domain")) {
+            if lower.contains("primary") && (lower.contains("function") || lower.contains("domain"))
+            {
                 if let Some(value) = line.split(':').nth(1) {
                     let value = value.trim().trim_matches('"').to_string();
                     if !value.is_empty() && value.len() < 100 {
@@ -211,7 +215,9 @@ impl TaxonomyLinkerAgent {
                     let value = value.trim();
                     // Handle both array format and comma-separated
                     for func in value.split(',') {
-                        let func = func.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+                        let func = func
+                            .trim()
+                            .trim_matches(|c| c == '[' || c == ']' || c == '"');
                         if !func.is_empty() && func.len() < 100 {
                             secondary_functions.push(func.to_string());
                         }
@@ -223,7 +229,9 @@ impl TaxonomyLinkerAgent {
                 if let Some(value) = line.split(':').nth(1) {
                     let value = value.trim();
                     for subf in value.split(',') {
-                        let subf = subf.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+                        let subf = subf
+                            .trim()
+                            .trim_matches(|c| c == '[' || c == ']' || c == '"');
                         if !subf.is_empty() && subf.len() < 100 {
                             subfunctions.push(subf.to_string());
                         }
@@ -244,7 +252,9 @@ impl TaxonomyLinkerAgent {
                 if let Some(value) = line.split(':').nth(1) {
                     let value = value.trim();
                     for playbook in value.split(',') {
-                        let playbook = playbook.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+                        let playbook = playbook
+                            .trim()
+                            .trim_matches(|c| c == '[' || c == ']' || c == '"');
                         if !playbook.is_empty() && playbook.len() < 200 {
                             recommended_playbooks.push(playbook.to_string());
                         }

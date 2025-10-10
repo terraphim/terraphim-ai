@@ -50,7 +50,10 @@
         "llm_base_url": "http://127.0.0.1:11434",
         "llm_auto_summarize": true,
         "llm_description": "Local Ollama instance with llama3.2:3b for Rust-focused development and documentation"
-      }
+      },
+      "llm_auto_summarize": true,
+      "llm_enabled": true,
+      "llm_model": "llama3.2:3b"
     },
     "Llama AI Assistant": {
       "shortname": "LlamaAI",
@@ -135,7 +138,12 @@
           "enabled": true,
           "api_base_url": "http://localhost:8080",
           "default_vm_type": "focal-optimized",
-          "allowed_languages": ["python", "javascript", "bash", "rust"]
+          "allowed_languages": [
+            "python",
+            "javascript",
+            "bash",
+            "rust"
+          ]
         }
       }
     },

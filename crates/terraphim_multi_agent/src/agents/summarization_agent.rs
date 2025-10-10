@@ -140,8 +140,7 @@ impl SummarizationAgent {
 
         let user_prompt = format!(
             "Create a consolidated summary from these individual document summaries:\n\n{}\n\nProvide a cohesive overview that highlights:\n1. Common themes across documents\n2. Key insights and findings\n3. Important differences or contrasts\n4. Overall conclusions\n\nKeep the consolidated summary to approximately {} words.",
-            consolidated_content,
-            self.config.max_summary_words
+            consolidated_content, self.config.max_summary_words
         );
 
         let messages = vec![
@@ -160,10 +159,18 @@ impl SummarizationAgent {
     /// Create system prompt based on configuration
     fn create_system_prompt(&self) -> String {
         let style_instruction = match self.config.summary_style {
-            SummaryStyle::Brief => "Create a brief, concise summary that captures the essential points.",
-            SummaryStyle::Detailed => "Create a detailed summary that covers all major points and supporting details.",
-            SummaryStyle::BulletPoints => "Create a summary in bullet point format, organizing information clearly.",
-            SummaryStyle::Executive => "Create an executive summary suitable for business stakeholders, focusing on key insights and actionable information.",
+            SummaryStyle::Brief => {
+                "Create a brief, concise summary that captures the essential points."
+            }
+            SummaryStyle::Detailed => {
+                "Create a detailed summary that covers all major points and supporting details."
+            }
+            SummaryStyle::BulletPoints => {
+                "Create a summary in bullet point format, organizing information clearly."
+            }
+            SummaryStyle::Executive => {
+                "Create an executive summary suitable for business stakeholders, focusing on key insights and actionable information."
+            }
         };
 
         let quote_instruction = if self.config.include_quotes {
@@ -183,10 +190,7 @@ impl SummarizationAgent {
 
         format!(
             "You are an expert summarization specialist. {} The summary should be approximately {} words.{}{}",
-            style_instruction,
-            self.config.max_summary_words,
-            quote_instruction,
-            focus_instruction
+            style_instruction, self.config.max_summary_words, quote_instruction, focus_instruction
         )
     }
 

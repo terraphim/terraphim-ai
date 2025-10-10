@@ -192,7 +192,10 @@ impl OmissionDetectorAgent {
             Ok(omissions) => omissions,
             Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content preview: {}", &content[..content.len().min(300)]);
+                warn!(
+                    "Raw content preview: {}",
+                    &content[..content.len().min(300)]
+                );
                 info!("Attempting markdown fallback parsing...");
 
                 // Fallback to markdown parsing
@@ -353,7 +356,11 @@ impl OmissionDetectorAgent {
                         .trim_start_matches("Description:")
                         .trim();
                     current_omission.description = Some(desc.to_string());
-                } else if has_content && !line.is_empty() && !line.starts_with("**") && current_omission.description.is_none() {
+                } else if has_content
+                    && !line.is_empty()
+                    && !line.starts_with("**")
+                    && current_omission.description.is_none()
+                {
                     current_omission.description = Some(line.to_string());
                 }
 
@@ -388,7 +395,9 @@ impl OmissionDetectorAgent {
                 }
 
                 // Extract suggested addition
-                if line.starts_with("**Suggested Addition:**") || line.starts_with("Suggested Addition:") {
+                if line.starts_with("**Suggested Addition:**")
+                    || line.starts_with("Suggested Addition:")
+                {
                     let text = line
                         .trim_start_matches("**Suggested Addition:**")
                         .trim_start_matches("Suggested Addition:")
@@ -469,7 +478,10 @@ impl OmissionDetectorAgent {
         } else if category_lower.contains("counter") {
             OmissionCategory::UnaddressedCounterargument
         } else {
-            warn!("Unknown category '{}', defaulting to ContextGap", category_str);
+            warn!(
+                "Unknown category '{}', defaulting to ContextGap",
+                category_str
+            );
             OmissionCategory::ContextGap
         }
     }
@@ -520,7 +532,9 @@ impl OmissionBuilder {
             severity,
             exploitability,
             composite_risk: (severity * exploitability).clamp(0.0, 1.0),
-            text_reference: self.text_reference.unwrap_or_else(|| "Extracted from markdown".to_string()),
+            text_reference: self
+                .text_reference
+                .unwrap_or_else(|| "Extracted from markdown".to_string()),
             confidence,
             suggested_addition: self.suggested_addition,
         })

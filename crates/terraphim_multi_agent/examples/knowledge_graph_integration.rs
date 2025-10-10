@@ -10,7 +10,7 @@ use ahash::AHashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
@@ -316,8 +316,14 @@ async fn example_performance_analysis() -> MultiAgentResult<()> {
     let test_queries = vec![
         ("Simple", "Rust"),
         ("Medium", "Rust memory management"),
-        ("Complex", "How does Rust's ownership system interact with async programming patterns?"),
-        ("Very Complex", "What are the performance implications of different async runtime configurations in Rust applications with heavy concurrent workloads?"),
+        (
+            "Complex",
+            "How does Rust's ownership system interact with async programming patterns?",
+        ),
+        (
+            "Very Complex",
+            "What are the performance implications of different async runtime configurations in Rust applications with heavy concurrent workloads?",
+        ),
     ];
 
     println!("📊 Performance Analysis of Knowledge Graph Enrichment:");

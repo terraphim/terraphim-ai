@@ -25,8 +25,7 @@ fn extract_clean_output(output: &str) -> String {
 async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn std::error::Error>> {
     // Use CARGO_MANIFEST_DIR to find workspace root
     // CARGO_MANIFEST_DIR points to crates/terraphim_tui
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .unwrap_or_else(|_| ".".to_string());
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let manifest_path = PathBuf::from(manifest_dir);
 
     // Go up two levels: crates/terraphim_tui -> crates -> workspace_root
@@ -41,7 +40,8 @@ async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn st
         return Err(format!(
             "KG path does not exist: {:?}\nworkspace_root: {:?}\nmanifest_dir: {:?}",
             kg_path, workspace_root, manifest_path
-        ).into());
+        )
+        .into());
     }
 
     let logseq_builder = Logseq::default();

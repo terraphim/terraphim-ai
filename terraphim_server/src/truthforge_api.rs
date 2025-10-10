@@ -123,7 +123,10 @@ pub async fn analyze_narrative(
     let persistence = match terraphim_persistence::DeviceStorage::arc_memory_only().await {
         Ok(storage) => storage,
         Err(e) => {
-            log::warn!("TruthForge: Failed to create persistence: {}, skipping context enrichment", e);
+            log::warn!(
+                "TruthForge: Failed to create persistence: {}, skipping context enrichment",
+                e
+            );
             // Continue without enrichment - use original narrative
             log::info!("TruthForge: Checking for OPENROUTER_API_KEY environment variable...");
             let api_key_present = std::env::var("OPENROUTER_API_KEY").is_ok();
@@ -219,10 +222,8 @@ pub async fn analyze_narrative(
         }
     };
 
-    let enricher = TruthForgeContextEnricher::new(
-        Arc::new(app_state.config_state.clone()),
-        persistence,
-    );
+    let enricher =
+        TruthForgeContextEnricher::new(Arc::new(app_state.config_state.clone()), persistence);
 
     match enricher.enrich_narrative(&mut narrative).await {
         Ok(enriched_text) => {

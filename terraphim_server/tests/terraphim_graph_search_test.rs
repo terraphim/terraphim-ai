@@ -103,7 +103,6 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
-            weight: 1.0,
             fetch_content: false,
         }],
         kg: Some(KnowledgeGraph {
@@ -118,22 +117,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         terraphim_it: true,
         theme: "lumen".to_string(),
         relevance_function: RelevanceFunction::TerraphimGraph,
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        extra: AHashMap::new(),
-        llm_system_prompt: None,
+        ..Default::default()
     };
 
     config.roles.insert(role_name.clone(), role);
@@ -219,14 +203,10 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
 
         let results = terraphim_service.search(&search_query).await?;
 
-        log::info!(
-            "  📊 Query '{}' returned {} results",
-            query,
-            results.documents.len()
-        );
+        log::info!("  📊 Query '{}' returned {} results", query, results.len());
 
         // Log result details for debugging
-        for (i, result) in results.documents.iter().enumerate() {
+        for (i, result) in results.iter().enumerate() {
             log::info!(
                 "    {}. '{}' (ID: {}, Rank: {:?})",
                 i + 1,
@@ -240,14 +220,14 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         // This is the core assertion that validates the fix
         if query == "haystack" || query == "service" || query == "terraphim-graph" {
             assert!(
-                !results.documents.is_empty(),
+                !results.is_empty(),
                 "Query '{}' should return results - this indicates TerraphimGraph is working",
                 query
             );
             log::info!(
                 "  ✅ Query '{}' successfully returned {} results",
                 query,
-                results.documents.len()
+                results.len()
             );
         }
     }
@@ -352,22 +332,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
         terraphim_it: true,
         theme: "lumen".to_string(),
         relevance_function: RelevanceFunction::TerraphimGraph,
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        extra: AHashMap::new(),
-        llm_system_prompt: None,
+        ..Default::default()
     };
 
     config.roles.insert(role_name.clone(), role);
@@ -390,13 +355,13 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
 
     // Should return empty results, not crash
     assert!(
-        results.documents.is_empty(),
+        results.is_empty(),
         "Empty rolegraph should return empty results"
     );
 
     log::info!(
         "✅ Empty rolegraph search handled gracefully (returned {} results)",
-        results.documents.len()
+        results.len()
     );
     Ok(())
 }

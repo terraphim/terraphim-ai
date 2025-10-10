@@ -18,33 +18,30 @@
 //! - **Context-Aware Execution**: Task execution guided by knowledge graph context
 //! - **Coordination Capabilities**: Multi-agent workflow orchestration
 
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
 // Re-export core types
 pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};
 // Define GenAgent types locally since we removed gen_agent dependency
 pub type GenAgentResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum GenAgentError {
     #[error("Execution error: {0}")]
     ExecutionError(String),
 }
 pub use terraphim_types::*;
 
-pub mod coordination;
+// TODO: Re-enable when GenAgent trait framework is implemented
+// These modules depend on terraphim_gen_agent and terraphim_automata::Automata
+// which don't exist yet in the current codebase
+// pub mod coordination;
 pub mod error;
-pub mod planning;
-pub mod worker;
+// pub mod planning;
+// pub mod worker;
 
-pub use coordination::*;
+// pub use coordination::*;
 pub use error::*;
-pub use planning::*;
-pub use worker::*;
+// pub use planning::*;
+// pub use worker::*;
 
 /// Result type for knowledge graph agent operations
 pub type KgAgentResult<T> = Result<T, KgAgentError>;

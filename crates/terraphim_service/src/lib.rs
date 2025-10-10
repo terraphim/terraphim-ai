@@ -27,6 +27,7 @@ pub mod http_client;
 pub mod logging;
 
 // Summarization queue system for production-ready async processing
+pub mod conversation_service;
 pub mod rate_limiter;
 pub mod summarization_manager;
 pub mod summarization_queue;
@@ -1900,6 +1901,7 @@ impl TerraphimService {
                                                 stub: None,
                                                 tags: document.tags.clone(),
                                                 rank: document.rank,
+                                                source_haystack: document.source_haystack.clone(),
                                             };
 
                                             // Save to persistence for future use

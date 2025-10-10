@@ -2,11 +2,13 @@
 
 use thiserror::Error;
 
-use terraphim_gen_agent::GenAgentError;
 use terraphim_task_decomposition::TaskDecompositionError;
 
+// GenAgentError is defined in lib.rs since terraphim_gen_agent doesn't exist yet
+use crate::GenAgentError;
+
 /// Errors that can occur in knowledge graph agent operations
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum KgAgentError {
     /// Task decomposition failed
     #[error("Task decomposition failed: {0}")]
@@ -70,7 +72,7 @@ impl KgAgentError {
             KgAgentError::PlanningError(_) => true,
             KgAgentError::WorkerError(_) => true,
             KgAgentError::CoordinationAgentError(_) => true,
-            KgAgentError::GenAgentError(e) => e.is_recoverable(),
+            KgAgentError::GenAgentError(_) => true, // TODO: implement is_recoverable() for GenAgentError
             KgAgentError::TaskDecompositionError(_) => true,
             KgAgentError::SystemError(_) => false,
         }

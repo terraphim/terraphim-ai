@@ -1644,8 +1644,10 @@ impl ResponseGenerator {
         let llm_response: serde_json::Value = match serde_json::from_str(json_str) {
             Ok(json) => json,
             Err(e) => {
-                warn!("Failed to parse response strategy JSON. Content preview: {}",
-                      &content[..content.len().min(200)]);
+                warn!(
+                    "Failed to parse response strategy JSON. Content preview: {}",
+                    &content[..content.len().min(200)]
+                );
                 warn!("Falling back to markdown-based strategy extraction");
 
                 // Parse structured markdown content
@@ -1808,28 +1810,51 @@ impl ResponseGenerator {
             let lower = line.to_lowercase();
 
             // Detect section headers
-            if line.starts_with('#') || line.starts_with("**") && line.ends_with("**") ||
-               (line.chars().next().map(|c| c.is_numeric()).unwrap_or(false) && line.contains('.')) {
-
+            if line.starts_with('#')
+                || line.starts_with("**") && line.ends_with("**")
+                || (line.chars().next().map(|c| c.is_numeric()).unwrap_or(false)
+                    && line.contains('.'))
+            {
                 // Save previous section content
                 if !current_section.is_empty() && !current_content.is_empty() {
-                    self.assign_section_content(&current_section, &current_content,
-                        &mut social_media, &mut press_statement, &mut internal_memo,
-                        &mut qa_brief, &mut potential_backfire);
+                    self.assign_section_content(
+                        &current_section,
+                        &current_content,
+                        &mut social_media,
+                        &mut press_statement,
+                        &mut internal_memo,
+                        &mut qa_brief,
+                        &mut potential_backfire,
+                    );
                 }
 
                 // Start new section
-                current_section = line.trim_matches(|c: char| c == '#' || c == '*' || c.is_numeric() || c == '.' || c == ' ').to_lowercase();
+                current_section = line
+                    .trim_matches(|c: char| {
+                        c == '#' || c == '*' || c.is_numeric() || c == '.' || c == ' '
+                    })
+                    .to_lowercase();
                 current_content = String::new();
             }
             // Extract Q&A pairs
             else if line.starts_with("Q:") || lower.starts_with("question:") {
-                let question = line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().to_string();
+                let question = line
+                    .split(':')
+                    .skip(1)
+                    .collect::<Vec<_>>()
+                    .join(":")
+                    .trim()
+                    .to_string();
                 // Next line should be answer
                 current_content.push_str(&format!("Q: {}\n", question));
-            }
-            else if line.starts_with("A:") || lower.starts_with("answer:") {
-                let answer = line.split(':').skip(1).collect::<Vec<_>>().join(":").trim().to_string();
+            } else if line.starts_with("A:") || lower.starts_with("answer:") {
+                let answer = line
+                    .split(':')
+                    .skip(1)
+                    .collect::<Vec<_>>()
+                    .join(":")
+                    .trim()
+                    .to_string();
                 current_content.push_str(&format!("A: {}\n", answer));
                 // Try to extract as Q&A pair from recent content
                 let recent_lines: Vec<&str> = current_content.lines().rev().take(2).collect();
@@ -1856,9 +1881,15 @@ impl ResponseGenerator {
 
         // Save last section
         if !current_section.is_empty() && !current_content.is_empty() {
-            self.assign_section_content(&current_section, &current_content,
-                &mut social_media, &mut press_statement, &mut internal_memo,
-                &mut qa_brief, &mut potential_backfire);
+            self.assign_section_content(
+                &current_section,
+                &current_content,
+                &mut social_media,
+                &mut press_statement,
+                &mut internal_memo,
+                &mut qa_brief,
+                &mut potential_backfire,
+            );
         }
 
         // Use defaults if sections weren't found
@@ -1872,7 +1903,8 @@ impl ResponseGenerator {
             internal_memo = "See full analysis for internal guidance".to_string();
         }
         if potential_backfire.is_empty() {
-            potential_backfire.push("Markdown parsing fallback - manual review recommended".to_string());
+            potential_backfire
+                .push("Markdown parsing fallback - manual review recommended".to_string());
         }
 
         let vulnerabilities_count = match strategy_type {
@@ -1887,9 +1919,14 @@ impl ResponseGenerator {
             StrategyType::Bridge => 0.3,
         };
 
-        info!("Extracted {} sections from markdown, {} Q&A pairs",
-              vec![&social_media, &press_statement, &internal_memo].iter().filter(|s| !s.is_empty()).count(),
-              qa_brief.len());
+        info!(
+            "Extracted {} sections from markdown, {} Q&A pairs",
+            vec![&social_media, &press_statement, &internal_memo]
+                .iter()
+                .filter(|s| !s.is_empty())
+                .count(),
+            qa_brief.len()
+        );
 
         Ok(ResponseStrategy {
             strategy_type,
@@ -1910,7 +1947,12 @@ impl ResponseGenerator {
                 media_amplification_risk: media_risk,
             },
             tone_guidance,
-            vulnerabilities_addressed: omission_catalog.prioritized.iter().take(vulnerabilities_count).copied().collect(),
+            vulnerabilities_addressed: omission_catalog
+                .prioritized
+                .iter()
+                .take(vulnerabilities_count)
+                .copied()
+                .collect(),
         })
     }
 
@@ -1926,17 +1968,33 @@ impl ResponseGenerator {
     ) {
         let section_lower = section.to_lowercase();
 
-        if section_lower.contains("social") || section_lower.contains("talking point") || section_lower.contains("rapid response") {
+        if section_lower.contains("social")
+            || section_lower.contains("talking point")
+            || section_lower.contains("rapid response")
+        {
             *social_media = content.to_string();
-        } else if section_lower.contains("rebuttal") || section_lower.contains("press") || section_lower.contains("statement") {
+        } else if section_lower.contains("rebuttal")
+            || section_lower.contains("press")
+            || section_lower.contains("statement")
+        {
             *press_statement = content.to_string();
-        } else if section_lower.contains("memo") || section_lower.contains("stakeholder") || section_lower.contains("engagement") || section_lower.contains("bridge") || section_lower.contains("letter") {
+        } else if section_lower.contains("memo")
+            || section_lower.contains("stakeholder")
+            || section_lower.contains("engagement")
+            || section_lower.contains("bridge")
+            || section_lower.contains("letter")
+        {
             *internal_memo = content.to_string();
         } else if section_lower.contains("q&a") || section_lower.contains("question") {
             // Q&A pairs should be extracted during line-by-line parsing
-        } else if section_lower.contains("risk") || section_lower.contains("backfire") || section_lower.contains("caution") {
+        } else if section_lower.contains("risk")
+            || section_lower.contains("backfire")
+            || section_lower.contains("caution")
+        {
             for line in content.lines() {
-                let line = line.trim().trim_start_matches(|c: char| c == '-' || c == '*' || c == ' ');
+                let line = line
+                    .trim()
+                    .trim_start_matches(|c: char| c == '-' || c == '*' || c == ' ');
                 if !line.is_empty() && line.len() < 500 {
                     potential_backfire.push(line.to_string());
                 }

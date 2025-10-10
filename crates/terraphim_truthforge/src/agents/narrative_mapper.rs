@@ -140,7 +140,10 @@ impl NarrativeMapperAgent {
             Ok(response) => response,
             Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content preview: {}", &content[..content.len().min(300)]);
+                warn!(
+                    "Raw content preview: {}",
+                    &content[..content.len().min(300)]
+                );
                 info!("Attempting markdown fallback parsing...");
 
                 // Fallback to markdown parsing
@@ -226,7 +229,12 @@ impl NarrativeMapperAgent {
 
         // Parse SCCT Classification
         if let Some(scct_section) = self.extract_section(content, "# SCCT Classification") {
-            let classification_line = scct_section.lines().next().unwrap_or("").trim().to_lowercase();
+            let classification_line = scct_section
+                .lines()
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_lowercase();
             scct_classification = if classification_line.contains("victim") {
                 SCCTClassification::Victim
             } else if classification_line.contains("preventable") {

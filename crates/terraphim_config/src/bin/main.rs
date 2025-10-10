@@ -26,6 +26,7 @@ async fn main() -> Result<()> {
                 location: "localsearch".to_string(),
                 service: ServiceType::Ripgrep,
                 read_only: false,
+                fetch_content: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
             }];

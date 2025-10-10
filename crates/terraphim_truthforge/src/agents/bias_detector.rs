@@ -169,7 +169,10 @@ impl BiasDetectorAgent {
             Ok(response) => response,
             Err(e) => {
                 warn!("Failed to parse LLM response as JSON: {}", e);
-                warn!("Raw content preview: {}", &content[..content.len().min(200)]);
+                warn!(
+                    "Raw content preview: {}",
+                    &content[..content.len().min(200)]
+                );
                 info!("Falling back to markdown parsing");
                 return self.parse_bias_from_markdown(content);
             }
@@ -231,7 +234,10 @@ impl BiasDetectorAgent {
             let line = line.trim();
 
             // Check for bias type headers (like "1. Loaded Language:" or "### Loaded Language")
-            if line.starts_with('#') || (line.chars().next().map(|c| c.is_numeric()).unwrap_or(false) && line.contains(':')) {
+            if line.starts_with('#')
+                || (line.chars().next().map(|c| c.is_numeric()).unwrap_or(false)
+                    && line.contains(':'))
+            {
                 // Save previous bias if we have one
                 if !current_type.is_empty() && !current_text.is_empty() {
                     biases.push(BiasPattern {
@@ -243,7 +249,9 @@ impl BiasDetectorAgent {
 
                 // Extract new type
                 current_type = line
-                    .trim_start_matches(|c: char| c.is_numeric() || c == '.' || c == ' ' || c == '#')
+                    .trim_start_matches(|c: char| {
+                        c.is_numeric() || c == '.' || c == ' ' || c == '#'
+                    })
                     .split(':')
                     .next()
                     .unwrap_or("")
@@ -254,8 +262,16 @@ impl BiasDetectorAgent {
                 in_explanation = false;
             }
             // Check for "Text:" or "Quote:"
-            else if line.to_lowercase().starts_with("text:") || line.to_lowercase().starts_with("quote:") {
-                current_text = line.split(':').nth(1).unwrap_or("").trim().trim_matches('"').to_string();
+            else if line.to_lowercase().starts_with("text:")
+                || line.to_lowercase().starts_with("quote:")
+            {
+                current_text = line
+                    .split(':')
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches('"')
+                    .to_string();
             }
             // Check for "Explanation:"
             else if line.to_lowercase().starts_with("explanation:") {
