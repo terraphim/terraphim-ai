@@ -12,7 +12,8 @@ use tokio::time::sleep;
 
 /// Load configuration from .env file
 fn load_env_config() {
-    dotenv::dotenv().ok();
+    // Environment variables loaded by shell or test environment
+    // dotenv not available, relying on OS environment
 }
 
 /// Create a test role with appropriate LLM configuration
@@ -24,7 +25,7 @@ fn create_test_role(name: &str, provider: &str) -> Role {
     };
 
     // Set role-specific system prompt based on our implementation
-    role.llm_system_prompt = match name {
+    role.llm_chat_system_prompt = match name {
         "Rust Engineer" => Some("You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.".to_string()),
         "AI Engineer" => Some("You are an expert AI/ML engineer specializing in implementing machine learning features, integrating language models, and building intelligent automation systems. Focus on practical AI implementation, model integration, and AI-powered applications.".to_string()),
         "Terraphim Engineer" => Some("You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.".to_string()),
@@ -48,14 +49,13 @@ fn create_test_role(name: &str, provider: &str) -> Role {
             );
         }
         "openrouter" => {
-            #[cfg(feature = "openrouter")]
-            {
-                if let Ok(api_key) = env::var("OPENROUTER_API_KEY") {
-                    role.openrouter_enabled = true;
-                    role.openrouter_api_key = Some(api_key);
-                    role.openrouter_model = Some("openai/gpt-3.5-turbo".to_string());
-                    role.openrouter_chat_enabled = true;
-                }
+            if let Ok(api_key) = env::var("OPENROUTER_API_KEY") {
+                role.llm_enabled = true;
+                role.llm_api_key = Some(api_key);
+                role.llm_model = Some("openai/gpt-3.5-turbo".to_string());
+                role.llm_chat_enabled = true;
+                role.extra
+                    .insert("llm_provider".to_string(), json!("openrouter"));
             }
         }
         _ => {}
@@ -66,10 +66,9 @@ fn create_test_role(name: &str, provider: &str) -> Role {
         location: "./docs/src".to_string(),
         service: ServiceType::Ripgrep,
         read_only: true,
+        fetch_content: false,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
-        weight: 1.0,
-        fetch_content: false,
     }];
 
     role

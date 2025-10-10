@@ -2,7 +2,7 @@
 //! without requiring actual LLM API calls
 
 use std::sync::Arc;
-use terraphim_multi_agent::{test_utils::create_test_role, AgentRegistry, MultiAgentError};
+use terraphim_multi_agent::{AgentRegistry, MultiAgentError, test_utils::create_test_role};
 use terraphim_persistence::DeviceStorage;
 
 #[tokio::test]
@@ -129,5 +129,5 @@ async fn test_queue_based_architecture_proof() {
     println!("✅ Rig integration configured correctly");
     println!("✅ Concurrent access patterns validated");
 
-    println!("\n💡 System is ready for production use with API keys!");
+    println!("\n💡 System is ready for production deployment (configure API credentials)!");
 }

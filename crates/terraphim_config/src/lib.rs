@@ -173,6 +173,8 @@ pub enum ServiceType {
     ClickUp,
     /// Use an MCP client to query a Model Context Protocol server
     Mcp,
+    /// Use Perplexity AI-powered web search for indexing
+    Perplexity,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
@@ -192,6 +194,11 @@ pub struct Haystack {
     /// editor). Defaults to `false` for backwards-compatibility.
     #[serde(default)]
     pub read_only: bool,
+    /// When set to `true`, fetch the actual content of documents from URLs
+    /// instead of just indexing metadata. Useful for web-based haystacks.
+    /// Defaults to `false` for backwards-compatibility.
+    #[serde(default)]
+    pub fetch_content: bool,
     /// The secret for connecting to an Atomic Server.
     /// This field is only serialized for Atomic service haystacks.
     #[serde(default)]
@@ -251,6 +258,7 @@ impl Haystack {
             location,
             service,
             read_only,
+            fetch_content: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }
@@ -375,6 +383,7 @@ impl ConfigBuilder {
             location: "docs/src".to_string(),
             service: ServiceType::Ripgrep,
             read_only: true,
+            fetch_content: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
@@ -400,6 +409,7 @@ impl ConfigBuilder {
             location: "docs/src".to_string(),
             service: ServiceType::Ripgrep,
             read_only: true,
+            fetch_content: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
@@ -414,6 +424,7 @@ impl ConfigBuilder {
             location: "https://query.rs".to_string(),
             service: ServiceType::QueryRs,
             read_only: true,
+            fetch_content: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
@@ -463,6 +474,7 @@ impl ConfigBuilder {
                     location: system_operator_haystack.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -487,6 +499,7 @@ impl ConfigBuilder {
                     location: system_operator_haystack.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -511,6 +524,7 @@ impl ConfigBuilder {
                     location: system_operator_haystack.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -534,6 +548,7 @@ impl ConfigBuilder {
                     location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -558,6 +573,7 @@ impl ConfigBuilder {
                     location: default_data_path.to_string_lossy().to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -571,6 +587,7 @@ impl ConfigBuilder {
                     location: "https://query.rs".to_string(),
                     service: ServiceType::QueryRs,
                     read_only: true,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];

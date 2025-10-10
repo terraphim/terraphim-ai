@@ -54,12 +54,30 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     let tech_stack = "React, Node.js, Express, MongoDB, JWT";
 
     let development_steps = vec![
-        ("Requirements & Specification", "Create detailed technical specification including user stories, API endpoints, data models, and acceptance criteria"),
-        ("System Design & Architecture", "Design system architecture, component structure, database schema, and technology integration"),
-        ("Development Planning", "Create detailed development plan with tasks, priorities, estimated timelines, and milestones"),
-        ("Code Implementation", "Generate core application code, including backend API, frontend components, and database setup"),
-        ("Testing & Quality Assurance", "Create comprehensive tests including unit tests, integration tests, and quality assurance checklist"),
-        ("Deployment & Documentation", "Provide deployment instructions, environment setup, and comprehensive documentation"),
+        (
+            "Requirements & Specification",
+            "Create detailed technical specification including user stories, API endpoints, data models, and acceptance criteria",
+        ),
+        (
+            "System Design & Architecture",
+            "Design system architecture, component structure, database schema, and technology integration",
+        ),
+        (
+            "Development Planning",
+            "Create detailed development plan with tasks, priorities, estimated timelines, and milestones",
+        ),
+        (
+            "Code Implementation",
+            "Generate core application code, including backend API, frontend components, and database setup",
+        ),
+        (
+            "Testing & Quality Assurance",
+            "Create comprehensive tests including unit tests, integration tests, and quality assurance checklist",
+        ),
+        (
+            "Deployment & Documentation",
+            "Provide deployment instructions, environment setup, and comprehensive documentation",
+        ),
     ];
 
     let mut context = format!(
@@ -406,7 +424,10 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     println!("\n🎯 Research Topic: {}", research_topic);
     println!("\n📋 Step 1: Orchestrator Planning");
 
-    let planning_prompt = format!("Create a detailed research plan for: {}\n\nDefine specific tasks for each worker type: data collection, content analysis, methodology, knowledge mapping, synthesis, and graph construction.", research_topic);
+    let planning_prompt = format!(
+        "Create a detailed research plan for: {}\n\nDefine specific tasks for each worker type: data collection, content analysis, methodology, knowledge mapping, synthesis, and graph construction.",
+        research_topic
+    );
     let planning_input = CommandInput::new(planning_prompt, CommandType::Create);
     let plan_result = orchestrator.process_command(planning_input).await?;
 
@@ -450,7 +471,10 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
 
     for (worker_name, task_description) in worker_tasks {
         if let Some(worker) = workers.get_mut(&worker_name.to_string()) {
-            let task_prompt = format!("Research Task: {}\n\nContext: {}\n\nPlease complete this specialized task as part of the larger research project.", task_description, research_topic);
+            let task_prompt = format!(
+                "Research Task: {}\n\nContext: {}\n\nPlease complete this specialized task as part of the larger research project.",
+                task_description, research_topic
+            );
             let task_input = CommandInput::new(task_prompt, CommandType::Generate);
 
             println!(
@@ -602,7 +626,10 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
         let generation_prompt = if current_content.is_empty() {
             format!("Create content for: {}", content_brief)
         } else {
-            format!("Improve this content based on evaluation feedback:\n\nOriginal Brief: {}\n\nCurrent Content:\n{}\n\nPlease enhance the content to address any quality issues.", content_brief, current_content)
+            format!(
+                "Improve this content based on evaluation feedback:\n\nOriginal Brief: {}\n\nCurrent Content:\n{}\n\nPlease enhance the content to address any quality issues.",
+                content_brief, current_content
+            )
         };
 
         println!("   📝 Generating content...");
@@ -625,7 +652,10 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
         let mut total_score = 0.0;
 
         for (eval_name, evaluator) in &mut evaluators {
-            let eval_prompt = format!("Evaluate this content on your specialized dimension:\n\n{}\n\nProvide a score from 1-10 and specific feedback for improvement.", current_content);
+            let eval_prompt = format!(
+                "Evaluate this content on your specialized dimension:\n\n{}\n\nProvide a score from 1-10 and specific feedback for improvement.",
+                current_content
+            );
             let eval_input = CommandInput::new(eval_prompt, CommandType::Review);
             let eval_result = evaluator.process_command(eval_input).await?;
 

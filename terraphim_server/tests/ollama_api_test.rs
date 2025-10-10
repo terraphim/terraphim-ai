@@ -20,9 +20,7 @@ async fn test_chat_endpoint_with_ollama() {
 
     // Create test server
     let config_path = "terraphim_server/default/terraphim_engineer_config.json";
-    let app = terraphim_server::create_app(config_path.to_string())
-        .await
-        .expect("Failed to create app");
+    let app = terraphim_server::build_router_for_tests().await;
 
     let server = TestServer::new(app).expect("Failed to create test server");
 
@@ -51,9 +49,7 @@ async fn test_chat_endpoint_with_ollama() {
 #[tokio::test]
 async fn test_chat_endpoint_invalid_role() {
     let config_path = "terraphim_server/default/terraphim_engineer_config.json";
-    let app = terraphim_server::create_app(config_path.to_string())
-        .await
-        .expect("Failed to create app");
+    let app = terraphim_server::build_router_for_tests().await;
 
     let server = TestServer::new(app).expect("Failed to create test server");
 
@@ -74,9 +70,7 @@ async fn test_chat_endpoint_invalid_role() {
 #[tokio::test]
 async fn test_chat_endpoint_empty_messages() {
     let config_path = "terraphim_server/default/terraphim_engineer_config.json";
-    let app = terraphim_server::create_app(config_path.to_string())
-        .await
-        .expect("Failed to create app");
+    let app = terraphim_server::build_router_for_tests().await;
 
     let server = TestServer::new(app).expect("Failed to create test server");
 

@@ -22,12 +22,14 @@ fn create_atomic_server_agent_role() -> Role {
         relevance_function: RelevanceFunction::TitleScorer,
         theme: "spacelab".to_string(),
         kg: None,
-        haystacks: vec![Haystack::new(
-            "http://localhost:9883".to_string(), // Atomic server URL
-            ServiceType::Atomic,
-            true, // read-only
-        )
-        .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+        haystacks: vec![
+            Haystack::new(
+                "http://localhost:9883".to_string(), // Atomic server URL
+                ServiceType::Atomic,
+                true, // read-only
+            )
+            .with_atomic_secret(Some("your-base64-secret-here".to_string())),
+        ],
         extra: {
             let mut extra = AHashMap::new();
             // Multi-agent specific configuration
@@ -307,7 +309,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • Multi-layered intelligence enhances every query");
     println!("   • Performance tracking enables continuous optimization");
 
-    println!("\n🚀 The Multi-Agent System transforms static configurations into intelligent, adaptive agents!");
+    println!(
+        "\n🚀 The Multi-Agent System transforms static configurations into intelligent, adaptive agents!"
+    );
 
     Ok(())
 }

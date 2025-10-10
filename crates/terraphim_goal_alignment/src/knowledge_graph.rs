@@ -9,7 +9,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use terraphim_automata::{extract_paragraphs_from_automata, is_all_terms_connected_by_path};
+use terraphim_automata::extract_paragraphs_from_automata;
 use terraphim_rolegraph::RoleGraph;
 
 use crate::{
@@ -402,30 +402,21 @@ impl KnowledgeGraphGoalAnalyzer {
             }
         }
 
-        // Use extract_paragraphs_from_automata for concept extraction
+        // TODO: Re-implement concept extraction with new extract_paragraphs_from_automata API
+        // The API now requires (text: &str, thesaurus: Thesaurus, include_term: bool)
+        // Need to load appropriate thesaurus for this role/goal context
         let text = format!(
             "{} {}",
             goal.description,
             goal.knowledge_context.keywords.join(" ")
         );
 
-        let paragraphs = extract_paragraphs_from_automata(
-            &text,
-            self.automata_config.max_paragraphs,
-            self.automata_config.min_confidence,
-        )
-        .map_err(|e| {
-            GoalAlignmentError::KnowledgeGraphError(format!("Failed to extract paragraphs: {}", e))
-        })?;
-
-        // Extract concepts from paragraphs
+        // Temporary fallback: simple word extraction until we integrate thesaurus
         let mut concepts = HashSet::new();
-        for paragraph in paragraphs {
-            let words: Vec<&str> = paragraph.split_whitespace().collect();
-            for word in words {
-                if word.len() > 3 && !word.chars().all(|c| c.is_ascii_punctuation()) {
-                    concepts.insert(word.to_lowercase());
-                }
+        let words: Vec<&str> = text.split_whitespace().collect();
+        for word in words {
+            if word.len() > 3 && !word.chars().all(|c| c.is_ascii_punctuation()) {
+                concepts.insert(word.to_lowercase());
             }
         }
 
@@ -483,19 +474,20 @@ impl KnowledgeGraphGoalAnalyzer {
         concepts: &[String],
     ) -> GoalAlignmentResult<SemanticAnalysis> {
         // Identify primary and secondary domains
-        let mut primary_domains = goal.knowledge_context.domains.clone();
-        let mut secondary_domains = Vec::new();
+        let primary_domains = goal.knowledge_context.domains.clone();
+        let secondary_domains = Vec::new();
 
-        // Use role graph to identify additional domains
-        for role_id in &goal.assigned_roles {
-            if let Some(role_node) = self.role_graph.get_role(role_id) {
-                for domain in &role_node.knowledge_domains {
-                    if !primary_domains.contains(domain) {
-                        secondary_domains.push(domain.clone());
-                    }
-                }
-            }
-        }
+        // TODO: Re-implement domain discovery using new RoleGraph API
+        // The get_role() method no longer exists - need to use alternative approach
+        // for role_id in &goal.assigned_roles {
+        //     if let Some(role_node) = self.role_graph.get_role(role_id) {
+        //         for domain in &role_node.knowledge_domains {
+        //             if !primary_domains.contains(domain) {
+        //                 secondary_domains.push(domain.clone());
+        //             }
+        //         }
+        //     }
+        // }
 
         // Identify key concepts (most frequent or important)
         let key_concepts = concepts
@@ -593,10 +585,14 @@ impl KnowledgeGraphGoalAnalyzer {
             });
         }
 
-        // Use is_all_terms_connected_by_path to check connectivity
-        let all_connected = is_all_terms_connected_by_path(concepts).map_err(|e| {
-            GoalAlignmentError::KnowledgeGraphError(format!("Failed to check connectivity: {}", e))
-        })?;
+        // TODO: Re-implement connectivity check with new terraphim_automata API
+        // is_all_terms_connected_by_path no longer exists
+        // let all_connected = is_all_terms_connected_by_path(concepts).map_err(|e| {
+        //     GoalAlignmentError::KnowledgeGraphError(format!("Failed to check connectivity: {}", e))
+        // })?;
+
+        // Temporary fallback: assume concepts are connected
+        let all_connected = true;
 
         // For now, create a simplified connectivity result
         let connectivity_result = ConnectivityResult {

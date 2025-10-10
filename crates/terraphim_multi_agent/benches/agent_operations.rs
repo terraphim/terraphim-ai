@@ -1,10 +1,10 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use terraphim_multi_agent::{
-    test_utils::create_test_agent_simple, AgentRegistry, CommandInput, CommandOutput, CommandType,
-    MultiAgentError, MultiAgentResult, TerraphimAgent,
+    AgentRegistry, CommandInput, CommandOutput, CommandType, MultiAgentError, MultiAgentResult,
+    TerraphimAgent, test_utils::create_test_agent_simple,
 };
 
 /// Benchmark agent creation time

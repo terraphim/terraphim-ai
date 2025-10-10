@@ -460,8 +460,8 @@ impl TerraphimAgent {
 
         match self.persistence.fastest_op.read(&key).await {
             Ok(data) => {
-                let state: AgentState =
-                    serde_json::from_slice(&data).map_err(MultiAgentError::SerializationError)?;
+                let state: AgentState = serde_json::from_slice(&data.to_vec())
+                    .map_err(MultiAgentError::SerializationError)?;
 
                 // Restore state
                 // TODO: Implement proper state loading with interior mutability
@@ -656,9 +656,8 @@ impl TerraphimAgent {
             )),
             LlmMessage::user(format!(
                 "Context: {}\n\nQuestion: {}",
-                context_items,
-                input.text
-            ))
+                context_items, input.text
+            )),
         ];
 
         let request = LlmRequest::new(messages)
@@ -691,9 +690,8 @@ impl TerraphimAgent {
             )),
             LlmMessage::user(format!(
                 "Context: {}\n\nAnalyze: {}",
-                context_items,
-                input.text
-            ))
+                context_items, input.text
+            )),
         ];
 
         let request = LlmRequest::new(messages)
@@ -833,9 +831,8 @@ impl TerraphimAgent {
             )),
             LlmMessage::user(format!(
                 "Context: {}\n\nCreate: {}",
-                context_items,
-                input.text
-            ))
+                context_items, input.text
+            )),
         ];
 
         let request = LlmRequest::new(messages)
@@ -914,7 +911,7 @@ impl TerraphimAgent {
         // TODO: Load from role configuration
         // TODO: Load actual automata from role config
         // TODO: Load actual automata from role config
-        use terraphim_automata::{build_autocomplete_index, AutocompleteConfig};
+        use terraphim_automata::{AutocompleteConfig, build_autocomplete_index};
         use terraphim_types::Thesaurus;
 
         let thesaurus = Thesaurus::new("default".to_string());

@@ -6,11 +6,11 @@
 
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::{sleep, Instant};
+use tokio::time::{Instant, sleep};
 
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, LoadBalancingStrategy, PoolConfig,
-    PoolManager, PoolManagerConfig,
+    CommandInput, CommandType, LoadBalancingStrategy, PoolConfig, PoolManager, PoolManagerConfig,
+    test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 
