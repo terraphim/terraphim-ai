@@ -15,7 +15,7 @@ File: `docs/src/kg/bun.md`
 
 Bun is a modern JavaScript runtime and package manager.
 
-synonyms:: pnpm install, npm install, yarn install, pnpm, npm, yarn
+(synonyms are defined in bun.md and bun-install.md files)
 ```
 
 This creates a thesaurus mapping:
@@ -192,7 +192,7 @@ To add more package manager commands, edit `docs/src/kg/bun.md`:
 
 Bun is a modern JavaScript runtime and package manager.
 
-synonyms:: pnpm install, npm install, yarn install, pnpm, npm, yarn, pnpm run, npm run, yarn run, pnpm dev, npm dev, yarn dev
+(synonyms are defined in bun.md and bun-install.md files)
 ```
 
 Then restart the terraphim server to rebuild the knowledge graph.
@@ -283,11 +283,11 @@ All will be loaded and used for replacement.
 In `bun.md`, you can customize the normalized term:
 
 ```markdown
-# Bun Install
+# bun install
 
 Fast package installation with Bun.
 
-synonyms:: pnpm install, npm install, yarn install
+(synonyms defined in bun-install.md)
 ```
 
 This would replace all synonyms with "Bun Install" instead of "bun".
