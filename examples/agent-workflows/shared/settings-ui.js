@@ -94,9 +94,9 @@ class TerraphimSettingsUI {
 
   bindSettingsInputs() {
     const inputs = [
-      'server-url', 'api-timeout', 'max-retries', 
+      'server-url', 'api-timeout', 'max-retries',
       'selected-role', 'overall-role',
-      'enable-websocket', 'auto-reconnect'
+      'enable-websocket', 'auto-reconnect', 'enable-debug-mode'
     ];
 
     inputs.forEach(id => {
@@ -176,7 +176,7 @@ class TerraphimSettingsUI {
   // UI update methods
   updateUI() {
     const settings = this.settingsManager.getSettings();
-    
+
     // Update form fields
     this.setInputValue('server-url', settings.serverUrl);
     this.setInputValue('api-timeout', settings.apiTimeout);
@@ -185,13 +185,14 @@ class TerraphimSettingsUI {
     this.setInputValue('overall-role', settings.overallRole);
     this.setInputValue('enable-websocket', settings.enableWebSocket);
     this.setInputValue('auto-reconnect', settings.autoReconnect);
-    
+    this.setInputValue('enable-debug-mode', settings.enableDebugMode);
+
     // Update discovered servers
     this.updateDiscoveredServers(settings.discoveredServers);
-    
+
     // Update profiles
     this.updateProfilesList(settings.userProfiles);
-    
+
     // Update connection status
     this.updateConnectionToggle();
   }

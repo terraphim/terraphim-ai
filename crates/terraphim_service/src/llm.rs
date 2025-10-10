@@ -155,7 +155,7 @@ fn has_ollama_hints(extra: &AHashMap<String, Value>) -> bool {
 
 #[cfg(feature = "openrouter")]
 fn role_has_openrouter_config(role: &terraphim_config::Role) -> bool {
-    role.openrouter_enabled && role.openrouter_api_key.is_some()
+    role.has_llm_config()
 }
 
 #[cfg(not(feature = "openrouter"))]
@@ -205,11 +205,8 @@ impl LlmClient for OpenRouterClient {
 
 #[cfg(feature = "openrouter")]
 fn build_openrouter_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
-    let api_key = role.openrouter_api_key.as_deref()?;
-    let model = role
-        .openrouter_model
-        .as_deref()
-        .unwrap_or("openai/gpt-3.5-turbo");
+    let api_key = role.llm_api_key.as_deref()?;
+    let model = role.llm_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
     match crate::openrouter::OpenRouterService::new(api_key, model) {
         Ok(inner) => Some(Arc::new(OpenRouterClient { inner }) as Arc<dyn LlmClient>),
         Err(e) => {

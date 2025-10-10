@@ -1,0 +1,45 @@
+[package]
+name = "terraphim-truthforge"
+version = "0.1.0"
+edition = "2021"
+license = "Proprietary"
+authors = ["Zestic AI <team@zestic.ai>"]
+description = "TruthForge Two-Pass Debate Arena - Private multi-agent narrative analysis"
+
+[dependencies]
+terraphim_multi_agent = { path = "../terraphim_multi_agent" }
+terraphim_config = { path = "../terraphim_config" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_automata = { path = "../terraphim_automata" }
+terraphim_persistence = { path = "../terraphim_persistence", features = ["redis"] }
+terraphim_types = { path = "../terraphim_types" }
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
+
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+rig-core = "0.1"
+
+thiserror = "1.0"
+anyhow = "1.0"
+
+tracing = "0.1"
+
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+terraphim_multi_agent = { path = "../terraphim_multi_agent", features = ["test-utils"] }
+tokio-test = "0.4"
+mockall = "0.12"
+tempfile = "3.8"
+
+[features]
+default = ["redis-persistence"]
+redis-persistence = []
+test-ollama = []

@@ -3,7 +3,7 @@ use regex::Regex;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::{replace_matches, LinkType};
-pub use terraphim_config::{ConfigState, Role};
+use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
@@ -27,7 +27,6 @@ pub mod http_client;
 pub mod logging;
 
 // Summarization queue system for production-ready async processing
-pub mod queue_based_rate_limiter;
 pub mod rate_limiter;
 pub mod summarization_manager;
 pub mod summarization_queue;
@@ -38,9 +37,6 @@ pub mod error;
 
 // Context management for LLM conversations
 pub mod context;
-
-// Conversation service for chat session history
-pub mod conversation_service;
 
 #[cfg(test)]
 mod context_tests;
@@ -110,131 +106,19 @@ impl crate::error::TerraphimError for ServiceError {
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
-/// Enhanced search result that includes both documents and async task IDs
-#[derive(Debug, Clone)]
-pub struct SearchResult {
-    /// The found documents
-    pub documents: Vec<Document>,
-    /// Task IDs for async summarization operations (if any)
-    pub summarization_task_ids: Vec<String>,
-}
-
-impl SearchResult {
-    pub fn new(documents: Vec<Document>) -> Self {
-        Self {
-            documents,
-            summarization_task_ids: Vec::new(),
-        }
-    }
-
-    pub fn with_task_ids(documents: Vec<Document>, task_ids: Vec<String>) -> Self {
-        Self {
-            documents,
-            summarization_task_ids: task_ids,
-        }
-    }
-
-    /// Merge completed summarizations into documents
-    pub async fn merge_completed_summaries(
-        mut self,
-        _summarization_manager: Option<
-            &std::sync::Arc<tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>>,
-        >,
-    ) -> Self {
-        if self.summarization_task_ids.is_empty() {
-            return self;
-        }
-
-        // Brief wait for fast summarizations to complete and be persisted
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-        let mut updated_documents = Vec::new();
-
-        for mut document in self.documents {
-            // Try to load from persistence if no summary exists
-            if document.summarization.is_none() {
-                match Document::new(document.id.clone()).load().await {
-                    Ok(persisted_doc) => {
-                        if let Some(ref summary) = persisted_doc.summarization {
-                            document.summarization = Some(summary.clone());
-                            log::debug!("Loaded persisted summary for document: {}", document.id);
-                        }
-                    }
-                    Err(e) => {
-                        log::debug!(
-                            "No persisted summary found for document {}: {:?}",
-                            document.id,
-                            e
-                        );
-                    }
-                }
-            }
-
-            updated_documents.push(document);
-        }
-
-        self.documents = updated_documents;
-        self
-    }
-}
-
 pub struct TerraphimService {
-    pub config_state: ConfigState,
-    summarization_manager: Option<
-        std::sync::Arc<tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>>,
-    >,
-    /// Track processed documents to prevent duplicate KG preprocessing
-    pub processed_documents: std::collections::HashMap<String, bool>,
+    config_state: ConfigState,
 }
 
 impl TerraphimService {
-    /// Create a new TerraphimService with an external summarization manager
-    pub fn with_manager(
-        config_state: ConfigState,
-        summarization_manager: std::sync::Arc<
-            tokio::sync::Mutex<crate::summarization_manager::SummarizationManager>,
-        >,
-    ) -> Self {
-        Self {
-            config_state,
-            summarization_manager: Some(summarization_manager),
-            processed_documents: std::collections::HashMap::new(),
-        }
-    }
-
-    /// Create a new TerraphimService with its own summarization manager
+    /// Create a new TerraphimService
     pub fn new(config_state: ConfigState) -> Self {
-        // Initialize summarization manager with default configuration
-        let queue_config = crate::summarization_queue::QueueConfig {
-            max_concurrent_workers: 4,
-            max_queue_size: 1000,
-            max_queue_time: std::time::Duration::from_secs(300),
-            task_retention_time: std::time::Duration::from_secs(3600),
-            rate_limits: std::collections::HashMap::new(),
-            retry_delay: std::time::Duration::from_secs(1),
-            max_retry_delay: std::time::Duration::from_secs(30),
-        };
-
-        let summarization_manager = Some(std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::summarization_manager::SummarizationManager::new(queue_config),
-        )));
-
-        Self {
-            config_state,
-            summarization_manager,
-            processed_documents: std::collections::HashMap::new(),
-        }
+        Self { config_state }
     }
 
     /// Build a thesaurus from the haystack and update the knowledge graph automata URL
     async fn build_thesaurus(&mut self, search_query: &SearchQuery) -> Result<()> {
         Ok(build_thesaurus_from_haystack(&mut self.config_state, search_query).await?)
-    }
-
-    /// Clear the processed documents cache (useful when configuration changes)
-    pub fn clear_processed_documents_cache(&mut self) {
-        self.processed_documents.clear();
-        log::debug!("Cleared processed documents cache");
     }
     /// load thesaurus from config object and if absent make sure it's loaded from automata_url
     pub async fn ensure_thesaurus_loaded(&mut self, role_name: &RoleName) -> Result<Thesaurus> {
@@ -631,11 +515,23 @@ impl TerraphimService {
         // Filter thesaurus to only include meaningful terms and avoid over-linking
         let mut kg_thesaurus = Thesaurus::new(format!("kg_links_{}", role.name));
 
-        // Very selective KG term filtering to avoid clutter:
-        // Only include highly specific, domain-relevant terms
-        let excluded_common_terms = [
-            "service",
+        // Prioritize important KG terms while excluding overly generic ones
+        // Key KG concepts should always be included even if they're common
+        let important_kg_terms = [
+            "graph",
             "haystack",
+            "service",
+            "terraphim",
+            "knowledge",
+            "embedding",
+            "search",
+            "automata",
+            "thesaurus",
+            "rolegraph",
+        ];
+
+        // Exclude only very generic programming/technical terms that don't add value
+        let excluded_common_terms = [
             "system",
             "config",
             "configuration",
@@ -732,26 +628,47 @@ impl TerraphimService {
             .filter(|(key, _)| {
                 let term = key.as_str();
 
-                // Exclude empty terms, very short terms, and common technical terms
-                if term.is_empty() || term.len() < 3 || excluded_common_terms.contains(&term) {
+                // Always exclude empty or very short terms
+                if term.is_empty() || term.len() < 3 {
+                    return false;
+                }
+
+                // Always include important KG terms, even if they're short
+                if important_kg_terms.contains(&term) {
+                    return true;
+                }
+
+                // Exclude generic technical terms
+                if excluded_common_terms.contains(&term) {
                     return false;
                 }
 
                 // Include terms that are:
-                // 1. Moderately long (>6 chars) OR
+                // 1. Moderately long (>5 chars) OR
                 // 2. Hyphenated compound terms OR
                 // 3. Underscore-separated compound terms OR
                 // 4. Capitalized terms (likely proper nouns or important concepts)
-                term.len() > 6
+                term.len() > 5
                     || term.contains('-')
                     || term.contains('_')
                     || term.chars().next().is_some_and(|c| c.is_uppercase())
             })
             .collect();
-        sorted_terms.sort_by(|a, b| b.1.id.cmp(&a.1.id)); // Sort by relevance (ID)
 
-        // Take only the top 3 most specific terms to minimize clutter
-        let max_kg_terms = 3;
+        // Sort by relevance, but prioritize important KG terms
+        sorted_terms.sort_by(|a, b| {
+            let a_important = important_kg_terms.contains(&a.0.as_str());
+            let b_important = important_kg_terms.contains(&b.0.as_str());
+
+            match (a_important, b_important) {
+                (true, false) => std::cmp::Ordering::Less, // a comes first
+                (false, true) => std::cmp::Ordering::Greater, // b comes first
+                _ => b.1.id.cmp(&a.1.id),                  // Both or neither important, sort by ID
+            }
+        });
+
+        // Take more terms since we're being more selective about quality
+        let max_kg_terms = 8;
         for (key, value) in sorted_terms.into_iter().take(max_kg_terms) {
             let mut kg_value = value.clone();
             // IMPORTANT: Keep the original term (key) as visible text, link to root concept (value.value)
@@ -764,9 +681,10 @@ impl TerraphimService {
 
         let kg_terms_count = kg_thesaurus.len();
         log::info!(
-            "📋 KG thesaurus filtering: {} → {} terms (filters: len>12, hyphenated, or contains graph/terraphim/knowledge/embedding)",
+            "📋 KG thesaurus filtering: {} → {} terms (prioritizing: {}, filters: len>5, hyphenated, or important KG terms)",
             thesaurus.len(),
-            kg_terms_count
+            kg_terms_count,
+            important_kg_terms.join(", ")
         );
 
         // Log the actual terms that passed filtering for debugging
@@ -1009,10 +927,10 @@ impl TerraphimService {
             role: None,
         };
 
-        let search_result = self.search(&search_query).await?;
+        let documents = self.search(&search_query).await?;
 
         // Look for a document whose title matches the requested ID
-        for doc in search_result.documents {
+        for doc in documents {
             if doc.title == document_id || doc.id == document_id {
                 log::debug!("Found document '{}' via search fallback", document_id);
                 return self.apply_kg_preprocessing_if_needed(doc).await.map(Some);
@@ -1028,19 +946,34 @@ impl TerraphimService {
     /// This helper method checks if the selected role has terraphim_it enabled
     /// and applies KG term preprocessing accordingly. It prevents double processing
     /// by checking if KG links already exist in the document.
-    pub async fn apply_kg_preprocessing_if_needed(
-        &mut self,
-        document: Document,
-    ) -> Result<Document> {
+    async fn apply_kg_preprocessing_if_needed(&mut self, document: Document) -> Result<Document> {
+        log::debug!(
+            "🔍 [KG-DEBUG] apply_kg_preprocessing_if_needed called for document: '{}'",
+            document.title
+        );
+        log::debug!(
+            "🔍 [KG-DEBUG] Document body preview: {}",
+            document.body.chars().take(100).collect::<String>()
+        );
+
         let role = {
             let config = self.config_state.config.lock().await;
             let selected_role = &config.selected_role;
 
+            log::debug!("🔍 [KG-DEBUG] Selected role: '{}'", selected_role);
+
             match config.roles.get(selected_role) {
-                Some(role) => role.clone(), // Clone to avoid borrowing issues
-                None => {
+                Some(role) => {
                     log::debug!(
-                        "Selected role '{}' not found, skipping KG preprocessing",
+                        "🔍 [KG-DEBUG] Role found: '{}', terraphim_it: {}",
+                        role.name,
+                        role.terraphim_it
+                    );
+                    role.clone() // Clone to avoid borrowing issues
+                }
+                None => {
+                    log::warn!(
+                        "❌ [KG-DEBUG] Selected role '{}' not found in config, skipping KG preprocessing",
                         selected_role
                     );
                     return Ok(document);
@@ -1050,51 +983,60 @@ impl TerraphimService {
 
         // Only apply preprocessing if role has terraphim_it enabled
         if !role.terraphim_it {
-            log::debug!(
-                "terraphim_it disabled for role '{}', skipping KG preprocessing",
+            log::info!(
+                "🔍 [KG-DEBUG] terraphim_it disabled for role '{}', skipping KG preprocessing",
                 role.name
             );
             return Ok(document);
         }
 
         // Check if document already has KG links to prevent double processing
-        if document.body.contains("](kg:") {
-            log::debug!(
-                "Document '{}' already has KG links, skipping preprocessing to prevent double processing",
+        let has_existing_kg_links = document.body.contains("](kg:");
+        log::debug!(
+            "🔍 [KG-DEBUG] Document already has KG links: {}",
+            has_existing_kg_links
+        );
+        if has_existing_kg_links {
+            log::info!(
+                "🔍 [KG-DEBUG] Document '{}' already has KG links, skipping preprocessing to prevent double processing",
                 document.title
             );
             return Ok(document);
         }
 
-        // Create a unique key for this document and role combination
-        let processing_key = format!("{}::{}", document.id, role.name);
-
-        // Check if we've already processed this document with this role
-        if self.processed_documents.contains_key(&processing_key) {
-            log::debug!(
-                "Document '{}' already processed for role '{}', skipping to prevent duplicate processing",
-                document.title,
-                role.name
-            );
-            return Ok(document);
-        }
-
         log::info!(
-            "🧠 Applying KG preprocessing to document '{}' for role '{}' (terraphim_it enabled)",
+            "🧠 [KG-DEBUG] Starting KG preprocessing for document '{}' with role '{}' (terraphim_it enabled)",
             document.title,
             role.name
         );
 
         // Apply KG preprocessing
-        let processed_doc = self.preprocess_document_content(document, &role).await?;
-
-        // Mark this document as processed for this role
-        self.processed_documents.insert(processing_key, true);
-
-        log::debug!(
-            "✅ KG preprocessing completed for document '{}'",
-            processed_doc.title
-        );
+        let document_title = document.title.clone(); // Save title before moving document
+        let processed_doc = match self.preprocess_document_content(document, &role).await {
+            Ok(doc) => {
+                let links_added = doc.body.contains("](kg:");
+                log::info!(
+                    "✅ [KG-DEBUG] KG preprocessing completed for document '{}'. Links added: {}",
+                    doc.title,
+                    links_added
+                );
+                if links_added {
+                    log::debug!(
+                        "🔍 [KG-DEBUG] Processed body preview: {}",
+                        doc.body.chars().take(200).collect::<String>()
+                    );
+                }
+                doc
+            }
+            Err(e) => {
+                log::error!(
+                    "❌ [KG-DEBUG] KG preprocessing failed for document '{}': {:?}",
+                    document_title,
+                    e
+                );
+                return Err(e);
+            }
+        };
 
         Ok(processed_doc)
     }
@@ -1111,37 +1053,14 @@ impl TerraphimService {
     ) -> Result<Vec<Document>> {
         use crate::llm::{build_llm_from_role, SummarizeOptions};
 
-        log::debug!(
-            "[DEBUGGER:enhance_ai:{}] enhance_descriptions_with_ai called for role '{}' with {} documents",
-            line!(),
-            role.name,
-            documents.len()
-        );
-
-        // Get config from config_state for fallback models
-        let config = self.config_state.config.lock().await.clone();
-        log::debug!(
-            "[DEBUGGER:enhance_ai:{}] config default_summarization_model={:?}, default_model_provider={:?}",
-            line!(),
-            config.default_summarization_model,
-            config.default_model_provider
-        );
-
+        eprintln!("🤖 Attempting to build LLM client for role: {}", role.name);
         let llm = match build_llm_from_role(role) {
             Some(client) => {
-                log::debug!(
-                    "[DEBUGGER:enhance_ai:{}] LLM client built successfully: {}",
-                    line!(),
-                    client.name()
-                );
+                eprintln!("✅ LLM client successfully created: {}", client.name());
                 client
             }
             None => {
-                log::warn!(
-                    "[DEBUGGER:enhance_ai:{}] Failed to build LLM client for role '{}', returning original documents",
-                    line!(),
-                    role.name
-                );
+                eprintln!("❌ No LLM client available for role: {}", role.name);
                 return Ok(documents);
             }
         };
@@ -1226,75 +1145,6 @@ impl TerraphimService {
         true
     }
 
-    /// Submit documents for async summarization and return immediately
-    ///
-    /// This method queues documents for background summarization without blocking
-    /// the search response. Returns task IDs that can be used to track progress.
-    async fn submit_async_summarization(
-        &self,
-        documents: Vec<Document>,
-        role: &Role,
-    ) -> Result<Vec<String>> {
-        let mut task_ids = Vec::new();
-
-        if let Some(ref manager) = self.summarization_manager {
-            // Get config for task
-            let config = self.config_state.config.lock().await.clone();
-
-            // Lock the manager to access its methods
-            let manager = manager.lock().await;
-
-            for document in documents {
-                if self.should_generate_ai_summary(&document) {
-                    match manager
-                        .summarize_document_with_config(
-                            document,
-                            role.clone(),
-                            config.clone(),
-                            None,       // priority
-                            None,       // max_summary_length
-                            Some(true), // force_regenerate - always use real LLM for auto-summarization
-                            None,       // callback_url
-                        )
-                        .await
-                    {
-                        Ok(submit_result) => match submit_result {
-                            crate::summarization_queue::SubmitResult::Queued {
-                                task_id, ..
-                            } => {
-                                task_ids.push(task_id.to_string());
-                                log::debug!(
-                                    "Submitted document for async summarization: {}",
-                                    task_id
-                                );
-                            }
-                            crate::summarization_queue::SubmitResult::Duplicate(task_id) => {
-                                task_ids.push(task_id.to_string());
-                                log::debug!(
-                                    "Document already queued for summarization: {}",
-                                    task_id
-                                );
-                            }
-                            crate::summarization_queue::SubmitResult::QueueFull => {
-                                log::warn!("Failed to submit document: queue is full");
-                            }
-                            crate::summarization_queue::SubmitResult::ValidationError(err) => {
-                                log::warn!("Failed to submit document: validation error: {}", err);
-                            }
-                        },
-                        Err(e) => {
-                            log::warn!("Failed to submit document for summarization: {}", e);
-                        }
-                    }
-                }
-            }
-        } else {
-            log::warn!("Summarization manager not available for async summarization");
-        }
-
-        Ok(task_ids)
-    }
-
     /// Get the role for the given search query
     async fn get_search_role(&self, search_query: &SearchQuery) -> Result<Role> {
         let search_role = match &search_query.role {
@@ -1321,69 +1171,6 @@ impl TerraphimService {
             // Fallback to simple contains if regex compilation fails
             text.contains(term)
         }
-    }
-
-    /// Check if a position in text is inside an existing HTML link tag
-    fn is_inside_link(text: &str, position: usize) -> bool {
-        // Find the most recent opening <a> tag before this position
-        let text_before = &text[..position];
-        let last_open = text_before.rfind("<a ");
-        let last_close = text_before.rfind("</a>");
-
-        match (last_open, last_close) {
-            (Some(open_pos), Some(close_pos)) => open_pos > close_pos,
-            (Some(_), None) => true,
-            _ => false,
-        }
-    }
-
-    /// Highlight search terms in text without interfering with existing KG links
-    fn highlight_search_terms(text: &str, search_query: &SearchQuery) -> String {
-        let mut result = text.to_string();
-
-        // Get all search terms from the query
-        let all_terms = search_query.get_all_terms();
-
-        for term in all_terms {
-            let term_str = term.as_str();
-            log::debug!("Highlighting search term: '{}'", term_str);
-
-            // Create regex pattern with word boundaries for better matching
-            let pattern = format!(r"\b{}\b", regex::escape(term_str));
-            if let Ok(regex) = Regex::new(&pattern) {
-                // Find all matches and their positions first to avoid borrow conflicts
-                let matches: Vec<_> = regex
-                    .find_iter(&result)
-                    .map(|m| (m.start(), m.end(), result[m.start()..m.end()].to_string()))
-                    .collect();
-
-                // Apply highlighting in reverse order to maintain positions
-                for (start, end, matched_text) in matches.into_iter().rev() {
-                    // Only highlight if not inside an existing link
-                    if !Self::is_inside_link(&result, start) {
-                        let highlighted =
-                            format!("<mark class='search-highlight'>{}</mark>", matched_text);
-                        result.replace_range(start..end, &highlighted);
-                        log::debug!(
-                            "Highlighted '{}' at position {}-{}",
-                            matched_text,
-                            start,
-                            end
-                        );
-                    } else {
-                        log::debug!(
-                            "Skipping highlight for '{}' at position {} (inside link)",
-                            matched_text,
-                            start
-                        );
-                    }
-                }
-            } else {
-                log::warn!("Failed to compile regex for term: '{}'", term_str);
-            }
-        }
-
-        result
     }
 
     /// Apply logical operators (AND/OR) to filter documents based on multiple search terms
@@ -1468,7 +1255,7 @@ impl TerraphimService {
         search_term: &NormalizedTermValue,
     ) -> Result<Vec<Document>> {
         let role = self.config_state.get_selected_role().await;
-        let search_result = self
+        let documents = self
             .search(&SearchQuery {
                 search_term: search_term.clone(),
                 search_terms: None,
@@ -1478,62 +1265,11 @@ impl TerraphimService {
                 limit: None,
             })
             .await?;
-        Ok(search_result.documents)
-    }
-
-    /// Apply haystack weights to documents based on their source
-    async fn apply_haystack_weights(
-        &self,
-        mut documents: Vec<Document>,
-        search_query: &SearchQuery,
-    ) -> Result<Vec<Document>> {
-        let config = self.config_state.config.lock().await.clone();
-        let search_query_role = search_query.role.clone().unwrap_or(config.default_role);
-
-        let role = config.roles.get(&search_query_role).ok_or_else(|| {
-            ServiceError::Config(format!("Role '{}' not found", search_query_role))
-        })?;
-
-        // Create a map of haystack location to weight for quick lookup
-        let haystack_weights: std::collections::HashMap<String, f64> = role
-            .haystacks
-            .iter()
-            .map(|h| (h.location.clone(), h.weight))
-            .collect();
-
-        // Apply weights to document ranks
-        for document in &mut documents {
-            if let (Some(source), Some(current_rank)) = (&document.source_haystack, document.rank) {
-                let weight = haystack_weights.get(source).unwrap_or(&1.0);
-                let weighted_rank = (current_rank as f64 * weight).round() as u64;
-                document.rank = Some(weighted_rank);
-
-                log::trace!(
-                    "Applied weight {} to document '{}' from haystack '{}': rank {} -> {}",
-                    weight,
-                    document.title,
-                    source,
-                    current_rank,
-                    weighted_rank
-                );
-            }
-        }
-
-        // Re-sort documents by their new weighted ranks (highest rank first)
-        documents.sort_by(|a, b| {
-            let rank_a = a.rank.unwrap_or(0);
-            let rank_b = b.rank.unwrap_or(0);
-            rank_b.cmp(&rank_a)
-        });
-
         Ok(documents)
     }
 
     /// Search for documents in the haystacks
-    pub async fn search(&mut self, search_query: &SearchQuery) -> Result<SearchResult> {
-        // Initialize task IDs collection for async summarization tracking
-        let mut all_task_ids = Vec::new();
-
+    pub async fn search(&mut self, search_query: &SearchQuery) -> Result<Vec<Document>> {
         // Get the role from the config
         log::debug!("Role for searching: {:?}", search_query.role);
         let role = self.get_search_role(search_query).await?;
@@ -1676,46 +1412,32 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply haystack weights to improve ranking of high-priority sources
-                docs_ranked = self
-                    .apply_haystack_weights(docs_ranked, search_query)
-                    .await?;
-
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 // Apply AI summarization if enabled via OpenRouter or generic LLM config
-                // Submit documents for async summarization instead of blocking
-                let should_use_openrouter = {
-                    #[cfg(feature = "openrouter")]
-                    {
-                        role.has_openrouter_config() && role.openrouter_auto_summarize
-                    }
-                    #[cfg(not(feature = "openrouter"))]
-                    {
-                        false
-                    }
-                };
-
-                // Check if role wants AI summarization via generic LLM config
-                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
-
-                if should_use_openrouter || should_use_llm_auto_summarize {
-                    if should_use_openrouter {
-                        log::debug!(
-                            "Submitting {} search results for async OpenRouter AI summarization for role '{}'",
-                            docs_ranked.len(),
-                            role.name
-                        );
-                    } else {
-                        log::debug!(
-                            "Submitting {} search results for async LLM AI summarization for role '{}'",
-                            docs_ranked.len(),
-                            role.name
-                        );
-                    }
-
-                    let task_ids = self
-                        .submit_async_summarization(docs_ranked.clone(), &role)
+                #[cfg(feature = "openrouter")]
+                if role.has_llm_config() && role.llm_auto_summarize {
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                    all_task_ids.extend(task_ids);
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
+                    eprintln!(
+                        "📋 Entering LLM AI summarization branch for role: {}",
+                        role.name
+                    );
+                    log::debug!(
+                        "Applying LLM AI summarization to {} search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
@@ -1752,15 +1474,9 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(processed_docs)
                 } else {
-                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(docs_ranked)
                 }
             }
             RelevanceFunction::BM25 => {
@@ -1800,41 +1516,23 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply haystack weights to improve ranking of high-priority sources
-                docs_ranked = self
-                    .apply_haystack_weights(docs_ranked, search_query)
-                    .await?;
-
-                // Apply AI summarization if enabled via OpenRouter or generic LLM config
-                let should_use_openrouter = {
-                    #[cfg(feature = "openrouter")]
-                    {
-                        role.has_openrouter_config() && role.openrouter_auto_summarize
-                    }
-                    #[cfg(not(feature = "openrouter"))]
-                    {
-                        false
-                    }
-                };
-
-                // Check if role wants AI summarization via generic LLM config
-                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
-
-                if should_use_openrouter || should_use_llm_auto_summarize {
-                    if should_use_openrouter {
-                        log::debug!("Submitting {} BM25 search results for background OpenRouter AI summarization for role '{}'", docs_ranked.len(), role.name);
-                    } else {
-                        log::debug!(
-                            "Submitting {} BM25 search results for background LLM AI summarization for role '{}'",
-                            docs_ranked.len(),
-                            role.name
-                        );
-                    }
-
-                    let task_ids = self
-                        .submit_async_summarization(docs_ranked.clone(), &role)
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
+                #[cfg(feature = "openrouter")]
+                if role.has_llm_config() && role.llm_auto_summarize {
+                    log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                    all_task_ids.extend(task_ids);
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
+                    log::debug!(
+                        "Applying LLM AI summarization to {} BM25 search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -1870,15 +1568,9 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(processed_docs)
                 } else {
-                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(docs_ranked)
                 }
             }
             RelevanceFunction::BM25F => {
@@ -1918,41 +1610,23 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply haystack weights to improve ranking of high-priority sources
-                docs_ranked = self
-                    .apply_haystack_weights(docs_ranked, search_query)
-                    .await?;
-
-                // Apply AI summarization if enabled via OpenRouter or generic LLM config
-                let should_use_openrouter = {
-                    #[cfg(feature = "openrouter")]
-                    {
-                        role.has_openrouter_config() && role.openrouter_auto_summarize
-                    }
-                    #[cfg(not(feature = "openrouter"))]
-                    {
-                        false
-                    }
-                };
-
-                // Check if role wants AI summarization via generic LLM config
-                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
-
-                if should_use_openrouter || should_use_llm_auto_summarize {
-                    if should_use_openrouter {
-                        log::debug!("Submitting {} BM25F search results for background OpenRouter AI summarization for role '{}'", docs_ranked.len(), role.name);
-                    } else {
-                        log::debug!(
-                            "Submitting {} BM25F search results for background LLM AI summarization for role '{}'",
-                            docs_ranked.len(),
-                            role.name
-                        );
-                    }
-
-                    let task_ids = self
-                        .submit_async_summarization(docs_ranked.clone(), &role)
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
+                #[cfg(feature = "openrouter")]
+                if role.has_llm_config() && role.llm_auto_summarize {
+                    log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                    all_task_ids.extend(task_ids);
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
+                    log::debug!(
+                        "Applying LLM AI summarization to {} BM25F search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
+                        .await?;
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -1988,15 +1662,9 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(processed_docs)
                 } else {
-                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(docs_ranked)
                 }
             }
             RelevanceFunction::BM25Plus => {
@@ -2036,41 +1704,13 @@ impl TerraphimService {
                     docs_ranked.push(document);
                 }
 
-                // Apply haystack weights to improve ranking of high-priority sources
-                docs_ranked = self
-                    .apply_haystack_weights(docs_ranked, search_query)
-                    .await?;
-
-                // Apply AI summarization if enabled via OpenRouter or generic LLM config
-                let should_use_openrouter = {
-                    #[cfg(feature = "openrouter")]
-                    {
-                        role.has_openrouter_config() && role.openrouter_auto_summarize
-                    }
-                    #[cfg(not(feature = "openrouter"))]
-                    {
-                        false
-                    }
-                };
-
-                // Check if role wants AI summarization via generic LLM config
-                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
-
-                if should_use_openrouter || should_use_llm_auto_summarize {
-                    if should_use_openrouter {
-                        log::debug!("Submitting {} BM25Plus search results for background OpenRouter AI summarization for role '{}'", docs_ranked.len(), role.name);
-                    } else {
-                        log::debug!(
-                            "Submitting {} BM25Plus search results for background LLM AI summarization for role '{}'",
-                            docs_ranked.len(),
-                            role.name
-                        );
-                    }
-
-                    let task_ids = self
-                        .submit_async_summarization(docs_ranked.clone(), &role)
+                // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
+                #[cfg(feature = "openrouter")]
+                if role.has_llm_config() && role.llm_auto_summarize {
+                    log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
+                    docs_ranked = self
+                        .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
-                    all_task_ids.extend(task_ids);
                 }
 
                 // Apply KG preprocessing if enabled for this role
@@ -2106,18 +1746,13 @@ impl TerraphimService {
                         docs_with_kg_links,
                         total_kg_terms
                     );
-                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(processed_docs)
                 } else {
-                    let result = SearchResult::with_task_ids(docs_ranked, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(docs_ranked)
                 }
             }
             RelevanceFunction::TerraphimGraph => {
+                eprintln!("🧠 TerraphimGraph search initiated for role: {}", role.name);
                 self.build_thesaurus(search_query).await?;
                 let _thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
                 let scored_index_docs: Vec<IndexedDocument> = self
@@ -2265,7 +1900,6 @@ impl TerraphimService {
                                                 stub: None,
                                                 tags: document.tags.clone(),
                                                 rank: document.rank,
-                                                source_haystack: document.source_haystack.clone(),
                                             };
 
                                             // Save to persistence for future use
@@ -2461,44 +2095,24 @@ impl TerraphimService {
                     }
                 }
 
-                // Apply AI summarization if enabled via OpenRouter or generic LLM config
-                let should_use_openrouter = {
-                    #[cfg(feature = "openrouter")]
-                    {
-                        role.has_openrouter_config() && role.openrouter_auto_summarize
-                    }
-                    #[cfg(not(feature = "openrouter"))]
-                    {
-                        false
-                    }
-                };
-
-                // Check if role wants AI summarization via generic LLM config
-                let should_use_llm_auto_summarize = crate::llm::role_wants_ai_summarize(&role);
-
-                if should_use_openrouter || should_use_llm_auto_summarize {
-                    if should_use_openrouter {
-                        log::debug!(
-                            "Submitting {} TerraphimGraph search results for background OpenRouter AI summarization for role '{}'",
-                            documents.len(),
-                            role.name
-                        );
-                    } else {
-                        log::debug!(
-                            "Submitting {} TerraphimGraph search results for background LLM AI summarization for role '{}'",
-                            documents.len(),
-                            role.name
-                        );
-                    }
-
-                    let task_ids = self
-                        .submit_async_summarization(documents.clone(), &role)
-                        .await?;
-                    all_task_ids.extend(task_ids);
+                // Apply OpenRouter AI summarization if enabled for this role
+                #[cfg(feature = "openrouter")]
+                if role.has_llm_config() {
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} search results for role '{}'",
+                        documents.len(),
+                        role.name
+                    );
+                    documents = self.enhance_descriptions_with_ai(documents, &role).await?;
+                } else {
+                    // Always apply LLM AI summarization if LLM client is available
+                    log::debug!(
+                        "Applying LLM AI summarization to {} search results for role '{}'",
+                        documents.len(),
+                        role.name
+                    );
+                    documents = self.enhance_descriptions_with_ai(documents, &role).await?;
                 }
-
-                // Apply haystack weights to improve ranking of high-priority sources
-                documents = self.apply_haystack_weights(documents, search_query).await?;
 
                 // Apply KG preprocessing if enabled for this role (but only once, not in individual document loads)
                 if role.terraphim_it {
@@ -2509,24 +2123,13 @@ impl TerraphimService {
                     );
                     let mut processed_docs = Vec::new();
                     for document in documents {
-                        let processed_doc = self
-                            .preprocess_document_content_with_search(
-                                document,
-                                &role,
-                                Some(search_query),
-                            )
-                            .await?;
+                        let processed_doc =
+                            self.preprocess_document_content(document, &role).await?;
                         processed_docs.push(processed_doc);
                     }
-                    let result = SearchResult::with_task_ids(processed_docs, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(processed_docs)
                 } else {
-                    let result = SearchResult::with_task_ids(documents, all_task_ids);
-                    Ok(result
-                        .merge_completed_summaries(self.summarization_manager.as_ref())
-                        .await)
+                    Ok(documents)
                 }
             }
         }
@@ -2895,6 +2498,17 @@ impl TerraphimService {
         current_config.clone()
     }
 
+    // Test helper methods
+    #[cfg(test)]
+    pub async fn get_role(&self, role_name: &RoleName) -> Result<Role> {
+        let config = self.config_state.config.lock().await;
+        config
+            .roles
+            .get(role_name)
+            .cloned()
+            .ok_or_else(|| ServiceError::Config(format!("Role '{}' not found", role_name)))
+    }
+
     /// Update the config
     ///
     /// Overwrites the config in the config state and returns the updated
@@ -2949,6 +2563,50 @@ impl TerraphimService {
         }
 
         Ok(current_config.clone())
+    }
+
+    /// Highlight search terms in the given text content
+    ///
+    /// This method wraps matching search terms with HTML-style highlighting tags
+    /// to make them visually distinct in the frontend.
+    fn highlight_search_terms(content: &str, search_query: &SearchQuery) -> String {
+        let mut highlighted_content = content.to_string();
+
+        // Get all terms from the search query
+        let terms = search_query.get_all_terms();
+
+        // Sort terms by length (longest first) to avoid partial replacements
+        let mut sorted_terms: Vec<&str> = terms.iter().map(|t| t.as_str()).collect();
+        sorted_terms.sort_by_key(|term| std::cmp::Reverse(term.len()));
+
+        for term in sorted_terms {
+            if term.trim().is_empty() {
+                continue;
+            }
+
+            // Create case-insensitive regex for the term
+            // Escape special regex characters in the search term
+            let escaped_term = regex::escape(term);
+
+            if let Ok(regex) = regex::RegexBuilder::new(&escaped_term)
+                .case_insensitive(true)
+                .build()
+            {
+                // Replace all matches with highlighted version
+                // Use a unique delimiter to avoid conflicts with existing HTML
+                let highlight_open = "<mark class=\"search-highlight\">";
+                let highlight_close = "</mark>";
+
+                highlighted_content = regex
+                    .replace_all(
+                        &highlighted_content,
+                        format!("{}{}{}", highlight_open, "$0", highlight_close),
+                    )
+                    .to_string();
+            }
+        }
+
+        highlighted_content
     }
 }
 
@@ -3093,28 +2751,25 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
-                weight: 1.0,
-                fetch_content: false,
             }],
             kg: None,
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -3163,28 +2818,25 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
-                weight: 1.0,
-                fetch_content: false,
             }],
             kg: None,
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -3203,7 +2855,6 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
-            source_haystack: None,
         };
 
         // Test 1: Save Atomic Data document to persistence
@@ -3278,8 +2929,6 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
-                weight: 1.0,
-                fetch_content: false,
             }],
             kg: Some(KnowledgeGraph {
                 automata_path: None,
@@ -3294,20 +2943,19 @@ mod tests {
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -3326,7 +2974,6 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
-            source_haystack: None,
         };
 
         // Save the Atomic Data document to persistence
@@ -3405,8 +3052,6 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
-                weight: 1.0,
-                fetch_content: false,
             }],
             kg: Some(terraphim_config::KnowledgeGraph {
                 automata_path: Some(terraphim_automata::AutomataPath::local_example()),
@@ -3418,20 +3063,19 @@ mod tests {
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
+            llm_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
+            llm_api_key: None,
             #[cfg(feature = "openrouter")]
-            openrouter_model: None,
+            llm_model: None,
             #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
+            llm_auto_summarize: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
+            llm_chat_enabled: false,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
+            llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_chat_model: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -3451,7 +3095,6 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "first".to_string()]),
                 rank: None, // Should be assigned by the function
-                source_haystack: None,
             },
             Document {
                 id: "test-doc-2".to_string(),
@@ -3463,7 +3106,6 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "second".to_string()]),
                 rank: None, // Should be assigned by the function
-                source_haystack: None,
             },
             Document {
                 id: "test-doc-3".to_string(),
@@ -3475,7 +3117,6 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "third".to_string()]),
                 rank: None, // Should be assigned by the function
-                source_haystack: None,
             },
         ];
 

@@ -1,129 +1,66 @@
-//! Direct HTTP LLM Client - Goose-inspired Implementation
+//! Rust-GenAI LLM Client - Unified Multi-Provider Implementation
 //!
-//! This implementation uses reqwest directly to communicate with LLM providers,
-//! avoiding dependency issues with rig-core and genai crates that require unstable Rust features.
-//! This approach provides maximum control and compatibility.
-
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
+//! This implementation uses the rust-genai library to provide a unified interface
+//! to multiple LLM providers. The library handles provider-specific details,
+//! authentication, and response formatting automatically.
 
 use crate::{LlmRequest, LlmResponse, MessageRole, MultiAgentError, MultiAgentResult, TokenUsage};
 use chrono::Utc;
-use tiktoken_rs::{
-    cl100k_base, get_chat_completion_max_tokens, o200k_base, ChatCompletionRequestMessage,
-};
+use genai::Client;
+use genai::chat::{ChatMessage, ChatOptions, ChatRequest};
 use uuid::Uuid;
 
-/// Direct HTTP LLM client that works with multiple providers
+/// Rust-GenAI LLM client that works with multiple providers
 #[derive(Debug)]
 pub struct GenAiLlmClient {
     client: Client,
     provider: String,
     model: String,
-    base_url: String,
 }
 
 /// Configuration for different LLM providers
 #[derive(Debug, Clone)]
 pub struct ProviderConfig {
-    pub base_url: String,
     pub model: String,
-    pub requires_auth: bool,
 }
 
 impl ProviderConfig {
     pub fn ollama(model: Option<String>) -> Self {
         Self {
-            base_url: "http://127.0.0.1:11434".to_string(),
             model: model.unwrap_or_else(|| "gemma3:270m".to_string()),
-            requires_auth: false,
         }
     }
 
     pub fn openai(model: Option<String>) -> Self {
         Self {
-            base_url: "https://api.openai.com/v1".to_string(),
             model: model.unwrap_or_else(|| "gpt-3.5-turbo".to_string()),
-            requires_auth: true,
         }
     }
 
     pub fn anthropic(model: Option<String>) -> Self {
         Self {
-            base_url: "https://api.anthropic.com/v1".to_string(),
             model: model.unwrap_or_else(|| "claude-3-sonnet-20240229".to_string()),
-            requires_auth: true,
+        }
+    }
+
+    pub fn openrouter(model: Option<String>) -> Self {
+        Self {
+            model: model.unwrap_or_else(|| "anthropic/claude-3.5-sonnet".to_string()),
         }
     }
 }
 
-/// Request format for Ollama API
-#[derive(Debug, Serialize)]
-struct OllamaRequest {
-    model: String,
-    messages: Vec<OllamaMessage>,
-    stream: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct OllamaMessage {
-    role: String,
-    content: String,
-}
-
-/// Response format for Ollama API
-#[derive(Debug, Deserialize)]
-struct OllamaResponse {
-    message: OllamaResponseMessage,
-}
-
-#[derive(Debug, Deserialize)]
-struct OllamaResponseMessage {
-    content: String,
-}
-
-/// Request format for OpenAI API
-#[derive(Debug, Serialize)]
-struct OpenAiRequest {
-    model: String,
-    messages: Vec<OpenAiMessage>,
-    max_tokens: Option<u32>,
-    temperature: Option<f32>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OpenAiMessage {
-    role: String,
-    content: String,
-}
-
-/// Response format for OpenAI API
-#[derive(Debug, Deserialize)]
-struct OpenAiResponse {
-    choices: Vec<OpenAiChoice>,
-}
-
-#[derive(Debug, Deserialize)]
-struct OpenAiChoice {
-    message: OpenAiMessage,
-}
+// All request/response formats are now handled by rust-genai library
 
 impl GenAiLlmClient {
-    /// Create a new Direct HTTP LLM client
+    /// Create a new Rust-GenAI LLM client
     pub fn new(provider: String, config: ProviderConfig) -> MultiAgentResult<Self> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(300)) // Increased from 30 to 300 seconds for complex workflows
-            .build()
-            .map_err(|e| {
-                MultiAgentError::LlmError(format!("Failed to create HTTP client: {}", e))
-            })?;
+        let client = Client::default();
 
         Ok(Self {
             client,
             provider,
             model: config.model,
-            base_url: config.base_url,
         })
     }
 
@@ -145,38 +82,101 @@ impl GenAiLlmClient {
         Self::new("anthropic".to_string(), config)
     }
 
-    /// Generate response using the HTTP client
+    /// Create a new client for OpenRouter
+    pub fn new_openrouter(model_name: Option<String>) -> MultiAgentResult<Self> {
+        let config = ProviderConfig::openrouter(model_name);
+        Self::new("openrouter".to_string(), config)
+    }
+
+    /// Convert LlmMessage to genai ChatMessage
+    fn convert_message(msg: &crate::LlmMessage) -> ChatMessage {
+        match msg.role {
+            MessageRole::System => ChatMessage::system(msg.content.clone()),
+            MessageRole::User => ChatMessage::user(msg.content.clone()),
+            MessageRole::Assistant => ChatMessage::assistant(msg.content.clone()),
+            MessageRole::Tool => ChatMessage::user(msg.content.clone()), // Map tool to user
+        }
+    }
+
+    /// Generate response using rust-genai
     pub async fn generate(&self, request: LlmRequest) -> MultiAgentResult<LlmResponse> {
         let start_time = Utc::now();
         let request_id = Uuid::new_v4();
 
-        let response_content = match self.provider.as_str() {
-            "ollama" => self.call_ollama(&request).await?,
-            "openai" => self.call_openai(&request).await?,
-            "anthropic" => self.call_anthropic(&request).await?,
-            _ => {
-                return Err(MultiAgentError::LlmError(format!(
-                    "Unsupported provider: {}",
-                    self.provider
-                )))
-            }
-        };
+        // Convert messages
+        let messages: Vec<ChatMessage> =
+            request.messages.iter().map(Self::convert_message).collect();
+
+        // Create chat request and options
+        let chat_req = ChatRequest::new(messages);
+
+        // Debug logging
+        log::debug!(
+            "🤖 LLM Request using rust-genai: {} ({})",
+            self.model,
+            self.provider
+        );
+        log::debug!("📋 Messages ({})", chat_req.messages.len());
+
+        let mut options = ChatOptions::default();
+        if let Some(temp) = request.temperature {
+            options = options.with_temperature(temp as f64);
+        }
+        if let Some(max_tokens) = request.max_tokens {
+            options = options.with_max_tokens(max_tokens as u32);
+        }
+
+        let chat_res = self
+            .client
+            .exec_chat(&self.model, chat_req, Some(&options))
+            .await
+            .map_err(|e| {
+                log::error!("❌ rust-genai error: {}", e);
+                MultiAgentError::LlmError(format!("rust-genai error: {}", e))
+            })?;
 
         let end_time = Utc::now();
         let duration_ms = (end_time - start_time).num_milliseconds() as u64;
 
-        // Estimate token usage using tiktoken
-        let (input_tokens, output_tokens) = self.estimate_tokens(&request, &response_content);
+        // Extract content from response
+        let content = match &chat_res.content {
+            Some(genai::chat::MessageContent::Text(text)) => text.clone(),
+            Some(genai::chat::MessageContent::Parts(parts)) => {
+                // For multi-part content, concatenate text parts
+                parts
+                    .iter()
+                    .filter_map(|part| match part {
+                        genai::chat::ContentPart::Text(text) => Some(text.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+            Some(genai::chat::MessageContent::ToolCalls(_)) => {
+                "Tool calls not supported".to_string()
+            }
+            Some(genai::chat::MessageContent::ToolResponses(_)) => {
+                "Tool responses not supported".to_string()
+            }
+            None => "No response".to_string(),
+        };
+
+        // Extract token usage if available
+        let (input_tokens, output_tokens) = (
+            chat_res.usage.prompt_tokens.unwrap_or(0) as u64,
+            chat_res.usage.completion_tokens.unwrap_or(0) as u64,
+        );
 
         log::debug!(
-            "Token usage - Input: {}, Output: {}, Total: {}",
+            "✅ LLM Response from {}: {} chars, tokens: {}/{}",
+            self.model,
+            content.len(),
             input_tokens,
-            output_tokens,
-            input_tokens + output_tokens
+            output_tokens
         );
 
         Ok(LlmResponse {
-            content: response_content,
+            content,
             model: self.model.clone(),
             usage: TokenUsage::new(input_tokens, output_tokens),
             request_id,
@@ -184,162 +184,6 @@ impl GenAiLlmClient {
             duration_ms,
             finish_reason: "completed".to_string(),
         })
-    }
-
-    /// Call Ollama API
-    async fn call_ollama(&self, request: &LlmRequest) -> MultiAgentResult<String> {
-        let messages: Vec<OllamaMessage> = request
-            .messages
-            .iter()
-            .map(|msg| OllamaMessage {
-                role: match msg.role {
-                    MessageRole::User => "user".to_string(),
-                    MessageRole::Assistant => "assistant".to_string(),
-                    MessageRole::System => "system".to_string(),
-                    MessageRole::Tool => "user".to_string(), // Ollama doesn't have tool role
-                },
-                content: msg.content.clone(),
-            })
-            .collect();
-
-        let ollama_request = OllamaRequest {
-            model: self.model.clone(),
-            messages,
-            stream: false,
-        };
-
-        let url = format!("{}/api/chat", self.base_url);
-
-        // Debug logging - log the request details
-        log::debug!("🤖 LLM Request to Ollama: {} at {}", self.model, url);
-        log::debug!("📋 Messages ({}):", ollama_request.messages.len());
-        for (i, msg) in ollama_request.messages.iter().enumerate() {
-            log::debug!(
-                "  [{}] {}: {}",
-                i + 1,
-                msg.role,
-                if msg.content.len() > 200 {
-                    format!("{}...", &msg.content[..200])
-                } else {
-                    msg.content.clone()
-                }
-            );
-        }
-
-        let response = self
-            .client
-            .post(&url)
-            .json(&ollama_request)
-            .send()
-            .await
-            .map_err(|e| {
-                log::error!("❌ Ollama API request failed: {}", e);
-                MultiAgentError::LlmError(format!("Ollama API request failed: {}", e))
-            })?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            log::error!("❌ Ollama API error {}: {}", status, text);
-            return Err(MultiAgentError::LlmError(format!(
-                "Ollama API error {}: {}",
-                status, text
-            )));
-        }
-
-        let ollama_response: OllamaResponse = response.json().await.map_err(|e| {
-            log::error!("❌ Failed to parse Ollama response: {}", e);
-            MultiAgentError::LlmError(format!("Failed to parse Ollama response: {}", e))
-        })?;
-
-        // Debug logging - log the response
-        let response_content = &ollama_response.message.content;
-        log::debug!(
-            "✅ LLM Response from {}: {}",
-            self.model,
-            if response_content.len() > 200 {
-                format!("{}...", &response_content[..200])
-            } else {
-                response_content.clone()
-            }
-        );
-
-        Ok(ollama_response.message.content)
-    }
-
-    /// Call OpenAI API (placeholder - requires API key setup)
-    async fn call_openai(&self, request: &LlmRequest) -> MultiAgentResult<String> {
-        let messages: Vec<OpenAiMessage> = request
-            .messages
-            .iter()
-            .map(|msg| OpenAiMessage {
-                role: match msg.role {
-                    MessageRole::User => "user".to_string(),
-                    MessageRole::Assistant => "assistant".to_string(),
-                    MessageRole::System => "system".to_string(),
-                    MessageRole::Tool => "tool".to_string(),
-                },
-                content: msg.content.clone(),
-            })
-            .collect();
-
-        let openai_request = OpenAiRequest {
-            model: self.model.clone(),
-            messages,
-            max_tokens: request.max_tokens.map(|t| t as u32),
-            temperature: request.temperature,
-        };
-
-        let url = format!("{}/chat/completions", self.base_url);
-
-        // TODO: Add API key from environment or config
-        let mut request_builder = self.client.post(&url).json(&openai_request);
-
-        if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-            request_builder = request_builder.bearer_auth(api_key);
-        } else {
-            return Err(MultiAgentError::LlmError(
-                "OpenAI API key not found in OPENAI_API_KEY environment variable".to_string(),
-            ));
-        }
-
-        let response = request_builder
-            .send()
-            .await
-            .map_err(|e| MultiAgentError::LlmError(format!("OpenAI API request failed: {}", e)))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(MultiAgentError::LlmError(format!(
-                "OpenAI API error {}: {}",
-                status, text
-            )));
-        }
-
-        let openai_response: OpenAiResponse = response.json().await.map_err(|e| {
-            MultiAgentError::LlmError(format!("Failed to parse OpenAI response: {}", e))
-        })?;
-
-        Ok(openai_response
-            .choices
-            .first()
-            .map(|choice| choice.message.content.clone())
-            .unwrap_or_else(|| "No response".to_string()))
-    }
-
-    /// Call Anthropic API (placeholder - requires API key setup)
-    async fn call_anthropic(&self, _request: &LlmRequest) -> MultiAgentResult<String> {
-        // TODO: Implement Anthropic API call
-        Err(MultiAgentError::LlmError(
-            "Anthropic API not implemented yet".to_string(),
-        ))
     }
 
     /// Get the model name
@@ -355,89 +199,6 @@ impl GenAiLlmClient {
     /// Get the provider name
     pub fn provider(&self) -> &str {
         &self.provider
-    }
-
-    /// Estimate token usage using tiktoken with proper chat completion support
-    fn estimate_tokens(&self, request: &LlmRequest, response: &str) -> (u64, u64) {
-        // Try to use the appropriate encoding for the model
-        let encoding = if self.model.contains("gpt-4o") || self.model.contains("gpt-4-turbo") {
-            o200k_base()
-        } else {
-            cl100k_base()
-        };
-
-        let encoding = match encoding {
-            Ok(enc) => enc,
-            Err(_) => {
-                // Ultimate fallback: rough character-based estimation
-                let input_text: String = request
-                    .messages
-                    .iter()
-                    .map(|m| m.content.clone())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                let input_tokens = (input_text.len() / 4) as u64;
-                let output_tokens = (response.len() / 4) as u64;
-                log::warn!("Using character-based token estimation fallback");
-                return (input_tokens, output_tokens);
-            }
-        };
-
-        // Get max tokens for this model
-        let tiktoken_messages: Vec<ChatCompletionRequestMessage> = request
-            .messages
-            .iter()
-            .map(|msg| ChatCompletionRequestMessage {
-                content: Some(msg.content.clone()),
-                role: match msg.role {
-                    MessageRole::User => "user".to_string(),
-                    MessageRole::Assistant => "assistant".to_string(),
-                    MessageRole::System => "system".to_string(),
-                    MessageRole::Tool => "user".to_string(), // Map tool to user for tiktoken
-                },
-                name: None,
-                function_call: None,
-            })
-            .collect();
-
-        let max_tokens =
-            get_chat_completion_max_tokens(&self.model, &tiktoken_messages).unwrap_or(4096);
-        log::debug!("Model {} max tokens: {}", self.model, max_tokens);
-
-        // For input tokens, count all messages properly
-        let input_text: String = request
-            .messages
-            .iter()
-            .map(|m| m.content.clone())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let input_tokens = encoding.encode_with_special_tokens(&input_text).len() as u64;
-
-        // For output tokens, encode the response
-        let output_tokens = encoding.encode_with_special_tokens(response).len() as u64;
-
-        // Check if we're approaching the token limit
-        let total_tokens = input_tokens + output_tokens;
-        if total_tokens > (max_tokens as u64 * 9 / 10) {
-            // 90% of max
-            log::warn!(
-                "Token usage approaching limit: {}/{} tokens for model {}",
-                total_tokens,
-                max_tokens,
-                self.model
-            );
-        }
-
-        log::debug!(
-            "Tiktoken estimation - Model: {}, Input: {} tokens, Output: {} tokens, Total: {}/{}",
-            self.model,
-            input_tokens,
-            output_tokens,
-            total_tokens,
-            max_tokens
-        );
-
-        (input_tokens, output_tokens)
     }
 }
 
@@ -464,46 +225,15 @@ impl GenAiLlmClient {
     }
 
     /// Create client from provider configuration with custom base URL
+    /// Note: rust-genai handles provider URLs automatically via environment variables
     pub fn from_config_with_url(
         provider: &str,
         model: Option<String>,
-        base_url: Option<String>,
+        _base_url: Option<String>, // Ignored - rust-genai uses env vars
     ) -> MultiAgentResult<Self> {
-        match provider.to_lowercase().as_str() {
-            "ollama" => {
-                let mut config = ProviderConfig::ollama(model);
-                if let Some(url) = base_url {
-                    config.base_url = url;
-                }
-                Self::new("ollama".to_string(), config)
-            }
-            "openai" => {
-                let mut config = ProviderConfig::openai(model);
-                if let Some(url) = base_url {
-                    config.base_url = url;
-                }
-                Self::new("openai".to_string(), config)
-            }
-            "anthropic" => {
-                let mut config = ProviderConfig::anthropic(model);
-                if let Some(url) = base_url {
-                    config.base_url = url;
-                }
-                Self::new("anthropic".to_string(), config)
-            }
-            _ => {
-                // Default to Ollama if unknown provider
-                log::warn!(
-                    "Unknown provider '{}', defaulting to Ollama with custom URL",
-                    provider
-                );
-                let mut config = ProviderConfig::ollama(model);
-                if let Some(url) = base_url {
-                    config.base_url = url;
-                }
-                Self::new("ollama".to_string(), config)
-            }
-        }
+        // Base URL configuration is handled by rust-genai via environment variables
+        // like OLLAMA_BASE_URL, OPENAI_API_BASE, etc.
+        Self::from_config(provider, model)
     }
 }
 

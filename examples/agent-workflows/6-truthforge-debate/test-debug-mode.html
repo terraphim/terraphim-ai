@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Debug Mode Test</title>
+    <link rel="stylesheet" href="../shared/debug-panel.css">
+</head>
+<body>
+    <h1>Debug Mode Integration Test</h1>
+
+    <button id="test-btn">Test Debug Logging</button>
+    <button id="toggle-debug">Toggle Debug Panel</button>
+
+    <div id="test-results"></div>
+    <div id="debug-panel-container"></div>
+
+    <script src="../shared/debug-panel.js"></script>
+    <script src="../shared/settings-manager.js"></script>
+    <script src="../shared/api-client.js"></script>
+
+    <script>
+        // Test 1: Debug Panel Initialization
+        console.log('Test 1: Initializing Debug Panel...');
+        const debugPanel = new DebugPanel('debug-panel-container');
+        console.log('✓ Debug Panel created:', debugPanel);
+
+        // Test 2: Settings Manager
+        console.log('Test 2: Initializing Settings Manager...');
+        const settingsManager = new TerraphimSettingsManager();
+        console.log('✓ Settings Manager created');
+        console.log('  - Debug mode enabled:', settingsManager.isDebugMode());
+
+        // Test 3: API Client
+        console.log('Test 3: Initializing API Client...');
+        const apiClient = new TerraphimApiClient('http://localhost:8000');
+        console.log('✓ API Client created');
+
+        // Test 4: Enable Debug Mode
+        console.log('Test 4: Enabling debug mode...');
+        apiClient.setDebugMode(true);
+        console.log('✓ Debug mode enabled in API client');
+
+        // Test 5: Connect debug panel to API client
+        console.log('Test 5: Connecting debug panel to API client...');
+        apiClient.onDebugLog((entry) => {
+            debugPanel.addEntry(entry);
+        });
+        console.log('✓ Debug panel connected');
+
+        // Test 6: Simulate LLM request
+        document.getElementById('test-btn').addEventListener('click', () => {
+            console.log('Test 6: Simulating LLM request...');
+
+            // Simulate request
+            apiClient.logDebug('request', {
+                endpoint: '/chat',
+                role: 'TestRole',
+                model: 'test-model',
+                prompt: 'This is a test prompt with sensitive data: user@example.com and api-key-12345',
+                payload: { test: true }
+            });
+
+            // Simulate response
+            setTimeout(() => {
+                apiClient.logDebug('response', {
+                    status: 'success',
+                    modelUsed: 'test-model',
+                    tokens: { input: 10, output: 20, total: 30 },
+                    duration: 1234,
+                    output: 'This is a test response with email test@test.com',
+                    fullResponse: { test: 'data' }
+                });
+            }, 1000);
+        });
+
+        // Test 7: Toggle debug panel visibility
+        let panelVisible = false;
+        document.getElementById('toggle-debug').addEventListener('click', () => {
+            panelVisible = !panelVisible;
+            const container = document.getElementById('debug-panel-container');
+            if (container) {
+                container.style.display = panelVisible ? 'block' : 'none';
+            }
+        });
+
+        // Show panel by default for testing
+        document.getElementById('debug-panel-container').style.display = 'block';
+
+        document.getElementById('test-results').innerHTML = `
+            <h2>Test Results:</h2>
+            <ul>
+                <li>✓ Debug Panel initialized</li>
+                <li>✓ Settings Manager initialized</li>
+                <li>✓ API Client initialized</li>
+                <li>✓ Debug mode enabled</li>
+                <li>✓ Debug panel connected</li>
+                <li>→ Click "Test Debug Logging" to simulate LLM requests</li>
+            </ul>
+        `;
+    </script>
+</body>
+</html>

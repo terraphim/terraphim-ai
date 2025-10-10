@@ -1,0 +1,229 @@
+[
+  {
+    "id": "relationship_management",
+    "name": "Relationship Management",
+    "description": "Building and maintaining mutually beneficial organization–public relationships via dialogic principles and sustained stakeholder engagement.",
+    "scope": ["external_stakeholders", "internal_stakeholders", "community", "media", "influencers", "partners"],
+    "coreConcepts": [
+      "dialogic_theory",
+      "relationship_management_theory",
+      "stakeholder_salience",
+      "trust_commitment_satisfaction",
+      "two_way_symmetry",
+      "listening_infrastructure"
+    ],
+    "subfunctions": [
+      {"name": "stakeholder_mapping", "outputs": ["stakeholder_register", "salience_matrix"]},
+      {"name": "engagement_design", "outputs": ["dialogue_playbooks", "channel_strategies"]},
+      {"name": "community_building", "outputs": ["advocacy_programs", "user_panels"]},
+      {"name": "feedback_loops", "outputs": ["voice_of_stakeholder_reports", "policy_change_logs"]},
+      {"name": "relationship_health_monitoring", "outputs": ["relationship_quality_index", "sentiment_dashboards"]}
+    ],
+    "lifecycle": [
+      "discover_stakeholders",
+      "prioritize_and_segment",
+      "design_dialogue",
+      "engage_and_co_create",
+      "measure_and_learn",
+      "sustain_and_scale"
+    ],
+    "channels": ["owned_media", "earned_media", "shared_social", "events", "community_forums", "internal_comms"],
+    "dataInputs": [
+      "stakeholder_directories",
+      "survey_data",
+      "social_listening",
+      "media_monitoring",
+      "crm_interactions",
+      "product_feedback"
+    ],
+    "artifacts": [
+      "stakeholder_map",
+      "engagement_calendar",
+      "dialogue_guidelines",
+      "Q&A_and_messaging_matrix",
+      "relationship_scorecards"
+    ],
+    "metrics": {
+      "relationshipQuality": ["trust", "commitment", "satisfaction", "mutual_control", "communal_exchange"],
+      "engagement": ["response_rate", "repeat_interactions", "community_growth"],
+      "outcomes": ["advocacy_rate", "issue_resolution_time", "policy_co_creation_count"]
+    },
+    "governance": {
+      "ownership": ["chief_communications_officer", "head_of_stakeholder_engagement"],
+      "cadence": "quarterly_review",
+      "policies": ["dialogue_ethics", "accessibility", "privacy_gdpr"]
+    },
+    "riskControls": [
+      "expectation_management",
+      "transparency_disclosures",
+      "bias_and_equity_reviews",
+      "grievance_redressal_process"
+    ],
+    "references": [
+      "kent_taylor_dialogic_theory",
+      "ledingham_relationship_management",
+      "grunig_symmetry_models"
+    ],
+    "version": "1.0.0",
+    "updated": "2025-09-11"
+  },
+  {
+    "id": "issue_crisis_management",
+    "name": "Issue & Crisis Management",
+    "description": "Anticipation, preparation, and response to issues and crises using evidence-based frameworks (e.g., SCCT) and multivocal sensemaking.",
+    "scope": ["pre_issue", "issue", "incident", "crisis", "post_crisis_learning"],
+    "coreConcepts": [
+      "situational_crisis_communication_theory",
+      "attribution_of_responsibility",
+      "stealing_thunder",
+      "multivocality",
+      "sensemaking",
+      "issue_life_cycle"
+    ],
+    "subfunctions": [
+      {"name": "horizon_scanning", "outputs": ["issue_register", "weak_signal_reports"]},
+      {"name": "risk_assessment", "outputs": ["impact_likelihood_matrix", "attribution_map"]},
+      {"name": "playbooks_and_scenarios", "outputs": ["SCCT_response_matrix", "holding_statements"]},
+      {"name": "war_room_operations", "outputs": ["sitreps", "decision_logs"]},
+      {"name": "recovery_and_learning", "outputs": ["post_mortems", "policy_updates"]}
+    ],
+    "lifecycle": [
+      "scan_and_detect",
+      "assess_and_classify",
+      "select_strategy",
+      "activate_and_respond",
+      "recover",
+      "learn_and_improve"
+    ],
+    "classification": {
+      "issueTypes": ["operational", "product_safety", "ethics_and_compliance", "cybersecurity", "leadership", "supply_chain", "environmental", "social_activism"],
+      "crisisSeverity": ["low", "moderate", "high", "severe"],
+      "responsibilityAttribution": ["victim", "accidental", "preventable"]
+    },
+    "strategyToolkit": {
+      "SCCT": {
+        "victim": ["instructing_information", "adjusting_information", "bolstering_care"],
+        "accidental": ["apology_if_warranted", "compensation", "corrective_action"],
+        "preventable": ["full_apology", "compensation", "leadership_accountability", "governance_change"]
+      },
+      "multivocal": ["acknowledge_multiple_stakeholder_frames", "amplify_independent_experts", "co_create_facts", "transparent_disagreement_logging"]
+    },
+    "channels": ["press_briefings", "owned_hub_page", "social_live_updates", "customer_care", "internal_alerts", "regulatory_filings"],
+    "dataInputs": [
+      "real_time_monitoring",
+      "media_and_social_analytics",
+      "customer_service_tickets",
+      "legal_and_compliance_flags",
+      "operational_telemetry"
+    ],
+    "artifacts": [
+      "crisis_communication_plan",
+      "contact_trees",
+      "holding_statements",
+      "Q&A_dossiers",
+      "issue_tracker",
+      "after_action_review"
+    ],
+    "metrics": {
+      "response": ["time_to_ack", "time_to_first_update", "cadence_adherence"],
+      "impact": ["sentiment_shift", "volume_peak_duration", "share_of_voice_recovery"],
+      "outcomes": ["reputation_delta", "stakeholder_trust_rebound", "regulatory_findings"],
+      "capability": ["exercise_coverage", "playbook_maturity", "post_mortem_closure_rate"]
+    },
+    "governance": {
+      "ownership": ["crisis_commander", "legal_counsel", "security_ops", "communications_lead"],
+      "cadence": "biannual_exercises",
+      "policies": ["disclosure_policy", "incident_severity_matrix", "regulatory_reporting_rules"]
+    },
+    "riskControls": [
+      "single_source_of_truth_portal",
+      "approval_workflows",
+      "pre_approved_assets",
+      "media_training",
+      "misinformation_countermeasures"
+    ],
+    "references": [
+      "coombs_SCCT_core_papers",
+      "frandsen_johansen_multivocal_crisis",
+      "fishman_stealing_thunder"
+    ],
+    "version": "1.0.0",
+    "updated": "2025-09-11"
+  },
+  {
+    "id": "strategic_management_function",
+    "name": "Strategic Management Function",
+    "description": "Embedding communication as a strategic management capability that informs and shapes organizational decisions at the executive level.",
+    "scope": ["enterprise_strategy", "governance", "risk", "reputation", "policy"],
+    "coreConcepts": [
+      "excellence_theory",
+      "environmental_scanning",
+      "issues_management",
+      "publics_segmentation",
+      "materiality",
+      "integrated_reporting"
+    ],
+    "subfunctions": [
+      {"name": "strategy_alignment", "outputs": ["comms_objectives_OKRs", "strategy_maps"]},
+      {"name": "executive_advisory", "outputs": ["board_memos", "risk_reputation_briefs"]},
+      {"name": "policy_and_standards", "outputs": ["communication_policies", "governance_raci"]},
+      {"name": "enterprise_listening", "outputs": ["materiality_matrix", "stakeholder_insight_reports"]},
+      {"name": "performance_management", "outputs": ["integrated_comms_scorecards", "ROI_attribution_models"]}
+    ],
+    "lifecycle": [
+      "scan_environment",
+      "diagnose_gaps",
+      "set_strategy_and_OKRs",
+      "enable_execution",
+      "measure_outcomes",
+      "refine_strategy"
+    ],
+    "decisionInterfaces": [
+      "board_meetings",
+      "risk_committee",
+      "ESG_committee",
+      "product_governance",
+      "IR_and_finance"
+    ],
+    "dataInputs": [
+      "market_and_policy_trends",
+      "stakeholder_analyses",
+      "investor_relations_data",
+      "employee_insights",
+      "brand_and_reputation_indices",
+      "operational_KPIs"
+    ],
+    "artifacts": [
+      "enterprise_comms_strategy",
+      "materiality_assessment",
+      "reputation_risk_register",
+      "executive_key_messages",
+      "measurement_framework"
+    ],
+    "metrics": {
+      "enterprise": ["reputation_index", "license_to_operate_indicators", "issue_pre_emption_rate"],
+      "alignment": ["OKR_attainment", "cross_functional_initiative_uptake"],
+      "efficiency": ["cost_per_outcome", "content_reuse_rate"],
+      "effectiveness": ["decision_influence_score", "policy_shift_events", "stakeholder_support_delta"]
+    },
+    "governance": {
+      "ownership": ["chief_communications_officer", "strategy_office", "CFO_for_IR_alignment"],
+      "cadence": "quarterly_strategy_reviews",
+      "policies": ["enterprise_listening_policy", "materiality_method", "measurement_and_reporting_standard"]
+    },
+    "riskControls": [
+      "pre_decision_stakeholder_checks",
+      "sensitivity_and_scenario_reviews",
+      "ethics_and_transparency_audits",
+      "cross_functional_RACI_alignment"
+    ],
+    "references": [
+      "grunig_excellence_study",
+      "dozier_managerial_roles",
+      "cornelissen_corporate_comms",
+      "van_riel_fombrun_reputation"
+    ],
+    "version": "1.0.0",
+    "updated": "2025-09-11"
+  }
+]
