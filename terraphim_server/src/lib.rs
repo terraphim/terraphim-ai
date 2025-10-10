@@ -1,14 +1,16 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::{
-    http::{header, Method, StatusCode, Uri},
+    http::{header, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
     Extension, Router,
 };
 use regex::Regex;
 use rust_embed::RustEmbed;
+use tokio::sync::{broadcast, RwLock};
 
 // Pre-compiled regex for normalizing document IDs (performance optimization)
 static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
@@ -22,17 +24,9 @@ use terraphim_service::summarization_manager::SummarizationManager;
 use terraphim_service::summarization_queue::QueueConfig;
 use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
-use tokio::sync::{broadcast::channel, Mutex};
+use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
-
-/// Application state for workflow execution
-#[derive(Clone)]
-pub struct AppState {
-    pub config_state: ConfigState,
-    pub workflow_sessions: Arc<workflows::WorkflowSessions>,
-    pub websocket_broadcaster: workflows::WebSocketBroadcaster,
-}
 
 /// Create a proper description from document content
 /// Collects multiple meaningful sentences to create informative descriptions
@@ -124,8 +118,9 @@ fn create_document_description(content: &str) -> Option<String> {
 }
 
 mod api;
-mod api_conversations;
 mod error;
+mod truthforge_api;
+mod truthforge_context;
 pub mod workflows;
 
 use api::{
@@ -144,8 +139,17 @@ pub use error::{Result, Status};
 static INDEX_HTML: &str = "index.html";
 
 #[derive(RustEmbed)]
-#[folder = "./dist"]
+#[folder = "../desktop/dist"]
 struct Assets;
+
+// Extended application state that includes workflow management
+#[derive(Clone)]
+pub struct AppState {
+    pub config_state: ConfigState,
+    pub workflow_sessions: Arc<workflows::WorkflowSessions>,
+    pub websocket_broadcaster: workflows::WebSocketBroadcaster,
+    pub truthforge_sessions: truthforge_api::SessionStore,
+}
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
     log::info!("Starting axum server");
@@ -247,7 +251,6 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     stub: None,
                                                     tags: None,
                                                     rank: None,
-                                                    source_haystack: None,
                                                 };
 
                                                 // Save document to persistence layer first
@@ -346,7 +349,6 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         stub: None,
                                                         tags: None,
                                                         rank: None,
-                                                        source_haystack: None,
                                                     };
 
                                                     // Save document to persistence layer
@@ -396,19 +398,22 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     // let assets = axum_embed::ServeEmbed::<Assets>::with_parameters(Some("index.html".to_owned()),axum_embed::FallbackBehavior::Ok, Some("index.html".to_owned()));
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
-    // Initialize summarization manager with Mutex for API handlers
-    let summarization_manager = Arc::new(Mutex::new(SummarizationManager::new(
-        QueueConfig::default(),
-    )));
+    // Initialize summarization manager
+    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
     log::info!("Initialized summarization manager with default configuration");
 
-    // Initialize AppState for workflow execution
-    let workflow_sessions = Arc::new(workflows::WorkflowSessions::default());
-    let (websocket_broadcaster, _) = tokio::sync::broadcast::channel(100);
+    // Initialize workflow management components
+    let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
+    let (websocket_broadcaster, _) = broadcast::channel(1000);
+    let truthforge_sessions = truthforge_api::SessionStore::new();
+    log::info!("Initialized workflow management system with WebSocket support");
+
+    // Create extended application state
     let app_state = AppState {
-        config_state: config_state.clone(),
+        config_state,
         workflow_sessions,
-        websocket_broadcaster: websocket_broadcaster.clone(),
+        websocket_broadcaster,
+        truthforge_sessions,
     };
 
     let app = Router::new()
@@ -454,9 +459,6 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
-        // TODO: Re-enable streaming when stream_task_status is implemented
-        // .route("/summarization/stream", get(api::stream_task_status))
-        // .route("/summarization/stream/", get(api::stream_task_status))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))
@@ -513,80 +515,55 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
-        // KG Context Management routes
-        // TODO: Re-enable KG context routes when API functions are implemented
-        // .route(
-        //     "/conversations/{id}/context/kg/search",
-        //     get(api::search_kg_terms),
-        // )
-        // .route(
-        //     "/conversations/{id}/context/kg/term",
-        //     post(api::add_kg_term_context),
-        // )
-        // .route(
-        //     "/conversations/{id}/context/kg/index",
-        //     post(api::add_kg_index_context),
-        // )
-        // Persistent conversation management routes (new)
+        // TruthForge API routes
         .route(
-            "/api/conversations",
-            get(api_conversations::list_persistent_conversations),
+            "/api/v1/truthforge",
+            post(truthforge_api::analyze_narrative),
         )
         .route(
-            "/api/conversations",
-            post(api_conversations::create_persistent_conversation),
+            "/api/v1/truthforge/",
+            post(truthforge_api::analyze_narrative),
         )
         .route(
-            "/api/conversations/search",
-            get(api_conversations::search_persistent_conversations),
+            "/api/v1/truthforge/analyses",
+            get(truthforge_api::list_analyses),
         )
         .route(
-            "/api/conversations/statistics",
-            get(api_conversations::get_conversation_statistics),
+            "/api/v1/truthforge/analyses/",
+            get(truthforge_api::list_analyses),
         )
         .route(
-            "/api/conversations/{id}",
-            get(api_conversations::get_persistent_conversation),
+            "/api/v1/truthforge/{session_id}",
+            get(truthforge_api::get_analysis),
         )
         .route(
-            "/api/conversations/{id}",
-            axum::routing::put(api_conversations::update_persistent_conversation),
+            "/api/v1/truthforge/{session_id}/",
+            get(truthforge_api::get_analysis),
         )
-        .route(
-            "/api/conversations/{id}",
-            delete(api_conversations::delete_persistent_conversation),
-        )
-        .route(
-            "/api/conversations/{id}/export",
-            post(api_conversations::export_persistent_conversation),
-        )
-        .route(
-            "/api/conversations/import",
-            post(api_conversations::import_persistent_conversation),
-        )
+        // Add workflow management routes
+        .merge(workflows::create_router())
         .fallback(static_handler)
-        .with_state(app_state.clone())
+        .with_state(app_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers(Any)
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::PATCH,
-                    Method::DELETE,
-                ]),
+                .allow_methods(Any),
         );
 
     // Note: Prefixing the host with `http://` makes the URL clickable in some terminals
     println!("listening on http://{server_hostname}");
 
-    // Use the new Axum 0.8+ API
-    let listener = tokio::net::TcpListener::bind(server_hostname).await?;
-    axum::serve(listener, app).await?;
+    // This is the new way to start the server
+    // However, we can't use it yet, because some crates have not updated
+    // to `http` 1.0.0 yet.
+    // let listener = tokio::net::TcpListener::bind(server_hostname).await?;
+    // axum::serve(listener, app).await?;
+
+    let listener = tokio::net::TcpListener::bind(&server_hostname).await?;
+    axum::serve(listener, app.into_make_service()).await?;
 
     Ok(())
 }
@@ -640,18 +617,20 @@ pub async fn build_router_for_tests() -> Router {
 
     let (tx, _rx) = channel::<IndexedDocument>(10);
 
-    // Initialize summarization manager with Mutex for API handlers
-    let summarization_manager = Arc::new(Mutex::new(SummarizationManager::new(
-        QueueConfig::default(),
-    )));
+    // Initialize summarization manager
+    let summarization_manager = Arc::new(SummarizationManager::new(QueueConfig::default()));
 
-    // Initialize AppState for workflow execution
-    let workflow_sessions = Arc::new(workflows::WorkflowSessions::default());
-    let (websocket_broadcaster, _) = tokio::sync::broadcast::channel(100);
+    // Initialize workflow management components for tests
+    let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
+    let (websocket_broadcaster, _) = broadcast::channel(100);
+    let truthforge_sessions = truthforge_api::SessionStore::new();
+
+    // Create extended application state for tests
     let app_state = AppState {
-        config_state: config_state.clone(),
+        config_state,
         workflow_sessions,
-        websocket_broadcaster: websocket_broadcaster.clone(),
+        websocket_broadcaster,
+        truthforge_sessions,
     };
 
     Router::new()
@@ -695,9 +674,6 @@ pub async fn build_router_for_tests() -> Router {
         )
         .route("/summarization/queue/stats", get(api::get_queue_stats))
         .route("/summarization/queue/stats/", get(api::get_queue_stats))
-        // TODO: Re-enable streaming when stream_task_status is implemented
-        // .route("/summarization/stream", get(api::stream_task_status))
-        // .route("/summarization/stream/", get(api::stream_task_status))
         .route("/chat", post(api::chat_completion))
         .route("/chat/", post(api::chat_completion))
         .route("/config", get(api::get_config))
@@ -754,19 +730,40 @@ pub async fn build_router_for_tests() -> Router {
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
-        .with_state(app_state.clone())
+        // TruthForge API routes for tests
+        .route(
+            "/api/v1/truthforge",
+            post(truthforge_api::analyze_narrative),
+        )
+        .route(
+            "/api/v1/truthforge/",
+            post(truthforge_api::analyze_narrative),
+        )
+        .route(
+            "/api/v1/truthforge/analyses",
+            get(truthforge_api::list_analyses),
+        )
+        .route(
+            "/api/v1/truthforge/analyses/",
+            get(truthforge_api::list_analyses),
+        )
+        .route(
+            "/api/v1/truthforge/{session_id}",
+            get(truthforge_api::get_analysis),
+        )
+        .route(
+            "/api/v1/truthforge/{session_id}/",
+            get(truthforge_api::get_analysis),
+        )
+        // Add workflow management routes for tests
+        .merge(workflows::create_router())
+        .with_state(app_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers(Any)
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::PATCH,
-                    Method::DELETE,
-                ]),
+                .allow_methods(Any),
         )
 }

@@ -33,5 +33,3 @@ rust-sdk
 .env
 .aider*
 scratchpad/firecracker-rust
-# Ignore large generated vendor files over 1MB
-terraphim_server/dist/assets/vendor-editor-*.js

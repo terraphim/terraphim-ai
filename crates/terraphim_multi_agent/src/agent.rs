@@ -460,8 +460,8 @@ impl TerraphimAgent {
 
         match self.persistence.fastest_op.read(&key).await {
             Ok(data) => {
-                let state: AgentState = serde_json::from_slice(&data.to_vec())
-                    .map_err(MultiAgentError::SerializationError)?;
+                let state: AgentState =
+                    serde_json::from_slice(&data).map_err(MultiAgentError::SerializationError)?;
 
                 // Restore state
                 // TODO: Implement proper state loading with interior mutability
@@ -1007,7 +1007,7 @@ impl TerraphimAgent {
     }
 
     /// Enhanced context enrichment using rolegraph and haystack search
-    async fn get_enriched_context_for_query(&self, query: &str) -> MultiAgentResult<String> {
+    pub async fn get_enriched_context_for_query(&self, query: &str) -> MultiAgentResult<String> {
         let mut enriched_context = String::new();
 
         // 1. Get knowledge graph node IDs that match the query

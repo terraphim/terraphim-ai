@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_multi_agent"
-version = "0.2.0"
-edition = "2021"
+version = "0.1.0"
+edition.workspace = true
 description = "Multi-agent system for Terraphim built on roles with Rig framework integration"
 license = "MIT"
 
@@ -24,11 +24,14 @@ log = { workspace = true }
 # Direct HTTP client approach (like Goose) for LLM communication
 reqwest = { version = "0.12", features = ["json", "stream"] }
 
+# Multi-provider generative AI client (using stable version due to let_chains issue in git version)
+genai = "0.3.5"
+
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
 futures = "0.3"
 rand = "0.8"
-tiktoken-rs = "0.6"
+# tiktoken-rs = "0.6" # Now handled by rust-genai
 tracing = "0.1"
 regex = "1.10"
 lazy_static = "1.4"
@@ -40,6 +43,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution" }
+terraphim_service = { path = "../terraphim_service" }
 
 # Firecracker VM dependencies (optional, feature-gated)
 # Note: fcctl-repl has its own workspace dependencies that may conflict

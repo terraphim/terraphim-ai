@@ -6,11 +6,15 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+use terraphim_automata::{extract_paragraphs_from_automata, is_all_terms_connected_by_path};
 use terraphim_rolegraph::RoleGraph;
 
-use crate::{Goal, GoalAlignmentResult, GoalId};
+use crate::{
+    Goal, GoalAlignmentError, GoalAlignmentResult, GoalId, GoalKnowledgeContext, GoalLevel,
+};
 
 /// Knowledge graph-based goal analysis and alignment
 pub struct KnowledgeGraphGoalAnalyzer {
@@ -206,7 +210,7 @@ pub struct GoalConflict {
 }
 
 /// Types of goal conflicts
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ConflictType {
     /// Resource conflicts
     Resource,
@@ -398,15 +402,30 @@ impl KnowledgeGraphGoalAnalyzer {
             }
         }
 
-        // TODO: Re-enable automata-based concept extraction when thesaurus is available
-        // For now, use simple keyword extraction
-        let mut concepts = HashSet::new();
+        // Use extract_paragraphs_from_automata for concept extraction
+        let text = format!(
+            "{} {}",
+            goal.description,
+            goal.knowledge_context.keywords.join(" ")
+        );
 
-        // Extract concepts from description
-        let words: Vec<&str> = goal.description.split_whitespace().collect();
-        for word in words {
-            if word.len() > 3 && !word.chars().all(|c| c.is_ascii_punctuation()) {
-                concepts.insert(word.to_lowercase());
+        let paragraphs = extract_paragraphs_from_automata(
+            &text,
+            self.automata_config.max_paragraphs,
+            self.automata_config.min_confidence,
+        )
+        .map_err(|e| {
+            GoalAlignmentError::KnowledgeGraphError(format!("Failed to extract paragraphs: {}", e))
+        })?;
+
+        // Extract concepts from paragraphs
+        let mut concepts = HashSet::new();
+        for paragraph in paragraphs {
+            let words: Vec<&str> = paragraph.split_whitespace().collect();
+            for word in words {
+                if word.len() > 3 && !word.chars().all(|c| c.is_ascii_punctuation()) {
+                    concepts.insert(word.to_lowercase());
+                }
             }
         }
 
@@ -464,18 +483,19 @@ impl KnowledgeGraphGoalAnalyzer {
         concepts: &[String],
     ) -> GoalAlignmentResult<SemanticAnalysis> {
         // Identify primary and secondary domains
-        let primary_domains = goal.knowledge_context.domains.clone();
+        let mut primary_domains = goal.knowledge_context.domains.clone();
         let mut secondary_domains = Vec::new();
 
-        // TODO: Re-enable role graph domain extraction when get_role() API is available
-        // For now, use existing knowledge context domains
-        secondary_domains.extend(
-            goal.knowledge_context
-                .keywords
-                .iter()
-                .filter(|k| !primary_domains.contains(k))
-                .cloned(),
-        );
+        // Use role graph to identify additional domains
+        for role_id in &goal.assigned_roles {
+            if let Some(role_node) = self.role_graph.get_role(role_id) {
+                for domain in &role_node.knowledge_domains {
+                    if !primary_domains.contains(domain) {
+                        secondary_domains.push(domain.clone());
+                    }
+                }
+            }
+        }
 
         // Identify key concepts (most frequent or important)
         let key_concepts = concepts
@@ -573,9 +593,10 @@ impl KnowledgeGraphGoalAnalyzer {
             });
         }
 
-        // TODO: Re-enable connectivity analysis when is_all_terms_connected_by_path is available
-        // For now, assume all concepts are connected
-        let all_connected = true;
+        // Use is_all_terms_connected_by_path to check connectivity
+        let all_connected = is_all_terms_connected_by_path(concepts).map_err(|e| {
+            GoalAlignmentError::KnowledgeGraphError(format!("Failed to check connectivity: {}", e))
+        })?;
 
         // For now, create a simplified connectivity result
         let connectivity_result = ConnectivityResult {

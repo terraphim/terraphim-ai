@@ -61,4 +61,10 @@ mcp-sse = ["reqwest-eventsource"]
 # High-level MCP support using SSE/http-only (no rust-sdk)
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
+<<<<<<< HEAD
 mcp-rust-sdk = ["mcp-sse", "mcp-client", "mcp-spec", "rmcp"]
+=======
+mcp-rust-sdk = ["mcp-client", "mcp-spec", "mcp-sse"]
+# OpenRouter LLM provider support
+openrouter = []
+>>>>>>> feature/rust-genai-integration
