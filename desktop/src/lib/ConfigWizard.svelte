@@ -440,7 +440,7 @@ async function fetchLlmModels(roleIdx: number) {
   }
 </script>
 
-<div class="box">
+<div class="box" data-testid="config-wizard">
   <div class="is-flex is-justify-content-space-between is-align-items-center" style="gap: .5rem;">
     <h3 class="title is-4" style="margin-bottom: 0;">Configuration Wizard</h3>
     <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
