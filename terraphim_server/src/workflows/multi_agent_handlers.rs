@@ -23,6 +23,7 @@ use terraphim_config::ConfigState;
 
 /// Multi-agent workflow executor
 pub struct MultiAgentWorkflowExecutor {
+    #[allow(dead_code)]
     agent_registry: AgentRegistry,
     persistence: Arc<DeviceStorage>,
     config_state: Option<ConfigState>,
@@ -155,7 +156,7 @@ impl MultiAgentWorkflowExecutor {
         overall_role: &str,
         sessions: &WorkflowSessions,
         broadcaster: &WebSocketBroadcaster,
-        llm_config: Option<&LlmConfig>,
+        _llm_config: Option<&LlmConfig>,
         step_configs: Option<&Vec<StepConfig>>,
     ) -> MultiAgentResult<Value> {
         log::info!("Executing prompt chain workflow with per-step specialized agents");
@@ -179,8 +180,8 @@ impl MultiAgentWorkflowExecutor {
         } else {
             log::info!("Using default step configurations");
             vec![
-                ("requirements".to_string(), "Create detailed technical specification".to_string(), 
-                 "Create detailed technical specification including user stories, API endpoints, data models, and acceptance criteria.".to_string(), 
+                ("requirements".to_string(), "Create detailed technical specification".to_string(),
+                 "Create detailed technical specification including user stories, API endpoints, data models, and acceptance criteria.".to_string(),
                  Some("BusinessAnalyst".to_string())),
                 ("architecture".to_string(), "Design system architecture and components".to_string(),
                  "Design the system architecture, component structure, database schema, and technology integration.".to_string(),
@@ -342,7 +343,7 @@ impl MultiAgentWorkflowExecutor {
         .await;
 
         // Use the specified role for routing, but choose model based on complexity
-        let llm_config = if complexity > 0.7 {
+        let _llm_config = if complexity > 0.7 {
             // Use a more powerful model for complex tasks
             Some(LlmConfig {
                 llm_provider: Some("ollama".to_string()),
@@ -798,7 +799,7 @@ impl MultiAgentWorkflowExecutor {
             let gen_prompt = if current_content.is_empty() {
                 format!("Create content for: {}", prompt)
             } else {
-                format!("Improve this content based on evaluation:\n\nOriginal request: {}\n\nCurrent content:\n{}", 
+                format!("Improve this content based on evaluation:\n\nOriginal request: {}\n\nCurrent content:\n{}",
                     prompt, current_content)
             };
 

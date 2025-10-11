@@ -10,6 +10,8 @@ use super::{
 };
 use crate::AppState;
 
+// Allow dead code for workflow API structs and functions
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 struct OrchestratorAgent {
     id: String,
@@ -40,6 +42,7 @@ enum WorkerStatus {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct TaskAssignment {
     task_id: String,
     worker_id: String,
@@ -52,6 +55,7 @@ struct TaskAssignment {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
 enum TaskPriority {
     Critical,
     High,
@@ -71,6 +75,7 @@ struct WorkerResult {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct ResourceUsage {
     cpu_time_ms: u64,
     memory_peak_mb: u32,
@@ -80,6 +85,7 @@ struct ResourceUsage {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
 enum CompletionStatus {
     Success,
     PartialSuccess,
@@ -88,6 +94,7 @@ enum CompletionStatus {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct OrchestrationResult {
     orchestrator_summary: OrchestratorSummary,
     worker_results: Vec<WorkerResult>,
@@ -97,6 +104,7 @@ struct OrchestrationResult {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct OrchestratorSummary {
     total_tasks_assigned: usize,
     successful_completions: usize,
@@ -281,6 +289,7 @@ pub async fn execute_orchestration(
     Ok(Json(response))
 }
 
+#[allow(dead_code)]
 async fn create_orchestrator(prompt: &str) -> OrchestratorAgent {
     let task_complexity = analyze_task_complexity(prompt);
 
@@ -340,8 +349,9 @@ async fn create_orchestrator(prompt: &str) -> OrchestratorAgent {
     }
 }
 
+#[allow(dead_code)]
 async fn decompose_and_assign_tasks(
-    orchestrator: &OrchestratorAgent,
+    _orchestrator: &OrchestratorAgent,
     prompt: &str,
 ) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
     let task_type = analyze_task_complexity(prompt);
@@ -354,7 +364,8 @@ async fn decompose_and_assign_tasks(
     }
 }
 
-async fn create_data_science_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+#[allow(dead_code)]
+async fn create_data_science_workflow(_prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
     let workers = vec![
         WorkerAgent {
             id: "data_collector_001".to_string(),
@@ -460,6 +471,7 @@ async fn create_data_science_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec
     (assignments, workers)
 }
 
+#[allow(dead_code)]
 async fn create_software_development_workflow(
     prompt: &str,
 ) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
@@ -535,7 +547,8 @@ async fn create_software_development_workflow(
     (assignments, workers)
 }
 
-async fn create_research_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+#[allow(dead_code)]
+async fn create_research_workflow(_prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
     let workers = vec![
         WorkerAgent {
             id: "researcher_001".to_string(),
@@ -588,7 +601,7 @@ async fn create_research_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<Wor
     (assignments, workers)
 }
 
-async fn create_general_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+async fn create_general_workflow(_prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
     let workers = vec![
         WorkerAgent {
             id: "analyst_001".to_string(),
@@ -641,7 +654,7 @@ async fn create_general_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<Work
 }
 
 async fn execute_coordinated_work(
-    orchestrator: &OrchestratorAgent,
+    _orchestrator: &OrchestratorAgent,
     workers: &[WorkerAgent],
     assignments: &[TaskAssignment],
 ) -> Vec<WorkerResult> {
@@ -775,10 +788,10 @@ async fn synthesize_orchestration_result(
             "Orchestrated workflow completed successfully with {}/{} tasks completed. \
             The orchestrator effectively coordinated {} specialized workers to achieve \
             high-quality results across all task domains. Average quality score: {:.2}. \
-            
+
             Key achievements: Successful task decomposition, efficient resource utilization \
             ({:.1}% worker utilization), and effective coordination with minimal overhead. \
-            
+
             The hierarchical coordination model proved effective for this type of complex task, \
             enabling specialized workers to focus on their areas of expertise while maintaining \
             overall project coherence and quality standards.",

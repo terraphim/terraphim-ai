@@ -421,7 +421,7 @@ async fn execute_iterative_optimization(
     let convergence_threshold = 0.05; // 5% improvement threshold
 
     for iteration in 0..max_iterations {
-        let iteration_start = Instant::now();
+        let _iteration_start = Instant::now();
 
         // Generate content variants
         let variants = generate_content_variants(prompt, iteration, &current_best_score).await;

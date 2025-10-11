@@ -2,12 +2,10 @@ use ahash::AHashMap;
 use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
 
-// Import multi-agent system for enhanced functionality
-#[cfg(feature = "multi_agent")]
+// Multi-agent system demonstration requires the crate to be added as dependency
+// #[cfg(feature = "multi_agent")]
 use std::sync::Arc;
-#[cfg(feature = "multi_agent")]
 use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
-#[cfg(feature = "multi_agent")]
 use terraphim_persistence::DeviceStorage;
 
 /// Enhanced Atomic Server Configuration with Multi-Agent Intelligence
@@ -92,20 +90,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     extra
                 },
-                #[cfg(feature = "openrouter")]
-                llm_enabled: false,
-                #[cfg(feature = "openrouter")]
-                llm_api_key: None,
-                #[cfg(feature = "openrouter")]
-                llm_model: None,
-                #[cfg(feature = "openrouter")]
-                llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
-                llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
-                llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
-                llm_chat_model: None,
             },
         )
         .build()
@@ -149,20 +133,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .with_atomic_secret(Some("your-base64-secret-here".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                llm_context_window: Some(32768),
             },
         )
         .add_role(
@@ -190,20 +168,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .with_atomic_secret(Some("secret-for-server-2".to_string())),
                 ],
                 extra: ahash::AHashMap::new(),
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                llm_context_window: Some(32768),
             },
         )
         .build()
@@ -237,20 +209,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // No authentication (atomic_server_secret: None is default)
                 )],
                 extra: ahash::AHashMap::new(),
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                llm_context_window: Some(32768),
             },
         )
         .build()
@@ -291,20 +257,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ),
                 ],
                 extra: ahash::AHashMap::new(),
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                llm_context_window: Some(32768),
             },
         )
         .build()
@@ -364,8 +324,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("     ✓ Team-specific resources");
 
     // Example 6: Multi-Agent System Integration (if feature enabled)
-    #[cfg(feature = "multi_agent")]
-    {
+    // Commented out - requires terraphim_multi_agent dependency
+    // #[cfg(feature = "multi_agent")]
+    if false {
         println!("\n🤖 Example 6: Multi-Agent System Integration");
         println!("============================================");
 
@@ -453,20 +414,14 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 haystacks: vec![Haystack::new(server_url, ServiceType::Atomic, read_only)
                     .with_atomic_secret(secret)],
                 extra: ahash::AHashMap::new(),
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
+                llm_context_window: Some(32768),
             },
         )
         .build()?;
@@ -475,7 +430,8 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
 }
 
 /// Helper function to create test storage (would be imported from multi-agent crate)
-#[cfg(feature = "multi_agent")]
+// Commented out - requires terraphim_multi_agent dependency
+#[allow(dead_code)]
 async fn create_test_storage(
 ) -> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
     // Use the safe Arc method instead of unsafe ptr::read

@@ -99,6 +99,7 @@ pub trait DiscoveryAlgorithmImpl: Send + Sync {
 pub struct ExactMatchAlgorithm;
 
 impl DiscoveryAlgorithmImpl for ExactMatchAlgorithm {
+    #[allow(unused_variables)]
     fn discover(
         &self,
         query: &AgentDiscoveryQuery,
@@ -280,6 +281,7 @@ impl FuzzyMatchAlgorithm {
 }
 
 impl DiscoveryAlgorithmImpl for FuzzyMatchAlgorithm {
+    #[allow(unused_variables, unused_assignments, clippy::manual_clamp)]
     fn discover(
         &self,
         query: &AgentDiscoveryQuery,
@@ -510,7 +512,7 @@ impl DiscoveryEngine {
                 let mut agent_scores: HashMap<String, (AgentMatch, f64, usize)> = HashMap::new();
                 for agent_match in all_matches {
                     let agent_id = agent_match.agent.agent_id.to_string();
-                    if let Some((existing_match, total_score, count)) = agent_scores.get(&agent_id)
+                    if let Some((_existing_match, total_score, count)) = agent_scores.get(&agent_id)
                     {
                         let new_total_score = total_score + agent_match.match_score;
                         let new_count = count + 1;

@@ -14,6 +14,7 @@ use terraphim_rolegraph::RoleGraph;
 use crate::{AgentMetadata, RegistryError, RegistryResult};
 
 /// Knowledge graph-based agent discovery and matching
+#[allow(dead_code)]
 pub struct KnowledgeGraphIntegration {
     /// Role graph for role-based agent specialization
     role_graph: Arc<RoleGraph>,
@@ -645,7 +646,7 @@ impl KnowledgeGraphIntegration {
         &self,
         agent: &AgentMetadata,
         score_breakdown: &ScoreBreakdown,
-        query_analysis: &QueryAnalysis,
+        _query_analysis: &QueryAnalysis,
     ) -> String {
         let mut explanation = format!("Agent {} ({})", agent.agent_id, agent.primary_role.name);
 
@@ -721,7 +722,7 @@ impl KnowledgeGraphIntegration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentMetadata, AgentRole};
+    use crate::{AgentMetadata, AgentPid, AgentRole, SupervisorId};
 
     #[tokio::test]
     async fn test_knowledge_graph_integration_creation() {

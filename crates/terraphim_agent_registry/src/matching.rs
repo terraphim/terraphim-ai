@@ -193,6 +193,7 @@ pub trait KnowledgeGraphAgentMatcher: Send + Sync {
 }
 
 /// Knowledge graph-based agent matcher implementation
+#[allow(dead_code)]
 pub struct TerraphimKnowledgeGraphMatcher {
     /// Knowledge graph automata
     automata: Arc<Automata>,

@@ -8387,6 +8387,7 @@ dependencies = [
  "temp-env",
  "tempfile",
  "terraphim_config",
+ "terraphim_multi_agent",
  "terraphim_settings",
  "terraphim_types",
  "test-env-log",
