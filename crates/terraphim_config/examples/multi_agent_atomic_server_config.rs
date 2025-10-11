@@ -9,9 +9,9 @@ use std::sync::Arc;
 use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
 
-// Import multi-agent system for demonstration
-#[cfg(feature = "multi_agent")]
-use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
+// Multi-agent system demonstration requires the crate to be added as dependency
+// #[cfg(feature = "multi_agent")]
+// use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
 
 /// Enhanced atomic server configuration with multi-agent capabilities
 #[tokio::main]
@@ -81,6 +81,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             extra
         },
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(32768),
     };
 
     let config = ConfigBuilder::new()

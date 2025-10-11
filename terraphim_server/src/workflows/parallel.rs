@@ -10,6 +10,8 @@ use super::{
 };
 use crate::AppState;
 
+// Allow dead code for workflow API structs and functions
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 struct ParallelAgent {
     id: String,
@@ -487,13 +489,13 @@ async fn consolidate_analyses(
     let comprehensive_analysis = format!(
         "Multi-agent parallel analysis completed with {} specialized agents providing diverse perspectives. \
         Average confidence level: {:.1}%, consensus achieved: {:.1}%, diversity score: {:.2}. \
-        
+
         The analysis reveals strong alignment on fundamental approaches while highlighting \
         strategic differences in implementation timelines and resource allocation. \
-        
+
         Key recommendations emerge from cross-agent consensus: prioritize scalable architecture, \
         implement robust security measures, and adopt iterative development methodology. \
-        
+
         Conflicting perspectives on timeline and approach provide valuable decision-making context, \
         enabling informed trade-off analysis between speed-to-market and technical robustness.",
         total_agents,

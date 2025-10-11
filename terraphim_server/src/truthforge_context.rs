@@ -8,7 +8,7 @@ use log::{debug, info, warn};
  * - Leverages multi-agent context management infrastructure
  */
 use std::sync::Arc;
-use terraphim_config::{ConfigState, Role};
+use terraphim_config::ConfigState;
 use terraphim_multi_agent::{AgentConfig, MultiAgentError, MultiAgentResult, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;
 use terraphim_truthforge::types::NarrativeInput;
@@ -103,7 +103,7 @@ impl TruthForgeContextEnricher {
         // Create agent with default configuration
         let config = AgentConfig::default();
 
-        let mut agent =
+        let agent =
             TerraphimAgent::new(role.clone(), self.persistence.clone(), Some(config)).await?;
 
         agent.initialize().await?;
@@ -238,10 +238,10 @@ impl TruthForgeContextEnricher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    // use chrono::Utc; // Unused import
     use terraphim_config::Config;
-    use terraphim_truthforge::types::NarrativeContext;
-    use uuid::Uuid;
+    // use terraphim_truthforge::types::NarrativeContext; // Unused import
+    // use uuid::Uuid; // Unused import
 
     #[tokio::test]
     async fn test_context_enricher_creation() {
@@ -249,7 +249,7 @@ mod tests {
         let config_state = Arc::new(ConfigState::new(&mut config).await.unwrap());
         let persistence = DeviceStorage::arc_memory_only().await.unwrap();
 
-        let enricher = TruthForgeContextEnricher::new(config_state, persistence);
+        let _enricher = TruthForgeContextEnricher::new(config_state, persistence);
 
         // Just verify it can be created
         assert!(true);
@@ -261,7 +261,7 @@ mod tests {
         let config_state = Arc::new(ConfigState::new(&mut config).await.unwrap());
         let persistence = DeviceStorage::arc_memory_only().await.unwrap();
 
-        let enricher = TruthForgeContextEnricher::new(config_state, persistence);
+        let _enricher = TruthForgeContextEnricher::new(config_state, persistence);
 
         let narrative = "Crisis communication requires transparency and accountability. \
                         The organization must address stakeholder concerns immediately.";
