@@ -131,7 +131,7 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
                             error: None,
                         };
 
-                        if let Ok(msg) = serde_json::to_string(&response) {
+                        if let Ok(_msg) = serde_json::to_string(&response) {
                             // Note: In a real implementation, we'd need to maintain sender references
                             // per session to actually send messages back to clients
                             // For now, this demonstrates the structure

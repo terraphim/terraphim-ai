@@ -93,10 +93,10 @@ async fn main() -> Result<()> {
         // Initialize storage for multi-agent system
         DeviceStorage::init_memory_only()
             .await
-            .map_err(|e| terraphim_persistence::Error::Other(e.to_string()))?;
+            .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
         let storage_ref = DeviceStorage::instance()
             .await
-            .map_err(|e| terraphim_persistence::Error::Other(e.to_string()))?;
+            .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
 
         use std::ptr;
         let storage_copy = unsafe { ptr::read(storage_ref) };
@@ -106,11 +106,11 @@ async fn main() -> Result<()> {
         let role = create_test_role();
         let mut agent = TerraphimAgent::new(role, persistence, None)
             .await
-            .map_err(|e| terraphim_persistence::Error::Other(e.to_string()))?;
+            .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
         agent
             .initialize()
             .await
-            .map_err(|e| terraphim_persistence::Error::Other(e.to_string()))?;
+            .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
 
         println!("✅ Intelligent persistence agent created:");
         println!("   Agent ID: {}", agent.agent_id);
@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
         let output = agent
             .process_command(input)
             .await
-            .map_err(|e| terraphim_persistence::Error::Other(e.to_string()))?;
+            .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
 
         println!("\n🔍 Intelligent Data Analysis:");
         println!("   Query: Analyze data structure and suggest improvements");
@@ -137,7 +137,7 @@ async fn main() -> Result<()> {
         let output = agent
             .process_command(input)
             .await
-            .map_err(|e| terraphim_persistence::Error::Other(e.to_string()))?;
+            .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
 
         println!("\n🎯 Intelligent Data Generation:");
         println!("   Query: {}", generation_query);

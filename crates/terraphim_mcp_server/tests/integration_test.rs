@@ -110,7 +110,7 @@ fn create_test_config() -> String {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
-                        weight: 1.0,
+
                         fetch_content: false,
                     }];
                 }
@@ -127,7 +127,7 @@ fn create_test_config() -> String {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
-                weight: 1.0,
+
                 fetch_content: false,
             }];
         }
@@ -224,7 +224,7 @@ async fn test_search_with_different_roles() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
-                "config": test_config
+                "config_str": test_config
             })
             .as_object()
             .cloned(),
@@ -284,7 +284,7 @@ async fn test_resource_uri_mapping() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
-                "config": test_config
+                "config_str": test_config
             })
             .as_object()
             .cloned(),
@@ -343,7 +343,7 @@ async fn test_simple_search_with_debug() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "update_config_tool".into(),
             arguments: serde_json::json!({
-                "config": test_config
+                "config_str": test_config
             })
             .as_object()
             .cloned(),
@@ -408,7 +408,7 @@ async fn test_search_pagination() -> Result<()> {
     let test_config = create_test_config();
     service
         .call_tool(CallToolRequestParam {
-            name: "update_config".into(),
+            name: "update_config_tool".into(),
             arguments: serde_json::json!({"config_str": test_config})
                 .as_object()
                 .cloned(),
@@ -508,7 +508,7 @@ async fn test_search_read_resource_round_trip() -> Result<()> {
     let test_config = create_test_config();
     service
         .call_tool(CallToolRequestParam {
-            name: "update_config".into(),
+            name: "update_config_tool".into(),
             arguments: serde_json::json!({"config_str": test_config})
                 .as_object()
                 .cloned(),
