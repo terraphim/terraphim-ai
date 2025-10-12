@@ -520,7 +520,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_registry_creation() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let config = RegistryConfig::default();
         let automata_config = AutomataConfig::default();
         let similarity_thresholds = SimilarityThresholds::default();
@@ -538,7 +540,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_registration() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let registry = RegistryBuilder::new()
             .with_role_graph(role_graph)
             .build()
@@ -569,7 +573,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_discovery() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let registry = RegistryBuilder::new()
             .with_role_graph(role_graph)
             .build()
@@ -623,7 +629,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_registry_builder() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let config = RegistryConfig {
             max_agents: 100,
             auto_cleanup: false,

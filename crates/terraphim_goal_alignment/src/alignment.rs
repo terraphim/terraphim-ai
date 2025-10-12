@@ -3,20 +3,20 @@
 //! Provides the core goal alignment functionality that coordinates goal hierarchy
 //! validation, conflict resolution, and alignment optimization.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use terraphim_agent_registry::{AgentMetadata, AgentRegistry};
+use terraphim_agent_registry::AgentRegistry;
 use terraphim_rolegraph::RoleGraph;
 
 use crate::{
     AlignmentRecommendation, AnalysisType, Goal, GoalAlignmentAnalysis,
-    GoalAlignmentAnalysisResult, GoalAlignmentError, GoalAlignmentResult, GoalConflict,
-    GoalHierarchy, GoalId, GoalLevel, GoalStatus, KnowledgeGraphGoalAnalyzer,
+    GoalAlignmentAnalysisResult, GoalAlignmentResult, GoalHierarchy, GoalId, GoalLevel,
+    KnowledgeGraphGoalAnalyzer,
 };
 
 /// Goal alignment engine that manages the complete goal alignment process
@@ -26,8 +26,10 @@ pub struct KnowledgeGraphGoalAligner {
     /// Knowledge graph analyzer
     kg_analyzer: Arc<KnowledgeGraphGoalAnalyzer>,
     /// Agent registry for agent-goal assignments
+    #[allow(dead_code)]
     agent_registry: Arc<dyn AgentRegistry>,
     /// Role graph for role-based operations
+    #[allow(dead_code)]
     role_graph: Arc<RoleGraph>,
     /// Alignment configuration
     config: AlignmentConfig,
@@ -715,7 +717,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_goal_aligner_creation() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let kg_analyzer = Arc::new(KnowledgeGraphGoalAnalyzer::new(
             role_graph.clone(),
             AutomataConfig::default(),
@@ -733,7 +737,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_goal_management() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let kg_analyzer = Arc::new(KnowledgeGraphGoalAnalyzer::new(
             role_graph.clone(),
             AutomataConfig::default(),
@@ -774,7 +780,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_goal_alignment() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let kg_analyzer = Arc::new(KnowledgeGraphGoalAnalyzer::new(
             role_graph.clone(),
             AutomataConfig::default(),

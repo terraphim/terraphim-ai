@@ -120,7 +120,7 @@ pub enum ConstraintType {
 }
 
 /// Knowledge graph context for goals
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct GoalKnowledgeContext {
     /// Knowledge domains this goal operates in
     pub domains: Vec<String>,
@@ -134,17 +134,7 @@ pub struct GoalKnowledgeContext {
     pub similarity_thresholds: HashMap<String, f64>,
 }
 
-impl Default for GoalKnowledgeContext {
-    fn default() -> Self {
-        Self {
-            domains: Vec::new(),
-            concepts: Vec::new(),
-            relationships: Vec::new(),
-            keywords: Vec::new(),
-            similarity_thresholds: HashMap::new(),
-        }
-    }
-}
+// Default implementation is now derived
 
 /// Goal execution status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -399,8 +389,7 @@ impl Goal {
                     1.0
                 } else {
                     (criterion.current_value / criterion.target_value)
-                        .min(1.0)
-                        .max(0.0)
+                        .clamp(0.0, 1.0)
                 };
                 score * criterion.weight
             })
@@ -597,7 +586,7 @@ impl GoalHierarchy {
         // Add relationship
         self.parent_child
             .entry(parent_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(child_id.clone());
         self.child_parent.insert(child_id, parent_id);
 

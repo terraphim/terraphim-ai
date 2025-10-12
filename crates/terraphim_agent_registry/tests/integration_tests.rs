@@ -15,7 +15,9 @@ async fn test_full_agent_lifecycle() {
     env_logger::try_init().ok();
 
     // Create registry
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let config = RegistryConfig {
         max_agents: 100,
         auto_cleanup: false, // Disable for testing
@@ -138,7 +140,9 @@ async fn test_full_agent_lifecycle() {
 async fn test_multi_agent_discovery() {
     env_logger::try_init().ok();
 
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
         .build()
@@ -237,7 +241,9 @@ async fn test_multi_agent_discovery() {
 async fn test_agent_performance_tracking() {
     env_logger::try_init().ok();
 
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
         .build()
@@ -304,7 +310,9 @@ async fn test_agent_performance_tracking() {
 async fn test_agent_role_hierarchy() {
     env_logger::try_init().ok();
 
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
         .build()
@@ -369,7 +377,9 @@ async fn test_agent_role_hierarchy() {
 async fn test_registry_capacity_and_cleanup() {
     env_logger::try_init().ok();
 
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let config = RegistryConfig {
         max_agents: 3, // Small capacity for testing
         auto_cleanup: false,
@@ -421,7 +431,9 @@ async fn test_registry_capacity_and_cleanup() {
 async fn test_knowledge_graph_integration() {
     env_logger::try_init().ok();
 
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let automata_config = AutomataConfig {
         min_confidence: 0.6,
         max_paragraphs: 5,
@@ -506,7 +518,9 @@ async fn test_knowledge_graph_integration() {
 async fn test_concurrent_registry_operations() {
     env_logger::try_init().ok();
 
-    let role_graph = Arc::new(RoleGraph::new());
+    let role_name = RoleName::new("test_role");
+    let thesaurus = Thesaurus::new();
+    let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = Arc::new(
         RegistryBuilder::new()
             .with_role_graph(role_graph)

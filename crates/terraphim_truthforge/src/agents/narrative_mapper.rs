@@ -197,7 +197,7 @@ impl NarrativeMapperAgent {
         let mut stakeholders = Vec::new();
         let mut scct_classification = SCCTClassification::Accidental;
         let mut responsibility_level = "Medium".to_string();
-        let mut attribution_clarity = "Not specified".to_string();
+        let mut _attribution_clarity = "Not specified".to_string();
 
         // Parse stakeholders section
         if let Some(stakeholders_section) = self.extract_section(content, "# Stakeholders") {
@@ -208,7 +208,7 @@ impl NarrativeMapperAgent {
                     if !line.is_empty() {
                         // Parse format: [Name] (Type: primary/secondary/influencer) - [Role]
                         let parts: Vec<&str> = line.splitn(2, '-').collect();
-                        let name_type = parts.get(0).unwrap_or(&"").trim();
+                        let name_type = parts.first().unwrap_or(&"").trim();
                         let role = parts.get(1).map(|s| s.trim()).unwrap_or("Not specified");
 
                         let name = if let Some(bracket_pos) = name_type.find('(') {
@@ -254,7 +254,7 @@ impl NarrativeMapperAgent {
                         .trim()
                         .to_string();
                 } else if line.starts_with("**Accountability:**") {
-                    attribution_clarity = line
+                    _attribution_clarity = line
                         .trim_start_matches("**Accountability:**")
                         .trim()
                         .to_string();

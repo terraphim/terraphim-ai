@@ -313,6 +313,7 @@ impl OmissionDetectorAgent {
         Ok(catalog)
     }
 
+    #[allow(unused_assignments)]
     fn parse_omissions_from_markdown(&self, content: &str) -> Result<Vec<Omission>> {
         info!("Parsing omissions from markdown format");
 
@@ -497,7 +498,7 @@ impl OmissionDetectorAgent {
         if let Ok(mut value) = value_str.parse::<f64>() {
             // If value is > 1, assume it's a percentage and divide by 100
             if value > 1.0 {
-                value = value / 100.0;
+                value /= 100.0;
             }
             Some(value.clamp(0.0, 1.0))
         } else {

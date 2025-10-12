@@ -262,7 +262,7 @@ impl TaxonomyLinkerAgent {
                 }
                 // Also extract playbooks from lines like "- Playbook Name"
                 else if line.starts_with('-') || line.starts_with('*') {
-                    let playbook = line.trim_start_matches(|c| c == '-' || c == '*' || c == ' ');
+                    let playbook = line.trim_start_matches(['-', '*', ' ']);
                     if !playbook.is_empty() && playbook.len() < 200 {
                         recommended_playbooks.push(playbook.to_string());
                     }

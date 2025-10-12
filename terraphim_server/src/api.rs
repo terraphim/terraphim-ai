@@ -827,6 +827,7 @@ pub struct OpenRouterModelsResponse {
 }
 
 #[allow(dead_code)]
+#[cfg_attr(not(feature = "openrouter"), allow(unused_variables))]
 pub(crate) async fn list_openrouter_models(
     State(app_state): State<AppState>,
     Json(req): Json<OpenRouterModelsRequest>,
@@ -906,6 +907,7 @@ pub(crate) async fn list_openrouter_models(
 /// This endpoint generates AI-powered summaries for documents using the OpenRouter service.
 /// It requires the role to have OpenRouter properly configured (enabled, API key, model).
 /// Summaries are cached in the persistence layer to avoid redundant API calls.
+#[cfg_attr(not(feature = "openrouter"), allow(unused_variables))]
 pub(crate) async fn summarize_document(
     State(app_state): State<AppState>,
     Json(request): Json<SummarizeDocumentRequest>,
@@ -1082,6 +1084,7 @@ pub(crate) async fn summarize_document(
 }
 
 /// Check summarization status and capabilities for a role
+#[cfg_attr(not(feature = "openrouter"), allow(unused_variables))]
 pub(crate) async fn get_summarization_status(
     State(app_state): State<AppState>,
     Query(query): Query<SummarizationStatusQuery>,

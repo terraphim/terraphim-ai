@@ -349,9 +349,9 @@ impl PassTwoOptimizer {
 
     async fn generate_defensive_argument_mock(
         &self,
-        narrative: &NarrativeInput,
+        _narrative: &NarrativeInput,
         vulnerabilities: &[Uuid],
-        pass_one_debate: &DebateResult,
+        _pass_one_debate: &DebateResult,
     ) -> Result<Argument> {
         debug!("Pass 2: Generating defensive argument (mock)");
 
@@ -378,14 +378,14 @@ impl PassTwoOptimizer {
 
     async fn generate_exploitation_argument_mock(
         &self,
-        narrative: &NarrativeInput,
+        _narrative: &NarrativeInput,
         vulnerabilities: &[Uuid],
-        defensive_argument: &Argument,
+        _defensive_argument: &Argument,
     ) -> Result<Argument> {
         debug!("Pass 2: Generating exploitation argument (mock)");
 
         let omission_reference_count = vulnerabilities.len();
-        let omission_reference_percentage =
+        let _omission_reference_percentage =
             (omission_reference_count as f64 / vulnerabilities.len() as f64) * 100.0;
 
         Ok(Argument {
@@ -418,7 +418,7 @@ impl PassTwoOptimizer {
     ) -> Result<DebateEvaluation> {
         debug!("Pass 2: Evaluating exploitation debate (mock)");
 
-        let vulnerability_amplification = 0.25;
+        let _vulnerability_amplification = 0.25;
 
         Ok(DebateEvaluation {
             scores: DebateScores {
@@ -1643,7 +1643,7 @@ impl ResponseGenerator {
         // Try to parse as JSON, fallback to text extraction if it fails
         let llm_response: serde_json::Value = match serde_json::from_str(json_str) {
             Ok(json) => json,
-            Err(e) => {
+            Err(_e) => {
                 warn!(
                     "Failed to parse response strategy JSON. Content preview: {}",
                     &content[..content.len().min(200)]
@@ -1748,7 +1748,7 @@ impl ResponseGenerator {
                 skeptics: "May remain unconvinced".to_string(),
                 media: "Moderate coverage expected".to_string(),
             },
-            media_amplification_risk: media_amplification_risk.max(0.0).min(1.0),
+            media_amplification_risk: media_amplification_risk.clamp(0.0, 1.0),
         };
 
         let vulnerabilities_count = match strategy_type {
@@ -1782,6 +1782,7 @@ impl ResponseGenerator {
         })
     }
 
+    #[allow(unused_assignments)]
     fn parse_response_strategy_from_markdown(
         &self,
         content: &str,
@@ -1921,7 +1922,7 @@ impl ResponseGenerator {
 
         info!(
             "Extracted {} sections from markdown, {} Q&A pairs",
-            vec![&social_media, &press_statement, &internal_memo]
+            [&social_media, &press_statement, &internal_memo]
                 .iter()
                 .filter(|s| !s.is_empty())
                 .count(),
@@ -1956,6 +1957,7 @@ impl ResponseGenerator {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn assign_section_content(
         &self,
         section: &str,
@@ -1963,7 +1965,7 @@ impl ResponseGenerator {
         social_media: &mut String,
         press_statement: &mut String,
         internal_memo: &mut String,
-        qa_brief: &mut Vec<QAPair>,
+        _qa_brief: &mut [QAPair],
         potential_backfire: &mut Vec<String>,
     ) {
         let section_lower = section.to_lowercase();
@@ -1994,7 +1996,7 @@ impl ResponseGenerator {
             for line in content.lines() {
                 let line = line
                     .trim()
-                    .trim_start_matches(|c: char| c == '-' || c == '*' || c == ' ');
+                    .trim_start_matches(['-', '*', ' ']);
                 if !line.is_empty() && line.len() < 500 {
                     potential_backfire.push(line.to_string());
                 }

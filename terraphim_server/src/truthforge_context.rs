@@ -261,7 +261,7 @@ mod tests {
         let config_state = Arc::new(ConfigState::new(&mut config).await.unwrap());
         let persistence = DeviceStorage::arc_memory_only().await.unwrap();
 
-        let _enricher = TruthForgeContextEnricher::new(config_state, persistence);
+        let enricher = TruthForgeContextEnricher::new(config_state, persistence);
 
         let narrative = "Crisis communication requires transparency and accountability. \
                         The organization must address stakeholder concerns immediately.";

@@ -9,18 +9,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use terraphim_automata::extract_paragraphs_from_automata;
+// Removed unused import
 use terraphim_rolegraph::RoleGraph;
 
-use crate::{
-    Goal, GoalAlignmentError, GoalAlignmentResult, GoalId, GoalKnowledgeContext, GoalLevel,
-};
+use crate::{Goal, GoalAlignmentResult, GoalId};
 
 /// Knowledge graph-based goal analysis and alignment
 pub struct KnowledgeGraphGoalAnalyzer {
     /// Role graph for role-based goal propagation
+    #[allow(dead_code)]
     role_graph: Arc<RoleGraph>,
     /// Configuration for automata-based analysis
+    #[allow(dead_code)]
     automata_config: AutomataConfig,
     /// Cached analysis results for performance
     analysis_cache: Arc<tokio::sync::RwLock<HashMap<String, AnalysisResult>>>,
@@ -500,9 +500,8 @@ impl KnowledgeGraphGoalAnalyzer {
         let relationships = self.identify_semantic_relationships(concepts).await?;
 
         // Calculate complexity score based on number of concepts and relationships
-        let complexity_score = (concepts.len() as f64 * 0.1 + relationships.len() as f64 * 0.2)
-            .min(1.0)
-            .max(0.0);
+        let complexity_score =
+            (concepts.len() as f64 * 0.1 + relationships.len() as f64 * 0.2).clamp(0.0, 1.0);
 
         Ok(SemanticAnalysis {
             primary_domains,
@@ -572,7 +571,7 @@ impl KnowledgeGraphGoalAnalyzer {
     /// Analyze goal connectivity using knowledge graph
     async fn analyze_goal_connectivity(
         &self,
-        goal: &Goal,
+        _goal: &Goal,
         concepts: &[String],
     ) -> GoalAlignmentResult<ConnectivityResult> {
         if concepts.is_empty() {
@@ -839,7 +838,7 @@ impl KnowledgeGraphGoalAnalyzer {
     /// Generate alignment recommendations
     async fn generate_alignment_recommendations(
         &self,
-        goals: &[Goal],
+        _goals: &[Goal],
         conflicts: &[GoalConflict],
         connectivity_issues: &[ConnectivityIssue],
     ) -> GoalAlignmentResult<Vec<AlignmentRecommendation>> {
@@ -874,17 +873,14 @@ impl KnowledgeGraphGoalAnalyzer {
 
         // Generate recommendations based on connectivity issues
         for issue in connectivity_issues {
-            match issue.issue_type {
-                ConnectivityIssueType::DisconnectedConcepts => {
-                    recommendations.push(AlignmentRecommendation {
-                        recommendation_type: RecommendationType::ModifyDescription,
-                        target_goals: vec![issue.goal_id.clone()],
-                        description: "Improve concept connectivity in goal description".to_string(),
-                        expected_impact: 0.7,
-                        priority: 5,
-                    });
-                }
-                _ => {}
+            if let ConnectivityIssueType::DisconnectedConcepts = issue.issue_type {
+                recommendations.push(AlignmentRecommendation {
+                    recommendation_type: RecommendationType::ModifyDescription,
+                    target_goals: vec![issue.goal_id.clone()],
+                    description: "Improve concept connectivity in goal description".to_string(),
+                    expected_impact: 0.7,
+                    priority: 5,
+                });
             }
         }
 
@@ -909,7 +905,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_knowledge_graph_analyzer_creation() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let automata_config = AutomataConfig::default();
         let similarity_thresholds = SimilarityThresholds::default();
 
@@ -921,7 +919,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_concept_similarity() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let analyzer = KnowledgeGraphGoalAnalyzer::new(
             role_graph,
             AutomataConfig::default(),
@@ -946,7 +946,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_goal_alignment_score() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new();
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let analyzer = KnowledgeGraphGoalAnalyzer::new(
             role_graph,
             AutomataConfig::default(),

@@ -28,7 +28,7 @@ struct LlmBiasPattern {
     bias_type: String,
     text: String,
     explanation: String,
-    severity: Option<f64>,
+    _severity: Option<f64>,
 }
 
 const BIAS_DETECTOR_SYSTEM_PROMPT: &str = r#"You are an expert content critic specializing in identifying bias, framing tactics, and rhetorical manipulation in narratives.
