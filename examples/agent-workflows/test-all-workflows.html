@@ -11,19 +11,19 @@
             margin: 0 auto;
             padding: 2rem;
         }
-        
+
         .test-header {
             text-align: center;
             margin-bottom: 2rem;
         }
-        
+
         .test-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
-        
+
         .workflow-test {
             background: var(--surface);
             border-radius: var(--radius-lg);
@@ -31,51 +31,51 @@
             box-shadow: var(--shadow-md);
             border: 2px solid var(--border);
         }
-        
+
         .workflow-test.testing {
             border-color: var(--warning);
             background: #fff8dc;
         }
-        
+
         .workflow-test.success {
             border-color: var(--success);
             background: #f0fff0;
         }
-        
+
         .workflow-test.error {
             border-color: var(--error);
             background: #ffe4e1;
         }
-        
+
         .test-header h2 {
             color: var(--text);
             margin-bottom: 0.5rem;
         }
-        
+
         .test-status {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             margin-bottom: 1rem;
         }
-        
+
         .status-indicator {
             width: 12px;
             height: 12px;
             border-radius: 50%;
             background: var(--muted);
         }
-        
+
         .status-indicator.pending { background: var(--muted); }
         .status-indicator.testing { background: var(--warning); }
         .status-indicator.success { background: var(--success); }
         .status-indicator.error { background: var(--error); }
-        
+
         .test-details {
             font-size: 0.875rem;
             margin-bottom: 1rem;
         }
-        
+
         .test-results {
             background: var(--surface-2);
             border-radius: var(--radius-md);
@@ -86,12 +86,12 @@
             overflow-y: auto;
             white-space: pre-wrap;
         }
-        
+
         .controls {
             text-align: center;
             margin-bottom: 2rem;
         }
-        
+
         .control-group {
             display: flex;
             gap: 1rem;
@@ -99,14 +99,14 @@
             align-items: center;
             flex-wrap: wrap;
         }
-        
+
         .overall-status {
             margin-bottom: 2rem;
             text-align: center;
             font-size: 1.25rem;
             font-weight: 600;
         }
-        
+
         .progress-bar {
             width: 100%;
             height: 8px;
@@ -115,14 +115,14 @@
             overflow: hidden;
             margin: 1rem 0;
         }
-        
+
         .progress-fill {
             height: 100%;
             background: var(--primary);
             width: 0%;
             transition: width 0.3s ease;
         }
-        
+
         .server-status {
             background: var(--surface);
             border-radius: var(--radius-md);
@@ -130,7 +130,7 @@
             margin-bottom: 2rem;
             border: 1px solid var(--border);
         }
-        
+
         .connection-info {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -328,7 +328,7 @@
                 this.failedTests = 0;
                 this.isRunning = false;
                 this.testResults = new Map();
-                
+
                 this.initializeComponents();
                 this.setupEventListeners();
                 this.checkServerStatus();
@@ -364,17 +364,17 @@
                     if (this.apiClient) {
                         const health = await this.apiClient.health();
                         document.getElementById('health-status').textContent = '✅ Online';
-                        
+
                         const config = this.apiClient.getConfiguration();
                         document.getElementById('backend-url').textContent = config.baseUrl;
-                        
+
                         // Check WebSocket
                         if (this.apiClient.isWebSocketEnabled()) {
                             document.getElementById('ws-status').textContent = '✅ Connected';
                         } else {
                             document.getElementById('ws-status').textContent = '⚠️ Not Available';
                         }
-                        
+
                         // Validate multi-agent endpoints
                         await this.validateAgentSystem();
                     } else {
@@ -396,7 +396,7 @@
                         role: "system_tester",
                         overall_role: "integration_validator"
                     };
-                    
+
                     // Quick validation - just check if endpoints exist
                     // We don't actually execute to avoid resource usage
                     document.getElementById('agent-system-status').textContent = '✅ Ready';
@@ -428,7 +428,7 @@
 
             getEnabledTests() {
                 const tests = [
-                    'prompt-chain', 'routing', 'parallel', 
+                    'prompt-chain', 'routing', 'parallel',
                     'orchestration', 'optimization', 'knowledge-graph'
                 ];
                 return tests.filter(test => document.getElementById(`enable-${test}`).checked);
@@ -436,30 +436,30 @@
 
             async executeTests(tests) {
                 if (this.isRunning) return;
-                
+
                 this.isRunning = true;
                 this.totalTests = tests.length;
                 this.completedTests = 0;
                 this.passedTests = 0;
                 this.failedTests = 0;
                 this.testResults.clear();
-                
+
                 this.updateControls();
                 this.updateProgress(0, 'Starting tests...');
 
                 try {
                     for (let i = 0; i < tests.length; i++) {
                         if (!this.isRunning) break; // Check for stop signal
-                        
+
                         const testName = tests[i];
                         this.updateProgress((i / tests.length) * 100, `Testing ${testName}...`);
-                        
+
                         await this.runSingleTest(testName);
                         this.completedTests++;
-                        this.updateProgress(((i + 1) / tests.length) * 100, 
+                        this.updateProgress(((i + 1) / tests.length) * 100,
                             `Completed ${this.completedTests}/${this.totalTests} tests`);
                     }
-                    
+
                     this.showSummary();
                 } catch (error) {
                     console.error('Test execution failed:', error);
@@ -475,17 +475,17 @@
                 const textElement = document.getElementById(`status-text-${testName}`);
                 const resultsElement = document.getElementById(`results-${testName}`);
                 const testContainer = document.getElementById(`test-${testName}`);
-                
+
                 // Update UI to testing state
                 statusElement.className = 'status-indicator testing';
                 textElement.textContent = 'Testing...';
                 testContainer.className = 'workflow-test testing';
                 resultsElement.textContent = 'Executing test...';
-                
+
                 try {
                     const startTime = Date.now();
                     let result;
-                    
+
                     switch (testName) {
                         case 'prompt-chain':
                             result = await this.testPromptChain();
@@ -508,34 +508,34 @@
                         default:
                             throw new Error(`Unknown test: ${testName}`);
                     }
-                    
+
                     const duration = Date.now() - startTime;
-                    
+
                     // Success
                     statusElement.className = 'status-indicator success';
                     textElement.textContent = 'Passed';
                     testContainer.className = 'workflow-test success';
-                    
+
                     const successMessage = `✅ Test passed in ${duration}ms\n\n` +
                         `Result: ${JSON.stringify(result, null, 2)}`;
                     resultsElement.textContent = successMessage;
-                    
+
                     this.testResults.set(testName, { success: true, result, duration });
                     this.passedTests++;
-                    
+
                 } catch (error) {
                     // Failure
                     statusElement.className = 'status-indicator error';
                     textElement.textContent = 'Failed';
                     testContainer.className = 'workflow-test error';
-                    
+
                     const errorMessage = `❌ Test failed: ${error.message}\n\n` +
                         `Stack: ${error.stack}`;
                     resultsElement.textContent = errorMessage;
-                    
+
                     this.testResults.set(testName, { success: false, error: error.message });
                     this.failedTests++;
-                    
+
                     console.error(`Test ${testName} failed:`, error);
                 }
             }
@@ -547,7 +547,7 @@
                     role: "software_engineer",
                     overall_role: "full_stack_developer"
                 });
-                
+
                 this.validateWorkflowResult(result, 'prompt-chain');
                 return result;
             }
@@ -558,7 +558,7 @@
                     role: "system_architect",
                     overall_role: "technical_lead"
                 });
-                
+
                 this.validateWorkflowResult(result, 'routing');
                 return result;
             }
@@ -569,7 +569,7 @@
                     role: "ml_engineer",
                     overall_role: "ai_specialist"
                 });
-                
+
                 this.validateWorkflowResult(result, 'parallel');
                 return result;
             }
@@ -580,7 +580,7 @@
                     role: "data_engineer",
                     overall_role: "analytics_manager"
                 });
-                
+
                 this.validateWorkflowResult(result, 'orchestration');
                 return result;
             }
@@ -591,7 +591,7 @@
                     role: "content_optimizer",
                     overall_role: "marketing_specialist"
                 });
-                
+
                 this.validateWorkflowResult(result, 'optimization');
                 return result;
             }
@@ -604,7 +604,7 @@
                     contextEnrichment: 'Active',
                     roleGraphIntegration: 'Connected'
                 };
-                
+
                 return result;
             }
 
@@ -612,21 +612,21 @@
                 if (!result) {
                     throw new Error('No result returned from workflow');
                 }
-                
+
                 if (!result.success && result.error) {
                     throw new Error(`Workflow error: ${result.error}`);
                 }
-                
+
                 if (!result.result && !result.data) {
                     throw new Error('No result data in workflow response');
                 }
-                
+
                 // Validate metadata
                 if (result.metadata) {
                     if (!result.metadata.pattern || result.metadata.pattern !== workflowType.replace('-', '_')) {
                         console.warn(`Pattern mismatch: expected ${workflowType}, got ${result.metadata.pattern}`);
                     }
-                    
+
                     if (typeof result.metadata.execution_time_ms !== 'number') {
                         console.warn('Missing or invalid execution time');
                     }
@@ -642,25 +642,25 @@
             clearResults() {
                 // Reset all test states
                 const tests = ['prompt-chain', 'routing', 'parallel', 'orchestration', 'optimization', 'knowledge-graph'];
-                
+
                 tests.forEach(test => {
                     const statusElement = document.getElementById(`status-${test}`);
                     const textElement = document.getElementById(`status-text-${test}`);
                     const resultsElement = document.getElementById(`results-${test}`);
                     const testContainer = document.getElementById(`test-${test}`);
-                    
+
                     statusElement.className = 'status-indicator pending';
                     textElement.textContent = 'Ready';
                     testContainer.className = 'workflow-test';
                     resultsElement.textContent = 'Awaiting test execution...';
                 });
-                
+
                 // Hide summary
                 document.getElementById('summary-results').style.display = 'none';
-                
+
                 // Reset progress
                 this.updateProgress(0, 'Ready to test');
-                
+
                 // Reset counters
                 this.totalTests = 0;
                 this.completedTests = 0;
@@ -673,7 +673,7 @@
                 const runAllBtn = document.getElementById('run-all-tests');
                 const runSelectedBtn = document.getElementById('run-selected-tests');
                 const stopBtn = document.getElementById('stop-tests');
-                
+
                 runAllBtn.disabled = this.isRunning;
                 runSelectedBtn.disabled = this.isRunning;
                 stopBtn.disabled = !this.isRunning;
@@ -687,9 +687,9 @@
             showSummary() {
                 const summaryDiv = document.getElementById('summary-results');
                 const contentDiv = document.getElementById('summary-content');
-                
+
                 const successRate = this.totalTests > 0 ? (this.passedTests / this.totalTests * 100).toFixed(1) : 0;
-                
+
                 let summaryHTML = `
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                         <div><strong>Total Tests:</strong> ${this.totalTests}</div>
@@ -699,13 +699,13 @@
                     </div>
                     <h4>Detailed Results:</h4>
                 `;
-                
+
                 this.testResults.forEach((result, testName) => {
                     const status = result.success ? '✅' : '❌';
                     const duration = result.duration ? ` (${result.duration}ms)` : '';
                     summaryHTML += `<div>${status} ${testName}${duration}</div>`;
                 });
-                
+
                 contentDiv.innerHTML = summaryHTML;
                 summaryDiv.style.display = 'block';
             }

@@ -11,7 +11,7 @@ This crate provides Erlang/OTP-style supervision patterns for managing AI agents
 ### Supervision Trees
 Hierarchical fault tolerance with automatic restart strategies:
 - **OneForOne**: Restart only the failed agent
-- **OneForAll**: Restart all agents if one fails  
+- **OneForAll**: Restart all agents if one fails
 - **RestForOne**: Restart the failed agent and all agents started after it
 
 ### Agent Lifecycle
@@ -43,30 +43,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create supervisor configuration
     let mut config = SupervisorConfig::default();
     config.restart_policy.strategy = RestartStrategy::OneForOne;
-    
+
     // Create agent factory
     let factory = Arc::new(TestAgentFactory);
-    
+
     // Create and start supervisor
     let mut supervisor = AgentSupervisor::new(config, factory);
     supervisor.start().await?;
-    
+
     // Spawn an agent
     let spec = AgentSpec::new("test".to_string(), json!({}))
         .with_name("my-agent".to_string());
     let agent_id = supervisor.spawn_agent(spec).await?;
-    
+
     println!("Agent {} spawned successfully", agent_id);
-    
+
     // Simulate agent failure and restart
     supervisor.handle_agent_exit(
-        agent_id, 
+        agent_id,
         terraphim_agent_supervisor::ExitReason::Error("test failure".to_string())
     ).await?;
-    
+
     // Stop supervisor
     supervisor.stop().await?;
-    
+
     Ok(())
 }
 ```
@@ -81,7 +81,7 @@ let mut config = SupervisorConfig::default();
 config.restart_policy.strategy = RestartStrategy::OneForOne;
 ```
 
-### OneForAll  
+### OneForAll
 Restart all agents if one fails. Best for tightly coupled agents.
 
 ```rust
@@ -128,7 +128,7 @@ Implement the `SupervisedAgent` trait for custom agent types:
 ```rust
 use async_trait::async_trait;
 use terraphim_agent_supervisor::{
-    SupervisedAgent, AgentPid, SupervisorId, AgentStatus, 
+    SupervisedAgent, AgentPid, SupervisorId, AgentStatus,
     TerminateReason, SystemMessage, InitArgs, SupervisionResult
 };
 
@@ -146,20 +146,20 @@ impl SupervisedAgent for MyAgent {
         self.status = AgentStatus::Starting;
         Ok(())
     }
-    
+
     async fn start(&mut self) -> SupervisionResult<()> {
         self.status = AgentStatus::Running;
         // Start your agent logic here
         Ok(())
     }
-    
+
     async fn stop(&mut self) -> SupervisionResult<()> {
         self.status = AgentStatus::Stopping;
         // Cleanup logic here
         self.status = AgentStatus::Stopped;
         Ok(())
     }
-    
+
     // Implement other required methods...
 }
 ```
@@ -176,14 +176,14 @@ println!("Supervisor status: {:?}", status);
 // Get all child agents
 let children = supervisor.get_children().await;
 for (pid, info) in children {
-    println!("Agent {}: {:?} (restarts: {})", 
+    println!("Agent {}: {:?} (restarts: {})",
         pid, info.status, info.restart_count);
 }
 
 // Get restart history
 let history = supervisor.get_restart_history().await;
 for entry in history {
-    println!("Agent {} restarted at {} due to {:?}", 
+    println!("Agent {} restarted at {} due to {:?}",
         entry.agent_id, entry.timestamp, entry.reason);
 }
 ```
@@ -208,7 +208,7 @@ match supervisor.spawn_agent(spec).await {
 ## Features
 
 - **Fault Tolerance**: Automatic restart with configurable strategies
-- **Health Monitoring**: Built-in health checks and status tracking  
+- **Health Monitoring**: Built-in health checks and status tracking
 - **Resource Management**: Configurable limits and timeouts
 - **Observability**: Comprehensive monitoring and restart history
 - **Extensibility**: Custom agent types and factories

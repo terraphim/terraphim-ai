@@ -39,7 +39,7 @@ Testing
 - Write unit tests with `tokio::test` for async tests.
 - Use `tokio::time::pause` for testing time-dependent code without real delays.
 - Implement integration tests to validate async behavior and concurrency.
-- Use mocks and fakes for external dependencies in tests.
+- Never use mocks in tests.
 
 Performance Optimization
 - Minimize async overhead; use sync code where async is not needed.
@@ -65,14 +65,14 @@ Async Ecosystem
 ## Memory and Task Management
 
 Throughout all user interactions, maintain three key files:
-- **@memories.md**: Interaction history and project status
-- **@lessons-learned.md**: Knowledge retention and technical insights
-- **@scratchpad.md**: Active task management and current work
+- **memories.md**: Interaction history and project status
+- **lessons-learned.md**: Knowledge retention and technical insights
+- **scratchpad.md**: Active task management and current work
 
 ### Consolidated Agent Instructions
 
 For comprehensive project knowledge, patterns, and best practices, refer to:
-- **@agents_instructions_v2.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
+- **agents_instructions.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
   - Contains project context, status, and active features
   - Critical lessons on deployment patterns, UI development, security, Rust development, and TruthForge
   - Complete architecture overview with all crates and components
@@ -81,6 +81,33 @@ For comprehensive project knowledge, patterns, and best practices, refer to:
   - Common patterns for extending the system
   - Troubleshooting guide and recent achievements
   - Use this as your primary reference for understanding project patterns and established practices
+
+## Agent Systems Integration
+
+**Two Agent Systems Available**:
+
+### 1. Superpowers Skills (External, Mandatory Workflows)
+- **Location**: `~/.config/superpowers/skills/`
+- **Use for**: Process workflows like brainstorming, systematic debugging, TDD, code review
+- **Mandatory workflows**:
+  - **Brainstorming before coding**: MUST run /brainstorm or read brainstorming skill before implementation
+  - **Check skills before ANY task**: Use find-skills to search for relevant skills, read with Read tool if found
+  - **Historical context search**: Dispatch subagent to search past conversations when needed
+- **Trigger**: Automatically loaded via session-start hook
+- **Pattern**: Skills with checklists require TodoWrite for each item
+
+### 2. Terraphim .agents (Project-Specific Automation)
+- **Location**: `.agents/` directory
+- **Use for**: Project-specific automation tasks (git commits, code review, file exploration)
+- **Technology**: TypeScript + CodeBuff framework
+- **Available tools**: read_files, write_file, str_replace, find_files, code_search, run_terminal_command, spawn_agents, web_search, read_docs, think_deeply
+- **Trigger**: Manual via `codebuff --agent agent-name`
+- **Pattern**: Define agents in TypeScript with handleSteps() for multi-step workflows
+
+**Integration Hierarchy**:
+- **Skills workflows apply to all work**: Brainstorming, TDD, systematic debugging are mandatory processes
+- **Terraphim .agents for automation**: Use for repetitive tasks specific to this project
+- **When both apply**: Follow Skills workflows (like brainstorming) THEN use .agents for implementation
 
 ## Best Practices and Development Workflow
 
@@ -535,4 +562,17 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
    cd crates/terraphim_mcp_server
    ./start_local_dev.sh
    ```
-- Don't use svelte, use examples worflows for UI
+
+## Frontend Technology Guidelines
+
+**Svelte Desktop Application**:
+- **Use for**: `desktop/` directory - Main Terraphim AI desktop application
+- **Technology**: Svelte + TypeScript + Tauri + Vite
+- **CSS Framework**: Bulma (no Tailwind)
+- **Purpose**: Full-featured desktop app with real-time search, knowledge graph visualization, configuration UI
+
+**Vanilla JavaScript Examples**:
+- **Use for**: `examples/agent-workflows/` - Demonstration and testing workflows
+- **Technology**: Vanilla JavaScript, HTML, CSS (no frameworks)
+- **Pattern**: No build step, static files only
+- **Purpose**: Simple, deployable examples that work without compilation

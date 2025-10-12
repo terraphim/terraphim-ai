@@ -36,7 +36,7 @@ async fn test_prompt_chain_workflow() {
     assert!(result["result"]["steps"].as_array().is_some());
 
     let steps = result["result"]["steps"].as_array().unwrap();
-    assert!(steps.len() > 0);
+    assert!(!steps.is_empty());
 
     // Verify each step has required fields
     for step in steps {
@@ -61,7 +61,7 @@ async fn test_routing_workflow() {
         ("Create a responsive landing page with animations", "medium"),
     ];
 
-    for (prompt, expected_complexity) in test_cases {
+    for (prompt, _expected_complexity) in test_cases {
         let response = server
             .post("/workflows/route")
             .json(&json!({
@@ -135,7 +135,7 @@ async fn test_parallel_workflow() {
     let confidence_dist = parallel_result["confidence_distribution"]
         .as_array()
         .unwrap();
-    assert!(confidence_dist.len() > 0);
+    assert!(!confidence_dist.is_empty());
     for agent_confidence in confidence_dist {
         assert!(agent_confidence["agent_name"].as_str().is_some());
         assert!(agent_confidence["confidence"].as_f64().is_some());
@@ -177,7 +177,7 @@ async fn test_orchestration_workflow() {
 
     // Verify worker results
     let worker_results = orchestration_result["worker_results"].as_array().unwrap();
-    assert!(worker_results.len() > 0);
+    assert!(!worker_results.is_empty());
     for worker_result in worker_results {
         assert!(worker_result["worker_id"].as_str().is_some());
         assert!(worker_result["task_id"].as_str().is_some());
@@ -189,7 +189,7 @@ async fn test_orchestration_workflow() {
     let timeline = orchestration_result["execution_timeline"]
         .as_array()
         .unwrap();
-    assert!(timeline.len() > 0);
+    assert!(!timeline.is_empty());
 }
 
 #[tokio::test]
@@ -228,7 +228,7 @@ async fn test_optimization_workflow() {
 
     // Verify iteration history
     let iterations = optimization_result["iteration_history"].as_array().unwrap();
-    assert!(iterations.len() > 0);
+    assert!(!iterations.is_empty());
     for iteration in iterations {
         assert!(iteration["iteration_number"].as_u64().is_some());
         assert!(iteration["generated_variants"].as_array().is_some());
@@ -412,6 +412,7 @@ async fn test_concurrent_workflows() {
 
 #[cfg(test)]
 mod websocket_tests {
+    #[allow(unused_imports)]
     use super::*;
 
     // Note: WebSocket testing would require using a different testing library

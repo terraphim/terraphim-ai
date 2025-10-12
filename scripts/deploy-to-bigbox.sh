@@ -40,7 +40,7 @@ check_ssh_connection() {
 
 phase1_environment() {
     log_info "Phase 1: Environment Preparation"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -72,20 +72,20 @@ sudo usermod -aG kvm alex
 
 echo "Phase 1 complete"
 ENDSSH
-    
+
     log_info "Phase 1 complete"
 }
 
 phase2_firecracker() {
     log_info "Phase 2: Firecracker-Rust Deployment"
-    
+
     # Transfer firecracker-rust directory
     log_info "Transferring firecracker-rust code to bigbox..."
     rsync -avz --progress --delete \
         --exclude 'target' \
         "$PROJECT_ROOT/scratchpad/firecracker-rust/" \
         "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud-new/firecracker-rust/"
-    
+
     # Build and configure on bigbox
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
@@ -154,13 +154,13 @@ curl http://127.0.0.1:8080/health
 
 echo "Phase 2 complete"
 ENDSSH
-    
+
     log_info "Phase 2 complete"
 }
 
 phase3_agent_system() {
     log_info "Phase 3: Terraphim Agent System Deployment"
-    
+
     # Transfer agent system
     log_info "Transferring agent system code to bigbox..."
     rsync -avz --progress \
@@ -169,7 +169,7 @@ phase3_agent_system() {
         --exclude '.git' \
         "$PROJECT_ROOT/" \
         "$BIGBOX_USER@$BIGBOX_HOST:/home/alex/infrastructure/terraphim-private-cloud-new/agent-system/"
-    
+
     # Build and configure on bigbox
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
@@ -274,13 +274,13 @@ curl http://127.0.0.1:3000/health
 
 echo "Phase 3 complete"
 ENDSSH
-    
+
     log_info "Phase 3 complete"
 }
 
 phase4_caddy_integration() {
     log_info "Phase 4: Caddy Integration"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -360,13 +360,13 @@ sudo systemctl reload caddy
 
 echo "Phase 4 complete"
 ENDSSH
-    
+
     log_info "Phase 4 complete"
 }
 
 phase5_workflows() {
     log_info "Phase 5: Deploy Workflows"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -414,13 +414,13 @@ EOF
 
 echo "Phase 5 complete"
 ENDSSH
-    
+
     log_info "Phase 5 complete"
 }
 
 phase6_testing() {
     log_info "Phase 6: Testing & Validation"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -451,13 +451,13 @@ cd /home/alex/infrastructure/terraphim-private-cloud-new/agent-system
 
 echo "Phase 6 complete"
 ENDSSH
-    
+
     log_info "Phase 6 complete"
 }
 
 phase7_security() {
     log_info "Phase 7: Security & Hardening"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -484,13 +484,13 @@ chmod +x /home/alex/infrastructure/terraphim-private-cloud-new/backup.sh
 
 echo "Phase 7 complete"
 ENDSSH
-    
+
     log_info "Phase 7 complete"
 }
 
 verify_deployment() {
     log_info "Verifying deployment..."
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -513,13 +513,13 @@ ENDSSH
 # Main execution
 main() {
     local phase="${1:-all}"
-    
+
     log_info "Starting deployment to $BIGBOX_HOST"
     log_info "Target path: /home/alex/infrastructure/terraphim-private-cloud-new/"
     log_info "Phase: $phase"
-    
+
     check_ssh_connection
-    
+
     case "$phase" in
         1|phase1|environment)
             phase1_environment
@@ -561,7 +561,7 @@ main() {
             exit 1
             ;;
     esac
-    
+
     log_info "Deployment phase '$phase' completed successfully!"
 }
 

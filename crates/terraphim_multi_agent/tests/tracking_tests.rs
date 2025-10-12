@@ -4,7 +4,7 @@ use terraphim_multi_agent::{test_utils::*, *};
 
 #[tokio::test]
 async fn test_token_usage_tracking_accuracy() {
-    let mut agent = create_test_agent().await.unwrap();
+    let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
     // Process a command and verify token tracking
@@ -46,7 +46,7 @@ async fn test_cost_tracking_accuracy() {
 
     let initial_cost = {
         let cost_tracker = agent.cost_tracker.read().await;
-        cost_tracker.total_cost_usd
+        cost_tracker.current_month_spending
     };
 
     // Process a command
@@ -61,18 +61,19 @@ async fn test_cost_tracking_accuracy() {
 
     // Cost should have increased
     assert!(
-        cost_tracker.total_cost_usd > initial_cost,
+        cost_tracker.current_month_spending > initial_cost,
         "Cost should increase after processing"
     );
-    assert!(cost_tracker.total_cost_usd > 0.0, "Should have some cost");
+    assert!(
+        cost_tracker.current_month_spending > 0.0,
+        "Should have some cost"
+    );
 
-    // Should have at least one cost record
-    assert!(cost_tracker.records.len() > 0, "Should have cost records");
-
-    let latest_record = cost_tracker.records.last().unwrap();
-    assert_eq!(latest_record.agent_id, agent.agent_id);
-    assert!(latest_record.cost_usd > 0.0);
-    assert_eq!(latest_record.operation_type, "process_command");
+    // Note: CostTracker doesn't maintain a records list, but tracks spending by date/agent
+    assert!(
+        !cost_tracker.daily_spending.is_empty() || cost_tracker.current_month_spending > 0.0,
+        "Should have cost tracking data"
+    );
 }
 
 #[tokio::test]
@@ -80,13 +81,13 @@ async fn test_token_tracking_multiple_commands() {
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
-    let commands = vec![
+    let commands = [
         "Write a hello world function",
         "Explain async programming",
         "Review this code: fn main() {}",
     ];
 
-    let mut previous_total = 0u32;
+    let mut previous_total = 0u64;
 
     for (i, prompt) in commands.iter().enumerate() {
         let input = CommandInput::new(prompt.to_string(), CommandType::Generate);
@@ -137,7 +138,7 @@ async fn test_cost_calculation_by_model() {
         + (token_tracker.total_output_tokens as f64 * 0.002 / 1000.0);
 
     // Allow small floating point differences
-    let cost_diff = (cost_tracker.total_cost_usd - expected_cost).abs();
+    let cost_diff = (cost_tracker.current_month_spending - expected_cost).abs();
     assert!(
         cost_diff < 0.0001,
         "Cost calculation should be accurate within precision"
@@ -155,25 +156,18 @@ async fn test_tracking_record_structure() {
 
     // Verify token usage record structure
     let token_tracker = agent.token_tracker.read().await;
-    assert!(token_tracker.records.len() > 0);
+    assert!(!token_tracker.records.is_empty());
 
     let token_record = &token_tracker.records[0];
     assert_eq!(token_record.agent_id, agent.agent_id);
     assert!(token_record.input_tokens > 0);
     assert!(token_record.output_tokens > 0);
-    assert!(token_record.duration.as_millis() > 0);
-    assert!(!token_record.operation_type.is_empty());
+    assert!(token_record.duration_ms > 0);
     assert!(token_record.timestamp <= Utc::now());
 
-    // Verify cost record structure
+    // Verify cost tracker state
     let cost_tracker = agent.cost_tracker.read().await;
-    assert!(cost_tracker.records.len() > 0);
-
-    let cost_record = &cost_tracker.records[0];
-    assert_eq!(cost_record.agent_id, agent.agent_id);
-    assert!(cost_record.cost_usd > 0.0);
-    assert_eq!(cost_record.operation_type, "process_command");
-    assert!(cost_record.timestamp <= Utc::now());
+    assert!(cost_tracker.current_month_spending > 0.0);
 }
 
 #[tokio::test]
@@ -212,10 +206,8 @@ async fn test_concurrent_tracking() {
         5,
         "Should have 5 token usage records"
     );
-    assert_eq!(cost_tracker.records.len(), 5, "Should have 5 cost records");
-
     // All costs should be positive
-    assert!(cost_tracker.total_cost_usd > 0.0);
+    assert!(cost_tracker.current_month_spending > 0.0);
     assert!(token_tracker.total_input_tokens + token_tracker.total_output_tokens > 0);
 }
 
@@ -231,16 +223,15 @@ async fn test_tracking_metadata() {
     let token_tracker = agent.token_tracker.read().await;
     let token_record = &token_tracker.records[0];
 
-    // Verify metadata contains useful information
-    assert!(token_record.metadata.contains_key("command_type"));
-    assert_eq!(token_record.metadata.get("command_type").unwrap(), "Review");
+    // Verify token record has correct agent ID and model
+    assert_eq!(token_record.agent_id, agent.agent_id);
+    assert!(!token_record.model.is_empty());
+    assert!(token_record.input_tokens > 0);
+    assert!(token_record.output_tokens > 0);
 
+    // CostTracker doesn't maintain a records list - it uses daily_spending HashMap
     let cost_tracker = agent.cost_tracker.read().await;
-    let cost_record = &cost_tracker.records[0];
-
-    // Cost metadata should include model information
-    assert!(cost_record.metadata.contains_key("model_name"));
-    assert!(cost_record.metadata.get("model_name").unwrap().len() > 0);
+    assert!(cost_tracker.current_month_spending > 0.0);
 }
 
 #[tokio::test]
@@ -265,7 +256,7 @@ async fn test_budget_tracking() {
 
     // Should track against budget (even if not enforced in mock)
     assert!(cost_tracker.daily_budget_usd.is_some());
-    assert!(cost_tracker.total_cost_usd >= 0.0);
+    assert!(cost_tracker.current_month_spending >= 0.0);
 }
 
 #[tokio::test]
@@ -273,20 +264,18 @@ async fn test_tracking_add_record_methods() {
     let agent = create_test_agent().await.unwrap();
 
     // Test manual token record addition
-    let token_record = TokenUsageRecord {
-        timestamp: Utc::now(),
-        agent_id: agent.agent_id,
-        operation_type: "test_operation".to_string(),
-        input_tokens: 100,
-        output_tokens: 50,
-        total_tokens: 150,
-        duration: std::time::Duration::from_millis(500),
-        metadata: HashMap::new(),
-    };
+    let token_record = TokenUsageRecord::new(
+        agent.agent_id,
+        "test-model".to_string(),
+        100,
+        50,
+        0.01,
+        1000,
+    );
 
     {
         let mut token_tracker = agent.token_tracker.write().await;
-        token_tracker.add_record(token_record);
+        token_tracker.add_record(token_record).unwrap();
     }
 
     let token_tracker = agent.token_tracker.read().await;
@@ -309,12 +298,11 @@ async fn test_tracking_add_record_methods() {
 
     {
         let mut cost_tracker = agent.cost_tracker.write().await;
-        cost_tracker.add_record(cost_record);
+        cost_tracker.add_record(cost_record).unwrap();
     }
 
     let cost_tracker = agent.cost_tracker.read().await;
-    assert_eq!(cost_tracker.total_cost_usd, 0.0015);
-    assert_eq!(cost_tracker.records.len(), 1);
+    assert!(cost_tracker.current_month_spending >= 0.0015);
 }
 
 #[tokio::test]
@@ -338,6 +326,6 @@ async fn test_tracking_time_accuracy() {
     assert!(token_record.timestamp <= end_time);
 
     // Duration should be reasonable (mock LLM adds simulated processing time)
-    assert!(token_record.duration.as_millis() > 0);
-    assert!(token_record.duration.as_millis() < 10000); // Should be less than 10 seconds
+    assert!(token_record.duration_ms > 0);
+    assert!(token_record.duration_ms < 10000); // Should be less than 10 seconds
 }

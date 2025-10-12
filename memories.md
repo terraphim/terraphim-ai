@@ -27,7 +27,7 @@ Phase 4 (Server Infrastructure) complete with REST API, WebSocket streaming, and
      - WebSocket integration for real-time progress updates
      - Session management and result caching
      - 120-second polling timeout with 2-second intervals
-   
+
    - `TruthForgeUI` class:
      - Event listeners for form submission and tab switching
      - Pipeline stage visualization updates
@@ -35,7 +35,7 @@ Phase 4 (Server Infrastructure) complete with REST API, WebSocket streaming, and
      - Risk score color coding (severe/high/moderate/low)
      - Debate transcript rendering with role-based styling
      - Export functionality (JSON download)
-   
+
    - WebSocket progress handlers:
      - Started → Update omissions step to running
      - Bias detected → Update bias step
@@ -447,14 +447,14 @@ pub fn openrouter(model: Option<String>) -> Self {
 pub async fn detect_omissions(&self, narrative: &str, context: &NarrativeContext) -> Result<OmissionCatalog> {
     let client = self.llm_client.as_ref()
         .ok_or_else(|| TruthForgeError::ConfigError("LLM client not configured".to_string()))?;
-    
+
     let request = LlmRequest::new(vec![
             LlmMessage::system(self.config.system_prompt_template.clone()),
             LlmMessage::user(prompt),
         ])
         .with_max_tokens(self.config.max_tokens as u64)
         .with_temperature(self.config.temperature as f32);
-    
+
     let response = client.generate(request).await?;
     let omissions = self.parse_omissions_from_llm(&response.content)?;
     Ok(OmissionCatalog::new(omissions))
@@ -789,7 +789,7 @@ pub fn with_llm_client(mut self, client: Arc<GenAiLlmClient>) -> Self {
 **Agent Breakdown**:
 1. **Pass One Agents** (4): OmissionDetector, BiasDetector, NarrativeMapper, TaxonomyLinker
 2. **Pass1 Debate Agents** (3): Supporting, Opposing, Evaluator
-3. **Pass2 Debate Agents** (3): Defensive, Exploitation, Evaluator  
+3. **Pass2 Debate Agents** (3): Defensive, Exploitation, Evaluator
 4. **ResponseGenerator Agents** (3): Reframe, CounterArgue, Bridge
 
 **Model Usage**:
@@ -839,7 +839,7 @@ Implementing TruthForge Two-Pass Debate Arena within terraphim-ai workspace. Pha
    - **Analysis**: omission_detector, bias_detector, narrative_mapper, taxonomy_linker
    - **Pass 1 Debate**: pass1_debater_supporting, pass1_debater_opposing, pass1_evaluator
    - **Pass 2 Exploitation**: pass2_exploitation_supporting, pass2_exploitation_opposing
-   - **Analysis**: cumulative_evaluator  
+   - **Analysis**: cumulative_evaluator
    - **Response Strategies**: reframe_agent, counter_argue_agent, bridge_agent
    - All configured with OpenRouter Claude 3.5 Sonnet/Haiku models
    - System prompts tailored to SCCT framework, dialogic theory, omission exploitation
@@ -980,7 +980,7 @@ Implemented comprehensive security test coverage following critical vulnerabilit
 - **Location**: `crates/terraphim_multi_agent/src/prompt_sanitizer.rs` (NEW)
 - **Integration**: `crates/terraphim_multi_agent/src/agent.rs:604-618`
 - **Issue**: User-controlled system prompts could manipulate agent behavior
-- **Solution**: 
+- **Solution**:
   - Comprehensive sanitization module with pattern detection
   - Detects "ignore instructions", special tokens (`<|im_start|>`), control characters
   - 10,000 character limit enforcement
@@ -1082,7 +1082,7 @@ Implemented comprehensive security test coverage following critical vulnerabilit
 - No clippy warnings on new security code
 
 ### Next Actions
-1. ✅ COMPLETE: Phase 1 critical tests implemented and validated  
+1. ✅ COMPLETE: Phase 1 critical tests implemented and validated
 2. ✅ COMPLETE: Phase 2 comprehensive tests (bypass, concurrent, error, DoS)
 3. 🔄 IN PROGRESS: Validate Phase 2 tests on bigbox remote server
 4. ⏳ TODO: Commit Phase 2 tests to repository
@@ -1188,7 +1188,7 @@ The Terraphim AI multi-agent system has been successfully integrated from simula
    - **Role Configuration**: Proper role and overall_role parameter passing
    - **Interactive Features**: Enhanced user experience with real AI responses
 
-3. **✅ Comprehensive Testing Infrastructure (100% Complete)**  
+3. **✅ Comprehensive Testing Infrastructure (100% Complete)**
    - **Interactive Test Suite**: `test-all-workflows.html` for manual and automated testing
    - **Browser Automation**: Playwright-based end-to-end testing with screenshot capture
    - **API Validation**: Direct endpoint testing with real workflow execution
@@ -1270,7 +1270,7 @@ Real-time UI ← WebSocket ← Progress Updates ← Agent Execution ← Context 
 - Health endpoint responsive with multi-agent system validation
 - All 5 workflow endpoints accepting real API calls with proper responses
 
-**✅ Frontend-Backend Integration**  
+**✅ Frontend-Backend Integration**
 - All workflow examples successfully calling real API endpoints
 - WebSocket connections established for real-time progress updates
 - Error handling working with graceful fallback to demo mode
@@ -1279,7 +1279,7 @@ Real-time UI ← WebSocket ← Progress Updates ← Agent Execution ← Context 
 **✅ End-to-End Workflow Execution**
 - Prompt chaining: Multi-step development workflow with real agent coordination
 - Routing: Intelligent agent selection based on task complexity analysis
-- Parallelization: Multi-perspective analysis with concurrent agent execution  
+- Parallelization: Multi-perspective analysis with concurrent agent execution
 - Orchestration: Hierarchical task decomposition with worker coordination
 - Optimization: Iterative improvement with evaluator-optimizer feedback loops
 
@@ -1291,7 +1291,7 @@ Real-time UI ← WebSocket ← Progress Updates ← Agent Execution ← Context 
 
 ### **Previous Achievements (Foundation for Integration):**
 
-**✅ Complete Multi-Agent Architecture** 
+**✅ Complete Multi-Agent Architecture**
 - TerraphimAgent with Role integration and professional LLM management (✅ Complete)
 - Individual agent evolution with memory/tasks/lessons tracking (✅ Complete)
 - Knowledge graph integration with context enrichment (✅ Complete)
@@ -1303,7 +1303,7 @@ Real-time UI ← WebSocket ← Progress Updates ← Agent Execution ← Context 
 - Agent goals and basic integration tests successful (✅ Complete)
 - Production architecture validation with memory safety confirmed (✅ Complete)
 
-**✅ Knowledge Graph Intelligence Integration** 
+**✅ Knowledge Graph Intelligence Integration**
 - Smart context enrichment with `get_enriched_context_for_query()` implementation (✅ Complete)
 - RoleGraph API integration with semantic relationship discovery (✅ Complete)
 - All 5 command types enhanced with multi-layered context injection (✅ Complete)
@@ -1334,7 +1334,7 @@ Real-time UI ← WebSocket ← Progress Updates ← Agent Execution ← Context 
 The Terraphim AI multi-agent system integration has been successfully completed with:
 
 - ✅ **Complete Backend Integration** - All endpoints use real multi-agent execution
-- ✅ **Full Frontend Integration** - All examples updated to real API calls  
+- ✅ **Full Frontend Integration** - All examples updated to real API calls
 - ✅ **Comprehensive Testing** - Interactive, automated, and end-to-end validation
 - ✅ **Production Architecture** - Professional-grade error handling, monitoring, observability
 - ✅ **Knowledge Graph Intelligence** - Context enrichment and semantic awareness
@@ -1384,7 +1384,7 @@ Successfully implemented comprehensive dynamic model selection system that elimi
 #[derive(Debug, Deserialize, Clone)]
 pub struct LlmConfig {
     pub llm_provider: Option<String>,
-    pub llm_model: Option<String>, 
+    pub llm_model: Option<String>,
     pub llm_base_url: Option<String>,
     pub llm_temperature: Option<f64>,
 }
@@ -1403,27 +1403,27 @@ pub struct WorkflowRequest {
 ```rust
 fn resolve_llm_config(&self, request_config: Option<&LlmConfig>, role_name: &str) -> LlmConfig {
     let mut resolved = LlmConfig::default();
-    
+
     // 1. Hardcoded defaults (safety net)
     resolved.llm_provider = Some("ollama".to_string());
     resolved.llm_model = Some("llama3.2:3b".to_string());
     resolved.llm_base_url = Some("http://127.0.0.1:11434".to_string());
-    
+
     // 2. Global defaults from "Default" role
     if let Some(default_role) = self.config_state.config.roles.get(&"Default".into()) {
         self.apply_role_llm_config(&mut resolved, default_role);
     }
-    
+
     // 3. Role-specific configuration (higher priority)
     if let Some(role) = self.config_state.config.roles.get(&role_name.into()) {
         self.apply_role_llm_config(&mut resolved, role);
     }
-    
+
     // 4. Request-level overrides (highest priority)
     if let Some(req_config) = request_config {
         self.apply_request_llm_config(&mut resolved, req_config);
     }
-    
+
     resolved
 }
 ```
@@ -1527,10 +1527,10 @@ During comprehensive testing of the agent workflow examples, discovered a critic
    ```javascript
    // If settings initialization fails, create a basic fallback API client
    if (!result && !window.apiClient) {
-     const serverUrl = window.location.protocol === 'file:' 
-       ? 'http://127.0.0.1:8000' 
+     const serverUrl = window.location.protocol === 'file:'
+       ? 'http://127.0.0.1:8000'
        : 'http://localhost:8000';
-     
+
      window.apiClient = new TerraphimApiClient(serverUrl, {
        enableWebSocket: true,
        autoReconnect: true
@@ -1549,7 +1549,7 @@ During comprehensive testing of the agent workflow examples, discovered a critic
        console.warn('Received malformed WebSocket message:', message);
        return;
      }
-     
+
      if (!type) {
        console.warn('Received WebSocket message without type field:', message);
        return;
@@ -1583,7 +1583,7 @@ During comprehensive testing of the agent workflow examples, discovered a critic
 
 **🚨 CRITICAL FINDING: Backend Multi-Agent Workflow Processing Broken**
 
-**User Testing Report:** 
+**User Testing Report:**
 > "I tested first prompt chaining and it's not calling LLM model - no activity on ollama ps and then times out"
 
 **Technical Analysis:**
@@ -1682,7 +1682,7 @@ Successfully reviewed the current status of the Terraphim AI agent system and id
 - **terraphim_agent_evolution**: ✅ 20/20 tests passing (workflow patterns working correctly)
 - **terraphim_multi_agent lib tests**: ✅ 18+ tests passing including:
   - ✅ Context management (5 tests)
-  - ✅ Token tracking (5 tests)  
+  - ✅ Token tracking (5 tests)
   - ✅ Command history (4 tests)
   - ✅ Agent goals (1 test)
   - ✅ Basic imports (1 test)
