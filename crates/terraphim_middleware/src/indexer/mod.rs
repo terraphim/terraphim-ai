@@ -1,6 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::path::Path;
 use terraphim_config::{ConfigState, ServiceType};
 use terraphim_types::{Index, SearchQuery};
 
@@ -8,13 +5,11 @@ use crate::{Error, Result};
 
 mod ripgrep;
 
+use crate::haystack::{
+    AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
+    QueryRsHaystackIndexer,
+};
 pub use ripgrep::RipgrepIndexer;
-
-fn hash_as_string<T: Hash>(t: &T) -> String {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    format!("{:x}", s.finish())
-}
 
 /// A Middleware is a service that creates an index of documents from
 /// a haystack.
@@ -27,11 +22,10 @@ pub trait IndexMiddleware {
     /// # Errors
     ///
     /// Returns an error if the middleware fails to index the haystack
-    // Note: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
     fn index(
         &self,
         needle: &str,
-        haystack: &Path,
+        haystack: &terraphim_config::Haystack,
     ) -> impl std::future::Future<Output = Result<Index>> + Send;
 }
 
@@ -46,6 +40,9 @@ pub async fn search_haystacks(
     let needle = search_query.search_term.as_str();
 
     let ripgrep = RipgrepIndexer::default();
+    let atomic = AtomicHaystackIndexer::default();
+    let query_rs = QueryRsHaystackIndexer::default();
+    let clickup = ClickUpHaystackIndexer::default();
     let mut full_index = Index::new();
 
     let role = config
@@ -60,11 +57,48 @@ pub async fn search_haystacks(
             ServiceType::Ripgrep => {
                 // Search through documents using ripgrep
                 // This indexes the haystack using the ripgrep middleware
-                ripgrep.index(needle, &haystack.path).await?
+                ripgrep.index(needle, haystack).await?
+            }
+            ServiceType::Atomic => {
+                // Search through documents using atomic-server
+                atomic.index(needle, haystack).await?
+            }
+            ServiceType::QueryRs => {
+                // Search through documents using query.rs
+                query_rs.index(needle, haystack).await?
+            }
+            ServiceType::ClickUp => {
+                // Search through documents using ClickUp
+                clickup.index(needle, haystack).await?
+            }
+            ServiceType::Mcp => {
+                // Search via MCP client
+                let mcp = McpHaystackIndexer;
+                mcp.index(needle, haystack).await?
+            }
+            ServiceType::Perplexity => {
+                // Search using Perplexity AI-powered web search
+                let perplexity = match PerplexityHaystackIndexer::from_haystack_config(haystack) {
+                    Ok(indexer) => indexer,
+                    Err(e) => {
+                        log::error!("Failed to create Perplexity indexer: {}", e);
+                        // Return empty index to allow graceful degradation
+                        return Ok(Index::new());
+                    }
+                };
+                perplexity.index(needle, haystack).await?
             }
         };
 
-        for indexed_doc in index.values() {
+        // Tag all documents from this haystack with their source
+        let mut tagged_index = Index::new();
+        for (doc_id, mut document) in index {
+            // Set the source haystack for this document
+            document.source_haystack = Some(haystack.location.clone());
+            tagged_index.insert(doc_id, document);
+        }
+
+        for indexed_doc in tagged_index.values() {
             if let Err(e) = config_state.add_to_roles(indexed_doc).await {
                 log::warn!(
                     "Failed to insert document `{}` ({}): {e:?}",
@@ -74,7 +108,7 @@ pub async fn search_haystacks(
             }
         }
 
-        full_index.extend(index);
+        full_index.extend(tagged_index);
     }
     Ok(full_index)
 }

@@ -1,0 +1,14 @@
+[
+  {
+    "@id": "http://localhost:9883/terraphim-drive/terraphim",
+    "https://atomicdata.dev/properties/description": "Ontology for Terraphim AI system, defining classes and properties for documents, knowledge graphs, roles, and search functionality.",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/shortname": "terraphim",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883/terraphim-drive",
+    "https://atomicdata.dev/properties/classes": [],
+    "https://atomicdata.dev/properties/properties": []
+  }
+]

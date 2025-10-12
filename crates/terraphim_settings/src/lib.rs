@@ -1,10 +1,13 @@
 use directories::ProjectDirs;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use twelf::{config, Layer};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use twelf::reexports::toml;
+use twelf::{config, Layer};
+
+#[cfg(feature = "onepassword")]
+use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -14,6 +17,9 @@ pub enum Error {
     IoError(#[from] std::io::Error),
     #[error("env error: {0}")]
     EnvError(#[from] std::env::VarError),
+    #[cfg(feature = "onepassword")]
+    #[error("1Password error: {0}")]
+    OnePasswordError(#[from] terraphim_onepassword_cli::OnePasswordError),
 }
 
 // Need to name it explicitly to avoid conflict with std::Result
@@ -24,7 +30,7 @@ pub type DeviceSettingsResult<T> = std::result::Result<T, Error>;
 pub const DEFAULT_CONFIG_PATH: &str = ".config";
 
 /// Default settings file
-pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_full.toml");
+pub const DEFAULT_SETTINGS: &str = include_str!("../default/settings_local_dev.toml");
 
 fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
@@ -69,10 +75,100 @@ pub struct DeviceSettings {
     pub profiles: HashMap<String, HashMap<String, String>>,
 }
 
+impl Default for DeviceSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeviceSettings {
     /// Create a new DeviceSettings
     pub fn new() -> Self {
-        Self::load_from_env_and_file(None).unwrap()
+        Self::load_from_env_and_file(None).unwrap_or_else(|e| {
+            log::warn!(
+                "Failed to load device settings from file: {:?}, using defaults",
+                e
+            );
+            Self::default_embedded()
+        })
+    }
+
+    /// Load settings with 1Password secret resolution
+    #[cfg(feature = "onepassword")]
+    pub async fn load_with_onepassword(config_path: Option<PathBuf>) -> DeviceSettingsResult<Self> {
+        log::info!("Loading device settings with 1Password integration...");
+        let config_path = config_path.unwrap_or_else(Self::default_config_path);
+
+        log::debug!("Settings path: {:?}", config_path);
+        let config_file = init_config_file(&config_path)?;
+        log::debug!("Loading config_file: {:?}", config_file);
+
+        // Read the raw configuration file
+        let raw_config = std::fs::read_to_string(&config_file)?;
+
+        // Process 1Password references
+        let loader = OnePasswordLoader::new();
+        let processed_config = if loader.is_available().await {
+            log::info!("1Password CLI available, processing secrets...");
+            loader.process_config(&raw_config).await?
+        } else {
+            log::warn!("1Password CLI not available, using raw configuration");
+            raw_config
+        };
+
+        // Parse the processed configuration
+        let settings: DeviceSettings = toml::from_str(&processed_config).map_err(|e| {
+            Error::IoError(std::io::Error::other(format!("TOML parsing error: {}", e)))
+        })?;
+
+        log::info!("Successfully loaded settings with 1Password integration");
+        Ok(settings)
+    }
+
+    /// Process a configuration string with 1Password secret resolution
+    #[cfg(feature = "onepassword")]
+    pub async fn process_config_with_secrets(config: &str) -> DeviceSettingsResult<String> {
+        let loader = OnePasswordLoader::new();
+        if loader.is_available().await {
+            Ok(loader.process_config(config).await?)
+        } else {
+            log::warn!("1Password CLI not available, returning raw configuration");
+            Ok(config.to_string())
+        }
+    }
+
+    /// Create default embedded DeviceSettings without filesystem operations
+    /// Used for embedded/offline mode where config files are not needed
+    pub fn default_embedded() -> Self {
+        use std::collections::HashMap;
+
+        let mut profiles = HashMap::new();
+
+        // Add minimal required profiles for embedded mode
+        let mut memory_profile = HashMap::new();
+        memory_profile.insert("type".to_string(), "memory".to_string());
+        profiles.insert("memory".to_string(), memory_profile);
+
+        let mut sqlite_profile = HashMap::new();
+        sqlite_profile.insert("type".to_string(), "sqlite".to_string());
+        sqlite_profile.insert(
+            "datadir".to_string(),
+            "/tmp/terraphim_sqlite_embedded".to_string(),
+        );
+        sqlite_profile.insert(
+            "connection_string".to_string(),
+            "/tmp/terraphim_sqlite_embedded/terraphim.db".to_string(),
+        );
+        sqlite_profile.insert("table".to_string(), "terraphim_kv".to_string());
+        profiles.insert("sqlite".to_string(), sqlite_profile);
+
+        Self {
+            server_hostname: "127.0.0.1:8000".to_string(),
+            api_endpoint: "http://localhost:8000/api".to_string(),
+            initialized: true,
+            default_data_path: "/tmp/terraphim_embedded".to_string(),
+            profiles,
+        }
     }
     /// Get the default path for the config file
     ///
@@ -94,7 +190,7 @@ impl DeviceSettings {
             Some(path) => path,
             None => DeviceSettings::default_config_path(),
         };
-        println!("Settings path: {:?}", config_path);
+
         log::debug!("Settings path: {:?}", config_path);
         let config_file = init_config_file(&config_path)?;
         log::debug!("Loading config_file: {:?}", config_file);
@@ -104,7 +200,11 @@ impl DeviceSettings {
             Layer::Env(Some(String::from("TERRAPHIM_"))),
         ])?)
     }
-    pub fn update_initialized_flag(&mut self, settings_path: Option<PathBuf>, initialized: bool) -> Result<(), Error> {
+    pub fn update_initialized_flag(
+        &mut self,
+        settings_path: Option<PathBuf>,
+        initialized: bool,
+    ) -> Result<(), Error> {
         let settings_path = settings_path.unwrap_or_else(Self::default_config_path);
         let settings_path = settings_path.join("settings.toml");
         self.initialized = initialized;
@@ -121,12 +221,11 @@ impl DeviceSettings {
 
     /// Save settings to a specified file
     fn save_to_file(&self, path: &PathBuf) -> Result<(), Error> {
-        let serialized_settings = toml::to_string_pretty(self)
-            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-        
-        std::fs::write(path, serialized_settings)
-            .map_err(Error::IoError)?;
-        
+        let serialized_settings =
+            toml::to_string_pretty(self).map_err(|e| Error::IoError(std::io::Error::other(e)))?;
+
+        std::fs::write(path, serialized_settings).map_err(Error::IoError)?;
+
         Ok(())
     }
 }
@@ -146,15 +245,14 @@ fn init_config_file(path: &PathBuf) -> Result<PathBuf, std::io::Error> {
     Ok(config_file)
 }
 
-
 /// To run test with logs and variables use:
 /// RUST_LOG="info,warn" TERRAPHIM_API_ENDPOINT="test_endpoint" TERRAPHIM_PROFILE_S3_REGION="us-west-1" cargo test -- --nocapture
 #[cfg(test)]
 mod tests {
     use super::*;
     use test_log::test;
-    use tempfile::tempdir;
-    use envtestkit::lock::{lock_read, lock_test};
+
+    use envtestkit::lock::lock_test;
     use envtestkit::set_env;
     use std::ffi::OsString;
 
@@ -162,13 +260,20 @@ mod tests {
     fn test_env_variable() {
         let _lock = lock_test();
         let _test = set_env(OsString::from("TERRAPHIM_PROFILE_S3_REGION"), "us-west-1");
-        let _test2 = set_env(OsString::from("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE"),"on");
-        println!("Env: {:?}", std::env::var("TERRAPHIM_PROFILE_S3_REGION"));
-        let config = DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
-        println!("Config: {:?}", config);
-        println!(
+        let _test2 = set_env(
+            OsString::from("TERRAPHIM_PROFILE_S3_ENABLE_VIRTUAL_HOST_STYLE"),
+            "on",
+        );
+
+        log::debug!("Env: {:?}", std::env::var("TERRAPHIM_PROFILE_S3_REGION"));
+        let config =
+            DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
+
+        log::debug!("Config: {:?}", config);
+        log::debug!(
             "Region: {:?}",
-            config.as_ref()
+            config
+                .as_ref()
                 .unwrap()
                 .profiles
                 .get("s3")
@@ -191,19 +296,22 @@ mod tests {
 
     #[test]
     fn test_update_initialized_flag() {
-
         let test_config_path = PathBuf::from("./test_settings/");
-        
+
         // Check if initialized is false
-        let mut config = DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
+        let mut config =
+            DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
         config.initialized = false;
-        assert_eq!(config.initialized, false);
+        assert!(!config.initialized);
 
         // Update to true
-        config.update_initialized_flag(Some(test_config_path.clone()), true).unwrap();
+        config
+            .update_initialized_flag(Some(test_config_path.clone()), true)
+            .unwrap();
 
         // Check if initialized is now true
-        let config_copy = DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
-        assert_eq!(config_copy.initialized, true);
+        let config_copy =
+            DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
+        assert!(config_copy.initialized);
     }
 }

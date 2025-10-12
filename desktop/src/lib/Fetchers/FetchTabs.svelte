@@ -49,7 +49,8 @@
     const agent = Agent.fromSecret(agentSecret);
     $store.setServerUrl(atomicServerUrl);
     console.log("Server set.Setting agent");
-    $store.setAgent(agent);
+    // Type assertion needed due to different @tomic/lib versions between dependencies
+    $store.setAgent(agent as any);
   };
 
   const handleClickUrl = async () => {

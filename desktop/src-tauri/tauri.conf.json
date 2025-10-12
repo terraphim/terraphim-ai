@@ -1,59 +1,27 @@
 {
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "package": {
-    "productName": "terraphim-ai-desktop",
-    "version": "0.1.0"
+    "productName": "Terraphim Desktop",
+    "version": "0.2.0"
   },
   "build": {
-    "distDir": "../dist",
+    "beforeDevCommand": "yarn run dev",
+    "beforeBuildCommand": "yarn run build",
     "devPath": "http://localhost:5173",
-    "beforeDevCommand": "yarn dev",
-    "beforeBuildCommand": "yarn build"
+    "distDir": "../dist"
   },
   "tauri": {
-    "cli": {
-      "description": "Terraphim AI desktop app",
-      "args": [
-        {
-          "short": "c",
-          "name": "config",
-          "takesValue": true,
-          "description": "Config path"
-        },
-        {
-          "short": "t",
-          "name": "theme",
-          "takesValue": true,
-          "description": "App theme",
-          "possibleValues": [
-            "light",
-            "dark",
-            "system"
-          ]
-        },
-        {
-          "short": "v",
-          "name": "verbose",
-          "multipleOccurrences": true,
-          "description": "Verbosity level"
-        }
-      ],
-      "subcommands": {
-        "update": {
-          "description": "Updates the app",
-          "args": [
-            {
-              "short": "b",
-              "name": "background",
-              "description": "Update in background"
-            }
-          ]
-        }
-      }
+    "allowlist": {
+      "all": false,
+      "dialog": { "all": true },
+      "path": { "all": true },
+      "fs": { "all": true },
+      "globalShortcut": { "all": true }
     },
     "bundle": {
       "active": true,
       "targets": "all",
-      "identifier": "com.terraphim.ai",
+      "identifier": "com.terraphim.ai.desktop",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
@@ -61,61 +29,31 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "resources": [],
-      "externalBin": [],
-      "copyright": "Applied Knowledge System Ltd",
-      "category": "Productivity",
-      "shortDescription": "",
-      "longDescription": "",
-      "deb": {
-        "depends": []
-      },
-      "macOS": {
-        "frameworks": [],
-        "minimumSystemVersion": "",
-        "exceptionDomain": "",
-        "signingIdentity": null,
-        "providerShortName": null,
-        "entitlements": null
-      },
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
-      }
+      "resources": [
+        "../default/**/*",
+        "../public/assets/bulmaswatch/**/*.css"
+      ]
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png"
     },
     "updater": {
-      "active": false
-    },
-    "allowlist": {
-      "globalShortcut": {
-        "all": true
-      },
-      "fs": {
-        "all": true
-      },
-      "path": {
-        "all": true
-      },
-      "dialog": {
-        "all": true
-      }
+      "active": true,
+      "endpoints": [
+        "https://github.com/terraphim/terraphim-ai/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": "PLACEHOLDER_PUBLIC_KEY"
     },
     "windows": [
       {
-        "title": "Terraphim AI Search",
-        "width": 800,
-        "height": 600,
+        "label": "main",
+        "title": "Terraphim AI",
+        "width": 1024,
+        "height": 768,
         "resizable": true,
         "fullscreen": false
       }
-    ],
-    "security": {
-      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self' img-src: 'self'"
-    },
-    "systemTray": {
-      "iconPath": "icons/icon_white.png",
-      "iconAsTemplate": true
-    }
+    ]
   }
 }

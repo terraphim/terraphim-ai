@@ -1,7 +1,7 @@
 # Terraphim AI Assistant
 
 [![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
-[![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group) 
+[![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group)
 
 Terraphim is a privacy-first AI assistant that works for you under your complete control and is fully deterministic.
 
@@ -31,33 +31,48 @@ Terraphim aims to bridge this gap by providing a privacy-first AI assistant that
 
 ## Getting Started
 
-In order to start a terraphim server, run the following command:
+### Quick Start
 
-```bash
-cargo run
-```
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/terraphim/terraphim-ai.git
+   cd terraphim-ai
+   ```
 
-This will start an API endpoint, which can be used to index and query documents.
+2. **Set up development environment**:
+   ```bash
+   # Install Git hooks for code quality (optional but recommended)
+   ./scripts/install-hooks.sh
+   ```
 
-To open the local web-frontend, open a new terminal and run:
+3. **Start the backend server**:
+   ```bash
+   cargo run
+   ```
+   This starts an API endpoint for indexing and querying documents.
 
-```bash
-cd desktop
-yarn # Install dependencies
-yarn run dev
-```
+4. **Run the frontend** (choose one):
 
-Alternatively, you can use the Tauri-based desktop app by running:
+   **Web Frontend:**
+   ```bash
+   cd desktop
+   yarn install
+   yarn run dev
+   ```
 
-```bash
-cd desktop
-# Install dependencies
-yarn
-# run the Tauri dev server 
-yarn run tauri dev
-```
+   **Desktop App (Tauri):**
+   ```bash
+   cd desktop
+   yarn install
+   yarn run tauri dev
+   ```
 
-(See the [desktop README](desktop/README.md) for more details.)
+   **Terminal Interface (TUI):**
+   ```bash
+   cargo run --bin terraphim-tui
+   ```
+
+(See the [desktop README](desktop/README.md) and [development setup guide](docs/src/development-setup.md) for more details.)
 
 ## Terminology
 
@@ -90,20 +105,117 @@ your tasks. You can carry it around with you.
 Similar entities now common in science fiction, for example Destiny 2 has entity called [Ghost][ghost].
 
 
-Or in Star Wars Jedi Survivor there is an AI assistant [BD-1][bd-1]. 
+Or in Star Wars Jedi Survivor there is an AI assistant [BD-1][bd-1].
 
 The compactness and mobility of such AI assistant drives the [[Design Decisions]] of Terraphim.
 
 [bd-1]: https://starwars.fandom.com/wiki/BD-1
-[ghost]: https://www.destinypedia.com/Ghost 
-[relict]: https://www.goodreads.com/en/book/show/196710046  
+[ghost]: https://www.destinypedia.com/Ghost
+[relict]: https://www.goodreads.com/en/book/show/196710046
 
 Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
 
+## Configuration
+
+### Storage Backends
+
+Terraphim supports multiple storage backends for different deployment scenarios:
+
+#### Local Development (Default)
+The system uses local storage backends by default, requiring no additional configuration:
+- **Memory**: In-memory storage for testing
+- **DashMap**: High-performance concurrent storage
+- **SQLite**: Local database storage
+- **ReDB**: Embedded key-value database
+
+#### Cloud Storage (Optional)
+For production deployments, you can optionally enable cloud storage:
+
+##### AWS S3 Configuration
+To use AWS S3 storage, set the following environment variables:
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export TERRAPHIM_PROFILE_S3_REGION="us-east-1"
+export TERRAPHIM_PROFILE_S3_ENDPOINT="https://s3.amazonaws.com/"
+```
+
+**Note**: AWS credentials are completely optional. The system will automatically fall back to local storage if AWS credentials are not available, ensuring local development works without any cloud dependencies.
+
+### Environment Variables
+- `TERRAPHIM_SETTINGS_PATH`: Override the settings file path
+- `TERRAPHIM_DATA_PATH`: Set the data directory location
+- `LOG_LEVEL`: Set logging verbosity (debug, info, warn, error)
+
+## Installation Methods
+
+### For End Users
+
+#### Homebrew (macOS/Linux)
+```bash
+brew install terraphim/terraphim-ai/terraphim-ai
+```
+This installs the server, TUI, and desktop app (macOS only).
+
+#### Debian/Ubuntu
+```bash
+# Download from GitHub releases
+sudo dpkg -i terraphim-server_*.deb
+sudo dpkg -i terraphim-tui_*.deb
+sudo dpkg -i terraphim-ai-desktop_*.deb
+```
+
+#### Docker
+```bash
+docker run ghcr.io/terraphim/terraphim-server:latest
+```
+
+#### Direct Download
+Download pre-built binaries from [GitHub Releases](https://github.com/terraphim/terraphim-ai/releases).
+
+### Development Setup
+
+For development, see our comprehensive [Development Setup Guide](docs/src/development-setup.md) which covers:
+- Code quality tools and pre-commit hooks
+- Multiple installation options (no Python required!)
+- IDE integration and troubleshooting
+
 ## Contributing
 
-If you'd like to contribute to the project, please read our
-[Contributing guide](CONTRIBUTING.md).
+We welcome contributions! Here's how to get started:
+
+1. **Read our guides**:
+   - [Contributing guide](CONTRIBUTING.md)
+   - [Development setup](docs/src/development-setup.md)
+
+2. **Set up your environment**:
+   ```bash
+   git clone https://github.com/terraphim/terraphim-ai.git
+   cd terraphim-ai
+   ./scripts/install-hooks.sh  # Sets up code quality tools
+   ```
+
+3. **Code quality standards**:
+   - All commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
+   - Rust code is automatically formatted with `cargo fmt`
+   - JavaScript/TypeScript uses [Biome](https://biomejs.dev/) for linting and formatting
+   - No secrets or large files allowed in commits
+
+4. **Make your changes**:
+   - Create a feature branch: `git checkout -b feat/your-feature`
+   - Make your changes with proper tests
+   - Commit with conventional format: `git commit -m "feat: add amazing feature"`
+   - Push and create a Pull Request
+
+### Dependency Management
+
+**Important**: Some dependencies are pinned to specific versions to ensure compatibility:
+
+- `wiremock = "0.6.4"` - Version 0.6.5 uses unstable Rust features requiring nightly compiler
+- `schemars = "0.8.22"` - Version 1.0+ introduces breaking API changes
+- `thiserror = "1.0.x"` - Version 2.0+ requires code migration for breaking changes
+
+These constraints are enforced in `.github/dependabot.yml` to prevent automatic updates that would break CI. Future upgrades require manual code migration work.
 
 ### Contributors are awesome
 <a href="https://github.com/terraphim/terraphim-ai/graphs/contributors">
@@ -115,4 +227,3 @@ If you'd like to contribute to the project, please read our
 ## License
 
 This project is licensed under the [Apache license](LICENSE).
-

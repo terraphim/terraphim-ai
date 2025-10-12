@@ -10,26 +10,38 @@ repository = "https://github.com/terraphim/terraphim-ai"
 keywords = ["personal-assistant", "ai", "privacy", "tauri", "desktop"]
 readme = "../../README.md"
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.87"
+
+[[bin]]
+name = "generate-bindings"
+path = "src/bin/generate-bindings.rs"
 
 [build-dependencies]
-tauri-build = { version = "1.5.1", features = [] }
+tauri-build = { version = "1.5.5", features = [] }
 
 [dependencies]
-terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.1.0" }
-terraphim_config = { path = "../../crates/terraphim_config", version = "0.1.0" }
-terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.1.0" }
-terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.1.0" }
-terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.1.0" }
-terraphim_types = { path = "../../crates/terraphim_types", version = "0.1.0" }
-terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.1.0" }
-terraphim_service = { path = "../../crates/terraphim_service", version = "0.1.0" }
-serde_json_any_key = "2.0.0" 
+terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
+terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "0.2.0", features = ["native"] }
+terraphim_config = { path = "../../crates/terraphim_config", version = "0.2.0", features = ["typescript"] }
+terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.2.0" }
+terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.2.0" }
+terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.2.0", features = ["onepassword"] }
+terraphim_onepassword_cli = { path = "../../crates/terraphim_onepassword_cli", version = "0.2.0" }
+terraphim_types = { path = "../../crates/terraphim_types", version = "0.2.0", features = ["typescript"] }
+terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.2.0" }
+terraphim_service = { path = "../../crates/terraphim_service", version = "0.2.0" }
+terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "0.2.0" }
+rmcp = { version = "0.6.1", features = ["server"] }
+serde_json_any_key = "2.0.0"
 anyhow = "1.0.81"
 log = "0.4.21"
+env_logger = "0.11.8"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
-tauri = { version = "1.7.1", features = [ "cli", "dialog-all", "path-all", "fs-all",
+tauri = { version = "1.7.1", features = [ "updater",
+    "dialog-all",
+    "path-all",
+    "fs-all",
     "global-shortcut-all",
     "system-tray",
 ] }
@@ -37,6 +49,22 @@ serde_json = "1.0.104"
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0.58"
 ahash = "0.8.11"
+schemars = { version = "0.8.22", features = ["derive"] }
+tsify = { version = "0.5", features = ["js"] }
+wasm-bindgen = "0.2"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-appender = "0.2.3"
+tracing-log = "0.1"
+ulid = "1.1.2"
+chrono = { version = "0.4.38", features = ["serde"] }
+lru = "0.12"
+
+[dev-dependencies]
+tokio-test = "0.4.4"
+serial_test = "3.1.1"
+tempfile = "3.12.0"
+mockall = "0.13.1"
 
 [features]
 # by default Tauri runs in production mode
@@ -45,3 +73,28 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+# OpenRouter AI integration feature
+openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+# Optional database backends
+sqlite = ["terraphim_persistence/services-sqlite"]
+rocksdb = ["terraphim_persistence/services-rocksdb"]
+redis = ["terraphim_persistence/services-redis"]
+# Enable all database backends
+full-db = ["sqlite", "rocksdb", "redis"]
+
+[package.metadata.deb]
+maintainer = "Terraphim Contributors <team@terraphim.ai>"
+copyright = "2024, Terraphim Contributors"
+license-file = ["../../LICENSE-Apache-2.0", "4"]
+extended-description = """
+Terraphim AI Desktop - Privacy-first AI assistant desktop application.
+Native desktop app with semantic search and knowledge management.
+Built with Tauri for cross-platform compatibility."""
+depends = "$auto, libwebkit2gtk-4.0-37, libgtk-3-0"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/terraphim-ai-desktop", "usr/bin/", "755"],
+    ["icons/128x128.png", "usr/share/icons/hicolor/128x128/apps/terraphim-ai.png", "644"],
+    ["../../README.md", "usr/share/doc/terraphim-ai-desktop/README", "644"],
+]

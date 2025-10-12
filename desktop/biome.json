@@ -1,0 +1,93 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"correctness": {
+				"noUnusedVariables": "error",
+				"noUnusedImports": "error"
+			},
+			"style": {
+				"useConst": "error",
+				"useTemplate": "error"
+			},
+			"suspicious": {
+				"noDebugger": "error",
+				"noConsole": "warn"
+			},
+			"complexity": {
+				"noExtraBooleanCast": "error"
+			},
+			"performance": {
+				"noDelete": "error"
+			},
+			"security": {
+				"noDangerouslySetInnerHtml": "error"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 2,
+		"lineEnding": "lf",
+		"lineWidth": 100,
+		"attributePosition": "auto"
+	},
+	"javascript": {
+		"formatter": {
+			"jsxQuoteStyle": "double",
+			"quoteProperties": "asNeeded",
+			"trailingCommas": "es5",
+			"semicolons": "always",
+			"arrowParentheses": "always",
+			"bracketSpacing": true,
+			"bracketSameLine": false,
+			"quoteStyle": "single",
+			"attributePosition": "auto"
+		}
+	},
+	"json": {
+		"formatter": {
+			"trailingCommas": "none"
+		}
+	},
+	"files": {
+		"includes": [
+			"src/**/*.js",
+			"src/**/*.ts",
+			"src/**/*.tsx",
+			"src/**/*.jsx",
+			"src/**/*.svelte",
+			"src/**/*.json",
+			"src/**/*.jsonc",
+			"*.json",
+			"*.jsonc"
+		],
+		"ignoreUnknown": false
+	},
+	"overrides": [
+		{
+			"includes": ["src/**/*.svelte"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/**/*.test.ts", "src/**/*.test.js", "src/**/*.spec.ts", "src/**/*.spec.js"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off"
+					}
+				}
+			}
+		}
+	]
+}
