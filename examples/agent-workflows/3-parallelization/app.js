@@ -13,7 +13,7 @@ class ParallelizationAnalysisDemo {
     this.analysisResults = new Map();
     this.executionTasks = new Map();
     this.isRunning = false;
-    
+
     // Define analysis perspectives with their characteristics
     this.perspectives = {
       analytical: {
@@ -84,13 +84,13 @@ class ParallelizationAnalysisDemo {
   async init() {
     // Initialize settings system first
     await this.initializeSettings();
-    
+
     this.setupEventListeners();
     this.renderPerspectives();
     this.renderDomainTags();
     this.createWorkflowPipeline();
     this.selectDefaultPerspectives();
-    
+
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
@@ -193,14 +193,14 @@ class ParallelizationAnalysisDemo {
     ['analytical', 'practical', 'creative'].forEach(id => {
       this.togglePerspective(id);
     });
-    
+
     // Create parallel timeline visualization immediately
     this.updateParallelTimeline();
   }
 
   toggleDomain(domain) {
     const tag = document.querySelector(`[data-domain="${domain}"]`);
-    
+
     if (this.selectedDomains.has(domain)) {
       this.selectedDomains.delete(domain);
       tag.classList.remove('selected');
@@ -212,7 +212,7 @@ class ParallelizationAnalysisDemo {
 
   togglePerspective(perspectiveId) {
     const card = document.querySelector(`[data-perspective="${perspectiveId}"]`);
-    
+
     if (this.selectedPerspectives.has(perspectiveId)) {
       this.selectedPerspectives.delete(perspectiveId);
       card.classList.remove('selected');
@@ -220,7 +220,7 @@ class ParallelizationAnalysisDemo {
       this.selectedPerspectives.add(perspectiveId);
       card.classList.add('selected');
     }
-    
+
     // Update parallel timeline when perspectives change
     this.updateParallelTimeline();
   }
@@ -238,14 +238,14 @@ class ParallelizationAnalysisDemo {
       { id: 'parallel', name: 'Parallel Execution' },
       { id: 'aggregate', name: 'Result Aggregation' }
     ];
-    
+
     this.visualizer.createPipeline(steps);
     this.visualizer.createProgressBar('progress-container');
   }
 
   async startParallelAnalysis() {
     const topic = this.topicInput.value.trim();
-    
+
     if (!topic) {
       alert('Please enter a topic to analyze.');
       return;
@@ -258,50 +258,50 @@ class ParallelizationAnalysisDemo {
 
     this.isRunning = true;
     this.updateControlsState();
-    
+
     // Update workflow status
     document.getElementById('workflow-status').textContent = 'Analyzing...';
     document.getElementById('workflow-status').className = 'workflow-status running';
     document.getElementById('timeline-status').textContent = 'Executing';
-    
+
     // Reset and setup pipeline
     this.visualizer.updateStepStatus('setup', 'active');
     this.visualizer.updateProgress(10, 'Setting up parallel tasks...');
-    
+
     // Hide initial state and show results area
     document.getElementById('initial-state').style.display = 'none';
     document.getElementById('analysis-results').style.display = 'block';
-    
+
     await this.delay(1500);
-    
+
     // Create parallel timeline visualization
     this.createParallelTimeline();
-    
+
     this.visualizer.updateStepStatus('setup', 'completed');
     this.visualizer.updateStepStatus('parallel', 'active');
     this.visualizer.updateProgress(30, 'Executing parallel analysis...');
-    
+
     // Start parallel tasks
     await this.executeParallelTasks(topic);
-    
+
     this.visualizer.updateStepStatus('parallel', 'completed');
     this.visualizer.updateStepStatus('aggregate', 'active');
     this.visualizer.updateProgress(80, 'Aggregating results...');
-    
+
     // Aggregate results
     await this.aggregateResults();
-    
+
     this.visualizer.updateStepStatus('aggregate', 'completed');
     this.visualizer.updateProgress(100, 'Analysis completed successfully!');
-    
+
     // Update final status
     document.getElementById('workflow-status').textContent = 'Completed';
     document.getElementById('workflow-status').className = 'workflow-status completed';
     document.getElementById('timeline-status').textContent = 'Completed';
-    
+
     this.isRunning = false;
     this.updateControlsState();
-    
+
     // Show metrics
     this.displayMetrics();
   }
@@ -311,7 +311,7 @@ class ParallelizationAnalysisDemo {
       id,
       name: this.perspectives[id].name
     }));
-    
+
     this.visualizer.createParallelTimeline(tasks, 'parallel-timeline-container');
   }
 
@@ -330,11 +330,11 @@ class ParallelizationAnalysisDemo {
         color: this.perspectives[id].color,
         icon: this.perspectives[id].icon
       }));
-      
+
       this.visualizer.createParallelTimeline(tasks, 'parallel-timeline-container');
-      
+
       // Update timeline status
-      document.getElementById('timeline-status').textContent = 
+      document.getElementById('timeline-status').textContent =
         `${this.selectedPerspectives.size} perspectives selected`;
     } else {
       // Show empty state
@@ -349,10 +349,10 @@ class ParallelizationAnalysisDemo {
     const tasks = Array.from(this.selectedPerspectives).map(perspectiveId => {
       return this.executePerspectiveAnalysis(perspectiveId, topic);
     });
-    
+
     // Execute all tasks in parallel
     const results = await Promise.all(tasks);
-    
+
     // Store results
     results.forEach((result, index) => {
       const perspectiveId = Array.from(this.selectedPerspectives)[index];
@@ -362,21 +362,21 @@ class ParallelizationAnalysisDemo {
 
   async executePerspectiveAnalysis(perspectiveId, topic) {
     const perspective = this.perspectives[perspectiveId];
-    
+
     // Update perspective status
     this.updatePerspectiveStatus(perspectiveId, 'running', 'Analyzing...');
-    
+
     // Simulate analysis with varying duration
     const duration = 2000 + Math.random() * 3000;
     const startTime = Date.now();
-    
+
     // Update parallel timeline
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(100, (elapsed / duration) * 100);
       this.visualizer.updateParallelTask(perspectiveId, progress);
     }, 100);
-    
+
     try {
       // Enhanced agent configuration for parallel processing
       const agentConfig = this.apiClient.createAgentWorkflowConfig('parallel', {
@@ -412,26 +412,26 @@ class ParallelizationAnalysisDemo {
           ...(agentConfig.llm_config && { llm_config: agentConfig.llm_config })
         })
       });
-      
+
       console.log('Parallel HTTP result:', result);
-      
+
       clearInterval(progressInterval);
       this.visualizer.updateParallelTask(perspectiveId, 100);
-      
+
       // Generate perspective-specific analysis
       const analysis = this.generatePerspectiveAnalysis(perspective, topic, result);
-      
+
       // Update UI with results
       this.displayPerspectiveResult(perspectiveId, analysis);
       this.updatePerspectiveStatus(perspectiveId, 'completed', 'Completed');
-      
+
       return {
         perspectiveId,
         analysis,
         duration: Date.now() - startTime,
         result
       };
-      
+
     } catch (error) {
       clearInterval(progressInterval);
       this.updatePerspectiveStatus(perspectiveId, 'error', 'Error');
@@ -458,7 +458,7 @@ class ParallelizationAnalysisDemo {
         ],
         confidence: 0.85
       }),
-      
+
       creative: (topic) => ({
         title: 'Innovative Exploration',
         keyPoints: [
@@ -475,7 +475,7 @@ class ParallelizationAnalysisDemo {
         ],
         confidence: 0.78
       }),
-      
+
       practical: (topic) => ({
         title: 'Implementation Focus',
         keyPoints: [
@@ -492,7 +492,7 @@ class ParallelizationAnalysisDemo {
         ],
         confidence: 0.92
       }),
-      
+
       critical: (topic) => ({
         title: 'Risk Assessment',
         keyPoints: [
@@ -509,7 +509,7 @@ class ParallelizationAnalysisDemo {
         ],
         confidence: 0.88
       }),
-      
+
       strategic: (topic) => ({
         title: 'Long-term Strategy',
         keyPoints: [
@@ -526,7 +526,7 @@ class ParallelizationAnalysisDemo {
         ],
         confidence: 0.89
       }),
-      
+
       user_centered: (topic) => ({
         title: 'Human Impact Analysis',
         keyPoints: [
@@ -544,14 +544,14 @@ class ParallelizationAnalysisDemo {
         confidence: 0.91
       })
     };
-    
+
     return (analyses[perspective.id] && analyses[perspective.id](topic)) || analyses.analytical(topic);
   }
 
   displayPerspectiveResult(perspectiveId, analysis) {
     const perspective = this.perspectives[perspectiveId];
     const container = document.getElementById('analysis-results');
-    
+
     const resultElement = document.createElement('div');
     resultElement.className = 'perspective-result';
     resultElement.id = `result-${perspectiveId}`;
@@ -585,19 +585,19 @@ class ParallelizationAnalysisDemo {
         </div>
       </div>
     `;
-    
+
     container.appendChild(resultElement);
-    
+
     // Animate in
     AnimationUtils.fadeIn(resultElement);
   }
 
   async aggregateResults() {
     await this.delay(2000);
-    
+
     // Generate aggregated insights
     const insights = this.generateAggregatedInsights();
-    
+
     // Show aggregated insights section
     document.getElementById('aggregated-insights').style.display = 'block';
     this.displayAggregatedInsights(insights);
@@ -642,7 +642,7 @@ class ParallelizationAnalysisDemo {
   createComparisonMatrix() {
     const table = document.getElementById('comparison-matrix');
     const perspectives = Array.from(this.selectedPerspectives).map(id => this.perspectives[id]);
-    
+
     const headers = ['Aspect', ...perspectives.map(p => p.name)];
     const aspects = [
       'Risk Level',
@@ -651,7 +651,7 @@ class ParallelizationAnalysisDemo {
       'User Impact',
       'Strategic Value'
     ];
-    
+
     // Generate mock comparison data
     const comparisonData = aspects.map(aspect => {
       const row = [aspect];
@@ -661,7 +661,7 @@ class ParallelizationAnalysisDemo {
       });
       return row;
     });
-    
+
     table.innerHTML = `
       <thead>
         <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
@@ -695,28 +695,28 @@ class ParallelizationAnalysisDemo {
       }
       // Add more scoring logic as needed
     };
-    
+
     return (scores[aspect] && scores[aspect][perspectiveId]) || 'Medium';
   }
 
   formatScore(score) {
     const colors = {
       'High': '#ef4444',
-      'Medium': '#f59e0b', 
+      'Medium': '#f59e0b',
       'Low': '#10b981'
     };
-    
+
     return `<span style="color: ${colors[score] || '#6b7280'}; font-weight: 600;">${score}</span>`;
   }
 
   updatePerspectiveStatus(perspectiveId, status, text) {
     const card = document.querySelector(`[data-perspective="${perspectiveId}"]`);
     const statusElement = document.getElementById(`status-${perspectiveId}`);
-    
+
     if (card) {
       card.className = `perspective-card selected ${status}`;
     }
-    
+
     if (statusElement) {
       statusElement.textContent = text;
     }
@@ -740,24 +740,24 @@ class ParallelizationAnalysisDemo {
     this.isRunning = false;
     this.analysisResults.clear();
     this.executionTasks.clear();
-    
+
     // Reset UI
     document.getElementById('analysis-results').innerHTML = '';
     document.getElementById('analysis-results').style.display = 'none';
     document.getElementById('aggregated-insights').style.display = 'none';
     document.getElementById('metrics-section').style.display = 'none';
     document.getElementById('initial-state').style.display = 'block';
-    
+
     // Reset workflow status
     document.getElementById('workflow-status').textContent = 'Ready to Analyze';
     document.getElementById('workflow-status').className = 'workflow-status idle';
     document.getElementById('timeline-status').textContent = 'Idle';
-    
+
     // Reset perspective statuses
     Object.keys(this.perspectives).forEach(id => {
       this.updatePerspectiveStatus(id, '', 'Ready');
     });
-    
+
     this.updateControlsState();
     this.visualizer.clear();
     this.createWorkflowPipeline();
@@ -765,7 +765,7 @@ class ParallelizationAnalysisDemo {
 
   displayMetrics() {
     document.getElementById('metrics-section').style.display = 'block';
-    
+
     const metrics = {
       'Total Perspectives': this.selectedPerspectives.size,
       'Parallel Execution Time': '4.2s',
@@ -774,7 +774,7 @@ class ParallelizationAnalysisDemo {
       'Consensus Areas': '3',
       'Divergent Views': '2'
     };
-    
+
     this.visualizer.createMetricsGrid(metrics, 'metrics-content');
   }
 
@@ -799,17 +799,17 @@ class ParallelizationAnalysisDemo {
     if (saved) {
       try {
         const state = JSON.parse(saved);
-        
+
         if (state.activePerspectives) {
           this.selectedPerspectives = new Set(state.activePerspectives);
           this.renderPerspectives();
         }
-        
+
         if (state.activeDomains) {
           this.selectedDomains = new Set(state.activeDomains);
           this.renderDomainTags();
         }
-        
+
         if (state.topic) {
           this.topicInput.value = state.topic;
         }

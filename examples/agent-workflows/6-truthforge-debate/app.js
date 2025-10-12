@@ -9,7 +9,7 @@ class TruthForgeDebateApp {
 
         this.init();
     }
-    
+
     async init() {
         // Initialize DOM-based components first
         this.initializeWorkflowVisualizer();
@@ -56,7 +56,7 @@ class TruthForgeDebateApp {
             this.debugPanel = null;
         }
     }
-    
+
     async initializeSettings() {
         if (typeof TerraphimSettingsManager === 'undefined' || typeof TerraphimSettingsUI === 'undefined') {
             console.warn('Settings components not loaded');
@@ -121,14 +121,14 @@ class TruthForgeDebateApp {
             container.style.display = visible ? 'block' : 'none';
         }
     }
-    
+
     async loadRoles() {
         try {
             const config = await this.apiClient.getConfig();
             if (config && config.config && config.config.roles) {
                 const roles = Object.keys(config.config.roles);
                 console.log('Available roles:', roles);
-                
+
                 this.currentRole = roles[0] || 'crisis_analyst';
             }
         } catch (error) {
@@ -136,15 +136,15 @@ class TruthForgeDebateApp {
             this.currentRole = 'crisis_analyst';
         }
     }
-    
+
     initializeWorkflowVisualizer() {
         if (typeof WorkflowVisualizer === 'undefined') {
             console.warn('WorkflowVisualizer not loaded');
             return;
         }
-        
+
         this.visualizer = new WorkflowVisualizer('pipeline-container');
-        
+
         const steps = [
             { id: 'pass1-bias', name: 'BiasDetector' },
             { id: 'pass1-narrative', name: 'NarrativeMapper' },
@@ -154,36 +154,36 @@ class TruthForgeDebateApp {
             { id: 'pass2-opposing', name: 'Opposing Agent' },
             { id: 'pass2-assessment', name: 'Vulnerability Assessment' }
         ];
-        
+
         this.visualizer.createPipeline(steps, 'pipeline-container');
         this.visualizer.createProgressBar('progress-container');
     }
-    
+
     async startAnalysis() {
         const narrative = document.getElementById('crisis-narrative').value.trim();
-        
+
         if (!narrative) {
             alert('Please enter a crisis narrative to analyze');
             return;
         }
-        
+
         if (!this.apiClient) {
             alert('API client not initialized');
             return;
         }
-        
+
         const startButton = document.getElementById('start-analysis');
         startButton.disabled = true;
         startButton.innerHTML = '<span class="loading-spinner"></span> Analyzing...';
-        
+
         this.updateWorkflowStatus('analyzing', 'Initiating Analysis...');
-        
+
         try {
             const pass1Results = await this.runPass1Analysis(narrative);
-            
+
             this.displayPass1Results(pass1Results);
             this.updateWorkflowStatus('analyzing', 'Pass 2: Exploitation Debate...');
-            
+
             if (this.visualizer) {
                 ['pass1-bias', 'pass1-narrative', 'pass1-omission', 'pass1-taxonomy'].forEach(id => {
                     this.visualizer.updateStepStatus(id, 'completed');
@@ -191,20 +191,20 @@ class TruthForgeDebateApp {
                 this.visualizer.updateStepStatus('pass2-supporting', 'active');
                 this.visualizer.updateProgress(60, 'Pass 2 starting...');
             }
-            
+
             const pass2Results = await this.runPass2Analysis(narrative, pass1Results);
-            
+
             this.displayPass2Results(pass2Results);
             this.updateWorkflowStatus('complete', 'Analysis Complete');
-            
+
             if (this.visualizer) {
                 this.visualizer.updateStepStatus('pass2-assessment', 'completed');
                 this.visualizer.updateProgress(100, 'Analysis Complete!');
             }
-            
+
             startButton.disabled = false;
             startButton.innerHTML = '<i class="fas fa-play"></i> Start Analysis';
-            
+
         } catch (error) {
             console.error('Analysis error:', error);
             this.displayError(error.message);
@@ -213,42 +213,42 @@ class TruthForgeDebateApp {
             this.updateWorkflowStatus('error', 'Analysis Failed');
         }
     }
-    
+
     async runPass1Analysis(narrative) {
         const pass1Agents = ['BiasDetector', 'NarrativeMapper', 'OmissionDetector', 'TaxonomyLinker'];
         const results = {};
-        
+
         for (const agent of pass1Agents) {
             if (this.visualizer) {
                 this.visualizer.updateStepStatus(`pass1-${agent.toLowerCase().replace('detector', '').replace('mapper', 'narrative').replace('linker', 'taxonomy')}`, 'active');
             }
-            
+
             const prompt = `You are ${agent}, an expert crisis communication analyst. Analyze this crisis narrative:
 
 "${narrative}"
 
 Provide a detailed analysis focusing on your specialty.`;
-            
+
             const response = await this.apiClient.chatCompletion([
                 { role: 'system', content: `You are ${agent}, an expert crisis communication analyst.` },
                 { role: 'user', content: prompt }
             ], { role: this.currentRole });
-            
+
             results[agent] = response.choices?.[0]?.message?.content || response.content || 'No response';
-            
+
             if (this.visualizer) {
                 this.visualizer.updateStepStatus(`pass1-${agent.toLowerCase().replace('detector', '').replace('mapper', 'narrative').replace('linker', 'taxonomy')}`, 'completed');
             }
         }
-        
+
         return results;
     }
-    
+
     async runPass2Analysis(narrative, pass1Results) {
         if (this.visualizer) {
             this.visualizer.updateStepStatus('pass2-supporting', 'active');
         }
-        
+
         const supportingPrompt = `As a Supporting Agent, find ways to exploit the vulnerabilities identified in Pass 1:
 
 Original Narrative: "${narrative}"
@@ -257,17 +257,17 @@ Pass 1 Analysis:
 ${JSON.stringify(pass1Results, null, 2)}
 
 Provide exploitation strategies that would make the crisis worse.`;
-        
+
         const supportingResponse = await this.apiClient.chatCompletion([
             { role: 'system', content: 'You are a Supporting Agent identifying exploitation opportunities.' },
             { role: 'user', content: supportingPrompt }
         ], { role: this.currentRole });
-        
+
         if (this.visualizer) {
             this.visualizer.updateStepStatus('pass2-supporting', 'completed');
             this.visualizer.updateStepStatus('pass2-opposing', 'active');
         }
-        
+
         const opposingPrompt = `As an Opposing Agent, defend against the exploitation strategies:
 
 Original Narrative: "${narrative}"
@@ -275,62 +275,62 @@ Original Narrative: "${narrative}"
 Supporting Agent's Exploitation: ${supportingResponse.choices?.[0]?.message?.content || 'No response'}
 
 Provide defensive strategies and recommendations.`;
-        
+
         const opposingResponse = await this.apiClient.chatCompletion([
             { role: 'system', content: 'You are an Opposing Agent providing defense strategies.' },
             { role: 'user', content: opposingPrompt }
         ], { role: this.currentRole });
-        
+
         if (this.visualizer) {
             this.visualizer.updateStepStatus('pass2-opposing', 'completed');
             this.visualizer.updateStepStatus('pass2-assessment', 'active');
         }
-        
+
         return {
             supporting: supportingResponse.choices?.[0]?.message?.content || 'No response',
             opposing: opposingResponse.choices?.[0]?.message?.content || 'No response'
         };
     }
-    
+
     displayPass1Results(pass1Data) {
         const container = document.getElementById('results-container');
         const existingPass1 = container.querySelector('.pass1');
-        
+
         if (existingPass1) {
             existingPass1.remove();
         }
-        
+
         const pass1Section = this.createPass1Display(pass1Data);
         container.insertBefore(pass1Section, container.firstChild);
     }
-    
+
     displayPass2Results(pass2Data) {
         const container = document.getElementById('results-container');
-        
+
         const arrow = document.createElement('div');
         arrow.className = 'debate-flow';
         arrow.innerHTML = '<i class="fas fa-arrow-down flow-arrow"></i>';
         container.appendChild(arrow);
-        
+
         const pass2Section = this.createPass2Display(pass2Data);
         container.appendChild(pass2Section);
     }
-    
+
     createPass1Display(pass1Data) {
         const section = document.createElement('div');
         section.className = 'pass-section pass1';
-        
+
         const supportingScore = pass1Data?.supporting_confidence || Math.floor(Math.random() * 30 + 60);
         const opposingScore = pass1Data?.opposing_confidence || Math.floor(Math.random() * 30 + 60);
         const omissionsCount = pass1Data?.omissions?.length || Math.floor(Math.random() * 15 + 5);
-        
+
         section.innerHTML = `
             <div class="pass-header">
                 <i class="fas fa-comment-dots pass-icon"></i>
                 <h3 class="pass-title">PASS 1: Initial Debate</h3>
                 <span class="status-badge complete">Complete</span>
             </div>
-            
+
             <div class="agent-results">
                 <div class="agent-card">
                     <div class="agent-header">
@@ -341,7 +341,7 @@ Provide defensive strategies and recommendations.`;
                         ${pass1Data?.bias_analysis || 'Analyzing narrative for cognitive biases, emotional framing, and manipulation patterns...'}
                     </div>
                 </div>
-                
+
                 <div class="agent-card">
                     <div class="agent-header">
                         <i class="fas fa-map agent-icon"></i>
@@ -351,7 +351,7 @@ Provide defensive strategies and recommendations.`;
                         ${pass1Data?.narrative_structure || 'Mapping narrative structure, identifying key claims and their logical connections...'}
                     </div>
                 </div>
-                
+
                 <div class="agent-card">
                     <div class="agent-header">
                         <i class="fas fa-eye-slash agent-icon"></i>
@@ -368,7 +368,7 @@ Provide defensive strategies and recommendations.`;
                         ${this.renderOmissions(pass1Data?.omissions)}
                     </div>
                 </div>
-                
+
                 <div class="agent-card">
                     <div class="metric-row">
                         <span class="metric-label">
@@ -387,25 +387,25 @@ Provide defensive strategies and recommendations.`;
                 </div>
             </div>
         `;
-        
+
         return section;
     }
-    
+
     createPass2Display(pass2Data) {
         const section = document.createElement('div');
         section.className = 'pass-section pass2';
-        
+
         const supportingScore = pass2Data?.supporting_strength || Math.floor(Math.random() * 40 + 40);
         const opposingScore = pass2Data?.opposing_effectiveness || Math.floor(Math.random() * 30 + 60);
         const vulnerabilityLevel = this.calculateVulnerability(supportingScore, opposingScore);
-        
+
         section.innerHTML = `
             <div class="pass-header">
                 <i class="fas fa-crosshairs pass-icon" style="color: #f59e0b;"></i>
                 <h3 class="pass-title">PASS 2: Exploitation Debate</h3>
                 <span class="status-badge complete">Complete</span>
             </div>
-            
+
             <div class="agent-results">
                 <div class="agent-card">
                     <div class="agent-header">
@@ -423,7 +423,7 @@ Provide defensive strategies and recommendations.`;
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="agent-card">
                     <div class="agent-header">
                         <i class="fas fa-bullseye agent-icon" style="color: #dc2626;"></i>
@@ -440,7 +440,7 @@ Provide defensive strategies and recommendations.`;
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="agent-card" style="background: linear-gradient(135deg, #fee2e2 0%, #fef3c7 100%);">
                     <div class="metric-row">
                         <span class="metric-label">
@@ -458,25 +458,25 @@ Provide defensive strategies and recommendations.`;
                 </div>
             </div>
         `;
-        
+
         return section;
     }
-    
+
     renderOmissions(omissions) {
         if (!omissions || omissions.length === 0) {
             return '<div class="omissions-list"><div class="omission-item">Detecting omissions...</div></div>';
         }
-        
-        const omissionItems = omissions.slice(0, 5).map(omission => 
+
+        const omissionItems = omissions.slice(0, 5).map(omission =>
             `<div class="omission-item">${typeof omission === 'string' ? omission : omission.description}</div>`
         ).join('');
-        
+
         return `<div class="omissions-list">${omissionItems}</div>`;
     }
-    
+
     calculateVulnerability(supportingScore, opposingScore) {
         const diff = opposingScore - supportingScore;
-        
+
         if (diff > 30) {
             return {
                 class: 'high',
@@ -497,7 +497,7 @@ Provide defensive strategies and recommendations.`;
             };
         }
     }
-    
+
     displayError(message) {
         const container = document.getElementById('results-container');
         container.innerHTML = `
@@ -513,12 +513,12 @@ Provide defensive strategies and recommendations.`;
             </div>
         `;
     }
-    
+
     resetAnalysis() {
         if (this.pollInterval) {
             clearInterval(this.pollInterval);
         }
-        
+
         this.currentSessionId = null;
         document.getElementById('results-container').innerHTML = `
             <div class="empty-state">
@@ -529,14 +529,14 @@ Provide defensive strategies and recommendations.`;
                 </div>
             </div>
         `;
-        
+
         const startButton = document.getElementById('start-analysis');
         startButton.disabled = false;
         startButton.innerHTML = '<i class="fas fa-play"></i> Start Analysis';
-        
+
         this.updateWorkflowStatus('idle', 'Ready to Analyze');
     }
-    
+
     updateWorkflowStatus(status, message) {
         const statusElement = document.getElementById('workflow-status');
         if (statusElement) {

@@ -1,11 +1,11 @@
 # Implementation Roadmap: TruthForge Two-Pass Debate Arena
 
-**Version**: 1.0  
-**Date**: 2025-10-07  
-**Status**: Draft  
-**Owner**: Zestic AI / K-Partners  
-**Timeline**: 8 weeks (2025-10-14 to 2025-12-06)  
-**Related Documents**: 
+**Version**: 1.0
+**Date**: 2025-10-07
+**Status**: Draft
+**Owner**: Zestic AI / K-Partners
+**Timeline**: 8 weeks (2025-10-14 to 2025-12-06)
+**Related Documents**:
 - [PRD_TwoPassDebateArena.md](./PRD_TwoPassDebateArena.md)
 - [SPEC_TerraphimIntegration.md](./SPEC_TerraphimIntegration.md)
 - [REQUIREMENTS_AgentRoles.md](./REQUIREMENTS_AgentRoles.md)
@@ -42,7 +42,7 @@ This roadmap outlines an 8-week implementation plan to deliver the TruthForge Tw
 
 ## Phase 1: Foundation (Weeks 1-2)
 
-**Dates**: 2025-10-14 to 2025-10-25  
+**Dates**: 2025-10-14 to 2025-10-25
 **Goal**: Establish core infrastructure and implement first 3 analysis agents
 
 ### Week 1: Repository Setup & Taxonomy Migration
@@ -105,7 +105,7 @@ chrono = { version = "0.4", features = ["serde"] }
 - CI runs `cargo clippy -- -D warnings`
 - CI runs `cargo fmt -- --check`
 
-**Owner**: DevOps Lead  
+**Owner**: DevOps Lead
 **Estimated Effort**: 16 hours
 
 ---
@@ -155,9 +155,9 @@ pub async fn migrate_truthforge_taxonomy(
 ) -> anyhow::Result<RoleGraph> {
     let json_str = tokio::fs::read_to_string(json_path).await?;
     let functions: Vec<TaxonomyFunction> = serde_json::from_str(&json_str)?;
-    
+
     let mut graph = RoleGraph::new();
-    
+
     for func in functions {
         // Create function node
         let func_node = NormalizedTerm {
@@ -166,7 +166,7 @@ pub async fn migrate_truthforge_taxonomy(
             url: Some(format!("truthforge://function/{}", func.id)),
         };
         graph.add_node(func_node.clone());
-        
+
         // Create subfunction nodes
         for subf in func.subfunctions {
             let subf_node = NormalizedTerm {
@@ -175,10 +175,10 @@ pub async fn migrate_truthforge_taxonomy(
                 url: Some(format!("truthforge://function/{}/{}", func.id, subf.name)),
             };
             graph.add_node(subf_node.clone());
-            
+
             // Create edge: function -> subfunction
             graph.add_edge(&func_node, &subf_node, 1.0)?;
-            
+
             // Create output nodes
             for output in subf.outputs {
                 let output_node = NormalizedTerm {
@@ -187,12 +187,12 @@ pub async fn migrate_truthforge_taxonomy(
                     url: Some(format!("truthforge://output/{}", output)),
                 };
                 graph.add_node(output_node.clone());
-                
+
                 // Create edge: subfunction -> output
                 graph.add_edge(&subf_node, &output_node, 1.0)?;
             }
         }
-        
+
         // Add SCCT classification nodes if present
         if let Some(classification) = func.classification {
             for attr in classification.responsibility_attribution {
@@ -206,46 +206,46 @@ pub async fn migrate_truthforge_taxonomy(
             }
         }
     }
-    
+
     Ok(graph)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_taxonomy_migration() {
         let graph = migrate_truthforge_taxonomy("../../assets/trueforge_taxonomy.json")
             .await
             .expect("Migration failed");
-        
+
         // Verify 3 core functions
         assert!(graph.has_node("relationship_management"));
         assert!(graph.has_node("issue_crisis_management"));
         assert!(graph.has_node("strategic_management_function"));
-        
+
         // Verify subfunctions exist
         assert!(graph.has_node("issue_crisis_management.risk_assessment"));
         assert!(graph.has_node("relationship_management.stakeholder_mapping"));
-        
+
         // Verify SCCT nodes
         assert!(graph.has_node("scct.victim"));
         assert!(graph.has_node("scct.accidental"));
         assert!(graph.has_node("scct.preventable"));
-        
+
         // Verify edges exist
         let risk_node = graph.get_node("issue_crisis_management").unwrap();
         let subf_node = graph.get_node("issue_crisis_management.risk_assessment").unwrap();
         assert!(graph.has_edge(&risk_node, &subf_node));
     }
-    
+
     #[tokio::test]
     async fn test_graph_connectivity() {
         let graph = migrate_truthforge_taxonomy("../../assets/trueforge_taxonomy.json")
             .await
             .expect("Migration failed");
-        
+
         // All nodes should be reachable from at least one function
         let total_nodes = graph.node_count();
         let reachable = graph.nodes_reachable_from_functions();
@@ -265,7 +265,7 @@ mod tests {
 - Integration test verifies graph connectivity
 - Benchmark migration time (<100ms)
 
-**Owner**: Backend Engineer  
+**Owner**: Backend Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -328,7 +328,7 @@ impl Omission {
         if !(0.0..=1.0).contains(&confidence) {
             anyhow::bail!("Confidence must be between 0.0 and 1.0");
         }
-        
+
         Ok(Self {
             id: Uuid::new_v4(),
             category,
@@ -342,7 +342,7 @@ impl Omission {
             detected_at: Utc::now(),
         })
     }
-    
+
     pub fn is_high_risk(&self) -> bool {
         self.composite_risk >= 0.6
     }
@@ -357,7 +357,7 @@ impl Omission {
 - Unit tests for validation logic
 - Serde serialization/deserialization tests
 
-**Owner**: Backend Engineer  
+**Owner**: Backend Engineer
 **Estimated Effort**: 8 hours
 
 ---
@@ -388,16 +388,16 @@ impl BiasDetectorAgent {
         let agent = TerraphimAgent::from_config_file(config_path).await?;
         Ok(Self { agent })
     }
-    
+
     pub async fn analyze(&self, text: &str) -> anyhow::Result<BiasAnalysis> {
         let prompt = format!(
             "Analyze the following text for cognitive biases, logical fallacies, and rhetorical tactics:\n\n{}",
             text
         );
-        
+
         let response = self.agent.generate_response(&prompt).await?;
         let analysis: BiasAnalysis = serde_json::from_str(&response)?;
-        
+
         Ok(analysis)
     }
 }
@@ -413,30 +413,30 @@ pub struct BiasAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_bias_detection_confirmation_bias() {
         let agent = BiasDetectorAgent::new("configs/bias_detector.json")
             .await
             .expect("Agent creation failed");
-        
+
         let text = "We've carefully selected the most reliable research to support our position.";
         let analysis = agent.analyze(text).await.expect("Analysis failed");
-        
+
         assert!(!analysis.biases.is_empty(), "Should detect confirmation bias");
         assert_eq!(analysis.biases[0].bias_type, "confirmation_bias");
     }
-    
+
     #[tokio::test]
     async fn test_bias_detection_with_ollama() {
         // Test with Ollama gemma3:270m for fast local testing
         let agent = BiasDetectorAgent::new("configs/bias_detector_ollama.json")
             .await
             .expect("Agent creation failed");
-        
+
         let text = "My opponent's criticism is invalid because they have financial ties to competitors.";
         let analysis = agent.analyze(text).await.expect("Analysis failed");
-        
+
         assert!(!analysis.fallacies.is_empty(), "Should detect ad hominem");
     }
 }
@@ -466,7 +466,7 @@ mod tests {
 - Ollama integration test (fast, always runs)
 - Latency test (<5s with OpenRouter, <2s with Ollama)
 
-**Owner**: AI Engineer  
+**Owner**: AI Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -490,15 +490,15 @@ impl TaxonomyLinkerAgent {
     ) -> anyhow::Result<TaxonomyClassification> {
         // Use rolegraph to enhance classification with graph connectivity
         let relevant_nodes = rolegraph.find_relevant_nodes(text)?;
-        
+
         let prompt = format!(
             "Classify the following text using the taxonomy.\n\nRelevant taxonomy nodes: {:?}\n\nText: {}",
             relevant_nodes, text
         );
-        
+
         let response = self.agent.generate_response(&prompt).await?;
         let classification: TaxonomyClassification = serde_json::from_str(&response)?;
-        
+
         Ok(classification)
     }
 }
@@ -509,7 +509,7 @@ impl TaxonomyLinkerAgent {
 - TaxonomyLinkerAgent: 3 test scenarios (9 tests)
 - Integration test: Full Pass 1 analysis pipeline
 
-**Owner**: AI Engineer  
+**Owner**: AI Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -537,7 +537,7 @@ impl TaxonomyLinkerAgent {
 
 ## Phase 2: Two-Pass Workflow (Weeks 3-4)
 
-**Dates**: 2025-10-28 to 2025-11-08  
+**Dates**: 2025-10-28 to 2025-11-08
 **Goal**: Implement complete two-pass debate workflow with omission detection
 
 ### Week 3: OmissionDetectorAgent & Pass 1 Debate
@@ -562,7 +562,7 @@ impl OmissionDetectorAgent {
         let prompt = self.build_detection_prompt(text, bias_analysis, narrative_map);
         let response = self.agent.generate_response(&prompt).await?;
         let raw_omissions: Vec<RawOmission> = serde_json::from_str(&response)?;
-        
+
         // Convert to validated Omission structs
         let omissions = raw_omissions
             .into_iter()
@@ -576,10 +576,10 @@ impl OmissionDetectorAgent {
                 raw.confidence,
             ))
             .collect::<Result<Vec<_>, _>>()?;
-        
+
         // Sort by composite risk
         omissions.sort_by(|a, b| b.composite_risk.partial_cmp(&a.composite_risk).unwrap());
-        
+
         Ok(omissions)
     }
 }
@@ -591,7 +591,7 @@ impl OmissionDetectorAgent {
 - Composite risk ranking validation
 - Integration with Bias + Narrative agents
 
-**Owner**: AI Engineer  
+**Owner**: AI Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -623,19 +623,19 @@ impl Pass1Workflow {
         let narrative_map = self.narrative_mapper.analyze(input_text).await?;
         let taxonomy = self.taxonomy_linker.classify(input_text, &narrative_map).await?;
         let omissions = self.omission_detector.detect(input_text, &bias_analysis, &narrative_map).await?;
-        
+
         // Parallel debate
         let (pro_debate, con_debate) = tokio::join!(
             self.debater_pro.argue(input_text, &bias_analysis, &narrative_map, &omissions),
             self.debater_con.argue(input_text, &bias_analysis, &narrative_map, &omissions)
         );
-        
+
         let pro_debate = pro_debate?;
         let con_debate = con_debate?;
-        
+
         // Evaluation
         let evaluation = self.evaluator.evaluate(&pro_debate, &con_debate, &omissions).await?;
-        
+
         Ok(Pass1Analysis {
             input_text: input_text.to_string(),
             bias_analysis,
@@ -657,7 +657,7 @@ impl Pass1Workflow {
 - End-to-end Pass 1 workflow test
 - Latency benchmark (<45s target)
 
-**Owner**: AI Engineer  
+**Owner**: AI Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -699,16 +699,16 @@ impl CumulativeEvaluatorAgent {
         defense: &DefenseResponse,
     ) -> OmissionResolutionStatus {
         let pass1_risk = omission.composite_risk;
-        
+
         // Score attack strength (0.0-1.0)
         let attack_strength = self.score_attack_effectiveness(exploitation);
-        
+
         // Score defense strength (0.0-1.0)
         let defense_strength = self.score_defense_effectiveness(defense, omission);
-        
+
         // Calculate residual risk
         let residual_risk = pass1_risk * attack_strength * (1.0 - defense_strength);
-        
+
         // Determine status
         let status = if residual_risk < 0.2 {
             ResolutionStatus::Resolved
@@ -719,7 +719,7 @@ impl CumulativeEvaluatorAgent {
         } else {
             ResolutionStatus::Escalated
         };
-        
+
         OmissionResolutionStatus {
             omission_id: omission.id,
             pass1_risk,
@@ -738,7 +738,7 @@ impl CumulativeEvaluatorAgent {
 - CumulativeEvaluator: Vulnerability tracking accuracy
 - Integration: Pass 1 → Pass 2 → Cumulative Evaluation
 
-**Owner**: AI Engineer  
+**Owner**: AI Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -762,7 +762,7 @@ pub async fn generate_responses(
         self.counterargue_agent.generate(cumulative_eval),
         self.bridge_agent.generate(cumulative_eval)
     );
-    
+
     Ok(ResponseSet {
         reframe: reframe?,
         counterargue: counterargue?,
@@ -778,7 +778,7 @@ pub async fn generate_responses(
 - **End-to-end workflow test**: Input text → Pass 1 → Pass 2 → Responses
 - Cost tracking test (ensure <$5 per analysis)
 
-**Owner**: AI Engineer  
+**Owner**: AI Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -808,7 +808,7 @@ pub async fn generate_responses(
 
 ## Phase 3: Infrastructure (Weeks 5-6)
 
-**Dates**: 2025-10-11 to 2025-10-22  
+**Dates**: 2025-10-11 to 2025-10-22
 **Goal**: Build WebSocket server, Redis persistence, and real-time UI
 
 ### Week 5: WebSocket Server & Redis Persistence
@@ -875,7 +875,7 @@ async fn websocket_handler(
 async fn handle_socket(socket: WebSocket, state: Arc<WebSocketState>) {
     let (mut sender, mut receiver) = socket.split();
     let mut progress_rx = state.progress_tx.subscribe();
-    
+
     // Send progress updates to client
     let send_task = tokio::spawn(async move {
         while let Ok(msg) = progress_rx.recv().await {
@@ -885,7 +885,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<WebSocketState>) {
             }
         }
     });
-    
+
     // Receive pings from client
     let recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
@@ -894,7 +894,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<WebSocketState>) {
             }
         }
     });
-    
+
     tokio::select! {
         _ = send_task => {},
         _ = recv_task => {},
@@ -908,7 +908,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<WebSocketState>) {
 - Concurrent client test (10 simultaneous connections)
 - Progress streaming test with mock workflow
 
-**Owner**: Backend Engineer  
+**Owner**: Backend Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -935,7 +935,7 @@ impl RedisPersistence {
         let client = Client::open(redis_url)?;
         Ok(Self { client })
     }
-    
+
     pub async fn save_session(
         &self,
         session_id: Uuid,
@@ -943,24 +943,24 @@ impl RedisPersistence {
     ) -> anyhow::Result<()> {
         let mut conn = self.client.get_async_connection().await?;
         let key = format!("session:{}", session_id);
-        
+
         conn.json_set(&key, "$", data).await?;
         conn.expire(&key, 86400).await?; // 24 hours
-        
+
         Ok(())
     }
-    
+
     pub async fn get_session(
         &self,
         session_id: Uuid,
     ) -> anyhow::Result<Option<SessionData>> {
         let mut conn = self.client.get_async_connection().await?;
         let key = format!("session:{}", session_id);
-        
+
         let data: Option<SessionData> = conn.json_get(&key, "$").await?;
         Ok(data)
     }
-    
+
     pub async fn save_analysis_result(
         &self,
         analysis_id: Uuid,
@@ -968,13 +968,13 @@ impl RedisPersistence {
     ) -> anyhow::Result<()> {
         let mut conn = self.client.get_async_connection().await?;
         let key = format!("result:{}", analysis_id);
-        
+
         conn.json_set(&key, "$", result).await?;
         conn.expire(&key, 604800).await?; // 7 days
-        
+
         Ok(())
     }
-    
+
     pub async fn save_to_learning_vault(
         &self,
         crisis_type: &str,
@@ -982,10 +982,10 @@ impl RedisPersistence {
     ) -> anyhow::Result<()> {
         let mut conn = self.client.get_async_connection().await?;
         let key = format!("vault:{}:{}", crisis_type, Uuid::new_v4());
-        
+
         conn.json_set(&key, "$", case_study).await?;
         conn.expire(&key, 7776000).await?; // 90 days
-        
+
         Ok(())
     }
 }
@@ -997,7 +997,7 @@ impl RedisPersistence {
 - Learning vault test
 - Redis connection failure handling
 
-**Owner**: Backend Engineer  
+**Owner**: Backend Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -1025,7 +1025,7 @@ impl RedisPersistence {
 <body>
     <div class="container">
         <h1><i class="fas fa-search"></i> TruthForge - Two-Pass Debate Arena</h1>
-        
+
         <div class="input-section">
             <i class="fas fa-file-alt"></i>
             <textarea id="input-text" placeholder="Paste your crisis communication text here..."></textarea>
@@ -1033,7 +1033,7 @@ impl RedisPersistence {
                 <i class="fas fa-play-circle"></i> Analyze
             </button>
         </div>
-        
+
         <div id="progress-container" style="display: none;">
             <h2><i class="fas fa-tasks"></i> Analysis Progress</h2>
             <div class="phase-tracker">
@@ -1064,20 +1064,20 @@ impl RedisPersistence {
                 </div>
             </div>
         </div>
-        
+
         <div id="results-container" style="display: none;">
             <h2><i class="fas fa-chart-line"></i> Analysis Results</h2>
-            
+
             <div class="results-section">
                 <h3><i class="fas fa-eye-slash"></i> Detected Omissions</h3>
                 <div id="omissions-list"></div>
             </div>
-            
+
             <div class="results-section">
                 <h3><i class="fas fa-fire"></i> Pass 2 Vulnerability Assessment</h3>
                 <div id="vulnerability-chart"></div>
             </div>
-            
+
             <div class="results-section">
                 <h3><i class="fas fa-reply-all"></i> Recommended Responses</h3>
                 <div class="response-tabs">
@@ -1095,7 +1095,7 @@ impl RedisPersistence {
             </div>
         </div>
     </div>
-    
+
     <script src="app.js"></script>
 </body>
 </html>
@@ -1109,13 +1109,13 @@ let sessionId;
 function startAnalysis() {
     const inputText = document.getElementById('input-text').value;
     sessionId = generateUUID();
-    
+
     // Show progress
     document.getElementById('progress-container').style.display = 'block';
-    
+
     // Connect to WebSocket
     ws = new WebSocket('ws://localhost:3000/ws');
-    
+
     ws.onopen = () => {
         // Send analysis request via REST API
         fetch('/api/v1/analysis', {
@@ -1127,7 +1127,7 @@ function startAnalysis() {
             })
         });
     };
-    
+
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         handleWebSocketMessage(msg);
@@ -1165,7 +1165,7 @@ function updateAgentProgress(agent, progress, message) {
 function displayResults(results) {
     document.getElementById('progress-container').style.display = 'none';
     document.getElementById('results-container').style.display = 'block';
-    
+
     // Display omissions
     const omissionsList = document.getElementById('omissions-list');
     results.pass1_analysis.omissions
@@ -1173,21 +1173,21 @@ function displayResults(results) {
         .forEach(omission => {
             omissionsList.innerHTML += createOmissionCard(omission);
         });
-    
+
     // Display responses
     displayResponse('reframe', results.responses.reframe);
 }
 
 function createOmissionCard(omission) {
-    const riskColor = omission.composite_risk >= 0.7 ? 'red' : 
+    const riskColor = omission.composite_risk >= 0.7 ? 'red' :
                       omission.composite_risk >= 0.5 ? 'orange' : 'yellow';
-    
-    const riskIcon = omission.composite_risk >= 0.7 ? 
-                     '<i class="fas fa-exclamation-circle"></i>' : 
-                     omission.composite_risk >= 0.5 ? 
-                     '<i class="fas fa-exclamation-triangle"></i>' : 
+
+    const riskIcon = omission.composite_risk >= 0.7 ?
+                     '<i class="fas fa-exclamation-circle"></i>' :
+                     omission.composite_risk >= 0.5 ?
+                     '<i class="fas fa-exclamation-triangle"></i>' :
                      '<i class="fas fa-info-circle"></i>';
-    
+
     return `
         <div class="omission-card risk-${riskColor}">
             <div class="omission-header">
@@ -1205,7 +1205,7 @@ function createOmissionCard(omission) {
                 <i class="fas fa-quote-left"></i> "${omission.text_reference}"
             </div>
             <div class="omission-suggestion">
-                <i class="fas fa-plus-circle"></i> 
+                <i class="fas fa-plus-circle"></i>
                 <strong>Suggested addition:</strong> ${omission.suggested_addition}
             </div>
         </div>
@@ -1220,7 +1220,7 @@ function createOmissionCard(omission) {
 - Results render correctly with sample data
 - Responsive design on mobile/tablet
 
-**Owner**: Frontend Engineer  
+**Owner**: Frontend Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -1258,7 +1258,7 @@ function copyToClipboardFallback(text) {
     textarea.style.position = 'fixed';
     textarea.style.opacity = '0';
     document.body.appendChild(textarea);
-    
+
     try {
         textarea.select();
         document.execCommand('copy');
@@ -1277,7 +1277,7 @@ function copyToClipboardFallback(text) {
 - Error scenario testing (network failure, invalid input)
 - Performance test (large input text >5000 words)
 
-**Owner**: Full Stack Engineer  
+**Owner**: Full Stack Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -1306,7 +1306,7 @@ function copyToClipboardFallback(text) {
 
 ## Phase 4: Testing, Polish, Deployment (Weeks 7-8)
 
-**Dates**: 2025-10-25 to 2025-12-06  
+**Dates**: 2025-10-25 to 2025-12-06
 **Goal**: Production readiness - performance, security, deployment
 
 ### Week 7: Security, Performance, Testing
@@ -1327,19 +1327,19 @@ impl SecurityMiddleware {
     pub fn sanitize_user_input(input: &str) -> anyhow::Result<String> {
         // Use existing terraphim sanitizer
         let sanitized = sanitize_system_prompt(input);
-        
+
         if sanitized.was_modified {
             tracing::warn!(
                 "Input sanitized: {} patterns detected",
                 sanitized.modifications.len()
             );
         }
-        
+
         // Additional TruthForge-specific checks
         if input.len() > 10000 {
             anyhow::bail!("Input exceeds maximum length");
         }
-        
+
         Ok(sanitized.sanitized_prompt)
     }
 }
@@ -1349,18 +1349,18 @@ impl SecurityMiddleware {
 ```rust
 pub fn redact_pii(text: &str) -> String {
     use regex::Regex;
-    
+
     lazy_static! {
         static ref EMAIL_REGEX: Regex = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap();
         static ref PHONE_REGEX: Regex = Regex::new(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b").unwrap();
         static ref SSN_REGEX: Regex = Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").unwrap();
     }
-    
+
     let mut redacted = text.to_string();
     redacted = EMAIL_REGEX.replace_all(&redacted, "[EMAIL REDACTED]").to_string();
     redacted = PHONE_REGEX.replace_all(&redacted, "[PHONE REDACTED]").to_string();
     redacted = SSN_REGEX.replace_all(&redacted, "[SSN REDACTED]").to_string();
-    
+
     redacted
 }
 ```
@@ -1371,7 +1371,7 @@ pub fn redact_pii(text: &str) -> String {
 - Rate limiting test (429 responses after threshold)
 - Security scan with cargo-audit
 
-**Owner**: Security Engineer  
+**Owner**: Security Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -1416,12 +1416,12 @@ impl AgentCache {
                 }
             }
         }
-        
+
         // Generate and cache
         let response = generator.await?;
         let mut cache = self.cache.write().await;
         cache.insert(input_hash.to_string(), CachedResponse::new(response.clone()));
-        
+
         Ok(response)
     }
 }
@@ -1450,11 +1450,11 @@ export default function() {
         session_id: `session-${__VU}-${__ITER}`,
         input_text: 'Sample crisis communication text...'
     });
-    
+
     const res = http.post('http://localhost:3000/api/v1/analysis', payload, {
         headers: { 'Content-Type': 'application/json' },
     });
-    
+
     check(res, {
         'status is 200': (r) => r.status === 200,
         'response has session_id': (r) => JSON.parse(r.body).session_id !== undefined,
@@ -1468,7 +1468,7 @@ export default function() {
 - Cost tracking with actual OpenRouter billing
 - Memory leak detection (run for 1 hour)
 
-**Owner**: Performance Engineer  
+**Owner**: Performance Engineer
 **Estimated Effort**: 24 hours
 
 ---
@@ -1523,7 +1523,7 @@ services:
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
-    
+
   truthforge-server:
     build: .
     ports:
@@ -1600,7 +1600,7 @@ spec:
 - Health checks working
 - Horizontal pod autoscaling test
 
-**Owner**: DevOps Engineer  
+**Owner**: DevOps Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -1623,13 +1623,13 @@ lazy_static! {
         "Time spent in each agent",
         &["agent_name"]
     ).unwrap();
-    
+
     pub static ref OMISSIONS_DETECTED: CounterVec = register_counter_vec!(
         "truthforge_omissions_detected_total",
         "Total omissions detected by category",
         &["category"]
     ).unwrap();
-    
+
     pub static ref ANALYSIS_COST: HistogramVec = register_histogram_vec!(
         "truthforge_analysis_cost_usd",
         "Cost per analysis in USD",
@@ -1652,7 +1652,7 @@ lazy_static! {
 - Grafana dashboards visualize sample data
 - Alerts trigger for SLA violations
 
-**Owner**: SRE Engineer  
+**Owner**: SRE Engineer
 **Estimated Effort**: 16 hours
 
 ---
@@ -1677,7 +1677,7 @@ lazy_static! {
 - [ ] On-call rotation scheduled
 - [ ] Stakeholder sign-off obtained
 
-**Owner**: Technical Lead + Product Owner  
+**Owner**: Technical Lead + Product Owner
 **Estimated Effort**: 8 hours
 
 ---
@@ -1814,6 +1814,6 @@ lazy_static! {
 
 ---
 
-**Document Status**: Draft v1.0  
-**Next Review**: Weekly during implementation  
+**Document Status**: Draft v1.0
+**Next Review**: Weekly during implementation
 **Approval Required**: Technical Lead, Product Owner, Finance

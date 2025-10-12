@@ -87,11 +87,11 @@ Knowledge Graph → Pattern Analysis → Insight Extraction → Report Generatio
 ```javascript
 analyzeQueryComplexity(query) {
   let complexity = 0.5; // base complexity
-  
+
   if (query.length > 100) complexity += 0.2;
   if (query.includes('machine learning')) complexity += 0.2;
   if (query.includes('meta-analysis')) complexity += 0.3;
-  
+
   return Math.min(1.0, complexity);
 }
 ```
@@ -162,10 +162,10 @@ class OrchestratorWorkersDemo {
     stage.workers.forEach(workerId => {
       this.updateWorkerStatus(workerId, 'active');
     });
-    
+
     // Execute with progress monitoring
     await this.monitorStageExecution(stage);
-    
+
     // Collect and validate results
     const results = this.generateStageResults(stage);
     this.stageResults.set(stage.id, results);
@@ -182,7 +182,7 @@ const workers = [
     capabilities: ['web_scraping', 'api_integration', 'filtering']
   },
   {
-    id: 'content_analyzer', 
+    id: 'content_analyzer',
     specialty: 'Abstract and content analysis',
     capabilities: ['nlp', 'concept_extraction', 'summarization']
   }
@@ -195,11 +195,11 @@ const workers = [
 buildKnowledgeGraph() {
   const nodes = this.extractConcepts();
   const edges = this.identifyRelationships();
-  
+
   // Integrate with terraphim rolegraph
   this.terraphimGraph.addNodes(nodes);
   this.terraphimGraph.addEdges(edges);
-  
+
   return this.terraphimGraph.build();
 }
 ```
@@ -233,7 +233,7 @@ buildKnowledgeGraph() {
 - **Interactive Elements**: Clickable components for detailed inspection
 
 ### Scientific Workflow Design
-- **Research-Focused UI**: Tailored for academic and scientific use cases  
+- **Research-Focused UI**: Tailored for academic and scientific use cases
 - **Data-Rich Displays**: Comprehensive metrics and analytical outputs
 - **Professional Styling**: Clean, academic interface design
 - **Accessibility**: ARIA labels and keyboard navigation support

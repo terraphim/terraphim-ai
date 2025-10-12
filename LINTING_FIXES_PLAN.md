@@ -49,7 +49,7 @@ Line 62: Cannot find name 'AHashMap'
    - Check `crates/terraphim_types/src/lib.rs` or wherever types are generated
    - Ensure `AHashMap` is mapped to TypeScript `Record<K, V>` or `Map<K, V>`
    - Ensure `Value` type is properly exported
-   
+
 2. **Option B**: Add missing type definitions manually to `types.ts`:
    ```typescript
    // Add at top of file:
@@ -80,7 +80,7 @@ Line 9: Cannot find module '$lib/stores' or its corresponding type declarations
 Line 64: Cannot find module '$workers/postmessage.ts' or its corresponding type declarations
 ```
 
-**Root Cause**: 
+**Root Cause**:
 1. TypeScript path aliases (`$lib`, `$workers`) not properly configured in `tsconfig.json`
 2. Files may be missing or misnamed
 
@@ -134,12 +134,12 @@ Line 64: Cannot find module '$workers/postmessage.ts' or its corresponding type 
    ```typescript
    declare module 'svelte-routing' {
      import type { SvelteComponentTyped } from 'svelte';
-     
+
      export class Route extends SvelteComponentTyped<{
        path?: string;
        component?: any;
      }> {}
-     
+
      export class Router extends SvelteComponentTyped<{}> {}
      export class Link extends SvelteComponentTyped<{ to: string }> {}
    }
@@ -160,7 +160,7 @@ Line 148: This comparison appears to be unintentional because the types 'RoleNam
 Line 160: Type 'string' is not assignable to type 'RoleName'
 ```
 
-**Root Cause**: 
+**Root Cause**:
 1. Trying to import `Role` type from stores, but stores exports it from generated types
 2. Mixing `string` and `RoleName` types
 
@@ -177,7 +177,7 @@ Line 160: Type 'string' is not assignable to type 'RoleName'
    ```typescript
    // Line 148-160: Instead of comparing string to RoleName
    const roleSettings = $roles.find((r) => r.name.lowercase === newRoleName.toLowerCase());
-   
+
    // Or convert string to RoleName:
    const roleNameObj: RoleName = {
      original: newRoleName,
@@ -240,7 +240,7 @@ Line 447: Property 'removeChild' does not exist on type 'string'
 ---
 
 ### Issue 8: Accessibility Warnings (A11y)
-**Files**: 
+**Files**:
 - `desktop/src/lib/Search/ArticleModal.svelte:320`
 - `desktop/src/lib/Search/AtomicSaveModal.svelte:281, 366`
 **Severity**: Low (warnings, not errors)
@@ -362,4 +362,3 @@ cargo test --workspace
 - Core functionality likely works at runtime despite type errors
 - Generated types file is the root cause of cascade failures
 - Consider regenerating TypeScript bindings from Rust after fixing type definitions
-

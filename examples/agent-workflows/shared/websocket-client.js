@@ -12,7 +12,7 @@ class TerraphimWebSocketClient {
     this.baseHeartbeatInterval = this.heartbeatInterval;
     this.maxHeartbeatInterval = options.maxHeartbeatInterval || 300000; // 5 minutes max
     this.heartbeatScaleFactor = options.heartbeatScaleFactor || 1.2;
-    
+
     this.ws = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
@@ -20,7 +20,7 @@ class TerraphimWebSocketClient {
     this.messageQueue = [];
     this.subscribers = new Map();
     this.workflowSessions = new Map();
-    
+
     this.connect();
   }
 
@@ -29,7 +29,7 @@ class TerraphimWebSocketClient {
     if (window.location.protocol === 'file:') {
       return 'ws://127.0.0.1:8000/ws';
     }
-    
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname;
     const port = window.location.port || (protocol === 'wss:' ? '443' : '80');
@@ -51,7 +51,7 @@ class TerraphimWebSocketClient {
       console.log('WebSocket connected:', event);
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      
+
       // Reset heartbeat interval on reconnection
       this.resetHeartbeatInterval();
       this.startHeartbeat();
@@ -73,7 +73,7 @@ class TerraphimWebSocketClient {
       this.isConnected = false;
       this.stopHeartbeat();
       this.emit('disconnected', { code: event.code, reason: event.reason });
-      
+
       if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.scheduleReconnect();
       }
@@ -91,60 +91,60 @@ class TerraphimWebSocketClient {
       console.warn('Received malformed WebSocket message:', message);
       return;
     }
-    
+
     const { response_type, workflowId, sessionId, data } = message;
-    
+
     // Handle messages without response_type field
     if (!response_type) {
       console.warn('Received WebSocket message without response_type field:', message);
       return;
     }
-    
+
     switch (response_type) {
       case 'workflow_started':
         this.handleWorkflowStarted(workflowId, sessionId, data);
         break;
-        
+
       case 'workflow_progress':
         this.handleWorkflowProgress(workflowId, sessionId, data);
         break;
-        
+
       case 'workflow_completed':
         this.handleWorkflowCompleted(workflowId, sessionId, data);
         break;
-        
+
       case 'workflow_error':
         this.handleWorkflowError(workflowId, sessionId, data);
         break;
-        
+
       case 'agent_update':
         this.handleAgentUpdate(workflowId, sessionId, data);
         break;
-        
+
       case 'quality_assessment':
         this.handleQualityAssessment(workflowId, sessionId, data);
         break;
-        
+
       case 'heartbeat':
         this.handleHeartbeat(data);
         break;
-        
+
       case 'pong':
         this.handlePong(data);
         break;
-        
+
       case 'connection_established':
         this.handleConnectionEstablished(workflowId, sessionId, data);
         break;
-        
+
       case 'error':
         this.handleServerError(workflowId, sessionId, data);
         break;
-        
+
       default:
         console.warn('Unknown message response_type:', response_type);
     }
-    
+
     // Emit to all subscribers
     this.emit(response_type, { workflowId, sessionId, data, timestamp: new Date() });
   }
@@ -224,18 +224,18 @@ class TerraphimWebSocketClient {
   handlePong(data) {
     // Server responded to our ping
     console.log('Received pong from server:', data);
-    
+
     // Adaptive timeout: Increase heartbeat interval on successful ping/pong
     // This allows for longer-running LLM operations
     const newInterval = Math.min(
       this.heartbeatInterval * this.heartbeatScaleFactor,
       this.maxHeartbeatInterval
     );
-    
+
     if (newInterval !== this.heartbeatInterval) {
       console.log(`📈 Adaptive timeout: Increasing heartbeat interval from ${this.heartbeatInterval}ms to ${newInterval}ms`);
       this.heartbeatInterval = newInterval;
-      
+
       // Restart heartbeat with new interval
       this.stopHeartbeat();
       this.startHeartbeat();
@@ -246,12 +246,12 @@ class TerraphimWebSocketClient {
     console.log('WebSocket connection established:', data);
     // Set connection as established and update UI if needed
     this.isConnected = true;
-    
+
     // Store server capabilities if provided
     if (data && data.capabilities) {
       this.serverCapabilities = data.capabilities;
     }
-    
+
     // Update session info
     if (sessionId && data) {
       this.serverSessionId = sessionId;
@@ -265,7 +265,7 @@ class TerraphimWebSocketClient {
 
   handleServerError(workflowId, sessionId, data) {
     console.error('Server error received:', data);
-    
+
     // Create error object
     const error = {
       workflowId,
@@ -275,18 +275,18 @@ class TerraphimWebSocketClient {
       timestamp: new Date(),
       data
     };
-    
+
     // Store in error history for debugging
     if (!this.errorHistory) {
       this.errorHistory = [];
     }
     this.errorHistory.push(error);
-    
+
     // Keep only last 10 errors
     if (this.errorHistory.length > 10) {
       this.errorHistory = this.errorHistory.slice(-10);
     }
-    
+
     // Emit error event for UI handling
     this.emit('server_error', error);
   }
@@ -301,7 +301,7 @@ class TerraphimWebSocketClient {
       steps: [],
       currentStep: 0
     };
-    
+
     this.workflowSessions.set(workflowId, sessionData);
     return workflowId;
   }
@@ -337,7 +337,7 @@ class TerraphimWebSocketClient {
         timestamp: new Date().toISOString()
       }
     });
-    
+
     // Clean up local session data
     this.workflowSessions.delete(sessionId);
   }
@@ -368,7 +368,7 @@ class TerraphimWebSocketClient {
       this.subscribers.set(eventType, new Set());
     }
     this.subscribers.get(eventType).add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       const subscribers = this.subscribers.get(eventType);
@@ -423,7 +423,7 @@ class TerraphimWebSocketClient {
       this.heartbeatTimer = null;
     }
   }
-  
+
   resetHeartbeatInterval() {
     if (this.heartbeatInterval !== this.baseHeartbeatInterval) {
       console.log(`🔄 Resetting heartbeat interval from ${this.heartbeatInterval}ms to ${this.baseHeartbeatInterval}ms`);
@@ -435,7 +435,7 @@ class TerraphimWebSocketClient {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      
+
       setTimeout(() => {
         this.connect();
       }, this.reconnectInterval * this.reconnectAttempts);

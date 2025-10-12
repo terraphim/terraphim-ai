@@ -461,17 +461,17 @@
     width: 95vw;
     max-height: 95vh;
   }
-  
+
   .settings-header,
   .settings-content,
   .settings-buttons {
     padding: 1rem;
   }
-  
+
   .settings-buttons {
     flex-direction: column;
   }
-  
+
   .settings-button {
     width: 100%;
     justify-content: center;

@@ -62,7 +62,7 @@ class AgentConfigManager {
         // Temporarily disable backend saving during state loading
         const originalOnStateChange = this.onStateChange;
         this.onStateChange = () => {}; // Disable state change callbacks
-        
+
         if (state.selectedRole && this.roles[state.selectedRole]) {
             this.roleSelector.value = state.selectedRole;
             // Manually set the system prompt without triggering events
@@ -73,21 +73,21 @@ class AgentConfigManager {
                 this.systemPrompt.value = 'This role has no default system prompt. You can define one here.';
             }
         }
-        
+
         // We only set the system prompt from state if it's different from the role default
         // This handles the case where a user has customized the prompt.
         const role = this.roles[this.roleSelector.value];
-        const defaultPrompt = (role && role.extra && role.extra.llm_system_prompt) 
-            ? role.extra.llm_system_prompt 
+        const defaultPrompt = (role && role.extra && role.extra.llm_system_prompt)
+            ? role.extra.llm_system_prompt
             : 'This role has no default system prompt. You can define one here.';
-            
+
         if (state.systemPrompt && state.systemPrompt !== defaultPrompt) {
             this.systemPrompt.value = state.systemPrompt;
         }
-        
+
         // Restore the original state change callback
         this.onStateChange = originalOnStateChange;
-        
+
         // Update the last saved state to match what we just loaded
         this.lastSavedState = this.getState();
     }
@@ -117,9 +117,9 @@ class AgentConfigManager {
         }
 
         const currentState = this.getState();
-        
+
         // Only save if state has actually changed
-        if (this.lastSavedState && 
+        if (this.lastSavedState &&
             this.lastSavedState.selectedRole === currentState.selectedRole &&
             this.lastSavedState.systemPrompt === currentState.systemPrompt) {
             return;
@@ -128,11 +128,11 @@ class AgentConfigManager {
         try {
             // Get the current config first
             const currentConfig = await this.apiClient.getConfig();
-            
+
             if (currentConfig && currentConfig.config) {
                 const roleName = currentState.selectedRole;
                 const role = this.roles[roleName];
-                
+
                 if (role) {
                     // Create updated role configuration
                     const updatedRole = {

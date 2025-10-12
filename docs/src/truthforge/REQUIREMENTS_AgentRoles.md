@@ -1,10 +1,10 @@
 # Agent Role Requirements: TruthForge Two-Pass Debate Arena
 
-**Version**: 1.0  
-**Date**: 2025-10-07  
-**Status**: Draft  
-**Owner**: Zestic AI / K-Partners  
-**Related Documents**: 
+**Version**: 1.0
+**Date**: 2025-10-07
+**Status**: Draft
+**Owner**: Zestic AI / K-Partners
+**Related Documents**:
 - [PRD_TwoPassDebateArena.md](./PRD_TwoPassDebateArena.md)
 - [SPEC_TerraphimIntegration.md](./SPEC_TerraphimIntegration.md)
 
@@ -86,7 +86,7 @@ pub struct AgentExtra {
     "agent_type": "analyzer",
     "quality_criteria": [
       "precision",
-      "recall", 
+      "recall",
       "severity_calibration",
       "alternative_quality"
     ],
@@ -940,6 +940,6 @@ Current version: **1.0.0** for all roles (initial release)
 
 ---
 
-**Document Status**: Draft v1.0  
-**Next Review**: After implementation of first 3 agents (Bias, Narrative, Taxonomy)  
+**Document Status**: Draft v1.0
+**Next Review**: After implementation of first 3 agents (Bias, Narrative, Taxonomy)
 **Approval Required**: Technical Lead, Product Owner

@@ -11,7 +11,7 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --success: #10b981;
-  
+
   /* Neutral Colors */
   --background: #f9fafb;
   --surface: #ffffff;
@@ -21,7 +21,7 @@
   --text-light: #9ca3af;
   --border: #e5e7eb;
   --border-focus: #3b82f6;
-  
+
   /* Spacing */
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
@@ -29,22 +29,22 @@
   --space-lg: 1.5rem;
   --space-xl: 2rem;
   --space-2xl: 3rem;
-  
+
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-  
+
   /* Borders & Radius */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
+
   /* Transitions */
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -486,21 +486,21 @@ pre {
   .container {
     padding: 0 var(--space-sm);
   }
-  
+
   .workflow-pipeline {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .workflow-arrow {
     transform: rotate(90deg);
     align-self: center;
   }
-  
+
   .controls {
     justify-content: center;
   }
-  
+
   .metrics-grid {
     grid-template-columns: 1fr;
   }

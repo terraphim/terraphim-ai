@@ -241,9 +241,11 @@ mod tests {
     #[tokio::test]
     async fn test_system_prompt_generation() {
         let agent = create_test_agent().await.unwrap();
-        let mut config = SummarizationConfig::default();
-        config.include_quotes = true;
-        config.focus_areas = vec!["technology".to_string(), "innovation".to_string()];
+        let config = SummarizationConfig {
+            include_quotes: true,
+            focus_areas: vec!["technology".to_string(), "innovation".to_string()],
+            ..SummarizationConfig::default()
+        };
 
         let summarization_agent = SummarizationAgent::new(agent, Some(config)).await.unwrap();
         let prompt = summarization_agent.create_system_prompt();

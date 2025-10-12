@@ -1,8 +1,8 @@
 # Font Awesome Icon Reference: TruthForge UI
 
-**Version**: 1.0  
-**Date**: 2025-10-08  
-**Font Awesome Version**: 6.5.1 (Classic)  
+**Version**: 1.0
+**Date**: 2025-10-08
+**Font Awesome Version**: 6.5.1 (Classic)
 **CDN**: `https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css`
 
 ---
@@ -191,10 +191,10 @@ Add to HTML `<head>`:
 
 **Example**:
 ```javascript
-const riskIcon = omission.composite_risk >= 0.7 ? 
-                 '<i class="fas fa-exclamation-circle"></i>' : 
-                 omission.composite_risk >= 0.5 ? 
-                 '<i class="fas fa-exclamation-triangle"></i>' : 
+const riskIcon = omission.composite_risk >= 0.7 ?
+                 '<i class="fas fa-exclamation-circle"></i>' :
+                 omission.composite_risk >= 0.5 ?
+                 '<i class="fas fa-exclamation-triangle"></i>' :
                  '<i class="fas fa-info-circle"></i>';
 
 return `
@@ -214,7 +214,7 @@ return `
             <i class="fas fa-quote-left"></i> "${omission.text_reference}"
         </div>
         <div class="omission-suggestion">
-            <i class="fas fa-plus-circle"></i> 
+            <i class="fas fa-plus-circle"></i>
             <strong>Suggested addition:</strong> ${omission.suggested_addition}
         </div>
     </div>
@@ -470,6 +470,6 @@ Font Awesome icons are decorative by default. For semantic icons, add `aria-labe
 
 ---
 
-**Document Status**: Final v1.0  
-**Last Updated**: 2025-10-08  
+**Document Status**: Final v1.0
+**Last Updated**: 2025-10-08
 **Maintainer**: Frontend Team

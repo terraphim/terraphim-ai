@@ -1,7 +1,7 @@
 # TruthForge Two-Pass Debate Arena
 
-**Private Narrative Intelligence Platform**  
-**Status**: Phase 5 - UI Development Complete ✅  
+**Private Narrative Intelligence Platform**
+**Status**: Phase 5 - UI Development Complete ✅
 **Version**: 0.1.0 (MVP Ready for K-Partners Pilot)
 
 ## Overview
@@ -200,7 +200,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Found {} omissions", catalog.omissions.len());
     println!("Total risk score: {:.2}", catalog.total_risk_score);
-    
+
     for omission in catalog.get_top_n(5) {
         println!("\n{:?}: {}", omission.category, omission.description);
         println!("  Risk: {:.0}% (severity {:.0}% × exploitability {:.0}%)",
@@ -389,7 +389,7 @@ Agent roles will be configured in JSON format:
 
 ## License
 
-Proprietary - Zestic AI  
+Proprietary - Zestic AI
 **Not for public distribution or use**
 
 ## Authors
@@ -407,15 +407,15 @@ Proprietary - Zestic AI
 
 ---
 
-**Phase 1 Status**: ✅ Foundation Complete (Crate structure, types, OmissionDetectorAgent, 13 agent configs)  
-**Phase 2 Status**: ✅ 100% Complete (All workflows implemented with mock agents, 28/28 tests passing)  
-**Phase 3 Status**: ✅ LLM Integration Complete (OpenRouter integration, 13 agent configs, 7 tests passing)  
-**Phase 4 Status**: ✅ Server Infrastructure Complete (REST API, WebSocket, session storage, 5 tests passing)  
+**Phase 1 Status**: ✅ Foundation Complete (Crate structure, types, OmissionDetectorAgent, 13 agent configs)
+**Phase 2 Status**: ✅ 100% Complete (All workflows implemented with mock agents, 28/28 tests passing)
+**Phase 3 Status**: ✅ LLM Integration Complete (OpenRouter integration, 13 agent configs, 7 tests passing)
+**Phase 4 Status**: ✅ Server Infrastructure Complete (REST API, WebSocket, session storage, 5 tests passing)
 **Phase 5 Status**: ⏳ UI Development - Next Phase (Frontend design and implementation)
 
 **Test Coverage Summary**:
 - Library tests: 8/8 passing
-- End-to-end workflow: 7/7 passing  
+- End-to-end workflow: 7/7 passing
 - PassOneOrchestrator: 4/4 passing
 - PassTwoOptimizer: 4/4 passing
 - ResponseGenerator: 5/5 passing

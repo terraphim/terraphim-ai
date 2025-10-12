@@ -722,10 +722,13 @@ impl KnowledgeGraphIntegration {
 mod tests {
     use super::*;
     use crate::{AgentMetadata, AgentPid, AgentRole, SupervisorId};
+    use terraphim_types::{RoleName, Thesaurus};
 
     #[tokio::test]
     async fn test_knowledge_graph_integration_creation() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let automata_config = AutomataConfig::default();
         let similarity_thresholds = SimilarityThresholds::default();
 
@@ -757,7 +760,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_score_calculation() {
-        let role_graph = Arc::new(RoleGraph::new());
+        let role_name = RoleName::new("test_role");
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
+        let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let automata_config = AutomataConfig::default();
         let similarity_thresholds = SimilarityThresholds::default();
 
@@ -780,6 +785,6 @@ mod tests {
             .calculate_availability_score(&agent)
             .await
             .unwrap();
-        assert!(availability_score >= 0.0 && availability_score <= 1.0);
+        assert!((0.0..=1.0).contains(&availability_score));
     }
 }

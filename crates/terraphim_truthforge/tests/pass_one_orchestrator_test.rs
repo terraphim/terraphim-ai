@@ -134,6 +134,6 @@ async fn test_pass_one_concurrent_agent_execution() {
         "Parallel execution should be fast"
     );
 
-    assert!(result.omission_catalog.omissions.len() > 0);
+    assert!(!result.omission_catalog.omissions.is_empty());
     assert!(result.bias_analysis.confidence > 0.0);
 }

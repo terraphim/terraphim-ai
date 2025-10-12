@@ -72,7 +72,7 @@ async fn test_routing_web_flow_with_complexity_analysis() {
         ),
         (
             "Complex task: Design a distributed system with event sourcing, CQRS, and microservices architecture for a global banking platform with real-time fraud detection",
-            "ComplexTaskAgent", 
+            "ComplexTaskAgent",
             0.8
         ),
         (
@@ -82,7 +82,7 @@ async fn test_routing_web_flow_with_complexity_analysis() {
         ),
     ];
 
-    for (prompt, expected_agent_type, expected_complexity_range) in test_cases {
+    for (prompt, _expected_agent_type, _expected_complexity_range) in test_cases {
         let web_request = json!({
             "prompt": prompt,
             "role": "Developer",
@@ -107,7 +107,7 @@ async fn test_routing_web_flow_with_complexity_analysis() {
 
         let task_analysis = &result["task_analysis"];
         let complexity = task_analysis["complexity"].as_f64().unwrap();
-        assert!(complexity >= 0.0 && complexity <= 1.0);
+        assert!((0.0..=1.0).contains(&complexity));
 
         let selected_route = &result["selected_route"];
         assert!(selected_route["agent_id"].as_str().is_some());
@@ -217,7 +217,7 @@ async fn test_orchestration_web_flow_with_workers() {
     assert!(result["execution_summary"].is_object());
 
     let worker_results = result["worker_results"].as_array().unwrap();
-    assert!(worker_results.len() >= 1, "Should have worker results");
+    assert!(!worker_results.is_empty(), "Should have worker results");
 
     // Verify worker results contain web-displayable data
     for worker_result in worker_results {
@@ -277,7 +277,10 @@ async fn test_optimization_web_flow_with_iterations() {
     assert!(result["execution_summary"].is_object());
 
     let iterations = result["iterations"].as_array().unwrap();
-    assert!(iterations.len() >= 1, "Should have optimization iterations");
+    assert!(
+        !iterations.is_empty(),
+        "Should have optimization iterations"
+    );
     assert!(iterations.len() <= 3, "Should not exceed max iterations");
 
     // Verify iteration data for web progress visualization
@@ -291,7 +294,7 @@ async fn test_optimization_web_flow_with_iterations() {
 
         // Verify quality progression for web charts
         let quality_score = iteration["quality_score"].as_f64().unwrap();
-        assert!(quality_score >= 1.0 && quality_score <= 10.0);
+        assert!((1.0..=10.0).contains(&quality_score));
 
         // Verify substantial content for web display
         let generated_content = iteration["generated_content"].as_str().unwrap();
@@ -493,7 +496,7 @@ async fn test_web_concurrent_workflow_handling() {
         let client = reqwest::Client::new();
         let handle = tokio::spawn(async move {
             client
-                .post(&format!("{}/workflows/{}", base_url, workflow_type))
+                .post(format!("{}/workflows/{}", base_url, workflow_type))
                 .json(&json!({
                     "prompt": prompt,
                     "role": "Test Role"
