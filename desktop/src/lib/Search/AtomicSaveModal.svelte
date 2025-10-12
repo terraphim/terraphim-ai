@@ -278,7 +278,7 @@
     {#if !success}
       <!-- Document Preview -->
       <div class="field">
-        <label class="label">Document to Save</label>
+        <div class="label">Document to Save</div>
         <div class="box document-preview">
           <h5 class="title is-6">{document?.title || 'Untitled'}</h5>
           {#if document?.description}
@@ -363,7 +363,7 @@
 
         <!-- Parent Selection -->
         <div class="field">
-          <label class="label">Parent Collection</label>
+          <div class="label">Parent Collection</div>
           <div class="control">
             <label class="radio">
               <input

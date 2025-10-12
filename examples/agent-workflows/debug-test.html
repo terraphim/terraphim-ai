@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Test</title>
+</head>
+<body>
+    <h1>Debug Test - Press Ctrl+, to test settings</h1>
+    <div id="debug-log"></div>
+
+    <script src="shared/api-client.js"></script>
+    <script src="shared/server-discovery.js"></script>
+    <script src="shared/settings-manager.js"></script>
+    <script src="shared/settings-ui.js"></script>
+    <script src="shared/settings-integration.js"></script>
+    <script src="shared/connection-status.js"></script>
+
+    <script>
+        const log = document.getElementById('debug-log');
+        function addLog(message) {
+            log.innerHTML += `<p>${new Date().toISOString()}: ${message}</p>`;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            addLog('DOM loaded');
+
+            try {
+                addLog('Initializing settings...');
+                const initialized = await initializeSettings();
+
+                if (initialized) {
+                    addLog('✅ Settings initialized successfully');
+
+                    const integration = getSettingsIntegration();
+                    const settingsUI = integration.getSettingsUI();
+
+                    if (settingsUI) {
+                        addLog('✅ Settings UI available');
+                        addLog('Try pressing Ctrl+, to open settings');
+
+                        // Test keyboard shortcut manually
+                        document.addEventListener('keydown', (e) => {
+                            if (e.ctrlKey && e.key === ',') {
+                                addLog('🎯 Ctrl+, detected!');
+                            }
+                        });
+                    } else {
+                        addLog('❌ Settings UI not available');
+                    }
+
+                    // Test API client
+                    if (window.apiClient) {
+                        addLog('✅ API Client available');
+                        addLog(`API Config: ${JSON.stringify(window.apiClient.getConfiguration())}`);
+
+                        // Test connection status
+                        const connectionStatus = new ConnectionStatusComponent('debug-log', window.apiClient);
+                        addLog('✅ Connection status component created');
+                    } else {
+                        addLog('❌ API Client not available');
+                    }
+
+                } else {
+                    addLog('❌ Settings initialization failed');
+                }
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

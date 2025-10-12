@@ -2,7 +2,8 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { listen } from "@tauri-apps/api/event";
   import { CONFIG } from "../config";
-  import { configStore, is_tauri, role, roles, theme, thesaurus, typeahead, type Role as RoleInterface } from "./stores";
+  import { configStore, is_tauri, role, roles, theme, thesaurus, typeahead } from "./stores";
+  import type { Role as RoleInterface } from "./generated/types";
 
   interface ConfigResponse {
     status: string;
@@ -145,7 +146,11 @@ const newRoleName = target.value;
     // any reactive subscribers update immediately (e.g. App.svelte head link).
     role.set(newRoleName);
 
-    const roleSettings = $roles.find((r) => r.name === newRoleName);
+    // Handle both string and RoleName object types for name field
+    const roleSettings = $roles.find((r) => {
+      const roleName = typeof r.name === 'string' ? r.name : r.name.original;
+      return roleName === newRoleName;
+    });
     if (!roleSettings) {
       console.error(`No role settings found for role: ${newRoleName}.`);
       return;
@@ -157,7 +162,10 @@ const newRoleName = target.value;
 
     // Update selected role in the main config object
     configStore.update((cfg) => {
-      cfg.selected_role = newRoleName;
+      // Handle RoleName type - convert string to RoleName if needed
+      cfg.selected_role = typeof cfg.selected_role === 'string'
+        ? { original: newRoleName, lowercase: newRoleName.toLowerCase() } as any
+        : { original: newRoleName, lowercase: newRoleName.toLowerCase() } as any;
       return cfg;
     });
 
@@ -217,7 +225,8 @@ const newRoleName = target.value;
            Direct store binding with `$role` is avoided because `$role` is read-only. -->
       <select value={$role} on:change={updateRole}>
         {#each $roles as r}
-          <option value={r.name}>{r.name}</option>
+          {@const roleName = typeof r.name === 'string' ? r.name : r.name.original}
+          <option value={roleName}>{roleName}</option>
         {/each}
       </select>
     </div>

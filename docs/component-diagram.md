@@ -30,6 +30,14 @@ graph TB
         MARKDOWN_PARSER[terraphim-markdown-parser<br/>📝 Markdown Processing]
 
         ONEPASSWORD[terraphim_onepassword_cli<br/>🔐 1Password CLI Integration]
+        MULTI_AGENT[terraphim_multi_agent<br/>🤖 Multi-Agent System with VM Execution]
+    end
+
+    %% VM Execution Layer
+    subgraph "VM Execution" ["🔥 VM Execution Infrastructure"]
+        FCCTL_WEB[fcctl-web<br/>🌐 Firecracker Control Web API]
+        FCCTL_REPL[fcctl-repl<br/>💻 VM Session Management]
+        FIRECRACKER[Firecracker VMs<br/>🔒 Isolated Code Execution]
     end
 
     %% Applications
@@ -145,6 +153,12 @@ graph TB
     S3 --> SERVICE
     S3 --> CONFIG
     OPENROUTER --> SERVICE
+
+    %% VM Execution Connections
+    MULTI_AGENT --> FCCTL_WEB
+    FCCTL_WEB --> FCCTL_REPL
+    FCCTL_REPL --> FIRECRACKER
+    SERVICE --> MULTI_AGENT
 
     %% External Dependencies
     TOKIO --> SERVICE

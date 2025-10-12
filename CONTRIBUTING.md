@@ -36,6 +36,12 @@ Thank you for your interest in contributing to Terraphim AI! This guide will hel
    git clone https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
    ```
 
+3. **Configure Git remotes** (if working with private code):
+   ```bash
+   # Add private repository remote
+   git remote add private git@github.com:zestic-ai/terraphim-private.git
+   ```
+
 3. **Start development servers**:
    ```bash
    # Terminal 1: Backend server
@@ -159,6 +165,117 @@ yarn run e2e
 - Frontend components should have corresponding tests
 - Use descriptive test names following Rust conventions
 
+## Branch Protection and Naming Conventions
+
+### Repository Structure
+
+Terraphim AI uses a **dual-repository approach** for security:
+
+- **Public Repository** (`terraphim/terraphim-ai`): Open-source code only
+- **Private Repository** (`zestic-ai/terraphim-private`): Proprietary and sensitive code
+
+### Branch Naming Rules
+
+#### ✅ Allowed Branch Names (Public Repository)
+```bash
+# Feature branches
+feat/new-ui-component
+feat/semantic-search
+fix/memory-leak
+docs/update-readme
+refactor/cleanup-code
+test/add-unit-tests
+
+# Development branches
+wip/experimental-feature
+experimental/new-algorithm
+```
+
+#### ❌ Blocked Branch Names (Public Repository)
+```bash
+# Private patterns (will be blocked by pre-push hook)
+private-feature          # Use private repository instead
+private_tf              # Use private repository instead
+internal-api            # Use private repository instead
+internal_docs           # Use private repository instead
+client-data             # Use private repository instead
+client_config           # Use private repository instead
+secret-auth             # Use private repository instead
+secret_key              # Use private repository instead
+wip-private-feature     # Use private repository instead
+customer-data           # Use private repository instead
+proprietary-code        # Use private repository instead
+confidential-docs       # Use private repository instead
+```
+
+### Pre-Push Hook Protection
+
+The repository has a **comprehensive pre-push hook** that automatically:
+
+1. **Validates branch names** against private patterns
+2. **Scans commit messages** for private markers (`[PRIVATE]`, `[INTERNAL]`, etc.)
+3. **Checks file contents** for sensitive keywords
+4. **Validates file patterns** using `.gitprivateignore`
+5. **Provides clear error messages** with guidance
+
+### Working with Private Code
+
+If you need to work with private or sensitive code:
+
+1. **Switch to private repository**:
+   ```bash
+   git remote set-url origin git@github.com:zestic-ai/terraphim-private.git
+   ```
+
+2. **Create private branch**:
+   ```bash
+   git checkout -b private-feature
+   # or
+   git checkout -b internal-api
+   ```
+
+3. **Develop normally**:
+   ```bash
+   git add .
+   git commit -m "feat: add private feature"
+   git push origin private-feature
+   ```
+
+4. **Switch back to public** (when ready for open-source work):
+   ```bash
+   git remote set-url origin https://github.com/terraphim/terraphim-ai.git
+   ```
+
+### Troubleshooting Branch Protection
+
+#### Error: "Branch matches private pattern"
+```bash
+✗ Branch 'private_tf' matches private pattern '^private_'
+Private branches should not be pushed to public remotes.
+Push to private remote instead: git push private private_tf
+```
+
+**Solution:**
+```bash
+# Configure branch to push to private remote
+git config branch.private_tf.remote private
+git config branch.private_tf.pushRemote private
+
+# Push to private repository
+git push private private_tf
+```
+
+#### Error: "Sensitive keyword found"
+```bash
+✗ Sensitive keyword 'truthforge' found in file changes
+Remove sensitive content before pushing to public remote.
+```
+
+**Solution:**
+- Remove or replace sensitive content
+- Use private repository for sensitive development
+- Update `.gitprivateignore` if it's a false positive
+
 ## Pull Request Process
 
 1. **Create a feature branch**:
@@ -170,6 +287,7 @@ yarn run e2e
    - Follow our code style (enforced by pre-commit hooks)
    - Add tests for new functionality
    - Update documentation if needed
+   - Ensure no private/sensitive content
 
 3. **Commit with conventional format**:
    ```bash
@@ -188,6 +306,7 @@ yarn run e2e
    - [ ] Commit messages follow conventional format
    - [ ] Documentation updated if needed
    - [ ] No breaking changes without justification
+   - [ ] No private/sensitive content (enforced by pre-push hook)
 
 ## Project Structure
 

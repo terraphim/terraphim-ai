@@ -7,7 +7,11 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "allowJs": true,
-    "checkJs": true
+    "checkJs": true,
+    "paths": {
+      "$lib/*": ["src/lib/*"],
+      "$workers/*": ["src/workers/*"]
+    }
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
   "references": [{ "path": "./tsconfig.node.json" }]

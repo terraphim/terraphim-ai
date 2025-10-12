@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings Test</title>
+</head>
+<body>
+    <h1>Settings Integration Test</h1>
+    <div id="status">Loading...</div>
+    <div id="config-display"></div>
+
+    <script src="shared/api-client.js"></script>
+    <script src="shared/server-discovery.js"></script>
+    <script src="shared/settings-manager.js"></script>
+    <script src="shared/settings-ui.js"></script>
+    <script src="shared/settings-integration.js"></script>
+
+    <script>
+        async function testSettings() {
+            const statusDiv = document.getElementById('status');
+            const configDiv = document.getElementById('config-display');
+
+            try {
+                statusDiv.textContent = 'Initializing settings...';
+
+                // Test settings initialization
+                const initialized = await initializeSettings();
+                if (initialized) {
+                    statusDiv.textContent = '✅ Settings initialized successfully!';
+
+                    const integration = getSettingsIntegration();
+                    const settings = integration.getWorkflowSettings();
+
+                    configDiv.innerHTML = `
+                        <h3>Current Configuration:</h3>
+                        <pre>${JSON.stringify(settings, null, 2)}</pre>
+                        <h3>API Client Configuration:</h3>
+                        <pre>${JSON.stringify(window.apiClient.getConfiguration(), null, 2)}</pre>
+                    `;
+                } else {
+                    statusDiv.textContent = '❌ Settings initialization failed';
+                }
+            } catch (error) {
+                statusDiv.textContent = '❌ Error: ' + error.message;
+                console.error('Settings test error:', error);
+            }
+        }
+
+        // Test when page loads
+        document.addEventListener('DOMContentLoaded', testSettings);
+    </script>
+</body>
+</html>

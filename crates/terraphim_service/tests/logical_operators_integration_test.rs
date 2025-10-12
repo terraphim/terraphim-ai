@@ -40,13 +40,10 @@ mod logical_operators_integration_tests {
         );
 
         let documents = result.unwrap();
-        assert!(documents.documents.len() <= 10, "Should respect limit");
+        assert!(documents.len() <= 10, "Should respect limit");
 
         // Log for debugging
-        println!(
-            "AND search returned {} documents",
-            documents.documents.len()
-        );
+        println!("AND search returned {} documents", documents.len());
     }
 
     #[tokio::test]
@@ -74,9 +71,9 @@ mod logical_operators_integration_tests {
         );
 
         let documents = result.unwrap();
-        assert!(documents.documents.len() <= 10, "Should respect limit");
+        assert!(documents.len() <= 10, "Should respect limit");
 
-        println!("OR search returned {} documents", documents.documents.len());
+        println!("OR search returned {} documents", documents.len());
     }
 
     #[tokio::test]
@@ -101,12 +98,9 @@ mod logical_operators_integration_tests {
         );
 
         let documents = result.unwrap();
-        assert!(documents.documents.len() <= 10, "Should respect limit");
+        assert!(documents.len() <= 10, "Should respect limit");
 
-        println!(
-            "Single term search returned {} documents",
-            documents.documents.len()
-        );
+        println!("Single term search returned {} documents", documents.len());
     }
 
     #[tokio::test]
@@ -128,10 +122,7 @@ mod logical_operators_integration_tests {
         assert!(result.is_ok(), "Empty search terms should not crash");
 
         let documents = result.unwrap();
-        println!(
-            "Empty terms search returned {} documents",
-            documents.documents.len()
-        );
+        println!("Empty terms search returned {} documents", documents.len());
     }
 
     #[tokio::test]
@@ -158,7 +149,7 @@ mod logical_operators_integration_tests {
         let documents = result.unwrap();
         println!(
             "Multiple AND terms search returned {} documents",
-            documents.documents.len()
+            documents.len()
         );
     }
 
@@ -187,7 +178,7 @@ mod logical_operators_integration_tests {
         let documents = result.unwrap();
         println!(
             "Multiple OR terms search returned {} documents",
-            documents.documents.len()
+            documents.len()
         );
     }
 
@@ -231,13 +222,13 @@ mod logical_operators_integration_tests {
 
         println!(
             "First page: {} docs, Second page: {} docs",
-            docs1.documents.len(),
-            docs2.documents.len()
+            docs1.len(),
+            docs2.len()
         );
 
         // Verify pagination works
-        assert!(docs1.documents.len() <= 3);
-        assert!(docs2.documents.len() <= 3);
+        assert!(docs1.len() <= 3);
+        assert!(docs2.len() <= 3);
     }
 
     #[tokio::test]
@@ -267,9 +258,9 @@ mod logical_operators_integration_tests {
                 println!(
                     "Role '{}' search returned {} documents",
                     role_name,
-                    documents.documents.len()
+                    documents.len()
                 );
-                assert!(documents.documents.len() <= 5);
+                assert!(documents.len() <= 5);
             } else {
                 println!("Role '{}' search failed: {:?}", role_name, result.err());
             }

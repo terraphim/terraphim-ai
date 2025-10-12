@@ -33,6 +33,7 @@ impl ClickUpHaystackIndexer {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
         dummy_doc.normalize_key(original_id)
     }
@@ -58,6 +59,7 @@ impl ClickUpHaystackIndexer {
             stub: None,
             tags: Some(vec!["clickup".to_string(), "task".to_string()]),
             rank: None,
+            source_haystack: None,
         })
     }
 }

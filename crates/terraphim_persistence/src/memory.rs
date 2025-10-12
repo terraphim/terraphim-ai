@@ -68,7 +68,7 @@ mod tests {
         // Test basic write/read operations
         memory_op.write("test_key", "test_value").await.unwrap();
         let result = memory_op.read("test_key").await.unwrap();
-        assert_eq!(result, "test_value".as_bytes());
+        assert_eq!(result.to_vec(), "test_value".as_bytes());
 
         Ok(())
     }
@@ -98,7 +98,7 @@ mod tests {
             ) -> Result<Self> {
                 let key = format!("test_data_{}", name.to_lowercase());
                 let data = operator.read(&key).await?;
-                let obj: TestData = serde_json::from_slice(&data)?;
+                let obj: TestData = serde_json::from_slice(&data.to_vec())?;
                 Ok(obj)
             }
         }
@@ -154,7 +154,7 @@ mod tests {
 
         // Load the thesaurus back
         let loaded_data = memory_op.read(&key).await?;
-        let loaded_thesaurus: Thesaurus = serde_json::from_slice(&loaded_data)?;
+        let loaded_thesaurus: Thesaurus = serde_json::from_slice(&loaded_data.to_vec())?;
 
         // Verify the thesaurus was properly saved and loaded
         assert_eq!(thesaurus.name(), loaded_thesaurus.name());
@@ -210,7 +210,8 @@ mod tests {
 
         // Load the config back
         let loaded_data = memory_op.read(&key).await?;
-        let loaded_config: terraphim_config::Config = serde_json::from_slice(&loaded_data)?;
+        let loaded_config: terraphim_config::Config =
+            serde_json::from_slice(&loaded_data.to_vec())?;
 
         // Verify the config was properly saved and loaded
         assert_eq!(config.id, loaded_config.id);

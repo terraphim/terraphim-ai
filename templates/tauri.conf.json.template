@@ -1,0 +1,51 @@
+{
+  "package": {
+    "productName": "Terraphim AI",
+    "version": "1.0.0"
+  },
+  "build": {
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "tauri": {
+    "updater": {
+      "active": true,
+      "endpoints": ["https://releases.terraphim.io/latest.json"],
+      "dialog": true,
+      "pubkey": "op://Terraphim-Shared/TauriSigning/PUBLIC_KEY"
+    },
+    "bundle": {
+      "active": true,
+      "category": "Productivity",
+      "copyright": "© 2023 Terraphim AI",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "identifier": "com.terraphim.ai",
+      "longDescription": "Terraphim AI - Intelligent Search and Knowledge Management",
+      "macOS": {
+        "entitlements": null,
+        "exceptionDomain": "",
+        "frameworks": [],
+        "providerShortName": null,
+        "signingIdentity": null
+      },
+      "resources": [],
+      "shortDescription": "Intelligent Search and Knowledge Management",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    }
+  }
+}

@@ -17,6 +17,7 @@ fn create_test_documents() -> Vec<Document> {
             rank: None,
             stub: None,
             url: "https://example.com/doc1".to_string(),
+            source_haystack: None,
         },
         Document {
             id: "doc2".to_string(),
@@ -28,6 +29,7 @@ fn create_test_documents() -> Vec<Document> {
             rank: None,
             stub: None,
             url: "https://example.com/doc2".to_string(),
+            source_haystack: None,
         },
         Document {
             id: "doc3".to_string(),
@@ -39,6 +41,7 @@ fn create_test_documents() -> Vec<Document> {
             rank: None,
             stub: None,
             url: "https://example.com/doc3".to_string(),
+            source_haystack: None,
         },
     ]
 }

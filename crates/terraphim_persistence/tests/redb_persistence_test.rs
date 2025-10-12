@@ -47,7 +47,7 @@ async fn test_redb_configuration() -> Result<(), Box<dyn std::error::Error>> {
     let test_key = "test_document";
 
     match op.write(test_key, test_data).await {
-        Ok(()) => {
+        Ok(_metadata) => {
             log::info!("✅ Successfully wrote data to ReDB");
         }
         Err(e) => {
@@ -67,7 +67,7 @@ async fn test_redb_configuration() -> Result<(), Box<dyn std::error::Error>> {
     // Test 3: Read data from ReDB
     match op.read(test_key).await {
         Ok(data) => {
-            let data_str = String::from_utf8(data)?;
+            let data_str = String::from_utf8(data.to_vec())?;
             log::info!("✅ Successfully read data from ReDB: {}", data_str);
 
             // Verify the content matches

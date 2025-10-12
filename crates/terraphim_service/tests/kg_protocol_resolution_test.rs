@@ -35,21 +35,14 @@ mod kg_protocol_resolution_test {
                 publish: false,
             }),
             haystacks: vec![],
-            #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: None,
             extra: AHashMap::new(),
         };
 
@@ -63,9 +56,6 @@ mod kg_protocol_resolution_test {
             roles,
             default_role: role_name.clone(),
             selected_role: role_name.clone(),
-            default_chat_model: None,
-            default_model_provider: None,
-            default_summarization_model: None,
         };
 
         let config_state = ConfigState {
@@ -184,21 +174,14 @@ mod kg_protocol_resolution_test {
                 publish: false,
             }),
             haystacks: vec![],
-            #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: None,
             extra: AHashMap::new(),
         };
 
@@ -212,9 +195,6 @@ mod kg_protocol_resolution_test {
             roles,
             default_role: role_name.clone(),
             selected_role: role_name.clone(),
-            default_chat_model: None,
-            default_model_provider: None,
-            default_summarization_model: None,
         };
 
         let config_state = ConfigState {

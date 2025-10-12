@@ -150,8 +150,15 @@ async fn test_atomic_haystack_with_terraphim_config() {
                     true,
                 )
                 .with_atomic_secret(atomic_secret.clone())],
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()
@@ -234,7 +241,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
         .expect("Failed to create config state");
 
     let search_query = SearchQuery {
-        search_term: "Terraphim".to_string().into(), // Convert to NormalizedTermValue
+        search_term: "Terraphim".into(),
         skip: Some(0),
         limit: Some(10),
         role: Some("AtomicUser".into()),
@@ -466,8 +473,15 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks,
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
                 extra: ahash::AHashMap::new(),
-                ..Default::default()
             },
         )
         .build()

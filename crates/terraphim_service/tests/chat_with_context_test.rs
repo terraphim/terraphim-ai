@@ -2,39 +2,29 @@ use ahash::AHashMap;
 use terraphim_service::context::{ContextConfig, ContextManager};
 use terraphim_service::llm::{build_llm_from_role, ChatOptions};
 use terraphim_types::{ContextItem, ContextType, ConversationId, RoleName};
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
 
-/// Test chat completion with context using mocked OpenRouter
+/// Test chat completion with context using real Ollama (requires Ollama running)
 #[tokio::test]
-#[cfg(feature = "openrouter")]
-async fn test_openrouter_chat_with_context() {
-    // Setup mock OpenRouter server
-    let server = MockServer::start().await;
-    std::env::set_var("OPENROUTER_BASE_URL", server.uri());
+#[ignore] // Only run when Ollama is available
+async fn test_ollama_chat_with_context_real() {
+    // Skip if Ollama is not running
+    let ollama_url = "http://127.0.0.1:11434";
+    let client = reqwest::Client::new();
+    if client
+        .get(format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
+        eprintln!("Skipping test: Ollama not running on {}", ollama_url);
+        return;
+    }
 
-    // Mock response with context-aware answer
-    let body = serde_json::json!({
-        "choices": [{
-            "message": {"content": "Based on the context about Rust async programming, I can help you implement tokio tasks efficiently."}
-        }]
-    });
-
-    Mock::given(method("POST"))
-        .and(path("/chat/completions"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(body))
-        .mount(&server)
-        .await;
-
-    // Create OpenRouter role configuration
-    let mut role = create_test_openrouter_role();
-    role.extra.insert(
-        "openrouter_base_url".to_string(),
-        serde_json::json!(server.uri()),
-    );
+    // Create Ollama role configuration
+    let role = create_test_ollama_role(ollama_url);
 
     // Create LLM client
-    let llm_client = build_llm_from_role(&role).expect("Should build OpenRouter client");
+    let llm_client = build_llm_from_role(&role).expect("Should build Ollama client");
 
     // Create context manager and conversation
     let mut context_manager = ContextManager::new(ContextConfig::default());
@@ -98,35 +88,32 @@ async fn test_openrouter_chat_with_context() {
         .await
         .expect("Chat completion should succeed");
 
-    // Verify the response acknowledges the context
-    assert!(response.contains("context"));
-    assert!(response.contains("tokio"));
-    assert!(response.contains("implement"));
+    // Verify we got a response (content may vary with real LLM)
+    assert!(
+        !response.is_empty(),
+        "Should get non-empty response from Ollama"
+    );
 }
 
-/// Test chat completion with context using mocked Ollama
+/// Test chat completion with multiple contexts using real Ollama
 #[tokio::test]
-#[cfg(feature = "ollama")]
-async fn test_ollama_chat_with_context() {
-    // Setup mock Ollama server
-    let server = MockServer::start().await;
-
-    // Mock response with context-aware answer
-    let body = serde_json::json!({
-        "message": {
-            "role": "assistant",
-            "content": "Based on the provided context about Docker containers, I can help you optimize your containerization strategy."
-        }
-    });
-
-    Mock::given(method("POST"))
-        .and(path("/api/chat"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(body))
-        .mount(&server)
-        .await;
+#[ignore] // Only run when Ollama is available
+async fn test_ollama_multi_context_chat() {
+    // Skip if Ollama is not running
+    let ollama_url = "http://127.0.0.1:11434";
+    let client = reqwest::Client::new();
+    if client
+        .get(format!("{}/api/tags", ollama_url))
+        .send()
+        .await
+        .is_err()
+    {
+        eprintln!("Skipping test: Ollama not running on {}", ollama_url);
+        return;
+    }
 
     // Create Ollama role configuration
-    let role = create_test_ollama_role(&server.uri());
+    let role = create_test_ollama_role(ollama_url);
 
     // Create LLM client
     let llm_client = build_llm_from_role(&role).expect("Should build Ollama client");
@@ -184,10 +171,11 @@ async fn test_ollama_chat_with_context() {
         .await
         .expect("Chat completion should succeed");
 
-    // Verify the response acknowledges the context
-    assert!(response.contains("context"));
-    assert!(response.contains("Docker"));
-    assert!(response.contains("containerization"));
+    // Verify we got a response (content may vary with real LLM)
+    assert!(
+        !response.is_empty(),
+        "Should get non-empty response from Ollama"
+    );
 }
 
 /// Test that context is properly formatted for LLM consumption
@@ -213,7 +201,7 @@ async fn test_context_formatting() {
         },
         ContextItem {
             id: "search-1".to_string(),
-            context_type: ContextType::Document,
+            context_type: ContextType::SearchResult,
             title: "Search Result: API Examples".to_string(),
             summary: Some("Code examples for API usage".to_string()),
             content: "Example: curl -X GET https://api.example.com/users".to_string(),
@@ -282,34 +270,6 @@ async fn test_empty_context_handling() {
 
 // Helper functions
 
-#[cfg(feature = "openrouter")]
-fn create_test_openrouter_role() -> terraphim_config::Role {
-    let mut role = terraphim_config::Role {
-        shortname: Some("TestOpenRouter".into()),
-        name: "Test OpenRouter".into(),
-        relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "default".into(),
-        kg: None,
-        haystacks: vec![],
-        openrouter_enabled: true,
-        openrouter_api_key: Some("sk-test-key".to_string()),
-        openrouter_model: Some("openai/gpt-3.5-turbo".to_string()),
-        openrouter_auto_summarize: false,
-        openrouter_chat_enabled: true,
-        openrouter_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
-        openrouter_chat_model: Some("openai/gpt-3.5-turbo".to_string()),
-        llm_system_prompt: None,
-        extra: AHashMap::new(),
-    };
-
-    role.extra
-        .insert("llm_provider".to_string(), serde_json::json!("openrouter"));
-
-    role
-}
-
-#[cfg(feature = "ollama")]
 fn create_test_ollama_role(base_url: &str) -> terraphim_config::Role {
     let mut role = terraphim_config::Role {
         shortname: Some("TestOllama".into()),
@@ -319,34 +279,21 @@ fn create_test_ollama_role(base_url: &str) -> terraphim_config::Role {
         theme: "default".into(),
         kg: None,
         haystacks: vec![],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: true,
+        llm_api_key: None,
+        llm_model: Some("gemma3:270m".to_string()),
+        llm_auto_summarize: false,
+        llm_chat_enabled: true,
+        llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
+        llm_chat_model: Some("gemma3:270m".to_string()),
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
 
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
     role.extra
-        .insert("llm_model".to_string(), serde_json::json!("llama3.2:3b"));
-    role.extra
-        .insert("llm_base_url".to_string(), serde_json::json!(base_url));
-    role.extra.insert(
-        "system_prompt".to_string(),
-        serde_json::json!("You are a helpful DevOps assistant."),
-    );
+        .insert("ollama_base_url".to_string(), serde_json::json!(base_url));
 
     role
 }

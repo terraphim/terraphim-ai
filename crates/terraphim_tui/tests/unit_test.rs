@@ -182,6 +182,7 @@ fn test_summarize_request_serialization() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let summarize_request = SummarizeRequest {
@@ -448,6 +449,7 @@ fn test_batch_summarize_request_serialization() {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         },
         Document {
             id: "doc2".to_string(),
@@ -459,6 +461,7 @@ fn test_batch_summarize_request_serialization() {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         },
     ];
 
@@ -553,6 +556,7 @@ fn test_boundary_values() {
         stub: None,
         tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
         rank: Some(100),
+        source_haystack: None,
     };
 
     let doc_json = serde_json::to_string(&complete_doc);
@@ -569,6 +573,7 @@ fn test_boundary_values() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let minimal_doc_json = serde_json::to_string(&minimal_doc);

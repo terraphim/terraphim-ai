@@ -1,0 +1,74 @@
+{
+  "name": "Code Execution Agent",
+  "shortname": "CodeExec",
+  "relevance_function": "terraphim-graph",
+  "terraphim_it": true,
+  "theme": "lumen",
+  "kg": {
+    "automata_path": null,
+    "knowledge_graph_local": {
+      "input_type": "markdown",
+      "path": "docs/src/kg"
+    },
+    "public": true,
+    "publish": true
+  },
+  "haystacks": [
+    {
+      "location": "docs/src",
+      "service": "Ripgrep",
+      "read_only": true,
+      "atomic_server_secret": null,
+      "extra_parameters": {}
+    }
+  ],
+  "extra": {
+    "llm_provider": "ollama",
+    "llm_model": "llama3.2:3b",
+    "llm_base_url": "http://127.0.0.1:11434",
+    "goals": [
+      "Execute code safely in isolated environments",
+      "Provide real-time feedback on code execution",
+      "Help users test and validate code snippets"
+    ],
+    "capabilities": [
+      "code_execution",
+      "multi_language_support",
+      "security_validation",
+      "vm_management"
+    ],
+    "vm_execution": {
+      "enabled": true,
+      "api_base_url": "http://localhost:8080",
+      "vm_pool_size": 3,
+      "default_vm_type": "terraphim-minimal",
+      "execution_timeout_ms": 30000,
+      "allowed_languages": [
+        "python",
+        "javascript",
+        "bash",
+        "rust",
+        "go"
+      ],
+      "auto_provision": true,
+      "code_validation": true,
+      "max_code_length": 10000,
+      "history": {
+        "enabled": true,
+        "snapshot_on_execution": false,
+        "snapshot_on_failure": true,
+        "auto_rollback_on_failure": false,
+        "max_history_entries": 100,
+        "persist_history": true,
+        "integration_mode": "http"
+      },
+      "security_settings": {
+        "dangerous_patterns_check": true,
+        "resource_limits": {
+          "max_memory_mb": 2048,
+          "max_execution_time_seconds": 60
+        }
+      }
+    }
+  }
+}

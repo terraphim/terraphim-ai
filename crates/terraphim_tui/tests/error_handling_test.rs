@@ -358,6 +358,7 @@ async fn test_summarization_error_handling() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let result = client

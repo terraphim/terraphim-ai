@@ -58,7 +58,7 @@ path = "src/main.rs"
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"
 copyright = "2024, Terraphim Contributors"
-license-file = ["../../LICENSE", "4"]
+license-file = ["../../LICENSE-Apache-2.0", "4"]
 extended-description = """
 Terraphim TUI - Terminal User Interface for Terraphim AI.
 Command-line interface with interactive REPL and ASCII graph visualization.

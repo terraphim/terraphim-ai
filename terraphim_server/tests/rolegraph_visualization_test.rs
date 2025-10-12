@@ -5,6 +5,7 @@
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use ahash::AHashMap;
 
     use terraphim_server::{axum_server, Status};
@@ -40,24 +41,10 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        fetch_content: false,
                     }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
                     terraphim_it: false,
-                    llm_system_prompt: None,
+                    ..Default::default()
                 },
             )
             .add_role(
@@ -82,24 +69,10 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        fetch_content: false,
                     }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
                     terraphim_it: false,
-                    llm_system_prompt: None,
+                    ..Default::default()
                 },
             )
             .add_role(
@@ -124,24 +97,10 @@ mod tests {
                         read_only: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
+                        fetch_content: false,
                     }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
-                    extra: AHashMap::new(),
                     terraphim_it: false,
-                    llm_system_prompt: None,
+                    ..Default::default()
                 },
             )
             .build()

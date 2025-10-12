@@ -42,7 +42,7 @@ async fn initialize_user_data_folder(
         let has_docs = data_path.read_dir()?.any(|entry| {
             if let Ok(entry) = entry {
                 let path = entry.path();
-                path.is_file() && path.extension().map_or(false, |ext| ext == "md")
+                path.is_file() && path.extension().is_some_and(|ext| ext == "md")
             } else {
                 false
             }
@@ -377,7 +377,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::find_documents_for_kg_term,
             cmd::save_article_to_atomic,
             cmd::get_autocomplete_suggestions,
-            // Conversation management commands
+            // Conversation management commands (in-memory)
             cmd::create_conversation,
             cmd::list_conversations,
             cmd::get_conversation,
@@ -386,12 +386,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::add_search_context_to_conversation,
             cmd::delete_context,
             cmd::update_context,
+            // Persistent conversation management commands
+            cmd::list_persistent_conversations,
+            cmd::get_persistent_conversation,
+            cmd::create_persistent_conversation,
+            cmd::update_persistent_conversation,
+            cmd::delete_persistent_conversation,
+            cmd::search_persistent_conversations,
+            cmd::export_persistent_conversation,
+            cmd::import_persistent_conversation,
+            cmd::get_conversation_statistics,
             // Chat command
             cmd::chat,
             // KG search commands
             cmd::search_kg_terms,
             cmd::add_kg_term_context,
-            cmd::add_kg_index_context
+            cmd::add_kg_index_context,
+            // 1Password integration commands
+            cmd::onepassword_status,
+            cmd::onepassword_resolve_secret,
+            cmd::onepassword_process_config,
+            cmd::onepassword_load_settings
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();

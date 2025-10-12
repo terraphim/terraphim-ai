@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Routing - Smart Prototyping Environment</title>
+    <link rel="stylesheet" href="../shared/styles.css">
+    <style>
+        .prototyping-environment {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .sidebar {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            height: fit-content;
+        }
+
+        .main-canvas {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            min-height: 600px;
+        }
+
+        .model-selector {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            border-left: 4px solid var(--primary);
+        }
+
+        .model-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .model-option:hover {
+            border-color: var(--primary);
+            background: #f8faff;
+        }
+
+        .model-option.selected {
+            border-color: var(--success);
+            background: #d1fae5;
+        }
+
+        .model-option.recommended {
+            border-color: var(--primary);
+            background: #dbeafe;
+            position: relative;
+        }
+
+        .model-option.recommended::after {
+            content: "✨ AI Recommended";
+            position: absolute;
+            top: -8px;
+            right: 8px;
+            background: var(--primary);
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+        }
+
+        .model-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .model-name {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .model-specs {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .model-cost {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .prototype-templates {
+            margin-bottom: 2rem;
+        }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+
+        .template-card {
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .template-card:hover {
+            border-color: var(--primary);
+            background: #f8faff;
+        }
+
+        .template-card.selected {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+
+        .template-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .template-description {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .complexity-analyzer {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+        }
+
+        .complexity-meter {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .meter-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+        }
+
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .complexity-label {
+            font-weight: 600;
+            min-width: 80px;
+        }
+
+        .canvas-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .prototype-preview {
+            background: #f9fafb;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            text-align: center;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .prototype-content {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            box-shadow: var(--shadow-sm);
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .routing-visualization {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+
+        .generation-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .live-preview {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            min-height: 300px;
+            background: white;
+            padding: 1rem;
+        }
+
+        @media (max-width: 968px) {
+            .prototyping-environment {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>🧠 AI Routing</h1>
+            <p>Smart Prototyping Environment - Intelligent model selection based on task complexity</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Workflow Status -->
+        <div class="workflow-container">
+            <div class="workflow-header">
+                <h2 class="workflow-title">Smart Routing Pipeline</h2>
+                <span id="workflow-status" class="workflow-status idle">Ready to Route</span>
+            </div>
+
+            <!-- Pipeline Visualization -->
+            <div id="pipeline-container"></div>
+
+            <!-- Progress Bar -->
+            <div id="progress-container"></div>
+        </div>
+
+        <!-- Main Interface -->
+        <div class="prototyping-environment">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <h3>🎯 Smart AI Router</h3>
+
+                <!-- Model Selection Display -->
+                <div class="model-selector">
+                    <h4>Selected Model</h4>
+                    <div id="selected-model-display">
+                        <div class="model-details">
+                            <div class="model-name">GPT-3.5 Turbo</div>
+                            <div class="model-specs">Fast • Balanced • Cost-effective</div>
+                            <div class="model-cost">$0.002/1k tokens</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prototype Templates -->
+                <div class="prototype-templates">
+                    <h4>Prototype Templates</h4>
+                    <div class="template-grid">
+                        <div class="template-card" data-template="landing-page">
+                            <div class="template-title">🏠 Landing Page</div>
+                            <div class="template-description">Marketing site with hero section</div>
+                        </div>
+                        <div class="template-card" data-template="dashboard">
+                            <div class="template-title">📊 Dashboard</div>
+                            <div class="template-description">Analytics with charts and metrics</div>
+                        </div>
+                        <div class="template-card" data-template="ecommerce">
+                            <div class="template-title">🛒 E-commerce</div>
+                            <div class="template-description">Product catalog with cart</div>
+                        </div>
+                        <div class="template-card" data-template="saas-app">
+                            <div class="template-title">⚡ SaaS App</div>
+                            <div class="template-description">Feature-rich application</div>
+                        </div>
+                        <div class="template-card" data-template="portfolio">
+                            <div class="template-title">🎨 Portfolio</div>
+                            <div class="template-description">Creative showcase site</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complexity Analyzer -->
+                <div class="complexity-analyzer">
+                    <h4>Task Complexity Analysis</h4>
+                    <div class="complexity-meter">
+                        <div class="meter-bar">
+                            <div id="complexity-fill" class="meter-fill"></div>
+                        </div>
+                        <span id="complexity-label" class="complexity-label">Simple</span>
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        <div id="complexity-factors">Analyzing prompt complexity...</div>
+                    </div>
+                </div>
+
+                <!-- Available Models -->
+                <div class="available-models">
+                    <h4>Available Models</h4>
+                    <div id="models-list">
+                        <!-- Models will be populated here -->
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <div class="form-group">
+                        <label class="form-label" for="role-selector">Select Agent Role:</label>
+                        <select id="role-selector" class="form-input" data-testid="role-selector"></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="system-prompt">System Prompt:</label>
+                        <textarea
+                            id="system-prompt"
+                            class="form-input form-textarea"
+                            rows="5"
+                            placeholder="The agent's system prompt will appear here. You can edit it."
+                            data-testid="system-prompt"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">🚀 Actions</h3>
+                    <div class="controls">
+                        <button id="sidebar-analyze-btn" class="btn">Analyze Task</button>
+                        <button id="sidebar-generate-btn" class="btn primary" data-testid="execute-routing" disabled>Generate Prototype</button>
+                        <button id="sidebar-refine-btn" class="btn" disabled>Refine Output</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Canvas -->
+            <div class="main-canvas">
+                <div class="canvas-header">
+                    <h3 id="canvas-title">Prototype Generator</h3>
+                    <div class="generation-controls">
+                        <button id="analyze-btn" class="btn">Analyze Task</button>
+                        <button id="generate-btn" class="btn primary" data-testid="execute-routing" disabled>Generate Prototype</button>
+                        <button id="refine-btn" class="btn" disabled>Refine Output</button>
+                    </div>
+                </div>
+
+                <!-- Input Section -->
+                <div class="form-group">
+                    <label class="form-label" for="prototype-prompt">Describe your prototype:</label>
+                    <textarea
+                        id="prototype-prompt"
+                        class="form-input form-textarea"
+                        placeholder="Example: Create a modern landing page for a SaaS startup that helps teams collaborate better. Include a hero section with pricing plans, testimonials, and a clean navigation bar."
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <!-- Routing Visualization -->
+                <div id="routing-visualization" style="display: none;"></div>
+
+                <!-- Preview Area -->
+                <div class="prototype-preview" id="prototype-preview">
+                    <div style="color: var(--text-muted);">
+                        <h4>🚀 Ready to Prototype</h4>
+                        <p>Describe your idea above and click "Analyze Task" to see the AI routing in action.</p>
+                        <p style="font-size: 0.875rem; margin-top: 1rem;">The system will analyze complexity and route to the optimal model automatically.</p>
+                    </div>
+                    <!-- Prototype Output Frame -->
+                    <iframe id="output-frame" style="display: none; width: 100%; height: 400px; border: 1px solid var(--border); border-radius: var(--radius-md); margin-top: 1rem;"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" style="display: none; margin-top: 2rem;">
+            <div class="workflow-container">
+                <div class="workflow-header">
+                    <h3>Generation Results</h3>
+                </div>
+                <div id="results-content"></div>
+                <div id="results-container"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="../shared/api-client.js"></script>
+    <script src="../shared/server-discovery.js"></script>
+    <script src="../shared/settings-manager.js"></script>
+    <script src="../shared/settings-ui.js"></script>
+    <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/workflow-visualizer.js"></script>
+    <script src="../shared/connection-status.js"></script>
+    <script src="../shared/agent-config-manager.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

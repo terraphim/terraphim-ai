@@ -130,7 +130,7 @@ async fn test_thesaurus_full_persistence_lifecycle() {
 
     println!(
         "  📊 Search with persisted thesaurus: {} results",
-        search_result.documents.len()
+        search_result.len()
     );
 
     // Step 7: Verify the rolegraph is properly updated in config_state

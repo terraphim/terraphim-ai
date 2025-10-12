@@ -27,7 +27,7 @@ Another paragraph with a [regular link](https://www.example.com).
                     link_type: pulldown_cmark::LinkType::Shortcut,
                     dest_url: link_text.to_string().into(),
                     title: link_text.to_string().into(),
-                    id: "".into(),
+                    id: "".to_string().into(),
                 })
             } else {
                 pulldown_cmark::Event::Text(text)

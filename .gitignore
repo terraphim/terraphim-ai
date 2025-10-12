@@ -32,3 +32,4 @@ demo_data
 rust-sdk
 .env
 .aider*
+scratchpad/firecracker-rust
