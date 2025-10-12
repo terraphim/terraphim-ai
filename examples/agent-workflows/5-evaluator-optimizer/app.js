@@ -16,18 +16,18 @@ class EvaluatorOptimizerDemo {
     this.contentVersions = [];
     this.qualityHistory = [];
     this.bestVersion = null;
-    
+
     // Terraphim role configuration - will be updated by agent config manager
     this.terraphimConfig = {
       overallRole: 'TechnicalWriter', // Default overall role for the workflow
       agentRoles: {
         generator: 'TechnicalWriter',
-        evaluator: 'QAEngineer', 
+        evaluator: 'QAEngineer',
         optimizer: 'QAEngineer'
       },
       availableRoles: [
         'content_creator',
-        'creative_writer', 
+        'creative_writer',
         'content_critic',
         'content_editor',
         'technical_writer',
@@ -36,7 +36,7 @@ class EvaluatorOptimizerDemo {
         'copy_editor'
       ]
     };
-    
+
     // Define quality criteria with weights
     this.qualityCriteria = [
       {
@@ -48,7 +48,7 @@ class EvaluatorOptimizerDemo {
       },
       {
         id: 'engagement',
-        name: 'Engagement', 
+        name: 'Engagement',
         weight: 20,
         description: 'How engaging and interesting for target audience',
         enabled: true
@@ -87,12 +87,12 @@ class EvaluatorOptimizerDemo {
   async init() {
     // Initialize settings system first
     await this.initializeSettings();
-    
+
     this.setupEventListeners();
     this.renderQualityCriteria();
     this.renderCurrentMetrics();
     this.createWorkflowPipeline();
-    
+
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
@@ -244,10 +244,10 @@ class EvaluatorOptimizerDemo {
 
   renderCurrentMetrics() {
     const container = document.getElementById('current-quality-metrics');
-    const metrics = this.currentIteration > 0 ? 
-      this.contentVersions[this.currentIteration - 1] && this.contentVersions[this.currentIteration - 1].qualityScores : 
+    const metrics = this.currentIteration > 0 ?
+      this.contentVersions[this.currentIteration - 1] && this.contentVersions[this.currentIteration - 1].qualityScores :
       this.getDefaultMetrics();
-    
+
     container.innerHTML = Object.entries(metrics).map(([key, value]) => `
       <div class="metric-card">
         <div class="metric-value">${Math.round(value)}%</div>
@@ -292,14 +292,14 @@ class EvaluatorOptimizerDemo {
       { id: 'evaluate', name: 'Quality Evaluation' },
       { id: 'optimize', name: 'Iterative Optimization' }
     ];
-    
+
     this.visualizer.createPipeline(steps);
     this.visualizer.createProgressBar('progress-container');
   }
 
   async generateInitialContent() {
     const prompt = document.getElementById('content-prompt').value.trim();
-    
+
     if (!prompt) {
       alert('Please enter a content brief.');
       return;
@@ -308,32 +308,32 @@ class EvaluatorOptimizerDemo {
     // Update workflow status
     document.getElementById('workflow-status').textContent = 'Generating...';
     document.getElementById('workflow-status').className = 'workflow-status running';
-    
+
     // Reset state
     this.currentIteration = 0;
     this.contentVersions = [];
     this.qualityHistory = [];
     this.bestVersion = null;
-    
+
     // Hide initial state
     document.getElementById('initial-state').style.display = 'none';
-    
+
     // Setup pipeline
     this.visualizer.updateStepStatus('generate', 'active');
     this.visualizer.updateProgress(20, 'Generating initial content...');
-    
+
     try {
       // Generate initial content
       const initialContent = await this.generateContent(prompt, null);
       this.currentIteration = 1;
-      
+
       this.visualizer.updateStepStatus('generate', 'completed');
       this.visualizer.updateStepStatus('evaluate', 'active');
       this.visualizer.updateProgress(50, 'Evaluating content quality...');
-      
+
       // Evaluate initial content
       const qualityScores = await this.evaluateContent(initialContent, prompt);
-      
+
       // Store version
       const version = {
         iteration: 1,
@@ -342,25 +342,25 @@ class EvaluatorOptimizerDemo {
         feedback: this.generateFeedback(qualityScores),
         timestamp: new Date()
       };
-      
+
       this.contentVersions.push(version);
       this.qualityHistory.push(qualityScores.overall);
       this.bestVersion = version;
-      
+
       this.visualizer.updateStepStatus('evaluate', 'completed');
       this.visualizer.updateProgress(100, 'Initial content generated and evaluated!');
-      
+
       // Update UI
       this.renderContentVersion(version);
       this.renderIterationHistory();
       this.renderCurrentMetrics();
       this.updateBestVersionInfo();
-      
+
       // Enable optimization
       document.getElementById('optimize-btn').disabled = false;
       document.getElementById('workflow-status').textContent = 'Ready to Optimize';
       document.getElementById('workflow-status').className = 'workflow-status ready';
-      
+
     } catch (error) {
       console.error('Generation failed:', error);
       document.getElementById('workflow-status').textContent = 'Error';
@@ -376,45 +376,45 @@ class EvaluatorOptimizerDemo {
 
     this.isOptimizing = true;
     this.updateControlsState();
-    
+
     // Update workflow status
     document.getElementById('workflow-status').textContent = 'Optimizing...';
     document.getElementById('workflow-status').className = 'workflow-status running';
-    
+
     this.visualizer.updateStepStatus('optimize', 'active');
-    
+
     try {
       // Run optimization iterations
       while (this.currentIteration < this.maxIterations && this.isOptimizing) {
         const currentBestScore = this.bestVersion.qualityScores.overall;
-        
+
         // Check if quality threshold is met
         if (currentBestScore >= this.qualityThreshold) {
           break;
         }
-        
+
         await this.performOptimizationIteration();
-        
+
         const progress = 70 + (this.currentIteration / this.maxIterations) * 30;
         this.visualizer.updateProgress(progress, `Optimization iteration ${this.currentIteration}...`);
-        
+
         // Brief delay between iterations
         await this.delay(1000);
       }
-      
+
       this.visualizer.updateStepStatus('optimize', 'completed');
       this.visualizer.updateProgress(100, 'Optimization completed!');
-      
+
       // Show results
       this.displayOptimizationResults();
-      
+
     } catch (error) {
       console.error('Optimization failed:', error);
       this.visualizer.updateStepStatus('optimize', 'error');
     } finally {
       this.isOptimizing = false;
       this.updateControlsState();
-      
+
       document.getElementById('workflow-status').textContent = 'Completed';
       document.getElementById('workflow-status').className = 'workflow-status completed';
     }
@@ -422,15 +422,15 @@ class EvaluatorOptimizerDemo {
 
   async performOptimizationIteration() {
     this.currentIteration++;
-    
+
     // Get previous version and feedback
     const previousVersion = this.contentVersions[this.contentVersions.length - 1];
     const optimizationPrompt = this.buildOptimizationPrompt(previousVersion);
-    
+
     let version;
     let qualityScores;
     let improvedContent;
-    
+
     try {
       // Execute real optimization workflow with API client
       // FORCE HTTP ONLY - bypass any WebSocket caching issues
@@ -449,13 +449,13 @@ class EvaluatorOptimizerDemo {
           }
         })
       });
-      
+
       console.log('Optimization HTTP result:', result);
-      
+
       // Extract improved content from API result
       improvedContent = (result.result && result.result.optimized_content) || (result.result && result.result.final_result) || 'Generated improved content';
       qualityScores = (result.result && result.result.quality_metrics) || await this.evaluateContent(improvedContent, document.getElementById('content-prompt').value);
-      
+
       // Create new version with API results
       version = {
         iteration: this.currentIteration,
@@ -465,28 +465,28 @@ class EvaluatorOptimizerDemo {
         improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
         apiResult: result.result // Store full API result
       };
-      
+
       this.contentVersions.push(version);
       this.qualityHistory.push(qualityScores.overall);
-      
+
       // Update best version if this is better
       if (qualityScores.overall > this.bestVersion.qualityScores.overall) {
         this.bestVersion = version;
         this.updateBestVersionInfo();
       }
-      
+
     } catch (error) {
       console.error('API optimization failed, falling back to simulation:', error);
-      
+
       // Ensure all variables are properly initialized in catch block
       try {
         improvedContent = await this.generateContent(
           document.getElementById('content-prompt').value,
           optimizationPrompt
         );
-        
+
         qualityScores = await this.evaluateContent(
-          improvedContent, 
+          improvedContent,
           document.getElementById('content-prompt').value
         );
       } catch (fallbackError) {
@@ -495,7 +495,7 @@ class EvaluatorOptimizerDemo {
         improvedContent = previousVersion.content + '\n\n[Optimization iteration failed - using previous version]';
         qualityScores = { ...previousVersion.qualityScores };
       }
-      
+
       version = {
         iteration: this.currentIteration,
         content: improvedContent,
@@ -504,17 +504,17 @@ class EvaluatorOptimizerDemo {
         improvements: this.identifyImprovements(previousVersion.qualityScores, qualityScores),
         timestamp: new Date()
       };
-    
+
       this.contentVersions.push(version);
       this.qualityHistory.push(qualityScores.overall);
-      
+
       // Update best version if this is better
       if (qualityScores.overall > this.bestVersion.qualityScores.overall) {
         this.bestVersion = version;
         this.updateBestVersionInfo();
       }
     }
-    
+
     // Update UI - all variables are guaranteed to be defined at this point
     this.renderContentVersion(version);
     this.renderIterationHistory();
@@ -525,7 +525,7 @@ class EvaluatorOptimizerDemo {
   buildOptimizationPrompt(previousVersion) {
     const weakestCriteria = this.identifyWeakestCriteria(previousVersion.qualityScores);
     const feedback = previousVersion.feedback.negative.slice(0, 2); // Top 2 issues
-    
+
     return {
       focusAreas: weakestCriteria,
       specificFeedback: feedback,
@@ -555,10 +555,10 @@ class EvaluatorOptimizerDemo {
 
   async generateContent(prompt, optimizationContext = null) {
     // Use terraphim role for content generation
-    const role = optimizationContext ? 
-      this.terraphimConfig.agentRoles.optimizer : 
+    const role = optimizationContext ?
+      this.terraphimConfig.agentRoles.optimizer :
       this.terraphimConfig.agentRoles.generator;
-    
+
     // Simulate API call to terraphim with role configuration
     const terraphimRequest = {
       role: role,
@@ -567,17 +567,17 @@ class EvaluatorOptimizerDemo {
       context: optimizationContext,
       workflow: 'evaluator-optimizer'
     };
-    
+
     // Simulate content generation with realistic delay
     await this.delay(2000 + Math.random() * 2000);
-    
+
     // Generate mock content based on prompt and role context
     const baseContent = this.generateMockContentWithRole(prompt, role);
-    
+
     if (optimizationContext) {
       return this.applyOptimizations(baseContent, optimizationContext, role);
     }
-    
+
     return baseContent;
   }
 
@@ -592,7 +592,7 @@ class EvaluatorOptimizerDemo {
       'academic_researcher': () => this.generateAcademicContent(prompt),
       'copy_editor': () => this.generatePolishedContent(prompt)
     };
-    
+
     const generator = roleSpecializations[role] || (() => this.generateGenericContent(prompt));
     return generator();
   }
@@ -745,7 +745,7 @@ This technical specification outlines the core components, implementation requir
 
 ### Core Components
 - **Processing Module**: Handles primary computational tasks with 99.7% uptime SLA
-- **Data Layer**: Implements redundant storage with automatic failover capabilities  
+- **Data Layer**: Implements redundant storage with automatic failover capabilities
 - **Interface Layer**: RESTful API with OAuth 2.0 authentication and rate limiting
 - **Monitoring System**: Real-time metrics collection and alerting infrastructure
 
@@ -794,7 +794,7 @@ A mixed-methods approach was employed, combining quantitative analysis (n=247) w
 Statistical analysis revealed significant correlations (p<0.05) between primary variables, while thematic analysis of qualitative data identified three major patterns:
 
 1. **Pattern A**: Structural relationships and dependencies
-2. **Pattern B**: Behavioral adaptations and responses  
+2. **Pattern B**: Behavioral adaptations and responses
 3. **Pattern C**: Systemic implications and outcomes
 
 ## Discussion
@@ -829,7 +829,7 @@ Organizations that invest in building adaptive capabilities today will be best p
 ## Recommended Actions
 
 1. **Immediate Steps**: Conduct comprehensive assessment and establish baseline metrics
-2. **Short-term Initiatives**: Implement pilot programs with clear success criteria  
+2. **Short-term Initiatives**: Implement pilot programs with clear success criteria
 3. **Long-term Strategy**: Develop sustainable competitive advantages through continuous innovation
 
 ## Conclusion
@@ -843,12 +843,12 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
   evaluateCriterionWithRole(content, originalPrompt, criterion, evaluatorRole) {
     // Enhanced evaluation logic based on evaluator role
     let baseScore = 60 + Math.random() * 25; // Base score 60-85
-    
+
     // Role-specific evaluation adjustments
     if (evaluatorRole === 'content_critic') {
       // More stringent evaluation
       baseScore -= 5;
-      
+
       // Additional criteria for critical evaluation
       if (criterion.id === 'accuracy' && !content.includes('research') && !content.includes('data')) {
         baseScore -= 8;
@@ -858,36 +858,36 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
       if (criterion.id === 'clarity' && content.includes('utilize')) baseScore -= 10;
       if (criterion.id === 'structure' && content.includes('#')) baseScore += 10;
     }
-    
+
     // Original criterion-specific logic
     switch (criterion.id) {
       case 'clarity':
         if (content.includes('utilize') || content.includes('numerous')) baseScore -= 5;
         if (content.includes('clear') || content.includes('simple')) baseScore += 5;
         break;
-        
+
       case 'engagement':
         if (content.includes('?') || content.includes('!')) baseScore += 5;
         if (content.includes('you') || content.includes('your')) baseScore += 3;
         if (content.includes('Imagine') || content.includes('Picture this')) baseScore += 8; // Creative content bonus
         break;
-        
+
       case 'accuracy':
         baseScore = 75 + Math.random() * 15;
         if (content.includes('research') || content.includes('study')) baseScore += 5;
         break;
-        
+
       case 'structure':
         if (content.includes('#')) baseScore += 8;
         if (content.includes('\n\n')) baseScore += 3;
         if (content.includes('## ')) baseScore += 5; // Well-structured headers
         break;
-        
+
       case 'tone':
         if (originalPrompt.includes('professional') && !content.includes('🌱')) baseScore += 5;
         if (originalPrompt.includes('creative') && content.includes('Imagine')) baseScore += 8;
         break;
-        
+
       case 'completeness':
         const promptWords = originalPrompt.toLowerCase().split(' ');
         const contentWords = content.toLowerCase().split(' ');
@@ -895,29 +895,29 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
         baseScore += (coverage / promptWords.length) * 20;
         break;
     }
-    
+
     return Math.max(0, Math.min(100, baseScore));
   }
 
   applyOptimizations(baseContent, optimizationContext) {
     // Apply specific optimizations based on context
     let optimizedContent = baseContent;
-    
+
     // Improve clarity if needed
     if (optimizationContext.focusAreas.includes('clarity')) {
       optimizedContent = this.improveClarity(optimizedContent);
     }
-    
+
     // Enhance engagement if needed
     if (optimizationContext.focusAreas.includes('engagement')) {
       optimizedContent = this.enhanceEngagement(optimizedContent);
     }
-    
+
     // Improve structure if needed
     if (optimizationContext.focusAreas.includes('structure')) {
       optimizedContent = this.improveStructure(optimizedContent);
     }
-    
+
     return optimizedContent;
   }
 
@@ -937,9 +937,9 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
       "The results are remarkable:",
       "This changes everything:"
     ];
-    
+
     const randomPhrase = engagingPhrases[Math.floor(Math.random() * engagingPhrases.length)];
-    
+
     // Insert engaging phrase at beginning of a paragraph
     return content.replace(/^([A-Z])/m, `${randomPhrase} $1`);
   }
@@ -960,7 +960,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
   async evaluateContent(content, originalPrompt) {
     // Use terraphim evaluator role
     const evaluatorRole = this.terraphimConfig.agentRoles.evaluator;
-    
+
     // Simulate API call to terraphim with evaluator role
     const terraphimRequest = {
       role: evaluatorRole,
@@ -970,73 +970,73 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
       criteria: this.qualityCriteria.filter(c => c.enabled),
       workflow: 'evaluator-optimizer'
     };
-    
+
     // Simulate evaluation with realistic delay
     await this.delay(1500);
-    
+
     // Generate quality scores for each criterion using role-based evaluation
     const qualityScores = {};
-    
+
     this.qualityCriteria.forEach(criterion => {
       if (criterion.enabled) {
         qualityScores[criterion.id] = this.evaluateCriterionWithRole(
-          content, 
-          originalPrompt, 
-          criterion, 
+          content,
+          originalPrompt,
+          criterion,
           evaluatorRole
         );
       } else {
         qualityScores[criterion.id] = 0;
       }
     });
-    
+
     // Calculate weighted overall score
     const totalWeight = this.qualityCriteria
       .filter(c => c.enabled)
       .reduce((sum, c) => sum + c.weight, 0);
-      
+
     const weightedSum = this.qualityCriteria
       .filter(c => c.enabled)
       .reduce((sum, c) => sum + (qualityScores[c.id] * c.weight), 0);
-    
+
     qualityScores.overall = totalWeight > 0 ? weightedSum / totalWeight : 0;
-    
+
     return qualityScores;
   }
 
   evaluateCriterion(content, originalPrompt, criterion) {
     // Mock evaluation logic for each criterion
     let baseScore = 60 + Math.random() * 25; // Base score 60-85
-    
+
     switch (criterion.id) {
       case 'clarity':
         // Penalize for complex language, reward simple language
         if (content.includes('utilize') || content.includes('numerous')) baseScore -= 5;
         if (content.includes('clear') || content.includes('simple')) baseScore += 5;
         break;
-        
+
       case 'engagement':
         // Reward engaging elements
         if (content.includes('?') || content.includes('!')) baseScore += 5;
         if (content.includes('you') || content.includes('your')) baseScore += 3;
         break;
-        
+
       case 'accuracy':
         // Simulate fact-checking (always reasonably high for mock)
         baseScore = 75 + Math.random() * 15;
         break;
-        
+
       case 'structure':
         // Reward headings and good organization
         if (content.includes('#')) baseScore += 8;
         if (content.includes('\n\n')) baseScore += 3;
         break;
-        
+
       case 'tone':
         // Evaluate appropriateness to prompt
         if (originalPrompt.includes('professional') && !content.includes('🌱')) baseScore += 5;
         break;
-        
+
       case 'completeness':
         // Check if content addresses prompt requirements
         const promptWords = originalPrompt.toLowerCase().split(' ');
@@ -1045,7 +1045,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
         baseScore += (coverage / promptWords.length) * 20;
         break;
     }
-    
+
     return Math.max(0, Math.min(100, baseScore));
   }
 
@@ -1055,14 +1055,14 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
       negative: [],
       suggestions: []
     };
-    
+
     // Generate feedback based on scores
     Object.entries(qualityScores).forEach(([criterion, score]) => {
       if (criterion === 'overall') return;
-      
+
       const criterionObj = this.qualityCriteria.find(c => c.id === criterion);
       if (!criterionObj) return;
-      
+
       if (score >= 80) {
         feedback.positive.push(`${criterionObj.name}: Excellent ${criterionObj.description.toLowerCase()}`);
       } else if (score < 65) {
@@ -1070,7 +1070,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
         feedback.suggestions.push(this.generateSuggestion(criterion, score));
       }
     });
-    
+
     return feedback;
   }
 
@@ -1083,35 +1083,35 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
       tone: 'Adjust writing style to better match target audience expectations',
       completeness: 'Address all aspects mentioned in the original brief'
     };
-    
+
     return suggestions[criterion] || 'Consider refining this aspect of the content';
   }
 
   identifyImprovements(previousScores, currentScores) {
     const improvements = {};
-    
+
     Object.keys(currentScores).forEach(criterion => {
       if (criterion === 'overall') return;
-      
+
       const change = currentScores[criterion] - previousScores[criterion];
       improvements[criterion] = {
         change: change,
         improved: change > 0
       };
     });
-    
+
     return improvements;
   }
 
   renderContentVersion(version) {
     const container = document.getElementById('content-versions');
-    
+
     // Remove existing versions for clean display (show only current)
     container.innerHTML = '';
-    
-    const qualityLevel = version.qualityScores.overall >= 80 ? 'high' : 
+
+    const qualityLevel = version.qualityScores.overall >= 80 ? 'high' :
                         version.qualityScores.overall >= 65 ? 'medium' : 'low';
-    
+
     const versionElement = document.createElement('div');
     versionElement.className = 'version-card';
     versionElement.innerHTML = `
@@ -1123,21 +1123,21 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
           </span>
         </div>
       </div>
-      
+
       <div class="version-content">${version.content.substring(0, 500)}${version.content.length > 500 ? '...' : ''}</div>
-      
+
       <div class="version-feedback">
         <div class="feedback-title">Quality Assessment</div>
         <ul class="feedback-list">
-          ${version.feedback.positive.slice(0, 2).map(item => 
+          ${version.feedback.positive.slice(0, 2).map(item =>
             `<li class="feedback-item feedback-positive">✓ ${item}</li>`
           ).join('')}
-          ${version.feedback.negative.slice(0, 2).map(item => 
+          ${version.feedback.negative.slice(0, 2).map(item =>
             `<li class="feedback-item feedback-negative">⚠ ${item}</li>`
           ).join('')}
         </ul>
       </div>
-      
+
       ${version.improvements ? `
         <div class="improvements-section" style="margin-top: 1rem;">
           <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.5rem;">Improvements from Previous Version:</div>
@@ -1154,14 +1154,14 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
         </div>
       ` : ''}
     `;
-    
+
     container.appendChild(versionElement);
   }
 
   renderIterationHistory() {
     const container = document.getElementById('history-timeline');
     container.innerHTML = this.contentVersions.map((version, index) => `
-      <div class="iteration-node ${index === this.currentIteration - 1 ? 'active' : ''} ${version === this.bestVersion ? 'best' : ''}" 
+      <div class="iteration-node ${index === this.currentIteration - 1 ? 'active' : ''} ${version === this.bestVersion ? 'best' : ''}"
            data-iteration="${version.iteration}">
         <div class="iteration-number">${version.iteration}</div>
         <div class="iteration-score">${Math.round(version.qualityScores.overall)}%</div>
@@ -1171,10 +1171,10 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
 
   renderOptimizationChart() {
     document.getElementById('optimization-chart').style.display = 'block';
-    
+
     const container = document.getElementById('chart-bars');
     const maxScore = Math.max(...this.qualityHistory, 100);
-    
+
     container.innerHTML = this.qualityHistory.map((score, index) => {
       const height = (score / maxScore) * 100;
       return `
@@ -1190,7 +1190,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
     const version = this.contentVersions.find(v => v.iteration === iteration);
     if (version) {
       this.renderContentVersion(version);
-      
+
       // Update current metrics to show this iteration's scores
       const container = document.getElementById('current-quality-metrics');
       container.innerHTML = Object.entries(version.qualityScores).map(([key, value]) => `
@@ -1213,11 +1213,11 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
 
   displayOptimizationResults() {
     document.getElementById('results-section').style.display = 'block';
-    
+
     const finalScore = this.qualityHistory[this.qualityHistory.length - 1];
     const initialScore = this.qualityHistory[0];
     const improvement = finalScore - initialScore;
-    
+
     const metrics = {
       'Total Iterations': this.currentIteration,
       'Initial Quality': `${Math.round(initialScore)}%`,
@@ -1228,7 +1228,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
       'Threshold Met': finalScore >= this.qualityThreshold ? 'Yes' : 'No',
       'Content Length': `${this.bestVersion.content.length} chars`
     };
-    
+
     this.visualizer.createMetricsGrid(metrics, 'results-content');
   }
 
@@ -1241,7 +1241,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
   stopOptimization() {
     this.isOptimizing = false;
     this.updateControlsState();
-    
+
     document.getElementById('workflow-status').textContent = 'Stopped';
     document.getElementById('workflow-status').className = 'workflow-status paused';
   }
@@ -1253,7 +1253,7 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
     this.contentVersions = [];
     this.qualityHistory = [];
     this.bestVersion = null;
-    
+
     // Reset UI
     document.getElementById('content-versions').innerHTML = `
       <div id="initial-state" class="text-center" style="padding: 3rem;">
@@ -1264,16 +1264,16 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
         </div>
       </div>
     `;
-    
+
     document.getElementById('optimization-chart').style.display = 'none';
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('best-version-info').style.display = 'none';
     document.getElementById('history-timeline').innerHTML = '';
-    
+
     // Reset workflow status
     document.getElementById('workflow-status').textContent = 'Ready to Generate';
     document.getElementById('workflow-status').className = 'workflow-status idle';
-    
+
     this.updateControlsState();
     this.renderCurrentMetrics();
     this.visualizer.clear();
@@ -1304,16 +1304,16 @@ Success in this domain requires thoughtful strategy, disciplined execution, and 
     if (saved) {
       try {
         const state = JSON.parse(saved);
-        
+
         if (state.prompt) {
           document.getElementById('content-prompt').value = state.prompt;
         }
-        
+
         if (state.qualityCriteria) {
           this.qualityCriteria = state.qualityCriteria;
           this.renderQualityCriteria();
         }
-        
+
         if (state.maxIterations) this.maxIterations = state.maxIterations;
         if (state.qualityThreshold) this.qualityThreshold = state.qualityThreshold;
 

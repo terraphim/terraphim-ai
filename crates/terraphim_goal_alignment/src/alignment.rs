@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -610,54 +609,42 @@ impl KnowledgeGraphGoalAligner {
 mod tests {
     use super::*;
     use crate::{AutomataConfig, Goal, GoalLevel, SimilarityThresholds};
+    use async_trait::async_trait;
     use std::sync::Arc;
+    use terraphim_agent_registry::{
+        AgentMetadata, AgentPid, AgentRegistry, RegistryResult, SupervisorId,
+    };
+    use terraphim_types::{RoleName, Thesaurus};
 
     // Mock agent registry for testing
     struct MockAgentRegistry;
 
     #[async_trait]
     impl AgentRegistry for MockAgentRegistry {
-        async fn register_agent(
-            &self,
-            _metadata: AgentMetadata,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        async fn register_agent(&self, _metadata: AgentMetadata) -> RegistryResult<()> {
             Ok(())
         }
 
-        async fn unregister_agent(
-            &self,
-            _agent_id: &crate::AgentPid,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        async fn unregister_agent(&self, _agent_id: &AgentPid) -> RegistryResult<()> {
             Ok(())
         }
 
-        async fn update_agent(
-            &self,
-            _metadata: AgentMetadata,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        async fn update_agent(&self, _metadata: AgentMetadata) -> RegistryResult<()> {
             Ok(())
         }
 
-        async fn get_agent(
-            &self,
-            _agent_id: &crate::AgentPid,
-        ) -> Result<Option<AgentMetadata>, Box<dyn std::error::Error + Send + Sync>> {
+        async fn get_agent(&self, _agent_id: &AgentPid) -> RegistryResult<Option<AgentMetadata>> {
             Ok(None)
         }
 
-        async fn list_agents(
-            &self,
-        ) -> Result<Vec<AgentMetadata>, Box<dyn std::error::Error + Send + Sync>> {
+        async fn list_agents(&self) -> RegistryResult<Vec<AgentMetadata>> {
             Ok(Vec::new())
         }
 
         async fn discover_agents(
             &self,
             _query: terraphim_agent_registry::AgentDiscoveryQuery,
-        ) -> Result<
-            terraphim_agent_registry::AgentDiscoveryResult,
-            Box<dyn std::error::Error + Send + Sync>,
-        > {
+        ) -> RegistryResult<terraphim_agent_registry::AgentDiscoveryResult> {
             Ok(terraphim_agent_registry::AgentDiscoveryResult {
                 matches: Vec::new(),
                 query_analysis: terraphim_agent_registry::QueryAnalysis {
@@ -675,33 +662,27 @@ mod tests {
             })
         }
 
-        async fn find_agents_by_role(
-            &self,
-            _role_id: &str,
-        ) -> Result<Vec<AgentMetadata>, Box<dyn std::error::Error + Send + Sync>> {
+        async fn find_agents_by_role(&self, _role_id: &str) -> RegistryResult<Vec<AgentMetadata>> {
             Ok(Vec::new())
         }
 
         async fn find_agents_by_capability(
             &self,
             _capability_id: &str,
-        ) -> Result<Vec<AgentMetadata>, Box<dyn std::error::Error + Send + Sync>> {
+        ) -> RegistryResult<Vec<AgentMetadata>> {
             Ok(Vec::new())
         }
 
         async fn find_agents_by_supervisor(
             &self,
-            _supervisor_id: &crate::SupervisorId,
-        ) -> Result<Vec<AgentMetadata>, Box<dyn std::error::Error + Send + Sync>> {
+            _supervisor_id: &SupervisorId,
+        ) -> RegistryResult<Vec<AgentMetadata>> {
             Ok(Vec::new())
         }
 
         async fn get_statistics(
             &self,
-        ) -> Result<
-            terraphim_agent_registry::RegistryStatistics,
-            Box<dyn std::error::Error + Send + Sync>,
-        > {
+        ) -> RegistryResult<terraphim_agent_registry::RegistryStatistics> {
             Ok(terraphim_agent_registry::RegistryStatistics {
                 total_agents: 0,
                 agents_by_status: HashMap::new(),
@@ -718,7 +699,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_aligner_creation() {
         let role_name = RoleName::new("test_role");
-        let thesaurus = Thesaurus::new();
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let kg_analyzer = Arc::new(KnowledgeGraphGoalAnalyzer::new(
             role_graph.clone(),
@@ -738,7 +719,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_management() {
         let role_name = RoleName::new("test_role");
-        let thesaurus = Thesaurus::new();
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let kg_analyzer = Arc::new(KnowledgeGraphGoalAnalyzer::new(
             role_graph.clone(),
@@ -781,7 +762,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_alignment() {
         let role_name = RoleName::new("test_role");
-        let thesaurus = Thesaurus::new();
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let kg_analyzer = Arc::new(KnowledgeGraphGoalAnalyzer::new(
             role_graph.clone(),

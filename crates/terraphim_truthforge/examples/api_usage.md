@@ -146,19 +146,19 @@ ws.onopen = () => {
 
 ws.onmessage = (event) => {
   const message = JSON.parse(event.data);
-  
+
   if (message.message_type === 'truthforge_progress') {
     const { stage, details } = message.data;
     const sessionId = message.session_id;
-    
+
     console.log(`[${sessionId}] ${stage}:`, details);
-    
+
     // Handle different stages
     switch (stage) {
       case 'started':
         console.log(`Analysis started for ${details.narrative_length} char narrative`);
         break;
-      
+
       case 'completed':
         console.log(`Analysis complete!`);
         console.log(`- Omissions detected: ${details.omissions_count}`);
@@ -166,7 +166,7 @@ ws.onmessage = (event) => {
         console.log(`- Total risk score: ${details.total_risk_score}`);
         console.log(`- Processing time: ${details.processing_time_ms}ms`);
         break;
-      
+
       case 'failed':
         console.error(`Analysis failed: ${details.error}`);
         break;
@@ -253,7 +253,7 @@ echo "Waiting for analysis to complete..."
 for i in {1..10}; do
   sleep 5
   RESULT=$(curl -s http://localhost:8080/api/v1/truthforge/${SESSION_ID})
-  
+
   if [ "$(echo $RESULT | jq -r '.result')" != "null" ]; then
     echo "Analysis complete!"
     echo $RESULT | jq '.result | {
@@ -294,10 +294,10 @@ print(f"Analysis started: {session_id}")
 max_attempts = 20
 for attempt in range(max_attempts):
     time.sleep(3)
-    
+
     result_response = requests.get(f"{BASE_URL}/{session_id}")
     data = result_response.json()
-    
+
     if data["result"]:
         print("Analysis complete!")
         result = data["result"]
@@ -305,7 +305,7 @@ for attempt in range(max_attempts):
         print(f"- Total risk score: {result['omission_catalog']['total_risk_score']:.2f}")
         print(f"- Strategies generated: {len(result['response_strategies'])}")
         print(f"- Processing time: {result['processing_time_ms']}ms")
-        
+
         # Print top 3 omissions
         print("\nTop 3 Omissions:")
         for i, omission in enumerate(result['omission_catalog']['omissions'][:3], 1):
@@ -346,21 +346,21 @@ else:
 interface TruthForgeAnalysisResult {
   session_id: string;
   narrative: NarrativeInput;
-  
+
   // Pass One Analysis
   bias_analysis: BiasAnalysis;
   narrative_mapping: NarrativeMapping;
   taxonomy_linking: TaxonomyLinking;
   omission_catalog: OmissionCatalog;
-  
+
   // Debate Results
   pass_one_debate: DebateResult;
   pass_two_debate: DebateResult;
   cumulative_analysis: CumulativeAnalysis;
-  
+
   // Response Strategies
   response_strategies: ResponseStrategy[];
-  
+
   // Summary
   executive_summary: string;
   processing_time_ms: number;

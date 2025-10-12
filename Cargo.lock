@@ -8161,6 +8161,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "terraphim_automata",
+ "terraphim_multi_agent",
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_settings",

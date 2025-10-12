@@ -5,7 +5,7 @@
 ### Completed Tasks
 ✅ Created TruthForge-specific configuration with 7 specialized crisis analysis roles:
   - BiasDetector
-  - NarrativeMapper  
+  - NarrativeMapper
   - OmissionDetector
   - TaxonomyLinker
   - SupportingAgent (Exploitation)

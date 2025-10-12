@@ -1994,9 +1994,7 @@ impl ResponseGenerator {
             || section_lower.contains("caution")
         {
             for line in content.lines() {
-                let line = line
-                    .trim()
-                    .trim_start_matches(['-', '*', ' ']);
+                let line = line.trim().trim_start_matches(['-', '*', ' ']);
                 if !line.is_empty() && line.len() < 500 {
                     potential_backfire.push(line.to_string());
                 }

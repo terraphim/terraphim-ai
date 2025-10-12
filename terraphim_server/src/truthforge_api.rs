@@ -45,6 +45,12 @@ pub struct SessionStore {
     sessions: Arc<RwLock<AHashMap<Uuid, TruthForgeAnalysisResult>>>,
 }
 
+impl Default for SessionStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionStore {
     pub fn new() -> Self {
         Self {

@@ -23,22 +23,22 @@ pub type EvolutionResult<T> = Result<T, EvolutionError>;
 pub enum EvolutionError {
     #[error("Memory operation error: {0}")]
     MemoryError(String),
-    
+
     #[error("Task operation error: {0}")]
     TaskError(String),
-    
+
     #[error("Lesson operation error: {0}")]
     LessonError(String),
-    
+
     #[error("LLM operation error: {0}")]
     LlmError(String),
-    
+
     #[error("Workflow execution error: {0}")]
     WorkflowError(String),
-    
+
     #[error("Persistence error: {0}")]
     PersistenceError(String),
-    
+
     #[error("Configuration error: {0}")]
     ConfigError(String),
 }
@@ -63,17 +63,17 @@ pub struct AgentEvolutionSystem {
 impl AgentEvolutionSystem {
     /// Create a new evolution system for an agent
     pub fn new(agent_id: AgentId) -> Self;
-    
+
     /// Create a snapshot of current agent state
     pub async fn create_snapshot(&self, description: String) -> EvolutionResult<()>;
-    
+
     /// Get agent snapshots within a time range
     pub async fn get_snapshots_in_range(
-        &self, 
-        start: DateTime<Utc>, 
+        &self,
+        start: DateTime<Utc>,
         end: DateTime<Utc>
     ) -> EvolutionResult<Vec<AgentSnapshot>>;
-    
+
     /// Calculate goal alignment score
     pub async fn calculate_goal_alignment(&self, goal: &str) -> EvolutionResult<f64>;
 }
@@ -118,43 +118,43 @@ pub struct VersionedMemory {
 impl VersionedMemory {
     /// Create new versioned memory for an agent
     pub fn new(agent_id: AgentId) -> Self;
-    
+
     /// Add short-term memory entry
     pub fn add_short_term_memory(
-        &mut self, 
-        memory_id: MemoryId, 
-        content: String, 
-        context: String, 
+        &mut self,
+        memory_id: MemoryId,
+        content: String,
+        context: String,
         tags: Vec<String>
     ) -> EvolutionResult<()>;
-    
+
     /// Promote short-term memory to long-term
     pub fn promote_to_long_term(
-        &mut self, 
-        memory_id: &MemoryId, 
+        &mut self,
+        memory_id: &MemoryId,
         consolidation_reason: String
     ) -> EvolutionResult<()>;
-    
+
     /// Add episodic memory entry
     pub fn add_episodic_memory(
-        &mut self, 
-        memory_id: MemoryId, 
-        event_description: String, 
-        event_sequence: Vec<String>, 
+        &mut self,
+        memory_id: MemoryId,
+        event_description: String,
+        event_sequence: Vec<String>,
         outcome: String,
         tags: Vec<String>
     ) -> EvolutionResult<()>;
-    
+
     /// Search memories by content or tags
     pub fn search_memories(
-        &self, 
-        query: &str, 
+        &self,
+        query: &str,
         memory_types: Option<Vec<MemoryType>>
     ) -> Vec<&MemoryEntry>;
-    
+
     /// Get memory evolution timeline
     pub fn get_memory_timeline(&self) -> Vec<MemoryEvolution>;
-    
+
     /// Create memory snapshot
     pub async fn create_snapshot(&mut self, description: String) -> EvolutionResult<()>;
 }
@@ -211,7 +211,7 @@ pub struct VersionedTaskList {
 impl VersionedTaskList {
     /// Create new versioned task list for an agent
     pub fn new(agent_id: AgentId) -> Self;
-    
+
     /// Add a new task
     pub fn add_task(
         &mut self,
@@ -220,45 +220,45 @@ impl VersionedTaskList {
         priority: TaskPriority,
         estimated_duration: Option<Duration>
     ) -> EvolutionResult<()>;
-    
+
     /// Start task execution
     pub fn start_task(&mut self, task_id: &TaskId) -> EvolutionResult<TaskExecution>;
-    
+
     /// Complete a task
     pub fn complete_task(
-        &mut self, 
-        task_id: &TaskId, 
+        &mut self,
+        task_id: &TaskId,
         result: String
     ) -> EvolutionResult<TaskCompletion>;
-    
+
     /// Cancel a task
     pub fn cancel_task(
-        &mut self, 
-        task_id: &TaskId, 
+        &mut self,
+        task_id: &TaskId,
         reason: String
     ) -> EvolutionResult<()>;
-    
+
     /// Update task progress
     pub fn update_task_progress(
-        &mut self, 
-        task_id: &TaskId, 
-        progress: f64, 
+        &mut self,
+        task_id: &TaskId,
+        progress: f64,
         notes: Option<String>
     ) -> EvolutionResult<()>;
-    
+
     /// Add task dependency
     pub fn add_dependency(
-        &mut self, 
-        task_id: &TaskId, 
+        &mut self,
+        task_id: &TaskId,
         depends_on: &TaskId
     ) -> EvolutionResult<()>;
-    
+
     /// Get tasks ready for execution
     pub fn get_ready_tasks(&self) -> Vec<&Task>;
-    
+
     /// Get task execution history
     pub fn get_task_history(&self, task_id: &TaskId) -> Option<&TaskHistory>;
-    
+
     /// Create task snapshot
     pub async fn create_snapshot(&mut self, description: String) -> EvolutionResult<()>;
 }
@@ -320,7 +320,7 @@ pub struct VersionedLessons {
 impl VersionedLessons {
     /// Create new versioned lessons for an agent
     pub fn new(agent_id: AgentId) -> Self;
-    
+
     /// Learn from a successful experience
     pub fn learn_from_success(
         &mut self,
@@ -330,7 +330,7 @@ impl VersionedLessons {
         success_factors: Vec<String>,
         confidence: f64
     ) -> EvolutionResult<()>;
-    
+
     /// Learn from a failure
     pub fn learn_from_failure(
         &mut self,
@@ -340,7 +340,7 @@ impl VersionedLessons {
         failure_causes: Vec<String>,
         prevention_strategies: Vec<String>
     ) -> EvolutionResult<()>;
-    
+
     /// Learn from general experience
     pub fn learn_from_experience(
         &mut self,
@@ -349,14 +349,14 @@ impl VersionedLessons {
         domain: String,
         confidence: f64
     ) -> EvolutionResult<()>;
-    
+
     /// Apply a lesson to current situation
     pub fn apply_lesson(
         &mut self,
         lesson_id: &LessonId,
         application_context: String
     ) -> EvolutionResult<LessonApplication>;
-    
+
     /// Update lesson based on application results
     pub fn update_lesson_effectiveness(
         &mut self,
@@ -364,13 +364,13 @@ impl VersionedLessons {
         effectiveness_score: f64,
         feedback: String
     ) -> EvolutionResult<()>;
-    
+
     /// Search lessons by content or domain
     pub fn search_lessons(&self, query: &str, domain: Option<&str>) -> Vec<&Lesson>;
-    
+
     /// Get most applicable lessons for current context
     pub fn get_applicable_lessons(&self, context: &str) -> Vec<&Lesson>;
-    
+
     /// Create lesson snapshot
     pub async fn create_snapshot(&mut self, description: String) -> EvolutionResult<()>;
 }
@@ -416,13 +416,13 @@ Base trait for all workflow patterns.
 pub trait WorkflowPattern: Send + Sync {
     /// Get the name of this pattern
     fn pattern_name(&self) -> &'static str;
-    
+
     /// Execute the workflow pattern
     async fn execute(&self, input: WorkflowInput) -> EvolutionResult<WorkflowOutput>;
-    
+
     /// Check if this pattern is suitable for the given task analysis
     fn is_suitable_for(&self, task_analysis: &TaskAnalysis) -> bool;
-    
+
     /// Estimate execution time for this pattern with given input
     fn estimate_execution_time(&self, input: &WorkflowInput) -> Duration;
 }
@@ -522,10 +522,10 @@ impl Routing {
     pub fn new(primary_adapter: Arc<dyn LlmAdapter>) -> Self;
     pub fn with_config(primary_adapter: Arc<dyn LlmAdapter>, config: RouteConfig) -> Self;
     pub fn add_route(
-        self, 
-        name: &str, 
-        adapter: Arc<dyn LlmAdapter>, 
-        cost: f64, 
+        self,
+        name: &str,
+        adapter: Arc<dyn LlmAdapter>,
+        cost: f64,
         performance: f64
     ) -> Self;
 }
@@ -584,7 +584,7 @@ pub struct OrchestratorWorkers {
 impl OrchestratorWorkers {
     pub fn new(orchestrator_adapter: Arc<dyn LlmAdapter>) -> Self;
     pub fn with_config(
-        orchestrator_adapter: Arc<dyn LlmAdapter>, 
+        orchestrator_adapter: Arc<dyn LlmAdapter>,
         config: OrchestrationConfig
     ) -> Self;
     pub fn add_worker(self, role: WorkerRole, adapter: Arc<dyn LlmAdapter>) -> Self;
@@ -643,13 +643,13 @@ Unified interface for LLM providers.
 pub trait LlmAdapter: Send + Sync {
     /// Get the provider name
     fn provider_name(&self) -> &'static str;
-    
+
     /// Create a completion
     async fn complete(&self, prompt: &str, options: CompletionOptions) -> EvolutionResult<String>;
-    
+
     /// Create a chat completion with multiple messages
     async fn chat_complete(&self, messages: Vec<Value>, options: CompletionOptions) -> EvolutionResult<String>;
-    
+
     /// List available models for this provider
     async fn list_models(&self) -> EvolutionResult<Vec<String>>;
 }
@@ -672,14 +672,14 @@ pub struct LlmAdapterFactory;
 impl LlmAdapterFactory {
     /// Create a mock adapter for testing
     pub fn create_mock(provider: &str) -> Arc<dyn LlmAdapter>;
-    
+
     /// Create an adapter from configuration
     pub fn from_config(
-        provider: &str, 
-        model: &str, 
+        provider: &str,
+        model: &str,
         config: Option<Value>
     ) -> EvolutionResult<Arc<dyn LlmAdapter>>;
-    
+
     /// Create an adapter with a specific role/persona
     pub fn create_specialized_agent(
         provider: &str,
@@ -704,10 +704,10 @@ pub struct EvolutionWorkflowManager {
 impl EvolutionWorkflowManager {
     /// Create a new evolution workflow manager
     pub fn new(agent_id: AgentId) -> Self;
-    
+
     /// Create with custom LLM adapter
     pub fn with_adapter(agent_id: AgentId, adapter: Arc<dyn LlmAdapter>) -> Self;
-    
+
     /// Execute a task using the most appropriate workflow pattern
     pub async fn execute_task(
         &mut self,
@@ -715,7 +715,7 @@ impl EvolutionWorkflowManager {
         prompt: String,
         context: Option<String>,
     ) -> EvolutionResult<String>;
-    
+
     /// Execute a task with a specific workflow pattern
     pub async fn execute_with_pattern(
         &mut self,
@@ -724,13 +724,13 @@ impl EvolutionWorkflowManager {
         context: Option<String>,
         pattern_name: &str,
     ) -> EvolutionResult<String>;
-    
+
     /// Get the agent evolution system for direct access
     pub fn evolution_system(&self) -> &AgentEvolutionSystem;
-    
+
     /// Get mutable access to the evolution system
     pub fn evolution_system_mut(&mut self) -> &mut AgentEvolutionSystem;
-    
+
     /// Save the current evolution state
     pub async fn save_evolution_state(&self) -> EvolutionResult<()>;
 }
@@ -746,19 +746,19 @@ pub struct WorkflowFactory;
 impl WorkflowFactory {
     /// Create a workflow pattern for a specific task analysis
     pub fn create_for_task(
-        analysis: &TaskAnalysis, 
+        analysis: &TaskAnalysis,
         adapter: Arc<dyn LlmAdapter>
     ) -> Box<dyn WorkflowPattern>;
-    
+
     /// Create a workflow pattern by name
     pub fn create_by_name(
-        pattern_name: &str, 
+        pattern_name: &str,
         adapter: Arc<dyn LlmAdapter>
     ) -> EvolutionResult<Box<dyn WorkflowPattern>>;
-    
+
     /// Get available pattern names
     pub fn available_patterns() -> Vec<&'static str>;
-    
+
     /// Analyze task and recommend best pattern
     pub fn recommend_pattern(analysis: &TaskAnalysis) -> &'static str;
 }
@@ -777,21 +777,21 @@ pub struct MemoryEvolutionViewer {
 
 impl MemoryEvolutionViewer {
     pub fn new(agent_id: AgentId) -> Self;
-    
+
     /// Get evolution timeline for memory
     pub async fn get_evolution_timeline(
-        &self, 
-        start: DateTime<Utc>, 
+        &self,
+        start: DateTime<Utc>,
         end: DateTime<Utc>
     ) -> EvolutionResult<Vec<MemoryEvolution>>;
-    
+
     /// Compare memory states between two points in time
     pub async fn compare_memory_states(
         &self,
         earlier: DateTime<Utc>,
         later: DateTime<Utc>,
     ) -> EvolutionResult<MemoryComparison>;
-    
+
     /// Get memory insights and trends
     pub async fn get_memory_insights(
         &self,

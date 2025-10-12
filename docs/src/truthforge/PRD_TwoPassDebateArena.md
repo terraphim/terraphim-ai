@@ -1,9 +1,9 @@
 # Product Requirements Document: TruthForge Two-Pass Debate Arena
 
-**Version**: 1.0  
-**Date**: 2025-10-07  
-**Status**: Draft  
-**Owner**: Zestic AI / K-Partners  
+**Version**: 1.0
+**Date**: 2025-10-07
+**Status**: Draft
+**Owner**: Zestic AI / K-Partners
 **Linear Issues**: [ZES-12](https://linear.app/zestic-ai/issue/ZES-12), [ZES-11](https://linear.app/zestic-ai/issue/ZES-11)
 
 ---
@@ -46,12 +46,12 @@ This product will be delivered as a **private Rust crate** (`terraphim_truthforg
 **Profile**:
 - **Role**: Senior PR/Communications professional at enterprise or agency
 - **Experience**: 5-15 years in crisis management, media relations
-- **Challenges**: 
+- **Challenges**:
   - Tight deadlines during crisis situations
   - Need to anticipate opponent arguments before they emerge
   - Pressure to craft messages that withstand scrutiny
   - Limited time to consult with legal, C-suite, subject matter experts
-  
+
 **Goals**:
 - Rapidly assess narrative risks and vulnerabilities
 - Identify what's *not* being said (omissions, gaps, unstated assumptions)
@@ -73,7 +73,7 @@ This product will be delivered as a **private Rust crate** (`terraphim_truthforg
   - Clients expect immediate expert analysis
   - Need to demonstrate value through insight quality
   - Must stay current on evolving narrative tactics
-  
+
 **Goals**:
 - Provide differentiated strategic intelligence
 - Build playbooks for recurring crisis scenarios
@@ -88,7 +88,7 @@ This product will be delivered as a **private Rust crate** (`terraphim_truthforg
   - Need to scale best practices across team
   - Building institutional memory around crisis response
   - Training junior team members on strategic thinking
-  
+
 **Goals**:
 - Standardize narrative analysis workflows
 - Build learning library from past engagements
@@ -110,7 +110,7 @@ TruthForge follows a comprehensive 6-phase user journey aligned with strategic c
   - **Urgency**: High (immediate response) vs. Low (strategic planning)
   - **Stakes**: Reputational, legal, financial, operational
   - **Audience**: Public/media vs. internal stakeholders
-  
+
 **Terraphim Pattern**: Initial routing workflow (Pattern #2)
 - Route to appropriate analysis depth based on context
 - Complexity assessment determines agent allocation
@@ -427,14 +427,14 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 - **Urgency toggle**: High (immediate response) / Low (strategic planning)
   - High urgency → faster agents, shorter outputs
   - Low urgency → deeper analysis, more comprehensive
-  
+
 - **Stakes toggle**: Select applicable impacts
   - Reputational
   - Legal/regulatory
   - Financial
   - Operational
   - Social license
-  
+
 - **Audience toggle**: Public/media vs. Internal stakeholders
   - Public → emphasize media framing, external perception
   - Internal → focus on stakeholder alignment, governance
@@ -456,13 +456,13 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   - Client connects on session start
   - Server streams agent progress updates
   - Heartbeat every 30s to maintain connection
-  
+
 - **Agent coordination** (terraphim_multi_agent workflows)
   - Pass 1: 4 parallel agents (Bias, Narrative, Taxonomy, Omission)
   - Debate: Sequential passes with evaluation between
   - Pass 2: Exploitation agents using Pass 1 results
   - Response: 3 parallel strategy agents
-  
+
 - **Progress reporting**:
   ```json
   {
@@ -500,7 +500,7 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   3. **Absent Stakeholder Voices**: Perspectives not represented
   4. **Context Gaps**: Background information omitted
   5. **Unaddressed Counterarguments**: Obvious rebuttals ignored
-  
+
 - **Omission Structure**:
   ```json
   {
@@ -511,7 +511,7 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
     "text_reference": "We achieved 40% reduction in incidents"
   }
   ```
-  
+
 - **Prioritization**: Rank omissions by `exploitability` score
   - High exploitability (>0.8) → top priority for Pass 2
   - Severity × Exploitability = composite risk score
@@ -563,12 +563,12 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   - Find common ground, shared values
   - Recontextualize narrative to open dialogue
   - Avoid defensive posture
-  
+
 - **CounterArgueAgent**: Direct fact-based rebuttal
   - Address specific claims and omissions
   - Provide missing evidence
   - Correct the record professionally
-  
+
 - **BridgeAgent**: Pivot to future commitments
   - Acknowledge stakeholder concerns
   - Commit to specific actions
@@ -676,13 +676,13 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   Key: session:{uuid}
   Value: {narrative, context, timestamp, status}
   ```
-  
+
 - **Analysis Results** (TTL: 7 days):
   ```
   Key: results:{session_id}
   Value: {pass1, pass2, responses, metadata}
   ```
-  
+
 - **Learning Vault** (TTL: 90 days):
   ```
   Key: vault:case:{session_id}
@@ -712,11 +712,11 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   - Pass 1 analysis: <20 seconds (p95)
   - Pass 2 debate: <25 seconds (p95)
   - Total workflow: <60 seconds (p95), <45 seconds (target)
-  
+
 - **Throughput**:
   - Support 10 concurrent analyses (initial deployment)
   - Scale to 50 concurrent (6 months post-launch)
-  
+
 - **WebSocket**:
   - Progress updates every ≤500ms
   - Connection stable for 10-minute sessions
@@ -728,7 +728,7 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   - Agent failures → graceful degradation (skip failed agent, continue workflow)
   - LLM timeout (30s) → retry once, then fail with clear message
   - Redis unavailable → in-memory fallback
-  
+
 - **Data Integrity**:
   - All results persisted before WebSocket close
   - Session recovery after connection drop
@@ -741,7 +741,7 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   - Narratives stored encrypted at rest (AES-256)
   - PII detection + redaction before learning vault storage
   - GDPR compliance: right to deletion (purge session data)
-  
+
 - **LLM Security**:
   - Prompt sanitization (prevent injection attacks)
   - Rate limiting: 100 requests/hour per user
@@ -752,11 +752,11 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 - **Horizontal Scaling**:
   - Stateless WebSocket servers (session in Redis)
   - Load balancer distributes connections
-  
+
 - **Agent Pool**:
   - Pre-warm agent pool (5 agents per role)
   - Auto-scale based on queue depth
-  
+
 - **Database**:
   - Redis cluster for high availability
   - Sharding by session ID prefix
@@ -767,12 +767,12 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
   - Rust: 80% test coverage
   - Clippy warnings = 0
   - Documentation for all public APIs
-  
+
 - **Observability**:
   - Structured logging (JSON format)
   - Metrics: Prometheus exporter
   - Tracing: OpenTelemetry integration
-  
+
 - **Deployment**:
   - Docker containers for all services
   - Kubernetes manifests for orchestration
@@ -826,23 +826,23 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 ### Existing Solutions
 
 #### 1. Cision/Meltwater (Media Monitoring)
-**Strengths**: Comprehensive media tracking, sentiment analysis  
-**Weaknesses**: Reactive (no predictive analysis), expensive ($10k-50k/year), no debate simulation  
+**Strengths**: Comprehensive media tracking, sentiment analysis
+**Weaknesses**: Reactive (no predictive analysis), expensive ($10k-50k/year), no debate simulation
 **TruthForge Advantage**: Proactive vulnerability detection, adversarial simulation, 10x cost reduction
 
 #### 2. Critical Mention / Brandwatch
-**Strengths**: Social listening, influencer tracking  
-**Weaknesses**: Surface-level analysis, no strategic response generation  
+**Strengths**: Social listening, influencer tracking
+**Weaknesses**: Surface-level analysis, no strategic response generation
 **TruthForge Advantage**: Deep narrative analysis, multi-phase debate, strategic playbooks
 
 #### 3. Manual Process (In-house PR teams)
-**Strengths**: Tailored to organization, human expertise  
-**Weaknesses**: Slow (2-4 hours), inconsistent quality, no omission detection  
+**Strengths**: Tailored to organization, human expertise
+**Weaknesses**: Slow (2-4 hours), inconsistent quality, no omission detection
 **TruthForge Advantage**: 97% faster, systematic omission detection, institutional learning
 
 #### 4. Generic AI Tools (ChatGPT, Claude)
-**Strengths**: Accessible, low cost  
-**Weaknesses**: No specialized PR knowledge, no debate simulation, no systematic workflow  
+**Strengths**: Accessible, low cost
+**Weaknesses**: No specialized PR knowledge, no debate simulation, no systematic workflow
 **TruthForge Advantage**: Purpose-built for crisis communication, validated against PR frameworks, two-pass analysis
 
 ### Differentiation Matrix
@@ -863,24 +863,24 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 ### Technical Risks
 
 #### Risk: LLM Quality Variance
-**Probability**: Medium  
-**Impact**: High  
-**Mitigation**: 
+**Probability**: Medium
+**Impact**: High
+**Mitigation**:
 - Use Claude 3.5 Sonnet (proven high quality) for critical agents
 - Implement quality thresholds (reject analysis if confidence <0.7)
 - Fallback to human review for high-stakes scenarios
 
 #### Risk: WebSocket Connection Instability
-**Probability**: Medium  
-**Impact**: Medium  
+**Probability**: Medium
+**Impact**: Medium
 **Mitigation**:
 - Auto-reconnect with exponential backoff
 - Session recovery via Redis persistence
 - Fallback to REST polling if WebSocket fails
 
 #### Risk: Redis Downtime
-**Probability**: Low  
-**Impact**: Medium  
+**Probability**: Low
+**Impact**: Medium
 **Mitigation**:
 - Redis cluster with automatic failover
 - In-memory cache fallback (loses persistence)
@@ -889,16 +889,16 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 ### Business Risks
 
 #### Risk: Market Adoption (PR professionals skeptical of AI)
-**Probability**: Medium  
-**Impact**: High  
+**Probability**: Medium
+**Impact**: High
 **Mitigation**:
 - Pilot program with K-Partners clients (built-in user base)
 - Emphasize AI as "augmentation not replacement"
 - Provide expert validation of omission detection accuracy
 
 #### Risk: Privacy Concerns (sensitive narratives)
-**Probability**: Low  
-**Impact**: High  
+**Probability**: Low
+**Impact**: High
 **Mitigation**:
 - On-premise deployment option for enterprises
 - PII redaction before storage
@@ -906,8 +906,8 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 - Transparent data handling policies
 
 #### Risk: Cost Overruns (LLM usage)
-**Probability**: Medium  
-**Impact**: Medium  
+**Probability**: Medium
+**Impact**: Medium
 **Mitigation**:
 - Cost caps per analysis ($5 max)
 - Monitor token usage, optimize prompts
@@ -916,16 +916,16 @@ This is the **core innovation** of TruthForge - a two-pass debate that first ide
 ### Product Risks
 
 #### Risk: Omission Detection False Positives
-**Probability**: High (new feature)  
-**Impact**: Medium  
+**Probability**: High (new feature)
+**Impact**: Medium
 **Mitigation**:
 - Confidence scoring (only show omissions >0.7 confidence)
 - User feedback loop ("Was this omission valid?")
 - Continuous model fine-tuning based on feedback
 
 #### Risk: Pass 2 Doesn't Amplify Vulnerabilities
-**Probability**: Low  
-**Impact**: High  
+**Probability**: Low
+**Impact**: High
 **Mitigation**:
 - System prompt engineering (explicit instructions to exploit)
 - Test with known vulnerable narratives
@@ -1044,15 +1044,15 @@ See SPEC_TerraphimIntegration.md Section 4.3 for complete protocol details.
 
 ## Approval & Sign-off
 
-**Product Owner**: __________________ Date: __________  
-**Engineering Lead**: __________________ Date: __________  
-**Design Lead**: __________________ Date: __________  
+**Product Owner**: __________________ Date: __________
+**Engineering Lead**: __________________ Date: __________
+**Design Lead**: __________________ Date: __________
 **Stakeholder (K-Partners)**: __________________ Date: __________
 
 ---
 
-**Document Control**  
-**Created**: 2025-10-07  
-**Last Modified**: 2025-10-07  
-**Version**: 1.0  
+**Document Control**
+**Created**: 2025-10-07
+**Last Modified**: 2025-10-07
+**Version**: 1.0
 **Classification**: Internal - Zestic AI Confidential

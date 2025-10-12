@@ -56,7 +56,7 @@ if (complexity = 1.0) → Claude 3 Opus (Expert, $0.075/1k)
 
 ### 3. Quality-Cost Balance
 - **Simple Tasks**: Route to faster, cheaper models
-- **Complex Tasks**: Route to more capable, expensive models  
+- **Complex Tasks**: Route to more capable, expensive models
 - **Automatic Optimization**: Best model for the job without manual selection
 
 ## 🎮 User Experience
@@ -87,7 +87,7 @@ Result: Clean, simple marketing page
 ### SaaS Dashboard (GPT-4)
 ```
 Prompt: "Build an analytics dashboard with real-time charts, user management, and API integration"
-Complexity: 78% → Routes to GPT-4  
+Complexity: 78% → Routes to GPT-4
 Cost: $0.03/1k tokens
 Result: Feature-rich dashboard with complex UI
 ```
@@ -113,18 +113,18 @@ Result: Sophisticated application with enterprise features
 class RoutingPrototypingDemo {
   calculateComplexity(prompt) {
     let complexity = this.templates[template].baseComplexity;
-    
+
     // Content analysis
     if (wordCount > 100) complexity += 0.2;
     if (wordCount > 200) complexity += 0.2;
-    
+
     // Feature detection
     complexity += featureMatches * 0.1;
-    
+
     // Technical requirements
     if (hasResponsive) complexity += 0.1;
     if (hasInteractive) complexity += 0.15;
-    
+
     return Math.min(1.0, complexity);
   }
 }
@@ -151,7 +151,7 @@ models = [
 - **No Over-engineering**: Complex models only for complex tasks
 - **Transparent Pricing**: Real-time cost estimation
 
-### Quality Assurance  
+### Quality Assurance
 - **Right Tool for Job**: Each model excels in its complexity range
 - **Consistent Results**: Reliable routing based on proven algorithms
 - **Performance Metrics**: Track quality scores and success rates

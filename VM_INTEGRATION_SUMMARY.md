@@ -212,9 +212,9 @@ for code_block in code_blocks {
         agent_id: self.agent_id.clone(),
         ...
     };
-    
+
     let result = self.vm_client.execute_code(vm_request).await?;
-    
+
     if result.exit_code != 0 && config.auto_rollback_on_failure {
         bridge.rollback_to_last_success(vm_id, agent_id).await?;
     }

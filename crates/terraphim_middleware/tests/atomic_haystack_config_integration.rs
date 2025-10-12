@@ -150,21 +150,13 @@ async fn test_atomic_haystack_with_terraphim_config() {
                     true,
                 )
                 .with_atomic_secret(atomic_secret.clone())],
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: ahash::AHashMap::new(),
             },
@@ -481,21 +473,13 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks,
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: ahash::AHashMap::new(),
             },

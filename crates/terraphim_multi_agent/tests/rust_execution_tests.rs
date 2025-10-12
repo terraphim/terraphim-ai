@@ -1,4 +1,3 @@
-use serde_json::json;
 use std::collections::HashMap;
 use terraphim_multi_agent::vm_execution::*;
 
@@ -124,7 +123,7 @@ fn main() {
     let numbers = vec![1, 2, 3, 4, 5];
     let sum: i32 = numbers.iter().sum();
     println!("Sum: {}", sum);
-    
+
     let squared: Vec<i32> = numbers.iter().map(|x| x * x).collect();
     println!("Squared: {:?}", squared);
 }
@@ -144,7 +143,6 @@ fn main() {
 #[cfg(test)]
 mod rust_integration_tests {
     use super::*;
-    use tokio;
 
     #[tokio::test]
     #[ignore]
@@ -262,10 +260,10 @@ fn main() {
     scores.insert("Alice", 95);
     scores.insert("Bob", 87);
     scores.insert("Carol", 92);
-    
+
     let average: i32 = scores.values().sum::<i32>() / scores.len() as i32;
     println!("Average score: {}", average);
-    
+
     let top_student = scores.iter()
         .max_by_key(|(_, &score)| score)
         .map(|(name, score)| format!("{}: {}", name, score))
@@ -315,17 +313,17 @@ fn main() {
             code: r#"
 fn main() {
     let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    
+
     let sum: i32 = numbers.iter().sum();
     println!("Sum: {}", sum);
-    
+
     let even_squares: Vec<i32> = numbers
         .iter()
         .filter(|&&x| x % 2 == 0)
         .map(|&x| x * x)
         .collect();
     println!("Even squares: {:?}", even_squares);
-    
+
     let product: i32 = (1..=5).product();
     println!("Factorial of 5: {}", product);
 }
@@ -373,10 +371,10 @@ fn main() {
 fn main() {
     let start = std::time::Instant::now();
     println!("Starting Rust execution...");
-    
+
     let result = (1..=1000).fold(0, |acc, x| acc + x);
     println!("Result: {}", result);
-    
+
     let elapsed = start.elapsed();
     println!("Execution time: {:?}", elapsed);
 }
@@ -403,7 +401,6 @@ fn main() {
 #[cfg(test)]
 mod rust_hook_tests {
     use super::*;
-    use terraphim_multi_agent::vm_execution::hooks::*;
 
     #[tokio::test]
     async fn test_dangerous_pattern_hook_blocks_unsafe() {
@@ -425,9 +422,8 @@ unsafe {
 
         let decision = hook.pre_tool(&context).await.unwrap();
 
-        match decision {
-            HookDecision::Allow => {}
-            _ => {}
+        if decision == HookDecision::Allow {
+            // Test passes
         }
     }
 

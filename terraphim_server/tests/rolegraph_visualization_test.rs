@@ -5,6 +5,7 @@
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use ahash::AHashMap;
 
     use terraphim_server::{axum_server, Status};

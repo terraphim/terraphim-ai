@@ -1,7 +1,7 @@
 # TruthForge Phase 3: Real LLM Integration
 
-**Status**: Planning  
-**Duration**: 2-3 days  
+**Status**: Planning
+**Duration**: 2-3 days
 **Goal**: Replace mock methods with real OpenRouter Claude 3.5 API calls
 
 ## Prerequisites ✅
@@ -176,7 +176,7 @@ futures = "0.3"
 
 **Environment Variables**:
 ```bash
-export OPENROUTER_API_KEY="sk-or-v1-..."
+export OPENROUTER_API_KEY="sk-or-v1-..."  # pragma: allowlist secret
 export TRUTHFORGE_MAX_COST="5.00"  # $5 max per analysis
 export TRUTHFORGE_LLM_TIMEOUT="30"  # 30 seconds per call
 ```
@@ -219,19 +219,19 @@ export TRUTHFORGE_LLM_TIMEOUT="30"  # 30 seconds per call
 
 ## Risk Mitigation
 
-**Risk 1**: API rate limits  
+**Risk 1**: API rate limits
 **Mitigation**: Implement exponential backoff, add request queuing
 
-**Risk 2**: Cost overruns  
+**Risk 2**: Cost overruns
 **Mitigation**: Hard cost limits, detailed tracking, abort on budget exceeded
 
-**Risk 3**: Response quality  
+**Risk 3**: Response quality
 **Mitigation**: Validate against expected schemas, log failures for review
 
-**Risk 4**: Network failures  
+**Risk 4**: Network failures
 **Mitigation**: Retry logic, timeout handling, graceful degradation
 
-**Risk 5**: Token limits  
+**Risk 5**: Token limits
 **Mitigation**: Truncate long inputs, split into chunks if needed
 
 ## Post-Phase 3 Deliverables

@@ -4,6 +4,7 @@
 //! We test the server by sending requests to it and checking the responses.
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use ahash::AHashMap;
     use terraphim_automata::AutomataPath;
     use terraphim_server::{axum_server, CreateDocumentResponse, SearchResponse, Status};
