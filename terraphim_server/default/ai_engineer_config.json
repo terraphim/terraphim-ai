@@ -1,0 +1,146 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+A",
+  "default_model_provider": "ollama",
+  "default_chat_model": "llama3.2:3b",
+  "default_summarization_model": "gemma3:270m",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true
+    },
+    "AI Engineer": {
+      "shortname": "AI-Eng",
+      "name": "AI Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "superhero",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "openrouter_enabled": true,
+      "openrouter_api_key": null,
+      "openrouter_model": "openai/gpt-3.5-turbo",
+      "llm_system_prompt": "You are an expert AI/ML engineer specializing in implementing machine learning features, integrating language models, and building intelligent automation systems. Focus on practical AI implementation, model integration, and AI-powered applications.",
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true
+    },
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "llm_system_prompt": "You are an expert Terraphim AI engineer specializing in knowledge graphs, semantic search, and document intelligence. You help users build and optimize Terraphim AI systems with advanced graph-based search capabilities.",
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true
+    },
+    "Engineer": {
+      "shortname": "Engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "llm_system_prompt": "You are an expert software engineer specializing in system architecture, DevOps, and full-stack development. You help with designing scalable systems, implementing best practices, and troubleshooting technical issues.",
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true
+    },
+    "ClickUp": {
+      "shortname": "ClickUp",
+      "name": "ClickUp",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "clickup",
+          "service": "ClickUp",
+          "read_only": true,
+          "extra_parameters": {
+            "team_id": "${CLICKUP_TEAM_ID}",
+            "include_closed": "true",
+            "subtasks": "true",
+            "page": "0"
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true
+    }
+  },
+  "default_role": "AI Engineer",
+  "selected_role": "AI Engineer"
+}

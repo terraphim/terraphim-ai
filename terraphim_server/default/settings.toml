@@ -1,6 +1,22 @@
 server_hostname = "127.0.0.1:8000"
 api_endpoint="http://localhost:8000/api"
 
-[profiles.sled]
-type = "sled"
-datadir= "/tmp/sled"
+[profiles.rocksdb]
+type = "rocksdb"
+datadir = "/tmp/terraphim_rocksdb"
+
+[profiles.redb]
+type = "redb"
+datadir = "/tmp/terraphim_redb/terraphim.redb"
+table = "terraphim"
+
+[profiles.sqlite]
+type = "sqlite"
+connection_string = "/tmp/terraphim_sqlite.db"
+
+[profiles.dash]
+type = "dashmap"
+root = "/tmp/terraphim_dash"
+
+[profiles.memory]
+type = "memory"

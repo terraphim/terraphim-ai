@@ -7,45 +7,64 @@ use serde::{Deserialize, Serialize};
 /// The default is OkapiBM25. If you aren't sure which scorer to use, then
 /// stick with the default.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Default)]
-pub enum NameScorer {
+pub enum QueryScorer {
     /// OkapiBM25 is a TF-IDF-like ranking function, which takes name length
     /// into account.
     #[default]
     OkapiBM25,
-    /// TFIDF is the traditional TF-IDF ranking function, which does not
+    /// Tfidf is the traditional TF-IDF ranking function, which does not
     /// incorporate document length.
-    TFIDF,
+    #[allow(dead_code)]
+    Tfidf,
     /// Jaccard is a ranking function determined by computing the similarity
     /// of ngrams between the query and a name in the index. The similarity
     /// is computed by dividing the number of ngrams in common by the total
     /// number of distinct ngrams in both the query and the name combined.
+    #[allow(dead_code)]
     Jaccard,
     /// QueryRatio is a ranking function that represents the ratio of query
     /// terms that matched a name. It is computed by dividing the number of
     /// ngrams in common by the total number of ngrams in the query only.
+    #[allow(dead_code)]
     QueryRatio,
+    /// BM25 is the Okapi BM25 ranking function, which is a probabilistic
+    /// relevance function based on term frequency and inverse document frequency.
+    #[allow(dead_code)]
+    BM25,
+    /// BM25F is a fielded version of BM25 that applies different weights
+    /// to different document fields (title, body, description, tags).
+    #[allow(dead_code)]
+    BM25F,
+    /// BM25Plus is an enhanced version of BM25 with additional parameters
+    /// for fine-tuning the ranking algorithm.
+    #[allow(dead_code)]
+    BM25Plus,
 }
 
-impl NameScorer {
+impl QueryScorer {
     /// Returns a list of strings representing the possible scorer values.
+    #[allow(dead_code)]
     pub fn possible_names() -> &'static [&'static str] {
         &["okapibm25", "tfidf", "jaccard", "queryratio"]
     }
 
     /// Return a string representation of this scorer.
     ///
-    /// The string returned can be parsed back into a `NameScorer`.
+    /// The string returned can be parsed back into a `QueryScorer`.
     pub fn as_str(&self) -> &'static str {
         match *self {
-            NameScorer::OkapiBM25 => "okapibm25",
-            NameScorer::TFIDF => "tfidf",
-            NameScorer::Jaccard => "jaccard",
-            NameScorer::QueryRatio => "queryratio",
+            QueryScorer::OkapiBM25 => "okapibm25",
+            QueryScorer::Tfidf => "tfidf",
+            QueryScorer::Jaccard => "jaccard",
+            QueryScorer::QueryRatio => "queryratio",
+            QueryScorer::BM25 => "bm25",
+            QueryScorer::BM25F => "bm25f",
+            QueryScorer::BM25Plus => "bm25plus",
         }
     }
 }
 
-impl fmt::Display for NameScorer {
+impl fmt::Display for QueryScorer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }

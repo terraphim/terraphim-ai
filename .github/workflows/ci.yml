@@ -1,12 +1,13 @@
-name: CI
+name: CI (Earthly - DEPRECATED)
 
 on:
-  push:
-    branches: [main]
-    tags:
-      - "*.*.*"
-  pull_request:
-    types: [opened, synchronize]
+  # DISABLED - Migrated to ci-native.yml with GitHub Actions + Docker Buildx
+  # push:
+  #   branches: [main]
+  #   tags:
+  #     - "*.*.*"
+  # pull_request:
+  #   types: [opened, synchronize]
   workflow_dispatch:
 
 env:
@@ -24,8 +25,8 @@ jobs:
       - uses: earthly/actions-setup@v1
         with:
           version: v0.8.3
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
       - name: Docker Login
         run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
       - name: Run build
-        run: earthly --org applied-knowledge-systems --sat registry-satellite --ci --push +pipeline 
+        run: earthly --org applied-knowledge-systems --sat registry-satellite --ci --push +pipeline

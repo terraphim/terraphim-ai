@@ -1,0 +1,226 @@
+# Multi-stage, multi-architecture Dockerfile for Terraphim Server
+# Supports Ubuntu 18.04, 20.04, 22.04, and 24.04 with multiple architectures
+
+ARG UBUNTU_VERSION=22.04
+ARG RUST_VERSION=1.85.0
+ARG NODE_VERSION=20
+
+# ================================
+# Frontend Build Stage
+# ================================
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
+
+WORKDIR /app
+COPY desktop/package*.json desktop/yarn.lock ./
+RUN yarn install --frozen-lockfile --network-timeout 300000
+
+COPY desktop ./
+RUN yarn run build
+
+# Verify frontend build
+RUN ls -la dist/ && test -f dist/index.html
+
+# ================================
+# Rust Build Stage
+# ================================
+FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS rust-builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+ARG RUST_VERSION
+ARG UBUNTU_VERSION
+
+# Install system dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
+
+RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    build-essential \
+    bison \
+    flex \
+    ca-certificates \
+    openssl \
+    libssl-dev \
+    bc \
+    wget \
+    git \
+    curl \
+    cmake \
+    pkg-config \
+    musl-tools \
+    musl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cross-compilation tools based on target architecture
+RUN case "${TARGETARCH}" in \
+    "arm64") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends \
+        gcc-aarch64-linux-gnu \
+        libc6-dev-arm64-cross \
+        && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    "arm") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends \
+        gcc-arm-linux-gnueabihf \
+        libc6-dev-armhf-cross \
+        && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    esac
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${RUST_VERSION}
+ENV PATH="/root/.cargo/bin:$PATH"
+ENV CARGO_HOME="/root/.cargo"
+
+# Set up cross-compilation environment
+RUN case "${TARGETARCH}" in \
+    "amd64") \
+        rustup target add x86_64-unknown-linux-gnu \
+        ;; \
+    "arm64") \
+        rustup target add aarch64-unknown-linux-gnu && \
+        echo 'export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc' >> /root/.profile && \
+        echo 'export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++' >> /root/.profile && \
+        echo 'export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc' >> /root/.profile \
+        ;; \
+    "arm") \
+        rustup target add armv7-unknown-linux-gnueabihf && \
+        echo 'export CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc' >> /root/.profile && \
+        echo 'export CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++' >> /root/.profile && \
+        echo 'export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc' >> /root/.profile \
+        ;; \
+    esac
+
+# Set Rust target based on platform
+RUN case "${TARGETARCH}" in \
+    "amd64") echo "x86_64-unknown-linux-gnu" > /tmp/rust-target ;; \
+    "arm64") echo "aarch64-unknown-linux-gnu" > /tmp/rust-target ;; \
+    "arm") echo "armv7-unknown-linux-gnueabihf" > /tmp/rust-target ;; \
+    *) echo "unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac
+
+WORKDIR /code
+
+# Copy dependency files first for better caching
+COPY Cargo.toml Cargo.lock ./
+COPY crates/*/Cargo.toml crates/
+COPY terraphim_server/Cargo.toml terraphim_server/
+
+# Create empty source files to satisfy cargo
+RUN find crates -name Cargo.toml -exec dirname {} \; | while read dir; do \
+    mkdir -p "$dir/src" && echo 'fn main() {}' > "$dir/src/lib.rs" || true; \
+    done && \
+    mkdir -p terraphim_server/src && echo 'fn main() {}' > terraphim_server/src/main.rs
+
+# Pre-build dependencies
+RUN . /root/.profile && \
+    RUST_TARGET=$(cat /tmp/rust-target) && \
+    cargo fetch --target=$RUST_TARGET
+
+# Copy source code
+COPY crates ./crates
+COPY terraphim_server ./terraphim_server
+COPY --from=frontend-builder /app/dist ./terraphim_server/dist
+
+# Build the application
+RUN . /root/.profile && \
+    RUST_TARGET=$(cat /tmp/rust-target) && \
+    cargo build --release --target=$RUST_TARGET \
+    --package terraphim_server \
+    --package terraphim_mcp_server \
+    --package terraphim_tui
+
+# Test the binaries
+RUN . /root/.profile && \
+    RUST_TARGET=$(cat /tmp/rust-target) && \
+    ./target/$RUST_TARGET/release/terraphim_server --version && \
+    ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
+    ./target/$RUST_TARGET/release/terraphim-tui --version
+
+# Move binaries to predictable location
+RUN . /root/.profile && \
+    RUST_TARGET=$(cat /tmp/rust-target) && \
+    mkdir -p /usr/local/bin && \
+    cp target/$RUST_TARGET/release/terraphim_server /usr/local/bin/ && \
+    cp target/$RUST_TARGET/release/terraphim_mcp_server /usr/local/bin/ && \
+    cp target/$RUST_TARGET/release/terraphim-tui /usr/local/bin/
+
+# ================================
+# Runtime Stage
+# ================================
+FROM ubuntu:${UBUNTU_VERSION} AS runtime
+
+ARG UBUNTU_VERSION
+
+# Install minimal runtime dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    ca-certificates \
+    libssl1.1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Handle different OpenSSL versions across Ubuntu releases
+RUN case "${UBUNTU_VERSION}" in \
+    "18.04") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl1.1 && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    "20.04") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl1.1 && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    "22.04") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl3 && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    "24.04") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl3 && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    esac
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash terraphim
+
+# Copy binaries from builder
+COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim_server /usr/local/bin/
+COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim_mcp_server /usr/local/bin/
+COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim-tui /usr/local/bin/
+
+# Set executable permissions
+RUN chmod +x /usr/local/bin/terraphim_server \
+    /usr/local/bin/terraphim_mcp_server \
+    /usr/local/bin/terraphim-tui
+
+# Create application directories
+RUN mkdir -p /home/terraphim/.config/terraphim && \
+    chown -R terraphim:terraphim /home/terraphim
+
+# Switch to non-root user
+USER terraphim
+WORKDIR /home/terraphim
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Environment variables
+ENV TERRAPHIM_SERVER_HOSTNAME="0.0.0.0:8000"
+ENV TERRAPHIM_SERVER_API_ENDPOINT="http://localhost:8000/api"
+ENV RUST_LOG="info"
+ENV RUST_BACKTRACE="1"
+
+# Add image metadata
+LABEL org.opencontainers.image.title="Terraphim Server" \
+      org.opencontainers.image.description="Privacy-first AI assistant with semantic search" \
+      org.opencontainers.image.vendor="Terraphim AI" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/terraphim/terraphim-ai" \
+      ubuntu.version="${UBUNTU_VERSION}" \
+      rust.version="${RUST_VERSION}"
+
+# Expose ports
+EXPOSE 8000 3000 9883
+
+# Default command
+ENTRYPOINT ["/usr/local/bin/terraphim_server"]
+CMD ["--config", "/home/terraphim/.config/terraphim/config.json"]

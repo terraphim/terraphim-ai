@@ -1,0 +1,18 @@
+{
+  "https://atomicdata.dev/properties/createdAt": 1750162500,
+  "https://atomicdata.dev/properties/isA": [
+    "https://atomicdata.dev/classes/Commit"
+  ],
+  "https://atomicdata.dev/properties/set": {
+    "https://atomicdata.dev/properties/description": "A test article resource",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Article"
+    ],
+    "https://atomicdata.dev/properties/name": "Test Article",
+    "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+    "https://atomicdata.dev/properties/shortname": "test-article"
+  },
+  "https://atomicdata.dev/properties/signature": "ZVYhZtL2f4QnO+KLkcP8QRPfckL3oteNM07J3CphRwUdQc6dkJd+76FdUV6wVGZBEuynYhkhxZyZG8exzu6tCA==",
+  "https://atomicdata.dev/properties/signer": "http://localhost:9883/agents/zZ2S0HTg17PM5YLQJHYkyFxG/BaL0uXShw7KaB1CJOg=",
+  "https://atomicdata.dev/properties/subject": "http://localhost:9883/test-article"
+}

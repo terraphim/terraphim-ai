@@ -310,8 +310,10 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { sum, replaceLinks, searchDocumentsSelectedRole } = nativeBinding
+const { sum, replaceLinks, getTestConfig, getConfig, searchDocumentsSelectedRole } = nativeBinding
 
 module.exports.sum = sum
 module.exports.replaceLinks = replaceLinks
+module.exports.getTestConfig = getTestConfig
+module.exports.getConfig = getConfig
 module.exports.searchDocumentsSelectedRole = searchDocumentsSelectedRole

@@ -1,38 +1,29 @@
 import { writable } from "svelte/store";
 import { CONFIG } from "../config";
+// Import generated types instead of manual definitions
+import type {
+  Role,
+  Config,
+  ConfigResponse,
+  RoleName
+} from "./generated/types";
 
-// TypeScript interfaces for Rust types
-interface Role {
-  name: string;
-  theme: string;
-}
+// Custom interface for thesaurus (not in generated types)
 interface NormalisedThesaurus {
   id: string;
   term: string;
 }
+
 // writable key value store for thesaurus, where value is id and normalised term
 const thesaurus = writable<Array<Record<string, NormalisedThesaurus>>>([]);
 
-interface Config {
-  id: string;
-  global_shortcut: string;
-  roles: Record<string, Role>;
-  default_role: string;
-  selected_role: string;
-}
-
-interface ConfigResponse {
-  status: string;
-  config: Config;
-}
-
-// Default empty configuration
+// Default empty configuration - updated to match generated Config type
 const defaultConfig: Config = {
-  id: "",
+  id: "Desktop" as const,
   global_shortcut: "",
-  roles: {},
-  default_role: "",
-  selected_role: ""
+  roles: {} as Record<string, Role>,
+  default_role: { original: "", lowercase: "" } as RoleName,
+  selected_role: { original: "", lowercase: "" } as RoleName
 };
 
 const theme = writable<string>("spacelab");
@@ -43,11 +34,58 @@ const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
 const isInitialSetupComplete = writable<boolean>(false);
 
-// FIXME: add default role
-// const roles = writable<Record<string, Role>>({}); // Store roles separately for easier access
-const roles = writable<{ [key: string]: { name: string; theme: string; kg?: { publish?: boolean } } }>({});
+// Roles should be an array of Role objects - using generated Role type
+const roles = writable<Role[]>([]);
 
 let input = writable<string>("");
 const typeahead = writable<boolean>(false);
 
-export { configStore, input, is_tauri, role, roles, serverUrl, theme, typeahead, thesaurus, isInitialSetupComplete };
+// Conversation management stores
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  role: string;
+  message_count: number;
+  preview: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationStatistics = {
+  total_conversations: number;
+  total_messages: number;
+  conversations_by_role: Record<string, number>;
+};
+
+// Store for persistent conversations list
+const persistentConversations = writable<ConversationSummary[]>([]);
+
+// Store for current persistent conversation ID
+const currentPersistentConversationId = writable<string | null>(null);
+
+// Store for conversation statistics
+const conversationStatistics = writable<ConversationStatistics>({
+  total_conversations: 0,
+  total_messages: 0,
+  conversations_by_role: {}
+});
+
+// Store for showing/hiding session list panel
+const showSessionList = writable<boolean>(false);
+
+export {
+  configStore,
+  input,
+  is_tauri,
+  role,
+  roles,
+  serverUrl,
+  theme,
+  typeahead,
+  thesaurus,
+  isInitialSetupComplete,
+  persistentConversations,
+  currentPersistentConversationId,
+  conversationStatistics,
+  showSessionList
+};

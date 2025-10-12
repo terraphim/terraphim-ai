@@ -1,0 +1,140 @@
+{
+  "name": "Terraphim Browser Extensions Configuration Template",
+  "description": "Template configuration for Terraphim browser extensions API endpoints and settings",
+  "version": "1.0.0",
+  "environments": {
+    "development": {
+      "terraphim_server": {
+        "auto_discovery": true,
+        "fallback_urls": [
+          "http://localhost:3000",
+          "http://localhost:8000",
+          "http://localhost:8080",
+          "http://localhost:3001"
+        ],
+        "health_check_endpoint": "/health",
+        "api_endpoints": {
+          "search": "/documents/search",
+          "config": "/config",
+          "roles": "/roles",
+          "thesaurus": "/thesaurus"
+        }
+      },
+      "cloudflare": {
+        "api_base_url": "https://api.cloudflare.com/client/v4",
+        "ai_endpoint": "/accounts/{account_id}/ai/run/@cf/meta/m2m100-1.2b",
+        "credentials_required": {
+          "account_id": "Your Cloudflare Account ID (32-character hex string)",
+          "api_token": "Your Cloudflare API Token with AI:Read permissions"
+        }
+      }
+    },
+    "production": {
+      "terraphim_server": {
+        "auto_discovery": false,
+        "primary_url": "https://api.terraphim.cloud",
+        "fallback_urls": [
+          "https://api-backup.terraphim.cloud"
+        ],
+        "health_check_endpoint": "/health",
+        "api_endpoints": {
+          "search": "/documents/search",
+          "config": "/config",
+          "roles": "/roles",
+          "thesaurus": "/thesaurus"
+        }
+      },
+      "cloudflare": {
+        "api_base_url": "https://api.cloudflare.com/client/v4",
+        "ai_endpoint": "/accounts/{account_id}/ai/run/@cf/meta/m2m100-1.2b",
+        "credentials_required": {
+          "account_id": "Your Cloudflare Account ID (32-character hex string)",
+          "api_token": "Your Cloudflare API Token with AI:Read permissions"
+        }
+      }
+    },
+    "custom": {
+      "terraphim_server": {
+        "auto_discovery": false,
+        "primary_url": "https://your-custom-terraphim-server.com",
+        "fallback_urls": [],
+        "health_check_endpoint": "/health",
+        "api_endpoints": {
+          "search": "/documents/search",
+          "config": "/config",
+          "roles": "/roles",
+          "thesaurus": "/thesaurus"
+        }
+      },
+      "cloudflare": {
+        "api_base_url": "https://api.cloudflare.com/client/v4",
+        "ai_endpoint": "/accounts/{account_id}/ai/run/@cf/meta/m2m100-1.2b",
+        "credentials_required": {
+          "account_id": "Your Cloudflare Account ID",
+          "api_token": "Your Cloudflare API Token with AI:Read permissions"
+        }
+      }
+    }
+  },
+  "security": {
+    "storage": {
+      "use_chrome_storage_sync": true,
+      "encrypt_credentials": true,
+      "credential_fields": [
+        "cloudflareAccountId",
+        "cloudflareApiToken"
+      ]
+    },
+    "api_calls": {
+      "timeout_ms": 10000,
+      "retry_attempts": 3,
+      "retry_delay_ms": 1000,
+      "user_agent": "TerraphimAI-Extension/1.0"
+    }
+  },
+  "features": {
+    "wasm_processing": {
+      "enabled": true,
+      "fallback_to_js": true,
+      "load_timeout_ms": 5000
+    },
+    "auto_discovery": {
+      "enabled": true,
+      "cache_duration_ms": 300000,
+      "ports_to_scan": [3000, 8000, 8080, 3001]
+    },
+    "wiki_links": {
+      "default_mode": 0,
+      "modes": {
+        "0": "Generate HTML links to knowledge graph",
+        "1": "Generate wiki links with normalized terms [[concept]]",
+        "2": "Generate simple wiki links [[matched text]]"
+      }
+    }
+  },
+  "ui": {
+    "popup": {
+      "width": 400,
+      "height": 300
+    },
+    "side_panel": {
+      "width": 350,
+      "default_open": false
+    },
+    "context_menu": {
+      "enabled": true,
+      "search_text_limit": 100
+    }
+  },
+  "installation_notes": {
+    "steps": [
+      "1. Copy this template to your extension directory",
+      "2. Rename to config.json",
+      "3. Choose your environment (development/production/custom)",
+      "4. Configure your Terraphim server URLs",
+      "5. Set up Cloudflare credentials through the extension options",
+      "6. Test the configuration using the extension options page"
+    ],
+    "security_reminder": "NEVER commit actual API credentials to version control. Use the extension options page to configure credentials securely."
+  }
+}

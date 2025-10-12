@@ -1,0 +1,79 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+P",
+  "roles": {
+    "Perplexity Researcher": {
+      "shortname": "perplexity-researcher",
+      "name": "Perplexity Researcher",
+      "relevance_function": "title-scorer",
+      "theme": "superhero",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://api.perplexity.ai",
+          "service": "Perplexity",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "model": "sonar-medium-online",
+            "max_tokens": "1000",
+            "temperature": "0.2",
+            "cache_ttl_hours": "1",
+            "search_recency": "week"
+          }
+        }
+      ],
+      "extra": {}
+    },
+    "AI Research Scientist": {
+      "shortname": "ai-researcher",
+      "name": "AI Research Scientist",
+      "relevance_function": "title-scorer",
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://api.perplexity.ai",
+          "service": "Perplexity",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "model": "sonar-large-online",
+            "max_tokens": "2000",
+            "temperature": "0.1",
+            "cache_ttl_hours": "2",
+            "search_domains": "arxiv.org,huggingface.co,github.com,papers.nips.cc",
+            "search_recency": "month"
+          }
+        }
+      ],
+      "extra": {}
+    },
+    "News & Current Events": {
+      "shortname": "news-analyst",
+      "name": "News & Current Events",
+      "relevance_function": "title-scorer",
+      "theme": "flatly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://api.perplexity.ai",
+          "service": "Perplexity",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "model": "sonar-medium-online",
+            "max_tokens": "1500",
+            "temperature": "0.3",
+            "cache_ttl_hours": "0.5",
+            "search_domains": "reuters.com,bbc.com,cnn.com,npr.org,apnews.com",
+            "search_recency": "day"
+          }
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Perplexity Researcher",
+  "selected_role": "Perplexity Researcher"
+}

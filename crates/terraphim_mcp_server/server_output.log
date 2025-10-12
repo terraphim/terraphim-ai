@@ -1,0 +1,316 @@
+warning: unused import: `Path`
+ --> crates/terraphim_automata/src/builder.rs:2:17
+  |
+2 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::process::Stdio`
+ --> crates/terraphim_automata/src/builder.rs:3:5
+  |
+3 | use std::process::Stdio;
+  |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `haystack`
+  --> crates/terraphim_automata/src/builder.rs:49:13
+   |
+49 |         let haystack = haystack.into();
+   |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_haystack`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: field `service` is never read
+  --> crates/terraphim_automata/src/builder.rs:44:5
+   |
+43 | pub struct Logseq {
+   |            ------ field in this struct
+44 |     service: LogseqService,
+   |     ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: fields `command` and `default_args` are never read
+  --> crates/terraphim_automata/src/builder.rs:63:5
+   |
+62 | pub struct LogseqService {
+   |            ------------- fields in this struct
+63 |     command: String,
+   |     ^^^^^^^
+64 |     default_args: Vec<String>,
+   |     ^^^^^^^^^^^^
+
+warning: method `path` is never used
+   --> crates/terraphim_automata/src/builder.rs:223:19
+    |
+222 | impl Match {
+    | ---------- method in this implementation
+223 |     pub(crate) fn path(&self) -> Option<String> {
+    |                   ^^^^
+
+warning: method `path` is never used
+   --> crates/terraphim_automata/src/builder.rs:238:19
+    |
+237 | impl Context {
+    | ------------ method in this implementation
+238 |     pub(crate) fn path(&self) -> Option<String> {
+    |                   ^^^^
+
+warning: `terraphim_automata` (lib) generated 7 warnings (run `cargo fix --lib -p terraphim_automata` to apply 2 suggestions)
+warning: function `build_search_url` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:682:4
+    |
+682 | fn build_search_url(server_url: &str, query: &str, opts: &SearchOpts) -> Result<String> {
+    |    ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `build_query_url` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:716:4
+    |
+716 | fn build_query_url(collection_subject: &str, opts: &QueryOpts) -> Result<String> {
+    |    ^^^^^^^^^^^^^^^
+
+warning: function `build_filter_string` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:752:4
+    |
+752 | fn build_filter_string(filters: &HashMap<String, String>) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `escape_tantivy_key` is never used
+   --> crates/terraphim_atomic_client/src/store.rs:767:4
+    |
+767 | fn escape_tantivy_key(key: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: `terraphim_atomic_client` (lib) generated 4 warnings
+warning: field `tasks` is never read
+  --> crates/terraphim_middleware/src/haystack/clickup.rs:92:5
+   |
+91 | struct UniversalSearchResponse {
+   |        ----------------------- field in this struct
+92 |     tasks: Option<Vec<serde_json::Valu...
+   |     ^^^^^
+   |
+   = note: `UniversalSearchResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `terraphim_middleware` (lib) generated 1 warning
+warning: unused import: `std::cmp`
+ --> crates/terraphim_service/src/score/bm25_additional.rs:1:5
+  |
+1 | use std::cmp;
+  |     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `BinaryHeap`
+ --> crates/terraphim_service/src/score/bm25_additional.rs:2:24
+  |
+2 | use std::collections::{BinaryHeap, Hash...
+  |                        ^^^^^^^^^^
+
+warning: unused import: `std::fmt`
+ --> crates/terraphim_service/src/score/bm25_additional.rs:3:5
+  |
+3 | use std::fmt;
+  |     ^^^^^^^^
+
+warning: unused import: `terraphim_types::SearchQuery`
+  --> crates/terraphim_service/src/score/mod.rs:20:5
+   |
+20 | use terraphim_types::SearchQuery;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `enhance_descriptions_with_ai` and `should_generate_ai_summary` are never used
+   --> crates/terraphim_service/src/lib.rs:636:14
+    |
+55  | impl<'a> TerraphimService {
+    | ------------------------- methods in this implementation
+...
+636 |     async fn enhance_descriptions_with_ai(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+699 |     fn should_generate_ai_summary(&self, doc...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: method `score` is never used
+   --> crates/terraphim_service/src/score/mod.rs:120:12
+    |
+78  | impl Scorer {
+    | ----------- method in this implementation
+...
+120 |     pub fn score(
+    |            ^^^^^
+
+warning: methods `is_empty` and `similarity` are never used
+   --> crates/terraphim_service/src/score/mod.rs:242:12
+    |
+228 | impl Query {
+    | ---------- methods in this implementation
+...
+242 |     pub fn is_empty(&self) -> bool {
+    |            ^^^^^^^^
+...
+265 |     pub fn similarity(mut self, sim: ...
+    |            ^^^^^^^^^^
+
+warning: variant `Levenshtein` is never constructed
+   --> crates/terraphim_service/src/score/mod.rs:322:5
+    |
+316 | pub enum Similarity {
+    |          ---------- variant in this enum
+...
+322 |     Levenshtein,
+    |     ^^^^^^^^^^^
+    |
+    = note: `Similarity` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `with_params` and `initialize` are never used
+  --> crates/terraphim_service/src/score/bm25.rs:71:12
+   |
+58 | impl BM25FScorer {
+   | ---------------- associated items in this implementation
+...
+71 |     pub fn with_params(params: BM25Par...
+   |            ^^^^^^^^^^^
+...
+82 |     pub fn initialize(&mut self, docum...
+   |            ^^^^^^^^^^
+
+warning: associated items `with_params` and `initialize` are never used
+   --> crates/terraphim_service/src/score/bm25.rs:233:12
+    |
+221 | impl BM25PlusScorer {
+    | ------------------- associated items in this implementation
+...
+233 |     pub fn with_params(params: BM25Pa...
+    |            ^^^^^^^^^^^
+...
+243 |     pub fn initialize(&mut self, docu...
+    |            ^^^^^^^^^^
+
+warning: field `delta` is never read
+  --> crates/terraphim_service/src/score/bm25_additional.rs:14:9
+   |
+8  | pub struct BM25Params {
+   |            ---------- field in this struct
+...
+14 |     pub delta: f64,
+   |         ^^^^^
+
+warning: fields `title`, `body`, `description`, and `tags` are never read
+  --> crates/terraphim_service/src/score/bm25_additional.rs:30:9
+   |
+28 | pub struct FieldWeights {
+   |            ------------ fields in this struct
+29 |     /// Weight for document title
+30 |     pub title: f64,
+   |         ^^^^^
+31 |     /// Weight for document body
+32 |     pub body: f64,
+   |         ^^^^
+33 |     /// Weight for doc...
+34 |     pub description: f64,
+   |         ^^^^^^^^^^^
+35 |     /// Weight for doc...
+36 |     pub tags: f64,
+   |         ^^^^
+
+warning: associated items `with_params` and `initialize` are never used
+  --> crates/terraphim_service/src/score/bm25_additional.rs:70:12
+   |
+58 | impl OkapiBM25Scorer {
+   | -------------------- associated items in this implementation
+...
+70 |     pub fn with_params(params: BM25Par...
+   |            ^^^^^^^^^^^
+...
+80 |     pub fn initialize(&mut self, docum...
+   |            ^^^^^^^^^^
+
+warning: method `initialize` is never used
+   --> crates/terraphim_service/src/score/bm25_additional.rs:246:12
+    |
+239 | impl JaccardScorer {
+    | ------------------ method in this implementation
+...
+246 |     pub fn initialize(&mut self, docu...
+    |            ^^^^^^^^^^
+
+warning: method `initialize` is never used
+   --> crates/terraphim_service/src/score/bm25_additional.rs:299:12
+    |
+292 | impl QueryRatioScorer {
+    | --------------------- method in this implementation
+...
+299 |     pub fn initialize(&mut self, docu...
+    |            ^^^^^^^^^^
+
+warning: methods `normalize`, `trim`, `len`, `is_empty`, and `as_slice` are never used
+  --> crates/terraphim_service/src/score/scored.rs:29:12
+   |
+9  | impl<T> SearchResults<T> {
+   | ------------------------ methods in this implementation
+...
+29 |     pub fn normalize(&mut self) {
+   |            ^^^^^^^^^
+...
+57 |     pub fn trim(&mut self, size: usize) {
+   |            ^^^^
+...
+64 |     pub fn len(&self) -> usize {
+   |            ^^^
+...
+69 |     pub fn is_empty(&self) -> bool {
+   |            ^^^^^^^^
+...
+74 |     pub fn as_slice(&self) -> &[Scored...
+   |            ^^^^^^^^
+
+warning: methods `score`, `with_score`, `map`, `map_score`, and `into_pair` are never used
+   --> crates/terraphim_service/src/score/scored.rs:117:12
+    |
+105 | impl<T> Scored<T> {
+    | ----------------- methods in this implementation
+...
+117 |     pub fn score(&self) -> f64 {
+    |            ^^^^^
+...
+133 |     pub fn with_score(mut self, score...
+    |            ^^^^^^^^^^
+...
+141 |     pub fn map<U, F: FnOnce(T) -> U>(...
+    |            ^^^
+...
+152 |     pub fn map_score<F: FnOnce(f64) -...
+    |            ^^^^^^^^^
+...
+170 |     pub fn into_pair(self) -> (f64, T) {
+    |            ^^^^^^^^^
+
+warning: `terraphim_service` (lib) generated 17 warnings (run `cargo fix --lib -p terraphim_service` to apply 4 suggestions)
+warning: unused variable: `role_name`
+   --> crates/terraphim_mcp_server/src/lib.rs:293:13
+    |
+293 |         let role_name = if let Some(r...
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_role_name`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `role_name`
+   --> crates/terraphim_mcp_server/src/lib.rs:385:13
+    |
+385 |         let role_name = if let Some(r...
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_role_name`
+
+warning: `terraphim_mcp_server` (lib) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.98s
+     Running `/Users/alex/projects/terraphim/terraphim-ai/target/debug/terraphim_mcp_server --verbose`
+Error: connection closed: initialized request
+{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"build_autocomplete_index","arguments":{"role":"Terraphim Engineer"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"autocomplete_with_snippets","arguments":{"query":"terraphim","limit":5,"role":"Terraphim Engineer"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"autocomplete_terms","arguments":{"query":"terraphim","limit":5,"role":"Terraphim Engineer"}}}

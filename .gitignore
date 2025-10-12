@@ -28,3 +28,8 @@ desktop/src-tauri/Cargo.lock
 docs/src/thesaurus.json
 docs/src/*.json
 
+demo_data
+rust-sdk
+.env
+.aider*
+scratchpad/firecracker-rust

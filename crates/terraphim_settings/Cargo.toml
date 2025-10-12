@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_settings"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim settings handling library"
@@ -17,6 +17,12 @@ log = "0.4.14"
 thiserror = "1.0.56"
 twelf = { version = "0.15.0", features = ["json", "toml", "env", "clap"] }
 serde = { version = "1.0.182", features = ["derive"] }
+terraphim_onepassword_cli = { path = "../terraphim_onepassword_cli", optional = true }
+tokio = { version = "1.35.1", features = ["rt"], optional = true }
+
+[features]
+default = []
+onepassword = ["terraphim_onepassword_cli", "tokio"]
 
 [dev-dependencies]
 tempfile="3.2.0"

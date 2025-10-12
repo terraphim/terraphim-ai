@@ -1,88 +1,560 @@
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { Field, Input } from "svelma";
+  import { Field, Input, Taglist, Tag } from "svelma";
   import { input, is_tauri, role, roles, serverUrl } from "../stores";
   import ResultItem from "./ResultItem.svelte";
   import type { Document, SearchResponse } from "./SearchResult";
   import logo from "/assets/terraphim_gray.png";
   import { thesaurus,typeahead } from "../stores";
+  import { parseSearchInput, buildSearchQuery } from "./searchUtils";
+  import TermChip from "./TermChip.svelte";
 
   let results: Document[] = [];
   let error: string | null = null;
   let suggestions: string[] = [];
   let suggestionIndex = -1;
 
+  // SSE streaming for summarization updates
+  let sseConnection: EventSource | null = null;
+  let summarizationTaskIds: string[] = [];
+  let taskStatuses: Map<string, any> = new Map();
+
+  // Term chips state
+  interface SelectedTerm {
+    value: string;
+    isFromKG: boolean;
+  }
+  let selectedTerms: SelectedTerm[] = [];
+  let currentLogicalOperator: 'AND' | 'OR' | null = null;
+
   $: thesaurusEntries = Object.entries($thesaurus);
 
-  function getSuggestions(value: string) {
-    const inputValue = value.trim().toLowerCase();
-    const inputLength = inputValue.length;
-    
-    return inputLength === 0
-      ? []
-      : thesaurusEntries
-          .filter(([key]) => key.toLowerCase().includes(inputValue))
-          .map(([key]) => key)
-          .slice(0, 5);
+  // State to prevent circular updates
+  let isUpdatingFromChips = false;
+
+  // --- Persistence helpers ---
+  function searchStateKey(): string {
+    return `terraphim:searchState:${$role}`;
   }
 
-  function updateSuggestions(event: Event) {
-    const inputElement = event.target as HTMLInputElement;
+  function loadSearchState() {
+    try {
+      if (typeof window === 'undefined') return;
+      const raw = localStorage.getItem(searchStateKey());
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (typeof data.input === 'string') {
+        $input = data.input;
+      }
+      if (Array.isArray(data.results)) {
+        results = data.results;
+      }
+    } catch (e) {
+      console.warn('Failed to load search state:', e);
+    }
+  }
+
+  function saveSearchState() {
+    try {
+      if (typeof window === 'undefined') return;
+      const data = { input: $input, results };
+      localStorage.setItem(searchStateKey(), JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save search state:', e);
+    }
+  }
+
+  // Reactive statement to parse input and update chips when user types
+  // Only parse when input contains operators to avoid constant parsing
+  // Add a small delay to prevent aggressive parsing during autocomplete
+  let parseTimeout: number | null = null;
+  $: if ($input && !isUpdatingFromChips && ($input.includes(' AND ') || $input.includes(' OR ') || $input.includes(' and ') || $input.includes(' or '))) {
+    if (parseTimeout) {
+      clearTimeout(parseTimeout);
+    }
+    parseTimeout = setTimeout(() => {
+      parseAndUpdateChips($input);
+      parseTimeout = null;
+    }, 300); // 300ms delay to allow for multiple autocomplete selections
+  }
+
+  // Hydrate previous state on mount
+  onMount(() => {
+    loadSearchState();
+  });
+
+  // Clean up timeout, SSE connection, and polling on component destruction
+  onDestroy(() => {
+    if (parseTimeout) {
+      clearTimeout(parseTimeout);
+    }
+    if (sseConnection) {
+      sseConnection.close();
+      sseConnection = null;
+    }
+    stopPollingForSummaries();
+  });
+
+
+  // SSE connection management
+  function startSummarizationStreaming() {
+    if ($is_tauri) {
+      // For Tauri, use polling instead of SSE
+      startPollingForSummaries();
+      return;
+    }
+
+    if (sseConnection) {
+      sseConnection.close();
+    }
+
+    const baseUrl = $serverUrl.replace('/documents/search', '');
+    const sseUrl = `${baseUrl}/summarization/stream`;
+
+    try {
+      sseConnection = new EventSource(sseUrl);
+
+      sseConnection.onopen = () => {
+        console.log('SSE connection opened for summarization updates');
+      };
+
+      sseConnection.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('SSE received:', data);
+
+          if (data.task_id && data.status === 'completed' && data.summary) {
+            // Update the corresponding document with the completed summary
+            updateDocumentSummary(data.task_id, data.summary);
+          }
+        } catch (error) {
+          console.warn('Failed to parse SSE message:', error);
+        }
+      };
+
+      sseConnection.onerror = (error) => {
+        console.warn('SSE connection error:', error);
+        // Auto-reconnect after a delay
+        setTimeout(() => {
+          if (sseConnection) {
+            startSummarizationStreaming();
+          }
+        }, 5000);
+      };
+    } catch (error) {
+      console.error('Failed to create SSE connection:', error);
+    }
+  }
+
+  // Polling fallback for Tauri (since EventSource isn't supported)
+  let pollingInterval: number | null = null;
+
+  function startPollingForSummaries() {
+    console.log('Starting polling for summary updates (Tauri mode)');
+
+    // Stop any existing polling
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+
+    // Poll every 2 seconds for summary updates
+    pollingInterval = setInterval(async () => {
+      if (results.length === 0) return;
+
+      try {
+        // Re-search to get updated documents with summaries
+        const searchQuery = buildSearchQueryFromInput();
+        if (!searchQuery) return;
+
+        const response: SearchResponse = await invoke("search", {
+          searchQuery,
+        });
+
+        if (response.status === "success") {
+          // Update results with any new summaries
+          const updatedResults = response.results;
+
+          // Check if any documents now have summaries that didn't before
+          let hasUpdates = false;
+          for (let i = 0; i < Math.min(results.length, updatedResults.length); i++) {
+            if (!results[i].summarization && updatedResults[i].summarization) {
+              hasUpdates = true;
+              console.log(`New AI summary found for document: ${updatedResults[i].title}`);
+            }
+          }
+
+          if (hasUpdates) {
+            results = updatedResults;
+            console.log('Updated results with new AI summaries');
+            saveSearchState();
+          }
+
+          // Stop polling if all documents that need summaries have them
+          const documentsNeedingSummaries = results.filter(doc =>
+            !doc.summarization && doc.body && doc.body.length > 500
+          );
+
+          if (documentsNeedingSummaries.length === 0) {
+            console.log('All summaries complete, stopping polling');
+            stopPollingForSummaries();
+          }
+        }
+      } catch (error) {
+        console.error('Error during summary polling:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    // Auto-stop polling after 30 seconds to prevent infinite polling
+    setTimeout(() => {
+      if (pollingInterval) {
+        console.log('Stopping summary polling after timeout');
+        stopPollingForSummaries();
+      }
+    }, 30000);
+  }
+
+  function stopPollingForSummaries() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
+  function updateDocumentSummary(taskId: string, summary: string) {
+    // Find and update the document with the completed summary
+    results = results.map(doc => {
+      // Update document that doesn't have a summarization yet
+      if (!doc.summarization && doc.body && doc.body.length > 500) {
+        return { ...doc, summarization: summary };
+      }
+      return doc;
+    });
+    console.log(`Updated document summary for task ${taskId}:`, summary);
+    saveSearchState();
+  }
+
+  // Function to parse input and update chips
+  function parseAndUpdateChips(inputText: string) {
+    const parsed = parseSearchInput(inputText);
+
+    if (parsed.hasOperator && parsed.terms.length > 1) {
+      const newSelectedTerms = parsed.terms.map(term => {
+        const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
+        return { value: term, isFromKG };
+      });
+
+      // Only update if the terms have actually changed
+      const currentTermValues = selectedTerms.map(t => t.value);
+      const newTermValues = newSelectedTerms.map(t => t.value);
+
+      if (JSON.stringify(currentTermValues) !== JSON.stringify(newTermValues) ||
+          currentLogicalOperator !== parsed.operator) {
+        selectedTerms = newSelectedTerms;
+        currentLogicalOperator = parsed.operator;
+      }
+    } else if (parsed.terms.length === 1 && selectedTerms.length > 0) {
+      // Single term - clear chips if they exist
+      selectedTerms = [];
+      currentLogicalOperator = null;
+    } else if (parsed.terms.length === 0) {
+      // Empty input - clear everything
+      selectedTerms = [];
+      currentLogicalOperator = null;
+    }
+  }
+
+  // Helper function to get term suggestions for autocomplete
+  async function getTermSuggestions(query: string): Promise<string[]> {
+    try {
+      if ($is_tauri) {
+        const response: any = await invoke("get_autocomplete_suggestions", {
+          query: query,
+          roleName: $role,
+          limit: 8
+        });
+
+        if (response.status === 'success' && response.suggestions) {
+          return response.suggestions.map((suggestion: any) => suggestion.term);
+        }
+      } else {
+        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success' && data.suggestions) {
+            return data.suggestions.map((suggestion: any) => suggestion.term);
+          }
+        }
+      }
+
+      // Fallback to thesaurus matching
+      return thesaurusEntries
+        .filter(([key]) => key.toLowerCase().includes(query.toLowerCase()))
+        .map(([key]) => key)
+        .slice(0, 8);
+    } catch (error) {
+      console.warn('Error fetching term suggestions:', error);
+      return [];
+    }
+  }
+
+  async function getSuggestions(value: string): Promise<string[]> {
+    const inputValue = value.trim();
+    const inputLength = inputValue.length;
+
+    // Return empty suggestions for very short inputs
+    if (inputLength === 0) {
+      return [];
+    }
+
+    // Parse the input to detect operators and terms
+    const parsed = parseSearchInput(inputValue);
+    const words = inputValue.split(/\s+/);
+    const lastWord = words[words.length - 1].toLowerCase();
+
+
+    // If we have operators in the input, prioritize term suggestions after operators
+    if (parsed.hasOperator && parsed.terms.length > 0) {
+      // Get the last term (what user is currently typing)
+      const currentTerm = parsed.terms[parsed.terms.length - 1];
+      if (currentTerm && currentTerm.length >= 2) {
+        return getTermSuggestions(currentTerm);
+      }
+      return [];
+    }
+
+    // If the last word is a partial "and" or "or", suggest these operators
+    if (words.length > 1) {
+      const operatorSuggestions = [];
+      if ("and".startsWith(lastWord)) {
+        operatorSuggestions.push("AND");
+      }
+      if ("or".startsWith(lastWord)) {
+        operatorSuggestions.push("OR");
+      }
+      if (operatorSuggestions.length > 0) {
+        return operatorSuggestions;
+      }
+    }
+
+    // If the input ends with "AND" or "OR", suggest terms but don't include operators
+    const inputLower = inputValue.toLowerCase();
+    if (inputLower.includes(" and ") || inputLower.includes(" or ") ||
+        inputLower.includes(" AND ") || inputLower.includes(" OR ")) {
+      // For multi-term queries, only suggest terms after the operator
+      const termAfterOperator = lastWord;
+      if (termAfterOperator.length < 2) {
+        return [];
+      }
+      return getTermSuggestions(termAfterOperator);
+    }
+
+    // Regular single-term autocomplete with enhanced operator suggestions
+    try {
+      const termSuggestions = await getTermSuggestions(inputValue);
+
+      // Return only term suggestions (no operators in autocomplete)
+      return termSuggestions.slice(0, 7);
+    } catch (error) {
+      console.warn('Error fetching autocomplete suggestions:', error);
+      // Fall back to thesaurus-based matching
+      const termSuggestions = thesaurusEntries
+        .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+        .map(([key]) => key)
+        .slice(0, 5);
+
+      // Return only term suggestions (no operators in autocomplete)
+      return termSuggestions.slice(0, 7);
+    }
+  }
+
+  async function updateSuggestions(event: Event) {
+    const inputElement = event.target as HTMLInputElement | null;
+    if (!inputElement || inputElement.selectionStart == null) {
+      return;
+    }
     const cursorPosition = inputElement.selectionStart;
     const textBeforeCursor = $input.slice(0, cursorPosition);
     const words = textBeforeCursor.split(/\s+/);
     const currentWord = words[words.length - 1];
 
-    suggestions = getSuggestions(currentWord);
+    // Check if user is typing an operator
+    if (currentWord.toLowerCase() === 'a' || currentWord.toLowerCase() === 'an') {
+      suggestions = ['AND'];
+    } else if (currentWord.toLowerCase() === 'o' || currentWord.toLowerCase() === 'or') {
+      suggestions = ['OR'];
+    } else if (currentWord.length >= 2) {
+      // Get term suggestions for longer words
+      try {
+        const termSuggestions = await getSuggestions(currentWord);
+
+        // Return only term suggestions (no operators in autocomplete)
+        suggestions = termSuggestions;
+      } catch (error) {
+        console.warn('Failed to get suggestions:', error);
+        suggestions = [];
+      }
+    } else {
+      suggestions = [];
+    }
     suggestionIndex = -1;
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (suggestions.length === 0) return;
-
-    if (event.key === "ArrowDown") {
+    if (suggestions.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
+      } else if ((event.key === "Enter" || event.key === "Tab") && suggestionIndex !== -1) {
+        event.preventDefault();
+        applySuggestion(suggestions[suggestionIndex]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        suggestions = [];
+        suggestionIndex = -1;
+      }
+    } else if (event.key === "Enter") {
       event.preventDefault();
-      suggestionIndex = (suggestionIndex + 1) % suggestions.length;
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
-    } else if ((event.key === "Enter" || event.key === "Tab") && suggestionIndex !== -1) {
-      event.preventDefault();
-      applySuggestion(suggestions[suggestionIndex]);
+      parseAndSearch();
     }
   }
 
+  // Combined function to parse input into chips and then search
+  function parseAndSearch() {
+    // Force parsing of the current input
+    parseAndUpdateChips($input);
+    // Then perform search
+    handleSearchInputEvent();
+  }
+
   function applySuggestion(suggestion: string) {
-    const inputElement = document.querySelector('input[type="search"]') as HTMLInputElement;
-    const cursorPosition = inputElement.selectionStart;
-    const textBeforeCursor = $input.slice(0, cursorPosition);
-    const textAfterCursor = $input.slice(cursorPosition);
-    const words = textBeforeCursor.split(/\s+/);
-    words[words.length - 1] = suggestion;
-    
-    $input = [...words, textAfterCursor].join(" ");
-    inputElement.setSelectionRange(cursorPosition + suggestion.length, cursorPosition + suggestion.length);
+    if (suggestion === 'AND' || suggestion === 'OR') {
+      // If it's an operator, set it for the next term
+      currentLogicalOperator = suggestion as 'AND' | 'OR';
+
+      // Parse current input to add current term if not already added
+      const parsed = parseSearchInput($input);
+      if (parsed.terms.length > 0 && !selectedTerms.some(t => t.value === parsed.terms[parsed.terms.length - 1])) {
+        addSelectedTerm(parsed.terms[parsed.terms.length - 1]);
+      }
+
+      $input = $input + ` ${suggestion} `;
+    } else {
+      // It's a term suggestion - replace the current partial term
+      const words = $input.trim().split(/\s+/);
+      const lastWord = words[words.length - 1];
+
+      // If the last word is a partial match for the suggestion, replace it
+      if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
+        // Replace the last word with the full suggestion
+        words[words.length - 1] = suggestion;
+        $input = words.join(' ');
+
+        // Don't immediately parse - let the user continue typing
+        // The reactive statement will handle parsing with a delay when operators are present
+      } else {
+        // If no partial match, add as new term
+        addSelectedTerm(suggestion, currentLogicalOperator);
+      }
+    }
+
     suggestions = [];
     suggestionIndex = -1;
+  }
+
+  // Create SearchQuery using shared utilities
+  function buildSearchQueryFromInput(): any {
+    const inputText = $input.trim();
+    if (!inputText) return null;
+
+    // Use parseSearchInput to detect operators in text
+    const parsed = parseSearchInput(inputText);
+    const searchQuery = buildSearchQuery(parsed, $role);
+
+    return {
+      ...searchQuery,
+      skip: 0,
+      limit: 10,
+    };
+  }
+
+  // Term chips management
+  function addSelectedTerm(term: string, operator: 'AND' | 'OR' | null = null) {
+    // Check if term is from thesaurus (KG)
+    const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
+
+    // Don't add if already selected
+    if (selectedTerms.some(t => t.value.toLowerCase() === term.toLowerCase())) {
+      return;
+    }
+
+    selectedTerms = [...selectedTerms, { value: term, isFromKG }];
+
+    if (operator && selectedTerms.length > 1) {
+      currentLogicalOperator = operator;
+    }
+
+    // Update the input to show the structured query
+    updateInputFromSelectedTerms();
+    saveSearchState();
+  }
+
+  function removeSelectedTerm(term: string) {
+    selectedTerms = selectedTerms.filter(t => t.value !== term);
+    updateInputFromSelectedTerms();
+    saveSearchState();
+  }
+
+  function updateInputFromSelectedTerms() {
+    isUpdatingFromChips = true;
+
+    if (selectedTerms.length === 0) {
+      $input = '';
+      currentLogicalOperator = null;
+    } else if (selectedTerms.length === 1) {
+      $input = selectedTerms[0].value;
+      currentLogicalOperator = null;
+    } else {
+      const operator = currentLogicalOperator || 'AND';
+      $input = selectedTerms.map(t => t.value).join(` ${operator} `);
+    }
+
+    // Reset the flag after a brief delay to allow reactivity to settle
+    setTimeout(() => {
+      isUpdatingFromChips = false;
+    }, 10);
+  }
+
+  function clearSelectedTerms() {
+    selectedTerms = [];
+    currentLogicalOperator = null;
+    $input = '';
+    saveSearchState();
   }
 
   async function handleSearchInputEvent() {
     error = null; // Clear previous errors
 
     if ($is_tauri) {
+      if (!$input.trim()) return; // Skip if input is empty
+
       try {
+        const searchQuery = buildSearchQueryFromInput();
+        if (!searchQuery) return;
+
         const response: SearchResponse = await invoke("search", {
-          searchQuery: {
-            search_term: $input,
-            skip: 0,
-            limit: 10,
-            role: $role,
-          },
+          searchQuery,
         });
         if (response.status === "success") {
           results = response.results;
           console.log("Response results");
           console.log(results);
+          saveSearchState();
+          // Start SSE streaming for summarization updates (Tauri doesn't support SSE)
+          // SSE will be available when using web interface
         } else {
           error = `Search failed: ${response.status}`;
           console.error("Search failed:", response);
@@ -94,12 +566,10 @@
     } else {
       if (!$input.trim()) return; // Skip if input is empty
 
-      const json_body = JSON.stringify({
-        search_term: $input,
-        skip: 0,
-        limit: 10,
-        role: $role,
-      });
+      const searchQuery = buildSearchQueryFromInput();
+      if (!searchQuery) return;
+
+      const json_body = JSON.stringify(searchQuery);
 
       try {
         const response = await fetch($serverUrl, {
@@ -115,9 +585,13 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        this.error = `Error fetching data: ${error}`;
+        saveSearchState();
+
+        // Start SSE streaming for real-time summarization updates
+        startSummarizationStreaming();
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        error = `Error fetching data: ${err}`;
       }
     }
   }
@@ -125,30 +599,87 @@
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
   <Field>
-    <div class="input-wrapper">
-      <Input
-        type="search"
-        bind:value={$input}
-        placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-        icon="search"
-        expanded
-        autofocus
-        on:click={handleSearchInputEvent}
-        on:submit={handleSearchInputEvent}
-        on:keydown={handleKeydown}
-        on:input={updateSuggestions}
-      />
+    <div class="search-row">
+      <div class="input-wrapper">
+        <Input
+          type="search"
+          bind:value={$input}
+          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
+          icon="search"
+          expanded
+          autofocus
+          on:click={handleSearchInputEvent}
+          on:submit={handleSearchInputEvent}
+          on:keydown={handleKeydown}
+          on:input={updateSuggestions}
+        />
       {#if suggestions.length > 0}
         <ul class="suggestions">
           {#each suggestions as suggestion, index}
             <li
               class:active={index === suggestionIndex}
               on:click={() => applySuggestion(suggestion)}
+              on:keydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  applySuggestion(suggestion);
+                }
+              }}
+              tabindex="0"
+              role="option"
+              aria-selected={index === suggestionIndex}
+              aria-label={`Apply suggestion: ${suggestion}`}
             >
               {suggestion}
             </li>
           {/each}
         </ul>
+      {/if}
+      </div>
+
+      <!-- Selected terms display -->
+      {#if selectedTerms.length > 0}
+        <div class="selected-terms-section">
+          <Taglist>
+            {#each selectedTerms as term, index}
+              <div class="term-tag-wrapper" class:from-kg={term.isFromKG}>
+                <Tag
+                  rounded
+                  on:click={() => removeSelectedTerm(term.value)}
+                  title="Click to remove term"
+                >
+                  {term.value}
+                  <button
+                    class="remove-tag-btn"
+                    on:click|stopPropagation={() => removeSelectedTerm(term.value)}
+                    aria-label={`Remove term: ${term.value}`}
+                  >
+                    ×
+                  </button>
+                </Tag>
+              </div>
+              {#if index < selectedTerms.length - 1}
+                <div class="operator-tag-wrapper">
+                  <Tag class="operator-tag" rounded>
+                    {currentLogicalOperator || 'AND'}
+                  </Tag>
+                </div>
+              {/if}
+            {/each}
+          </Taglist>
+          <button type="button" class="clear-terms-btn" on:click={clearSelectedTerms}>
+            Clear all
+          </button>
+        </div>
+      {/if}
+
+      <!-- Parse button for manual parsing -->
+      {#if $input && ($input.includes(' AND ') || $input.includes(' OR ')) && selectedTerms.length === 0}
+        <div class="search-hint-container">
+          <button type="button" class="button is-small is-info" on:click={() => parseAndUpdateChips($input)}>
+            Parse Terms
+          </button>
+        </div>
       {/if}
     </div>
   </Field>
@@ -158,13 +689,19 @@
   <p class="error">{error}</p>
 {:else if results.length}
   {#each results as item}
-    <ResultItem document={item} />
+    <ResultItem {item} />
   {/each}
 {:else}
   <section class="section">
     <div class="content has-text-grey has-text-centered">
       <img src={logo} alt="Terraphim Logo" />
       <p>I am Terraphim, your personal assistant.</p>
+      <button class="button is-primary" data-testid="wizard-start" on:click={() => window.location.href = '/config/wizard'}>
+        <span class="icon">
+          <i class="fas fa-magic"></i>
+        </span>
+        <span>Configuration Wizard</span>
+      </button>
     </div>
   </section>
 {/if}
@@ -176,8 +713,23 @@
   .error {
     color: red;
   }
+  .search-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    width: 100%;
+  }
+
   .input-wrapper {
     position: relative;
+    flex: 1;
+  }
+
+  .search-hint-container {
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
   .suggestions {
     position: absolute;
@@ -201,5 +753,90 @@
   .suggestions li:hover,
   .suggestions li.active {
     background-color: #f5f5f5;
+  }
+  /* Center logo and text on empty state */
+  .has-text-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+  }
+
+  /* Selected terms section */
+  .selected-terms-section {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+  }
+
+  .term-tag-wrapper {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    display: inline-block;
+  }
+
+  .term-tag-wrapper:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+
+  .term-tag-wrapper.from-kg :global(.tag) {
+    background-color: #3273dc;
+    color: white;
+  }
+
+  .term-tag-wrapper.from-kg:hover :global(.tag) {
+    background-color: #2366d1;
+  }
+
+  .remove-tag-btn {
+    position: absolute;
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    width: 1rem;
+    height: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+  }
+
+  .remove-tag-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .operator-tag-wrapper :global(.tag) {
+    background-color: #f5f5f5;
+    color: #666;
+    font-weight: 600;
+    cursor: default;
+  }
+
+  .clear-terms-btn {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .clear-terms-btn:hover {
+    background: #e0e0e0;
   }
 </style>

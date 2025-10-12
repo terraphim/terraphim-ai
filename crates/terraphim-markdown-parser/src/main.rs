@@ -23,11 +23,12 @@ Another paragraph with a [regular link](https://www.example.com).
         pulldown_cmark::Event::Text(text) => {
             if text.starts_with("[[") && text.ends_with("]]") {
                 let link_text = text.trim_matches(|c| c == '[' || c == ']');
-                pulldown_cmark::Event::Start(Tag::Link(
-                    pulldown_cmark::LinkType::Shortcut,
-                    link_text.to_string().into(),
-                    link_text.to_string().into(),
-                ))
+                pulldown_cmark::Event::Start(Tag::Link {
+                    link_type: pulldown_cmark::LinkType::Shortcut,
+                    dest_url: link_text.to_string().into(),
+                    title: link_text.to_string().into(),
+                    id: "".to_string().into(),
+                })
             } else {
                 pulldown_cmark::Event::Text(text)
             }

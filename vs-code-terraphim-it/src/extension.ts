@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CollectionBuilder, core, Store } from '@tomic/lib';
-import { getStore } from './helpers/getStore';
+import { getStore, getUpdatedStore } from './helpers/getStore';
+import { serverConnection } from './helpers/serverConnection';
 import { replace_links } from '../rust-lib/pkg';
 import { searchDocumentsSelectedRole } from 'terraphim_ai_nodejs/index.js';
 import {
@@ -129,7 +130,72 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(napiAutocompleteDisposable);
-  
+
+  // Register the Terraphim Server Autocomplete command
+  const serverAutocompleteDisposable = vscode.commands.registerCommand(
+    'extension.terraphimServerAutocomplete',
+    async function () {
+      // Deactivate the existing provider if any
+      if (activeProvider) {
+        activeProvider.dispose();
+        activeProvider = undefined;
+      }
+
+      // Check server health first
+      const healthCheck = await serverConnection.healthCheck();
+      if (!healthCheck.healthy) {
+        vscode.window.showWarningMessage(`Terraphim server is not available: ${healthCheck.message}. Please check your configuration and server status.`);
+        return;
+      }
+
+      // Register the completion provider
+      const provider = vscode.languages.registerCompletionItemProvider(
+        { scheme: 'file', language: '*' },
+        new TerraphimServerCompletionProvider(),
+        ' ' // Trigger on space
+      );
+
+      activeProvider = provider;
+      context.subscriptions.push(provider);
+      vscode.window.showInformationMessage('Terraphim Server Autocomplete activated');
+    }
+  );
+
+  context.subscriptions.push(serverAutocompleteDisposable);
+
+  // Register the Server Health Check command
+  const healthCheckDisposable = vscode.commands.registerCommand(
+    'extension.terraphimHealthCheck',
+    async function () {
+      vscode.window.showInformationMessage('Checking server health...');
+
+      const testResults = await serverConnection.testConnection();
+
+      const terraphimStatus = testResults.terraphim.healthy ? '✅' : '❌';
+      const atomicStatus = testResults.atomic.healthy ? '✅' : '❌';
+
+      const message = `Server Status:\n${terraphimStatus} Terraphim Server: ${testResults.terraphim.message}\n${atomicStatus} Atomic Server: ${testResults.atomic.message}`;
+
+      if (testResults.terraphim.healthy && testResults.atomic.healthy) {
+        vscode.window.showInformationMessage(message);
+      } else {
+        vscode.window.showWarningMessage(message);
+      }
+    }
+  );
+
+  context.subscriptions.push(healthCheckDisposable);
+
+  // Listen for configuration changes
+  const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('terraphimIt')) {
+      serverConnection.updateConfiguration();
+      vscode.window.showInformationMessage('Terraphim IT configuration updated');
+    }
+  });
+
+  context.subscriptions.push(configChangeDisposable);
+
 }
 
 class TerraphimNapiCompletionProvider implements vscode.CompletionItemProvider {
@@ -160,11 +226,32 @@ class TerraphimNapiCompletionProvider implements vscode.CompletionItemProvider {
     if (wordRange) {
       const word = document.getText(wordRange);
       console.log("word", word);
-      if (word !== this.lastQuery) {
+      if (word !== this.lastQuery && word.length >= 2) { // Only search if word has at least 2 characters
         this.lastQuery = word;
-        const results = await searchDocumentsSelectedRole(word);
-        const parsedResults = JSON.parse(results);
-        this.lastResults = this.createCompletionItems(parsedResults);
+
+        // Try server-based search first, fallback to local nodejs binding
+        try {
+          const searchResponse = await serverConnection.searchDocuments(word, 10);
+          if (searchResponse.status === 'success' && searchResponse.results.length > 0) {
+            this.lastResults = this.createCompletionItemsFromServer(searchResponse.results);
+          } else {
+            // Fallback to local nodejs binding
+            const results = await searchDocumentsSelectedRole(word);
+            const parsedResults = JSON.parse(results);
+            this.lastResults = this.createCompletionItems(parsedResults);
+          }
+        } catch (error) {
+          console.warn('Server search failed, using local nodejs binding:', error);
+          // Fallback to local nodejs binding
+          try {
+            const results = await searchDocumentsSelectedRole(word);
+            const parsedResults = JSON.parse(results);
+            this.lastResults = this.createCompletionItems(parsedResults);
+          } catch (localError) {
+            console.error('Both server and local search failed:', localError);
+            this.lastResults = [];
+          }
+        }
       }
     }
   }
@@ -174,6 +261,18 @@ class TerraphimNapiCompletionProvider implements vscode.CompletionItemProvider {
       const item = new vscode.CompletionItem(value.title, vscode.CompletionItemKind.Text);
       item.detail = value.body as string;
       item.documentation = new vscode.MarkdownString(`[${value.title}](${value.url})`);
+      return item;
+    });
+  }
+
+  private createCompletionItemsFromServer(results: any[]): vscode.CompletionItem[] {
+    return results.map((result: any) => {
+      const item = new vscode.CompletionItem(result.title, vscode.CompletionItemKind.Text);
+      item.detail = result.description || result.body || '';
+      item.documentation = new vscode.MarkdownString(`[${result.title}](${result.url})`);
+      if (result.rank) {
+        item.sortText = result.rank.toString().padStart(3, '0');
+      }
       return item;
     });
   }
@@ -220,6 +319,65 @@ class TerraphimCompletionProvider implements vscode.CompletionItemProvider {
       item.documentation = new vscode.MarkdownString(`[${value.nterm}](${value.url})`);
       return item;
     });
+  }
+}
+
+class TerraphimServerCompletionProvider implements vscode.CompletionItemProvider {
+  private lastQuery: string = '';
+  private lastResults: vscode.CompletionItem[] = [];
+
+  async provideCompletionItems(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    token: vscode.CancellationToken,
+    context: vscode.CompletionContext
+  ): Promise<vscode.CompletionItem[] | vscode.CompletionList> {
+    const wordRange = document.getWordRangeAtPosition(position) || document.getWordRangeAtPosition(position.translate(0, -1));
+    if (!wordRange) {
+      return [];
+    }
+
+    const word = document.getText(wordRange);
+    if (word.length < 2) {
+      return [];
+    }
+
+    if (word !== this.lastQuery) {
+      this.lastQuery = word;
+
+      try {
+        // Try autocomplete endpoint first
+        const autocompleteResponse = await serverConnection.getAutocompleteSuggestions(word, 10);
+        if (autocompleteResponse.status === 'success' && autocompleteResponse.suggestions.length > 0) {
+          this.lastResults = autocompleteResponse.suggestions.map(suggestion => {
+            const item = new vscode.CompletionItem(suggestion.term, vscode.CompletionItemKind.Text);
+            item.sortText = suggestion.score.toString().padStart(8, '0');
+            return item;
+          });
+        } else {
+          // Fallback to search endpoint
+          const searchResponse = await serverConnection.searchDocuments(word, 10);
+          if (searchResponse.status === 'success' && searchResponse.results.length > 0) {
+            this.lastResults = searchResponse.results.map(result => {
+              const item = new vscode.CompletionItem(result.title, vscode.CompletionItemKind.Text);
+              item.detail = result.description || result.body || '';
+              item.documentation = new vscode.MarkdownString(`[${result.title}](${result.url})`);
+              if (result.rank) {
+                item.sortText = result.rank.toString().padStart(3, '0');
+              }
+              return item;
+            });
+          } else {
+            this.lastResults = [];
+          }
+        }
+      } catch (error) {
+        console.error('Server completion failed:', error);
+        this.lastResults = [];
+      }
+    }
+
+    return this.lastResults;
   }
 }
 

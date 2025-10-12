@@ -2,47 +2,103 @@ use std::f64;
 use std::fmt;
 use std::result;
 
+mod bm25;
+pub mod bm25_additional;
+#[cfg(test)]
+mod bm25_test;
+pub mod common;
 mod names;
 mod scored;
+#[cfg(test)]
+mod scorer_integration_test;
 
-use crate::error::Result;
-use names::NameScorer;
+use bm25::{BM25FScorer, BM25PlusScorer};
+use bm25_additional::{JaccardScorer, OkapiBM25Scorer, QueryRatioScorer, TFIDFScorer};
+pub use names::QueryScorer;
 use scored::{Scored, SearchResults};
 use serde::{Serialize, Serializer};
 
+use crate::ServiceError;
 use terraphim_types::Document;
-use terraphim_types::SearchQuery;
+
+/// Score module local Result type using TerraphimService's error enum.
+type Result<T> = std::result::Result<T, ServiceError>;
 
 /// Sort the documents by relevance.
 ///
 /// The `relevance_function` parameter is used to determine how the documents
 /// should be sorted.
-pub fn sort_documents(search_query: &SearchQuery, documents: Vec<Document>) -> Vec<Document> {
-    log::debug!("Sorting documents by relevance");
+pub fn sort_documents(query: &Query, documents: Vec<Document>) -> Vec<Document> {
+    let mut scorer = Scorer::new().with_similarity(query.similarity);
 
-    // Create a new scorer
-    let mut scorer = Scorer::new();
+    // Initialize the appropriate scorer based on the query's name_scorer
+    match query.name_scorer {
+        QueryScorer::BM25 => {
+            let mut bm25_scorer = OkapiBM25Scorer::new();
+            bm25_scorer.initialize(&documents);
+            scorer = scorer.with_scorer(Box::new(bm25_scorer));
+        }
+        QueryScorer::BM25F => {
+            let mut bm25f_scorer = BM25FScorer::new();
+            bm25f_scorer.initialize(&documents);
+            scorer = scorer.with_scorer(Box::new(bm25f_scorer));
+        }
+        QueryScorer::BM25Plus => {
+            let mut bm25plus_scorer = BM25PlusScorer::new();
+            bm25plus_scorer.initialize(&documents);
+            scorer = scorer.with_scorer(Box::new(bm25plus_scorer));
+        }
+        QueryScorer::Tfidf => {
+            let mut tfidf_scorer = TFIDFScorer::new();
+            tfidf_scorer.initialize(&documents);
+            scorer = scorer.with_scorer(Box::new(tfidf_scorer));
+        }
+        QueryScorer::Jaccard => {
+            let mut jaccard_scorer = JaccardScorer::new();
+            jaccard_scorer.initialize(&documents);
+            scorer = scorer.with_scorer(Box::new(jaccard_scorer));
+        }
+        QueryScorer::QueryRatio => {
+            let mut query_ratio_scorer = QueryRatioScorer::new();
+            query_ratio_scorer.initialize(&documents);
+            scorer = scorer.with_scorer(Box::new(query_ratio_scorer));
+        }
+        _ => {
+            // For OkapiBM25 and other cases, use similarity scoring
+        }
+    }
 
-    // Create a new query
-    let query = Query::new(search_query.search_term.as_str()).similarity(Similarity::Levenshtein);
-
-    // Score the documents
-    let mut results = scorer.score(&query, documents).unwrap();
-    results.rescore(|doc| query.similarity.similarity(&query.name, &doc.title));
-    log::debug!("Rescore results {:#?}", results);
-    results
-        .into_vec()
-        .iter()
-        .map(|s| s.clone().into_value())
-        .collect()
+    match scorer.score_documents(query, documents.clone()) {
+        Ok(results) => results
+            .into_iter()
+            .map(|scored| scored.into_value())
+            .collect(),
+        Err(_) => documents,
+    }
 }
 
 #[derive(Debug)]
-pub struct Scorer {}
+pub struct Scorer {
+    similarity: Similarity,
+    scorer: Option<Box<dyn std::any::Any>>,
+}
 
 impl Scorer {
     pub fn new() -> Scorer {
-        Scorer {}
+        Scorer {
+            similarity: Similarity::default(),
+            scorer: None,
+        }
+    }
+
+    pub fn with_similarity(mut self, similarity: Similarity) -> Scorer {
+        self.similarity = similarity;
+        self
+    }
+
+    pub fn with_scorer(mut self, scorer: Box<dyn std::any::Any>) -> Scorer {
+        self.scorer = Some(scorer);
+        self
     }
 
     /// Execute a search with the given `Query`.
@@ -69,6 +125,7 @@ impl Scorer {
     ///
     /// If there was a problem reading the underlying index or the IMDb data,
     /// then an error is returned.
+    #[allow(dead_code)]
     pub fn score(
         &mut self,
         query: &Query,
@@ -92,9 +149,58 @@ impl Scorer {
         for document in documents {
             results.push(Scored::new(document));
         }
-        log::debug!("Similarity {:?}", query.similarity);
-        log::debug!("Query {:?}", query);
-        results.rescore(|document| self.similarity(query, &document.title));
+
+        match query.name_scorer {
+            QueryScorer::BM25 => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(bm25_scorer) = scorer.downcast_ref::<OkapiBM25Scorer>() {
+                        results.rescore(|document| bm25_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::BM25F => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(bm25f_scorer) = scorer.downcast_ref::<BM25FScorer>() {
+                        results.rescore(|document| bm25f_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::BM25Plus => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(bm25plus_scorer) = scorer.downcast_ref::<BM25PlusScorer>() {
+                        results.rescore(|document| bm25plus_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::Tfidf => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(tfidf_scorer) = scorer.downcast_ref::<TFIDFScorer>() {
+                        results.rescore(|document| tfidf_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::Jaccard => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(jaccard_scorer) = scorer.downcast_ref::<JaccardScorer>() {
+                        results.rescore(|document| jaccard_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            QueryScorer::QueryRatio => {
+                if let Some(scorer) = &self.scorer {
+                    if let Some(query_ratio_scorer) = scorer.downcast_ref::<QueryRatioScorer>() {
+                        results.rescore(|document| query_ratio_scorer.score(&query.name, document));
+                    }
+                }
+            }
+            _ => {
+                // Fall back to similarity scoring for OkapiBM25 and other cases
+                log::debug!("Similarity {:?}", query.similarity);
+                log::debug!("Query {:?}", query);
+                results.rescore(|document| self.similarity(query, &document.title));
+            }
+        }
+
         log::debug!("results after rescoring: {:#?}", results);
         Ok(results)
     }
@@ -109,31 +215,23 @@ impl Scorer {
     }
 }
 
-/// A query that can be used to search records.
+/// A simplified query structure for Terraphim document search.
 ///
-/// A query typically consists of a fuzzy name query along with zero or more
-/// filters.
-///
-/// A search result must satisfy every filter on a query to match.
-///
-/// Empty queries always return no results.
-///
-/// The `Serialize` and `Deserialize` implementations for this type use the
-/// free-form query syntax.
+/// This is a streamlined version focused on document search functionality.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query {
-    name: String,
-    name_scorer: NameScorer,
-    similarity: Similarity,
-    size: usize,
+    pub name: String,
+    pub name_scorer: QueryScorer,
+    pub similarity: Similarity,
+    pub size: usize,
 }
 
 impl Query {
-    /// Create a new empty query.
+    /// Create a new query with the given search term.
     pub fn new(name: &str) -> Query {
         Query {
             name: name.to_string(),
-            name_scorer: NameScorer::default(),
+            name_scorer: QueryScorer::default(),
             similarity: Similarity::default(),
             size: 30,
         }
@@ -142,21 +240,30 @@ impl Query {
     /// Return true if and only if this query is empty.
     ///
     /// Searching with an empty query always yields no results.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.name.is_empty()
+    }
+
+    /// Set the name scorer to use for ranking.
+    ///
+    /// The name scorer determines which algorithm is used to rank documents.
+    pub fn name_scorer(mut self, scorer: QueryScorer) -> Query {
+        self.name_scorer = scorer;
+        self
     }
 
     /// Set the similarity function.
     ///
     /// The similarity function can be selected from a predefined set of
-    /// choices defined by the
-    /// [`Similarity`](enum.Similarity.html) type.
+    /// choices defined by the [`Similarity`](enum.Similarity.html) type.
     ///
     /// When a similarity function is used, then any results from searching
     /// the name index are re-ranked according to their similarity with the
     /// query.
     ///
     /// By default, no similarity function is used.
+    #[allow(dead_code)]
     pub fn similarity(mut self, sim: Similarity) -> Query {
         self.similarity = sim;
         self
@@ -171,18 +278,6 @@ impl Serialize for Query {
         s.serialize_str(&self.to_string())
     }
 }
-
-// impl<'a> Deserialize<'a> for Query {
-//     fn deserialize<D>(d: D) -> result::Result<Query, D::Error>
-//     where
-//         D: Deserializer<'a>,
-//     {
-//         use serde::de::Error;
-
-//         let querystr = String::deserialize(d)?;
-//         Ok(querystr)
-//     }
-// }
 
 impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -214,12 +309,15 @@ pub enum Similarity {
     None,
     /// Computes the Levenshtein edit distance between two names and converts
     /// it to a similarity.
+    #[allow(dead_code)] // Part of public API, documented in user guide
     Levenshtein,
     /// Computes the Jaro edit distance between two names and converts it to a
     /// similarity.
+    #[allow(dead_code)]
     Jaro,
     /// Computes the Jaro-Winkler edit distance between two names and converts
     /// it to a similarity.
+    #[allow(dead_code)]
     JaroWinkler,
 }
 

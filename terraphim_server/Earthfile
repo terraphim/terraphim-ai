@@ -2,7 +2,7 @@ VERSION --try --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
 IMPORT ../desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -26,10 +26,16 @@ pipeline:
 
 
 install:
-  FROM rust:1.76.0-buster
+  FROM ubuntu:24.04
+  ENV DEBIAN_FRONTEND=noninteractive
+  ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt install -y musl-tools musl-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential ca-certificates curl musl-tools musl-dev
   RUN update-ca-certificates
+  # Install Rust from official installer
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.76.0
+  ENV PATH="/root/.cargo/bin:$PATH"
+  ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   RUN cargo install cross

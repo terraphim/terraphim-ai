@@ -4,12 +4,12 @@
 //! We test the server by sending requests to it and checking the responses.
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use ahash::AHashMap;
     use terraphim_automata::AutomataPath;
     use terraphim_server::{axum_server, CreateDocumentResponse, SearchResponse, Status};
     use terraphim_settings::DeviceSettings;
 
-    use reqwest::{Client, StatusCode};
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
         Config, ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role,
@@ -24,12 +24,12 @@ mod tests {
     // Sample config for testing
     fn sample_config() -> Config {
         let automata_path = AutomataPath::from_local("fixtures/term_to_id.json");
-        let haystack = PathBuf::from("fixtures/haystack");
+        let haystack = "fixtures/haystack".to_string();
 
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
             .add_role(
-                "Default".into(),
+                "Default",
                 Role {
                     shortname: Some("Default".to_string()),
                     name: "Default".into(),
@@ -37,10 +37,15 @@ mod tests {
                     theme: "spacelab".to_string(),
                     kg: None,
                     haystacks: vec![Haystack {
-                        path: haystack.clone(),
+                        location: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                        fetch_content: false,
                     }],
-                    extra: AHashMap::new(),
+                    terraphim_it: false,
+                    ..Default::default()
                 },
             )
             .add_role(
@@ -60,10 +65,15 @@ mod tests {
                         publish: true,
                     }),
                     haystacks: vec![Haystack {
-                        path: haystack.clone(),
+                        location: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
+                        fetch_content: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
                     }],
-                    extra: AHashMap::new(),
+                    terraphim_it: false,
+                    ..Default::default()
                 },
             )
             .add_role(
@@ -83,10 +93,15 @@ mod tests {
                         publish: true,
                     }),
                     haystacks: vec![Haystack {
-                        path: haystack.clone(),
+                        location: haystack.clone(),
                         service: ServiceType::Ripgrep,
+                        read_only: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                        fetch_content: false,
                     }],
-                    extra: AHashMap::new(),
+                    terraphim_it: false,
+                    ..Default::default()
                 },
             )
             .build()
@@ -119,13 +134,14 @@ mod tests {
     }
 
     async fn wait_for_server_ready(address: SocketAddr) {
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+            .expect("Failed to create HTTP client");
         let health_url = format!("http://{}/health", address);
 
         let mut attempts = 0;
         loop {
             match client.get(&health_url).send().await {
-                Ok(response) if response.status() == StatusCode::OK => {
+                Ok(response) if response.status() == 200 => {
                     println!("Server is ready at {}", address);
                     break;
                 }
@@ -153,7 +169,8 @@ mod tests {
     #[serial]
     async fn test_post_search_document() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+            .expect("Failed to create HTTP client");
         let response = client
             .post(format!("http://{server}/documents/search"))
             .header("Content-Type", "application/json")
@@ -170,7 +187,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -178,7 +195,7 @@ mod tests {
     async fn test_search_documents() {
         let server = ensure_server_started().await;
         let response = reqwest::get(format!("http://{server}/documents/search?search_term=trained%20operators%20and%20maintainers&skip=0&limit=10&role=System%20Operator")).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
     }
 
     #[tokio::test]
@@ -188,7 +205,7 @@ mod tests {
 
         let url = format!("http://{server}/documents/search?search_term=system&skip=0&limit=10");
         let response = reqwest::get(url).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         // The response body should be of this form:
         // {
@@ -239,7 +256,7 @@ mod tests {
         ))
         .await
         .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let response: SearchResponse = response.json().await.unwrap();
         println!("{:#?}", response);
@@ -263,7 +280,7 @@ mod tests {
         let response = reqwest::get(format!("http://{server}/config"))
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         // Check that the config is valid JSON and contains the expected roles
         let response: ConfigResponse = response.json().await.unwrap();
@@ -294,7 +311,8 @@ mod tests {
         let mut new_config = orig_config.config.clone();
         new_config.default_role = "Engineer".to_string().into();
         new_config.global_shortcut = "Ctrl+P".to_string();
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+            .expect("Failed to create HTTP client");
         let response = client
             .post(&config_url)
             .header("Content-Type", "application/json")
@@ -303,7 +321,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
 
         let new_config: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(orig_config.status, Status::Success));
@@ -315,7 +333,8 @@ mod tests {
     #[serial]
     async fn test_create_document() {
         let server = ensure_server_started().await;
-        let client = Client::new();
+        let client = terraphim_service::http_client::create_default_client()
+            .expect("Failed to create HTTP client");
         let response = client.post(format!("http://{server}/documents"))
             .header("Content-Type", "application/json")
             // TODO: Do we want to set the ID here or want the server to
@@ -331,7 +350,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), 200);
         let response: CreateDocumentResponse = response.json().await.unwrap();
         assert!(matches!(response.status, Status::Success));
         assert_eq!(response.id, "Title of the document");

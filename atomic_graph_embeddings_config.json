@@ -1,0 +1,80 @@
+{
+  "id": "atomic-graph-embeddings",
+  "global_shortcut": "Ctrl+Shift+G",
+  "roles": {
+    "Atomic Graph Embeddings": {
+      "shortname": "graph-embeddings",
+      "name": "Atomic Graph Embeddings",
+      "relevance_function": "terraphim-graph",
+      "theme": "superhero",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "./docs/src"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Engineer": {
+      "shortname": "engineer",
+      "name": "Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "./docs/src"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "default",
+      "name": "Default",
+      "relevance_function": "terraphim-graph",
+      "theme": "spacelab",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "./docs/src"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "http://localhost:9883",
+          "service": "Atomic",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Atomic Graph Embeddings",
+  "selected_role": "Atomic Graph Embeddings"
+}

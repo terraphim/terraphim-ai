@@ -1,11 +1,17 @@
 use serde_json as json;
+use terraphim_automata::builder::BuilderError;
 use terraphim_config::TerraphimConfigError;
 
-mod command;
+pub mod command;
+pub mod haystack;
 pub mod indexer;
 pub mod thesaurus;
 
-pub use indexer::search_haystacks;
+pub use haystack::{AtomicHaystackIndexer, QueryRsHaystackIndexer};
+pub use indexer::{search_haystacks, RipgrepIndexer};
+
+// #[cfg(test)]
+// mod tests; // Removed - no tests module
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -23,6 +29,18 @@ pub enum Error {
 
     #[error("Config error: {0}")]
     Config(#[from] TerraphimConfigError),
+
+    #[error("Persistence error: {0}")]
+    Persistence(#[from] terraphim_persistence::Error),
+
+    #[error("Builder error: {0}")]
+    Builder(#[from] BuilderError),
+
+    #[error("HTTP request error: {0}")]
+    Http(#[from] reqwest::Error),
+
+    #[error("Validation error: {0}")]
+    Validation(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

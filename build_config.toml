@@ -1,0 +1,58 @@
+# Terraphim AI Build Configuration
+#
+# This file defines the build arguments and configuration for the Terraphim AI project.
+# It supports multiple build targets, feature flags, and environment-specific settings.
+
+target = "NativeRelease"
+
+[features]
+enabled = ["openrouter", "typescript", "native"]
+default_features = true
+
+[environment]
+name = "production"
+description = "Production environment configuration"
+
+[environment.variables]
+RUST_LOG = "info"
+TERRAPHIM_SERVER_HOSTNAME = "0.0.0.0:8000"
+TERRAPHIM_SERVER_API_ENDPOINT = "http://localhost:8000/api"
+
+[custom_args]
+# Additional custom build arguments can be specified here
+# offline = ""
+# verbose = ""
+
+[docker_args]
+# Docker-specific build arguments
+base_image = "ubuntu:24.04"
+context = "."
+dockerfile = "Dockerfiles/Dockerfile.server"
+target_stage = ""
+platform = ""
+cache_from = []
+cache_to = []
+
+[docker_args.build_args]
+RUST_VERSION = "1.75.0"
+TARGET_ARCH = "x86_64"
+
+[workspace]
+root = "."
+build_all = false
+members = []
+exclude = []
+default_member = ""
+
+[metadata]
+build_id = "terraphim-build-001"
+timestamp = "2025-07-21T10:30:00Z"
+commit_hash = ""
+initiator = "ci"
+tags = ["production", "release", "optimized"]
+
+[features.constraints]
+mutually_exclusive = []
+dependencies = {}
+target_specific = {}
+environment_specific = {}

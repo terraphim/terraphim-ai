@@ -1,0 +1,7 @@
+[package]
+name = "haystack_core"
+version = "0.2.0"
+edition = "2024"
+
+[dependencies]
+terraphim_types = { path = "../terraphim_types" }

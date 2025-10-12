@@ -1,0 +1,145 @@
+name: Test Matrix Configuration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [test-matrix]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      rust-targets: ${{ steps.targets.outputs.targets }}
+      ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
+
+    steps:
+      - name: Set test targets
+        id: targets
+        run: |
+          echo 'targets=["x86_64-unknown-linux-gnu"]' >> $GITHUB_OUTPUT
+
+      - name: Set Ubuntu versions
+        id: ubuntu
+        run: |
+          echo 'versions=["22.04"]' >> $GITHUB_OUTPUT
+
+  test-matrix-basic:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.setup.outputs.rust-targets) }}
+        ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
+
+    steps:
+      - name: Test matrix variables
+        run: |
+          echo "Target: ${{ matrix.target }}"
+          echo "Ubuntu Version: ${{ matrix.ubuntu-version }}"
+          echo "✅ Matrix configuration working!"
+
+  test-matrix-with-container:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.setup.outputs.rust-targets) }}
+        ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
+
+    container: ubuntu:${{ matrix.ubuntu-version }}
+
+    steps:
+      - name: Test container matrix
+        run: |
+          echo "Running in container ubuntu:${{ matrix.ubuntu-version }}"
+          echo "Target: ${{ matrix.target }}"
+          uname -a
+          cat /etc/os-release
+          echo "✅ Container matrix working!"
+
+  test-matrix-complex:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            ubuntu-version: "22.04"
+            build-type: native
+          - target: x86_64-unknown-linux-musl
+            ubuntu-version: "22.04"
+            build-type: musl
+
+    steps:
+      - name: Test complex matrix
+        run: |
+          echo "Target: ${{ matrix.target }}"
+          echo "Ubuntu Version: ${{ matrix.ubuntu-version }}"
+          echo "Build Type: ${{ matrix.build-type }}"
+          echo "✅ Complex matrix working!"
+
+  test-artifacts:
+    needs: test-matrix-basic
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ubuntu-version: ["22.04"]
+
+    steps:
+      - name: Create test artifact
+        run: |
+          mkdir -p test-output
+          echo "Test artifact for ubuntu-${{ matrix.ubuntu-version }}" > test-output/test-file.txt
+
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifact-${{ matrix.ubuntu-version }}
+          path: test-output/
+          retention-days: 1
+
+  validate-artifacts:
+    needs: test-artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-artifact-*
+          path: downloaded/
+          merge-multiple: true
+
+      - name: Validate artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          find downloaded/ -type f
+          cat downloaded/test-file.txt
+          echo "✅ Artifact handling working!"
+
+  summary:
+    needs: [test-matrix-basic, test-matrix-with-container, test-matrix-complex, validate-artifacts]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Matrix test summary
+        run: |
+          echo "## Matrix Test Results"
+          echo "- Basic matrix: ${{ needs.test-matrix-basic.result }}"
+          echo "- Container matrix: ${{ needs.test-matrix-with-container.result }}"
+          echo "- Complex matrix: ${{ needs.test-matrix-complex.result }}"
+          echo "- Artifact validation: ${{ needs.validate-artifacts.result }}"
+
+          if [[ "${{ needs.test-matrix-basic.result }}" == "success" ]] && \
+             [[ "${{ needs.test-matrix-with-container.result }}" == "success" ]] && \
+             [[ "${{ needs.test-matrix-complex.result }}" == "success" ]] && \
+             [[ "${{ needs.validate-artifacts.result }}" == "success" ]]; then
+            echo "🎉 All matrix tests passed!"
+          else
+            echo "❌ Some matrix tests failed"
+            exit 1
+          fi

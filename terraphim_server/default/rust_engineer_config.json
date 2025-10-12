@@ -1,0 +1,55 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+R",
+  "roles": {
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://query.rs",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "disable_content_enhancement": "true"
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.",
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "/Users/alex/projects/terraphim/terraphim-ai/terraphim_server/fixtures/haystack",
+          "service": "Ripgrep",
+          "read_only": false,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
+    }
+  },
+  "default_role": "Rust Engineer",
+  "selected_role": "Rust Engineer"
+}

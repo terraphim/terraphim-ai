@@ -1,0 +1,142 @@
+/* Popup styles for Terraphim AI Parse Extension */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    width: 280px;
+    min-height: 300px;
+    background: #ffffff;
+}
+
+main {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.header {
+    text-align: center;
+    border-bottom: 1px solid #e1e5e9;
+    padding-bottom: 12px;
+}
+
+.header h1 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: #1a73e8;
+    font-weight: 600;
+}
+
+.status {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status.success {
+    background: #e8f5e8;
+    color: #137333;
+    border: 1px solid #c3e6c3;
+}
+
+.status.error {
+    background: #fce8e6;
+    color: #d93025;
+    border: 1px solid #f9ab9d;
+}
+
+.status.warning {
+    background: #fef7e0;
+    color: #ea8600;
+    border: 1px solid #fdd663;
+}
+
+.status.info {
+    background: #e8f0fe;
+    color: #1a73e8;
+    border: 1px solid #aecbfa;
+}
+
+.server-info {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.server-info div {
+    margin: 2px 0;
+    color: #5f6368;
+}
+
+.buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+button {
+    padding: 10px 16px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background: white;
+    color: #1a73e8;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button:hover:not(:disabled) {
+    background: #f8f9fa;
+    border-color: #1a73e8;
+}
+
+button:active:not(:disabled) {
+    background: #e8f0fe;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f1f3f4;
+    color: #80868b;
+}
+
+button#terraphim-it {
+    background: #1a73e8;
+    color: white;
+    border-color: #1a73e8;
+}
+
+button#terraphim-it:hover:not(:disabled) {
+    background: #1557b0;
+    border-color: #1557b0;
+}
+
+.footer {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #e1e5e9;
+}
+
+.configure-btn {
+    width: 100%;
+    background: #f8f9fa;
+    color: #5f6368;
+    border-color: #dadce0;
+    font-size: 12px;
+    padding: 8px 12px;
+}
+
+.configure-btn:hover {
+    background: #e8eaed;
+    color: #202124;
+}
