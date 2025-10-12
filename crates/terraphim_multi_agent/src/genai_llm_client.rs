@@ -216,6 +216,7 @@ impl GenAiLlmClient {
             "ollama" => Self::new_ollama(model),
             "openai" => Self::new_openai(model),
             "anthropic" => Self::new_anthropic(model),
+            "openrouter" => Self::new_openrouter(model),
             _ => {
                 // Default to Ollama if unknown provider
                 log::warn!("Unknown provider '{}', defaulting to Ollama", provider);
@@ -266,6 +267,12 @@ mod tests {
         let client = GenAiLlmClient::from_config("openai", None);
         assert!(client.is_ok());
         assert_eq!(client.unwrap().model(), "gpt-3.5-turbo");
+
+        let client = GenAiLlmClient::from_config("openrouter", Some("deepseek/deepseek-chat".to_string()));
+        assert!(client.is_ok());
+        let client = client.unwrap();
+        assert_eq!(client.model(), "deepseek/deepseek-chat");
+        assert_eq!(client.provider(), "openrouter");
     }
 
     #[test]
