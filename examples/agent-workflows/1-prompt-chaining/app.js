@@ -14,7 +14,7 @@ class PromptChainingDemo {
     this.connectionStatus = null;
     this.settingsIntegration = null;
     this.agentConfigManager = null;
-    
+
     this.initializeElements();
     this.setupEventListeners();
     this.loadProjectTemplate();
@@ -27,14 +27,14 @@ class PromptChainingDemo {
     this.resetButton = document.getElementById('reset-chain');
     this.templateSelector = document.getElementById('project-template');
     this.statusElement = document.getElementById('workflow-status');
-    
+
     // Input elements
     this.projectDescription = document.getElementById('project-description');
     this.techStack = document.getElementById('tech-stack');
     this.requirements = document.getElementById('requirements');
-    
+
     // Agent configuration elements are managed by AgentConfigManager
-    
+
     // Output elements
     this.outputContainer = document.getElementById('chain-output');
     this.metricsContainer = document.getElementById('metrics-container');
@@ -46,7 +46,7 @@ class PromptChainingDemo {
     this.pauseButton.addEventListener('click', () => this.pauseChain());
     this.resetButton.addEventListener('click', () => this.resetChain());
     this.templateSelector.addEventListener('change', () => this.loadProjectTemplate());
-    
+
     // Auto-save inputs
     this.projectDescription.addEventListener('input', () => this.saveState());
     this.techStack.addEventListener('input', () => this.saveState());
@@ -66,17 +66,17 @@ class PromptChainingDemo {
       const initialized = await initializeSettings();
       if (initialized) {
         this.settingsIntegration = getSettingsIntegration();
-        
+
         // Get global API client created by settings
         this.apiClient = window.apiClient;
-        
+
         // Update connection status with new API client if available
         if (this.connectionStatus && this.apiClient && typeof this.connectionStatus.updateApiClient === 'function') {
           this.connectionStatus.updateApiClient(this.apiClient);
         }
-        
+
         console.log('Settings initialized successfully');
-        
+
         // Initialize connection status after API client is ready
         this.initializeConnectionStatus();
 
@@ -88,20 +88,20 @@ class PromptChainingDemo {
           onStateChange: () => this.saveState()
         });
         await this.agentConfigManager.initialize();
-        
+
         this.loadState();
       } else {
         // Fallback to default API client
         this.apiClient = new TerraphimApiClient();
         console.warn('Settings initialization failed, using default API client');
-        
+
         // Initialize connection status with fallback client
         this.initializeConnectionStatus();
       }
     } catch (error) {
       console.error('Settings initialization error:', error);
       this.apiClient = new TerraphimApiClient();
-      
+
       // Initialize connection status with fallback client
       this.initializeConnectionStatus();
     }
@@ -111,13 +111,13 @@ class PromptChainingDemo {
     const template = this.templateSelector.value;
     const templates = this.getProjectTemplates();
     const selectedTemplate = templates[template];
-    
+
     if (selectedTemplate) {
       // Set example values
       this.projectDescription.value = selectedTemplate.description;
       this.techStack.value = selectedTemplate.techStack;
       this.requirements.value = selectedTemplate.requirements;
-      
+
       // Load template steps
       this.steps = selectedTemplate.steps;
       this.createStepEditors();
@@ -322,23 +322,23 @@ class PromptChainingDemo {
 
   createStepEditors() {
     this.stepEditorsContainer.innerHTML = '';
-    
+
     // Define available roles for each step type (matching backend config)
     const availableRoles = [
       'BusinessAnalyst', 'BackendArchitect', 'ProductManager', 'DevelopmentAgent',
       'QAEngineer', 'DevOpsEngineer', 'TechnicalWriter', 'SvelteFrontendDeveloper'
     ];
-    
+
     this.steps.forEach((step, index) => {
       const stepEditor = document.createElement('div');
       stepEditor.className = 'step-editor';
       stepEditor.id = `step-editor-${step.id}`;
-      
+
       // Initialize step role if not set
       if (!step.role) {
         step.role = this.getDefaultRoleForStep(step.id);
       }
-      
+
       stepEditor.innerHTML = `
         <div class="step-title">
           <div style="display: flex; align-items: center;">
@@ -350,20 +350,20 @@ class PromptChainingDemo {
         <div class="step-config">
           <div class="config-row">
             <label for="role-${step.id}">Agent Role:</label>
-            <select 
-              class="form-input" 
+            <select
+              class="form-input"
               id="role-${step.id}"
               onchange="window.promptChainDemo.updateStepRole('${step.id}', this.value)"
             >
-              ${availableRoles.map(role => 
+              ${availableRoles.map(role =>
                 `<option value="${role}" ${step.role === role ? 'selected' : ''}>${role}</option>`
               ).join('')}
             </select>
           </div>
           <div class="config-row">
             <label for="system-prompt-${step.id}">System Prompt (optional):</label>
-            <textarea 
-              class="form-input" 
+            <textarea
+              class="form-input"
               placeholder="Custom system prompt for this step..."
               rows="2"
               id="system-prompt-${step.id}"
@@ -372,8 +372,8 @@ class PromptChainingDemo {
           </div>
           <div class="config-row">
             <label for="prompt-${step.id}">Step Instructions:</label>
-            <textarea 
-              class="form-input" 
+            <textarea
+              class="form-input"
               placeholder="Step prompt..."
               rows="3"
               id="prompt-${step.id}"
@@ -382,7 +382,7 @@ class PromptChainingDemo {
           </div>
         </div>
       `;
-      
+
       this.stepEditorsContainer.appendChild(stepEditor);
     });
   }
@@ -431,11 +431,11 @@ class PromptChainingDemo {
       const promptTextarea = document.getElementById(`prompt-${stepId}`);
       const roleSelect = document.getElementById(`role-${stepId}`);
       const systemPromptTextarea = document.getElementById(`system-prompt-${stepId}`);
-      
+
       if (promptTextarea) step.prompt = promptTextarea.value;
       if (roleSelect) step.role = roleSelect.value;
       if (systemPromptTextarea) step.system_prompt = systemPromptTextarea.value;
-      
+
       this.saveState();
     }
   }
@@ -450,16 +450,16 @@ class PromptChainingDemo {
     this.startButton.disabled = true;
     this.pauseButton.disabled = false;
     this.resetButton.disabled = true;
-    
+
     // Create pipeline visualization
     this.visualizer.clear();
     const pipeline = this.visualizer.createPipeline(this.steps, 'pipeline-container');
     this.visualizer.createProgressBar('progress-container');
-    
+
     // Clear output
     this.outputContainer.innerHTML = '';
     this.currentStepIndex = 0;
-    
+
     try {
       const agentState = this.agentConfigManager.getState();
 
@@ -481,13 +481,13 @@ class PromptChainingDemo {
       };
 
       // Enhance input with settings
-      const enhancedInput = this.settingsIntegration 
+      const enhancedInput = this.settingsIntegration
         ? this.settingsIntegration.enhanceWorkflowInput(input)
         : input;
 
       // Execute workflow
       await this.executePromptChain(enhancedInput);
-      
+
     } catch (error) {
       console.error('Chain execution failed:', error);
       this.updateStatus('error');
@@ -497,7 +497,7 @@ class PromptChainingDemo {
 
   async executePromptChain(input) {
     const startTime = Date.now();
-    
+
     try {
       // Prepare step configurations for backend
       const stepConfigs = this.steps.map(step => ({
@@ -509,7 +509,7 @@ class PromptChainingDemo {
       }));
 
       const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
-      
+
       // Execute the entire prompt chain workflow with step configurations
       console.log('Executing prompt chain with step configs:', stepConfigs);
       const result = await this.apiClient.executePromptChain({
@@ -520,15 +520,15 @@ class PromptChainingDemo {
         config: input.config,
         llm_config: input.llm_config
       });
-      
+
       console.log('Prompt chain result:', result);
-      
+
       // Process results and update UI step by step
       if (result.result && result.result.steps) {
         for (let i = 0; i < result.result.steps.length; i++) {
           const stepResult = result.result.steps[i];
           const step = this.steps[i];
-          
+
           if (step) {
             // Update visualization
             this.visualizer.updateStepStatus(step.id, 'active');
@@ -536,34 +536,34 @@ class PromptChainingDemo {
               ((i + 1) / this.steps.length) * 100,
               `Completed: ${step.name}`
             );
-            
+
             // Highlight current step editor
             this.highlightCurrentStep(step.id);
-            
+
             // Add output to UI
             this.addStepOutput(step, {
               output: stepResult.output,
               duration: stepResult.duration_ms || 2000,
               metadata: stepResult
             });
-            
+
             // Mark as completed
             this.visualizer.updateStepStatus(step.id, 'completed', {
               duration: stepResult.duration_ms || 2000
             });
-            
+
             // Small delay for visual effect
             await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
       }
-      
+
       // Completion
       this.updateStatus('success');
       this.startButton.disabled = false;
       this.pauseButton.disabled = true;
       this.resetButton.disabled = false;
-      
+
       // Show metrics
       const executionSummary = result.result?.execution_summary || {};
       this.showMetrics({
@@ -574,12 +574,12 @@ class PromptChainingDemo {
         linesOfCode: Math.floor(Math.random() * 500 + 200),
         filesGenerated: this.steps.length + Math.floor(Math.random() * 5),
       });
-      
+
     } catch (error) {
       console.error('Prompt chain execution failed:', error);
       this.updateStatus('error');
       this.showError(error.message);
-      
+
       this.startButton.disabled = false;
       this.pauseButton.disabled = true;
       this.resetButton.disabled = false;
@@ -594,7 +594,7 @@ class PromptChainingDemo {
       stepIndex,
       totalSteps: this.steps.length
     };
-    
+
     // Enhanced agent configuration for prompt chaining
     const agentConfig = this.apiClient.createAgentWorkflowConfig('prompt-chain', {
       prompt: stepInput.prompt,
@@ -615,16 +615,16 @@ class PromptChainingDemo {
         quality_gates: true
       }
     });
-    
+
     // Build the full prompt with context from previous steps
     const fullPrompt = input.context ? `${input.context}\n\nCurrent Task: ${stepInput.prompt}` : stepInput.prompt;
-    
+
     console.log(`Step ${stepIndex + 1} Debug Info:`);
     console.log('- Step Prompt:', stepInput.prompt);
     console.log('- Accumulated Context:', input.context || 'None');
     console.log('- Full Prompt Being Sent:', fullPrompt);
     console.log('- Agent Role:', agentConfig.role || agentConfig.input?.role);
-    
+
     // Execute real prompt chain workflow with enhanced agent configuration
     // Use WebSocket path for better timeout handling and real-time updates
     const result = await this.apiClient.executePromptChain({
@@ -634,7 +634,7 @@ class PromptChainingDemo {
       ...(agentConfig.config && { config: agentConfig.config }),
       ...(agentConfig.llm_config && { llm_config: agentConfig.llm_config })
     });
-    
+
     console.log(`Step ${stepIndex + 1} HTTP result:`, result);
     // Extract text content from response
     let extractedOutput;
@@ -661,9 +661,9 @@ class PromptChainingDemo {
     } else {
       extractedOutput = this.generateStepOutput(step, input);
     }
-    
+
     console.log(`Step ${stepIndex + 1} Extracted Output:`, extractedOutput);
-    
+
     return {
       output: extractedOutput,
       duration: 2000 + Math.random() * 3000,
@@ -733,7 +733,7 @@ User: {
   createdAt: Date
 }
 \`\`\``,
-      
+
       architecture: `# System Architecture
 
 ## High-Level Architecture
@@ -760,7 +760,7 @@ src/
 
 ## Database Schema
 Tasks and Users collections with proper indexing on userId and email fields.`,
-      
+
       planning: `# Development Plan
 
 ## Phase 1: Foundation (Days 1-2)
@@ -833,7 +833,7 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
 function authenticateToken(req, res, next) {
   const token = req.headers['authorization'];
   if (!token) return res.sendStatus(401);
-  
+
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
@@ -869,7 +869,7 @@ function TaskList() {
   const toggleTask = async (id, completed) => {
     try {
       await api.put(\`/tasks/\${id}\`, { completed });
-      setTasks(tasks.map(task => 
+      setTasks(tasks.map(task =>
         task.id === id ? { ...task, completed } : task
       ));
     } catch (error) {
@@ -914,7 +914,7 @@ describe('Tasks API', () => {
       .get('/api/tasks')
       .set('Authorization', token)
       .expect(200);
-    
+
     expect(Array.isArray(response.body)).toBe(true);
   });
 
@@ -924,13 +924,13 @@ describe('Tasks API', () => {
       title: 'Test Task',
       description: 'Test Description'
     };
-    
+
     const response = await request(app)
       .post('/api/tasks')
       .set('Authorization', token)
       .send(newTask)
       .expect(200);
-    
+
     expect(response.body.title).toBe(newTask.title);
     expect(response.body.id).toBeDefined();
   });
@@ -953,7 +953,7 @@ test('renders task list', async () => {
   });
 
   render(<TaskList />);
-  
+
   await waitFor(() => {
     expect(screen.getByText('Test Task')).toBeInTheDocument();
   });
@@ -966,7 +966,7 @@ test('toggles task completion', async () => {
   api.put.mockResolvedValue({});
 
   render(<TaskList />);
-  
+
   await waitFor(() => {
     const checkbox = screen.getByRole('checkbox');
     fireEvent.click(checkbox);
@@ -1034,7 +1034,7 @@ services:
       - JWT_SECRET=production-secret
     depends_on:
       - mongo
-  
+
   mongo:
     image: mongo:5
     volumes:
@@ -1060,7 +1060,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
 - **Docker**: Use provided Dockerfile and docker-compose
 - **Traditional VPS**: PM2 process manager with Nginx reverse proxy`
     };
-    
+
     return outputs[step.id] || `Generated output for ${step.name}:\n\n${input.prompt.substring(0, 200)}...`;
   }
 
@@ -1071,9 +1071,9 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
       <h4>${step.name}</h4>
       <div class="step-content">${result.output}</div>
     `;
-    
+
     this.outputContainer.appendChild(outputDiv);
-    
+
     // Auto-scroll to show new content
     outputDiv.scrollIntoView({ behavior: 'smooth' });
   }
@@ -1083,7 +1083,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
     document.querySelectorAll('.step-editor').forEach(editor => {
       editor.classList.remove('active');
     });
-    
+
     // Add active class to current step
     const currentEditor = document.getElementById(`step-editor-${stepId}`);
     if (currentEditor) {
@@ -1108,7 +1108,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
       border: 1px solid var(--danger);
     `;
     errorDiv.textContent = `Error: ${message}`;
-    
+
     this.outputContainer.appendChild(errorDiv);
   }
 
@@ -1143,18 +1143,18 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
     this.currentExecution = null;
     this.isPaused = false;
     this.currentStepIndex = 0;
-    
+
     this.updateStatus('idle');
     this.startButton.disabled = false;
     this.pauseButton.disabled = true;
     this.pauseButton.textContent = 'Pause';
     this.resetButton.disabled = false;
-    
+
     // Clear visualizations
     this.visualizer.clear();
     this.outputContainer.innerHTML = '<p class="text-muted">Start the development process to see step-by-step outputs here.</p>';
     this.metricsContainer.style.display = 'none';
-    
+
     // Remove active highlighting
     document.querySelectorAll('.step-editor').forEach(editor => {
       editor.classList.remove('active');
@@ -1169,7 +1169,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
       success: 'Completed',
       error: 'Error'
     };
-    
+
     this.statusElement.textContent = statusText[status] || status;
     this.statusElement.className = `workflow-status ${status}`;
   }
@@ -1187,7 +1187,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
         prompt: (document.getElementById(`prompt-${step.id}`) && document.getElementById(`prompt-${step.id}`).value) || step.prompt
       }))
     };
-    
+
     localStorage.setItem('prompt-chain-state', JSON.stringify(state));
   }
 
@@ -1199,7 +1199,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
         this.projectDescription.value = state.projectDescription || '';
         this.techStack.value = state.techStack || '';
         this.requirements.value = state.requirements || '';
-        
+
         if (state.template) {
           this.templateSelector.value = state.template;
         }
@@ -1223,7 +1223,7 @@ API endpoints documented with OpenAPI 3.0 specification available at /api/docs
 document.addEventListener('DOMContentLoaded', async () => {
   window.promptChainDemo = new PromptChainingDemo();
   await window.promptChainDemo.initializeSettings();
-  
+
   // Ensure settings UI is globally available
   if (window.promptChainDemo.settingsIntegration && window.promptChainDemo.settingsIntegration.getSettingsUI()) {
     console.log('Settings UI ready - use Ctrl+, to open');

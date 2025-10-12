@@ -7,41 +7,41 @@
     <h1>WebSocket Protocol Fix Test</h1>
     <div id="status">Connecting...</div>
     <div id="messages"></div>
-    
+
     <script src="shared/websocket-client.js"></script>
     <script>
         const statusDiv = document.getElementById('status');
         const messagesDiv = document.getElementById('messages');
-        
+
         function addMessage(msg) {
             const div = document.createElement('div');
             div.textContent = `${new Date().toISOString()}: ${msg}`;
             messagesDiv.appendChild(div);
         }
-        
+
         // Test WebSocket client with fixed protocol
         const client = new TerraphimWebSocketClient({
             url: 'ws://127.0.0.1:8000/ws'
         });
-        
+
         client.subscribe('connected', () => {
             statusDiv.textContent = 'Connected!';
             addMessage('WebSocket connected successfully');
-            
+
             // Test heartbeat message format
             addMessage('Testing heartbeat message...');
         });
-        
+
         client.subscribe('disconnected', (data) => {
             statusDiv.textContent = 'Disconnected';
             addMessage(`Disconnected: ${data.reason || 'Unknown reason'}`);
         });
-        
+
         client.subscribe('error', (data) => {
             statusDiv.textContent = 'Error';
             addMessage(`Error: ${data.error}`);
         });
-        
+
         // Capture and verify message format
         window.sentMessages = [];
         const originalSend = WebSocket.prototype.send;
@@ -50,7 +50,7 @@
                 const parsed = JSON.parse(data);
                 window.sentMessages.push(parsed);
                 addMessage(`Sending message: ${JSON.stringify(parsed, null, 2)}`);
-                
+
                 // Verify protocol compliance
                 if (parsed.command_type) {
                     addMessage('✅ Message uses correct command_type field');
@@ -62,10 +62,10 @@
             } catch (e) {
                 addMessage(`Raw message: ${data}`);
             }
-            
+
             return originalSend.call(this, data);
         };
-        
+
         // Test workflow start after connection
         setTimeout(() => {
             if (client.isConnected) {

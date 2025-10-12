@@ -1037,6 +1037,7 @@ mod tests {
                     location: "localsearch".to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -1050,6 +1051,7 @@ mod tests {
                     location: "localsearch".to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -1074,6 +1076,7 @@ mod tests {
                     location: "/tmp/system_operator/pages/".to_string(),
                     service: ServiceType::Ripgrep,
                     read_only: false,
+                    fetch_content: false,
                     atomic_server_secret: None,
                     extra_parameters: std::collections::HashMap::new(),
                 }];
@@ -1119,6 +1122,7 @@ mod tests {
             location: "localsearch".to_string(),
             service: ServiceType::Ripgrep,
             read_only: false,
+            fetch_content: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];

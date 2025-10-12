@@ -39,7 +39,7 @@ This interactive example demonstrates parallel execution of AI analysis tasks, w
 - **Approach**: Quantitative and evidence-based evaluation
 - **Output**: Statistical trends, market research, ROI projections
 
-### 🎨 Creative Perspective  
+### 🎨 Creative Perspective
 - **Focus**: Innovative thinking with alternative solutions
 - **Strengths**: Innovation, alternative solutions, out-of-box thinking
 - **Approach**: Imaginative and possibility-focused exploration
@@ -157,7 +157,7 @@ async executeParallelTasks(topic) {
   const tasks = Array.from(this.selectedPerspectives).map(perspectiveId => {
     return this.executePerspectiveAnalysis(perspectiveId, topic);
   });
-  
+
   // Execute all tasks in parallel
   const results = await Promise.all(tasks);
   return results;

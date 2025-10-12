@@ -98,10 +98,10 @@ let body_bytes = body.collect().await?.to_bytes();
 async fn test_arc_memory_only_no_memory_leaks() {
     let storage = DeviceStorage::arc_memory_only().await.unwrap();
     let weak = Arc::downgrade(&storage);
-    
+
     drop(storage);
-    
-    assert!(weak.upgrade().is_none(), 
+
+    assert!(weak.upgrade().is_none(),
         "Storage should be freed after dropping Arc");
 }
 ```
@@ -113,7 +113,7 @@ async fn test_arc_memory_only_no_memory_leaks() {
 
 ### 1. Test File Naming Strategy 📝
 - **Issue**: Test names can trigger security scans
-- **Examples to Avoid**: 
+- **Examples to Avoid**:
   - Function names >40 chars (Cloudflare token pattern)
   - Words like "token", "secret", "key" in long identifiers
 - **Solution**: Concise, descriptive test names under 35 characters
@@ -264,7 +264,7 @@ ssh bigbox "source ~/.cargo/env && cargo test -p terraphim_multi_agent ..."
 ### Test Breakdown by Category:
 - Prompt injection prevention: 27 tests (12 E2E + 15 bypass)
 - Memory safety: 7 tests
-- Network validation: 20 tests  
+- Network validation: 20 tests
 - HTTP client security: 9 tests
 - Concurrent security: 9 tests
 - Error boundaries: 8 tests

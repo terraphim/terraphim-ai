@@ -81,7 +81,7 @@ for block in blocks {
     println!("Language: {}", block.language);
     println!("Confidence: {:.2}", block.execution_confidence);
     println!("Code:\n{}", block.code);
-    
+
     // Validate before execution
     if let Err(e) = extractor.validate_code(&block) {
         eprintln!("Security violation: {}", e);
@@ -176,17 +176,17 @@ Pre/post processing hooks for tool and LLM interactions inspired by Claude Agent
 #[async_trait]
 pub trait Hook: Send + Sync {
     fn name(&self) -> &str;
-    
-    async fn pre_tool(&self, context: &PreToolContext) 
+
+    async fn pre_tool(&self, context: &PreToolContext)
         -> Result<HookDecision, VmExecutionError>;
-    
-    async fn post_tool(&self, context: &PostToolContext) 
+
+    async fn post_tool(&self, context: &PostToolContext)
         -> Result<HookDecision, VmExecutionError>;
-    
-    async fn pre_llm(&self, context: &PreLlmContext) 
+
+    async fn pre_llm(&self, context: &PreLlmContext)
         -> Result<HookDecision, VmExecutionError>;
-    
-    async fn post_llm(&self, context: &PostLlmContext) 
+
+    async fn post_llm(&self, context: &PostLlmContext)
         -> Result<HookDecision, VmExecutionError>;
 }
 ```
@@ -492,8 +492,8 @@ impl Hook for CustomSecurityHook {
     fn name(&self) -> &str {
         "CustomSecurityHook"
     }
-    
-    async fn pre_tool(&self, context: &PreToolContext) 
+
+    async fn pre_tool(&self, context: &PreToolContext)
         -> Result<HookDecision, VmExecutionError> {
         for pattern in &self.patterns {
             if context.code.contains(pattern) {
@@ -504,7 +504,7 @@ impl Hook for CustomSecurityHook {
         }
         Ok(HookDecision::Allow)
     }
-    
+
     // Implement other hook methods...
 }
 ```
@@ -639,7 +639,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load agent with VM execution enabled
     let role = Role::from_file("examples/vm_execution_agent_config.json")?;
     let agent = TerraphimAgent::new(role).await?;
-    
+
     // Execute fibonacci calculation
     let input = CommandInput {
         command: CommandType::Execute,
@@ -659,7 +659,7 @@ print(f"Fibonacci(20) = {result}")
         "#.to_string(),
         metadata: None,
     };
-    
+
     match agent.process_command(input).await {
         Ok(result) if result.success => {
             println!("✓ Execution successful!");
@@ -672,7 +672,7 @@ print(f"Fibonacci(20) = {result}")
             eprintln!("✗ Error: {}", e);
         }
     }
-    
+
     Ok(())
 }
 ```

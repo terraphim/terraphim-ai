@@ -693,7 +693,7 @@ pub(crate) async fn chat_completion(
     // Determine model name for response
     let model_name = request
         .model
-        .or_else(|| {
+        .or({
             #[cfg(feature = "openrouter")]
             {
                 role.llm_chat_model

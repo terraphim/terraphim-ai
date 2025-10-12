@@ -311,21 +311,14 @@ fn create_ollama_live_role(base_url: &str) -> terraphim_config::Role {
         theme: "default".into(),
         kg: None,
         haystacks: vec![],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: true,
+        llm_api_key: None,
+        llm_model: Some("gemma3:270m".to_string()),
+        llm_auto_summarize: false,
+        llm_chat_enabled: true,
+        llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
+        llm_chat_model: Some("gemma3:270m".to_string()),
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
 

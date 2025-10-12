@@ -8,8 +8,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ConflictType, ConstraintType, Goal, GoalAlignmentResult, GoalConflict,
-    GoalConstraint, GoalId,
+    ConflictType, ConstraintType, Goal, GoalAlignmentResult, GoalConflict, GoalConstraint, GoalId,
 };
 
 /// Conflict detection engine
@@ -612,7 +611,7 @@ impl Default for ConflictDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentPid, ConstraintType, Goal, GoalConstraint, GoalLevel};
+    use crate::{AgentPid, Goal, GoalLevel};
 
     #[test]
     fn test_resource_conflict_detection() {

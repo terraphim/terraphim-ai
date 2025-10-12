@@ -12,28 +12,28 @@ graph TD
     B --> C[Task Analysis]
     C --> D[WorkflowFactory]
     D --> E{Pattern Selection}
-    
+
     E -->|Simple Tasks| F[Prompt Chaining]
     E -->|Cost Optimization| G[Routing]
     E -->|Independent Subtasks| H[Parallelization]
     E -->|Complex Planning| I[Orchestrator-Workers]
     E -->|Quality Critical| J[Evaluator-Optimizer]
-    
+
     F --> K[WorkflowOutput]
     G --> K
     H --> K
     I --> K
     J --> K
-    
+
     K --> L[Evolution State Update]
     L --> M[VersionedMemory]
     L --> N[VersionedTaskList]
     L --> O[VersionedLessons]
-    
+
     M --> P[Agent Evolution Viewer]
     N --> P
     O --> P
-    
+
     P --> Q[Timeline Analysis]
     P --> R[Performance Metrics]
     P --> S[Learning Insights]
@@ -50,15 +50,15 @@ graph LR
     A[AgentEvolutionSystem] --> B[VersionedMemory]
     A --> C[VersionedTaskList]
     A --> D[VersionedLessons]
-    
+
     B --> E[Short-term Memory]
     B --> F[Long-term Memory]
     B --> G[Episodic Memory]
-    
+
     C --> H[Active Tasks]
     C --> I[Completed Tasks]
     C --> J[Task Dependencies]
-    
+
     D --> K[Technical Lessons]
     D --> L[Process Lessons]
     D --> M[Success Patterns]
@@ -94,23 +94,23 @@ graph TD
     A --> D[Parallelization]
     A --> E[Orchestrator-Workers]
     A --> F[Evaluator-Optimizer]
-    
+
     B --> B1[Step-by-step execution]
     B --> B2[Context preservation]
     B --> B3[Quality checkpoints]
-    
+
     C --> C1[Cost optimization]
     C --> C2[Performance routing]
     C --> C3[Multi-criteria selection]
-    
+
     D --> D1[Concurrent execution]
     D --> D2[Result aggregation]
     D --> D3[Failure threshold management]
-    
+
     E --> E1[Hierarchical planning]
     E --> E2[Specialized worker roles]
     E --> E3[Coordination strategies]
-    
+
     F --> F1[Iterative improvement]
     F --> F2[Quality evaluation]
     F --> F3[Feedback loops]
@@ -127,16 +127,16 @@ sequenceDiagram
     participant User
     participant PC as PromptChaining
     participant LLM as LlmAdapter
-    
+
     User->>PC: Input prompt
     PC->>PC: Create chain steps
-    
+
     loop For each step
         PC->>LLM: Execute step with context
         LLM-->>PC: Step result
         PC->>PC: Validate and accumulate
     end
-    
+
     PC-->>User: Final aggregated result
 ```
 
@@ -153,15 +153,15 @@ sequenceDiagram
 graph TD
     A[Input Task] --> B[TaskRouter]
     B --> C{Analysis}
-    
+
     C -->|Simple| D[Fast/Cheap Model]
     C -->|Complex| E[Advanced Model]
     C -->|Specialized| F[Domain Expert Model]
-    
+
     D --> G[Route Execution]
     E --> G
     F --> G
-    
+
     G --> H[Performance Tracking]
     H --> I[Route Optimization]
 ```
@@ -182,12 +182,12 @@ graph TD
     B --> D[Parallel Task 2]
     B --> E[Parallel Task 3]
     B --> F[Parallel Task N]
-    
+
     C --> G[Result Aggregator]
     D --> G
     E --> G
     F --> G
-    
+
     G --> H{Aggregation Strategy}
     H -->|Concatenation| I[Simple Merge]
     H -->|Best Result| J[Quality Selection]
@@ -209,21 +209,21 @@ graph TD
     A[Input Task] --> B[Orchestrator]
     B --> C[Execution Plan]
     C --> D[Task Assignment]
-    
+
     D --> E[Analyst Worker]
     D --> F[Researcher Worker]
     D --> G[Writer Worker]
     D --> H[Reviewer Worker]
     D --> I[Validator Worker]
     D --> J[Synthesizer Worker]
-    
+
     E --> K[Quality Gate]
     F --> K
     G --> K
     H --> K
     I --> K
     J --> K
-    
+
     K --> L{Quality Check}
     L -->|Pass| M[Final Synthesis]
     L -->|Fail| N[Retry/Reassign]
@@ -245,15 +245,15 @@ sequenceDiagram
     participant Gen as Generator
     participant Eval as Evaluator
     participant Opt as Optimizer
-    
+
     User->>EO: Input task
     EO->>Gen: Generate initial content
     Gen-->>EO: Initial result
-    
+
     loop Until quality threshold or max iterations
         EO->>Eval: Evaluate current content
         Eval-->>EO: Quality assessment + feedback
-        
+
         alt Quality threshold met
             EO-->>User: Final result
         else Needs improvement
@@ -279,15 +279,15 @@ graph LR
     A[EvolutionWorkflowManager] --> B[Task Analysis Engine]
     A --> C[Workflow Selection Logic]
     A --> D[Evolution State Manager]
-    
+
     B --> E[Complexity Assessment]
     B --> F[Domain Classification]
     B --> G[Resource Estimation]
-    
+
     C --> H[Pattern Suitability Scoring]
     C --> I[Performance Optimization]
     C --> J[Cost Analysis]
-    
+
     D --> K[Memory Updates]
     D --> L[Task Tracking]
     D --> M[Lesson Learning]
@@ -300,26 +300,26 @@ flowchart TD
     A[User Request] --> B[Task Analysis]
     B --> C[Pattern Selection]
     C --> D[Workflow Execution]
-    
+
     D --> E[Resource Tracking]
     D --> F[Quality Measurement]
     D --> G[Performance Metrics]
-    
+
     E --> H[Evolution Update]
     F --> H
     G --> H
-    
+
     H --> I[Memory Evolution]
     H --> J[Task Evolution]
     H --> K[Lessons Evolution]
-    
+
     I --> L[Snapshot Creation]
     J --> L
     K --> L
-    
+
     L --> M[Persistence Layer]
     M --> N[Evolution Viewer]
-    
+
     N --> O[Timeline Analysis]
     N --> P[Comparison Tools]
     N --> Q[Insights Dashboard]
@@ -334,7 +334,7 @@ erDiagram
         datetime created_at
         datetime last_updated
     }
-    
+
     MEMORY_SNAPSHOT {
         string snapshot_id
         string agent_id
@@ -344,7 +344,7 @@ erDiagram
         json episodic_memory
         json metadata
     }
-    
+
     TASK_SNAPSHOT {
         string snapshot_id
         string agent_id
@@ -354,7 +354,7 @@ erDiagram
         json task_dependencies
         json performance_metrics
     }
-    
+
     LESSON_SNAPSHOT {
         string snapshot_id
         string agent_id
@@ -364,7 +364,7 @@ erDiagram
         json success_patterns
         json failure_analysis
     }
-    
+
     WORKFLOW_EXECUTION {
         string execution_id
         string agent_id
@@ -376,7 +376,7 @@ erDiagram
         json execution_trace
         float quality_score
     }
-    
+
     AGENT_EVOLUTION_SYSTEM ||--o{ MEMORY_SNAPSHOT : "has"
     AGENT_EVOLUTION_SYSTEM ||--o{ TASK_SNAPSHOT : "has"
     AGENT_EVOLUTION_SYSTEM ||--o{ LESSON_SNAPSHOT : "has"
@@ -390,20 +390,20 @@ erDiagram
 ```mermaid
 graph TD
     A[Workflow Output] --> B[Quality Evaluator]
-    
+
     B --> C[Accuracy Assessment]
     B --> D[Completeness Check]
     B --> E[Clarity Evaluation]
     B --> F[Relevance Analysis]
-    
+
     C --> G[Weighted Scoring]
     D --> G
     E --> G
     F --> G
-    
+
     G --> H[Quality Score 0.0-1.0]
     H --> I[Quality Gate Decision]
-    
+
     I -->|Pass| J[Accept Result]
     I -->|Fail| K[Trigger Optimization]
 ```
@@ -413,19 +413,19 @@ graph TD
 ```mermaid
 graph LR
     A[Workflow Execution] --> B[Metrics Collection]
-    
+
     B --> C[Execution Time]
     B --> D[Token Consumption]
     B --> E[Memory Usage]
     B --> F[LLM Calls]
     B --> G[Error Rates]
-    
+
     C --> H[Performance Dashboard]
     D --> H
     E --> H
     F --> H
     G --> H
-    
+
     H --> I[Optimization Recommendations]
     H --> J[Resource Planning]
     H --> K[Cost Analysis]
@@ -438,11 +438,11 @@ graph TD
     A[User Input] --> B[Input Sanitization]
     B --> C[Access Control]
     C --> D[Role-based Permissions]
-    
+
     D --> E[Workflow Execution]
     E --> F[Data Isolation]
     F --> G[Memory Encryption]
-    
+
     G --> H[Audit Logging]
     H --> I[Privacy Compliance]
     I --> J[Secure Output]
@@ -454,24 +454,24 @@ graph TD
 graph TD
     A[User Interface] --> B[API Gateway]
     B --> C[Load Balancer]
-    
+
     C --> D[Workflow Manager Instances]
     C --> E[Workflow Manager Instances]
     C --> F[Workflow Manager Instances]
-    
+
     D --> G[Evolution Storage]
     E --> G
     F --> G
-    
+
     G --> H[Persistence Backends]
     H --> I[Memory Backend]
     H --> J[SQLite Backend]
     H --> K[Redis Backend]
-    
+
     D --> L[LLM Providers]
     E --> L
     F --> L
-    
+
     L --> M[OpenAI]
     L --> N[Anthropic]
     L --> O[Local Models]
@@ -487,7 +487,7 @@ graph LR
     B --> C[Pattern Registration]
     C --> D[Factory Integration]
     D --> E[Automatic Selection]
-    
+
     B --> F[Required Methods]
     F --> G[pattern_name()]
     F --> H[execute()]
@@ -503,7 +503,7 @@ graph LR
     B --> C[Provider Integration]
     C --> D[Adapter Factory]
     D --> E[Runtime Selection]
-    
+
     B --> F[Required Methods]
     F --> G[provider_name()]
     F --> H[complete()]
@@ -526,22 +526,22 @@ graph LR
 ```mermaid
 timeline
     title Agent Evolution System Roadmap
-    
+
     Phase 1 : Core Implementation
             : 5 Workflow Patterns
             : Evolution Tracking
             : Basic Testing
-    
+
     Phase 2 : Production Ready
             : Complete Documentation
             : End-to-end Tests
             : Performance Optimization
-    
+
     Phase 3 : Advanced Features
             : Distributed Execution
             : ML-based Optimization
             : Advanced Analytics
-    
+
     Phase 4 : Enterprise Features
             : Multi-tenant Support
             : Advanced Security

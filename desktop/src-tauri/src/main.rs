@@ -42,7 +42,7 @@ async fn initialize_user_data_folder(
         let has_docs = data_path.read_dir()?.any(|entry| {
             if let Ok(entry) = entry {
                 let path = entry.path();
-                path.is_file() && path.extension().map_or(false, |ext| ext == "md")
+                path.is_file() && path.extension().is_some_and(|ext| ext == "md")
             } else {
                 false
             }

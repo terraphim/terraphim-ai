@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
 
         // Create intelligent agent for data management
         let role = create_test_role();
-        let mut agent = TerraphimAgent::new(role, persistence, None)
+        let agent = TerraphimAgent::new(role, persistence, None)
             .await
             .map_err(|e| terraphim_persistence::Error::Serde(e.to_string()))?;
         agent

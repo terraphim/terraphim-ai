@@ -13,7 +13,7 @@ class OrchestratorWorkersDemo {
     this.currentStage = 0;
     this.stageResults = new Map();
     this.knowledgeGraph = new Map();
-    
+
     // Define available data sources
     this.dataSources = [
       {
@@ -154,13 +154,13 @@ class OrchestratorWorkersDemo {
   async init() {
     // Initialize settings system first
     await this.initializeSettings();
-    
+
     this.setupEventListeners();
     this.renderDataSources();
     this.renderWorkers();
     this.renderPipelineStages();
     this.createWorkflowPipeline();
-    
+
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
@@ -252,7 +252,7 @@ class OrchestratorWorkersDemo {
 
   populateRoleSelector() {
     if (!this.roleSelector) return;
-    
+
     this.roleSelector.innerHTML = '';
     for (const roleName in this.roles) {
       const option = document.createElement('option');
@@ -265,7 +265,7 @@ class OrchestratorWorkersDemo {
 
   onRoleChange() {
     if (!this.roleSelector || !this.systemPrompt) return;
-    
+
     const selectedRoleName = this.roleSelector.value;
     const role = this.roles[selectedRoleName];
 
@@ -341,7 +341,7 @@ class OrchestratorWorkersDemo {
 
   toggleDataSource(sourceId) {
     const card = document.querySelector(`[data-source-id="${sourceId}"]`);
-    
+
     if (this.selectedSources.has(sourceId)) {
       this.selectedSources.delete(sourceId);
       card.classList.remove('selected');
@@ -364,7 +364,7 @@ class OrchestratorWorkersDemo {
       { id: 'execute', name: 'Worker Execution' },
       { id: 'aggregate', name: 'Result Aggregation' }
     ];
-    
+
     this.visualizer.createPipeline(steps);
     this.visualizer.createProgressBar('progress-container');
   }
@@ -374,9 +374,9 @@ class OrchestratorWorkersDemo {
       alert('Query input not found. Please refresh the page.');
       return;
     }
-    
+
     const query = this.queryInput.value.trim();
-    
+
     if (!query) {
       alert('Please enter a research query.');
       return;
@@ -390,61 +390,61 @@ class OrchestratorWorkersDemo {
     this.isRunning = true;
     this.currentStage = 0;
     this.updateControlsState();
-    
+
     // Update workflow status
     document.getElementById('workflow-status').textContent = 'Orchestrating...';
     document.getElementById('workflow-status').className = 'workflow-status running';
-    
+
     // Hide initial state and show pipeline stages
     document.getElementById('initial-state').style.display = 'none';
     document.getElementById('pipeline-stages').style.display = 'block';
-    
+
     // Reset and setup pipeline
     this.visualizer.updateStepStatus('orchestrate', 'active');
     this.visualizer.updateProgress(10, 'Analyzing research query and planning tasks...');
-    
+
     await this.delay(2000);
-    
+
     // Task orchestration phase
     await this.orchestrateTasks();
-    
+
     this.visualizer.updateStepStatus('orchestrate', 'completed');
     this.visualizer.updateStepStatus('execute', 'active');
     this.visualizer.updateProgress(20, 'Executing pipeline stages with specialized workers...');
-    
+
     // Execute pipeline stages sequentially
     for (let i = 0; i < this.pipelineStages.length; i++) {
       this.currentStage = i;
       await this.executePipelineStage(this.pipelineStages[i]);
-      
+
       const progress = 20 + (i + 1) * (60 / this.pipelineStages.length);
       this.visualizer.updateProgress(progress, `Completed ${this.pipelineStages[i].title}`);
     }
-    
+
     this.visualizer.updateStepStatus('execute', 'completed');
     this.visualizer.updateStepStatus('aggregate', 'active');
     this.visualizer.updateProgress(85, 'Aggregating results and building knowledge graph...');
-    
+
     // Final aggregation and knowledge graph construction
     await this.aggregateResults();
-    
+
     this.visualizer.updateStepStatus('aggregate', 'completed');
     this.visualizer.updateProgress(100, 'Pipeline completed successfully!');
-    
+
     // Update final status
     document.getElementById('workflow-status').textContent = 'Completed';
     document.getElementById('workflow-status').className = 'workflow-status completed';
-    
+
     this.isRunning = false;
     this.updateControlsState();
-    
+
     // Show results and knowledge graph
     this.displayResults();
   }
 
   async orchestrateTasks() {
     await this.delay(1500);
-    
+
     // Simulate task analysis and worker assignment optimization
     const query = this.queryInput ? this.queryInput.value : '';
     const complexity = this.analyzeQueryComplexity(query);
@@ -464,7 +464,7 @@ class OrchestratorWorkersDemo {
     const enhancedInput = this.settingsIntegration
       ? this.settingsIntegration.enhanceWorkflowInput(input)
       : input;
-    
+
     // Update orchestrator status
     console.log(`Orchestrating tasks for complexity level: ${complexity}`);
   }
@@ -472,11 +472,11 @@ class OrchestratorWorkersDemo {
   analyzeQueryComplexity(query) {
     // Simple complexity analysis based on query characteristics
     let complexity = 0.5; // base complexity
-    
+
     if (query.length > 100) complexity += 0.2;
     if (query.toLowerCase().includes('machine learning') || query.toLowerCase().includes('ai')) complexity += 0.2;
     if (query.toLowerCase().includes('meta-analysis') || query.toLowerCase().includes('systematic')) complexity += 0.3;
-    
+
     return Math.min(1.0, complexity);
   }
 
@@ -484,12 +484,12 @@ class OrchestratorWorkersDemo {
     // Update stage status to active
     document.getElementById(`stage-status-${stage.id}`).textContent = 'Active';
     document.getElementById(`stage-status-${stage.id}`).className = 'stage-status active';
-    
+
     // Activate assigned workers
     stage.workers.forEach(workerId => {
       this.updateWorkerStatus(workerId, 'active', 'Processing...');
     });
-    
+
     // Execute real orchestration workflow with API client
     try {
       // FORCE HTTP ONLY - bypass any WebSocket caching issues
@@ -506,31 +506,31 @@ class OrchestratorWorkersDemo {
           }
         })
       });
-      
+
       console.log('Orchestration HTTP result:', result);
-      
+
       // Store API result for later use
       this.stageResults.set(stage.id, result.result || result);
     } catch (error) {
       console.error(`Stage ${stage.id} execution failed:`, error);
       // Fallback to basic completion for demo purposes
     }
-    
+
     // Complete workers
     stage.workers.forEach(workerId => {
       this.updateWorkerStatus(workerId, 'completed', 'Completed');
       this.updateWorkerProgress(workerId, 100);
     });
-    
+
     // Update stage status to completed
     document.getElementById(`stage-status-${stage.id}`).textContent = 'Completed';
     document.getElementById(`stage-status-${stage.id}`).className = 'stage-status completed';
-    
+
     // Generate and display stage results
     const results = this.generateStageResults(stage);
     this.displayStageResults(stage.id, results);
     this.stageResults.set(stage.id, results);
-    
+
     // Add delay between stages
     await this.delay(500);
   }
@@ -538,11 +538,11 @@ class OrchestratorWorkersDemo {
   updateWorkerStatus(workerId, status, statusText) {
     const workerCard = document.getElementById(`worker-${workerId}`);
     const statusElement = document.getElementById(`status-${workerId}`);
-    
+
     if (workerCard) {
       workerCard.className = `worker-card ${status}`;
     }
-    
+
     if (statusElement) {
       statusElement.textContent = statusText;
     }
@@ -578,7 +578,7 @@ class OrchestratorWorkersDemo {
         details: 'Synthesized findings across all pipeline stages. Identified 8 key research trends, 15 promising methodologies, and 23 potential research opportunities for future investigation.'
       }
     };
-    
+
     return mockResults[stage.id] || {
       summary: `Completed ${stage.title}`,
       details: 'Stage execution completed successfully with detailed analysis.'
@@ -589,7 +589,7 @@ class OrchestratorWorkersDemo {
     const resultsContainer = document.getElementById(`results-${stageId}`);
     const summaryElement = document.getElementById(`summary-${stageId}`);
     const detailsElement = document.getElementById(`details-${stageId}`);
-    
+
     if (summaryElement) summaryElement.textContent = results.summary;
     if (detailsElement) detailsElement.textContent = results.details;
     if (resultsContainer) resultsContainer.classList.add('visible');
@@ -597,23 +597,23 @@ class OrchestratorWorkersDemo {
 
   async aggregateResults() {
     await this.delay(2000);
-    
+
     // Build knowledge graph visualization
     this.buildKnowledgeGraph();
-    
+
     // Show knowledge graph section
     document.getElementById('knowledge-graph').style.display = 'block';
   }
 
   buildKnowledgeGraph() {
     const graphContainer = document.getElementById('graph-visualization');
-    
+
     // Mock knowledge graph nodes and connections
     const nodes = [
       'Machine Learning', 'Healthcare Outcomes', 'Clinical Trials', 'Predictive Models',
       'Data Analysis', 'Patient Care', 'Diagnostic Accuracy', 'Treatment Efficacy'
     ];
-    
+
     const connections = [
       {
         type: 'Applied to',
@@ -632,7 +632,7 @@ class OrchestratorWorkersDemo {
         description: 'Healthcare Outcomes → Patient Care'
       }
     ];
-    
+
     graphContainer.innerHTML = `
       <div class="graph-nodes">
         ${nodes.map(node => `<div class="graph-node">${node}</div>`).join('')}
@@ -646,7 +646,7 @@ class OrchestratorWorkersDemo {
         `).join('')}
       </div>
     `;
-    
+
     // Store in knowledge graph map
     nodes.forEach(node => {
       this.knowledgeGraph.set(node, {
@@ -658,12 +658,12 @@ class OrchestratorWorkersDemo {
 
   displayResults() {
     document.getElementById('results-section').style.display = 'block';
-    
+
     const totalPapers = 247;
     const totalConcepts = 342;
     const totalConnections = 567;
     const executionTime = this.pipelineStages.reduce((sum, stage) => sum + stage.duration, 0);
-    
+
     const metrics = {
       'Papers Processed': totalPapers,
       'Concepts Extracted': totalConcepts,
@@ -674,7 +674,7 @@ class OrchestratorWorkersDemo {
       'Execution Time': `${(executionTime / 1000).toFixed(1)}s`,
       'Knowledge Clusters': '12'
     };
-    
+
     this.visualizer.createMetricsGrid(metrics, 'results-content');
   }
 
@@ -700,23 +700,23 @@ class OrchestratorWorkersDemo {
     this.currentStage = 0;
     this.stageResults.clear();
     this.knowledgeGraph.clear();
-    
+
     // Reset UI
     document.getElementById('pipeline-stages').style.display = 'none';
     document.getElementById('knowledge-graph').style.display = 'none';
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('initial-state').style.display = 'block';
-    
+
     // Reset workflow status
     document.getElementById('workflow-status').textContent = 'Ready to Process';
     document.getElementById('workflow-status').className = 'workflow-status idle';
-    
+
     // Reset all workers
     this.workers.forEach(worker => {
       this.updateWorkerStatus(worker.id, '', 'Idle');
       this.updateWorkerProgress(worker.id, 0);
     });
-    
+
     // Reset all stages
     this.pipelineStages.forEach(stage => {
       const statusElement = document.getElementById(`stage-status-${stage.id}`);
@@ -724,13 +724,13 @@ class OrchestratorWorkersDemo {
         statusElement.textContent = 'Pending';
         statusElement.className = 'stage-status pending';
       }
-      
+
       const resultsContainer = document.getElementById(`results-${stage.id}`);
       if (resultsContainer) {
         resultsContainer.classList.remove('visible');
       }
     });
-    
+
     this.updateControlsState();
     this.visualizer.clear();
     this.createWorkflowPipeline();

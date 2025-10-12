@@ -45,7 +45,7 @@
       "execution_timeout_ms": 30000,
       "allowed_languages": [
         "python",
-        "javascript", 
+        "javascript",
         "bash",
         "rust",
         "go"

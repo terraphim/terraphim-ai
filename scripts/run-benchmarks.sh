@@ -30,28 +30,28 @@ mkdir -p "${RESULTS_DIR}/${TIMESTAMP}"
 run_rust_benchmarks() {
     echo -e "${YELLOW}📊 Running Rust Agent Operation Benchmarks${NC}"
     echo "============================================"
-    
+
     cd "${BENCHMARK_DIR}/crates/terraphim_multi_agent"
-    
+
     # Check if criterion dependency is available
     if ! grep -q "criterion" Cargo.toml; then
         echo -e "${RED}❌ Criterion not found in Cargo.toml. Adding dependency...${NC}"
         echo 'criterion = { version = "0.5", features = ["html_reports"] }' >> Cargo.toml
     fi
-    
+
     # Run benchmarks with detailed output
     echo "Running cargo bench with criterion..."
     CARGO_BENCH_OUTPUT="${RESULTS_DIR}/${TIMESTAMP}/rust_benchmarks.txt"
-    
+
     if cargo bench --bench agent_operations > "${CARGO_BENCH_OUTPUT}" 2>&1; then
         echo -e "${GREEN}✅ Rust benchmarks completed successfully${NC}"
-        
+
         # Copy HTML reports if available
         if [ -d "target/criterion" ]; then
             cp -r target/criterion "${RESULTS_DIR}/${TIMESTAMP}/rust_criterion_reports"
             echo -e "${GREEN}📁 Criterion HTML reports saved${NC}"
         fi
-        
+
         # Extract key metrics
         echo -e "${BLUE}📈 Key Rust Benchmark Results:${NC}"
         grep -E "(time:|slope:|R\^2:)" "${CARGO_BENCH_OUTPUT}" | head -20 || echo "Detailed metrics in ${CARGO_BENCH_OUTPUT}"
@@ -59,7 +59,7 @@ run_rust_benchmarks() {
         echo -e "${RED}❌ Rust benchmarks failed. Check ${CARGO_BENCH_OUTPUT} for details${NC}"
         return 1
     fi
-    
+
     cd "${BENCHMARK_DIR}"
 }
 
@@ -67,22 +67,22 @@ run_rust_benchmarks() {
 run_js_benchmarks() {
     echo -e "${YELLOW}🌐 Running JavaScript WebSocket Performance Benchmarks${NC}"
     echo "================================================"
-    
+
     cd "${BENCHMARK_DIR}/desktop"
-    
+
     # Check if vitest is available
     if ! command -v npx vitest >/dev/null 2>&1; then
         echo -e "${RED}❌ Vitest not found. Installing dependencies...${NC}"
         yarn install
     fi
-    
+
     # Run JavaScript benchmarks
     echo "Running Vitest benchmarks..."
     JS_BENCH_OUTPUT="${RESULTS_DIR}/${TIMESTAMP}/js_benchmarks.json"
-    
+
     if yarn run vitest --config vitest.benchmark.config.ts --reporter=json --outputFile="${JS_BENCH_OUTPUT}" --run; then
         echo -e "${GREEN}✅ JavaScript benchmarks completed successfully${NC}"
-        
+
         # Extract key metrics from JSON report
         if [ -f "${JS_BENCH_OUTPUT}" ]; then
             echo -e "${BLUE}📈 Key JavaScript Benchmark Results:${NC}"
@@ -104,7 +104,7 @@ run_js_benchmarks() {
             return 1
         fi
     fi
-    
+
     cd "${BENCHMARK_DIR}"
 }
 
@@ -112,9 +112,9 @@ run_js_benchmarks() {
 generate_report() {
     echo -e "${YELLOW}📋 Generating Comprehensive Performance Report${NC}"
     echo "============================================="
-    
+
     REPORT_FILE="${RESULTS_DIR}/${TIMESTAMP}/performance_report.md"
-    
+
     cat > "${REPORT_FILE}" << EOF
 # TerraphimAgent Performance Benchmark Report
 
@@ -247,27 +247,27 @@ EOF
 check_system_readiness() {
     echo -e "${YELLOW}🔍 Checking System Readiness${NC}"
     echo "============================="
-    
+
     # Check for required tools
     local missing_tools=()
-    
+
     if ! command -v cargo >/dev/null 2>&1; then
         missing_tools+=("cargo")
     fi
-    
+
     if ! command -v node >/dev/null 2>&1; then
         missing_tools+=("node")
     fi
-    
+
     if ! command -v yarn >/dev/null 2>&1 && ! command -v npm >/dev/null 2>&1; then
         missing_tools+=("yarn or npm")
     fi
-    
+
     if [ ${#missing_tools[@]} -ne 0 ]; then
         echo -e "${RED}❌ Missing required tools: ${missing_tools[*]}${NC}"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ System ready for benchmarking${NC}"
     echo ""
 }
@@ -277,7 +277,7 @@ main() {
     local run_rust=true
     local run_js=true
     local exit_code=0
-    
+
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -304,42 +304,42 @@ main() {
                 ;;
         esac
     done
-    
+
     # Execute benchmark suite
     check_system_readiness
-    
+
     if [ "$run_rust" = true ]; then
         if ! run_rust_benchmarks; then
             exit_code=1
         fi
         echo ""
     fi
-    
+
     if [ "$run_js" = true ]; then
         if ! run_js_benchmarks; then
             exit_code=1
         fi
         echo ""
     fi
-    
+
     generate_report
-    
+
     echo ""
     echo -e "${BLUE}🎯 Benchmark Summary${NC}"
     echo "==================="
     echo -e "Results saved to: ${GREEN}${RESULTS_DIR}/${TIMESTAMP}${NC}"
     echo -e "Report available: ${GREEN}${RESULTS_DIR}/${TIMESTAMP}/performance_report.md${NC}"
-    
+
     if [ -d "${RESULTS_DIR}/${TIMESTAMP}/rust_criterion_reports" ]; then
         echo -e "Criterion HTML: ${GREEN}${RESULTS_DIR}/${TIMESTAMP}/rust_criterion_reports/index.html${NC}"
     fi
-    
+
     if [ $exit_code -eq 0 ]; then
         echo -e "${GREEN}✅ All benchmarks completed successfully${NC}"
     else
         echo -e "${YELLOW}⚠️  Some benchmarks failed, but results were generated${NC}"
     fi
-    
+
     exit $exit_code
 }
 

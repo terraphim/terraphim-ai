@@ -2,11 +2,11 @@ use terraphim_multi_agent::{test_utils::*, *};
 
 #[tokio::test]
 async fn test_agent_creation_simple() {
-    let mut agent = create_test_agent().await.unwrap();
+    let agent = create_test_agent().await.unwrap();
 
     // Test basic agent functionality
     assert!(agent.agent_id != uuid::Uuid::nil());
-    assert_eq!(agent.status, AgentStatus::Initializing);
+    assert_eq!(*agent.status.read().await, AgentStatus::Initializing);
 
     // Initialize the agent
     let init_result = agent.initialize().await;
@@ -15,7 +15,7 @@ async fn test_agent_creation_simple() {
 
 #[tokio::test]
 async fn test_agent_command_processing() {
-    let mut agent = create_test_agent().await.unwrap();
+    let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
     // Process a simple command

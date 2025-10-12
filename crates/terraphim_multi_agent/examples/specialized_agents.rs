@@ -31,13 +31,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let sample_article = r#"
-        Artificial Intelligence (AI) has revolutionized numerous industries over the past decade. 
-        From healthcare to finance, AI technologies are being deployed to automate processes, 
-        enhance decision-making, and improve efficiency. Machine learning algorithms can now 
-        diagnose diseases with remarkable accuracy, while natural language processing has enabled 
-        sophisticated chatbots and virtual assistants. The rapid advancement in AI has also 
-        raised important questions about ethics, privacy, and the future of work. As we move 
-        forward, it's crucial to develop AI systems that are not only powerful but also 
+        Artificial Intelligence (AI) has revolutionized numerous industries over the past decade.
+        From healthcare to finance, AI technologies are being deployed to automate processes,
+        enhance decision-making, and improve efficiency. Machine learning algorithms can now
+        diagnose diseases with remarkable accuracy, while natural language processing has enabled
+        sophisticated chatbots and virtual assistants. The rapid advancement in AI has also
+        raised important questions about ethics, privacy, and the future of work. As we move
+        forward, it's crucial to develop AI systems that are not only powerful but also
         responsible and aligned with human values.
     "#;
 
@@ -82,13 +82,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_id = chat_agent.start_new_session();
     println!("📝 Started new chat session: {}", session_id);
 
-    let questions = vec![
+    let questions = [
         "What is Rust programming language?",
         "How does Rust compare to Python for system programming?",
         "What are the main benefits of using Rust?",
     ];
 
-    for (i, question) in questions.iter().enumerate() {
+    for question in questions.iter() {
         println!("\n👤 User: {}", question);
         match chat_agent.chat(question.to_string()).await {
             Ok(response) => {

@@ -138,18 +138,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         AutomataConfig::default(),
         SimilarityThresholds::default(),
     ));
-    
+
     // Create goal aligner
     let agent_registry = Arc::new(your_agent_registry);
     let config = AlignmentConfig::default();
-    
+
     let aligner = KnowledgeGraphGoalAligner::new(
         kg_analyzer,
         agent_registry,
         role_graph,
         config,
     );
-    
+
     Ok(())
 }
 ```
@@ -263,7 +263,7 @@ for conflict in &conflicts {
     println!("Type: {:?}", conflict.conflict_type);
     println!("Severity: {:.2}", conflict.severity);
     println!("Description: {}", conflict.description);
-    
+
     // Resolve conflict
     let resolution = detector.resolve_conflict(conflict, &mut goals)?;
     if resolution.success {
@@ -365,7 +365,7 @@ let propagation_result = engine.propagate_goal(request).await?;
 
 // Review propagation path
 for step in &propagation_result.propagation_path {
-    println!("Step {}: {} → {} ({})", 
+    println!("Step {}: {} → {} ({})",
         step.step, step.from_role, step.to_role, step.reason);
 }
 ```
@@ -384,7 +384,7 @@ let analysis_result = kg_analyzer.analyze_goal_alignment(analysis).await?;
 println!("Overall Alignment Score: {:.2}", analysis_result.overall_alignment_score);
 
 for (goal_id, analysis) in &analysis_result.goal_analyses {
-    println!("Goal {}: Connectivity Score {:.2}", 
+    println!("Goal {}: Connectivity Score {:.2}",
         goal_id, analysis.connectivity.strength_score);
 }
 ```

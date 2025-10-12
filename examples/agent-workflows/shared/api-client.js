@@ -39,16 +39,16 @@ class TerraphimApiClient {
         reconnectInterval: 3000,
         maxReconnectAttempts: 10
       });
-      
+
       // Set up event handlers for workflow updates
       this.wsClient.subscribe('connected', (data) => {
         console.log('WebSocket connected at:', data.timestamp);
       });
-      
+
       this.wsClient.subscribe('disconnected', (data) => {
         console.log('WebSocket disconnected:', data.reason);
       });
-      
+
     } catch (error) {
       console.warn('Failed to initialize WebSocket client:', error);
       this.enableWebSocket = false;
@@ -65,20 +65,20 @@ class TerraphimApiClient {
   updateConfiguration(newConfig) {
     const oldBaseUrl = this.baseUrl;
     const oldOptions = { ...this.options };
-    
+
     if (newConfig.baseUrl && newConfig.baseUrl !== this.baseUrl) {
       this.baseUrl = newConfig.baseUrl;
     }
-    
+
     this.options = { ...this.options, ...newConfig };
-    
+
     // Reinitialize WebSocket if URL changed or WebSocket settings changed
-    if (newConfig.baseUrl !== oldBaseUrl || 
+    if (newConfig.baseUrl !== oldBaseUrl ||
         newConfig.enableWebSocket !== oldOptions.enableWebSocket ||
         newConfig.autoReconnect !== oldOptions.autoReconnect) {
       this.reinitializeWebSocket();
     }
-    
+
     return { oldBaseUrl, oldOptions };
   }
 
@@ -221,18 +221,18 @@ class TerraphimApiClient {
       try {
         attempts++;
         const response = await fetch(url, config);
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const error = new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-          
+
           // Only retry on server errors (5xx) or network errors
           if (response.status >= 500 && attempts < maxAttempts) {
             lastError = error;
             await this.delay(this.options.retryDelay * attempts);
             continue;
           }
-          
+
           throw error;
         }
 
@@ -240,22 +240,22 @@ class TerraphimApiClient {
         if (contentType && contentType.includes('application/json')) {
           return await response.json();
         }
-        
+
         return await response.text();
       } catch (error) {
         lastError = error;
-        
+
         // Don't retry on abort/timeout errors unless it's a network error
         if (error.name === 'AbortError' || error.name === 'TimeoutError') {
           break;
         }
-        
+
         // Retry on network errors
         if (attempts < maxAttempts && (error.code === 'NETWORK_ERROR' || error.message.includes('fetch'))) {
           await this.delay(this.options.retryDelay * attempts);
           continue;
         }
-        
+
         break;
       }
     }
@@ -357,7 +357,7 @@ class TerraphimApiClient {
       return this.executeWorkflowWithWebSocket('prompt-chain', input, options);
     }
     console.log('Falling back to HTTP path for prompt-chain execution');
-    
+
     // Handle both direct input and agentConfig structures for fallback
     const request = {
       prompt: input.input?.prompt || input.prompt || '',
@@ -367,7 +367,7 @@ class TerraphimApiClient {
       ...(input.llm_config && { llm_config: input.llm_config }),
       ...(input.steps && { steps: input.steps })  // Include step configurations
     };
-    
+
     return this.request('/workflows/prompt-chain', {
       method: 'POST',
       body: JSON.stringify(request),
@@ -379,7 +379,7 @@ class TerraphimApiClient {
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('routing', input, options);
     }
-    
+
     // Handle both direct input and agentConfig structures for fallback
     const request = {
       prompt: input.input?.prompt || input.prompt || '',
@@ -388,7 +388,7 @@ class TerraphimApiClient {
       ...(input.config && { config: input.config }),
       ...(input.llm_config && { llm_config: input.llm_config })
     };
-    
+
     return this.request('/workflows/route', {
       method: 'POST',
       body: JSON.stringify(request),
@@ -400,7 +400,7 @@ class TerraphimApiClient {
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('parallel', input, options);
     }
-    
+
     // Handle both direct input and agentConfig structures for fallback
     const request = {
       prompt: input.input?.prompt || input.prompt || '',
@@ -409,7 +409,7 @@ class TerraphimApiClient {
       ...(input.config && { config: input.config }),
       ...(input.llm_config && { llm_config: input.llm_config })
     };
-    
+
     return this.request('/workflows/parallel', {
       method: 'POST',
       body: JSON.stringify(request),
@@ -421,7 +421,7 @@ class TerraphimApiClient {
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('orchestration', input, options);
     }
-    
+
     // Handle both direct input and agentConfig structures for fallback
     const request = {
       prompt: input.input?.prompt || input.prompt || '',
@@ -430,7 +430,7 @@ class TerraphimApiClient {
       ...(input.config && { config: input.config }),
       ...(input.llm_config && { llm_config: input.llm_config })
     };
-    
+
     return this.request('/workflows/orchestrate', {
       method: 'POST',
       body: JSON.stringify(request),
@@ -442,7 +442,7 @@ class TerraphimApiClient {
     if (this.wsClient && options.realTime) {
       return this.executeWorkflowWithWebSocket('optimization', input, options);
     }
-    
+
     // Handle both direct input and agentConfig structures for fallback
     const request = {
       prompt: input.input?.prompt || input.prompt || '',
@@ -451,7 +451,7 @@ class TerraphimApiClient {
       ...(input.config && { config: input.config }),
       ...(input.llm_config && { llm_config: input.llm_config })
     };
-    
+
     return this.request('/workflows/optimize', {
       method: 'POST',
       body: JSON.stringify(request),
@@ -464,7 +464,7 @@ class TerraphimApiClient {
     console.log('=== DEBUG START ===');
     console.log('Input:', input);
     console.log('Options:', options);
-    
+
     try {
       return new Promise(async (resolve, reject) => {
         try {
@@ -494,7 +494,7 @@ class TerraphimApiClient {
           },
           ...options
         };
-        
+
         // Flatten the structure to match backend expectations
         // Handle different input structures:
         // 1. Direct input: { prompt: "...", role: "..." }
@@ -523,29 +523,29 @@ class TerraphimApiClient {
 
         // Validate that prompt is present
         if (!flattenedRequest.prompt) {
-          console.error('Missing prompt in request:', { 
-            workflowType, 
-            input: JSON.stringify(input, null, 2), 
-            agentConfig: JSON.stringify(agentConfig, null, 2), 
-            flattenedRequest: JSON.stringify(flattenedRequest, null, 2) 
+          console.error('Missing prompt in request:', {
+            workflowType,
+            input: JSON.stringify(input, null, 2),
+            agentConfig: JSON.stringify(agentConfig, null, 2),
+            flattenedRequest: JSON.stringify(flattenedRequest, null, 2)
           });
           throw new Error('Prompt is required for workflow execution');
         }
-        
+
         // Execute workflow via HTTP POST first to get workflow ID
         console.log('About to make HTTP request to:', `/workflows/${this.getWorkflowEndpoint(workflowType)}`);
         console.log('Request payload:', JSON.stringify(flattenedRequest, null, 2));
-        
+
         const workflowResponse = await this.request(`/workflows/${this.getWorkflowEndpoint(workflowType)}`, {
           method: 'POST',
           body: JSON.stringify(flattenedRequest),
         });
-        
+
         console.log('HTTP response received:', workflowResponse);
-        
+
         // Generate or extract session ID for WebSocket tracking
         const sessionId = workflowResponse.workflow_id || workflowResponse.session_id || this.generateSessionId();
-        
+
         // Create WebSocket session for updates
         this.wsClient.createWorkflowSession(sessionId);
 
@@ -605,10 +605,10 @@ class TerraphimApiClient {
         const completionUnsub = this.wsClient.subscribe('workflow_completed', (data) => {
           if (data.sessionId === sessionId) {
             workflowResult = data.data;
-            
+
             // Cleanup listeners
             cleanupListeners.forEach(unsub => unsub());
-            
+
             resolve({
               sessionId,
               success: true,
@@ -629,7 +629,7 @@ class TerraphimApiClient {
           if (data.sessionId === sessionId) {
             // Cleanup listeners
             cleanupListeners.forEach(unsub => unsub());
-            
+
             reject(new Error(data.data.error || 'Workflow execution failed'));
           }
         });
@@ -674,12 +674,12 @@ class TerraphimApiClient {
   }
 
   // Utility methods for workflow demos
-  
+
   // Simulate workflow execution with progress updates
   async simulateWorkflow(workflowType, input, onProgress) {
     const startTime = Date.now();
     const workflowId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Simulate different workflow patterns
     const workflows = {
       'prompt-chain': () => this.simulatePromptChain(input, onProgress),
@@ -696,7 +696,7 @@ class TerraphimApiClient {
     try {
       const result = await workflows[workflowType]();
       const executionTime = Date.now() - startTime;
-      
+
       return {
         workflowId,
         success: true,
@@ -731,10 +731,10 @@ class TerraphimApiClient {
     ];
 
     const results = [];
-    
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      
+
       onProgress?.({
         step: i + 1,
         total: steps.length,
@@ -744,7 +744,7 @@ class TerraphimApiClient {
 
       // Simulate processing time
       await this.delay(step.duration);
-      
+
       // Simulate step result
       const stepResult = {
         stepId: step.id,
@@ -753,7 +753,7 @@ class TerraphimApiClient {
         duration: step.duration,
         success: true,
       };
-      
+
       results.push(stepResult);
     }
 
@@ -776,12 +776,12 @@ class TerraphimApiClient {
 
     const complexity = input.prompt.length > 500 ? 'complex' : 'simple';
     const selectedModel = complexity === 'complex' ? 'openai_gpt4' : 'openai_gpt35';
-    
+
     return {
       pattern: 'routing',
       taskAnalysis: { complexity, estimatedCost: complexity === 'complex' ? 0.08 : 0.02 },
-      selectedRoute: { 
-        routeId: selectedModel, 
+      selectedRoute: {
+        routeId: selectedModel,
         reasoning: `Selected ${selectedModel} for ${complexity} task`,
         confidence: complexity === 'complex' ? 0.95 : 0.85,
       },
@@ -801,16 +801,16 @@ class TerraphimApiClient {
     const taskPromises = tasks.map(async (task, index) => {
       const startProgress = (index / tasks.length) * 50;
       const endProgress = ((index + 1) / tasks.length) * 50;
-      
+
       onProgress?.({
         step: index + 1,
         total: tasks.length,
         current: `Processing ${task.name}`,
         percentage: startProgress,
       });
-      
+
       await this.delay(task.duration);
-      
+
       onProgress?.({
         step: index + 1,
         total: tasks.length,
@@ -1048,7 +1048,7 @@ class TerraphimApiClient {
   getDefaultRoleForWorkflow(workflowType) {
     const workflowRoleMap = {
       'prompt-chain': 'RustSystemDeveloper',
-      'routing': 'BackendArchitect', 
+      'routing': 'BackendArchitect',
       'parallel': 'DataScientistAgent',
       'orchestration': 'OrchestratorAgent',
       'optimization': 'QAEngineer'
@@ -1095,7 +1095,7 @@ class TerraphimApiClient {
         thesaurus_domains: ['general_concepts']
       }
     };
-    
+
     return roleConfigs[roleName] || roleConfigs['general_agent'];
   }
 
@@ -1103,7 +1103,7 @@ class TerraphimApiClient {
   createAgentWorkflowConfig(workflowType, input, customRole = null) {
     const role = customRole || this.getDefaultRoleForWorkflow(workflowType);
     const roleConfig = this.getRoleGraphConfig(role);
-    
+
     return {
       role: role,
       agentSettings: {
@@ -1167,7 +1167,7 @@ class WorkflowWebSocket {
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.url);
-        
+
         this.ws.onopen = () => {
           console.log('WebSocket connected');
           this.reconnectAttempts = 0;
@@ -1241,9 +1241,9 @@ class WorkflowWebSocket {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-      
+
       console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      
+
       setTimeout(() => {
         this.connect().catch(error => {
           console.error('Reconnection failed:', error);

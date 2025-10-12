@@ -124,7 +124,6 @@ pub fn create_agent_config_with_vm_execution(
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::collections::HashMap;
 
     #[test]
     fn test_extract_vm_config_basic() {
@@ -139,7 +138,7 @@ mod tests {
         );
 
         let vm_config = extract_vm_config_from_role(&role).unwrap();
-        assert_eq!(vm_config.enabled, true);
+        assert!(vm_config.enabled);
         assert_eq!(vm_config.api_base_url, "http://test:8080");
         assert_eq!(vm_config.default_vm_type, "test-vm");
     }
@@ -150,7 +149,7 @@ mod tests {
         role.extra.insert("vm_execution".to_string(), json!(true));
 
         let vm_config = extract_vm_config_from_role(&role).unwrap();
-        assert_eq!(vm_config.enabled, true);
+        assert!(vm_config.enabled);
         assert_eq!(vm_config.api_base_url, "http://localhost:8080");
     }
 

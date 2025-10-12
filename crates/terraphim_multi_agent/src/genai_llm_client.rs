@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_message_conversion() {
-        let client = GenAiLlmClient::new_ollama(None).unwrap();
+        let _client = GenAiLlmClient::new_ollama(None).unwrap();
 
         let messages = vec![
             LlmMessage::system("You are a helpful assistant.".to_string()),

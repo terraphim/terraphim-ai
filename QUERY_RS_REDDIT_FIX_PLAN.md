@@ -49,7 +49,7 @@ impl QueryRsHaystackIndexer {
             fetched_urls: Arc::new(Mutex::new(HashSet::new())),
         }
     }
-    
+
     fn should_fetch(&self, url: &str) -> bool {
         let mut cache = self.fetched_urls.lock().unwrap();
         if cache.contains(url) {
@@ -101,12 +101,12 @@ async fn fetch_document_content(
     result_type: QueryRsResultType,
     fetch_content: bool,
 ) -> Result<Document> {
-    
+
     // Check if already fetched
     if !self.should_fetch(url) {
         return Ok(create_cached_placeholder(url, title));
     }
-    
+
     let body = match result_type {
         QueryRsResultType::CratesIo { crate_name } => {
             if fetch_content {
@@ -120,7 +120,7 @@ async fn fetch_document_content(
                 format!("Crate: {} - {}", crate_name, url)
             }
         }
-        
+
         QueryRsResultType::Reddit { post_id } => {
             if fetch_content {
                 // Fetch Reddit post content via API
@@ -133,7 +133,7 @@ async fn fetch_document_content(
                 format!("Reddit: {}", title)
             }
         }
-        
+
         QueryRsResultType::Other { url } => {
             if fetch_content {
                 self.fetch_generic_content(&url).await
@@ -143,7 +143,7 @@ async fn fetch_document_content(
             }
         }
     };
-    
+
     Ok(Document {
         id: generate_document_id(&url),
         url: url.to_string(),
@@ -164,36 +164,36 @@ async fn fetch_document_content(
 ```rust
 async fn index(&self, haystack: &Haystack) -> Result<BTreeMap<String, Document>> {
     let fetch_content = haystack.fetch_content.unwrap_or(false);
-    
+
     log::info!(
-        "🔍 Indexing query.rs haystack (fetch_content: {})", 
+        "🔍 Indexing query.rs haystack (fetch_content: {})",
         fetch_content
     );
-    
+
     // Clear URL cache for fresh indexing
     {
         let mut cache = self.fetched_urls.lock().unwrap();
         cache.clear();
     }
-    
+
     let query = extract_query_from_location(&haystack.location);
     let search_results = self.search_query_rs(&query).await?;
-    
+
     let mut documents = BTreeMap::new();
-    
+
     for result in search_results {
         let result_type = self.classify_result(&result.url, &result.title);
-        
+
         let doc = self.fetch_document_content(
             &result.url,
             &result.title,
             result_type,
             fetch_content,
         ).await?;
-        
+
         documents.insert(doc.id.clone(), doc);
     }
-    
+
     log::info!("✅ Indexed {} documents from query.rs", documents.len());
     Ok(documents)
 }
@@ -219,7 +219,7 @@ struct RedditPostData {
 impl QueryRsHaystackIndexer {
     async fn fetch_reddit_post(&self, post_id: &str) -> Result<String> {
         let url = format!("https://www.reddit.com/comments/{}.json", post_id);
-        
+
         let response: Value = self.client
             .get(&url)
             .header("User-Agent", "terraphim-indexer/0.2.0")
@@ -227,10 +227,10 @@ impl QueryRsHaystackIndexer {
             .await?
             .json()
             .await?;
-        
+
         // Parse Reddit JSON structure
         let post_data = parse_reddit_response(response)?;
-        
+
         Ok(format!(
             "Title: {}\n\nAuthor: u/{}\nScore: {} | Comments: {}\n\n{}",
             post_data.title,
@@ -251,7 +251,7 @@ impl QueryRsHaystackIndexer {
 #[tokio::test]
 async fn test_query_rs_crates_search() {
     let indexer = QueryRsHaystackIndexer::default();
-    
+
     let haystack = Haystack {
         location: "https://query.rs/graph".to_string(),
         service: ServiceType::QueryRs,
@@ -260,14 +260,14 @@ async fn test_query_rs_crates_search() {
         extra_parameters: None,
         fetch_content: Some(true),  // Enable content fetching for this test
     };
-    
+
     // ... rest of test
 }
 
 #[tokio::test]
 async fn test_query_rs_lightweight_mode() {
     let indexer = QueryRsHaystackIndexer::default();
-    
+
     let haystack = Haystack {
         location: "https://query.rs/graph".to_string(),
         service: ServiceType::QueryRs,
@@ -276,7 +276,7 @@ async fn test_query_rs_lightweight_mode() {
         extra_parameters: None,
         fetch_content: Some(false),  // Metadata only, no content fetching
     };
-    
+
     match indexer.index(&haystack).await {
         Ok(index) => {
             println!("Found {} documents (lightweight mode)", index.len());
@@ -300,7 +300,7 @@ async fn test_query_rs_lightweight_mode() {
 ```rust
 async fn fetch_crate_api_data(&self, crate_name: &str) -> Result<String> {
     let api_url = format!("https://crates.io/api/v1/crates/{}", crate_name);
-    
+
     let response: Value = self.client
         .get(&api_url)
         .header("User-Agent", "terraphim-indexer/0.2.0")
@@ -308,11 +308,11 @@ async fn fetch_crate_api_data(&self, crate_name: &str) -> Result<String> {
         .await?
         .json()
         .await?;
-    
+
     // Extract relevant fields
     let crate_data = response["crate"].as_object()
         .ok_or_else(|| anyhow::anyhow!("Invalid crate data"))?;
-    
+
     let description = crate_data["description"]
         .as_str()
         .unwrap_or("No description");
@@ -322,7 +322,7 @@ async fn fetch_crate_api_data(&self, crate_name: &str) -> Result<String> {
     let version = crate_data["max_version"]
         .as_str()
         .unwrap_or("unknown");
-    
+
     Ok(format!(
         "Description: {}\nVersion: {}\nDownloads: {}\n",
         description, version, downloads
@@ -377,7 +377,7 @@ async fn fetch_crate_api_data(&self, crate_name: &str) -> Result<String> {
 ### Full Content Mode
 ```json
 {
-  "location": "https://query.rs/graph",  
+  "location": "https://query.rs/graph",
   "service": "QueryRs",
   "fetch_content": true
 }
@@ -431,4 +431,3 @@ async fn fetch_crate_api_data(&self, crate_name: &str) -> Result<String> {
 ✅ Reddit posts are properly handled and formatted
 ✅ Crates.io API data is correctly fetched and formatted
 ✅ No breaking changes to existing configurations
-

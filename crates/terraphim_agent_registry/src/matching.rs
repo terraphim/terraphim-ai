@@ -871,7 +871,7 @@ impl KnowledgeGraphAgentMatcher for TerraphimKnowledgeGraphMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentMetadata, AgentRole, AgentStatus};
+    use crate::{AgentMetadata, AgentRole, AgentStatus, CapabilityMetrics};
     use std::sync::Arc;
 
     fn create_test_automata() -> Arc<Automata> {
@@ -918,19 +918,33 @@ mod tests {
         agent.status = AgentStatus::Active;
 
         // Add relevant capabilities
-        agent.add_capability(AgentCapability::new(
-            "data_analysis".to_string(),
-            "Data Analysis".to_string(),
-            "analytics".to_string(),
-            "Analyzes datasets".to_string(),
-        ));
+        agent
+            .add_capability(AgentCapability {
+                capability_id: "data_analysis".to_string(),
+                name: "Data Analysis".to_string(),
+                description: "Analyzes datasets".to_string(),
+                category: "analytics".to_string(),
+                required_domains: Vec::new(),
+                input_types: Vec::new(),
+                output_types: Vec::new(),
+                performance_metrics: CapabilityMetrics::default(),
+                dependencies: Vec::new(),
+            })
+            .unwrap();
 
-        agent.add_capability(AgentCapability::new(
-            "visualization".to_string(),
-            "Data Visualization".to_string(),
-            "analytics".to_string(),
-            "Creates charts and graphs".to_string(),
-        ));
+        agent
+            .add_capability(AgentCapability {
+                capability_id: "visualization".to_string(),
+                name: "Data Visualization".to_string(),
+                description: "Creates charts and graphs".to_string(),
+                category: "analytics".to_string(),
+                required_domains: Vec::new(),
+                input_types: Vec::new(),
+                output_types: Vec::new(),
+                performance_metrics: CapabilityMetrics::default(),
+                dependencies: Vec::new(),
+            })
+            .unwrap();
 
         // Add domain knowledge
         agent
@@ -1024,12 +1038,17 @@ mod tests {
         let role_graph_map = HashMap::new();
         let matcher = TerraphimKnowledgeGraphMatcher::with_default_config(automata, role_graph_map);
 
-        let capability = AgentCapability::new(
-            "data_analysis".to_string(),
-            "Data Analysis".to_string(),
-            "analytics".to_string(),
-            "Analyzes data".to_string(),
-        );
+        let capability = AgentCapability {
+            capability_id: "data_analysis".to_string(),
+            name: "Data Analysis".to_string(),
+            description: "Analyzes data".to_string(),
+            category: "analytics".to_string(),
+            required_domains: Vec::new(),
+            input_types: Vec::new(),
+            output_types: Vec::new(),
+            performance_metrics: CapabilityMetrics::default(),
+            dependencies: Vec::new(),
+        };
 
         assert!(matcher.capability_matches("data_analysis", &capability));
         assert!(matcher.capability_matches("data", &capability));

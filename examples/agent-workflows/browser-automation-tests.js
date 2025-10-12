@@ -2,18 +2,18 @@
 
 /**
  * Terraphim AI - Browser Automation Test Suite
- * 
+ *
  * This script performs end-to-end browser automation testing of all workflow examples
  * to ensure the real multi-agent API integration is working properly.
- * 
+ *
  * Requirements:
  * - Node.js 18+
  * - Playwright (installed automatically if missing)
  * - Running Terraphim backend server
- * 
+ *
  * Usage:
  *   node browser-automation-tests.js
- *   
+ *
  * Environment Variables:
  *   BACKEND_URL - Backend server URL (default: http://localhost:8000)
  *   HEADLESS - Run in headless mode (default: true)
@@ -35,7 +35,7 @@ class BrowserAutomationTestSuite {
             slowMo: options.slowMo || 0,
             devtools: options.devtools || false
         };
-        
+
         this.browser = null;
         this.context = null;
         this.results = {
@@ -45,7 +45,7 @@ class BrowserAutomationTestSuite {
             skipped: 0,
             tests: []
         };
-        
+
         this.workflows = [
             {
                 name: 'Prompt Chaining',
@@ -55,7 +55,7 @@ class BrowserAutomationTestSuite {
             },
             {
                 name: 'Routing',
-                path: '2-routing/index.html', 
+                path: '2-routing/index.html',
                 testId: 'routing',
                 description: 'Smart agent selection based on complexity'
             },
@@ -68,7 +68,7 @@ class BrowserAutomationTestSuite {
             {
                 name: 'Orchestrator-Workers',
                 path: '4-orchestrator-workers/index.html',
-                testId: 'orchestration', 
+                testId: 'orchestration',
                 description: 'Hierarchical task decomposition'
             },
             {
@@ -85,7 +85,7 @@ class BrowserAutomationTestSuite {
         console.log(`Backend URL: ${this.options.backendUrl}`);
         console.log(`Headless: ${this.options.headless}`);
         console.log(`Timeout: ${this.options.timeout}ms`);
-        
+
         try {
             // Launch browser
             this.browser = await chromium.launch({
@@ -94,7 +94,7 @@ class BrowserAutomationTestSuite {
                 devtools: this.options.devtools,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
-            
+
             // Create context with device emulation
             this.context = await this.browser.newContext({
                 viewport: { width: 1920, height: 1080 },
@@ -102,20 +102,20 @@ class BrowserAutomationTestSuite {
                 permissions: ['clipboard-read', 'clipboard-write'],
                 colorScheme: 'light'
             });
-            
+
             // Enable request/response logging for debugging
             this.context.on('request', request => {
                 if (request.url().includes('/workflows/') || request.url().includes('/health')) {
                     console.log(`📤 ${request.method()} ${request.url()}`);
                 }
             });
-            
+
             this.context.on('response', response => {
                 if (response.url().includes('/workflows/') || response.url().includes('/health')) {
                     console.log(`📥 ${response.status()} ${response.url()}`);
                 }
             });
-            
+
             console.log('✅ Browser initialized successfully');
         } catch (error) {
             console.error('❌ Failed to initialize browser:', error);
@@ -139,54 +139,54 @@ class BrowserAutomationTestSuite {
 
     async runAllTests() {
         const startTime = Date.now();
-        
+
         try {
             await this.initialize();
-            
+
             // First verify backend is available
             await this.testBackendHealth();
-            
+
             // Test comprehensive test suite page
             await this.testComprehensiveTestSuite();
-            
+
             // Test individual workflow examples
             for (const workflow of this.workflows) {
                 await this.testWorkflowExample(workflow);
             }
-            
+
             // Generate summary report
             const duration = Date.now() - startTime;
             await this.generateReport(duration);
-            
+
         } catch (error) {
             console.error('💥 Test suite failed:', error);
             this.results.failed++;
         } finally {
             await this.cleanup();
         }
-        
+
         return this.results;
     }
 
     async testBackendHealth() {
         const testName = 'Backend Health Check';
         console.log(`\n🔍 Testing: ${testName}`);
-        
+
         try {
             const page = await this.context.newPage();
-            
+
             // Test direct API endpoint
             const response = await page.request.get(`${this.options.backendUrl}/health`);
-            
+
             if (response.ok()) {
                 console.log('✅ Backend is healthy and responding');
                 this.recordTestResult(testName, 'passed', { status: response.status() });
             } else {
                 throw new Error(`Backend health check failed: ${response.status()}`);
             }
-            
+
             await page.close();
-            
+
         } catch (error) {
             console.error(`❌ ${testName} failed:`, error.message);
             this.recordTestResult(testName, 'failed', { error: error.message });
@@ -196,86 +196,86 @@ class BrowserAutomationTestSuite {
     async testComprehensiveTestSuite() {
         const testName = 'Comprehensive Test Suite Page';
         console.log(`\n🔍 Testing: ${testName}`);
-        
+
         try {
             const page = await this.context.newPage();
-            
+
             // Load test suite page
             await page.goto('file://' + path.resolve(__dirname, 'test-all-workflows.html'), {
                 waitUntil: 'networkidle'
             });
-            
+
             // Wait for page to initialize
             await page.waitForSelector('#run-all-tests', { timeout: 10000 });
-            
+
             // Check server connection status
             await page.waitForSelector('#health-status', { timeout: 5000 });
             const healthStatus = await page.textContent('#health-status');
-            
+
             if (!healthStatus.includes('✅')) {
                 console.warn('⚠️ Server connection status shows issues');
             }
-            
+
             // Click run all tests button
             await page.click('#run-all-tests');
-            
+
             // Wait for tests to start
             await page.waitForSelector('.workflow-test.testing', { timeout: 5000 });
             console.log('🏃 Tests are running...');
-            
+
             // Wait for completion or timeout
             try {
-                await page.waitForSelector('#summary-results[style*="block"]', { 
-                    timeout: this.options.timeout 
+                await page.waitForSelector('#summary-results[style*="block"]', {
+                    timeout: this.options.timeout
                 });
             } catch (timeoutError) {
                 console.warn('⏰ Tests did not complete within timeout, checking current status');
             }
-            
+
             // Get test results
             const testElements = await page.$$('.workflow-test');
             const testResults = [];
-            
+
             for (const element of testElements) {
                 const testId = await element.getAttribute('id');
                 const statusElement = await element.$('.status-indicator');
                 const statusClass = await statusElement.getAttribute('class');
                 const resultText = await element.$eval('.test-results', el => el.textContent);
-                
+
                 testResults.push({
                     id: testId,
-                    status: statusClass.includes('success') ? 'passed' : 
-                           statusClass.includes('error') ? 'failed' : 
+                    status: statusClass.includes('success') ? 'passed' :
+                           statusClass.includes('error') ? 'failed' :
                            statusClass.includes('testing') ? 'running' : 'pending',
                     result: resultText.substring(0, 200) + '...'
                 });
             }
-            
+
             console.log('📊 Test Results Summary:');
             testResults.forEach(result => {
-                const icon = result.status === 'passed' ? '✅' : 
-                           result.status === 'failed' ? '❌' : 
+                const icon = result.status === 'passed' ? '✅' :
+                           result.status === 'failed' ? '❌' :
                            result.status === 'running' ? '🏃' : '⏸️';
                 console.log(`  ${icon} ${result.id}: ${result.status}`);
             });
-            
+
             // Take screenshot for documentation
             if (this.options.screenshotOnFailure) {
                 await this.takeScreenshot(page, 'comprehensive-test-suite');
             }
-            
+
             const passedTests = testResults.filter(r => r.status === 'passed').length;
             const failedTests = testResults.filter(r => r.status === 'failed').length;
-            
+
             this.recordTestResult(testName, passedTests > failedTests ? 'passed' : 'failed', {
                 totalTests: testResults.length,
                 passed: passedTests,
                 failed: failedTests,
                 details: testResults
             });
-            
+
             await page.close();
-            
+
         } catch (error) {
             console.error(`❌ ${testName} failed:`, error.message);
             this.recordTestResult(testName, 'failed', { error: error.message });
@@ -285,33 +285,33 @@ class BrowserAutomationTestSuite {
     async testWorkflowExample(workflow) {
         const testName = `Workflow: ${workflow.name}`;
         console.log(`\n🔍 Testing: ${testName}`);
-        
+
         try {
             const page = await this.context.newPage();
-            
+
             // Load workflow example page
             const filePath = path.resolve(__dirname, workflow.path);
             await page.goto(`file://${filePath}`, { waitUntil: 'networkidle' });
-            
+
             // Wait for page to load completely
             await page.waitForLoadState('domcontentloaded');
             await page.waitForTimeout(2000); // Allow time for settings initialization
-            
+
             // Check if settings integration is working
             const hasApiClient = await page.evaluate(() => {
                 return window.apiClient !== null && window.apiClient !== undefined;
             });
-            
+
             if (!hasApiClient) {
                 console.warn('⚠️ API client not initialized, may affect test results');
             }
-            
+
             // Find and click the primary action button
             const actionButtons = [
-                '#start-chain', '#start-routing', '#start-analysis', 
+                '#start-chain', '#start-routing', '#start-analysis',
                 '#start-pipeline', '#start-optimization', '.btn-primary'
             ];
-            
+
             let actionButton = null;
             for (const selector of actionButtons) {
                 try {
@@ -324,18 +324,18 @@ class BrowserAutomationTestSuite {
                     // Continue searching
                 }
             }
-            
+
             if (!actionButton) {
                 throw new Error('Could not find primary action button');
             }
-            
+
             // Click the action button to start workflow
             await actionButton.click();
             console.log('▶️ Started workflow execution');
-            
+
             // Wait for workflow to show progress
             await page.waitForTimeout(3000);
-            
+
             // Look for progress indicators or results
             const hasProgress = await page.evaluate(() => {
                 // Check for common progress indicators
@@ -343,13 +343,13 @@ class BrowserAutomationTestSuite {
                     '.progress-bar', '.workflow-progress', '.step-progress',
                     '[class*="progress"]', '[id*="progress"]', '.visualizer'
                 ];
-                
+
                 return progressSelectors.some(selector => {
                     const elements = document.querySelectorAll(selector);
                     return elements.length > 0;
                 });
             });
-            
+
             // Look for API calls in network tab
             const apiCalls = [];
             page.on('response', response => {
@@ -361,32 +361,32 @@ class BrowserAutomationTestSuite {
                     });
                 }
             });
-            
+
             // Wait a bit longer for API calls to complete
             await page.waitForTimeout(5000);
-            
+
             // Check for error messages
             const hasErrors = await page.evaluate(() => {
                 const errorText = document.body.textContent.toLowerCase();
-                return errorText.includes('error') || 
-                       errorText.includes('failed') || 
+                return errorText.includes('error') ||
+                       errorText.includes('failed') ||
                        errorText.includes('timeout');
             });
-            
+
             // Take screenshot for documentation
             if (this.options.screenshotOnFailure) {
                 await this.takeScreenshot(page, `workflow-${workflow.testId}`);
             }
-            
+
             // Evaluate test success
             const testPassed = hasProgress && !hasErrors && (apiCalls.length > 0 || hasApiClient);
-            
+
             if (testPassed) {
                 console.log('✅ Workflow example is functioning');
             } else {
                 console.log('⚠️ Workflow example may have issues');
             }
-            
+
             this.recordTestResult(testName, testPassed ? 'passed' : 'failed', {
                 hasProgress,
                 hasErrors,
@@ -394,12 +394,12 @@ class BrowserAutomationTestSuite {
                 hasApiClient,
                 url: filePath
             });
-            
+
             await page.close();
-            
+
         } catch (error) {
             console.error(`❌ ${testName} failed:`, error.message);
-            
+
             // Take screenshot on failure
             if (this.options.screenshotOnFailure) {
                 try {
@@ -411,7 +411,7 @@ class BrowserAutomationTestSuite {
                     console.warn('Could not take error screenshot:', screenshotError.message);
                 }
             }
-            
+
             this.recordTestResult(testName, 'failed', { error: error.message });
         }
     }
@@ -420,16 +420,16 @@ class BrowserAutomationTestSuite {
         try {
             const screenshotDir = path.resolve(__dirname, 'test-screenshots');
             await fs.mkdir(screenshotDir, { recursive: true });
-            
+
             const filename = `${name}-${Date.now()}.png`;
             const filepath = path.join(screenshotDir, filename);
-            
-            await page.screenshot({ 
-                path: filepath, 
+
+            await page.screenshot({
+                path: filepath,
                 fullPage: true,
                 type: 'png'
             });
-            
+
             console.log(`📸 Screenshot saved: ${filename}`);
             return filepath;
         } catch (error) {
@@ -439,7 +439,7 @@ class BrowserAutomationTestSuite {
 
     recordTestResult(testName, status, details = {}) {
         this.results.total++;
-        
+
         if (status === 'passed') {
             this.results.passed++;
         } else if (status === 'failed') {
@@ -447,7 +447,7 @@ class BrowserAutomationTestSuite {
         } else {
             this.results.skipped++;
         }
-        
+
         this.results.tests.push({
             name: testName,
             status,
@@ -465,25 +465,25 @@ class BrowserAutomationTestSuite {
         console.log(`❌ Failed: ${this.results.failed}`);
         console.log(`⏸️ Skipped: ${this.results.skipped}`);
         console.log(`📊 Success Rate: ${Math.round((this.results.passed / this.results.total) * 100)}%`);
-        
+
         console.log('\n📝 Detailed Results:');
         this.results.tests.forEach(test => {
             const icon = test.status === 'passed' ? '✅' : test.status === 'failed' ? '❌' : '⏸️';
             console.log(`  ${icon} ${test.name}`);
-            
+
             if (test.details.error) {
                 console.log(`      Error: ${test.details.error}`);
             }
-            
+
             if (test.details.apiCalls !== undefined) {
                 console.log(`      API Calls: ${test.details.apiCalls}`);
             }
-            
+
             if (test.details.totalTests) {
                 console.log(`      Subtests: ${test.details.passed}/${test.details.totalTests} passed`);
             }
         });
-        
+
         // Save JSON report
         const reportPath = path.resolve(__dirname, 'test-results.json');
         await fs.writeFile(reportPath, JSON.stringify({
@@ -492,9 +492,9 @@ class BrowserAutomationTestSuite {
             timestamp: new Date().toISOString(),
             options: this.options
         }, null, 2));
-        
+
         console.log(`\n💾 Detailed report saved: ${reportPath}`);
-        
+
         // Generate HTML report
         await this.generateHtmlReport(duration);
     }
@@ -532,7 +532,7 @@ class BrowserAutomationTestSuite {
         <p>Generated on ${new Date().toLocaleString()}</p>
         <p>Duration: ${Math.round(duration / 1000)}s</p>
     </div>
-    
+
     <div class="summary">
         <div class="summary-card total">
             <h3>Total Tests</h3>
@@ -551,7 +551,7 @@ class BrowserAutomationTestSuite {
             <div class="number">${Math.round((this.results.passed / this.results.total) * 100)}%</div>
         </div>
     </div>
-    
+
     <div class="test-results">
         <h2>Test Results</h2>
         ${this.results.tests.map(test => `
@@ -572,7 +572,7 @@ class BrowserAutomationTestSuite {
             </div>
         `).join('')}
     </div>
-    
+
     <div style="margin-top: 2rem; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
         <h3>Test Configuration</h3>
         <pre>${JSON.stringify(this.options, null, 2)}</pre>
@@ -580,7 +580,7 @@ class BrowserAutomationTestSuite {
 </body>
 </html>
         `;
-        
+
         const htmlReportPath = path.resolve(__dirname, 'test-report.html');
         await fs.writeFile(htmlReportPath, htmlReport.trim());
         console.log(`📄 HTML report saved: ${htmlReportPath}`);
@@ -591,17 +591,17 @@ class BrowserAutomationTestSuite {
 async function main() {
     console.log('🎭 Terraphim AI - Browser Automation Test Suite');
     console.log('Testing multi-agent workflow integration end-to-end\n');
-    
+
     const testSuite = new BrowserAutomationTestSuite();
-    
+
     try {
         const results = await testSuite.runAllTests();
-        
+
         // Exit with appropriate code
         const exitCode = results.failed > 0 ? 1 : 0;
         console.log(`\n🏁 Tests completed with exit code: ${exitCode}`);
         process.exit(exitCode);
-        
+
     } catch (error) {
         console.error('💥 Test suite crashed:', error);
         process.exit(1);

@@ -1,11 +1,8 @@
 //! Integration tests for LLM functionality with both llama3.2:3b and gemma3:270m models
 
 use ahash::AHashMap;
-use std::sync::Arc;
 use terraphim_config::Role;
-use terraphim_multi_agent::{
-    AgentConfig, CommandInput, CommandType, GenAiLlmClient, TerraphimAgent,
-};
+use terraphim_multi_agent::{CommandInput, CommandType, GenAiLlmClient, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;
 
 /// Test agent creation and response with llama3.2:3b model
@@ -29,13 +26,21 @@ async fn test_llama_model_response() {
     );
 
     let role = Role {
-        name: "Test Llama Engineer".to_string(),
+        name: "Test Llama Engineer".to_string().into(),
         shortname: Some("TestLlama".to_string()),
         relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
         haystacks: Vec::new(),
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         extra,
     };
 
@@ -44,7 +49,7 @@ async fn test_llama_model_response() {
         .await
         .expect("Failed to create test storage");
 
-    let mut agent = TerraphimAgent::new(role, persistence, None)
+    let agent = TerraphimAgent::new(role, persistence, None)
         .await
         .expect("Failed to create agent");
 
@@ -105,13 +110,21 @@ async fn test_gemma_model_response() {
     );
 
     let role = Role {
-        name: "Test Gemma Engineer".to_string(),
+        name: "Test Gemma Engineer".to_string().into(),
         shortname: Some("TestGemma".to_string()),
         relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
         haystacks: Vec::new(),
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         extra,
     };
 
@@ -120,7 +133,7 @@ async fn test_gemma_model_response() {
         .await
         .expect("Failed to create test storage");
 
-    let mut agent = TerraphimAgent::new(role, persistence, None)
+    let agent = TerraphimAgent::new(role, persistence, None)
         .await
         .expect("Failed to create agent");
 

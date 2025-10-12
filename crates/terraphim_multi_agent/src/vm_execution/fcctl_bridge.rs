@@ -429,7 +429,7 @@ mod tests {
     async fn test_bridge_creation() {
         let config = HistoryConfig::default();
         let bridge = FcctlBridge::new(config, "http://localhost:8080".to_string());
-        assert_eq!(bridge.config.enabled, true);
+        assert!(bridge.config.enabled);
     }
 
     #[tokio::test]

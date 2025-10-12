@@ -257,7 +257,7 @@ impl RigLlmClient {
             },
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Provider '{}' is not supported. Supported providers: openai, anthropic, ollama", 
+                    "Provider '{}' is not supported. Supported providers: openai, anthropic, ollama",
                     config.provider
                 ).into());
             },
@@ -310,7 +310,7 @@ impl RigLlmClient {
         // Estimate token usage (Rig doesn't always provide detailed usage)
         let input_tokens = (prompt.len() / 4) as u64; // rough estimation: 4 chars = 1 token
         let output_tokens = (response_content.len() / 4) as u64;
-        
+
         let response = LlmResponse {
             content: response_content,
             model: self.config.model.clone(),

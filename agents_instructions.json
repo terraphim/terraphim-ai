@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "system": "Terraphim AI Assistant",
     "description": "Machine-readable instructions for AI agents to leverage Terraphim functionality",
-    
+
     "architecture": {
       "core_components": {
         "rust_backend": {
@@ -16,7 +16,7 @@
               "dependencies": ["terraphim_persistence", "terraphim_config", "terraphim_middleware", "terraphim_automata", "terraphim_rolegraph"]
             },
             {
-              "name": "terraphim_middleware", 
+              "name": "terraphim_middleware",
               "purpose": "Haystack indexing, document processing, and search orchestration",
               "features": ["mcp", "mcp-sse", "mcp-rust-sdk", "openrouter"],
               "dependencies": ["terraphim_config", "terraphim_rolegraph", "terraphim_automata", "terraphim_atomic_client"]
@@ -60,20 +60,20 @@
             }
           ]
         },
-        
+
         "frontend": {
           "technology": "Svelte with TypeScript",
-          "build_tool": "Vite", 
+          "build_tool": "Vite",
           "desktop_integration": "Tauri",
           "css_framework": "Bulma",
           "location": "desktop/"
         },
-        
+
         "server": {
           "main_binary": "terraphim_server",
           "api_endpoints": [
             "GET /health",
-            "POST /config", 
+            "POST /config",
             "POST /documents/search",
             "POST /documents/summarize",
             "POST /chat",
@@ -82,16 +82,16 @@
           ]
         }
       },
-      
+
       "key_concepts": {
         "roles": "User profiles with specific knowledge domains and search preferences",
         "haystacks": "Data sources (local folders, Notion, email, etc.)",
-        "knowledge_graph": "Structured relationships between concepts and documents", 
+        "knowledge_graph": "Structured relationships between concepts and documents",
         "thesaurus": "Concept mappings and synonyms for semantic matching",
         "rolegraph": "Per-role knowledge graph for personalized search"
       }
     },
-    
+
     "agent_system": {
       "agent_definition_structure": {
         "file_location": ".agents/",
@@ -101,7 +101,7 @@
           "optional_fields": ["version", "publisher", "toolNames", "spawnableAgents", "inputSchema", "outputMode", "outputSchema", "spawnerPrompt", "systemPrompt", "instructionsPrompt", "stepPrompt", "handleSteps"],
           "available_models": ["openai/gpt-5", "anthropic/claude-4-sonnet-20250522", "google/gemini-2.5-pro", "x-ai/grok-4-07-09", "qwen/qwen3-coder", "deepseek/deepseek-chat-v3-0324"]
         },
-        
+
         "available_tools": [
           {
             "name": "read_files",
@@ -109,7 +109,7 @@
             "params": ["paths"]
           },
           {
-            "name": "write_file", 
+            "name": "write_file",
             "purpose": "Create or edit files",
             "params": ["path", "instructions", "content"]
           },
@@ -154,7 +154,7 @@
             "params": ["thought"]
           }
         ],
-        
+
         "agent_examples": [
           {
             "name": "basic-diff-reviewer",
@@ -163,7 +163,7 @@
             "model": "anthropic/claude-4-sonnet-20250522"
           },
           {
-            "name": "git-committer", 
+            "name": "git-committer",
             "purpose": "Create meaningful git commits",
             "tools": ["read_files", "run_terminal_command", "add_message", "end_turn"],
             "model": "anthropic/claude-4-sonnet-20250522",
@@ -179,20 +179,20 @@
           }
         ]
       },
-      
+
       "workflow_patterns": {
         "code_review_workflow": {
           "trigger": "After code modifications",
           "agents": ["rust-wasm-code-reviewer"],
           "steps": ["Analyze changes", "Security review", "Performance check", "Best practices validation"]
         },
-        
+
         "git_workflow": {
           "trigger": "Before committing changes",
           "agents": ["git-committer"],
           "steps": ["Run git diff", "Read relevant files", "Create commit message", "Stage and commit"]
         },
-        
+
         "exploration_workflow": {
           "trigger": "Understanding codebase",
           "agents": ["advanced-file-explorer"],
@@ -200,12 +200,12 @@
         }
       }
     },
-    
+
     "development_workflow": {
       "build_commands": {
         "rust": {
           "build_all": "cargo build --workspace",
-          "test_all": "cargo test --workspace", 
+          "test_all": "cargo test --workspace",
           "format": "cargo fmt",
           "lint": "cargo clippy",
           "test_with_features": "cargo test --features openrouter"
@@ -218,7 +218,7 @@
           "e2e": "cd desktop && yarn run e2e"
         }
       },
-      
+
       "quality_assurance": {
         "pre_commit_hooks": [
           "cargo fmt --all -- --check",
@@ -229,12 +229,12 @@
         ],
         "ci_workflows": [
           "ci-native.yml (GitHub Actions + Docker Buildx)",
-          "ci-optimized.yml", 
+          "ci-optimized.yml",
           "test-matrix.yml",
           "tauri-build.yml"
         ]
       },
-      
+
       "configuration_management": {
         "role_configs": {
           "location": "terraphim_server/default/",
@@ -253,14 +253,14 @@
         }
       }
     },
-    
+
     "search_and_knowledge_system": {
       "relevance_functions": {
         "TitleScorer": "Basic text matching and ranking",
-        "BM25/BM25F/BM25Plus": "Advanced text relevance algorithms", 
+        "BM25/BM25F/BM25Plus": "Advanced text relevance algorithms",
         "TerraphimGraph": "Semantic graph-based ranking with thesaurus"
       },
-      
+
       "haystack_types": {
         "Ripgrep": "Local filesystem search using ripgrep command",
         "AtomicServer": "Integration with Atomic Data protocol",
@@ -269,16 +269,16 @@
         "QueryRs": "Rust documentation and Reddit community search",
         "MCP": "Model Context Protocol for AI tool integration"
       },
-      
+
       "knowledge_graph_workflow": [
         "Thesaurus building from documents or URLs",
-        "Automata construction for fast text matching", 
+        "Automata construction for fast text matching",
         "Document indexing with concept extraction",
         "Graph construction with nodes/edges/documents",
         "Query processing with semantic expansion"
       ]
     },
-    
+
     "ai_integration": {
       "providers": {
         "OpenRouter": {
@@ -287,16 +287,16 @@
         },
         "Ollama": {
           "config_key": "llm_provider",
-          "base_url_key": "ollama_base_url", 
+          "base_url_key": "ollama_base_url",
           "model_key": "ollama_model"
         }
       },
-      
+
       "mcp_integration": {
         "server_location": "crates/terraphim_mcp_server/",
         "available_tools": [
           "autocomplete_terms",
-          "find_matches", 
+          "find_matches",
           "load_thesaurus",
           "is_all_terms_connected_by_path",
           "fuzzy_autocomplete_search_jaro_winkler"
@@ -304,21 +304,21 @@
         "transports": ["stdio", "sse/http"]
       }
     },
-    
+
     "deployment_patterns": {
       "development": {
         "backend": "cargo run",
         "frontend": "cd desktop && yarn run dev",
         "desktop_app": "cd desktop && yarn run tauri dev"
       },
-      
+
       "production": {
         "multi_platform": ["linux/amd64", "linux/arm64", "linux/arm/v7"],
         "containerization": "Docker Buildx with layer optimization",
         "ci_cd": "GitHub Actions with matrix builds"
       }
     },
-    
+
     "best_practices": {
       "rust_code": {
         "async_runtime": "tokio",
@@ -327,14 +327,14 @@
         "feature_gates": "#[cfg(feature = \"openrouter\")]",
         "trait_objects": "Use dyn keyword (Arc<dyn StateManager>)"
       },
-      
+
       "frontend_code": {
         "framework": "Svelte with TypeScript",
         "styling": "Bulma CSS (no Tailwind)",
         "package_manager": "yarn",
         "naming": "PascalCase for components, kebab-case for files"
       },
-      
+
       "testing": {
         "unit_tests": "tokio::test for async",
         "integration_tests": "Cross-crate functionality",
@@ -342,20 +342,20 @@
         "e2e_tests": "Full user workflows"
       }
     },
-    
+
     "common_patterns": {
       "adding_search_providers": [
         "Implement indexer in terraphim_middleware/src/indexer/",
-        "Add configuration in terraphim_config", 
+        "Add configuration in terraphim_config",
         "Integrate with search orchestration in terraphim_service"
       ],
-      
+
       "adding_relevance_functions": [
         "Implement scorer in terraphim_service/src/score/",
         "Update RelevanceFunction enum in terraphim_types",
         "Add handling in main search logic"
       ],
-      
+
       "knowledge_graph_work": [
         "Use terraphim_automata::load_thesaurus() for loading",
         "RoleGraph manages document-to-concept relationships",

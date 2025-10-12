@@ -11,7 +11,7 @@ This crate provides message-based communication patterns inspired by Erlang/OTP,
 ### Message Patterns
 Following Erlang/OTP conventions:
 - **Call**: Synchronous messages that expect a response (gen_server:call)
-- **Cast**: Asynchronous fire-and-forget messages (gen_server:cast)  
+- **Cast**: Asynchronous fire-and-forget messages (gen_server:cast)
 - **Info**: System notification messages (gen_server:info)
 
 ### Agent Mailboxes
@@ -45,14 +45,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create message system
     let config = RouterConfig::default();
     let system = MessageSystem::new(config);
-    
+
     // Register agents
     let agent1 = AgentPid::new();
     let agent2 = AgentPid::new();
-    
+
     system.register_agent(agent1.clone()).await?;
     system.register_agent(agent2.clone()).await?;
-    
+
     // Send message from agent1 to agent2
     let envelope = MessageEnvelope::new(
         agent2.clone(),
@@ -60,15 +60,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!({"message": "Hello, Agent2!"}),
         DeliveryOptions::default(),
     ).with_from(agent1.clone());
-    
+
     system.send_message(envelope).await?;
-    
+
     // Get mailbox and receive message
     if let Some(mailbox) = system.get_mailbox(&agent2).await {
         let message = mailbox.receive().await?;
         println!("Agent2 received: {:?}", message);
     }
-    
+
     system.shutdown().await?;
     Ok(())
 }
@@ -88,7 +88,7 @@ let payload = "Hello, World!";
 // Asynchronous cast message
 let cast_msg = AgentMessage::cast(from.clone(), payload);
 
-// Synchronous call message  
+// Synchronous call message
 let (call_msg, reply_rx) = AgentMessage::call(
     from.clone(),
     payload,
@@ -230,12 +230,12 @@ impl MessageRouter for CustomRouter {
         // Custom routing implementation
         Ok(())
     }
-    
+
     async fn register_agent(&self, agent_id: AgentPid, sender: MailboxSender) -> MessagingResult<()> {
         // Custom registration logic
         Ok(())
     }
-    
+
     // Implement other required methods...
 }
 ```
@@ -253,7 +253,7 @@ match system.send_message(envelope).await {
         println!("Error: {}", e);
         println!("Category: {:?}", e.category());
         println!("Recoverable: {}", e.is_recoverable());
-        
+
         match e {
             MessagingError::AgentNotFound(agent_id) => {
                 println!("Agent {} not found", agent_id);
@@ -283,7 +283,7 @@ let retry_candidates = delivery_manager.get_retry_candidates().await;
 for envelope in retry_candidates {
     let delay = delivery_manager.calculate_retry_delay(envelope.attempts);
     tokio::time::sleep(delay).await;
-    
+
     // Retry delivery...
 }
 ```
@@ -303,7 +303,7 @@ println!("  Active routes: {}", router_stats.active_routes);
 
 println!("Mailbox Stats:");
 for stats in mailbox_stats {
-    println!("  Agent {}: {} messages processed", 
+    println!("  Agent {}: {} messages processed",
         stats.agent_id, stats.total_messages_processed);
 }
 ```

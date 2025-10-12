@@ -4,6 +4,7 @@ use terraphim_types::RelevanceFunction;
 
 // Multi-agent system demonstration requires the crate to be added as dependency
 // #[cfg(feature = "multi_agent")]
+#[allow(unused_imports)]
 use std::sync::Arc;
 use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;
@@ -333,7 +334,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // This would create an intelligent agent from the role
         let persistence = create_test_storage().await?;
         let role = basic_config.roles.values().next().unwrap();
-        let mut agent = TerraphimAgent::new(role.clone(), persistence, None).await?;
+        let agent = TerraphimAgent::new(role.clone(), persistence, None).await?;
         agent.initialize().await?;
 
         println!("✅ Intelligent agent created from configuration:");
@@ -363,7 +364,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   Cost: ${:.6}", cost_tracker.current_month_spending);
     }
 
-    #[cfg(not(feature = "multi_agent"))]
+    // Multi-agent system information
     {
         println!("\n💡 Multi-Agent System Available");
         println!("====================================");

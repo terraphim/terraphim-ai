@@ -58,7 +58,7 @@ let chaining = PromptChaining::with_config(adapter, chain_config);
 
 #### Analysis Chain
 - **Extract Information**: Pull key data from input
-- **Identify Patterns**: Find relationships and trends  
+- **Identify Patterns**: Find relationships and trends
 - **Synthesize Analysis**: Combine insights into conclusions
 
 #### Generation Chain
@@ -181,7 +181,7 @@ impl TaskRouter {
         let routes = self.available_routes();
         let mut best_route = None;
         let mut best_score = 0.0;
-        
+
         for route in routes {
             let score = self.calculate_route_score(route, analysis);
             if score > best_score {
@@ -189,7 +189,7 @@ impl TaskRouter {
                 best_route = Some(route);
             }
         }
-        
+
         best_route.unwrap_or(self.default_route())
     }
 }
@@ -309,19 +309,19 @@ AggregationStrategy::StructuredCombination
 impl Parallelization {
     async fn execute_task_batches(&self, tasks: Vec<ParallelTask>) -> Result<Vec<ParallelTaskResult>> {
         let mut all_results = Vec::new();
-        
+
         // Sort by priority (Critical first)
         tasks.sort_by(|a, b| b.priority.cmp(&a.priority));
-        
+
         // Process in batches to respect max_parallel_tasks limit
         for batch in tasks.chunks(self.parallel_config.max_parallel_tasks) {
             let batch_futures: Vec<_> = batch.iter()
                 .map(|task| self.execute_single_task(task.clone()))
                 .collect();
-                
+
             let batch_results = join_all(batch_futures).await;
             all_results.extend(batch_results);
-            
+
             // Brief delay between batches
             if batch.len() == self.parallel_config.max_parallel_tasks {
                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -374,11 +374,11 @@ pub enum WorkerRole {
 ```rust
 let analyst_prompt = format!(
     "You are a skilled analyst. Focus on breaking down complex information, identifying patterns, and providing insights.
-    
+
     Task: {}
-    
+
     Expected deliverable: {}
-    
+
     Quality criteria: {}",
     task.instruction,
     task.expected_deliverable,
@@ -386,7 +386,7 @@ let analyst_prompt = format!(
 );
 ```
 
-#### Researcher Worker  
+#### Researcher Worker
 - **Purpose**: Gather comprehensive information and verify facts
 - **Specialization**: Information collection, fact checking, source validation
 - **Output**: Well-sourced findings with verified information
@@ -409,7 +409,7 @@ CoordinationStrategy::Sequential
 // Workers execute one after another with context accumulation
 ```
 
-#### Parallel Coordinated  
+#### Parallel Coordinated
 ```rust
 CoordinationStrategy::ParallelCoordinated
 // Workers execute in dependency-based levels, parallel within each level
@@ -445,7 +445,7 @@ Consider:
 4. What quality criteria should be applied?
 
 Provide a structured plan with clear task assignments."#,
-            prompt, 
+            prompt,
             context.as_deref().unwrap_or("")
         );
 
@@ -492,7 +492,7 @@ impl OrchestratorWorkers {
 
         let success_rate = successful_results.len() as f64 / results.len() as f64;
 
-        Ok(average_quality >= self.orchestration_config.quality_gate_threshold 
+        Ok(average_quality >= self.orchestration_config.quality_gate_threshold
            && success_rate >= 0.5)
     }
 }
@@ -644,7 +644,7 @@ impl EvaluatorOptimizer {
 
             // Generate optimization actions
             let actions = self.generate_optimization_actions(&evaluation).await?;
-            
+
             // Apply optimizations
             current_content = self.apply_optimizations(&current_content, &actions, &input.prompt).await?;
 
@@ -711,7 +711,7 @@ let result = manager.execute_task(
 
 // System automatically:
 // 1. Analyzes task to select best pattern
-// 2. Executes chosen workflow pattern  
+// 2. Executes chosen workflow pattern
 // 3. Updates memory, tasks, and lessons
 // 4. Creates evolution snapshots
 // 5. Tracks performance metrics

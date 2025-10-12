@@ -56,7 +56,7 @@ warning: multiple lines skipped by escaped newline
     |
 746 |               high-quality results across all task domains. Average quality score: {:.2}. \
     |  _________________________________________________________________________________________^
-747 | |             
+747 | |
 748 | |             Key achievements: Successful task decomposition, efficient resource utilization \
     | |____________^ skipping everything up to and including this point
 
@@ -65,7 +65,7 @@ warning: multiple lines skipped by escaped newline
     |
 749 |               ({:.1}% worker utilization), and effective coordination with minimal overhead. \
     |  ____________________________________________________________________________________________^
-750 | |             
+750 | |
 751 | |             The hierarchical coordination model proved effective for this type of complex task, \
     | |____________^ skipping everything up to and including this point
 
@@ -74,7 +74,7 @@ warning: multiple lines skipped by escaped newline
     |
 488 |           Average confidence level: {:.1}%, consensus achieved: {:.1}%, diversity score: {:.2}. \
     |  _______________________________________________________________________________________________^
-489 | |         
+489 | |
 490 | |         The analysis reveals strong alignment on fundamental approaches while highlighting \
     | |________^ skipping everything up to and including this point
 
@@ -83,7 +83,7 @@ warning: multiple lines skipped by escaped newline
     |
 491 |           strategic differences in implementation timelines and resource allocation. \
     |  ____________________________________________________________________________________^
-492 | |         
+492 | |
 493 | |         Key recommendations emerge from cross-agent consensus: prioritize scalable architecture, \
     | |________^ skipping everything up to and including this point
 
@@ -92,7 +92,7 @@ warning: multiple lines skipped by escaped newline
     |
 494 |           implement robust security measures, and adopt iterative development methodology. \
     |  __________________________________________________________________________________________^
-495 | |         
+495 | |
 496 | |         Conflicting perspectives on timeline and approach provide valuable decision-making context, \
     | |________^ skipping everything up to and including this point
 
@@ -1061,7 +1061,7 @@ warning: `terraphim_server` (lib) generated 153 warnings (run `cargo fix --lib -
 [2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
 [2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
 [2025-09-17T08:29:57Z INFO  terraphim_server] Failed to load saved config, using default: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
-    
+
     Context:
        service: memory
        path: server_config.json

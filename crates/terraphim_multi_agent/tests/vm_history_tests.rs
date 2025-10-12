@@ -16,10 +16,15 @@ async fn test_history_config_defaults() {
 
 #[tokio::test]
 async fn test_vm_execution_config_with_history() {
-    let mut config = VmExecutionConfig::default();
-    config.enabled = true;
-    config.history.enabled = true;
-    config.history.auto_rollback_on_failure = true;
+    let config = VmExecutionConfig {
+        enabled: true,
+        history: HistoryConfig {
+            enabled: true,
+            auto_rollback_on_failure: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     assert!(config.history.enabled);
     assert!(config.history.auto_rollback_on_failure);
@@ -28,7 +33,7 @@ async fn test_vm_execution_config_with_history() {
 #[tokio::test]
 async fn test_fcctl_bridge_creation() {
     let history_config = HistoryConfig::default();
-    let bridge = FcctlBridge::new(history_config, "http://localhost:8080".to_string());
+    let _bridge = FcctlBridge::new(history_config, "http://localhost:8080".to_string());
 }
 
 #[tokio::test]
@@ -85,7 +90,7 @@ async fn test_command_history_entry_creation() {
 
 #[tokio::test]
 async fn test_vm_execution_error_variants() {
-    let errors = vec![
+    let errors = [
         VmExecutionError::HistoryError("test error".to_string()),
         VmExecutionError::SnapshotNotFound("snap-123".to_string()),
         VmExecutionError::RollbackFailed("rollback error".to_string()),
@@ -98,20 +103,24 @@ async fn test_vm_execution_error_variants() {
 
 #[tokio::test]
 async fn test_vm_execution_client_with_history() {
-    let mut config = VmExecutionConfig::default();
-    config.enabled = true;
-    config.api_base_url = "http://localhost:8080".to_string();
+    let mut config = VmExecutionConfig {
+        enabled: true,
+        api_base_url: "http://localhost:8080".to_string(),
+        ..Default::default()
+    };
     config.history.enabled = true;
     config.history.snapshot_on_failure = true;
 
-    let client = VmExecutionClient::new(&config);
+    let _client = VmExecutionClient::new(&config);
 }
 
 #[tokio::test]
 async fn test_vm_execution_client_without_history() {
-    let mut config = VmExecutionConfig::default();
-    config.enabled = true;
-    config.api_base_url = "http://localhost:8080".to_string();
+    let mut config = VmExecutionConfig {
+        enabled: true,
+        api_base_url: "http://localhost:8080".to_string(),
+        ..Default::default()
+    };
     config.history.enabled = false;
 
     let client = VmExecutionClient::new(&config);
