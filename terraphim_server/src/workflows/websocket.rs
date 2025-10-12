@@ -33,7 +33,7 @@ struct WebSocketResponse {
 }
 
 #[derive(Debug, Clone)]
-struct WebSocketSession {
+pub struct WebSocketSession {
     session_id: String,
     connected_at: chrono::DateTime<chrono::Utc>,
     subscribed_workflows: Vec<String>,

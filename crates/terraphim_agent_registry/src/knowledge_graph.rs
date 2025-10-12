@@ -295,8 +295,7 @@ impl KnowledgeGraphIntegration {
             + domain_score * 0.20
             + performance_score * 0.20
             + availability_score * 0.10)
-            .min(1.0)
-            .max(0.0);
+            .clamp(0.0, 1.0);
 
         let score_breakdown = ScoreBreakdown {
             role_score,

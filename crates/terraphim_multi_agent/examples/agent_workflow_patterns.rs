@@ -6,13 +6,12 @@
 //!
 //! Patterns demonstrated:
 //! 1. Prompt Chaining - Sequential execution where each step feeds the next
-//! 2. Routing - Intelligent task distribution based on complexity and context  
+//! 2. Routing - Intelligent task distribution based on complexity and context
 //! 3. Parallelization - Concurrent execution with sophisticated result aggregation
 //! 4. Orchestrator-Workers - Hierarchical planning with specialized worker roles
 //! 5. Evaluator-Optimizer - Iterative quality improvement through evaluation loops
 
 use ahash::AHashMap;
-use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
@@ -21,7 +20,6 @@ use terraphim_multi_agent::{
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
-use tokio;
 
 /// Workflow Pattern 1: Prompt Chaining
 /// Sequential execution where each step's output feeds into the next step
@@ -44,7 +42,7 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
 
     // Create a software development role
     let dev_role = create_software_development_role();
-    let mut dev_agent = TerraphimAgent::new(dev_role, persistence.clone(), None).await?;
+    let dev_agent = TerraphimAgent::new(dev_role, persistence.clone(), None).await?;
     dev_agent.initialize().await?;
 
     println!("✅ Development agent created: {}", dev_agent.agent_id);
@@ -53,7 +51,7 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     let project_description = "Build a task management web application with user authentication, CRUD operations for tasks, and a clean responsive UI";
     let tech_stack = "React, Node.js, Express, MongoDB, JWT";
 
-    let development_steps = vec![
+    let development_steps = [
         (
             "Requirements & Specification",
             "Create detailed technical specification including user stories, API endpoints, data models, and acceptance criteria",
@@ -119,7 +117,7 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     Ok(())
 }
 
-/// Workflow Pattern 2: Routing  
+/// Workflow Pattern 2: Routing
 /// Intelligent task distribution based on complexity, cost, and performance
 async fn demonstrate_routing() -> MultiAgentResult<()> {
     println!("\n\n🧠 WORKFLOW PATTERN 2: Routing");
@@ -139,25 +137,20 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create different agent roles for different complexity levels
-    let mut registry = AgentRegistry::new();
-
     // Simple tasks agent (fast, low cost)
     let simple_role = create_simple_task_role();
     let mut simple_agent = TerraphimAgent::new(simple_role, persistence.clone(), None).await?;
     simple_agent.initialize().await?;
-    registry.register_agent(Arc::new(simple_agent)).await?;
 
     // Complex tasks agent (slower, higher quality)
     let complex_role = create_complex_task_role();
     let mut complex_agent = TerraphimAgent::new(complex_role, persistence.clone(), None).await?;
     complex_agent.initialize().await?;
-    registry.register_agent(Arc::new(complex_agent)).await?;
 
     // Creative tasks agent (specialized for creative work)
     let creative_role = create_creative_task_role();
     let mut creative_agent = TerraphimAgent::new(creative_role, persistence.clone(), None).await?;
     creative_agent.initialize().await?;
-    registry.register_agent(Arc::new(creative_agent)).await?;
 
     println!("✅ Created 3 specialized agents for different task types");
 
@@ -253,7 +246,7 @@ async fn demonstrate_parallelization() -> MultiAgentResult<()> {
     let mut agents = Vec::new();
     for (perspective_name, perspective_description) in &perspectives {
         let role = create_perspective_role(perspective_name, perspective_description);
-        let mut agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
+        let agent = TerraphimAgent::new(role, persistence.clone(), None).await?;
         agent.initialize().await?;
         agents.push(agent);
     }
@@ -362,8 +355,7 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
 
     // Create orchestrator agent
     let orchestrator_role = create_orchestrator_role();
-    let mut orchestrator =
-        TerraphimAgent::new(orchestrator_role, persistence.clone(), None).await?;
+    let orchestrator = TerraphimAgent::new(orchestrator_role, persistence.clone(), None).await?;
     orchestrator.initialize().await?;
 
     // Create specialized worker agents
@@ -401,15 +393,16 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     ];
 
     let mut workers = HashMap::new();
-    let mut registry = AgentRegistry::new();
+    let registry = AgentRegistry::new();
 
-    for (worker_name, worker_description, worker_capability) in &worker_roles {
+    for (worker_name, worker_description, _worker_capability) in &worker_roles {
         let worker_role = create_worker_role(worker_name, worker_description);
-        let mut worker_agent = TerraphimAgent::new(worker_role, persistence.clone(), None).await?;
+        let worker_agent = TerraphimAgent::new(worker_role, persistence.clone(), None).await?;
         worker_agent.initialize().await?;
 
-        registry.register_agent(Arc::new(worker_agent)).await?;
-        workers.insert(worker_name.to_string(), worker_agent);
+        let worker_arc = Arc::new(worker_agent);
+        registry.register_agent(worker_arc.clone()).await?;
+        workers.insert(worker_name.to_string(), worker_arc);
     }
 
     println!(
@@ -469,8 +462,8 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
 
     let mut worker_results = HashMap::new();
 
-    for (worker_name, task_description) in worker_tasks {
-        if let Some(worker) = workers.get_mut(&worker_name.to_string()) {
+    for (worker_name, task_description) in &worker_tasks {
+        if let Some(worker) = workers.get(*worker_name) {
             let task_prompt = format!(
                 "Research Task: {}\n\nContext: {}\n\nPlease complete this specialized task as part of the larger research project.",
                 task_description, research_topic
@@ -523,7 +516,7 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     total_tokens += orch_tokens.total_input_tokens + orch_tokens.total_output_tokens;
 
     // Worker metrics
-    for (worker_name, worker) in &workers {
+    for worker in workers.values() {
         let cost_tracker = worker.cost_tracker.read().await;
         let token_tracker = worker.token_tracker.read().await;
         total_cost += cost_tracker.current_month_spending;
@@ -540,7 +533,7 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     Ok(())
 }
 
-/// Workflow Pattern 5: Evaluator-Optimizer  
+/// Workflow Pattern 5: Evaluator-Optimizer
 /// Iterative quality improvement through evaluation loops
 async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     println!("\n\n🔄 WORKFLOW PATTERN 5: Evaluator-Optimizer");
@@ -561,7 +554,7 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
 
     // Create content generator agent
     let generator_role = create_content_generator_role();
-    let mut generator = TerraphimAgent::new(generator_role, persistence.clone(), None).await?;
+    let generator = TerraphimAgent::new(generator_role, persistence.clone(), None).await?;
     generator.initialize().await?;
 
     // Create multiple evaluator agents for different quality dimensions
@@ -595,7 +588,7 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     let mut evaluators = HashMap::new();
     for (eval_name, eval_description) in &evaluator_roles {
         let eval_role = create_evaluator_role(eval_name, eval_description);
-        let mut eval_agent = TerraphimAgent::new(eval_role, persistence.clone(), None).await?;
+        let eval_agent = TerraphimAgent::new(eval_role, persistence.clone(), None).await?;
         eval_agent.initialize().await?;
         evaluators.insert(eval_name.to_string(), eval_agent);
     }
@@ -727,7 +720,7 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     total_tokens += gen_tokens.total_input_tokens + gen_tokens.total_output_tokens;
 
     // Evaluator metrics
-    for (_, evaluator) in &evaluators {
+    for evaluator in evaluators.values() {
         let cost_tracker = evaluator.cost_tracker.read().await;
         let token_tracker = evaluator.token_tracker.read().await;
         total_cost += cost_tracker.current_month_spending;
@@ -1042,7 +1035,7 @@ fn extract_quality_score(evaluation_text: &str) -> f64 {
                     .trim_matches(|c: char| !c.is_ascii_digit() && c != '.')
                     .parse::<f64>()
                 {
-                    if score >= 1.0 && score <= 10.0 {
+                    if (1.0..=10.0).contains(&score) {
                         return score;
                     }
                 }

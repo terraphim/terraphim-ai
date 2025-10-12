@@ -17,12 +17,7 @@
 //! - **Dynamic Alignment**: Real-time goal alignment as system state changes
 //! - **Performance Optimization**: Efficient caching and incremental updates
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
+// Removed unused imports
 
 // Re-export core types
 pub use terraphim_agent_registry::{AgentMetadata, AgentPid, SupervisorId};
@@ -42,7 +37,7 @@ pub use conflicts::*;
 pub use error::*;
 pub use goals::*;
 pub use knowledge_graph::*;
-pub use propagation::*;
+// Removed unused re-export
 
 /// Result type for goal alignment operations
 pub type GoalAlignmentResult<T> = Result<T, GoalAlignmentError>;

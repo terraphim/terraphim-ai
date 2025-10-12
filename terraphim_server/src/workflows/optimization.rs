@@ -691,6 +691,7 @@ async fn evaluate_variant(
     }
 }
 
+#[allow(unused_variables)]
 async fn generate_optimization_decisions(
     optimizer: &OptimizerAgent,
     evaluation_results: &[EvaluationResult],

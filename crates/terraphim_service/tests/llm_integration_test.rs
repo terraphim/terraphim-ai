@@ -11,7 +11,7 @@ async fn test_llm_client_integration() {
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
     if client
-        .get(&format!("{}/api/tags", ollama_url))
+        .get(format!("{}/api/tags", ollama_url))
         .send()
         .await
         .is_err()
@@ -36,6 +36,7 @@ async fn test_llm_client_integration() {
         llm_chat_enabled: true,
         llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
         llm_chat_model: Some("gemma3:270m".to_string()),
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
     role.extra
@@ -107,6 +108,7 @@ async fn test_llm_client_error_handling() {
         llm_chat_enabled: true,
         llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
         llm_chat_model: Some("gemma3:270m".to_string()),
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
     role.extra
@@ -152,13 +154,14 @@ async fn test_role_validation() {
         llm_chat_enabled: false,
         llm_chat_system_prompt: None,
         llm_chat_model: None,
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
 
     // Should return error for disabled LLM
     let result = build_llm_from_role(&role_without_llm);
     assert!(
-        result.is_err(),
+        result.is_none(),
         "Should fail to build LLM client when disabled"
     );
 
@@ -167,5 +170,8 @@ async fn test_role_validation() {
     role_missing_provider.llm_enabled = true;
 
     let result = build_llm_from_role(&role_missing_provider);
-    assert!(result.is_err(), "Should fail without llm_provider in extra");
+    assert!(
+        result.is_none(),
+        "Should fail without llm_provider in extra"
+    );
 }
