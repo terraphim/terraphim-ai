@@ -118,7 +118,7 @@ use terraphim_rolegraph::RoleGraph;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create role graph (integrate with existing Terraphim role graph)
     let role_graph = Arc::new(RoleGraph::new());
-    
+
     // Configure registry
     let config = RegistryConfig {
         max_agents: 1000,
@@ -127,16 +127,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         enable_monitoring: true,
         discovery_cache_ttl_secs: 3600,
     };
-    
+
     // Build registry
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
         .with_config(config)
         .build()?;
-    
+
     // Start background tasks
     registry.start_background_tasks().await?;
-    
+
     Ok(())
 }
 ```

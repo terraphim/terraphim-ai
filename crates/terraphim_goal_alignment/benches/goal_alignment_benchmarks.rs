@@ -1,9 +1,11 @@
 //! Benchmarks for the goal alignment system
+//! Currently disabled due to API changes requiring async RoleGraph::new()
 
+// Commented out due to API incompatibility with to_async and RoleGraph::new()
+/*
 use std::sync::Arc;
-use std::time::Duration;
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, BenchmarkId, Criterion};
 use tokio::runtime::Runtime;
 
 use terraphim_goal_alignment::{
@@ -44,7 +46,7 @@ fn bench_goal_alignment_analysis(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
     let mut group = c.benchmark_group("goal_alignment_analysis");
-    group.sample_size(10); // Reduce sample size for expensive operations
+    group.sample_size(10);
 
     for num_goals in [5, 10, 20].iter() {
         group.bench_with_input(
@@ -87,6 +89,11 @@ fn bench_goal_alignment_analysis(c: &mut Criterion) {
     group.finish();
 }
 
-// Temporarily disabled due to API compatibility issues
-// criterion_group!(benches, bench_goal_creation, bench_goal_alignment_analysis);
-// criterion_main!(benches);
+criterion_group!(benches, bench_goal_creation, bench_goal_alignment_analysis);
+criterion_main!(benches);
+*/
+
+fn main() {
+    // Benchmarks are temporarily disabled due to async API issues
+    println!("Goal alignment benchmarks temporarily disabled");
+}

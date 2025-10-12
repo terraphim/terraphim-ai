@@ -40,7 +40,6 @@ async fn test_weighted_haystack_ranking() {
         location: "./local_docs".to_string(),
         service: ServiceType::Ripgrep,
         read_only: true,
-        weight: 3.0, // High weight for local docs
         atomic_server_secret: None,
         extra_parameters: HashMap::new(),
         fetch_content: false,
@@ -49,7 +48,6 @@ async fn test_weighted_haystack_ranking() {
         location: "https://remote.api".to_string(),
         service: ServiceType::QueryRs,
         read_only: true,
-        weight: 0.5, // Low weight for remote API
         atomic_server_secret: None,
         extra_parameters: HashMap::new(),
         fetch_content: false,
@@ -75,9 +73,6 @@ async fn test_weighted_haystack_ranking() {
         roles,
         default_role: RoleName::from("Test Role"),
         selected_role: RoleName::from("Test Role"),
-        default_model_provider: None,
-        default_chat_model: None,
-        default_summarization_model: None,
     };
     // Create config state
     let config_state = ConfigState::new(&mut config)
@@ -106,15 +101,13 @@ async fn test_weighted_haystack_ranking() {
     // Perform search which should apply haystack weights
     let search_result = service.search(&search_query).await.expect("Search failed");
     // Verify that documents are correctly weighted and re-ranked
-    assert_eq!(search_result.documents.len(), 2);
+    assert_eq!(search_result.len(), 2);
     // The high-weight document should now have a higher rank due to weight multiplication
     let high_weight_result = search_result
-        .documents
         .iter()
         .find(|d| d.id == "high_weight_doc")
         .expect("High weight document not found");
     let low_weight_result = search_result
-        .documents
         .iter()
         .find(|d| d.id == "low_weight_doc")
         .expect("Low weight document not found");
@@ -123,14 +116,14 @@ async fn test_weighted_haystack_ranking() {
     // Low weight doc: original rank 20 * weight 0.5 = 10
     assert_eq!(low_weight_result.rank, Some(10));
     // Verify that documents are sorted by rank (highest first)
-    assert!(search_result.documents[0].rank.unwrap() >= search_result.documents[1].rank.unwrap());
+    assert!(search_result[0].rank.unwrap() >= search_result[1].rank.unwrap());
     // The high-weight document should now be ranked first
-    assert_eq!(search_result.documents[0].id, "high_weight_doc");
-    assert_eq!(search_result.documents[1].id, "low_weight_doc");
+    assert_eq!(search_result[0].id, "high_weight_doc");
+    assert_eq!(search_result[1].id, "low_weight_doc");
     println!(
         "✅ Weighted ranking test passed: High-weight document (rank {}) ranks before low-weight document (rank {})",
-        search_result.documents[0].rank.unwrap(),
-        search_result.documents[1].rank.unwrap()
+        search_result[0].rank.unwrap(),
+        search_result[1].rank.unwrap()
     );
 }
 /// Test that documents without source haystack or weight default to 1.0
@@ -163,7 +156,6 @@ async fn test_default_weight_handling() {
             location: "./docs".to_string(),
             service: ServiceType::Ripgrep,
             read_only: true,
-            weight: 2.0,
             atomic_server_secret: None,
             extra_parameters: HashMap::new(),
             fetch_content: false,
@@ -179,9 +171,6 @@ async fn test_default_weight_handling() {
         roles,
         default_role: RoleName::from("Test Role"),
         selected_role: RoleName::from("Test Role"),
-        default_model_provider: None,
-        default_chat_model: None,
-        default_summarization_model: None,
     };
 
     let config_state = ConfigState::new(&mut config)
@@ -208,10 +197,10 @@ async fn test_default_weight_handling() {
     let search_result = service.search(&search_query).await.expect("Search failed");
 
     // Document without source should maintain its original rank (default weight 1.0 applied)
-    assert_eq!(search_result.documents.len(), 1);
-    assert_eq!(search_result.documents[0].rank, Some(15));
+    assert_eq!(search_result.len(), 1);
+    assert_eq!(search_result[0].rank, Some(15));
     println!(
         "✅ Default weight handling test passed: Document without source maintained rank {}",
-        search_result.documents[0].rank.unwrap()
+        search_result[0].rank.unwrap()
     );
 }

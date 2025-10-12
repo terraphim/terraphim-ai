@@ -5,8 +5,7 @@
 //! intelligent, autonomous agents.
 
 use ahash::AHashMap;
-use std::sync::Arc;
-use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
+use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_types::RelevanceFunction;
 
 // Multi-agent system demonstration requires the crate to be added as dependency
@@ -125,8 +124,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • Performance and cost tracking");
 
     // Example 3: Demonstrate multi-agent system integration (if available)
-    #[cfg(feature = "multi_agent")]
-    {
+    // Note: Multi-agent system integration code commented out
+    // Requires: terraphim_multi_agent dependency and feature flag
+    /*
+    if false {
         println!("\n🤖 Multi-Agent System Integration Demo");
         println!("======================================");
 
@@ -150,8 +151,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   AI Response: {}", output.text);
         println!("   Metadata: {:?}", output.metadata);
     }
+    */
 
-    #[cfg(not(feature = "multi_agent"))]
+    // Multi-agent system information
     {
         println!("\n💡 Multi-Agent Integration Available");
         println!("====================================");
@@ -205,10 +207,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Helper function to create test storage (would be imported from multi-agent crate)
-#[cfg(feature = "multi_agent")]
+#[allow(dead_code)]
 async fn create_test_storage(
 ) -> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
-    use std::sync::Arc;
     use terraphim_persistence::DeviceStorage;
 
     // Use the safe Arc method instead of unsafe ptr::read

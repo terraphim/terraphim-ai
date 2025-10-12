@@ -12,6 +12,7 @@ fn create_test_role() -> Role {
         location: "test_data".to_string(),
         service: ServiceType::Ripgrep,
         read_only: true,
+        fetch_content: false,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
     }];
@@ -34,6 +35,7 @@ async fn test_indexer() {
         location: "fixtures/haystack".to_string(),
         service: ServiceType::Ripgrep,
         read_only: true,
+        fetch_content: false,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
     };
@@ -49,6 +51,7 @@ async fn test_search_graph() {
         location: "fixtures/haystack".to_string(),
         service: ServiceType::Ripgrep,
         read_only: true,
+        fetch_content: false,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
     };
@@ -64,6 +67,7 @@ async fn test_search_machine_learning() {
         location: "fixtures/haystack".to_string(),
         service: ServiceType::Ripgrep,
         read_only: true,
+        fetch_content: false,
         atomic_server_secret: None,
         extra_parameters: std::collections::HashMap::new(),
     };

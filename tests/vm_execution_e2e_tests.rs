@@ -36,7 +36,7 @@ mod complete_workflow_tests {
                 }
             }
         }));
-        
+
         TerraphimAgent::new(role).await.expect("Failed to create agent")
     }
 
@@ -44,7 +44,7 @@ mod complete_workflow_tests {
     #[ignore]
     async fn test_end_to_end_python_execution() {
         let agent = create_vm_agent().await;
-        
+
         let input = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -62,12 +62,12 @@ print(f"Factorial of 10 is: {result}")
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result = timeout(Duration::from_secs(30), agent.process_command(input))
             .await
             .expect("Timeout")
             .expect("Execution failed");
-        
+
         assert!(result.success);
         assert!(result.response.contains("3628800"));
     }
@@ -76,7 +76,7 @@ print(f"Factorial of 10 is: {result}")
     #[ignore]
     async fn test_end_to_end_rust_execution() {
         let agent = create_vm_agent().await;
-        
+
         let input = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -101,12 +101,12 @@ fn main() {
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result = timeout(Duration::from_secs(90), agent.process_command(input))
             .await
             .expect("Timeout")
             .expect("Execution failed");
-        
+
         assert!(result.success);
         assert!(result.response.contains("Primes"));
         assert!(result.response.contains("2") && result.response.contains("47"));
@@ -116,7 +116,7 @@ fn main() {
     #[ignore]
     async fn test_security_blocks_dangerous_code() {
         let agent = create_vm_agent().await;
-        
+
         let input = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -128,12 +128,12 @@ rm -rf /home/user
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result = timeout(Duration::from_secs(10), agent.process_command(input))
             .await
             .expect("Timeout")
             .expect("Command processing failed");
-        
+
         assert!(!result.success || result.response.contains("blocked") || result.response.contains("dangerous"));
     }
 
@@ -141,7 +141,7 @@ rm -rf /home/user
     #[ignore]
     async fn test_multi_turn_conversation_with_vm_state() {
         let agent = create_vm_agent().await;
-        
+
         let turn1 = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -154,11 +154,11 @@ cat /tmp/conversation_state.txt
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result1 = agent.process_command(turn1).await.expect("Turn 1 failed");
         assert!(result1.success);
         assert!(result1.response.contains("Turn 1 data"));
-        
+
         let turn2 = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -171,7 +171,7 @@ cat /tmp/conversation_state.txt
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result2 = agent.process_command(turn2).await.expect("Turn 2 failed");
         assert!(result2.success);
         assert!(result2.response.contains("Turn 1 data"));
@@ -182,7 +182,7 @@ cat /tmp/conversation_state.txt
     #[ignore]
     async fn test_error_recovery_with_history() {
         let agent = create_vm_agent().await;
-        
+
         let success_cmd = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -192,9 +192,9 @@ print("Successful execution 1")
             "#.to_string(),
             metadata: None,
         };
-        
+
         agent.process_command(success_cmd).await.expect("Success 1 failed");
-        
+
         let fail_cmd = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -204,10 +204,10 @@ undefined_variable
             "#.to_string(),
             metadata: None,
         };
-        
+
         let fail_result = agent.process_command(fail_cmd).await.expect("Fail execution");
         assert!(!fail_result.success || fail_result.response.contains("error"));
-        
+
         let recovery_cmd = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -217,7 +217,7 @@ print("Recovery execution")
             "#.to_string(),
             metadata: None,
         };
-        
+
         let recovery_result = agent.process_command(recovery_cmd).await.expect("Recovery failed");
         assert!(recovery_result.success);
     }
@@ -231,22 +231,22 @@ mod multi_language_workflow_tests {
     #[ignore]
     async fn test_python_then_javascript() {
         let agent = create_vm_agent().await;
-        
+
         let py_input = CommandInput {
             command: CommandType::Execute,
             text: "```python\nprint('Python executed')\n```".to_string(),
             metadata: None,
         };
-        
+
         let py_result = agent.process_command(py_input).await.unwrap();
         assert!(py_result.response.contains("Python executed"));
-        
+
         let js_input = CommandInput {
             command: CommandType::Execute,
             text: "```javascript\nconsole.log('JavaScript executed')\n```".to_string(),
             metadata: None,
         };
-        
+
         let js_result = agent.process_command(js_input).await.unwrap();
         assert!(js_result.response.contains("JavaScript executed"));
     }
@@ -255,26 +255,26 @@ mod multi_language_workflow_tests {
     #[ignore]
     async fn test_all_languages_in_sequence() {
         let agent = create_vm_agent().await;
-        
+
         let languages = vec![
             ("python", "print('Python')"),
             ("javascript", "console.log('JavaScript')"),
             ("bash", "echo 'Bash'"),
             ("rust", "fn main() { println!(\"Rust\"); }"),
         ];
-        
+
         for (lang, code) in languages {
             let input = CommandInput {
                 command: CommandType::Execute,
                 text: format!("```{}\n{}\n```", lang, code),
                 metadata: None,
             };
-            
+
             let result = timeout(
                 Duration::from_secs(if lang == "rust" { 90 } else { 30 }),
                 agent.process_command(input)
             ).await.expect("Timeout").expect(&format!("{} failed", lang));
-            
+
             let lang_cap = lang.chars().next().unwrap().to_uppercase().collect::<String>() + &lang[1..];
             assert!(result.response.contains(&lang_cap) || result.response.contains(lang));
         }
@@ -289,7 +289,7 @@ mod hook_integration_e2e_tests {
     #[ignore]
     async fn test_output_sanitization_blocks_secrets() {
         let agent = create_vm_agent().await;
-        
+
         let input = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -300,9 +300,9 @@ print("PASSWORD=super_secret")
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result = agent.process_command(input).await.expect("Execution failed");
-        
+
         assert!(!result.response.contains("secret123456") || !result.success);
     }
 
@@ -310,7 +310,7 @@ print("PASSWORD=super_secret")
     #[ignore]
     async fn test_code_transformation_adds_imports() {
         let agent = create_vm_agent().await;
-        
+
         let input = CommandInput {
             command: CommandType::Execute,
             text: r#"
@@ -321,7 +321,7 @@ print(result)
             "#.to_string(),
             metadata: None,
         };
-        
+
         let result = agent.process_command(input).await.expect("Execution failed");
         assert!(result.success);
         assert!(result.response.contains("4"));
@@ -336,19 +336,19 @@ mod performance_e2e_tests {
     #[ignore]
     async fn test_rapid_execution_sequence() {
         let agent = create_vm_agent().await;
-        
+
         for i in 1..=10 {
             let input = CommandInput {
                 command: CommandType::Execute,
                 text: format!("```python\nprint('Execution {}')\n```", i),
                 metadata: None,
             };
-            
+
             let result = timeout(Duration::from_secs(10), agent.process_command(input))
                 .await
                 .expect(&format!("Timeout on execution {}", i))
                 .expect(&format!("Failed execution {}", i));
-            
+
             assert!(result.success);
             assert!(result.response.contains(&format!("Execution {}", i)));
         }
@@ -358,23 +358,23 @@ mod performance_e2e_tests {
     #[ignore]
     async fn test_concurrent_vm_sessions() {
         use tokio::task::JoinSet;
-        
+
         let mut set = JoinSet::new();
-        
+
         for i in 1..=3 {
             set.spawn(async move {
                 let agent = create_vm_agent().await;
-                
+
                 let input = CommandInput {
                     command: CommandType::Execute,
                     text: format!("```python\nprint('Agent {} output')\n```", i),
                     metadata: None,
                 };
-                
+
                 agent.process_command(input).await.unwrap()
             });
         }
-        
+
         while let Some(result) = set.join_next().await {
             let output = result.unwrap();
             assert!(output.success);

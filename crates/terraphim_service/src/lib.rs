@@ -2753,25 +2753,20 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                fetch_content: false,
             }],
             kg: None,
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-            #[cfg(feature = "openrouter")]
             llm_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_api_key: None,
-            #[cfg(feature = "openrouter")]
             llm_model: None,
-            #[cfg(feature = "openrouter")]
             llm_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
             llm_chat_model: None,
+            llm_context_window: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -2820,25 +2815,20 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                fetch_content: false,
             }],
             kg: None,
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-            #[cfg(feature = "openrouter")]
             llm_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_api_key: None,
-            #[cfg(feature = "openrouter")]
             llm_model: None,
-            #[cfg(feature = "openrouter")]
             llm_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
             llm_chat_model: None,
+            llm_context_window: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -2857,6 +2847,7 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
 
         // Test 1: Save Atomic Data document to persistence
@@ -2931,6 +2922,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                fetch_content: false,
             }],
             kg: Some(KnowledgeGraph {
                 automata_path: None,
@@ -2958,6 +2950,7 @@ mod tests {
             llm_chat_system_prompt: None,
             #[cfg(feature = "openrouter")]
             llm_chat_model: None,
+            llm_context_window: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -2976,6 +2969,7 @@ mod tests {
             stub: None,
             tags: None,
             rank: None,
+            source_haystack: None,
         };
 
         // Save the Atomic Data document to persistence
@@ -3054,6 +3048,7 @@ mod tests {
                 read_only: false,
                 atomic_server_secret: None,
                 extra_parameters: std::collections::HashMap::new(),
+                fetch_content: false,
             }],
             kg: Some(terraphim_config::KnowledgeGraph {
                 automata_path: Some(terraphim_automata::AutomataPath::local_example()),
@@ -3064,20 +3059,14 @@ mod tests {
             terraphim_it: false,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-            #[cfg(feature = "openrouter")]
             llm_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_api_key: None,
-            #[cfg(feature = "openrouter")]
             llm_model: None,
-            #[cfg(feature = "openrouter")]
             llm_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
             llm_chat_model: None,
+            llm_context_window: None,
             extra: AHashMap::new(),
         };
         config.roles.insert(role_name.clone(), role);
@@ -3097,6 +3086,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "first".to_string()]),
                 rank: None, // Should be assigned by the function
+                source_haystack: None,
             },
             Document {
                 id: "test-doc-2".to_string(),
@@ -3108,6 +3098,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "second".to_string()]),
                 rank: None, // Should be assigned by the function
+                source_haystack: None,
             },
             Document {
                 id: "test-doc-3".to_string(),
@@ -3119,6 +3110,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["test".to_string(), "third".to_string()]),
                 rank: None, // Should be assigned by the function
+                source_haystack: None,
             },
         ];
 

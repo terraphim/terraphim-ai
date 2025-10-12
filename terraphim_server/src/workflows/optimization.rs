@@ -897,7 +897,7 @@ fn calculate_criterion_score(criterion: &str, variant: &ContentVariant) -> f64 {
         _ => 0.1,
     };
 
-    (base_score + content_alignment).min(0.98).max(0.5)
+    (base_score + content_alignment).clamp(0.5, 0.98)
 }
 
 fn generate_evaluation_rationale(criterion: &str, score: f64) -> String {
@@ -963,7 +963,7 @@ fn calculate_evaluation_confidence(scores: &[CriterionScore]) -> f64 {
         / scores.len() as f64;
 
     // Lower variance = higher confidence
-    (1.0 - score_variance.sqrt()).max(0.6).min(0.95)
+    (1.0 - score_variance.sqrt()).clamp(0.6, 0.95)
 }
 
 fn calculate_score_variance(results: &[EvaluationResult]) -> f64 {
@@ -1028,7 +1028,7 @@ fn calculate_evaluation_consistency(iterations: &[OptimizationIteration]) -> f64
     let variance: f64 =
         scores.iter().map(|s| (s - avg_score).powi(2)).sum::<f64>() / scores.len() as f64;
 
-    (1.0 - variance.sqrt()).max(0.3).min(0.98)
+    (1.0 - variance.sqrt()).clamp(0.3, 0.98)
 }
 
 fn analyze_convergence(improvement_history: &[f64]) -> ConvergenceAnalysis {
@@ -1086,6 +1086,7 @@ fn analyze_convergence(improvement_history: &[f64]) -> ConvergenceAnalysis {
     }
 }
 
+#[allow(dead_code)]
 fn calculate_optimization_efficiency(result: &OptimizationResult) -> f64 {
     let improvement_rate = result.optimization_summary.total_improvement
         / result.optimization_summary.total_iterations as f64;

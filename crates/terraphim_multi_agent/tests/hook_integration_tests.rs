@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use terraphim_multi_agent::vm_execution::hooks::*;
 use terraphim_multi_agent::vm_execution::*;
-use tokio;
 
 #[cfg(test)]
 mod hook_flow_tests {
@@ -324,7 +323,7 @@ mod vm_client_with_hooks_tests {
             history: HistoryConfig::default(),
         };
 
-        let client = VmExecutionClient::new(&config);
+        let _client = VmExecutionClient::new(&config);
     }
 
     #[tokio::test]
@@ -462,7 +461,7 @@ mod vm_client_with_hooks_tests {
         let mut custom_manager = HookManager::new();
         custom_manager.add_hook(Arc::new(ExecutionLoggerHook));
 
-        let client = VmExecutionClient::new(&config).with_hook_manager(Arc::new(custom_manager));
+        let _client = VmExecutionClient::new(&config).with_hook_manager(Arc::new(custom_manager));
     }
 }
 

@@ -5,10 +5,11 @@ use std::time::Duration;
 
 use terraphim_agent_registry::{
     AgentCapability, AgentDiscoveryQuery, AgentMetadata, AgentPid, AgentRegistry, AgentRole,
-    AutomataConfig, CapabilityMetrics, KnowledgeGraphAgentRegistry, RegistryBuilder,
-    RegistryConfig, ResourceUsage, SimilarityThresholds, SupervisorId,
+    AutomataConfig, CapabilityMetrics, RegistryBuilder, RegistryConfig, ResourceUsage,
+    SimilarityThresholds, SupervisorId,
 };
 use terraphim_rolegraph::RoleGraph;
+use terraphim_types::{RoleName, Thesaurus};
 
 #[tokio::test]
 async fn test_full_agent_lifecycle() {
@@ -16,7 +17,7 @@ async fn test_full_agent_lifecycle() {
 
     // Create registry
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let config = RegistryConfig {
         max_agents: 100,
@@ -43,7 +44,7 @@ async fn test_full_agent_lifecycle() {
     );
     primary_role.knowledge_domains = vec!["machine_learning".to_string(), "statistics".to_string()];
 
-    let mut metadata = AgentMetadata::new(agent_id.clone(), supervisor_id, primary_role);
+    let mut metadata = AgentMetadata::new(agent_id.clone(), supervisor_id.clone(), primary_role);
 
     // Add capabilities
     let analysis_capability = AgentCapability {
@@ -141,7 +142,7 @@ async fn test_multi_agent_discovery() {
     env_logger::try_init().ok();
 
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
@@ -242,7 +243,7 @@ async fn test_agent_performance_tracking() {
     env_logger::try_init().ok();
 
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
@@ -311,7 +312,7 @@ async fn test_agent_role_hierarchy() {
     env_logger::try_init().ok();
 
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = RegistryBuilder::new()
         .with_role_graph(role_graph)
@@ -328,7 +329,7 @@ async fn test_agent_role_hierarchy() {
         "Experienced software developer".to_string(),
     );
 
-    let mut metadata = AgentMetadata::new(agent_id.clone(), supervisor_id, primary_role);
+    let mut metadata = AgentMetadata::new(agent_id.clone(), supervisor_id.clone(), primary_role);
 
     // Add secondary roles
     let reviewer_role = AgentRole::new(
@@ -378,7 +379,7 @@ async fn test_registry_capacity_and_cleanup() {
     env_logger::try_init().ok();
 
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let config = RegistryConfig {
         max_agents: 3, // Small capacity for testing
@@ -432,7 +433,7 @@ async fn test_knowledge_graph_integration() {
     env_logger::try_init().ok();
 
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let automata_config = AutomataConfig {
         min_confidence: 0.6,
@@ -519,7 +520,7 @@ async fn test_concurrent_registry_operations() {
     env_logger::try_init().ok();
 
     let role_name = RoleName::new("test_role");
-    let thesaurus = Thesaurus::new();
+    let thesaurus = Thesaurus::new("test_thesaurus".to_string());
     let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
     let registry = Arc::new(
         RegistryBuilder::new()
