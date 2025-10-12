@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ConflictType, ConstraintType, Goal, GoalAlignmentError, GoalAlignmentResult, GoalConflict,
+    ConflictType, ConstraintType, Goal, GoalAlignmentResult, GoalConflict,
     GoalConstraint, GoalId,
 };
 

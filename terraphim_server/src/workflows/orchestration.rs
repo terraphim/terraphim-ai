@@ -472,6 +472,7 @@ async fn create_data_science_workflow(_prompt: &str) -> (Vec<TaskAssignment>, Ve
 }
 
 #[allow(dead_code)]
+#[allow(unused_variables)]
 async fn create_software_development_workflow(
     prompt: &str,
 ) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
@@ -739,6 +740,7 @@ async fn generate_worker_result(
     }
 }
 
+#[allow(unused_variables)]
 async fn synthesize_orchestration_result(
     orchestrator: OrchestratorAgent,
     worker_results: Vec<WorkerResult>,

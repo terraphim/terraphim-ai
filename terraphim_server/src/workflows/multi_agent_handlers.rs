@@ -410,6 +410,7 @@ impl MultiAgentWorkflowExecutor {
     }
 
     /// Execute parallelization workflow with multiple perspective agents
+    #[allow(unused_variables)]
     pub async fn execute_parallelization(
         &self,
         workflow_id: &str,
@@ -730,6 +731,7 @@ impl MultiAgentWorkflowExecutor {
     }
 
     /// Execute optimization workflow with iterative improvement
+    #[allow(unused_variables)]
     pub async fn execute_optimization(
         &self,
         workflow_id: &str,

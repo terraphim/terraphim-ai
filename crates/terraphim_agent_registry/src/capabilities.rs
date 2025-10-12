@@ -296,8 +296,7 @@ impl CapabilityRegistry {
             + performance_score * 0.25
             + resource_score * 0.2
             + io_score * 0.15)
-            .min(1.0)
-            .max(0.0);
+            .clamp(0.0, 1.0);
 
         let match_details = CapabilityMatchDetails {
             exact_matches,
@@ -383,7 +382,7 @@ impl CapabilityRegistry {
             score *= actual.quality_score / required.quality_score;
         }
 
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Calculate resource compatibility score
@@ -410,7 +409,7 @@ impl CapabilityRegistry {
             score *= max_allowed.storage_mb / actual.storage_mb;
         }
 
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Calculate input/output compatibility score
