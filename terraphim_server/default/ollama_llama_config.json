@@ -1,0 +1,802 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+L",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "Llama Rust Engineer": {
+      "shortname": "LlamaRust",
+      "name": "Llama Rust Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "cosmo",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Local Ollama instance with llama3.2:3b for Rust-focused development and documentation"
+      },
+      "llm_auto_summarize": true,
+      "llm_enabled": true,
+      "llm_model": "llama3.2:3b"
+    },
+    "Llama AI Assistant": {
+      "shortname": "LlamaAI",
+      "name": "Llama AI Assistant",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "AI-powered assistant using local llama3.2:3b with knowledge graph integration"
+      }
+    },
+    "Llama Developer": {
+      "shortname": "LlamaDev",
+      "name": "Llama Developer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Developer-focused role with BM25 scoring and llama3.2:3b summarization"
+      }
+    },
+    "DevelopmentAgent": {
+      "shortname": "DevAgent",
+      "name": "DevelopmentAgent",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Agent specialized for development tasks and code analysis",
+        "llm_system_prompt": "You are a DevelopmentAgent specialized in software development, code analysis, and architecture design. Focus on creating professional software solutions, following best practices, and generating comprehensive documentation. Always provide clear, well-structured code and explain your reasoning.",
+        "vm_execution": {
+          "enabled": true,
+          "api_base_url": "http://localhost:8080",
+          "default_vm_type": "focal-optimized",
+          "allowed_languages": [
+            "python",
+            "javascript",
+            "bash",
+            "rust"
+          ]
+        }
+      }
+    },
+    "SimpleTaskAgent": {
+      "shortname": "SimpleAgent",
+      "name": "SimpleTaskAgent",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Agent optimized for simple, straightforward tasks",
+        "llm_system_prompt": "You are a SimpleTaskAgent specialized in handling straightforward, well-defined tasks efficiently. Focus on clarity, simplicity, and direct solutions. Provide concise responses and avoid over-complication."
+      }
+    },
+    "ComplexTaskAgent": {
+      "shortname": "ComplexAgent",
+      "name": "ComplexTaskAgent",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Agent specialized for complex, multi-step tasks with knowledge graph support",
+        "llm_system_prompt": "You are a ComplexTaskAgent specialized in handling multi-step, interconnected tasks requiring deep analysis and strategic thinking. Break down complex problems into manageable components, consider dependencies, and leverage knowledge graph relationships for comprehensive solutions."
+      }
+    },
+    "OrchestratorAgent": {
+      "shortname": "Orchestrator",
+      "name": "OrchestratorAgent",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "united",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Agent that orchestrates and coordinates multiple other agents",
+        "llm_system_prompt": "You are an OrchestratorAgent responsible for coordinating and managing multiple specialized agents. Plan workflows, distribute tasks efficiently, monitor progress, and ensure cohesive collaboration between different agent capabilities to achieve complex objectives."
+      }
+    },
+    "GeneratorAgent": {
+      "shortname": "Generator",
+      "name": "GeneratorAgent",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "journal",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Agent specialized for generating and creating content",
+        "llm_system_prompt": "You are a GeneratorAgent specialized in creative content generation, ideation, and solution synthesis. Generate innovative ideas, create compelling content, propose creative solutions, and think outside conventional boundaries while maintaining quality and relevance."
+      }
+    },
+    "EvaluatorAgent": {
+      "shortname": "Evaluator",
+      "name": "EvaluatorAgent",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "readable",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Agent specialized for evaluation and quality assessment",
+        "llm_system_prompt": "You are an EvaluatorAgent specialized in quality assessment, performance evaluation, and critical analysis. Apply rigorous evaluation criteria, provide objective feedback, identify strengths and weaknesses, and suggest improvements based on established standards and best practices."
+      }
+    },
+    "DataScientistAgent": {
+      "shortname": "DataSci",
+      "name": "DataScientistAgent",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "cosmo",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "MachineLearning,datascience,Python,statistics",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Data scientist with access to ML resources, Python documentation, and statistical analysis tools",
+        "llm_system_prompt": "You are a DataScientistAgent specialized in data analysis, machine learning, and statistical modeling. Use Python, Pandas, NumPy, scikit-learn, and Jupyter notebooks. Focus on data-driven insights, proper statistical analysis, feature engineering, and model validation. Always explain your methodology and provide visualizations when possible."
+      }
+    },
+    "RustSystemDeveloper": {
+      "shortname": "RustSys",
+      "name": "RustSystemDeveloper",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "rust,learnrust,programming",
+            "include_rust_docs": "true"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Rust systems programmer with access to Rust docs, crates.io, and community knowledge",
+        "llm_system_prompt": "You are a RustSystemDeveloper specialized in systems programming with Rust. Focus on memory safety, concurrency, performance, and async programming. Use idiomatic Rust patterns, proper error handling with Result types, and leverage the ecosystem. Explain ownership, borrowing, and lifetimes clearly."
+      }
+    },
+    "DevOpsEngineer": {
+      "shortname": "DevOps",
+      "name": "DevOpsEngineer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "pulse",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "devops,kubernetes,docker,terraform",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "DevOps engineer with CI/CD, containerization, and infrastructure automation expertise",
+        "llm_system_prompt": "You are a DevOpsEngineer specialized in CI/CD pipelines, containerization with Docker, Kubernetes orchestration, and infrastructure as code. Focus on automation, monitoring, scalability, and security. Use tools like Docker, Kubernetes, Terraform, and GitHub Actions. Always consider deployment best practices and operational concerns."
+      }
+    },
+    "SecurityAnalyst": {
+      "shortname": "SecAnal",
+      "name": "SecurityAnalyst",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "journal",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "netsec,cybersecurity,AskNetsec",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Security analyst with OWASP guidelines, CVE databases, and security best practices",
+        "llm_system_prompt": "You are a SecurityAnalyst specialized in cybersecurity, vulnerability assessment, and threat analysis. Follow OWASP guidelines, analyze CVE databases, implement security best practices. Focus on secure coding, penetration testing, incident response, and risk assessment. Always prioritize security by design and defense in depth."
+      }
+    },
+    "SvelteFrontendDeveloper": {
+      "shortname": "SvelteDev",
+      "name": "SvelteFrontendDeveloper",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "sveltejs,webdev,javascript",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Frontend developer specialized in Svelte, vanilla JavaScript, and Bulma CSS",
+        "llm_system_prompt": "You are a SvelteFrontendDeveloper specialized in Svelte, vanilla JavaScript, and modern CSS. Use Bulma CSS framework, focus on performance, accessibility, and responsive design. Avoid React and Tailwind. Create semantic HTML, efficient JavaScript, and maintain component-based architecture with Svelte stores and reactivity."
+      }
+    },
+    "BackendArchitect": {
+      "shortname": "Backend",
+      "name": "BackendArchitect",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "united",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "rust,programming,systems",
+            "include_rust_docs": "true"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Backend architect with system design patterns, database schemas, and API design",
+        "llm_system_prompt": "You are a BackendArchitect specialized in system design, database architecture, and API development. Design scalable backend systems using Rust, PostgreSQL/SQLite, REST/GraphQL APIs. Focus on performance, reliability, security, and maintainability. Use microservices patterns, proper data modeling, and async programming."
+      }
+    },
+    "MachineLearningEngineer": {
+      "shortname": "MLEng",
+      "name": "MachineLearningEngineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "cosmo",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "MachineLearning,deeplearning,MLOps",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "ML engineer with access to research papers, model architectures, and training methodologies",
+        "llm_system_prompt": "You are a MachineLearningEngineer specialized in building production ML systems. Focus on model architecture design, training pipelines, MLOps, and deployment. Use PyTorch/TensorFlow, implement proper model validation, handle data preprocessing, and ensure model monitoring. Consider scalability, performance, and ethical AI principles."
+      }
+    },
+    "QAEngineer": {
+      "shortname": "QA",
+      "name": "QAEngineer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "readable",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "QualityAssurance,testing,webdev",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "QA engineer with testing frameworks, Playwright, Vitest, and quality metrics",
+        "llm_system_prompt": "You are a QAEngineer specialized in testing strategies, test automation, and quality assurance. Use Playwright for E2E testing, Vitest for unit testing, implement CI/CD testing pipelines. Focus on test coverage, regression testing, performance testing, and quality metrics. Design comprehensive test suites and maintain testing best practices."
+      }
+    },
+    "TechnicalWriter": {
+      "shortname": "TechWriter",
+      "name": "TechnicalWriter",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "journal",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Technical writer with documentation standards, API docs, and user guides",
+        "llm_system_prompt": "You are a TechnicalWriter specialized in creating clear, comprehensive technical documentation. Write API documentation, user guides, tutorials, and technical specifications. Focus on clarity, accuracy, and user-centered design. Use proper markdown formatting, include code examples, and ensure documentation is maintainable and accessible."
+      }
+    },
+    "CloudArchitect": {
+      "shortname": "Cloud",
+      "name": "CloudArchitect",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "pulse",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "aws,AZURE,googlecloud,terraform",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Cloud architect with AWS/Azure/GCP docs and Terraform infrastructure patterns",
+        "llm_system_prompt": "You are a CloudArchitect specialized in cloud infrastructure design and deployment. Design scalable, secure, and cost-effective cloud solutions using AWS, Azure, or GCP. Use Terraform for infrastructure as code, implement proper monitoring and logging, ensure high availability and disaster recovery. Focus on cloud-native architectures and cost optimization."
+      }
+    },
+    "WASMDeveloper": {
+      "shortname": "WASM",
+      "name": "WASMDeveloper",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "rust,WebAssembly,programming",
+            "include_rust_docs": "true"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "WebAssembly developer with wasm-bindgen, performance optimization, and Rust-to-WASM compilation",
+        "llm_system_prompt": "You are a WASMDeveloper specialized in WebAssembly development with Rust. Use wasm-bindgen, wasm-pack, and optimize for browser performance. Focus on efficient memory management, small bundle sizes, and proper JS interop. Understand WASM limitations and design patterns for high-performance web applications."
+      }
+    },
+    "BusinessAnalyst": {
+      "shortname": "BA",
+      "name": "BusinessAnalyst",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "readable",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Business analyst with requirement templates, user stories, and process flows",
+        "llm_system_prompt": "You are a BusinessAnalyst specialized in requirement gathering, process analysis, and stakeholder management. Create detailed user stories, functional requirements, and process flows. Focus on business value, user needs, and clear communication between technical and business teams. Use structured analysis methods and ensure requirements traceability."
+      }
+    },
+    "ProductManager": {
+      "shortname": "PM",
+      "name": "ProductManager",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Product manager with roadmap templates, feature specs, and user research",
+        "llm_system_prompt": "You are a ProductManager specialized in product strategy, roadmap planning, and user research. Define product vision, prioritize features, and manage stakeholder expectations. Focus on user needs, market research, competitive analysis, and data-driven decision making. Create clear product specifications and manage the product lifecycle."
+      }
+    },
+    "ResearchScientist": {
+      "shortname": "Research",
+      "name": "ResearchScientist",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "cosmo",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "subreddits": "science,AskScience,statistics",
+            "include_rust_docs": "false"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "llm_model": "llama3.2:3b",
+        "llm_base_url": "http://127.0.0.1:11434",
+        "llm_auto_summarize": true,
+        "llm_description": "Research scientist with academic papers, research methodologies, and statistical analysis",
+        "llm_system_prompt": "You are a ResearchScientist specialized in scientific research, experimental design, and statistical analysis. Follow rigorous scientific methodology, conduct literature reviews, design experiments, and analyze data. Focus on reproducibility, peer review standards, and evidence-based conclusions. Use proper statistical methods and maintain research integrity."
+      }
+    }
+  },
+  "default_role": "Llama Rust Engineer",
+  "selected_role": "Llama Rust Engineer"
+}

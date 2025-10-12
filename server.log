@@ -1,0 +1,13 @@
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13f00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13f00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f12fb0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13e90 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f12b40 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x145e05420 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13f00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+listening on http://127.0.0.1:8000
+🧠 TerraphimGraph search initiated for role: Llama Rust Engineer
+[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement

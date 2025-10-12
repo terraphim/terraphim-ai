@@ -37,7 +37,7 @@ async fn get_rolegraph() -> RoleGraph {
     let thesaurus = load_thesaurus(&AutomataPath::remote_example())
         .await
         .unwrap();
-    let rolegraph = RoleGraph::new(role, thesaurus).await;
+    let rolegraph = RoleGraph::new(role.into(), thesaurus).await;
     rolegraph.unwrap()
 }
 
@@ -54,10 +54,12 @@ fn dummy_document(id: String, body: String) -> Document {
         title: "Title".to_string(),
         url: "URL".to_string(),
         description: None,
+        summarization: None,
         stub: None,
         rank: None,
         tags: None,
         body,
+        source_haystack: None,
     }
 }
 
@@ -185,6 +187,14 @@ fn bench_query(c: &mut Criterion) {
     });
 }
 
+fn bench_is_all_terms_connected_by_path(c: &mut Criterion) {
+    let rolegraph = block_on(get_rolegraph());
+    let text = "Life cycle concepts ... Paradigm Map ... project planning";
+    c.bench_function("is_all_terms_connected_by_path", |b| {
+        b.iter(|| rolegraph.is_all_terms_connected_by_path(text))
+    });
+}
+
 criterion_group!(
     benches,
     bench_find_matching_node_idss,
@@ -194,6 +204,7 @@ criterion_group!(
     bench_throughput,
     bench_throughput_corpus,
     bench_query_throughput,
-    bench_query
+    bench_query,
+    bench_is_all_terms_connected_by_path
 );
 criterion_main!(benches);

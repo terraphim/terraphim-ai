@@ -1,0 +1,122 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+# This configuration works with pre-commit, prek, and other compatible tools
+
+repos:
+  # General code quality hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: debug-statements
+        name: Check for debug statements
+      - id: detect-private-key
+        name: Detect private keys
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+
+  # Rust-specific hooks
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Cargo format check
+        entry: cargo fmt --all -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+        description: "Check Rust code formatting with cargo fmt"
+
+      - id: cargo-clippy
+        name: Cargo clippy
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+        description: "Run Rust linter with cargo clippy"
+
+      - id: cargo-test
+        name: Cargo test
+        entry: cargo test --workspace
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [manual]
+        description: "Run Rust tests (manual stage)"
+
+      - id: cargo-audit
+        name: Cargo audit
+        entry: cargo audit
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        description: "Check for known security vulnerabilities (manual stage)"
+
+  # JavaScript/TypeScript with Biome
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: Biome lint and format check
+        entry: bash -c 'cd desktop && npx @biomejs/biome check --write false --no-errors-on-unmatched'
+        language: system
+        files: 'desktop/.*\.(js|ts|tsx|jsx|json|jsonc)$'
+        pass_filenames: false
+        description: "Check JavaScript/TypeScript formatting and linting with Biome"
+
+      - id: biome-format
+        name: Biome format
+        entry: bash -c 'cd desktop && npx @biomejs/biome format --write --no-errors-on-unmatched'
+        language: system
+        files: 'desktop/.*\.(js|ts|tsx|jsx|json|jsonc)$'
+        pass_filenames: false
+        stages: [manual]
+        description: "Auto-format JavaScript/TypeScript with Biome (manual stage)"
+
+  # Conventional commits validation
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Conventional commit format
+        stages: [commit-msg]
+        args: [
+          "--strict",
+          "--scopes=feat,fix,docs,style,refactor,perf,test,chore,build,ci,revert"
+        ]
+        description: "Enforce conventional commit message format"
+
+  # Secret detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: .*/tests/.*|.*\.lock$|.*\.sum$|.*yarn\.lock$|.*pnpm-lock\.yaml$|.*/dist/.*|.*/target/.*|crates/terraphim_atomic_client/export.*\.json|crates/terraphim_atomic_client/terraphim_.*\.json|crates/terraphim_atomic_client/commit.*\.json|crates/terraphim_atomic_client/commit.*\.txt|crates/terraphim_atomic_client/.*\.ttl|crates/terraphim_atomic_client/.*\.sh|crates/terraphim_atomic_client/test_signature/.*|desktop/.*-config\.json|desktop/package\.json|desktop/package-lock\.kdl|desktop/test.*\.js|logs/.*\.log.*|docs/.*\.md|examples/.*\.md|docs/mermaid\.min\.js|atomic_server_config.*\.json|terraphim_server/default/.*config.*\.json|scripts/.*\.sh$|.*\.rs$|.*\.js\.map$|@.*\.md$|.*\.cjs$|.*README.*\.md$|crates/terraphim_settings/test_settings/.*|terraphim_ai_nodejs/.*|templates/.*\.template$
+        description: "Detect secrets in staged code"
+
+# Global exclusions
+exclude: |
+  (?x)(
+    ^target/.*|
+    ^desktop/node_modules/.*|
+    ^desktop/dist/.*|
+    ^desktop/src-tauri/target/.*|
+    ^vendor/.*|
+    .*\.rs\.bk$|
+    ^\.cargo/.*|
+    ^artifact/.*
+  )

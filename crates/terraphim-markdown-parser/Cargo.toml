@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-markdown-parser"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim Markdown Parser"
@@ -12,4 +12,4 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-pulldown-cmark = "0.9.3"
+pulldown-cmark = "0.13.0"

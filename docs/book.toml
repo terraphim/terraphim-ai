@@ -41,7 +41,7 @@ command = "mdbook-mermaid"
 # # See https://rust-lang.github.io/mdBook/format/mdbook.html?highlight=hidden#hiding-code-lines
 # show-hidden-lines = false
 
-# [output.pandoc.profile.pdf] 
+# [output.pandoc.profile.pdf]
 # # options to pass to Pandoc (see https://pandoc.org/MANUAL.html#defaults-files)
 # output-file = "output.pdf" # output file (within the profile's build directory)
 # to = "latex" # output format
@@ -55,7 +55,7 @@ command = "mdbook-mermaid"
 # standalone = true # produce output with an appropriate header and footer
 # table-of-contents = true # include an automatically generated table of contents
 
-# [output.pandoc.profile.docx] 
+# [output.pandoc.profile.docx]
 # # options to pass to Pandoc (see https://pandoc.org/MANUAL.html#defaults-files)
 # output-file = "output.docx" # output file (within the profile's build directory)
 # # `mdbook-pandoc` overrides Pandoc's defaults for the following options to better support mdBooks

@@ -89,7 +89,57 @@ export default defineConfig({
     alias: {
       '$lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
       '$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
+
+      // Map specific Svelte sub-paths back to the real runtime so they are **not** redirected to
+      // our shim (which would cause ENOTDIR errors like svelte-shim.js/store).
+      'svelte/internal': resolve(__dirname, 'node_modules/svelte/internal'),
+      'svelte/store': resolve(__dirname, 'node_modules/svelte/store'),
+      'svelte/transition': resolve(__dirname, 'node_modules/svelte/transition'),
+      'svelte/animate': resolve(__dirname, 'node_modules/svelte/animate'),
+      'svelte/easing': resolve(__dirname, 'node_modules/svelte/easing'),
+      'svelte/motion': resolve(__dirname, 'node_modules/svelte/motion'),
+
+      // Real runtime entry alias so the shim can import without causing an alias loop.
+      'svelte-original': resolve(__dirname, 'node_modules/svelte/index.mjs'),
+
+      // Any other bare `import "svelte"` should go to our shim that adds mount/unmount.
+      'svelte': fileURLToPath(new URL('./src/svelte-shim.js', import.meta.url)),
     }
   },
   clearScreen: false,
+  server: {
+    proxy: {
+      '/rolegraph': 'http://localhost:8000',
+      '/documents': 'http://localhost:8000',
+    }
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // Suppress all warnings from third-party dependencies
+        quietDeps: true,
+        // Silence deprecation warnings for all known categories
+        silenceDeprecations: ['legacy-js-api', 'import', 'global-builtin', 'color-functions', 'mixed-decls'],
+        // Add verbose flag to control output
+        verbose: false
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor libraries
+          'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
+          'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
+          'vendor-charts': ['d3'],
+          'vendor-atomic': ['@tomic/lib', '@tomic/svelte'],
+          'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
+          // Large components
+          'novel-editor': ['@paralect/novel-svelte']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000 // Increase limit to 1MB
+  }
 })

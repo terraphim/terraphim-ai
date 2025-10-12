@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Terraphim AI Context",
+  "short_name": "Terraphim",
+  "description": "Searches for the selected text in Terraphim AI, Atomic Server or Logseq",
+  "version": "0.0.2",
+  "minimum_chrome_version": "38",
+  "permissions": [
+    "contextMenus",
+    "tabs",
+    "storage",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "https://*.terraphim.cloud/*",
+    "https://atomicserver.com/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "assets/search.png"
+  },
+  "background": {
+    "service_worker": "main.js"
+  },
+  "action": {
+    "default_popup": "background.html"
+  }
+}

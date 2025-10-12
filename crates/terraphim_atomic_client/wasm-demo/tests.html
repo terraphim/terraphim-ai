@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Atomic WASM Tests</title>
+  <link data-trunk rel="rust" href="Cargo.toml" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    input { width: 480px; }
+    .pass { color: green; }
+    .fail { color: red; }
+    pre { background: #f0f0f0; padding: 1rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<h1>Atomic WASM Test Runner</h1>
+<p>Fill in your Atomic-Server URL and Agent secret, then run the Rust → WASM tests directly in your browser.</p>
+<label>Server URL:<br>
+  <input id="server" value="http://localhost:9883" />
+</label><br><br>
+<label>Agent Secret (base64):<br>
+  <input id="secret" placeholder="Leave empty for readonly tests" />
+</label><br><br>
+<button id="run">Run WASM tests</button>
+<h2>Results</h2>
+<pre id="output">(not run yet)</pre>
+<script type="module">
+  const output = document.getElementById('output');
+
+  // Utility to write to output and console
+  const log = (m) => { console.log(m); output.textContent += m + "\n"; };
+
+  let bindings = null;
+
+  async function loadBindings() {
+    if (bindings) return bindings;
+
+    // Strategy 1: if Trunk event has already fired, bindings are global
+    if (window.wasmBindings) {
+      bindings = window.wasmBindings;
+      return bindings;
+    }
+
+    // Strategy 2: wait for Trunk event (async)
+    bindings = await new Promise((resolve) => {
+      window.addEventListener('TrunkApplicationStarted', ({ detail: { wasm } }) => resolve(wasm), { once: true });
+    });
+    return bindings;
+  }
+
+  async function run() {
+    try {
+      const wasm = await loadBindings();
+
+      // initialise wasm (idempotent)
+      if (wasm.default) {
+        await wasm.default();
+      }
+
+      const { init_client, run_tests } = wasm;
+
+      const server = document.getElementById('server').value.trim();
+      const secret = document.getElementById('secret').value.trim();
+
+      output.textContent = 'Initialising client…\n';
+      await init_client(server, secret);
+      log('Client initialised');
+
+      log('Running tests…');
+      const resStr = await run_tests();
+      const results = JSON.parse(resStr);
+      output.textContent = results.map(r => `${r.success ? '✅' : '❌'} ${r.name}${r.success ? '' : ' – ' + r.message}`).join('\n');
+    } catch (err) {
+      log('Error: ' + err);
+    }
+  }
+
+  document.getElementById('run').addEventListener('click', run);
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+[package]
+name = "terraphim_kg_agents"
+version = "0.2.0"
+edition = "2021"
+description = "Specialized knowledge graph-based agent implementations"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Core dependencies
+async-trait = "0.1"
+log = "0.4"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+uuid = { version = "1.0", features = ["v4"] }
+
+# Terraphim dependencies
+terraphim_agent_registry = { path = "../terraphim_agent_registry" }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor" }
+terraphim_automata = { path = "../terraphim_automata" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_task_decomposition = { path = "../terraphim_task_decomposition" }
+terraphim_types = { path = "../terraphim_types" }
+
+[dev-dependencies]
+tokio-test = "0.4"

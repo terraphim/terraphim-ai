@@ -6,7 +6,7 @@ pub enum Error {
     Profile(String),
 
     #[error("OpenDal error: {0}")]
-    OpenDal(#[from] opendal::Error),
+    OpenDal(Box<opendal::Error>),
 
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
@@ -19,6 +19,15 @@ pub enum Error {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Serialization error: {0}")]
+    Serde(String),
+}
+
+impl From<opendal::Error> for Error {
+    fn from(error: opendal::Error) -> Self {
+        Error::OpenDal(Box::new(error))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

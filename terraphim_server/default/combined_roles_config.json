@@ -1,0 +1,87 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+Space",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
+    },
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://query.rs",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "disable_content_enhancement": "true"
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools.",
+      "extra": {}
+    },
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Terraphim Engineer specializing in knowledge graphs, semantic search, and AI-powered information retrieval. Focus on understanding context, relationships between concepts, and providing comprehensive technical documentation summaries.",
+      "extra": {}
+    }
+  },
+  "default_role": "Default",
+  "selected_role": "Default"
+}

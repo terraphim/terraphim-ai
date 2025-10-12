@@ -1,13 +1,8 @@
-use ahash::AHashMap;
-use std::path::PathBuf;
-
 use terraphim_automata::AutomataPath;
 use terraphim_config::{
-    ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Result, Role, ServiceType,
-    TerraphimConfigError,
+    ConfigBuilder, Haystack, KnowledgeGraph, Result, Role, ServiceType, TerraphimConfigError,
 };
 use terraphim_persistence::Persistable;
-use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,26 +12,26 @@ async fn main() -> Result<()> {
         .map_err(TerraphimConfigError::TracingSubscriber);
 
     let mut config = ConfigBuilder::new()
-        .add_role(
-            "Engineer",
-            Role {
-                shortname: Some("Engineer".to_string()),
-                name: "Engineer".into(),
-                relevance_function: RelevanceFunction::TitleScorer,
-                theme: "lumen".to_string(),
-                kg: Some(KnowledgeGraph {
-                    automata_path: Some(AutomataPath::local_example()),
-                    knowledge_graph_local: None,
-                    public: false,
-                    publish: false,
-                }),
-                haystacks: vec![Haystack {
-                    path: PathBuf::from("localsearch"),
-                    service: ServiceType::Ripgrep,
-                }],
-                extra: AHashMap::new(),
-            },
-        )
+        .add_role("Engineer", {
+            let mut engineer_role = Role::new("Engineer");
+            engineer_role.shortname = Some("Engineer".to_string());
+            engineer_role.theme = "lumen".to_string();
+            engineer_role.kg = Some(KnowledgeGraph {
+                automata_path: Some(AutomataPath::local_example()),
+                knowledge_graph_local: None,
+                public: false,
+                publish: false,
+            });
+            engineer_role.haystacks = vec![Haystack {
+                location: "localsearch".to_string(),
+                service: ServiceType::Ripgrep,
+                read_only: false,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: std::collections::HashMap::new(),
+            }];
+            engineer_role
+        })
         .build()?;
 
     let json_str = serde_json::to_string_pretty(&config)?;
@@ -44,7 +39,7 @@ async fn main() -> Result<()> {
 
     println!("key: {}", config.get_key());
     config.save().await?;
-    config.save_to_one("dash").await?;
+    config.save_to_one("dashmap").await?;
 
     println!("saved obj: {:?} to all", config);
     let (_ops, fastest_op) = config.load_config().await?;

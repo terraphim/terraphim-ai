@@ -1,0 +1,223 @@
+#!/bin/bash
+#
+# Native Git pre-commit hook for Terraphim AI
+# This serves as a fallback when pre-commit/prek/lefthook are not available
+#
+set -e
+
+echo "Running Terraphim AI pre-commit checks..."
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    local status=$1
+    local message=$2
+    if [ "$status" = "SUCCESS" ]; then
+        echo -e "${GREEN}✓${NC} $message"
+    elif [ "$status" = "FAIL" ]; then
+        echo -e "${RED}✗${NC} $message"
+    elif [ "$status" = "WARN" ]; then
+        echo -e "${YELLOW}⚠${NC} $message"
+    else
+        echo -e "$message"
+    fi
+}
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Check for large files
+print_status "INFO" "Checking for large files..."
+large_files=$(git diff --cached --name-only --diff-filter=A | xargs -I {} find {} -size +1000k 2>/dev/null || true)
+if [ -n "$large_files" ]; then
+    print_status "FAIL" "Large files detected (>1MB):"
+    echo "$large_files"
+    exit 1
+fi
+print_status "SUCCESS" "No large files found"
+
+# Check for secrets and sensitive patterns
+print_status "INFO" "Checking for secrets and sensitive data..."
+secrets_found=false
+
+# Common secret patterns
+secret_patterns=(
+    "password\s*=\s*['\"][^'\"]*['\"]"
+    "api_key\s*=\s*['\"][^'\"]*['\"]"
+    "secret_key\s*=\s*['\"][^'\"]*['\"]"
+    "private_key\s*=\s*['\"][^'\"]*['\"]"
+    "-----BEGIN.*PRIVATE KEY-----"
+    "-----BEGIN.*CERTIFICATE-----"
+    "AKIA[0-9A-Z]{16}"  # AWS Access Key
+    "sk_live_[0-9a-zA-Z]{24}"  # Stripe Secret Key
+    "ghp_[0-9a-zA-Z]{36}"  # GitHub Personal Access Token
+)
+
+for pattern in "${secret_patterns[@]}"; do
+    if git diff --cached --name-only | xargs grep -l -E -i "$pattern" 2>/dev/null; then
+        print_status "FAIL" "Potential secret found matching pattern: $pattern"
+        secrets_found=true
+    fi
+done
+
+if [ "$secrets_found" = true ]; then
+    print_status "FAIL" "Secrets detected! Please remove them before committing."
+    exit 1
+fi
+print_status "SUCCESS" "No secrets detected"
+
+# Comprehensive Rust checks
+if command_exists cargo; then
+    # Check if there are any Rust files in the staged changes
+    rust_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(rs|toml)$' || true)
+
+    if [ -n "$rust_files" ]; then
+        print_status "INFO" "Rust files detected, running comprehensive Rust checks..."
+
+        # Check Rust formatting
+        print_status "INFO" "Checking Rust formatting..."
+        if ! cargo fmt --all -- --check >/dev/null 2>&1; then
+            print_status "FAIL" "Rust code is not properly formatted"
+            print_status "INFO" "Run 'cargo fmt' to fix formatting issues"
+            exit 1
+        fi
+        print_status "SUCCESS" "Rust formatting check passed"
+
+        # Check Rust compilation (cargo check - faster than full build)
+        print_status "INFO" "Running cargo check..."
+        if ! timeout 60s cargo check --workspace --all-targets >/dev/null 2>&1; then
+            print_status "FAIL" "Cargo check failed - compilation errors detected"
+            print_status "INFO" "Run 'cargo check --workspace --all-targets' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "Cargo check passed"
+
+        # Check Rust linting (clippy)
+        print_status "INFO" "Running Rust linter (clippy)..."
+        if ! timeout 60s cargo clippy --workspace --all-targets >/dev/null 2>&1; then
+            print_status "FAIL" "Clippy found issues"
+            print_status "INFO" "Run 'cargo clippy --workspace --all-targets' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "Rust linting passed"
+
+        # Build the project (optimized for speed)
+        print_status "INFO" "Building Rust project..."
+        if ! timeout 90s cargo build --workspace >/dev/null 2>&1; then
+            print_status "FAIL" "Cargo build failed"
+            print_status "INFO" "Run 'cargo build --workspace' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "Cargo build passed"
+
+        # Run tests (with timeout to avoid hanging)
+        print_status "INFO" "Running Rust tests..."
+        if ! timeout 90s cargo test --workspace --lib >/dev/null 2>&1; then
+            print_status "FAIL" "Some tests are failing"
+            print_status "INFO" "Run 'cargo test --workspace --lib' to see details"
+            exit 1
+        fi
+        print_status "SUCCESS" "All Rust tests passed"
+
+    else
+        print_status "INFO" "No Rust files in staged changes, skipping Rust-specific checks"
+    fi
+else
+    print_status "WARN" "Cargo not found, skipping Rust checks"
+fi
+
+# Check JavaScript/TypeScript with Biome (if desktop files are modified)
+if git diff --cached --name-only | grep -q "^desktop/"; then
+    if command_exists npx && [ -f "desktop/biome.json" ]; then
+        print_status "INFO" "Checking JavaScript/TypeScript with Biome..."
+        cd desktop
+        if ! npx @biomejs/biome check --write false --no-errors-on-unmatched >/dev/null 2>&1; then
+            print_status "FAIL" "Biome found formatting or linting issues"
+            print_status "INFO" "Run 'cd desktop && npx @biomejs/biome check --write' to fix issues"
+            cd ..
+            exit 1
+        fi
+        cd ..
+        print_status "SUCCESS" "Biome checks passed"
+    else
+        print_status "WARN" "Biome not available, skipping JavaScript/TypeScript checks"
+    fi
+fi
+
+# Check for trailing whitespace
+print_status "INFO" "Checking for trailing whitespace..."
+if git diff --cached --check >/dev/null 2>&1; then
+    print_status "SUCCESS" "No trailing whitespace found"
+else
+    print_status "FAIL" "Trailing whitespace found"
+    print_status "INFO" "Fix with: git diff --cached --check"
+    exit 1
+fi
+
+# Check YAML/TOML syntax
+print_status "INFO" "Checking configuration file syntax..."
+yaml_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(yml|yaml)$' || true)
+toml_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.toml$' || true)
+
+if [ -n "$yaml_files" ]; then
+    if command_exists python3; then
+        for file in $yaml_files; do
+            if ! python3 -c "import yaml; yaml.safe_load(open('$file'))" >/dev/null 2>&1; then
+                print_status "FAIL" "Invalid YAML syntax in $file"
+                exit 1
+            fi
+        done
+        print_status "SUCCESS" "YAML syntax checks passed"
+    else
+        print_status "WARN" "Python3 not found, skipping YAML syntax check"
+    fi
+fi
+
+if [ -n "$toml_files" ]; then
+    if command_exists cargo; then
+        for file in $toml_files; do
+            if ! cargo metadata --manifest-path="$file" --format-version 1 >/dev/null 2>&1 && [[ "$file" == *"Cargo.toml" ]]; then
+                print_status "FAIL" "Invalid TOML syntax in $file"
+                exit 1
+            fi
+        done
+        print_status "SUCCESS" "TOML syntax checks passed"
+    else
+        print_status "WARN" "Cargo not found, skipping TOML syntax check"
+    fi
+fi
+
+# Validate commit message format (conventional commits)
+if [ -f "$1" ]; then
+    commit_msg_file="$1"
+elif [ -f ".git/COMMIT_EDITMSG" ]; then
+    commit_msg_file=".git/COMMIT_EDITMSG"
+else
+    commit_msg_file=""
+fi
+
+if [ -n "$commit_msg_file" ] && [ -f "$commit_msg_file" ]; then
+    print_status "INFO" "Validating conventional commit format..."
+    commit_msg=$(head -n1 "$commit_msg_file")
+
+    # Check conventional commit format: type(scope): description
+    if [[ "$commit_msg" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?\!?:\ .{1,50} ]]; then
+        print_status "SUCCESS" "Conventional commit format is valid!"
+    else
+        print_status "WARN" "Commit message doesn't follow conventional commit format"
+        print_status "INFO" "Expected format: type(scope): description"
+        print_status "INFO" "Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert"
+        print_status "INFO" "Current message: $commit_msg"
+    fi
+fi
+
+print_status "SUCCESS" "All pre-commit checks passed!"
+echo ""
+exit 0
