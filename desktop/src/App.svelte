@@ -1,5 +1,6 @@
 <script lang="ts">
 import { router } from 'tinro';
+import { theme } from './lib/stores';
 
 let _visible = 'is-hidden';
 function _toggleVissible() {
