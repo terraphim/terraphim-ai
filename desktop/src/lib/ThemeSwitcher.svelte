@@ -135,7 +135,7 @@ async function initializeConfig() {
 initializeConfig();
 console.log('Using Terraphim Server URL:', CONFIG.ServerURL);
 
-function __updateRole(event: Event) {
+function _updateRole(event: Event) {
 	const target = event.currentTarget as HTMLSelectElement;
 	const newRoleName = target.value;
 	console.log('Role change requested:', newRoleName);
