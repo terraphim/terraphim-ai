@@ -41,11 +41,11 @@ onMount(() => {
 {#if _isVisible}
 	<button
 		class="button is-light back-button {customClass}"
-		on:click={goBack}
+		on:click={_goBack}
 		on:keydown={(e) => {
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
-				goBack();
+				_goBack();
 			}
 		}}
 		title="Go back"
