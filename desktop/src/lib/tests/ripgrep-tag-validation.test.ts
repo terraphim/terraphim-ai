@@ -24,24 +24,24 @@ function validateRipgrepTag(tag: string): {
 
 	const trimmedTag = tag.trim();
 
-	// Validate tag format
+	// Check for invalid characters that could break ripgrep (check BEFORE trimming)
+	const invalidChars = /["\\\n\r\t]/;
+	if (invalidChars.test(tag)) {
+		errors.push('Tag contains invalid characters (quotes, backslashes, or control characters)');
+	}
+
+	// Validate tag format (use trimmed version for format validation)
 	if (!trimmedTag.startsWith('#')) {
 		errors.push('Tag must start with # (e.g., "#rust")');
 	}
 
-	// Check for invalid characters that could break ripgrep
-	const invalidChars = /["\\\n\r\t]/;
-	if (invalidChars.test(trimmedTag)) {
-		errors.push('Tag contains invalid characters (quotes, backslashes, or control characters)');
-	} else {
-		// Only check format if no invalid characters are present
-		// Check for valid tag format (alphanumeric, dash, underscore after #)
-		const validTagPattern = /^#[a-zA-Z0-9_-]+$/;
-		if (!validTagPattern.test(trimmedTag)) {
-			errors.push(
-				'Tag must contain only letters, numbers, dash, or underscore after # (e.g., "#rust", "#test-data", "#web_dev")'
-			);
-		}
+	// Only check format if no invalid characters are present
+	// Check for valid tag format (alphanumeric, dash, underscore after #)
+	const validTagPattern = /^#[a-zA-Z0-9_-]+$/;
+	if (!validTagPattern.test(trimmedTag)) {
+		errors.push(
+			'Tag must contain only letters, numbers, dash, or underscore after # (e.g., "#rust", "#test-data", "#web_dev")'
+		);
 	}
 
 	// If valid, generate expected ripgrep parameters

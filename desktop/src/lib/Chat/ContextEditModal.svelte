@@ -79,7 +79,7 @@ function _handleKeydown(event: KeyboardEvent) {
 }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window on:keydown={_handleKeydown} />
 
 <Modal {active} on:close={handleClose}>
   <div class="modal-card">
