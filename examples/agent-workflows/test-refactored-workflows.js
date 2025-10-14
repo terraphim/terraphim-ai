@@ -112,7 +112,7 @@ class RefactoredWorkflowsTestSuite {
         const screenshotPath = path.join(this.screenshotsDir, `${name.replace(/ /g, '_')}.png`);
         await this.page.screenshot({ path: screenshotPath });
         details += `📸 Screenshot saved to ${screenshotPath}\n`;
-        
+
         this.results.push({ name, success, details });
     }
 
@@ -137,7 +137,7 @@ class RefactoredWorkflowsTestSuite {
                 const options = document.querySelectorAll('#role-selector option');
                 return options.length > 1;
             }, { timeout: 15000 });
-            
+
             // Basic config checks
             const rolesCount = await this.page.locator('#role-selector option').count();
              if (rolesCount > 1) { details += `✅ Role selector populated with ${rolesCount} roles.\n`; } else { throw new Error('Role selector not populated.'); }
@@ -158,7 +158,7 @@ class RefactoredWorkflowsTestSuite {
             details += `✅ Analysis step completed.\n`;
             await this.page.click('#generate-btn');
             await this.page.waitForSelector('#output-frame', { timeout: 60000 });
-            
+
             await this.page.waitForFunction(() => {
                 const iframe = document.querySelector('#output-frame');
                 return iframe.contentDocument && iframe.contentDocument.body.innerHTML.length > 50;
@@ -176,7 +176,7 @@ class RefactoredWorkflowsTestSuite {
         const screenshotPath = path.join(this.screenshotsDir, `${name.replace(/ /g, '_')}.png`);
         await this.page.screenshot({ path: screenshotPath });
         details += `📸 Screenshot saved to ${screenshotPath}\n`;
-        
+
         this.results.push({ name, success, details });
     }
 

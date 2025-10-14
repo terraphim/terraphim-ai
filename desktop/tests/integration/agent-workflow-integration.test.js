@@ -31,7 +31,7 @@ describe('Agent Workflow Integration Tests', () => {
   beforeAll(async () => {
     // Start test server
     serverProcess = spawn('cargo', [
-      'run', '--release', '--', 
+      'run', '--release', '--',
       '--config', 'terraphim_server/default/ollama_llama_config.json',
       '--port', TEST_CONFIG.serverPort.toString()
     ], {
@@ -71,7 +71,7 @@ describe('Agent Workflow Integration Tests', () => {
 
     if (serverProcess) {
       serverProcess.kill('SIGTERM');
-      
+
       // Wait for graceful shutdown
       await new Promise(resolve => {
         serverProcess.on('exit', resolve);
@@ -97,14 +97,14 @@ describe('Agent Workflow Integration Tests', () => {
     it('should establish WebSocket connection successfully', async () => {
       await new Promise((resolve, reject) => {
         wsClient = new WebSocket(TEST_CONFIG.websocketUrl);
-        
+
         wsClient.on('open', () => {
           expect(wsClient.readyState).toBe(WebSocket.OPEN);
           resolve();
         });
 
         wsClient.on('error', reject);
-        
+
         setTimeout(() => reject(new Error('WebSocket connection timeout')), 10000);
       });
     });
@@ -112,7 +112,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should accept messages with correct command_type format', async () => {
       await new Promise((resolve, reject) => {
         wsClient = new WebSocket(TEST_CONFIG.websocketUrl);
-        
+
         wsClient.on('open', () => {
           const testMessage = {
             command_type: 'start_workflow',
@@ -126,7 +126,7 @@ describe('Agent Workflow Integration Tests', () => {
           };
 
           wsClient.send(JSON.stringify(testMessage));
-          
+
           // Should not receive error response
           setTimeout(resolve, 2000);
         });
@@ -146,7 +146,7 @@ describe('Agent Workflow Integration Tests', () => {
       await new Promise((resolve, reject) => {
         wsClient = new WebSocket(TEST_CONFIG.websocketUrl);
         let receivedError = false;
-        
+
         wsClient.on('open', () => {
           const legacyMessage = {
             type: 'start_workflow', // Legacy format should be rejected
@@ -161,7 +161,7 @@ describe('Agent Workflow Integration Tests', () => {
         wsClient.on('message', (data) => {
           const message = JSON.parse(data.toString());
           receivedMessages.push(message);
-          
+
           // Should receive error or be ignored
           if (message.response_type === 'error' || message.error) {
             receivedError = true;
@@ -190,10 +190,10 @@ describe('Agent Workflow Integration Tests', () => {
       // Establish fresh WebSocket connection for each test
       await new Promise((resolve, reject) => {
         wsClient = new WebSocket(TEST_CONFIG.websocketUrl);
-        
+
         wsClient.on('open', resolve);
         wsClient.on('error', reject);
-        
+
         wsClient.on('message', (data) => {
           try {
             const message = JSON.parse(data.toString());
@@ -202,14 +202,14 @@ describe('Agent Workflow Integration Tests', () => {
             console.warn('Failed to parse message:', data.toString());
           }
         });
-        
+
         setTimeout(() => reject(new Error('Connection timeout')), 5000);
       });
     });
 
     it('should handle workflow lifecycle messages', async () => {
       const sessionId = `integration-test-${Date.now()}`;
-      
+
       // Start workflow
       const startMessage = {
         command_type: 'start_workflow',
@@ -231,18 +231,18 @@ describe('Agent Workflow Integration Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 5000));
 
       // Should receive workflow started confirmation
-      const workflowMessages = receivedMessages.filter(msg => 
+      const workflowMessages = receivedMessages.filter(msg =>
         msg.sessionId === sessionId || msg.session_id === sessionId
       );
 
       expect(workflowMessages.length).toBeGreaterThan(0);
-      
+
       // Check for expected message types
       const messageTypes = workflowMessages.map(msg => msg.response_type).filter(Boolean);
       console.log('Received message types:', messageTypes);
-      
+
       // Should receive at least one workflow-related message
-      expect(messageTypes.some(type => 
+      expect(messageTypes.some(type =>
         type.includes('workflow') || type.includes('started') || type.includes('progress')
       )).toBe(true);
     });
@@ -255,7 +255,7 @@ describe('Agent Workflow Integration Tests', () => {
       for (let i = 0; i < numSessions; i++) {
         const sessionId = `concurrent-test-${i}-${Date.now()}`;
         sessions.push(sessionId);
-        
+
         const message = {
           command_type: 'start_workflow',
           session_id: sessionId,
@@ -268,7 +268,7 @@ describe('Agent Workflow Integration Tests', () => {
         };
 
         wsClient.send(JSON.stringify(message));
-        
+
         // Small delay between requests
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -285,7 +285,7 @@ describe('Agent Workflow Integration Tests', () => {
 
       console.log('Started sessions:', sessions);
       console.log('Received responses for sessions:', Array.from(uniqueSessions));
-      
+
       // Should handle multiple sessions without conflicts
       expect(uniqueSessions.size).toBeGreaterThan(0);
     });
@@ -355,7 +355,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should handle rapid message sending', async () => {
       const startTime = Date.now();
       const messageCount = 50;
-      
+
       // Send messages rapidly
       for (let i = 0; i < messageCount; i++) {
         const message = {
@@ -367,13 +367,13 @@ describe('Agent Workflow Integration Tests', () => {
             sequence: i
           }
         };
-        
+
         wsClient.send(JSON.stringify(message));
       }
 
       // Wait for processing
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       const endTime = Date.now();
       const duration = endTime - startTime;
 
@@ -390,7 +390,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should provide health check endpoint', async () => {
       const response = await fetch(`${TEST_CONFIG.httpUrl}/health`);
       expect(response.ok).toBe(true);
-      
+
       const data = await response.json();
       expect(data).toHaveProperty('status');
     });
@@ -398,7 +398,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should provide workflow configuration endpoint', async () => {
       try {
         const response = await fetch(`${TEST_CONFIG.httpUrl}/config`);
-        
+
         if (response.ok) {
           const config = await response.json();
           console.log('Server configuration loaded:', Object.keys(config));

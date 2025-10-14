@@ -1,32 +1,23 @@
 <script lang="ts">
-  import { Route, router, active } from "tinro";
-  import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
-  import Search from "./lib/Search/Search.svelte";
-  import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
-  import { theme } from "./lib/stores";
-  import ConfigWizard from "./lib/ConfigWizard.svelte";
-  import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
-  import RoleGraphVisualization from "./lib/RoleGraphVisualization.svelte";
-  import Chat from "./lib/Chat/Chat.svelte";
-  import logo from "/assets/terraphim_gray.png";
+import { router } from 'tinro';
 
-  let visible = "is-hidden";
-  function toggleVissible() {
-    visible = "";
-  }
+let _visible = 'is-hidden';
+function _toggleVissible() {
+	_visible = '';
+}
 
-  function navigateTo(path: string) {
-    router.goto(path);
-  }
+function _navigateTo(path: string) {
+	router.goto(path);
+}
 
-  function goBack() {
-    // Try to go back in browser history, fallback to home
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      router.goto('/');
-    }
-  }
+function _goBack() {
+	// Try to go back in browser history, fallback to home
+	if (window.history.length > 1) {
+		window.history.back();
+	} else {
+		router.goto('/');
+	}
+}
 </script>
 
 <svelte:head>
@@ -39,18 +30,18 @@
     <div class="top-controls">
       <div class="main-navigation">
         <div class="navigation-row">
-          <button
-            class="logo-back-button"
-            on:click={goBack}
-            on:keydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                goBack();
-              }
-            }}
-            title="Go back"
-            aria-label="Go back"
-          >
+  <button
+    class="logo-back-button"
+    on:click={_goBack}
+    on:keydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        _goBack();
+      }
+    }}
+    title="Go back"
+    aria-label="Go back"
+  >
             <img src={logo} alt="Terraphim" class="logo-image" />
           </button>
           <div class="tabs is-boxed">
@@ -93,8 +84,8 @@
     <Route path="/config/json"><ConfigJsonEditor /></Route>
   </main>
 
-  <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>
-    <div class={visible}>
+  <footer on:mouseover={_toggleVissible} on:focus={_toggleVissible}>
+    <div class={_visible}>
       <Route path="/">
         <nav class="navbar">
           <div class="navbar-brand">

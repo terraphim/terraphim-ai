@@ -33,6 +33,7 @@ struct WorkerAgent {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
 enum WorkerStatus {
     Idle,
     Working,
@@ -654,6 +655,7 @@ async fn create_general_workflow(_prompt: &str) -> (Vec<TaskAssignment>, Vec<Wor
     (assignments, workers)
 }
 
+#[allow(dead_code)]
 async fn execute_coordinated_work(
     _orchestrator: &OrchestratorAgent,
     workers: &[WorkerAgent],
@@ -692,6 +694,7 @@ async fn execute_coordinated_work(
     results
 }
 
+#[allow(dead_code)]
 async fn generate_worker_result(
     assignment: &TaskAssignment,
     workers: &[WorkerAgent],
@@ -741,6 +744,7 @@ async fn generate_worker_result(
 }
 
 #[allow(unused_variables)]
+#[allow(dead_code)]
 async fn synthesize_orchestration_result(
     orchestrator: OrchestratorAgent,
     worker_results: Vec<WorkerResult>,
@@ -790,10 +794,10 @@ async fn synthesize_orchestration_result(
             "Orchestrated workflow completed successfully with {}/{} tasks completed. \
             The orchestrator effectively coordinated {} specialized workers to achieve \
             high-quality results across all task domains. Average quality score: {:.2}. \
-
+            \
             Key achievements: Successful task decomposition, efficient resource utilization \
             ({:.1}% worker utilization), and effective coordination with minimal overhead. \
-
+            \
             The hierarchical coordination model proved effective for this type of complex task, \
             enabling specialized workers to focus on their areas of expertise while maintaining \
             overall project coherence and quality standards.",
@@ -891,6 +895,7 @@ fn analyze_task_complexity(prompt: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn calculate_task_quality_score(assignment: &TaskAssignment) -> f64 {
     let base_quality = match assignment.priority {
         TaskPriority::Critical => 0.90,
@@ -905,9 +910,10 @@ fn calculate_task_quality_score(assignment: &TaskAssignment) -> f64 {
         -0.02f64
     };
 
-    (base_quality + complexity_factor).min(0.95f64).max(0.70f64)
+    (base_quality + complexity_factor).clamp(0.70f64, 0.95f64)
 }
 
+#[allow(dead_code)]
 fn calculate_resource_efficiency(results: &[WorkerResult]) -> f64 {
     let total_execution_time: u64 = results.iter().map(|r| r.execution_time_ms).sum();
     let avg_execution_time = total_execution_time as f64 / results.len() as f64;
@@ -923,6 +929,7 @@ fn calculate_resource_efficiency(results: &[WorkerResult]) -> f64 {
     1.0 - normalized_variance * 0.5
 }
 
+#[allow(dead_code)]
 fn calculate_consistency_score(results: &[WorkerResult]) -> f64 {
     let avg_quality: f64 =
         results.iter().map(|r| r.quality_score).sum::<f64>() / results.len() as f64;
@@ -933,9 +940,10 @@ fn calculate_consistency_score(results: &[WorkerResult]) -> f64 {
         / results.len() as f64;
 
     // Higher consistency = lower variance in quality scores
-    (1.0 - quality_variance.sqrt()).max(0.5).min(0.98)
+    (1.0 - quality_variance.sqrt()).clamp(0.5, 0.98)
 }
 
+#[allow(dead_code)]
 fn calculate_orchestrator_efficiency(result: &OrchestrationResult) -> f64 {
     let success_rate = result.orchestrator_summary.successful_completions as f64
         / result.orchestrator_summary.total_tasks_assigned as f64;

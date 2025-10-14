@@ -1,49 +1,48 @@
 <script lang="ts">
-  import { JSONEditor } from "svelte-jsoneditor";
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/tauri";
-  // @ts-ignore local store defined elsewhere
-  import { is_tauri, configStore } from "$lib/stores";
-  import { get } from "svelte/store";
-  import { CONFIG } from "../config";
+import { invoke } from '@tauri-apps/api/tauri';
+import { onMount } from 'svelte';
+import { get } from 'svelte/store';
+// @ts-expect-error local store defined elsewhere
+import { configStore, is_tauri } from '$lib/stores';
+import { CONFIG } from '../config';
 
-  let content = {
-    json: $configStore,
-  };
+let _content = {
+	json: $configStore,
+};
 
-  function handleChange(updatedContent) {
-    console.log("contents changed:", updatedContent);
-    console.log("is tauri", $is_tauri);
-    configStore.update((config) => {
-      config = updatedContent.json;
-      return config;
-    });
-    if (get(is_tauri)) {
-      console.log("Updating config on server");
-      invoke("update_config", { configNew: updatedContent.json })
-        .then((res) => {
-          console.log(`Message: ${res}`);
-        })
-        .catch((e) => console.error(e));
-    } else {
-      // post to server using /api/config
-      let configURL = `${CONFIG.ServerURL}/config/`;
-      fetch(configURL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedContent.json),
-      });
-    }
-    content = updatedContent;
-    content;
-  }
+function _handleChange(updatedContent) {
+	console.log('contents changed:', updatedContent);
+	console.log('is tauri', $is_tauri);
+	configStore.update((config) => {
+		config = updatedContent.json;
+		return config;
+	});
+	if (get(is_tauri)) {
+		console.log('Updating config on server');
+		invoke('update_config', { configNew: updatedContent.json })
+			.then((res) => {
+				console.log(`Message: ${res}`);
+			})
+			.catch((e) => console.error(e));
+	} else {
+		// post to server using /api/config
+		const configURL = `${CONFIG.ServerURL}/config/`;
+		fetch(configURL, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(updatedContent.json),
+		});
+	}
+	_content = updatedContent;
+	_content;
+}
 
-  onMount(() => {
-    // Initialize content with current config
-    content = { json: $configStore };
-  });
+onMount(() => {
+	// Initialize content with current config
+	_content = { json: $configStore };
+});
 </script>
 
 <div class="box">

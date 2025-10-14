@@ -66,6 +66,7 @@ async fn main() -> Result<()> {
 }
 
 /// Handle update-related commands
+#[allow(clippy::unused_async)]
 async fn handle_update_commands(_args: &Args) -> Result<()> {
     // TODO: Re-enable when terraphim_update is added to workspace
     eprintln!("Auto-update feature temporarily disabled");

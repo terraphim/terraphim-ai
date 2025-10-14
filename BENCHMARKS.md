@@ -107,7 +107,7 @@ Uses Vitest for JavaScript performance testing.
 ```javascript
 const THRESHOLDS = {
   webSocketConnection: { avg: 500, p95: 1000 },    // ms
-  messageProcessing: { avg: 100, p95: 200 },       // ms  
+  messageProcessing: { avg: 100, p95: 200 },       // ms
   workflowStart: { avg: 2000, p95: 5000 },         // ms
   commandProcessing: { avg: 3000, p95: 10000 },    // ms
   memoryOperations: { avg: 50, p95: 100 },         // ms
@@ -127,7 +127,7 @@ const THRESHOLDS = {
 # Run only Rust benchmarks
 ./scripts/run-benchmarks.sh --rust-only
 
-# Run only JavaScript benchmarks  
+# Run only JavaScript benchmarks
 ./scripts/run-benchmarks.sh --js-only
 ```
 

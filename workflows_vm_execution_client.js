@@ -15,7 +15,7 @@ class VmExecutionClient {
       timeout: options.timeout || 30000,
       ...options
     };
-    
+
     this.executionHistory = [];
     this.vmSessions = new Map();
     this.activeSnapshots = new Map();
@@ -56,7 +56,7 @@ class VmExecutionClient {
       if (onProgress) {
         onProgress({ status: 'creating_snapshot', executionId, vmId });
       }
-      
+
       try {
         snapshotId = await this.createSnapshot(vmId, `pre-execution-${executionId}`);
         this.activeSnapshots.set(executionId, {
@@ -136,10 +136,10 @@ class VmExecutionClient {
 
           if (this.options.autoRollback && snapshotId) {
             if (onProgress) {
-              onProgress({ 
-                status: 'rolling_back', 
-                executionId, 
-                snapshotId 
+              onProgress({
+                status: 'rolling_back',
+                executionId,
+                snapshotId
               });
             }
 
@@ -155,9 +155,9 @@ class VmExecutionClient {
 
           if (attempts < this.options.maxRetries) {
             if (onProgress) {
-              onProgress({ 
-                status: 'retrying', 
-                executionId, 
+              onProgress({
+                status: 'retrying',
+                executionId,
                 attempt: attempts + 1,
                 maxRetries: this.options.maxRetries
               });
@@ -168,7 +168,7 @@ class VmExecutionClient {
 
           result.retriesExhausted = true;
           this.executionHistory.push(result);
-          
+
           if (onProgress) {
             onProgress({ status: 'failed', ...result });
           }
@@ -177,12 +177,12 @@ class VmExecutionClient {
         }
       } catch (error) {
         lastError = error;
-        
+
         if (attempts < this.options.maxRetries) {
           await this.delay(this.options.retryDelay * attempts);
           continue;
         }
-        
+
         const errorResult = {
           success: false,
           executionId,
@@ -195,7 +195,7 @@ class VmExecutionClient {
         };
 
         this.executionHistory.push(errorResult);
-        
+
         if (onProgress) {
           onProgress({ status: 'error', ...errorResult });
         }
@@ -209,7 +209,7 @@ class VmExecutionClient {
 
   async parseAndExecute(text, options = {}) {
     const codeBlocks = this.extractCodeBlocks(text);
-    
+
     if (codeBlocks.length === 0) {
       return {
         success: false,
@@ -268,7 +268,7 @@ class VmExecutionClient {
 
   validateCode(language, code) {
     const supportedLanguages = ['python', 'javascript', 'bash', 'rust', 'go'];
-    
+
     if (!supportedLanguages.includes(language)) {
       return {
         valid: false,

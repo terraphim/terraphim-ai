@@ -12,7 +12,6 @@ use terraphim_multi_agent::{
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
-use tokio;
 
 /// Workflow Pattern 1: Prompt Chaining
 /// Sequential execution where each step's output feeds into the next step
@@ -39,7 +38,7 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     println!("✅ Development agent created: {}", dev_agent.agent_id);
 
     // Development workflow steps (prompt chaining)
-    let steps = vec![
+    let steps = [
         "Create requirements specification",
         "Design system architecture",
         "Generate implementation plan",
@@ -222,12 +221,12 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create orchestrator
-    let mut orchestrator =
+    let orchestrator =
         TerraphimAgent::new(create_orchestrator_role(), persistence.clone(), None).await?;
     orchestrator.initialize().await?;
 
     // Create specialized workers
-    let workers = vec!["data_collector", "content_analyzer", "knowledge_mapper"];
+    let workers = ["data_collector", "content_analyzer", "knowledge_mapper"];
 
     let mut worker_agents = Vec::new();
     for worker_name in &workers {
@@ -307,12 +306,10 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     // Create generator and evaluator
-    let mut generator =
-        TerraphimAgent::new(create_generator_role(), persistence.clone(), None).await?;
+    let generator = TerraphimAgent::new(create_generator_role(), persistence.clone(), None).await?;
     generator.initialize().await?;
 
-    let mut evaluator =
-        TerraphimAgent::new(create_evaluator_role(), persistence.clone(), None).await?;
+    let evaluator = TerraphimAgent::new(create_evaluator_role(), persistence.clone(), None).await?;
     evaluator.initialize().await?;
 
     println!("✅ Created generator and evaluator agents");
@@ -378,6 +375,14 @@ fn create_simple_role() -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }
@@ -393,6 +398,14 @@ fn create_complex_role() -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }
@@ -408,6 +421,14 @@ fn create_perspective_role(perspective: &str) -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }
@@ -423,6 +444,14 @@ fn create_orchestrator_role() -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }
@@ -438,6 +467,14 @@ fn create_worker_role(worker_name: &str) -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }
@@ -453,6 +490,14 @@ fn create_generator_role() -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }
@@ -468,6 +513,14 @@ fn create_evaluator_role() -> Role {
         terraphim_it: false,
         theme: "default".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
     }

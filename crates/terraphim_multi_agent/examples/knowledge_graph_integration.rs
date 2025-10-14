@@ -6,14 +6,12 @@
 //! - Query-specific context injection
 //! - Multi-layered context assembly
 
-use ahash::AHashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
     CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
-use terraphim_types::RelevanceFunction;
 
 /// Create a role configured for knowledge graph demonstration
 fn create_knowledge_graph_role() -> Role {
@@ -63,7 +61,7 @@ async fn example_context_enrichment() -> MultiAgentResult<()> {
 
     // Create knowledge graph enabled agent
     let role = create_knowledge_graph_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     println!(
@@ -115,7 +113,7 @@ async fn example_semantic_relationships() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     let role = create_knowledge_graph_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     // Queries designed to test semantic relationships
@@ -176,9 +174,10 @@ async fn example_multilayer_context() -> MultiAgentResult<()> {
         extra_parameters: std::collections::HashMap::new(),
         location: "./rust_docs".to_string(),
         service: terraphim_config::ServiceType::Ripgrep,
+        fetch_content: false,
     });
 
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     // Add some context to agent memory first (simulate previous interactions)
@@ -248,7 +247,7 @@ async fn example_context_aware_commands() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     let role = create_knowledge_graph_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     let base_query = "Rust async programming patterns";
@@ -272,7 +271,7 @@ async fn example_context_aware_commands() -> MultiAgentResult<()> {
     ];
 
     for (command_type, description) in command_types {
-        println!("\n🔸 {} ({})", description, format!("{:?}", command_type));
+        println!("\n🔸 {} ({:?})", description, command_type);
 
         let input = CommandInput::new(base_query.to_string(), command_type);
         let start = std::time::Instant::now();
@@ -309,7 +308,7 @@ async fn example_performance_analysis() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     let role = create_knowledge_graph_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     // Test performance with different query complexities
@@ -339,7 +338,7 @@ async fn example_performance_analysis() -> MultiAgentResult<()> {
         let total_duration = start.elapsed();
 
         // Get tracking information
-        let token_tracker = agent.token_tracker.read().await;
+        let _token_tracker = agent.token_tracker.read().await;
         let context = agent.context.read().await;
 
         println!("   ⏱️  Total time: {:?}", total_duration);

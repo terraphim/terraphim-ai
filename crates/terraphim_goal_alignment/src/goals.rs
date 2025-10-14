@@ -388,8 +388,7 @@ impl Goal {
                 let score = if criterion.is_met {
                     1.0
                 } else {
-                    (criterion.current_value / criterion.target_value)
-                        .clamp(0.0, 1.0)
+                    (criterion.current_value / criterion.target_value).clamp(0.0, 1.0)
                 };
                 score * criterion.weight
             })
