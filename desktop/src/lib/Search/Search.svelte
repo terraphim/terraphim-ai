@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { onDestroy, onMount } from 'svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
+import { Field, Input, Tag, Taglist } from 'svelma';
+import { input, typeahead, role, serverUrl, is_tauri } from '$lib/stores';
 
 let results: Document[] = [];
 let _error: string | null = null;
