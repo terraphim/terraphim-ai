@@ -6,7 +6,7 @@
 
 use ahash::AHashMap;
 use std::sync::Arc;
-use terraphim_config::{Config, ConfigBuilder, Haystack, Role, ServiceType};
+use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_multi_agent::{
     CommandInput, CommandType, MultiAgentError, MultiAgentResult, TerraphimAgent,
 };
@@ -22,6 +22,14 @@ fn create_atomic_server_agent_role() -> Role {
         relevance_function: RelevanceFunction::TitleScorer,
         theme: "spacelab".to_string(),
         kg: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(16000),
         haystacks: vec![
             Haystack::new(
                 "http://localhost:9883".to_string(), // Atomic server URL
@@ -74,7 +82,7 @@ async fn demonstrate_config_evolution() -> MultiAgentResult<()> {
 
     // Step 1: Traditional configuration
     println!("\n1️⃣ Step 1: Traditional Role Configuration");
-    let config = ConfigBuilder::new()
+    let _config = ConfigBuilder::new()
         .global_shortcut("Ctrl+T")
         .add_role("AtomicUser", create_atomic_server_agent_role())
         .build()
@@ -104,7 +112,7 @@ async fn demonstrate_config_evolution() -> MultiAgentResult<()> {
 
     // Transform role into intelligent agent
     let role = create_atomic_server_agent_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     println!("✅ Role evolved into intelligent agent:");
@@ -135,7 +143,7 @@ async fn demonstrate_intelligent_queries() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     let role = create_atomic_server_agent_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     // Intelligent queries that leverage both atomic data and AI reasoning
@@ -200,7 +208,7 @@ async fn demonstrate_context_integration() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     let role = create_atomic_server_agent_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     // Query that should trigger comprehensive context assembly
@@ -268,7 +276,7 @@ async fn demonstrate_evolution_comparison() -> MultiAgentResult<()> {
     let persistence = Arc::new(storage_copy);
 
     let role = create_atomic_server_agent_role();
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     agent.initialize().await?;
 
     // Demonstrate intelligent capabilities

@@ -139,7 +139,6 @@ This document provides a comprehensive foundation for async Rust programming.
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
-            weight: 1.0,
             fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
@@ -179,14 +178,14 @@ This document provides a comprehensive foundation for async Rust programming.
     let search_result = service.search(&search_query).await?;
 
     println!("📊 SEARCH RESULTS:");
-    println!("   Documents found: {}", search_result.documents.len());
+    println!("   Documents found: {}", search_result.len());
     println!(
         "   Summarization tasks queued: {}",
-        search_result.summarization_task_ids.len()
+        0 // TODO: Summarization task tracking not available in current implementation
     );
 
-    if !search_result.documents.is_empty() {
-        let doc = &search_result.documents[0];
+    if !search_result.is_empty() {
+        let doc = &search_result[0];
         println!("   📄 Document: {}", doc.id);
         println!("   📝 Description: {:?}", doc.description);
         println!("   🔗 URL: {}", doc.url);
@@ -202,11 +201,12 @@ This document provides a comprehensive foundation for async Rust programming.
         }
     }
 
-    if !search_result.summarization_task_ids.is_empty() {
+    if false {
+        // TODO: Re-enable when summarization task tracking is implemented
         println!("   ✅ SUMMARIZATION TASKS WERE QUEUED!");
-        for task_id in &search_result.summarization_task_ids {
-            println!("   📋 Task ID: {}", task_id);
-        }
+        // for task_id in &search_result.summarization_task_ids {
+        //     println!("   📋 Task ID: {}", task_id);
+        // }
     } else {
         println!("   ❌ No summarization tasks queued");
     }
@@ -232,7 +232,7 @@ This document provides a comprehensive foundation for async Rust programming.
         let mut summaries_found = 0;
         let mut documents_with_summaries = Vec::new();
 
-        for doc in &updated_result.documents {
+        for doc in &updated_result {
             if let Some(ref summary) = doc.summarization {
                 summaries_found += 1;
                 documents_with_summaries.push((doc.id.clone(), summary.clone()));
@@ -279,10 +279,9 @@ This document provides a comprehensive foundation for async Rust programming.
     let final_result = service.search(&search_query).await?;
 
     println!("\n📊 FINAL RESULTS:");
-    println!("   Documents: {}", final_result.documents.len());
-    println!("   Task IDs: {}", final_result.summarization_task_ids.len());
+    println!("   Documents: {}", final_result.len());
 
-    for doc in &final_result.documents {
+    for doc in &final_result {
         if doc.summarization.is_some() {
             println!("   ✅ Document {} has summarization", doc.id);
         } else {

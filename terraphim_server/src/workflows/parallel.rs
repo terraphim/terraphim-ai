@@ -22,6 +22,7 @@ struct ParallelAgent {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct ParallelAnalysis {
     agent_id: String,
     agent_name: String,
@@ -33,6 +34,7 @@ struct ParallelAnalysis {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct ConsolidatedResult {
     consensus_points: Vec<String>,
     conflicting_views: Vec<ConflictingView>,
@@ -42,12 +44,14 @@ struct ConsolidatedResult {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct ConflictingView {
     topic: String,
     perspectives: Vec<AgentPerspective>,
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct AgentPerspective {
     agent_name: String,
     viewpoint: String,
@@ -55,6 +59,7 @@ struct AgentPerspective {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct AgentConfidence {
     agent_name: String,
     confidence: f64,
@@ -62,6 +67,7 @@ struct AgentConfidence {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct ExecutionSummary {
     total_agents: usize,
     parallel_processing_time_ms: u64,
@@ -163,6 +169,7 @@ pub async fn execute_parallel(
     Ok(Json(response))
 }
 
+#[allow(dead_code)]
 async fn create_specialized_agents(prompt: &str) -> Vec<ParallelAgent> {
     let task_type = analyze_task_type(prompt);
 
@@ -283,6 +290,7 @@ async fn create_specialized_agents(prompt: &str) -> Vec<ParallelAgent> {
     }
 }
 
+#[allow(dead_code)]
 async fn execute_parallel_analysis(
     agents: &[ParallelAgent],
     prompt: &str,
@@ -327,6 +335,7 @@ async fn execute_parallel_analysis(
     analyses
 }
 
+#[allow(dead_code)]
 async fn generate_agent_analysis(agent: &ParallelAgent, prompt: &str) -> String {
     // Simulate agent-specific analysis based on role and perspective
     match agent.role.as_str() {
@@ -376,6 +385,7 @@ async fn generate_agent_analysis(agent: &ParallelAgent, prompt: &str) -> String 
     }
 }
 
+#[allow(dead_code)]
 async fn generate_key_insights(agent: &ParallelAgent, prompt: &str) -> Vec<String> {
     let topic = extract_main_topic(prompt);
 
@@ -427,11 +437,10 @@ async fn calculate_agent_confidence(agent: &ParallelAgent, prompt: &str) -> f64 
         0.0
     };
 
-    (base_confidence + complexity_factor + domain_match)
-        .min(0.95_f64)
-        .max(0.60_f64)
+    (base_confidence + complexity_factor + domain_match).clamp(0.60_f64, 0.95_f64)
 }
 
+#[allow(dead_code)]
 async fn consolidate_analyses(
     analyses: Vec<ParallelAnalysis>,
     parallel_duration: Duration,
@@ -489,13 +498,13 @@ async fn consolidate_analyses(
     let comprehensive_analysis = format!(
         "Multi-agent parallel analysis completed with {} specialized agents providing diverse perspectives. \
         Average confidence level: {:.1}%, consensus achieved: {:.1}%, diversity score: {:.2}. \
-
+        \
         The analysis reveals strong alignment on fundamental approaches while highlighting \
         strategic differences in implementation timelines and resource allocation. \
-
+        \
         Key recommendations emerge from cross-agent consensus: prioritize scalable architecture, \
         implement robust security measures, and adopt iterative development methodology. \
-
+        \
         Conflicting perspectives on timeline and approach provide valuable decision-making context, \
         enabling informed trade-off analysis between speed-to-market and technical robustness.",
         total_agents,
@@ -554,6 +563,7 @@ fn extract_main_topic(prompt: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn calculate_consensus_level(analyses: &[ParallelAnalysis]) -> f64 {
     // Simplified consensus calculation based on confidence score variance
     let avg_confidence: f64 =
@@ -565,9 +575,10 @@ fn calculate_consensus_level(analyses: &[ParallelAnalysis]) -> f64 {
         / analyses.len() as f64;
 
     // Lower variance = higher consensus
-    (1.0 - variance.sqrt()).max(0.3).min(0.95)
+    (1.0 - variance.sqrt()).clamp(0.3, 0.95)
 }
 
+#[allow(dead_code)]
 fn calculate_diversity_score(analyses: &[ParallelAnalysis]) -> f64 {
     // Simplified diversity score based on unique perspectives
     let unique_roles: std::collections::HashSet<_> =
@@ -576,6 +587,7 @@ fn calculate_diversity_score(analyses: &[ParallelAnalysis]) -> f64 {
     (unique_roles.len() as f64 / analyses.len() as f64) * 0.8 + 0.2
 }
 
+#[allow(dead_code)]
 fn calculate_efficiency_score(result: &ConsolidatedResult) -> f64 {
     let time_efficiency = if result.execution_summary.parallel_processing_time_ms < 2000 {
         0.9

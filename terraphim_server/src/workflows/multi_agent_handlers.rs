@@ -148,6 +148,7 @@ impl MultiAgentWorkflowExecutor {
     }
 
     /// Execute prompt chaining workflow with actual TerraphimAgent
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_prompt_chain(
         &self,
         workflow_id: &str,
@@ -595,7 +596,7 @@ impl MultiAgentWorkflowExecutor {
         orchestrator.initialize().await?;
 
         // Create specialized workers
-        let worker_specs = vec![
+        let worker_specs = [
             ("data_collector", "Collect and validate research data"),
             ("content_analyzer", "Analyze and process content"),
             (
@@ -901,6 +902,7 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
+    #[allow(dead_code)]
     fn create_development_role(&self, base_role: &str, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert(
@@ -944,6 +946,7 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
+    #[allow(dead_code)]
     async fn create_simple_agent(&self) -> MultiAgentResult<TerraphimAgent> {
         log::debug!("🔧 Creating simple agent using configured role: SimpleTaskAgent");
 
@@ -955,6 +958,7 @@ impl MultiAgentWorkflowExecutor {
         Ok(agent)
     }
 
+    #[allow(dead_code)]
     async fn create_complex_agent(&self) -> MultiAgentResult<TerraphimAgent> {
         log::debug!("🔧 Creating complex agent using configured role: ComplexTaskAgent");
 
@@ -966,6 +970,7 @@ impl MultiAgentWorkflowExecutor {
         Ok(agent)
     }
 
+    #[allow(dead_code)]
     fn create_perspective_role(
         &self,
         perspective: &str,
@@ -1004,6 +1009,7 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
+    #[allow(dead_code)]
     fn create_orchestrator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("orchestrator"));
@@ -1074,6 +1080,7 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
+    #[allow(dead_code)]
     fn create_generator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("generator"));
@@ -1106,6 +1113,7 @@ impl MultiAgentWorkflowExecutor {
         }
     }
 
+    #[allow(dead_code)]
     fn create_evaluator_role(&self, llm_config: &LlmConfig) -> Role {
         let mut extra = AHashMap::new();
         extra.insert("role_type".to_string(), serde_json::json!("evaluator"));
@@ -1177,7 +1185,7 @@ impl MultiAgentWorkflowExecutor {
                 for word in line.split_whitespace() {
                     let cleaned = word.trim_matches(|c: char| !c.is_ascii_digit() && c != '.');
                     if let Ok(score) = cleaned.parse::<f64>() {
-                        if score >= 1.0 && score <= 10.0 {
+                        if (1.0..=10.0).contains(&score) {
                             return score;
                         }
                     }
@@ -1211,6 +1219,7 @@ impl MultiAgentWorkflowExecutor {
         Ok(role.clone())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_vm_execution_demo(
         &self,
         workflow_id: &str,

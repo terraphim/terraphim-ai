@@ -22,13 +22,13 @@ impl SimpleLlmClient {
     pub fn new() -> MultiAgentResult<Self> {
         // Create Ollama client (matching basic_agent_usage.rs exactly)
         let client = ollama::Client::new();
-        
+
         // Create agent (matching basic_agent_usage.rs exactly)
         let agent = client
             .agent("gemma3:270m")
             .preamble("You are a helpful assistant.")
             .build();
-        
+
         Ok(Self { agent })
     }
 
@@ -36,7 +36,7 @@ impl SimpleLlmClient {
     pub async fn generate(&self, request: LlmRequest) -> MultiAgentResult<LlmResponse> {
         let start_time = Utc::now();
         let request_id = Uuid::new_v4();
-        
+
         // Convert messages to a simple prompt (like basic example)
         let prompt = request.messages
             .iter()
@@ -61,7 +61,7 @@ impl SimpleLlmClient {
         // Estimate token usage
         let input_tokens = (prompt.len() / 4) as u64;
         let output_tokens = (response_content.len() / 4) as u64;
-        
+
         Ok(LlmResponse {
             content: response_content,
             model: "gemma3:270m".to_string(),

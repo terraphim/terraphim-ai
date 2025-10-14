@@ -12,7 +12,7 @@
             padding: 2rem;
             background: #f8f9fa;
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 2rem;
@@ -21,7 +21,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        
+
         .status-panel {
             background: white;
             border-radius: 8px;
@@ -29,12 +29,12 @@
             margin-bottom: 2rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        
+
         .controls {
             text-align: center;
             margin-bottom: 2rem;
         }
-        
+
         .btn {
             background: #007bff;
             color: white;
@@ -46,18 +46,18 @@
             margin: 0 0.5rem;
             transition: background 0.2s;
         }
-        
+
         .btn:hover { background: #0056b3; }
         .btn:disabled { background: #6c757d; opacity: 0.6; cursor: not-allowed; }
         .btn-success { background: #28a745; }
         .btn-danger { background: #dc3545; }
-        
+
         .test-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 1.5rem;
         }
-        
+
         .test-card {
             background: white;
             border-radius: 8px;
@@ -65,29 +65,29 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             border-left: 4px solid #6c757d;
         }
-        
+
         .test-card.testing { border-left-color: #ffc107; }
         .test-card.success { border-left-color: #28a745; }
         .test-card.error { border-left-color: #dc3545; }
-        
+
         .test-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
         }
-        
+
         .status-indicator {
             width: 12px;
             height: 12px;
             border-radius: 50%;
             background: #6c757d;
         }
-        
+
         .status-indicator.testing { background: #ffc107; }
         .status-indicator.success { background: #28a745; }
         .status-indicator.error { background: #dc3545; }
-        
+
         .test-results {
             background: #f8f9fa;
             border-radius: 4px;
@@ -98,7 +98,7 @@
             overflow-y: auto;
             white-space: pre-wrap;
         }
-        
+
         .summary {
             background: white;
             border-radius: 8px;
@@ -107,27 +107,27 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             display: none;
         }
-        
+
         .summary-stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        
+
         .stat {
             text-align: center;
             padding: 1rem;
             background: #f8f9fa;
             border-radius: 6px;
         }
-        
+
         .stat-value {
             font-size: 2rem;
             font-weight: bold;
             margin-bottom: 0.5rem;
         }
-        
+
         .success { color: #28a745; }
         .error { color: #dc3545; }
     </style>
@@ -269,7 +269,7 @@
                 this.baseUrl = 'http://127.0.0.1:8000';
                 this.isRunning = false;
                 this.results = new Map();
-                
+
                 this.init();
             }
 
@@ -322,7 +322,7 @@
 
             async executeTests(tests) {
                 if (this.isRunning) return;
-                
+
                 this.isRunning = true;
                 this.results.clear();
                 this.updateControls();
@@ -332,7 +332,7 @@
 
                 for (const test of tests) {
                     if (!this.isRunning) break;
-                    
+
                     try {
                         await this.runSingleTest(test);
                         passed++;
@@ -392,13 +392,13 @@
                     statusElement.className = 'status-indicator success';
                     textElement.textContent = 'Passed';
                     cardElement.className = 'test-card success';
-                    
+
                     const successMessage = `✅ Test passed in ${duration}ms\n\n` +
                         `Workflow ID: ${result.workflow_id}\n` +
                         `Success: ${result.success}\n` +
                         `Pattern: ${result.result?.pattern || 'N/A'}\n` +
                         `Execution Time: ${result.result?.execution_summary?.total_cost || 0} tokens`;
-                    
+
                     resultsElement.textContent = successMessage;
                     this.results.set(testName, { success: true, duration, result });
 
@@ -407,11 +407,11 @@
                     statusElement.className = 'status-indicator error';
                     textElement.textContent = 'Failed';
                     cardElement.className = 'test-card error';
-                    
+
                     const errorMessage = `❌ Test failed: ${error.message}`;
                     resultsElement.textContent = errorMessage;
                     this.results.set(testName, { success: false, error: error.message });
-                    
+
                     throw error;
                 }
             }
@@ -492,7 +492,7 @@
 
             clearResults() {
                 const tests = ['prompt-chain', 'parallel', 'routing', 'orchestration', 'optimization', 'model-selection'];
-                
+
                 tests.forEach(test => {
                     document.getElementById(`status-${test}`).className = 'status-indicator';
                     document.getElementById(`status-text-${test}`).textContent = 'Ready';

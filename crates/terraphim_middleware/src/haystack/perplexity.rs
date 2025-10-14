@@ -624,7 +624,6 @@ mod tests {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: extra_params,
-            weight: 1.0,
             fetch_content: false,
         };
 

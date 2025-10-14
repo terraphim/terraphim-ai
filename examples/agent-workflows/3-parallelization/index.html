@@ -12,7 +12,7 @@
             gap: 2rem;
             margin-top: 2rem;
         }
-        
+
         .control-panel {
             background: var(--surface);
             border-radius: var(--radius-lg);
@@ -20,7 +20,7 @@
             box-shadow: var(--shadow-md);
             height: fit-content;
         }
-        
+
         .results-area {
             background: var(--surface);
             border-radius: var(--radius-lg);
@@ -28,16 +28,16 @@
             box-shadow: var(--shadow-md);
             min-height: 600px;
         }
-        
+
         .perspective-selector {
             margin-bottom: 2rem;
         }
-        
+
         .perspective-grid {
             display: grid;
             gap: 0.75rem;
         }
-        
+
         .perspective-card {
             padding: 1rem;
             border: 2px solid var(--border);
@@ -46,27 +46,27 @@
             transition: var(--transition);
             position: relative;
         }
-        
+
         .perspective-card:hover {
             border-color: var(--primary);
             background: #f8faff;
         }
-        
+
         .perspective-card.selected {
             border-color: var(--primary);
             background: #dbeafe;
         }
-        
+
         .perspective-card.running {
             border-color: var(--warning);
             background: #fef3c7;
         }
-        
+
         .perspective-card.completed {
             border-color: var(--success);
             background: #d1fae5;
         }
-        
+
         .perspective-title {
             font-weight: 600;
             color: var(--text);
@@ -75,62 +75,62 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .perspective-icon {
             font-size: 1.2rem;
         }
-        
+
         .perspective-description {
             font-size: 0.875rem;
             color: var(--text-muted);
             margin-bottom: 0.5rem;
         }
-        
+
         .perspective-status {
             font-size: 0.75rem;
             font-weight: 600;
             color: var(--primary);
         }
-        
+
         .parallel-timeline {
             margin-bottom: 2rem;
             padding: 1rem;
             background: var(--surface-2);
             border-radius: var(--radius-md);
         }
-        
+
         .timeline-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
         }
-        
+
         .execution-controls {
             display: flex;
             gap: 1rem;
             margin-bottom: 2rem;
         }
-        
+
         .analysis-results {
             display: grid;
             gap: 1.5rem;
         }
-        
+
         .perspective-result {
             padding: 1.5rem;
             background: var(--surface-2);
             border-radius: var(--radius-md);
             border-left: 4px solid var(--primary);
         }
-        
+
         .result-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
         }
-        
+
         .result-title {
             font-weight: 600;
             color: var(--text);
@@ -138,17 +138,17 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .result-meta {
             font-size: 0.875rem;
             color: var(--text-muted);
         }
-        
+
         .result-content {
             line-height: 1.6;
             color: var(--text);
         }
-        
+
         .aggregated-insights {
             margin-top: 2rem;
             padding: 2rem;
@@ -156,37 +156,37 @@
             border-radius: var(--radius-lg);
             border: 1px solid var(--primary);
         }
-        
+
         .insights-header {
             display: flex;
             align-items: center;
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
-        
+
         .insights-title {
             font-size: 1.25rem;
             font-weight: 600;
             color: var(--text);
         }
-        
+
         .insights-content {
             display: grid;
             gap: 1rem;
         }
-        
+
         .insight-item {
             padding: 1rem;
             background: white;
             border-radius: var(--radius-md);
             border: 1px solid rgba(59, 130, 246, 0.2);
         }
-        
+
         .comparison-matrix {
             margin-top: 1.5rem;
             overflow-x: auto;
         }
-        
+
         .matrix-table {
             width: 100%;
             border-collapse: collapse;
@@ -195,31 +195,31 @@
             overflow: hidden;
             box-shadow: var(--shadow-sm);
         }
-        
+
         .matrix-table th,
         .matrix-table td {
             padding: 0.75rem;
             text-align: left;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .matrix-table th {
             background: var(--surface-2);
             font-weight: 600;
             color: var(--text);
         }
-        
+
         .analysis-topics {
             margin-bottom: 2rem;
         }
-        
+
         .topic-tags {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
             margin-top: 0.5rem;
         }
-        
+
         .topic-tag {
             padding: 0.25rem 0.75rem;
             background: var(--surface-2);
@@ -229,19 +229,19 @@
             cursor: pointer;
             transition: var(--transition);
         }
-        
+
         .topic-tag:hover,
         .topic-tag.selected {
             background: var(--primary);
             color: white;
             border-color: var(--primary);
         }
-        
+
         @media (max-width: 968px) {
             .analysis-environment {
                 grid-template-columns: 1fr;
             }
-            
+
             .control-panel {
                 order: 2;
             }
@@ -263,10 +263,10 @@
                 <h2 class="workflow-title">Parallel Analysis Pipeline</h2>
                 <span id="workflow-status" class="workflow-status idle">Ready to Analyze</span>
             </div>
-            
+
             <!-- Pipeline Visualization -->
             <div id="pipeline-container"></div>
-            
+
             <!-- Progress Bar -->
             <div id="progress-container"></div>
         </div>
@@ -276,13 +276,13 @@
             <!-- Control Panel -->
             <div class="control-panel">
                 <h3>🎯 Analysis Configuration</h3>
-                
+
                 <!-- Topic Input -->
                 <div class="form-group">
                     <label class="form-label" for="analysis-topic">Topic to Analyze:</label>
-                    <textarea 
-                        id="analysis-topic" 
-                        class="form-input form-textarea" 
+                    <textarea
+                        id="analysis-topic"
+                        class="form-input form-textarea"
                         placeholder="Example: The impact of artificial intelligence on future job markets, considering technological advancement, economic factors, and social implications"
                         rows="4"
                     ></textarea>
@@ -311,9 +311,9 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="system-prompt">System Prompt:</label>
-                        <textarea 
-                            id="system-prompt" 
-                            class="form-input form-textarea" 
+                        <textarea
+                            id="system-prompt"
+                            class="form-input form-textarea"
                             rows="5"
                             placeholder="The agent's system prompt will appear here. You can edit it."
                             data-testid="system-prompt"
@@ -351,7 +351,7 @@
             <!-- Results Area -->
             <div class="results-area">
                 <h3 id="results-title">Multi-Perspective Analysis Results</h3>
-                
+
                 <!-- Initial State -->
                 <div id="initial-state" class="text-center" style="padding: 3rem;">
                     <div style="color: var(--text-muted);">

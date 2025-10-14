@@ -26,7 +26,7 @@ impl AgentEvolutionSystem {
         }
     }
 
-    /// Create a snapshot with a description  
+    /// Create a snapshot with a description
     pub async fn create_snapshot(&self, description: String) -> EvolutionResult<()> {
         log::info!("Creating snapshot: {}", description);
         self.save_snapshot().await

@@ -13,7 +13,7 @@ class RoutingPrototypingDemo {
     this.currentComplexity = 0;
     this.generationResult = null;
     this.agentConfigManager = null;
-    
+
     // Element references
     this.promptInput = null;
     this.generateButton = null;
@@ -99,16 +99,16 @@ class RoutingPrototypingDemo {
     this.analyzeButton = document.getElementById('analyze-btn');
     this.refineButton = document.getElementById('refine-btn');
     this.outputFrame = document.getElementById('output-frame');
-    
+
     // Initialize settings system first
     await this.initializeSettings();
-    
+
     this.setupEventListeners();
     this.renderModels();
     this.renderTemplateCards();
     this.createWorkflowPipeline();
     this.selectDefaultModel();
-    
+
     // Auto-save functionality
     this.loadSavedState();
     setInterval(() => this.saveState(), 5000);
@@ -175,31 +175,31 @@ class RoutingPrototypingDemo {
     if (this.analyzeButton) {
       this.analyzeButton.addEventListener('click', () => this.analyzeTask());
     }
-    
+
     if (this.generateButton) {
       this.generateButton.addEventListener('click', () => this.generatePrototype());
     }
-    
+
     if (this.refineButton) {
       this.refineButton.addEventListener('click', () => this.refinePrototype());
     }
-    
+
     // Sidebar button event listeners (duplicates)
     const sidebarAnalyzeBtn = document.getElementById('sidebar-analyze-btn');
     if (sidebarAnalyzeBtn) {
       sidebarAnalyzeBtn.addEventListener('click', () => this.analyzeTask());
     }
-    
+
     const sidebarGenerateBtn = document.getElementById('sidebar-generate-btn');
     if (sidebarGenerateBtn) {
       sidebarGenerateBtn.addEventListener('click', () => this.generatePrototype());
     }
-    
+
     const sidebarRefineBtn = document.getElementById('sidebar-refine-btn');
     if (sidebarRefineBtn) {
       sidebarRefineBtn.addEventListener('click', () => this.refinePrototype());
     }
-    
+
     // Template selection event listeners
     document.querySelectorAll('.template-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -207,7 +207,7 @@ class RoutingPrototypingDemo {
         this.selectTemplate(template);
       });
     });
-    
+
     // Model selection event listeners
     document.addEventListener('click', (e) => {
       if (e.target.closest('.model-option')) {
@@ -215,7 +215,7 @@ class RoutingPrototypingDemo {
         this.selectModel(modelId);
       }
     });
-    
+
     // Real-time complexity analysis
     if (this.promptInput) {
       this.promptInput.addEventListener('input', () => {
@@ -304,7 +304,7 @@ class RoutingPrototypingDemo {
 
   selectTemplate(templateId) {
     this.currentTemplate = templateId;
-    
+
     // Update UI
     document.querySelectorAll('.template-card').forEach(card => {
       card.classList.remove('selected');
@@ -317,7 +317,7 @@ class RoutingPrototypingDemo {
 
   selectModel(modelId) {
     this.selectedModel = this.models.find(m => m.id === modelId);
-    
+
     // Update model selection display
     const display = document.getElementById('selected-model-display');
     if (this.selectedModel) {
@@ -352,51 +352,51 @@ class RoutingPrototypingDemo {
   calculateComplexity(prompt) {
     const template = this.templates[this.currentTemplate];
     let complexity = template.baseComplexity;
-    
+
     // Add complexity based on prompt characteristics
     const wordCount = prompt.split(/\s+/).length;
     const sentenceCount = prompt.split(/[.!?]+/).length;
-    
+
     // Length complexity
     if (wordCount > 100) complexity += 0.2;
     if (wordCount > 200) complexity += 0.2;
-    
+
     // Feature complexity keywords
     const complexFeatures = [
       'authentication', 'payment', 'database', 'api', 'real-time',
       'machine learning', 'ai', 'complex', 'advanced', 'enterprise',
       'integration', 'workflow', 'automation', 'dashboard', 'analytics'
     ];
-    
-    const featureMatches = complexFeatures.filter(feature => 
+
+    const featureMatches = complexFeatures.filter(feature =>
       prompt.toLowerCase().includes(feature)
     ).length;
-    
+
     complexity += featureMatches * 0.1;
-    
+
     // Technical requirements
     if (prompt.toLowerCase().includes('responsive')) complexity += 0.1;
     if (prompt.toLowerCase().includes('mobile')) complexity += 0.1;
     if (prompt.toLowerCase().includes('interactive')) complexity += 0.15;
-    
+
     return Math.min(1.0, Math.max(0.1, complexity));
   }
 
   updateComplexityDisplay(complexity) {
     this.currentComplexity = complexity;
-    
+
     const fill = document.getElementById('complexity-fill');
     const label = document.getElementById('complexity-label');
     const factors = document.getElementById('complexity-factors');
-    
+
     fill.style.width = `${complexity * 100}%`;
-    
+
     let complexityLevel = 'Simple';
     if (complexity > 0.7) complexityLevel = 'Complex';
     else if (complexity > 0.4) complexityLevel = 'Moderate';
-    
+
     label.textContent = complexityLevel;
-    
+
     // Show complexity factors
     const template = this.templates[this.currentTemplate];
     factors.innerHTML = `
@@ -408,14 +408,14 @@ class RoutingPrototypingDemo {
   recommendModel(complexity) {
     // Find best model for complexity
     let recommendedModel = this.models[0]; // Default to cheapest
-    
+
     for (const model of this.models) {
       if (complexity <= model.maxComplexity) {
         recommendedModel = model;
         break;
       }
     }
-    
+
     // Update model recommendations in UI
     document.querySelectorAll('.model-option').forEach(option => {
       option.classList.remove('recommended');
@@ -423,7 +423,7 @@ class RoutingPrototypingDemo {
         option.classList.add('recommended');
       }
     });
-    
+
     return recommendedModel;
   }
 
@@ -438,7 +438,7 @@ class RoutingPrototypingDemo {
       { id: 'route', name: 'Model Selection' },
       { id: 'generate', name: 'Content Generation' }
     ];
-    
+
     this.visualizer.createPipeline(steps);
     this.visualizer.createProgressBar('progress-container');
     return this.visualizer;
@@ -449,7 +449,7 @@ class RoutingPrototypingDemo {
 
     const pipeline = this.createWorkflowPipeline();
     pipeline.updateStepStatus('analyze', 'active');
-    
+
     // Simulate analysis delay
     await this.delay(500);
 
@@ -458,13 +458,13 @@ class RoutingPrototypingDemo {
     this.currentComplexity = complexity;
 
     this.updateComplexityDisplay(complexity);
-    
+
     const recommendedModel = this.recommendModel(complexity);
     this.selectModel(recommendedModel.id);
 
     pipeline.updateStepStatus('analyze', 'completed');
     pipeline.updateStepStatus('route', 'active');
-    
+
     // Simulate routing delay
     await this.delay(300);
 
@@ -478,13 +478,13 @@ class RoutingPrototypingDemo {
   createRoutingVisualization(selectedModel, complexity) {
     const visualizer = new WorkflowVisualizer('routing-visualization');
     visualizer.clear();
-    
+
     const routes = this.getModels().map(model => ({
       id: model.id,
       name: model.name,
       active: model.id === selectedModel.id
     }));
-    
+
     visualizer.createRoutingNetwork(routes, selectedModel.id);
   }
 
@@ -525,13 +525,13 @@ class RoutingPrototypingDemo {
           ...(enhancedInput.llm_config && { llm_config: enhancedInput.llm_config })
         })
       });
-      
+
       console.log('Routing HTTP result:', result);
 
       this.generationResult = result;
       this.renderPrototypeResult(result);
       this.displayGenerationResults(result);
-      
+
       pipeline.updateStepStatus('generate', 'completed');
       this.setRefineButtonState(false);
 
@@ -577,7 +577,7 @@ class RoutingPrototypingDemo {
   displayGenerationResults(result) {
     const container = document.getElementById('results-container');
     container.innerHTML = '';
-    
+
     const visualizer = new WorkflowVisualizer('results-container');
     visualizer.createResultsDisplay({
       'Selected Model': this.selectedModel.name,

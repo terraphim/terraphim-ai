@@ -1126,6 +1126,7 @@ mod tests {
         role.shortname = Some("eng".to_string());
         role.haystacks = vec![terraphim_config::Haystack {
             read_only: false,
+            fetch_content: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
             location: "./src".to_string(),

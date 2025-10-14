@@ -333,10 +333,7 @@ async fn test_service_search_with_persisted_data() {
         .expect("Search timed out")
         .expect("Search failed");
 
-    println!(
-        "  📊 Search returned {} results",
-        search_results.documents.len()
-    );
+    println!("  📊 Search returned {} results", search_results.len());
 
     // Step 4: Create new service instance and perform same search
     println!("🔄 Step 4: Testing search with new service instance");
@@ -350,13 +347,13 @@ async fn test_service_search_with_persisted_data() {
 
     println!(
         "  📊 New instance search returned {} results",
-        search_results_new_instance.documents.len()
+        search_results_new_instance.len()
     );
 
     // Results should be consistent (though may vary slightly due to timing/caching)
     // The key point is that both searches should work and return reasonable results
     assert!(
-        !search_results_new_instance.documents.is_empty() || search_results.documents.is_empty(),
+        !search_results_new_instance.is_empty() || search_results.is_empty(),
         "Search results should be consistent across service instances"
     );
 

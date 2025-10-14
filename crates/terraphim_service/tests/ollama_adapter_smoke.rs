@@ -9,7 +9,7 @@ async fn test_ollama_summarize_real() {
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
     if client
-        .get(&format!("{}/api/tags", ollama_url))
+        .get(format!("{}/api/tags", ollama_url))
         .send()
         .await
         .is_err()
@@ -34,6 +34,7 @@ async fn test_ollama_summarize_real() {
         llm_chat_enabled: true,
         llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
         llm_chat_model: Some("gemma3:270m".to_string()),
+        llm_context_window: None,
         extra: ahash::AHashMap::new(),
     };
     role.extra

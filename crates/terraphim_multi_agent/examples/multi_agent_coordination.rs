@@ -35,6 +35,7 @@ fn create_specialized_roles() -> Vec<Role> {
             llm_chat_enabled: false,
             llm_chat_system_prompt: None,
             llm_chat_model: None,
+            llm_context_window: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -75,6 +76,7 @@ fn create_specialized_roles() -> Vec<Role> {
             llm_chat_enabled: false,
             llm_chat_system_prompt: None,
             llm_chat_model: None,
+            llm_context_window: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(
@@ -115,6 +117,7 @@ fn create_specialized_roles() -> Vec<Role> {
             llm_chat_enabled: false,
             llm_chat_system_prompt: None,
             llm_chat_model: None,
+            llm_context_window: None,
             extra: {
                 let mut extra = AHashMap::new();
                 extra.insert(

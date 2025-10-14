@@ -9,28 +9,28 @@
     <div id="websocket-status">WebSocket: Connecting...</div>
     <div id="settings-status">Settings: Initializing...</div>
     <div id="api-test">API: Not tested</div>
-    
+
     <script src="shared/websocket-client.js"></script>
     <script src="shared/api-client.js"></script>
     <script src="shared/server-discovery.js"></script>
     <script src="shared/settings-manager.js"></script>
     <script src="shared/settings-ui.js"></script>
     <script src="shared/settings-integration.js"></script>
-    
+
     <script>
         async function testConnection() {
             const statusDiv = document.getElementById('status');
             const wsStatusDiv = document.getElementById('websocket-status');
             const settingsStatusDiv = document.getElementById('settings-status');
             const apiTestDiv = document.getElementById('api-test');
-            
+
             // Test 1: Settings initialization
             try {
                 const initialized = await initializeSettings();
                 if (initialized) {
                     settingsStatusDiv.textContent = 'Settings: ✅ Initialized';
                     settingsStatusDiv.style.color = 'green';
-                    
+
                     // Test 2: API client
                     if (window.apiClient) {
                         try {
@@ -46,7 +46,7 @@
                             apiTestDiv.textContent = 'API: ❌ Connection failed';
                             apiTestDiv.style.color = 'red';
                         }
-                        
+
                         // Test 3: WebSocket
                         if (window.apiClient.wsClient) {
                             window.apiClient.wsClient.subscribe('connected', () => {
@@ -55,7 +55,7 @@
                                 statusDiv.textContent = 'All tests passed! Examples should work.';
                                 statusDiv.style.color = 'green';
                             });
-                            
+
                             window.apiClient.wsClient.subscribe('error', () => {
                                 wsStatusDiv.textContent = 'WebSocket: ❌ Connection failed';
                                 wsStatusDiv.style.color = 'red';
@@ -71,7 +71,7 @@
                 settingsStatusDiv.style.color = 'red';
             }
         }
-        
+
         window.onload = testConnection;
     </script>
 </body>

@@ -16,12 +16,12 @@ class WorkflowVisualizer {
   // Create workflow pipeline visualization
   createPipeline(steps, containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const pipeline = document.createElement('div');
     pipeline.className = 'workflow-pipeline';
     pipeline.setAttribute('role', 'progressbar');
     pipeline.setAttribute('aria-label', 'Workflow progress');
-    
+
     steps.forEach((step, index) => {
       // Create step node
       const node = document.createElement('div');
@@ -32,9 +32,9 @@ class WorkflowVisualizer {
         <div class="node-status">Pending</div>
       `;
       node.setAttribute('aria-label', `Step ${index + 1}: ${step.name}`);
-      
+
       pipeline.appendChild(node);
-      
+
       // Add arrow between steps (except for last step)
       if (index < steps.length - 1) {
         const arrow = document.createElement('div');
@@ -44,7 +44,7 @@ class WorkflowVisualizer {
         pipeline.appendChild(arrow);
       }
     });
-    
+
     container.appendChild(pipeline);
     return pipeline;
   }
@@ -56,7 +56,7 @@ class WorkflowVisualizer {
 
     // Update visual status
     step.className = `workflow-node ${status}`;
-    
+
     const statusElement = step.querySelector('.node-status');
     const statusText = {
       'pending': 'Pending',
@@ -64,12 +64,12 @@ class WorkflowVisualizer {
       'completed': 'Completed',
       'error': 'Error'
     }[status] || status;
-    
+
     statusElement.textContent = statusText;
-    
+
     // Update aria-label for accessibility
     step.setAttribute('aria-label', `${step.querySelector('.node-title').textContent}: ${statusText}`);
-    
+
     // Add duration if completed
     if (status === 'completed' && data.duration) {
       const duration = document.createElement('div');
@@ -77,7 +77,7 @@ class WorkflowVisualizer {
       duration.textContent = `${(data.duration / 1000).toFixed(1)}s`;
       step.appendChild(duration);
     }
-    
+
     // Activate arrow to next step if this step is active
     if (status === 'active') {
       const nextArrow = step.nextElementSibling;
@@ -90,7 +90,7 @@ class WorkflowVisualizer {
   // Create progress bar
   createProgressBar(containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const progressContainer = document.createElement('div');
     progressContainer.className = 'progress-container';
     progressContainer.innerHTML = `
@@ -102,7 +102,7 @@ class WorkflowVisualizer {
         <div class="progress-fill" style="width: 0%"></div>
       </div>
     `;
-    
+
     container.appendChild(progressContainer);
     return progressContainer;
   }
@@ -112,15 +112,15 @@ class WorkflowVisualizer {
     const progressFill = this.container.querySelector('.progress-fill');
     const progressText = this.container.querySelector('.progress-text');
     const progressPercentage = this.container.querySelector('.progress-percentage');
-    
+
     if (progressFill) {
       progressFill.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
     }
-    
+
     if (progressPercentage) {
       progressPercentage.textContent = `${Math.round(percentage)}%`;
     }
-    
+
     if (text && progressText) {
       progressText.textContent = text;
     }
@@ -138,10 +138,10 @@ class WorkflowVisualizer {
   // Create metrics display
   createMetricsGrid(metrics, containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const metricsGrid = document.createElement('div');
     metricsGrid.className = 'metrics-grid';
-    
+
     Object.entries(metrics).forEach(([key, value]) => {
       const metricCard = document.createElement('div');
       metricCard.className = 'metric-card';
@@ -151,7 +151,7 @@ class WorkflowVisualizer {
       `;
       metricsGrid.appendChild(metricCard);
     });
-    
+
     container.appendChild(metricsGrid);
     return metricsGrid;
   }
@@ -159,7 +159,7 @@ class WorkflowVisualizer {
   // Create results display
   createResultsDisplay(results, containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const resultsContainer = document.createElement('div');
     resultsContainer.className = 'results-container';
     resultsContainer.innerHTML = `
@@ -170,9 +170,9 @@ class WorkflowVisualizer {
         <!-- Results will be populated here -->
       </div>
     `;
-    
+
     const resultsContent = resultsContainer.querySelector('#results-content');
-    
+
     if (Array.isArray(results)) {
       results.forEach((result, index) => {
         this.addResultItem(resultsContent, `Step ${index + 1}`, result);
@@ -182,7 +182,7 @@ class WorkflowVisualizer {
         this.addResultItem(resultsContent, key, value);
       });
     }
-    
+
     container.appendChild(resultsContainer);
     return resultsContainer;
   }
@@ -201,7 +201,7 @@ class WorkflowVisualizer {
   // Create network diagram for routing visualization
   createRoutingNetwork(routes, selectedRoute, containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const networkContainer = document.createElement('div');
     networkContainer.className = 'routing-network';
     networkContainer.style.cssText = `
@@ -214,7 +214,7 @@ class WorkflowVisualizer {
       border-radius: var(--radius-lg);
       margin: 1rem 0;
     `;
-    
+
     // Input node
     const inputNode = document.createElement('div');
     inputNode.className = 'network-node input-node';
@@ -229,7 +229,7 @@ class WorkflowVisualizer {
       background: #dbeafe;
       text-align: center;
     `;
-    
+
     // Router section
     const routerSection = document.createElement('div');
     routerSection.className = 'router-section';
@@ -242,9 +242,9 @@ class WorkflowVisualizer {
       flex-direction: column;
       gap: 1rem;
     `;
-    
+
     const routeOptionsContainer = routerSection.querySelector('.route-options');
-    
+
     routes.forEach(route => {
       const routeOption = document.createElement('div');
       routeOption.className = `route-option ${route.id === selectedRoute?.routeId ? 'selected' : ''}`;
@@ -253,7 +253,7 @@ class WorkflowVisualizer {
         <div class="route-details">Cost: $${route.cost} | Speed: ${route.speed}</div>
         ${route.id === selectedRoute?.routeId ? '<div class="route-selected">✓ Selected</div>' : ''}
       `;
-      
+
       const isSelected = route.id === selectedRoute?.routeId;
       routeOption.style.cssText = `
         padding: 0.75rem;
@@ -263,10 +263,10 @@ class WorkflowVisualizer {
         margin-bottom: 0.5rem;
         transition: var(--transition);
       `;
-      
+
       routeOptionsContainer.appendChild(routeOption);
     });
-    
+
     // Output node
     const outputNode = document.createElement('div');
     outputNode.className = 'network-node output-node';
@@ -281,11 +281,11 @@ class WorkflowVisualizer {
       background: #d1fae5;
       text-align: center;
     `;
-    
+
     networkContainer.appendChild(inputNode);
     networkContainer.appendChild(routerSection);
     networkContainer.appendChild(outputNode);
-    
+
     container.appendChild(networkContainer);
     return networkContainer;
   }
@@ -293,7 +293,7 @@ class WorkflowVisualizer {
   // Create parallel execution timeline
   createParallelTimeline(tasks, containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const timeline = document.createElement('div');
     timeline.className = 'parallel-timeline';
     timeline.style.cssText = `
@@ -305,14 +305,14 @@ class WorkflowVisualizer {
       padding: 1.5rem;
       margin: 1rem 0;
     `;
-    
+
     const taskLabels = document.createElement('div');
     taskLabels.className = 'task-labels';
-    
+
     const taskTimelines = document.createElement('div');
     taskTimelines.className = 'task-timelines';
     taskTimelines.style.position = 'relative';
-    
+
     tasks.forEach((task, index) => {
       // Task label with icon
       const label = document.createElement('div');
@@ -328,7 +328,7 @@ class WorkflowVisualizer {
         gap: 0.5rem;
       `;
       taskLabels.appendChild(label);
-      
+
       // Task timeline bar
       const timelineBar = document.createElement('div');
       timelineBar.className = 'timeline-bar';
@@ -342,7 +342,7 @@ class WorkflowVisualizer {
         overflow: hidden;
         border: 2px solid ${task.color || 'var(--border)'};
       `;
-      
+
       const progressBar = document.createElement('div');
       progressBar.className = 'timeline-progress';
       const taskColor = task.color || 'var(--primary)';
@@ -353,7 +353,7 @@ class WorkflowVisualizer {
         border-radius: var(--radius-sm);
         transition: width 0.3s ease;
       `;
-      
+
       // Add status text overlay
       const statusText = document.createElement('div');
       statusText.className = 'timeline-status';
@@ -368,16 +368,16 @@ class WorkflowVisualizer {
         z-index: 2;
       `;
       statusText.textContent = 'Ready';
-      
+
       timelineBar.appendChild(progressBar);
       timelineBar.appendChild(statusText);
       taskTimelines.appendChild(timelineBar);
     });
-    
+
     timeline.appendChild(taskLabels);
     timeline.appendChild(taskTimelines);
     container.appendChild(timeline);
-    
+
     return timeline;
   }
 
@@ -387,11 +387,11 @@ class WorkflowVisualizer {
     if (timelineElement) {
       const progressBar = timelineElement.querySelector('.timeline-progress');
       const statusText = timelineElement.querySelector('.timeline-status');
-      
+
       if (progressBar) {
         progressBar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
       }
-      
+
       if (statusText && status) {
         statusText.textContent = status;
       } else if (statusText) {
@@ -410,7 +410,7 @@ class WorkflowVisualizer {
   // Create evaluation cycle visualization
   createEvaluationCycle(iterations, containerId = null) {
     const container = containerId ? document.getElementById(containerId) : this.container;
-    
+
     const cycle = document.createElement('div');
     cycle.className = 'evaluation-cycle';
     cycle.style.cssText = `
@@ -423,11 +423,11 @@ class WorkflowVisualizer {
       border-radius: var(--radius-lg);
       margin: 1rem 0;
     `;
-    
+
     const cycleTitle = document.createElement('h3');
     cycleTitle.textContent = 'Generation-Evaluation-Optimization Cycle';
     cycleTitle.style.color = 'var(--primary)';
-    
+
     const iterationsContainer = document.createElement('div');
     iterationsContainer.className = 'iterations-container';
     iterationsContainer.style.cssText = `
@@ -437,7 +437,7 @@ class WorkflowVisualizer {
       flex-wrap: wrap;
       justify-content: center;
     `;
-    
+
     iterations.forEach((iteration, index) => {
       const iterationNode = document.createElement('div');
       iterationNode.className = `iteration-node iteration-${index}`;
@@ -446,10 +446,10 @@ class WorkflowVisualizer {
         <div class="quality-score">Quality: ${(iteration.quality * 100).toFixed(0)}%</div>
         <div class="iteration-status">${iteration.status}</div>
       `;
-      
-      const qualityColor = iteration.quality >= 0.8 ? 'var(--success)' : 
+
+      const qualityColor = iteration.quality >= 0.8 ? 'var(--success)' :
                           iteration.quality >= 0.6 ? 'var(--warning)' : 'var(--danger)';
-      
+
       iterationNode.style.cssText = `
         padding: 1rem;
         border: 2px solid ${qualityColor};
@@ -458,9 +458,9 @@ class WorkflowVisualizer {
         text-align: center;
         min-width: 120px;
       `;
-      
+
       iterationsContainer.appendChild(iterationNode);
-      
+
       // Add arrow between iterations
       if (index < iterations.length - 1) {
         const arrow = document.createElement('div');
@@ -474,11 +474,11 @@ class WorkflowVisualizer {
         iterationsContainer.appendChild(arrow);
       }
     });
-    
+
     cycle.appendChild(cycleTitle);
     cycle.appendChild(iterationsContainer);
     container.appendChild(cycle);
-    
+
     return cycle;
   }
 
@@ -537,10 +537,10 @@ class AnimationUtils {
   static fadeIn(element, duration = 300) {
     element.style.opacity = '0';
     element.style.transition = `opacity ${duration}ms ease`;
-    
+
     // Force reflow
     element.offsetHeight;
-    
+
     element.style.opacity = '1';
   }
 
@@ -551,13 +551,13 @@ class AnimationUtils {
       up: 'translateY(-100%)',
       down: 'translateY(100%)'
     };
-    
+
     element.style.transform = transforms[direction];
     element.style.transition = `transform ${duration}ms ease`;
-    
+
     // Force reflow
     element.offsetHeight;
-    
+
     element.style.transform = 'translate(0)';
   }
 

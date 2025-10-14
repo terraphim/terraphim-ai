@@ -1,8 +1,6 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::tempdir;
 use terraphim_multi_agent::vm_execution::*;
-use tokio::time::{Duration, timeout};
 
 #[cfg(test)]
 mod direct_session_unit_tests {
@@ -150,7 +148,7 @@ mod direct_session_integration_tests {
             .await
             .unwrap();
 
-        let commands = vec!["echo 'Command 1'", "echo 'Command 2'", "echo 'Command 3'"];
+        let commands = ["echo 'Command 1'", "echo 'Command 2'", "echo 'Command 3'"];
 
         for (i, cmd) in commands.iter().enumerate() {
             let (output, exit_code) = adapter
@@ -357,7 +355,7 @@ mod fcctl_bridge_integration_tests {
             integration_mode: "direct".to_string(),
         };
 
-        let bridge = FcctlBridge::new(config, "http://localhost:8080".to_string());
+        let _bridge = FcctlBridge::new(config, "http://localhost:8080".to_string());
     }
 
     #[tokio::test]
@@ -372,7 +370,7 @@ mod fcctl_bridge_integration_tests {
             integration_mode: "http".to_string(),
         };
 
-        let bridge = FcctlBridge::new(config, "http://localhost:8080".to_string());
+        let _bridge = FcctlBridge::new(config, "http://localhost:8080".to_string());
     }
 
     #[tokio::test]
@@ -398,8 +396,8 @@ mod fcctl_bridge_integration_tests {
             integration_mode: "http".to_string(),
         };
 
-        let direct_bridge = FcctlBridge::new(direct_config, "http://localhost:8080".to_string());
+        let _direct_bridge = FcctlBridge::new(direct_config, "http://localhost:8080".to_string());
 
-        let http_bridge = FcctlBridge::new(http_config, "http://localhost:8080".to_string());
+        let _http_bridge = FcctlBridge::new(http_config, "http://localhost:8080".to_string());
     }
 }

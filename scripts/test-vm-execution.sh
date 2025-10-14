@@ -151,7 +151,7 @@ if [ "$GENERATE_COVERAGE" = true ]; then
     export CARGO_INCREMENTAL=0
     export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
     export RUSTDOCFLAGS="-Cpanic=abort"
-    
+
     # Install grcov if not present
     if ! command -v grcov &> /dev/null; then
         log_info "Installing grcov for coverage reporting..."
@@ -162,18 +162,18 @@ fi
 # Cleanup function
 cleanup() {
     log_info "Cleaning up test environment..."
-    
+
     if [ -n "$FCCTL_WEB_PID" ] && [ "$KEEP_SERVER" = false ]; then
         log_info "Stopping fcctl-web server (PID: $FCCTL_WEB_PID)..."
         kill "$FCCTL_WEB_PID" 2>/dev/null || true
         wait "$FCCTL_WEB_PID" 2>/dev/null || true
     fi
-    
+
     if [ "$NO_CLEANUP" = false ]; then
         # Clean up test artifacts
         rm -rf test-vm-* test-agent-* /tmp/terraphim-test-* 2>/dev/null || true
     fi
-    
+
     if [ "$GENERATE_COVERAGE" = true ]; then
         generate_coverage_report
     fi
@@ -185,26 +185,26 @@ trap cleanup EXIT
 # Check dependencies
 check_dependencies() {
     log_info "Checking dependencies..."
-    
+
     local missing_deps=()
-    
+
     if ! command -v cargo &> /dev/null; then
         missing_deps+=("cargo")
     fi
-    
+
     if ! command -v rustc &> /dev/null; then
         missing_deps+=("rustc")
     fi
-    
+
     if [ ${#missing_deps[@]} -ne 0 ]; then
         log_error "Missing dependencies: ${missing_deps[*]}"
         log_error "Please install Rust toolchain: https://rustup.rs/"
         exit 1
     fi
-    
+
     # Check for fcctl-web binary if we need to start server
     if [ "$START_SERVER" = true ]; then
-        if [ ! -f "scratchpad/firecracker-rust/fcctl-web/target/debug/fcctl-web" ] && 
+        if [ ! -f "scratchpad/firecracker-rust/fcctl-web/target/debug/fcctl-web" ] &&
            [ ! -f "scratchpad/firecracker-rust/fcctl-web/target/release/fcctl-web" ]; then
             log_info "Building fcctl-web server..."
             cd scratchpad/firecracker-rust/fcctl-web
@@ -212,7 +212,7 @@ check_dependencies() {
             cd - > /dev/null
         fi
     fi
-    
+
     log_success "Dependencies check passed"
 }
 
@@ -221,11 +221,11 @@ start_server() {
     if [ "$START_SERVER" = false ]; then
         return
     fi
-    
+
     log_info "Starting fcctl-web server..."
-    
+
     cd scratchpad/firecracker-rust/fcctl-web
-    
+
     # Try release build first, then debug
     if [ -f "target/release/fcctl-web" ]; then
         ./target/release/fcctl-web &
@@ -235,10 +235,10 @@ start_server() {
         log_error "fcctl-web binary not found. Please build it first."
         exit 1
     fi
-    
+
     FCCTL_WEB_PID=$!
     cd - > /dev/null
-    
+
     # Wait for server to start
     log_info "Waiting for server to start..."
     for i in {1..30}; do
@@ -248,7 +248,7 @@ start_server() {
         fi
         sleep 1
     done
-    
+
     log_error "Failed to start fcctl-web server"
     exit 1
 }
@@ -256,7 +256,7 @@ start_server() {
 # Check if server is running
 check_server() {
     log_info "Checking fcctl-web server availability..."
-    
+
     if curl -s "$FCCTL_WEB_URL/health" > /dev/null 2>&1; then
         log_success "fcctl-web server is available at $FCCTL_WEB_URL"
     else
@@ -271,12 +271,12 @@ check_server() {
 # Run unit tests
 run_unit_tests() {
     log_info "Running unit tests..."
-    
+
     local test_args=()
     if [ "$VERBOSE" = true ]; then
         test_args+=("--" "--nocapture")
     fi
-    
+
     if timeout "$TEST_TIMEOUT" cargo test -p terraphim_multi_agent vm_execution "${test_args[@]}" 2>&1 | tee -a "$LOG_FILE"; then
         log_success "Unit tests passed"
         return 0
@@ -289,14 +289,14 @@ run_unit_tests() {
 # Run integration tests
 run_integration_tests() {
     log_info "Running integration tests..."
-    
+
     cd scratchpad/firecracker-rust/fcctl-web
-    
+
     local test_args=()
     if [ "$VERBOSE" = true ]; then
         test_args+=("--" "--nocapture")
     fi
-    
+
     local result=0
     if ! timeout "$TEST_TIMEOUT" cargo test llm_api_tests "${test_args[@]}" 2>&1 | tee -a "../../../$LOG_FILE"; then
         log_error "Integration tests failed"
@@ -304,7 +304,7 @@ run_integration_tests() {
     else
         log_success "Integration tests passed"
     fi
-    
+
     cd - > /dev/null
     return $result
 }
@@ -312,14 +312,14 @@ run_integration_tests() {
 # Run WebSocket tests
 run_websocket_tests() {
     log_info "Running WebSocket tests..."
-    
+
     cd scratchpad/firecracker-rust/fcctl-web
-    
+
     local test_args=("--ignored")
     if [ "$VERBOSE" = true ]; then
         test_args+=("--" "--nocapture")
     fi
-    
+
     local result=0
     if ! timeout "$TEST_TIMEOUT" cargo test websocket_tests "${test_args[@]}" 2>&1 | tee -a "../../../$LOG_FILE"; then
         log_error "WebSocket tests failed"
@@ -327,7 +327,7 @@ run_websocket_tests() {
     else
         log_success "WebSocket tests passed"
     fi
-    
+
     cd - > /dev/null
     return $result
 }
@@ -335,12 +335,12 @@ run_websocket_tests() {
 # Run end-to-end tests
 run_e2e_tests() {
     log_info "Running end-to-end tests..."
-    
+
     local test_args=("--ignored")
     if [ "$VERBOSE" = true ]; then
         test_args+=("--" "--nocapture")
     fi
-    
+
     if timeout "$TEST_TIMEOUT" cargo test agent_vm_integration_tests "${test_args[@]}" 2>&1 | tee -a "$LOG_FILE"; then
         log_success "End-to-end tests passed"
         return 0
@@ -353,15 +353,15 @@ run_e2e_tests() {
 # Run security tests
 run_security_tests() {
     log_info "Running security tests..."
-    
+
     local result=0
-    
+
     # Unit security tests
     if ! cargo test -p terraphim_multi_agent test_dangerous_code_validation test_code_injection_prevention 2>&1 | tee -a "$LOG_FILE"; then
         log_error "Unit security tests failed"
         result=1
     fi
-    
+
     # Integration security tests
     cd scratchpad/firecracker-rust/fcctl-web
     if ! cargo test security_tests 2>&1 | tee -a "../../../$LOG_FILE"; then
@@ -369,26 +369,26 @@ run_security_tests() {
         result=1
     fi
     cd - > /dev/null
-    
+
     if [ $result -eq 0 ]; then
         log_success "Security tests passed"
     fi
-    
+
     return $result
 }
 
 # Run performance tests
 run_performance_tests() {
     log_info "Running performance tests..."
-    
+
     local result=0
-    
+
     # Unit performance tests
     if ! cargo test -p terraphim_multi_agent performance_tests --release 2>&1 | tee -a "$LOG_FILE"; then
         log_error "Unit performance tests failed"
         result=1
     fi
-    
+
     # Integration performance tests
     cd scratchpad/firecracker-rust/fcctl-web
     if ! cargo test websocket_performance_tests --ignored --release 2>&1 | tee -a "../../../$LOG_FILE"; then
@@ -396,17 +396,17 @@ run_performance_tests() {
         result=1
     fi
     cd - > /dev/null
-    
+
     # Agent performance tests
     if ! cargo test agent_performance_tests --ignored --release 2>&1 | tee -a "$LOG_FILE"; then
         log_error "Agent performance tests failed"
         result=1
     fi
-    
+
     if [ $result -eq 0 ]; then
         log_success "Performance tests passed"
     fi
-    
+
     return $result
 }
 
@@ -415,14 +415,14 @@ generate_coverage_report() {
     if [ "$GENERATE_COVERAGE" = false ]; then
         return
     fi
-    
+
     log_info "Generating test coverage report..."
-    
+
     # Clean previous coverage data
     find . -name "*.profraw" -delete 2>/dev/null || true
-    
+
     grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o target/coverage/
-    
+
     log_success "Coverage report generated at target/coverage/index.html"
 }
 
@@ -430,7 +430,7 @@ generate_coverage_report() {
 run_test_suite() {
     local suite="$1"
     local failed_tests=()
-    
+
     case "$suite" in
         "unit")
             run_unit_tests || failed_tests+=("unit")
@@ -463,7 +463,7 @@ run_test_suite() {
             exit 1
             ;;
     esac
-    
+
     return ${#failed_tests[@]}
 }
 
@@ -472,34 +472,34 @@ main() {
     log_info "VM Execution Test Runner Started"
     log_info "Test suite: $TEST_SUITE"
     log_info "Log file: $LOG_FILE"
-    
+
     check_dependencies
-    
+
     if [ "$START_SERVER" = true ]; then
         start_server
     else
         check_server
     fi
-    
+
     local start_time=$(date +%s)
-    
+
     # Run the specified test suite
     if run_test_suite "$TEST_SUITE"; then
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
-        
+
         log_success "All tests passed! Duration: ${duration}s"
         log_info "Test log available at: $LOG_FILE"
-        
+
         if [ "$GENERATE_COVERAGE" = true ]; then
             log_info "Coverage report: target/coverage/index.html"
         fi
-        
+
         exit 0
     else
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
-        
+
         log_error "Some tests failed! Duration: ${duration}s"
         log_error "Check test log for details: $LOG_FILE"
         exit 1

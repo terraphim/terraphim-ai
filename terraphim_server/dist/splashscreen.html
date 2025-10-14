@@ -1,0 +1,39 @@
+
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Splash Screen</title>
+            <style>
+              /* Add your CSS styles here */
+              body {
+                font-family: Arial, sans-serif;
+                background-color: #f0f0f0;
+              }
+              .splash-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+              }
+              .splash-content {
+                text-align: center;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="splash-container">
+              <div class="splash-content">
+                <!-- Your Svelte component content goes here -->
+              </div>
+            </div>
+            <script type="module">
+              import SplashScreen from './splashscreen.js'; // Import the compiled Svelte component
+              const target = document.querySelector('.splash-content');
+              new SplashScreen({
+                target
+              });
+            </script>
+          </body>
+          

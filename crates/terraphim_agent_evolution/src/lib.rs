@@ -6,7 +6,7 @@
 //! ## Core Features
 //!
 //! - **Versioned Memory**: Time-based snapshots of agent memory states
-//! - **Task List Evolution**: Complete lifecycle tracking of agent tasks  
+//! - **Task List Evolution**: Complete lifecycle tracking of agent tasks
 //! - **Lessons Learned**: Comprehensive learning and knowledge retention system
 //! - **Goal Alignment**: Continuous tracking of agent alignment with objectives
 //! - **Evolution Visualization**: Tools to view agent development over time

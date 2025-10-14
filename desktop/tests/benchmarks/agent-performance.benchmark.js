@@ -1,6 +1,6 @@
 /**
  * Performance Benchmarks for Agent Operations
- * 
+ *
  * Comprehensive performance testing suite for TerraphimAgent operations
  * including agent creation, command processing, memory operations, and workflow execution.
  */
@@ -67,7 +67,7 @@ const BENCHMARK_CONFIG = {
   websocketUrl: 'ws://127.0.0.1:8002/ws',
   httpUrl: 'http://127.0.0.1:8002',
   timeout: 60000, // 1 minute for performance tests
-  
+
   // Performance thresholds (in milliseconds)
   thresholds: {
     webSocketConnection: { avg: 500, p95: 1000 },
@@ -95,10 +95,10 @@ describe('Agent Performance Benchmarks', () => {
 
   beforeAll(async () => {
     console.log('🚀 Starting Agent Performance Benchmark Suite');
-    
+
     // Start test server
     serverProcess = spawn('cargo', [
-      'run', '--release', '--', 
+      'run', '--release', '--',
       '--config', 'terraphim_server/default/ollama_llama_config.json',
       '--port', BENCHMARK_CONFIG.serverPort.toString()
     ], {
@@ -153,18 +153,18 @@ describe('Agent Performance Benchmarks', () => {
     // Generate performance report
     console.log('\n📈 AGENT PERFORMANCE BENCHMARK RESULTS');
     console.log('=====================================');
-    
+
     Object.values(measurements).forEach(measurement => {
       const stats = measurement.report();
-      
+
       // Check against thresholds
       const operationKey = measurement.operationName.toLowerCase().replace(/[^a-z]/g, '');
       const threshold = BENCHMARK_CONFIG.thresholds[operationKey];
-      
+
       if (threshold) {
         const avgPassed = stats.avg <= threshold.avg;
         const p95Passed = stats.p95 <= threshold.p95;
-        
+
         console.log(`   Threshold Check: ${avgPassed && p95Passed ? '✅ PASS' : '❌ FAIL'}`);
         if (!avgPassed) console.log(`     ⚠️  Average ${stats.avg.toFixed(2)}ms exceeds threshold ${threshold.avg}ms`);
         if (!p95Passed) console.log(`     ⚠️  P95 ${stats.p95.toFixed(2)}ms exceeds threshold ${threshold.p95}ms`);
@@ -173,7 +173,7 @@ describe('Agent Performance Benchmarks', () => {
 
     if (serverProcess) {
       serverProcess.kill('SIGTERM');
-      
+
       await new Promise(resolve => {
         serverProcess.on('exit', resolve);
         setTimeout(() => {
@@ -195,33 +195,33 @@ describe('Agent Performance Benchmarks', () => {
       for (let i = 0; i < BENCHMARK_CONFIG.scale.connectionLoad; i++) {
         connectionPromises.push(new Promise((resolve, reject) => {
           measurements.connectionTime.start();
-          
+
           const ws = new WebSocket(BENCHMARK_CONFIG.websocketUrl);
           connections.push(ws);
-          
+
           ws.on('open', () => {
             const duration = measurements.connectionTime.end();
             resolve(duration);
           });
 
           ws.on('error', reject);
-          
+
           setTimeout(() => reject(new Error('Connection timeout')), 10000);
         }));
       }
 
       const connectionTimes = await Promise.all(connectionPromises);
-      
+
       const avgConnectionTime = connectionTimes.reduce((sum, time) => sum + time, 0) / connectionTimes.length;
       const maxConnectionTime = Math.max(...connectionTimes);
-      
+
       console.log(`📊 Connection Performance: ${BENCHMARK_CONFIG.scale.connectionLoad} connections`);
       console.log(`   Average: ${avgConnectionTime.toFixed(2)}ms`);
       console.log(`   Maximum: ${maxConnectionTime.toFixed(2)}ms`);
-      
+
       // Verify all connections are established
       expect(connections.length).toBe(BENCHMARK_CONFIG.scale.connectionLoad);
-      
+
       // Performance assertions
       expect(avgConnectionTime).toBeLessThan(BENCHMARK_CONFIG.thresholds.webSocketConnection.avg);
       expect(maxConnectionTime).toBeLessThan(BENCHMARK_CONFIG.thresholds.webSocketConnection.p95);
@@ -232,12 +232,12 @@ describe('Agent Performance Benchmarks', () => {
       const ws = connections[0];
       const messageCount = BENCHMARK_CONFIG.scale.messageLoad;
       let responsesReceived = 0;
-      
+
       const responsePromise = new Promise((resolve) => {
         ws.on('message', () => {
           const duration = measurements.messageProcessing.end();
           responsesReceived++;
-          
+
           if (responsesReceived === messageCount) {
             resolve();
           } else if (responsesReceived < messageCount) {
@@ -249,7 +249,7 @@ describe('Agent Performance Benchmarks', () => {
 
       // Start timing for first message
       measurements.messageProcessing.start();
-      
+
       // Send rapid messages
       for (let i = 0; i < messageCount; i++) {
         const message = {
@@ -261,17 +261,17 @@ describe('Agent Performance Benchmarks', () => {
             sequence: i
           }
         };
-        
+
         ws.send(JSON.stringify(message));
       }
 
       await responsePromise;
-      
+
       const stats = measurements.messageProcessing.getStats();
       console.log(`📊 Message Processing: ${messageCount} messages`);
       console.log(`   Average Response Time: ${stats.avg.toFixed(2)}ms`);
       console.log(`   P95 Response Time: ${stats.p95.toFixed(2)}ms`);
-      
+
       expect(stats.avg).toBeLessThan(BENCHMARK_CONFIG.thresholds.messageProcessing.avg);
       expect(stats.p95).toBeLessThan(BENCHMARK_CONFIG.thresholds.messageProcessing.p95);
     });
@@ -282,7 +282,7 @@ describe('Agent Performance Benchmarks', () => {
       const ws = connections[0];
       const workflowCount = BENCHMARK_CONFIG.scale.workflowConcurrency;
       let workflowsStarted = 0;
-      
+
       const workflowPromise = new Promise((resolve) => {
         ws.on('message', (data) => {
           try {
@@ -290,7 +290,7 @@ describe('Agent Performance Benchmarks', () => {
             if (message.response_type && message.response_type.includes('workflow')) {
               measurements.workflowStart.end();
               workflowsStarted++;
-              
+
               if (workflowsStarted === workflowCount) {
                 resolve();
               } else if (workflowsStarted < workflowCount) {
@@ -305,11 +305,11 @@ describe('Agent Performance Benchmarks', () => {
 
       // Start timing for first workflow
       measurements.workflowStart.start();
-      
+
       // Start multiple workflows
       for (let i = 0; i < workflowCount; i++) {
         const sessionId = `perf-test-${i}-${Date.now()}`;
-        
+
         const message = {
           command_type: 'start_workflow',
           session_id: sessionId,
@@ -326,23 +326,23 @@ describe('Agent Performance Benchmarks', () => {
         };
 
         ws.send(JSON.stringify(message));
-        
+
         // Small delay between workflow starts
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
       await Promise.race([
         workflowPromise,
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Workflow start timeout')), 30000)
         )
       ]);
-      
+
       const stats = measurements.workflowStart.getStats();
       console.log(`📊 Workflow Start Performance: ${workflowCount} workflows`);
       console.log(`   Average Start Time: ${stats.avg.toFixed(2)}ms`);
       console.log(`   P95 Start Time: ${stats.p95.toFixed(2)}ms`);
-      
+
       expect(stats.avg).toBeLessThan(BENCHMARK_CONFIG.thresholds.workflowStart.avg);
       expect(stats.p95).toBeLessThan(BENCHMARK_CONFIG.thresholds.workflowStart.p95);
     });
@@ -353,12 +353,12 @@ describe('Agent Performance Benchmarks', () => {
 
       for (let i = 0; i < concurrentWorkflows; i++) {
         const ws = connections[i];
-        
+
         workflowPromises.push(new Promise((resolve, reject) => {
           let messageReceived = false;
-          
+
           measurements.commandProcessing.start();
-          
+
           ws.on('message', (data) => {
             if (!messageReceived) {
               messageReceived = true;
@@ -384,7 +384,7 @@ describe('Agent Performance Benchmarks', () => {
           };
 
           ws.send(JSON.stringify(message));
-          
+
           setTimeout(() => {
             if (!messageReceived) {
               reject(new Error(`Workflow ${i} timeout`));
@@ -394,12 +394,12 @@ describe('Agent Performance Benchmarks', () => {
       }
 
       await Promise.all(workflowPromises);
-      
+
       const stats = measurements.commandProcessing.getStats();
       console.log(`📊 Concurrent Workflow Performance: ${concurrentWorkflows} workflows`);
       console.log(`   Average Execution Time: ${stats.avg.toFixed(2)}ms`);
       console.log(`   P95 Execution Time: ${stats.p95.toFixed(2)}ms`);
-      
+
       expect(stats.avg).toBeLessThan(BENCHMARK_CONFIG.thresholds.commandProcessing.avg);
       expect(stats.p95).toBeLessThan(BENCHMARK_CONFIG.thresholds.commandProcessing.p95);
     });
@@ -410,7 +410,7 @@ describe('Agent Performance Benchmarks', () => {
       const ws = connections[0];
       const commandTypes = ['generate', 'analyze', 'answer', 'create', 'review'];
       let commandsProcessed = 0;
-      
+
       const commandPromise = new Promise((resolve) => {
         ws.on('message', (data) => {
           try {
@@ -418,7 +418,7 @@ describe('Agent Performance Benchmarks', () => {
             if (message.response_type !== 'heartbeat') {
               measurements.commandProcessing.end();
               commandsProcessed++;
-              
+
               if (commandsProcessed === commandTypes.length) {
                 resolve();
               } else if (commandsProcessed < commandTypes.length) {
@@ -433,11 +433,11 @@ describe('Agent Performance Benchmarks', () => {
 
       // Start timing for first command
       measurements.commandProcessing.start();
-      
+
       for (let i = 0; i < commandTypes.length; i++) {
         const sessionId = `cmd-perf-${i}-${Date.now()}`;
         const commandType = commandTypes[i];
-        
+
         const message = {
           command_type: 'start_workflow',
           session_id: sessionId,
@@ -454,23 +454,23 @@ describe('Agent Performance Benchmarks', () => {
         };
 
         ws.send(JSON.stringify(message));
-        
+
         // Delay between commands to avoid overwhelming
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       await Promise.race([
         commandPromise,
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Command processing timeout')), 30000)
         )
       ]);
-      
+
       const stats = measurements.commandProcessing.getStats();
       console.log(`📊 Command Processing Performance: ${commandTypes.length} command types`);
       console.log(`   Average Processing Time: ${stats.avg.toFixed(2)}ms`);
       console.log(`   P95 Processing Time: ${stats.p95.toFixed(2)}ms`);
-      
+
       expect(stats.avg).toBeLessThan(BENCHMARK_CONFIG.thresholds.commandProcessing.avg);
       expect(stats.p95).toBeLessThan(BENCHMARK_CONFIG.thresholds.commandProcessing.p95);
     });
@@ -482,21 +482,21 @@ describe('Agent Performance Benchmarks', () => {
       const maxConnections = Math.min(connections.length, 5);
       let totalOperations = 0;
       let operationsPerSecond = 0;
-      
+
       const startTime = Date.now();
       const endTime = startTime + testDuration;
-      
+
       // Create load generators for each connection
       const loadGenerators = connections.slice(0, maxConnections).map((ws, index) => {
         return new Promise((resolve) => {
           let operationCount = 0;
-          
+
           const sendMessage = () => {
             if (Date.now() >= endTime) {
               resolve(operationCount);
               return;
             }
-            
+
             const message = {
               command_type: 'heartbeat',
               session_id: null,
@@ -508,34 +508,34 @@ describe('Agent Performance Benchmarks', () => {
                 operation: operationCount
               }
             };
-            
+
             measurements.throughput.start();
             ws.send(JSON.stringify(message));
             operationCount++;
-            
+
             // Continue sending messages
             setTimeout(sendMessage, 50); // 20 ops/sec per connection
           };
-          
+
           ws.on('message', () => {
             measurements.throughput.end();
           });
-          
+
           sendMessage();
         });
       });
-      
+
       const operationCounts = await Promise.all(loadGenerators);
       totalOperations = operationCounts.reduce((sum, count) => sum + count, 0);
       operationsPerSecond = totalOperations / (testDuration / 1000);
-      
+
       const stats = measurements.throughput.getStats();
       console.log(`📊 Throughput Performance: ${testDuration / 1000}s load test`);
       console.log(`   Total Operations: ${totalOperations}`);
       console.log(`   Operations/Second: ${operationsPerSecond.toFixed(2)}`);
       console.log(`   Average Latency: ${stats.avg.toFixed(2)}ms`);
       console.log(`   P95 Latency: ${stats.p95.toFixed(2)}ms`);
-      
+
       // Throughput expectations
       expect(operationsPerSecond).toBeGreaterThan(50); // At least 50 ops/sec
       expect(stats.avg).toBeLessThan(500); // Average latency under 500ms
@@ -548,7 +548,7 @@ describe('Agent Performance Benchmarks', () => {
       const ws = connections[0];
       const memoryOperations = 20;
       let operationsCompleted = 0;
-      
+
       const memoryPromise = new Promise((resolve) => {
         ws.on('message', (data) => {
           try {
@@ -556,7 +556,7 @@ describe('Agent Performance Benchmarks', () => {
             if (message.data && message.data.memory_test) {
               measurements.memoryOperations.end();
               operationsCompleted++;
-              
+
               if (operationsCompleted === memoryOperations) {
                 resolve();
               } else if (operationsCompleted < memoryOperations) {
@@ -571,10 +571,10 @@ describe('Agent Performance Benchmarks', () => {
 
       // Start timing for first memory operation
       measurements.memoryOperations.start();
-      
+
       for (let i = 0; i < memoryOperations; i++) {
         const sessionId = `memory-${i}-${Date.now()}`;
-        
+
         const message = {
           command_type: 'start_workflow',
           session_id: sessionId,
@@ -591,23 +591,23 @@ describe('Agent Performance Benchmarks', () => {
         };
 
         ws.send(JSON.stringify(message));
-        
+
         // Small delay between memory operations
         await new Promise(resolve => setTimeout(resolve, 25));
       }
 
       await Promise.race([
         memoryPromise,
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Memory operations timeout')), 15000)
         )
       ]);
-      
+
       const stats = measurements.memoryOperations.getStats();
       console.log(`📊 Memory Operations Performance: ${memoryOperations} operations`);
       console.log(`   Average Memory Op Time: ${stats.avg.toFixed(2)}ms`);
       console.log(`   P95 Memory Op Time: ${stats.p95.toFixed(2)}ms`);
-      
+
       expect(stats.avg).toBeLessThan(BENCHMARK_CONFIG.thresholds.memoryOperations.avg);
       expect(stats.p95).toBeLessThan(BENCHMARK_CONFIG.thresholds.memoryOperations.p95);
     });
@@ -615,18 +615,18 @@ describe('Agent Performance Benchmarks', () => {
     it('should handle batch operations efficiently', async () => {
       const ws = connections[0];
       const batchSize = BENCHMARK_CONFIG.scale.commandBatch;
-      
+
       measurements.batchOperations.start();
-      
+
       const batchPromise = new Promise((resolve, reject) => {
         let responsesReceived = 0;
-        
+
         ws.on('message', (data) => {
           try {
             const message = JSON.parse(data.toString());
             if (message.data && message.data.batch_test) {
               responsesReceived++;
-              
+
               if (responsesReceived === batchSize) {
                 measurements.batchOperations.end();
                 resolve();
@@ -636,14 +636,14 @@ describe('Agent Performance Benchmarks', () => {
             // Ignore parse errors
           }
         });
-        
+
         setTimeout(() => reject(new Error('Batch operation timeout')), 30000);
       });
 
       // Send batch of operations
       for (let i = 0; i < batchSize; i++) {
         const sessionId = `batch-${i}-${Date.now()}`;
-        
+
         const message = {
           command_type: 'start_workflow',
           session_id: sessionId,
@@ -664,12 +664,12 @@ describe('Agent Performance Benchmarks', () => {
       }
 
       await batchPromise;
-      
+
       const stats = measurements.batchOperations.getStats();
       console.log(`📊 Batch Operations Performance: ${batchSize} operations`);
       console.log(`   Total Batch Time: ${stats.max.toFixed(2)}ms`);
       console.log(`   Average Per Operation: ${(stats.max / batchSize).toFixed(2)}ms`);
-      
+
       expect(stats.max).toBeLessThan(BENCHMARK_CONFIG.thresholds.batchOperations.avg);
     });
   });
@@ -683,9 +683,9 @@ describe('Agent Performance Benchmarks', () => {
         {}, // Empty message
         { command_type: 'start_workflow' }, // Missing session_id
       ];
-      
+
       let errorsHandled = 0;
-      
+
       const errorPromise = new Promise((resolve) => {
         const handleMessage = () => {
           errorsHandled++;
@@ -693,33 +693,33 @@ describe('Agent Performance Benchmarks', () => {
             resolve();
           }
         };
-        
+
         ws.on('message', handleMessage);
         ws.on('error', handleMessage);
-        
+
         setTimeout(resolve, 5000); // Max 5 seconds for error handling
       });
 
       const startTime = performance.now();
-      
+
       for (const errorMessage of errorMessages) {
         ws.send(JSON.stringify(errorMessage));
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
       await errorPromise;
-      
+
       const totalTime = performance.now() - startTime;
       const avgErrorHandlingTime = totalTime / errorMessages.length;
-      
+
       console.log(`📊 Error Handling Performance: ${errorMessages.length} error cases`);
       console.log(`   Total Error Handling Time: ${totalTime.toFixed(2)}ms`);
       console.log(`   Average Per Error: ${avgErrorHandlingTime.toFixed(2)}ms`);
-      
+
       // Error handling should be fast
       expect(avgErrorHandlingTime).toBeLessThan(100);
       expect(totalTime).toBeLessThan(1000);
-      
+
       // Connection should still be alive after errors
       expect(ws.readyState).toBe(WebSocket.OPEN);
     });

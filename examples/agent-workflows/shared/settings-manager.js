@@ -25,11 +25,11 @@ class TerraphimSettingsManager {
       userProfiles: [],
       lastUsed: null
     };
-    
+
     this.currentSettings = null;
     this.eventListeners = new Map();
     this.discoveryService = null;
-    
+
     this.init();
   }
 
@@ -37,7 +37,7 @@ class TerraphimSettingsManager {
   init() {
     this.loadSettings();
     this.initializeDiscoveryService();
-    
+
     // Auto-save settings periodically
     setInterval(() => {
       if (this.hasUnsavedChanges()) {
@@ -97,14 +97,14 @@ class TerraphimSettingsManager {
   updateSettings(newSettings) {
     const oldSettings = { ...this.currentSettings };
     this.currentSettings = { ...this.currentSettings, ...newSettings };
-    
+
     // Emit specific change events
     Object.keys(newSettings).forEach(key => {
       if (oldSettings[key] !== newSettings[key]) {
         this.emit('settingChanged', { key, oldValue: oldSettings[key], newValue: newSettings[key] });
       }
     });
-    
+
     this.emit('settingsUpdated', this.currentSettings);
     return this.currentSettings;
   }
@@ -122,10 +122,10 @@ class TerraphimSettingsManager {
   // Test server connection
   async testConnection(serverUrl = null) {
     const testUrl = serverUrl || this.currentSettings.serverUrl;
-    
+
     try {
       this.emit('connectionTesting', { url: testUrl });
-      
+
       const response = await fetch(`${testUrl}/health`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -174,14 +174,14 @@ class TerraphimSettingsManager {
 
     try {
       this.emit('discoveryStarted');
-      
+
       const servers = await this.discoveryService.discoverServers(onProgress);
-      
+
       // Update settings with discovered servers
       this.updateSettings({ discoveredServers: servers });
-      
+
       this.emit('discoveryCompleted', { servers, count: servers.length });
-      
+
       return servers;
     } catch (error) {
       this.emit('discoveryError', { error: error.message });
@@ -200,23 +200,23 @@ class TerraphimSettingsManager {
   // Switch to discovered server
   switchToServer(serverUrl) {
     const server = this.currentSettings.discoveredServers.find(s => s.url === serverUrl);
-    
+
     if (server) {
       this.updateSettings({
         serverUrl: server.url,
         wsUrl: server.wsUrl
       });
-      
+
       this.emit('serverSwitched', server);
       return server;
     }
-    
+
     // Manual server URL
     this.updateSettings({
       serverUrl: serverUrl,
       wsUrl: this.getWebSocketUrl(serverUrl)
     });
-    
+
     const manualServer = { url: serverUrl, wsUrl: this.getWebSocketUrl(serverUrl), manual: true };
     this.emit('serverSwitched', manualServer);
     return manualServer;
@@ -246,7 +246,7 @@ class TerraphimSettingsManager {
 
     const profiles = [...this.currentSettings.userProfiles];
     const existingIndex = profiles.findIndex(p => p.name === name);
-    
+
     if (existingIndex >= 0) {
       profiles[existingIndex] = { ...profiles[existingIndex], ...profile, updatedAt: new Date().toISOString() };
     } else {
@@ -260,7 +260,7 @@ class TerraphimSettingsManager {
 
   // Load profile
   loadProfile(nameOrId) {
-    const profile = this.currentSettings.userProfiles.find(p => 
+    const profile = this.currentSettings.userProfiles.find(p =>
       p.name === nameOrId || p.id === nameOrId
     );
 
@@ -269,9 +269,9 @@ class TerraphimSettingsManager {
     }
 
     const oldSettings = { ...this.currentSettings };
-    this.currentSettings = { 
-      ...profile.settings, 
-      userProfiles: this.currentSettings.userProfiles 
+    this.currentSettings = {
+      ...profile.settings,
+      userProfiles: this.currentSettings.userProfiles
     };
 
     this.emit('profileLoaded', { profile, oldSettings });
@@ -280,7 +280,7 @@ class TerraphimSettingsManager {
 
   // Delete profile
   deleteProfile(nameOrId) {
-    const profiles = this.currentSettings.userProfiles.filter(p => 
+    const profiles = this.currentSettings.userProfiles.filter(p =>
       p.name !== nameOrId && p.id !== nameOrId
     );
 
@@ -366,7 +366,7 @@ class TerraphimSettingsManager {
     try {
       const stored = localStorage.getItem(this.storageKey);
       if (!stored) return true;
-      
+
       const storedSettings = JSON.parse(stored);
       return JSON.stringify(storedSettings) !== JSON.stringify(this.currentSettings);
     } catch (error) {
@@ -380,7 +380,7 @@ class TerraphimSettingsManager {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event).add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       const listeners = this.eventListeners.get(event);

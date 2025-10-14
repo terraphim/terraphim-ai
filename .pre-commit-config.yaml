@@ -2,6 +2,9 @@
 # See https://pre-commit.com/hooks.html for more hooks
 # This configuration works with pre-commit, prek, and other compatible tools
 
+default_language_version:
+  python: python3.9
+
 repos:
   # General code quality hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -70,7 +73,7 @@ repos:
     hooks:
       - id: biome-check
         name: Biome lint and format check
-        entry: bash -c 'cd desktop && npx @biomejs/biome check --write false --no-errors-on-unmatched'
+        entry: bash -c 'cd desktop && npx @biomejs/biome check --no-errors-on-unmatched'
         language: system
         files: 'desktop/.*\.(js|ts|tsx|jsx|json|jsonc)$'
         pass_filenames: false
@@ -105,7 +108,7 @@ repos:
       - id: detect-secrets
         name: Detect secrets
         args: ['--baseline', '.secrets.baseline']
-        exclude: .*/tests/.*|.*\.lock$|.*\.sum$|.*yarn\.lock$|.*pnpm-lock\.yaml$|.*/dist/.*|.*/target/.*|crates/terraphim_atomic_client/export.*\.json|crates/terraphim_atomic_client/terraphim_.*\.json|crates/terraphim_atomic_client/commit.*\.json|crates/terraphim_atomic_client/commit.*\.txt|crates/terraphim_atomic_client/.*\.ttl|crates/terraphim_atomic_client/.*\.sh|crates/terraphim_atomic_client/test_signature/.*|desktop/.*-config\.json|desktop/package\.json|desktop/package-lock\.kdl|desktop/test.*\.js|logs/.*\.log.*|docs/.*\.md|examples/.*\.md|docs/mermaid\.min\.js|atomic_server_config.*\.json|terraphim_server/default/.*config.*\.json|scripts/.*\.sh$|.*\.rs$|.*\.js\.map$|@.*\.md$|.*\.cjs$|.*README.*\.md$|crates/terraphim_settings/test_settings/.*|terraphim_ai_nodejs/.*|templates/.*\.template$
+        exclude: .*/tests/.*|.*\.lock$|.*\.sum$|.*yarn\.lock$|.*pnpm-lock\.yaml$|.*/dist/.*|.*/target/.*|crates/terraphim_atomic_client/export.*\.json|crates/terraphim_atomic_client/terraphim_.*\.json|crates/terraphim_atomic_client/commit.*\.json|crates/terraphim_atomic_client/commit.*\.txt|crates/terraphim_atomic_client/.*\.ttl|crates/terraphim_atomic_client/.*\.sh|desktop/.*-config\.json|desktop/package\.json|desktop/package-lock\.kdl|desktop/test.*\.js|logs/.*\.log.*|docs/.*\.md|examples/.*\.md|docs/mermaid\.min\.js|atomic_server_config.*\.json|terraphim_server/default/.*config.*\.json|scripts/.*\.sh$|.*\.rs$|.*\.js\.map$|@.*\.md$|.*\.cjs$|.*README.*\.md$|crates/terraphim_settings/test_settings/.*|terraphim_ai_nodejs/.*|templates/.*\.template$
         description: "Detect secrets in staged code"
 
 # Global exclusions

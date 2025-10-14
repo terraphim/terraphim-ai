@@ -31,7 +31,7 @@ describe('TerraphimWebSocketClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Create a mock WebSocket instance
     mockWs = {
       send: vi.fn(),
@@ -44,9 +44,9 @@ describe('TerraphimWebSocketClient', () => {
       onclose: null,
       onerror: null
     };
-    
+
     mockWebSocket.mockImplementation(() => mockWs);
-    
+
     client = new global.TerraphimWebSocketClient({
       url: 'ws://localhost:8000/ws',
       reconnectInterval: 100,
@@ -89,7 +89,7 @@ describe('TerraphimWebSocketClient', () => {
 
     it('should send heartbeat with correct command_type format', () => {
       client.startHeartbeat();
-      
+
       // Manually trigger heartbeat
       const heartbeatMessage = {
         command_type: 'heartbeat',
@@ -102,13 +102,13 @@ describe('TerraphimWebSocketClient', () => {
 
       // Send heartbeat manually to test format
       client.send(heartbeatMessage);
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(heartbeatMessage));
     });
 
     it('should start workflow with correct message format', () => {
       const sessionId = client.startWorkflow('test_workflow', { param: 'value' });
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         command_type: 'start_workflow',
         workflow_id: sessionId,
@@ -124,7 +124,7 @@ describe('TerraphimWebSocketClient', () => {
     it('should pause workflow with correct message format', () => {
       const sessionId = 'test-session-123';
       client.pauseWorkflow(sessionId);
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         command_type: 'pause_workflow',
         session_id: sessionId,
@@ -138,7 +138,7 @@ describe('TerraphimWebSocketClient', () => {
     it('should stop workflow with correct message format', () => {
       const sessionId = 'test-session-123';
       client.stopWorkflow(sessionId);
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         command_type: 'stop_workflow',
         session_id: sessionId,
@@ -151,7 +151,7 @@ describe('TerraphimWebSocketClient', () => {
 
     it('should not use legacy type field', () => {
       client.startWorkflow('test', {});
-      
+
       const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
       expect(sentMessage).not.toHaveProperty('type');
       expect(sentMessage).toHaveProperty('command_type');
@@ -168,7 +168,7 @@ describe('TerraphimWebSocketClient', () => {
       };
 
       client.handleMessage(message);
-      
+
       const session = client.getWorkflowSession('test-session');
       expect(session).toBeDefined();
       expect(session.workflowId).toBe('test-workflow');
@@ -194,7 +194,7 @@ describe('TerraphimWebSocketClient', () => {
         data: { currentStep: 1, progress: 50 }
       };
       client.handleMessage(progressMessage);
-      
+
       const session = client.getWorkflowSession('test-session');
       expect(session.currentStep).toBe(1);
       expect(session.progress).toBe(50);
@@ -202,16 +202,16 @@ describe('TerraphimWebSocketClient', () => {
 
     it('should handle malformed messages gracefully', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+
       // Test various malformed messages
       client.handleMessage(null);
       client.handleMessage('not an object');
       client.handleMessage({});
       client.handleMessage({ no_response_type: 'test' });
-      
+
       expect(consoleSpy).toHaveBeenCalledWith('Received malformed WebSocket message:', null);
       expect(consoleSpy).toHaveBeenCalledWith('Received WebSocket message without response_type field:', {});
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -222,7 +222,7 @@ describe('TerraphimWebSocketClient', () => {
       };
 
       client.handleMessage(heartbeatMessage);
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({
         command_type: 'heartbeat_response',
         session_id: null,
@@ -238,9 +238,9 @@ describe('TerraphimWebSocketClient', () => {
     it('should allow subscribing to events', () => {
       const callback = vi.fn();
       const unsubscribe = client.subscribe('workflow_started', callback);
-      
+
       expect(typeof unsubscribe).toBe('function');
-      
+
       // Trigger event
       client.emit('workflow_started', { test: 'data' });
       expect(callback).toHaveBeenCalledWith({ test: 'data' });
@@ -249,9 +249,9 @@ describe('TerraphimWebSocketClient', () => {
     it('should allow unsubscribing from events', () => {
       const callback = vi.fn();
       const unsubscribe = client.subscribe('workflow_started', callback);
-      
+
       unsubscribe();
-      
+
       client.emit('workflow_started', { test: 'data' });
       expect(callback).not.toHaveBeenCalled();
     });
@@ -261,7 +261,7 @@ describe('TerraphimWebSocketClient', () => {
     it('should generate unique session IDs', () => {
       const id1 = client.generateSessionId();
       const id2 = client.generateSessionId();
-      
+
       expect(id1).not.toBe(id2);
       expect(id1).toMatch(/^session_[a-z0-9]+_\d+$/);
     });
@@ -276,7 +276,7 @@ describe('TerraphimWebSocketClient', () => {
       };
 
       client.handleMessage(message);
-      
+
       const session = client.getWorkflowSession(sessionId);
       expect(session).toBeDefined();
       expect(session.workflowId).toBe('test-workflow');
@@ -284,13 +284,13 @@ describe('TerraphimWebSocketClient', () => {
 
     it('should clean up session data on stop workflow', () => {
       const sessionId = 'test-session';
-      
+
       // Add session
       client.workflowSessions.set(sessionId, { test: 'data' });
-      
+
       // Stop workflow should clean up
       client.stopWorkflow(sessionId);
-      
+
       expect(client.getWorkflowSession(sessionId)).toBeUndefined();
     });
   });
@@ -298,7 +298,7 @@ describe('TerraphimWebSocketClient', () => {
   describe('Connection Status', () => {
     it('should provide connection status information', () => {
       const status = client.getConnectionStatus();
-      
+
       expect(status).toHaveProperty('connected');
       expect(status).toHaveProperty('reconnectAttempts');
       expect(status).toHaveProperty('activeSessions');
@@ -309,10 +309,10 @@ describe('TerraphimWebSocketClient', () => {
   describe('Message Queuing', () => {
     it('should queue messages when disconnected', () => {
       client.isConnected = false;
-      
+
       const message = { command_type: 'test', data: {} };
       client.send(message);
-      
+
       expect(mockWs.send).not.toHaveBeenCalled();
       expect(client.messageQueue).toContain(message);
     });
@@ -322,12 +322,12 @@ describe('TerraphimWebSocketClient', () => {
       client.isConnected = false;
       const message = { command_type: 'test', data: {} };
       client.send(message);
-      
+
       // Simulate connection
       client.isConnected = true;
       mockWs.readyState = WebSocket.OPEN;
       client.flushMessageQueue();
-      
+
       expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(message));
       expect(client.messageQueue).toHaveLength(0);
     });

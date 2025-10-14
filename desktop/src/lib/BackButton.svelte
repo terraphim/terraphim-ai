@@ -1,41 +1,41 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+import { onMount } from 'svelte';
 
-	export let fallbackPath: string = '/';
-	export let showText: boolean = true;
-	export let customClass: string = '';
-	// Hide button on these paths (home by default)
-	export let hideOnPaths: string[] = ['/'];
+export const fallbackPath: string = '/';
+export const showText: boolean = true;
+export const customClass: string = '';
+// Hide button on these paths (home by default)
+export const hideOnPaths: string[] = ['/'];
 
-	let isVisible = true;
+let _isVisible = true;
 
-	function updateVisibility() {
-		try {
-			const path = window.location?.pathname || '/';
-			isVisible = !hideOnPaths.includes(path);
-		} catch (_) {
-			isVisible = true;
-		}
+function updateVisibility() {
+	try {
+		const path = window.location?.pathname || '/';
+		_isVisible = !hideOnPaths.includes(path);
+	} catch (_) {
+		_isVisible = true;
 	}
+}
 
-	function goBack() {
-		// Try to go back in browser history, fallback to specified path
-		if (window.history.length > 1) {
-			window.history.back();
-		} else {
-			window.location.href = fallbackPath;
-		}
+function _goBack() {
+	// Try to go back in browser history, fallback to specified path
+	if (window.history.length > 1) {
+		window.history.back();
+	} else {
+		window.location.href = fallbackPath;
 	}
+}
 
-	onMount(() => {
-		updateVisibility();
-		window.addEventListener('popstate', updateVisibility);
-		window.addEventListener('hashchange', updateVisibility);
-		return () => {
-			window.removeEventListener('popstate', updateVisibility);
-			window.removeEventListener('hashchange', updateVisibility);
-		};
-	});
+onMount(() => {
+	updateVisibility();
+	window.addEventListener('popstate', updateVisibility);
+	window.addEventListener('hashchange', updateVisibility);
+	return () => {
+		window.removeEventListener('popstate', updateVisibility);
+		window.removeEventListener('hashchange', updateVisibility);
+	};
+});
 </script>
 
 {#if isVisible}

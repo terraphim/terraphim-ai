@@ -31,16 +31,16 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     steps:
     - name: Platform check
       run: |
         echo "⚠️ VM execution tests are Linux-only (Firecracker requirement)"
         echo "Running on: ubuntu-latest ✅"
-    
+
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
@@ -48,7 +48,7 @@ jobs:
         profile: minimal
         override: true
         components: rustfmt, clippy
-        
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -62,7 +62,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-unit-
           ${{ runner.os }}-cargo-
-          
+
     - name: Check if fcctl-web exists
       id: check_fcctl_unit
       run: |
@@ -72,21 +72,21 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "⚠️ fcctl-web not found - skipping VM execution tests (experimental code is gitignored)"
         fi
-    
+
     - name: Run VM execution unit tests
       if: steps.check_fcctl_unit.outputs.exists == 'true'
       run: |
         cargo test -p terraphim_multi_agent vm_execution \
           --verbose \
           -- --nocapture
-        
+
     - name: Run code extractor tests
       if: steps.check_fcctl_unit.outputs.exists == 'true'
       run: |
         cargo test -p terraphim_multi_agent code_extractor \
           --verbose \
           -- --nocapture
-    
+
     - name: Skip message
       if: steps.check_fcctl_unit.outputs.exists == 'false'
       run: echo "✅ Skipping VM execution unit tests - experimental code not present"
@@ -95,7 +95,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     services:
       redis:
         image: redis:7-alpine
@@ -106,18 +106,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         profile: minimal
         override: true
-        
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -126,7 +126,7 @@ jobs:
           pkg-config \
           libssl-dev \
           curl
-          
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -140,7 +140,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-integration-
           ${{ runner.os }}-cargo-
-    
+
     - name: Check if fcctl-web exists
       id: check_fcctl
       run: |
@@ -150,20 +150,20 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "⚠️ fcctl-web not found (experimental code is gitignored)"
         fi
-          
+
     - name: Build fcctl-web
       if: steps.check_fcctl.outputs.exists == 'true'
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo build --release
-        
+
     - name: Start fcctl-web server
       if: steps.check_fcctl.outputs.exists == 'true'
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         ./target/release/fcctl-web &
         echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
-        
+
         # Wait for server to start
         for i in {1..30}; do
           if curl -s http://localhost:8080/health > /dev/null 2>&1; then
@@ -173,7 +173,7 @@ jobs:
           echo "Waiting for server to start... ($i/30)"
           sleep 2
         done
-        
+
     - name: Run integration tests
       if: steps.check_fcctl.outputs.exists == 'true'
       run: |
@@ -181,19 +181,19 @@ jobs:
         cargo test llm_api_tests \
           --verbose \
           -- --nocapture
-          
-    - name: Run HTTP API security tests  
+
+    - name: Run HTTP API security tests
       if: steps.check_fcctl.outputs.exists == 'true'
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo test security_tests \
           --verbose \
           -- --nocapture
-    
+
     - name: Skip message
       if: steps.check_fcctl.outputs.exists == 'false'
       run: echo "✅ Skipping integration tests - fcctl-web experimental code not present (gitignored)"
-          
+
     - name: Stop fcctl-web server
       if: always() && steps.check_fcctl.outputs.exists == 'true'
       run: |
@@ -206,18 +206,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: integration-tests
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         profile: minimal
         override: true
-        
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -231,14 +231,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-websocket-
           ${{ runner.os }}-cargo-
-          
+
     - name: Build and start fcctl-web
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo build --release
         ./target/release/fcctl-web &
         echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
-        
+
         # Wait for server
         for i in {1..30}; do
           if curl -s http://localhost:8080/health > /dev/null 2>&1; then
@@ -246,7 +246,7 @@ jobs:
           fi
           sleep 2
         done
-        
+
     - name: Run WebSocket tests
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
@@ -254,7 +254,7 @@ jobs:
           --verbose \
           --ignored \
           -- --nocapture
-          
+
     - name: Stop server
       if: always()
       run: |
@@ -267,18 +267,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [unit-tests, integration-tests]
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         profile: minimal
         override: true
-        
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -292,20 +292,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-e2e-
           ${{ runner.os }}-cargo-
-          
+
     - name: Build all components
       run: |
         cargo build --release
         cd scratchpad/firecracker-rust/fcctl-web
         cargo build --release
         cd -
-        
+
     - name: Start fcctl-web server
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         ./target/release/fcctl-web &
         echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
-        
+
         # Wait for server
         for i in {1..30}; do
           if curl -s http://localhost:8080/health > /dev/null 2>&1; then
@@ -314,7 +314,7 @@ jobs:
           fi
           sleep 2
         done
-        
+
     - name: Run end-to-end tests
       run: |
         cargo test agent_vm_integration_tests \
@@ -322,14 +322,14 @@ jobs:
           --ignored \
           -- --nocapture \
           --test-threads=1
-          
+
     - name: Test agent configuration
       run: |
         cargo test test_agent_with_vm_execution \
           --verbose \
           --ignored \
           -- --nocapture
-          
+
     - name: Stop server
       if: always()
       run: |
@@ -341,18 +341,18 @@ jobs:
     name: Security Tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         profile: minimal
         override: true
-        
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -366,7 +366,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-security-
           ${{ runner.os }}-cargo-
-          
+
     - name: Check if fcctl-web exists
       id: check_fcctl_security
       run: |
@@ -376,7 +376,7 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "⚠️ fcctl-web not found - skipping VM security tests (experimental code is gitignored)"
         fi
-    
+
     - name: Run dangerous pattern detection tests
       if: steps.check_fcctl_security.outputs.exists == 'true'
       run: |
@@ -385,7 +385,7 @@ jobs:
           test_code_injection_prevention \
           --verbose \
           -- --nocapture
-          
+
     - name: Build fcctl-web for security tests
       if: steps.check_fcctl_security.outputs.exists == 'true'
       run: |
@@ -393,7 +393,7 @@ jobs:
         cargo build --release
         ./target/release/fcctl-web &
         echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
-        
+
         # Wait for server
         for i in {1..30}; do
           if curl -s http://localhost:8080/health > /dev/null 2>&1; then
@@ -401,7 +401,7 @@ jobs:
           fi
           sleep 2
         done
-        
+
     - name: Run security integration tests
       if: steps.check_fcctl_security.outputs.exists == 'true'
       run: |
@@ -409,7 +409,7 @@ jobs:
         cargo test security_tests \
           --verbose \
           -- --nocapture
-          
+
     - name: Test agent security handling
       if: steps.check_fcctl_security.outputs.exists == 'true'
       run: |
@@ -417,11 +417,11 @@ jobs:
           --verbose \
           --ignored \
           -- --nocapture
-    
+
     - name: Skip message
       if: steps.check_fcctl_security.outputs.exists == 'false'
       run: echo "✅ Skipping security tests - fcctl-web experimental code not present (gitignored)"
-          
+
     - name: Stop server
       if: always() && steps.check_fcctl_security.outputs.exists == 'true'
       run: |
@@ -433,18 +433,18 @@ jobs:
     name: Performance Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         profile: minimal
         override: true
-        
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -458,7 +458,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-perf-
           ${{ runner.os }}-cargo-
-          
+
     - name: Check if fcctl-web exists
       id: check_fcctl_perf
       run: |
@@ -468,7 +468,7 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "⚠️ fcctl-web not found - skipping VM performance tests (experimental code is gitignored)"
         fi
-    
+
     - name: Run unit performance tests
       if: steps.check_fcctl_perf.outputs.exists == 'true'
       run: |
@@ -476,7 +476,7 @@ jobs:
           --release \
           --verbose \
           -- --nocapture
-          
+
     - name: Build and start fcctl-web
       if: steps.check_fcctl_perf.outputs.exists == 'true'
       run: |
@@ -484,7 +484,7 @@ jobs:
         cargo build --release
         ./target/release/fcctl-web &
         echo "FCCTL_WEB_PID=$!" >> $GITHUB_ENV
-        
+
         # Wait for server
         for i in {1..30}; do
           if curl -s http://localhost:8080/health > /dev/null 2>&1; then
@@ -492,7 +492,7 @@ jobs:
           fi
           sleep 2
         done
-        
+
     - name: Run WebSocket performance tests
       if: steps.check_fcctl_perf.outputs.exists == 'true'
       run: |
@@ -502,7 +502,7 @@ jobs:
           --ignored \
           --verbose \
           -- --nocapture
-          
+
     - name: Run agent performance tests
       if: steps.check_fcctl_perf.outputs.exists == 'true'
       run: |
@@ -511,11 +511,11 @@ jobs:
           --ignored \
           --verbose \
           -- --nocapture
-    
+
     - name: Skip message
       if: steps.check_fcctl_perf.outputs.exists == 'false'
       run: echo "✅ Skipping performance tests - fcctl-web experimental code not present (gitignored)"
-          
+
     - name: Stop server
       if: always() && steps.check_fcctl_perf.outputs.exists == 'true'
       run: |
@@ -527,11 +527,11 @@ jobs:
     name: Test Runner Script
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Check if test script exists
       id: check_script
       run: |
@@ -541,28 +541,28 @@ jobs:
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "⚠️ test-vm-execution.sh not found - skipping (experimental script)"
         fi
-      
+
     - name: Make test script executable
       if: steps.check_script.outputs.exists == 'true'
       run: chmod +x scripts/test-vm-execution.sh
-      
+
     - name: Test script help
       if: steps.check_script.outputs.exists == 'true'
       run: ./scripts/test-vm-execution.sh --help
-      
+
     - name: Test script unit tests only
       if: steps.check_script.outputs.exists == 'true'
       run: |
         ./scripts/test-vm-execution.sh unit \
           --timeout 300 \
           --verbose
-          
+
     - name: Verify script creates logs
       if: steps.check_script.outputs.exists == 'true'
       run: |
         test -d test-logs || echo "Log directory not created"
         find test-logs -name "*.log" | head -5
-    
+
     - name: Skip message
       if: steps.check_script.outputs.exists == 'false'
       run: echo "✅ Skipping test script - experimental VM execution script not present"
@@ -572,11 +572,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install Rust nightly
       uses: actions-rs/toolchain@v1
       with:
@@ -584,13 +584,13 @@ jobs:
         profile: minimal
         override: true
         components: rustfmt, clippy, llvm-tools-preview
-        
+
     - name: Install grcov
       run: |
         curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-x86_64-unknown-linux-gnu.tar.bz2 | \
         tar jxf -
         sudo mv grcov /usr/local/bin/
-        
+
     - name: Cache cargo dependencies
       uses: actions/cache@v3
       with:
@@ -604,7 +604,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-coverage-
           ${{ runner.os }}-cargo-
-          
+
     - name: Run tests with coverage
       env:
         CARGO_INCREMENTAL: 0
@@ -613,14 +613,14 @@ jobs:
       run: |
         # Unit tests
         cargo test -p terraphim_multi_agent vm_execution
-        
+
         # Build fcctl-web
         cd scratchpad/firecracker-rust/fcctl-web
         cargo build
         ./target/debug/fcctl-web &
         FCCTL_WEB_PID=$!
         cd -
-        
+
         # Wait for server
         for i in {1..30}; do
           if curl -s http://localhost:8080/health > /dev/null 2>&1; then
@@ -628,15 +628,15 @@ jobs:
           fi
           sleep 2
         done
-        
+
         # Integration tests (with mock data to avoid needing real VMs)
         cd scratchpad/firecracker-rust/fcctl-web
         cargo test llm_api_tests || true # Allow failure for coverage
         cd -
-        
+
         # Stop server
         kill $FCCTL_WEB_PID || true
-        
+
     - name: Generate coverage report
       run: |
         grcov . -s . --binary-path ./target/debug/ \
@@ -647,7 +647,7 @@ jobs:
           --ignore "**/test_*.rs" \
           --ignore "**/build.rs" \
           -o target/coverage/
-          
+
     - name: Upload coverage to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       if: github.ref == 'refs/heads/main'
@@ -655,7 +655,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./target/coverage
         destination_dir: vm-execution-coverage
-        
+
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       with:
@@ -669,7 +669,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [unit-tests, integration-tests, websocket-tests, e2e-tests, security-tests, performance-tests]
     if: always()
-    
+
     steps:
     - name: Test Results Summary
       run: |
@@ -684,7 +684,7 @@ jobs:
         echo "| Security Tests | ${{ needs.security-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Performance Tests | ${{ needs.performance-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # Check if any tests failed
         if [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
            [[ "${{ needs.integration-tests.result }}" != "success" ]] || \

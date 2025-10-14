@@ -6,7 +6,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 // Removed unused import
@@ -902,11 +901,12 @@ impl KnowledgeGraphGoalAnalyzer {
 mod tests {
     use super::*;
     use crate::{Goal, GoalLevel};
+    use terraphim_types::{RoleName, Thesaurus};
 
     #[tokio::test]
     async fn test_knowledge_graph_analyzer_creation() {
         let role_name = RoleName::new("test_role");
-        let thesaurus = Thesaurus::new();
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let automata_config = AutomataConfig::default();
         let similarity_thresholds = SimilarityThresholds::default();
@@ -920,7 +920,7 @@ mod tests {
     #[tokio::test]
     async fn test_concept_similarity() {
         let role_name = RoleName::new("test_role");
-        let thesaurus = Thesaurus::new();
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let analyzer = KnowledgeGraphGoalAnalyzer::new(
             role_graph,
@@ -947,7 +947,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_alignment_score() {
         let role_name = RoleName::new("test_role");
-        let thesaurus = Thesaurus::new();
+        let thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let role_graph = Arc::new(RoleGraph::new(role_name, thesaurus).await.unwrap());
         let analyzer = KnowledgeGraphGoalAnalyzer::new(
             role_graph,

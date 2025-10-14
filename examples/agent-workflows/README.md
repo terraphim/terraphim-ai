@@ -11,17 +11,17 @@ All examples integrate with the terraphim ecosystem, utilizing role-based agent 
 ## 🚀 Available Workflow Patterns
 
 ### 1. 🔗 Prompt Chaining - Interactive Coding Environment
-**Pattern**: Sequential execution where each step's output feeds the next step  
-**Use Case**: Software development workflow with structured stages  
+**Pattern**: Sequential execution where each step's output feeds the next step
+**Use Case**: Software development workflow with structured stages
 **Key Features**: 6-step development pipeline, project templates, live code editing
 
 ```
 Specification → Architecture → Planning → Implementation → Testing → Deployment
 ```
 
-**Perfect For**: 
+**Perfect For**:
 - Software development workflows
-- Content creation pipelines  
+- Content creation pipelines
 - Multi-stage data processing
 - Sequential decision-making processes
 
@@ -29,9 +29,9 @@ Specification → Architecture → Planning → Implementation → Testing → D
 
 ---
 
-### 2. 🧠 Routing - Smart Prototyping Environment  
-**Pattern**: Intelligent task distribution based on complexity, cost, and performance  
-**Use Case**: Lovable-style prototyping with automatic model selection  
+### 2. 🧠 Routing - Smart Prototyping Environment
+**Pattern**: Intelligent task distribution based on complexity, cost, and performance
+**Use Case**: Lovable-style prototyping with automatic model selection
 **Key Features**: 3 AI models, real-time complexity analysis, cost optimization
 
 ```
@@ -49,8 +49,8 @@ Task Analysis → Model Selection → Content Generation
 ---
 
 ### 3. ⚡ Parallelization - Multi-perspective Analysis
-**Pattern**: Concurrent execution with sophisticated result aggregation  
-**Use Case**: Complex topic analysis from multiple viewpoints simultaneously  
+**Pattern**: Concurrent execution with sophisticated result aggregation
+**Use Case**: Complex topic analysis from multiple viewpoints simultaneously
 **Key Features**: 6 analysis perspectives, real-time parallel execution, consensus tracking
 
 ```
@@ -70,8 +70,8 @@ Practical  ┘
 ---
 
 ### 4. 🕸️ Orchestrator-Workers - Data Science Pipeline
-**Pattern**: Hierarchical planning with specialized worker roles  
-**Use Case**: Scientific research with knowledge graph enrichment  
+**Pattern**: Hierarchical planning with specialized worker roles
+**Use Case**: Scientific research with knowledge graph enrichment
 **Key Features**: 5-stage pipeline, 6 specialized workers, knowledge graph construction
 
 ```
@@ -89,8 +89,8 @@ Orchestrator → Task Distribution → Worker Execution → Knowledge Integratio
 ---
 
 ### 5. 🔄 Evaluator-Optimizer - Content Generation Studio
-**Pattern**: Iterative quality improvement through evaluation loops  
-**Use Case**: Content creation with automatic quality enhancement  
+**Pattern**: Iterative quality improvement through evaluation loops
+**Use Case**: Content creation with automatic quality enhancement
 **Key Features**: 6 quality criteria, role-based evaluation, adaptive learning
 
 ```
@@ -121,11 +121,11 @@ Each example uses different combinations of specialized roles:
 
 #### Content & Analysis Roles
 - **creative_writer**: Imaginative, engaging content creation
-- **content_critic**: Rigorous analytical evaluation  
+- **content_critic**: Rigorous analytical evaluation
 - **content_editor**: Professional editing and refinement
 - **copy_editor**: Technical precision and clarity optimization
 
-#### Technical Roles  
+#### Technical Roles
 - **data_collector**: Information gathering and retrieval
 - **content_analyzer**: Deep content analysis and processing
 - **methodology_expert**: Research methodology and validation
@@ -201,7 +201,7 @@ All examples use a consistent, professional design language:
 2. **Explore Routing** - Learn about intelligent task distribution
 3. **Try Evaluator-Optimizer** - Experience iterative improvement
 
-### Advanced Path  
+### Advanced Path
 1. **Master Parallelization** - Handle concurrent processing complexity
 2. **Tackle Orchestrator-Workers** - Build sophisticated hierarchical systems
 3. **Integrate All Patterns** - Create hybrid workflows combining multiple patterns
@@ -240,14 +240,14 @@ All examples use a consistent, professional design language:
 - **Market Research**: Parallel analysis of multiple data sources and perspectives
 - **Product Development**: Chain workflows from ideation to implementation
 
-### Technical Applications  
+### Technical Applications
 - **Data Science**: Orchestrate complex analysis pipelines with specialized workers
 - **DevOps**: Chain deployment workflows with quality gates and rollback
 - **AI/ML**: Route model selection based on task requirements and constraints
 - **Knowledge Management**: Build graphs from document analysis and expert input
 
 ### Research Applications
-- **Literature Review**: Parallel analysis of papers from multiple perspectives  
+- **Literature Review**: Parallel analysis of papers from multiple perspectives
 - **Meta-Analysis**: Chain data collection, analysis, and synthesis workflows
 - **Systematic Reviews**: Orchestrate specialized workers for different review stages
 - **Knowledge Discovery**: Iterative refinement of insights through evaluation

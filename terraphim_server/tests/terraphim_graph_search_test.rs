@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use ahash::AHashMap;
 use serial_test::serial;
 use std::path::PathBuf;

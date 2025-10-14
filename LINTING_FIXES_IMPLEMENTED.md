@@ -17,7 +17,7 @@ Successfully fixed linting issues in both Rust and frontend codebases.
    - `crates/terraphim_config/Cargo.toml`
    - `lab/parking-lot/config-settings/Cargo.toml`
    - **Rationale**: Resolves future incompatibility warnings with Rust 2024 never type fallback
-   
+
 2. **Redis dependency**: Updated transitively through opendal update (no direct dependency)
 
 ## Frontend Linting Status: ⚠️ IMPROVED
@@ -89,7 +89,7 @@ Reduced errors from **17 critical errors** to manageable type issues.
 
 #### 6. **Accessibility Improvements**
 
-**Files**: 
+**Files**:
 - `desktop/src/lib/Search/ArticleModal.svelte`
 - `desktop/src/lib/Search/AtomicSaveModal.svelte`
 
@@ -140,7 +140,7 @@ Most remaining issues are in test files and complex type inference scenarios:
 
 1. **Test files** using `vi` or `jest` without proper imports
 2. **Svelte Route components** - type definitions partially working
-3. **API response typing** - `unknown` types from invoke/fetch responses  
+3. **API response typing** - `unknown` types from invoke/fetch responses
 4. **Document type mismatch** - Some files expect different Document interface
 
 ### Low Priority Issues
@@ -193,7 +193,7 @@ Most remaining issues are in test files and complex type inference scenarios:
 cargo fmt --check
 cargo clippy --workspace --all-targets --all-features
 
-# Frontend linting  
+# Frontend linting
 cd desktop && yarn run check
 
 # Run tests
@@ -229,4 +229,3 @@ cd desktop && yarn build
 - Core functionality should work correctly despite remaining type warnings
 - Many remaining issues are in test files and can be addressed separately
 - Type generation from Rust may need long-term improvements for perfect TypeScript interop
-

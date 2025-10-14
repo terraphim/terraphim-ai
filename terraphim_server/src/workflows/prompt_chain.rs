@@ -9,6 +9,7 @@ use super::{
 };
 use crate::AppState;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct ChainStep {
     id: String,
@@ -115,6 +116,7 @@ pub async fn execute_prompt_chain(
     }
 }
 
+#[allow(dead_code)]
 async fn execute_chain_workflow(
     state: &AppState,
     workflow_id: &str,
@@ -171,6 +173,7 @@ async fn execute_chain_workflow(
     }))
 }
 
+#[allow(dead_code)]
 async fn execute_chain_step(
     step: &ChainStep,
     context: &str,
@@ -200,6 +203,7 @@ async fn execute_chain_step(
     }))
 }
 
+#[allow(dead_code)]
 fn get_chain_steps(_prompt: &str, role: &str) -> Vec<ChainStep> {
     // Role-specific step variations
     match role {
@@ -322,6 +326,7 @@ fn get_chain_steps(_prompt: &str, role: &str) -> Vec<ChainStep> {
 }
 
 // Role-based output generation functions
+#[allow(dead_code)]
 fn generate_specification_output(context: &str, role: &str) -> String {
     let topic = context.lines().next().unwrap_or("project").to_lowercase();
 
@@ -341,6 +346,7 @@ fn generate_specification_output(context: &str, role: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn generate_architecture_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# System Architecture\n\n## Component Overview\n- Frontend: React with TypeScript\n- Backend: Rust with Axum framework\n- Database: PostgreSQL with Redis cache\n- Infrastructure: Docker containers on Kubernetes\n\n## Integration Points\n- REST API for client communication\n- WebSocket for real-time updates\n- External service integrations via HTTP clients".to_string(),
@@ -349,6 +355,7 @@ fn generate_architecture_output(_context: &str, role: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn generate_planning_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Implementation Roadmap\n\n## Phase 1: Foundation (Weeks 1-2)\n- Set up development environment\n- Implement core infrastructure\n- Basic API endpoints\n\n## Phase 2: Core Features (Weeks 3-6)\n- User authentication and authorization\n- Primary business logic\n- Database schema and migrations\n\n## Phase 3: Integration & Testing (Weeks 7-8)\n- Third-party integrations\n- Comprehensive testing suite\n- Performance optimization".to_string(),
@@ -357,6 +364,7 @@ fn generate_planning_output(_context: &str, role: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn generate_implementation_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Code Implementation\n\n## Core Module Structure\n```rust\npub struct Application {\n    config: Config,\n    database: Database,\n    cache: Cache,\n}\n\nimpl Application {\n    pub async fn new() -> Result<Self, Error> {\n        // Implementation details\n    }\n}\n```\n\n## Key Features Implemented\n- Robust error handling with custom error types\n- Async/await throughout for optimal performance\n- Comprehensive logging and monitoring\n- Security best practices implementation".to_string(),
@@ -365,6 +373,7 @@ fn generate_implementation_output(_context: &str, role: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn generate_testing_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Testing Strategy\n\n## Test Coverage Summary\n- Unit Tests: 95% code coverage\n- Integration Tests: All API endpoints validated\n- End-to-End Tests: Critical user journeys automated\n- Performance Tests: Load testing up to 10k concurrent users\n\n## Quality Gates\n- All tests pass in CI/CD pipeline\n- Code quality metrics meet standards\n- Security scan shows no high/critical vulnerabilities\n- Performance benchmarks within acceptable ranges".to_string(),
@@ -373,6 +382,7 @@ fn generate_testing_output(_context: &str, role: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn generate_deployment_output(_context: &str, role: &str) -> String {
     match role {
         "technical_writer" => "# Deployment Guide\n\n## Production Deployment\n- Docker containers deployed to Kubernetes cluster\n- Database migrations executed successfully\n- SSL certificates configured and validated\n- Monitoring and alerting systems active\n\n## Operational Procedures\n- Health check endpoints responding correctly\n- Log aggregation and analysis configured\n- Backup and recovery procedures tested\n- Incident response playbooks documented\n\n## Post-Launch Monitoring\n- Application metrics within expected ranges\n- User activity tracking and analytics enabled\n- Performance monitoring dashboards active\n- Support documentation and runbooks complete".to_string(),

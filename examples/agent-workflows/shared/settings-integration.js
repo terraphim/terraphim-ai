@@ -65,7 +65,7 @@ class WorkflowSettingsIntegration {
         enableWebSocket: settings.enableWebSocket,
         autoReconnect: settings.autoReconnect
       });
-      
+
       console.log('Updated API client configuration:', window.apiClient.getConfiguration());
     }
 
@@ -78,7 +78,7 @@ class WorkflowSettingsIntegration {
         enableWebSocket: settings.enableWebSocket,
         autoReconnect: settings.autoReconnect
       });
-      
+
       console.log('Created new API client:', window.apiClient.getConfiguration());
     }
   }
@@ -86,7 +86,7 @@ class WorkflowSettingsIntegration {
   // Get current settings for workflow execution
   getWorkflowSettings() {
     if (!this.settingsManager) return {};
-    
+
     const settings = this.settingsManager.getSettings();
     return {
       role: settings.selectedRole,
@@ -99,7 +99,7 @@ class WorkflowSettingsIntegration {
   // Update workflow input with current role settings
   enhanceWorkflowInput(input) {
     const settings = this.getWorkflowSettings();
-    
+
     return {
       ...input,
       role: input.role || settings.role,
@@ -148,11 +148,11 @@ class WorkflowSettingsIntegration {
 
     // Test current connection
     const connectionResult = await this.testConnection();
-    
+
     // If connection fails, try to discover servers
     if (!connectionResult.success && this.settingsManager.discoveryService) {
       console.log('Connection failed, discovering servers...');
-      
+
       try {
         const servers = await this.settingsManager.discoverServers();
         if (servers.length > 0) {
@@ -180,25 +180,25 @@ async function initializeSettings() {
   if (!globalSettingsIntegration) {
     globalSettingsIntegration = new WorkflowSettingsIntegration();
   }
-  
+
   const result = await globalSettingsIntegration.init();
-  
+
   // If settings initialization fails, create a basic fallback API client
   if (!result && !window.apiClient) {
     console.log('Settings initialization failed, creating fallback API client');
     // For local examples, use the correct server URL
-    const serverUrl = window.location.protocol === 'file:' 
-      ? 'http://127.0.0.1:8000' 
+    const serverUrl = window.location.protocol === 'file:'
+      ? 'http://127.0.0.1:8000'
       : 'http://localhost:8000';
-    
+
     window.apiClient = new TerraphimApiClient(serverUrl, {
       enableWebSocket: true,
       autoReconnect: true
     });
-    
+
     return true; // Return true so examples work
   }
-  
+
   return result;
 }
 

@@ -650,21 +650,14 @@ mod tests {
             terraphim_it: false,
             theme: "default".to_string(),
             kg: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_api_key: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_model: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
-            openrouter_chat_model: None,
-            llm_system_prompt: None,
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: None,
             extra: ahash::AHashMap::new(),
         }
     }

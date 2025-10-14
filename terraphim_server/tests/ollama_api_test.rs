@@ -9,7 +9,7 @@ async fn test_chat_endpoint_with_ollama() {
     let ollama_url = "http://127.0.0.1:11434";
     let client = reqwest::Client::new();
     if client
-        .get(&format!("{}/api/tags", ollama_url))
+        .get(format!("{}/api/tags", ollama_url))
         .send()
         .await
         .is_err()
@@ -19,7 +19,7 @@ async fn test_chat_endpoint_with_ollama() {
     }
 
     // Create test server
-    let config_path = "terraphim_server/default/terraphim_engineer_config.json";
+    let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
 
     let server = TestServer::new(app).expect("Failed to create test server");
@@ -48,7 +48,7 @@ async fn test_chat_endpoint_with_ollama() {
 /// Test /chat endpoint with invalid role
 #[tokio::test]
 async fn test_chat_endpoint_invalid_role() {
-    let config_path = "terraphim_server/default/terraphim_engineer_config.json";
+    let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
 
     let server = TestServer::new(app).expect("Failed to create test server");
@@ -69,7 +69,7 @@ async fn test_chat_endpoint_invalid_role() {
 /// Test /chat endpoint with empty messages
 #[tokio::test]
 async fn test_chat_endpoint_empty_messages() {
-    let config_path = "terraphim_server/default/terraphim_engineer_config.json";
+    let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
 
     let server = TestServer::new(app).expect("Failed to create test server");

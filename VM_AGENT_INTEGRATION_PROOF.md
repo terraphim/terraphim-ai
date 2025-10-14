@@ -104,7 +104,7 @@ OK
 
 **Agent Roles with VM Execution**:
 1. OrchestratorAgent
-2. EvaluatorAgent  
+2. EvaluatorAgent
 3. DevelopmentAgent
 4. GeneratorAgent
 5. ComplexTaskAgent
@@ -352,7 +352,7 @@ curl -X POST http://localhost:8080/api/vms/vm-123/rollback/snap-abc123
 #[ignore]
 async fn test_end_to_end_python_execution() {
     let agent = create_vm_agent().await;
-    
+
     let input = CommandInput {
         command: CommandType::Execute,
         text: r#"
@@ -370,12 +370,12 @@ print(f"Factorial of 10 is: {result}")
         "#.to_string(),
         metadata: None,
     };
-    
+
     let result = timeout(Duration::from_secs(30), agent.process_command(input))
         .await
         .expect("Timeout")
         .expect("Execution failed");
-    
+
     assert!(result.success);
     assert!(result.response.contains("3628800"));
 }
@@ -430,7 +430,7 @@ The complete stack is operational:
 ### Execution Path Proven
 
 ```
-workflows.terraphim.cloud (JavaScript) 
+workflows.terraphim.cloud (JavaScript)
     ↓ HTTPS
 demo.terraphim.cloud (Terraphim Agent + Ollama)
     ↓ HTTP
@@ -470,6 +470,6 @@ curl -X POST http://localhost:8080/api/llm/execute \
 
 ---
 
-**Date**: October 6, 2025  
-**Location**: bigbox.terraphim.cloud  
+**Date**: October 6, 2025
+**Location**: bigbox.terraphim.cloud
 **Status**: ✅ FULLY OPERATIONAL

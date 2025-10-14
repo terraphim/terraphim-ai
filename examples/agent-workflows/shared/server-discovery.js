@@ -17,18 +17,18 @@ class ServerDiscoveryService {
   async discoverServers(onProgress = null) {
     this.isScanning = true;
     this.discoveredServers = [];
-    
+
     const totalCombinations = this.protocols.length * this.hostnames.length * this.commonPorts.length;
     let completed = 0;
 
     try {
       const scanPromises = [];
-      
+
       for (const protocol of this.protocols) {
         for (const hostname of this.hostnames) {
           for (const port of this.commonPorts) {
             const serverUrl = `${protocol}://${hostname}:${port}`;
-            
+
             scanPromises.push(
               this.testServer(serverUrl)
                 .then(result => {
@@ -64,10 +64,10 @@ class ServerDiscoveryService {
 
       const results = await Promise.all(scanPromises);
       this.discoveredServers = results.filter(server => server !== null);
-      
+
       // Sort by response time (fastest first)
       this.discoveredServers.sort((a, b) => a.responseTime - b.responseTime);
-      
+
       return this.discoveredServers;
     } finally {
       this.isScanning = false;
@@ -77,7 +77,7 @@ class ServerDiscoveryService {
   // Test individual server
   async testServer(baseUrl) {
     const startTime = Date.now();
-    
+
     try {
       // Test health endpoint
       const healthResponse = await this.fetchWithTimeout(`${baseUrl}/health`, {
@@ -90,7 +90,7 @@ class ServerDiscoveryService {
       }
 
       const responseTime = Date.now() - startTime;
-      
+
       // Try to get server info
       let serverInfo = { version: 'unknown', capabilities: [] };
       try {
@@ -163,21 +163,21 @@ class ServerDiscoveryService {
   async testWorkflowEndpoints(baseUrl) {
     const endpoints = [
       '/workflows/prompt-chain',
-      '/workflows/route', 
+      '/workflows/route',
       '/workflows/parallel',
       '/workflows/orchestrate',
       '/workflows/optimize'
     ];
 
     const availableEndpoints = [];
-    
+
     for (const endpoint of endpoints) {
       try {
         // Use OPTIONS request to test endpoint without executing
         const response = await this.fetchWithTimeout(`${baseUrl}${endpoint}`, {
           method: 'OPTIONS'
         }, 2000);
-        
+
         if (response.ok || response.status === 405) { // 405 = Method Not Allowed is OK
           availableEndpoints.push(endpoint);
         }
@@ -200,7 +200,7 @@ class ServerDiscoveryService {
   async fetchWithTimeout(url, options = {}, timeout = 5000) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -229,9 +229,9 @@ class ServerDiscoveryService {
     if (this.discoveredServers.length === 0) {
       return null;
     }
-    
+
     // Return server with best health and lowest response time
-    return this.discoveredServers.find(server => 
+    return this.discoveredServers.find(server =>
       server.health === 'ok' && server.workflowEndpoints.length > 0
     ) || this.discoveredServers[0];
   }
@@ -244,27 +244,27 @@ class ServerDiscoveryService {
   // Get recommended server based on criteria
   getRecommendedServer(criteria = {}) {
     const servers = this.getDiscoveredServers();
-    
+
     if (servers.length === 0) {
       return null;
     }
 
     let filtered = servers.filter(server => server.health === 'ok');
-    
+
     if (criteria.requireWebSocket) {
       filtered = filtered.filter(server => server.wsAvailable);
     }
-    
+
     if (criteria.requiredEndpoints) {
-      filtered = filtered.filter(server => 
-        criteria.requiredEndpoints.every(endpoint => 
+      filtered = filtered.filter(server =>
+        criteria.requiredEndpoints.every(endpoint =>
           server.workflowEndpoints.includes(endpoint)
         )
       );
     }
 
     if (criteria.maxResponseTime) {
-      filtered = filtered.filter(server => 
+      filtered = filtered.filter(server =>
         server.responseTime <= criteria.maxResponseTime
       );
     }
@@ -295,9 +295,9 @@ class ServerDiscoveryService {
     }
 
     // Validate each server entry
-    const validServers = data.servers.filter(server => 
-      server.url && 
-      server.health && 
+    const validServers = data.servers.filter(server =>
+      server.url &&
+      server.health &&
       typeof server.responseTime === 'number'
     );
 
