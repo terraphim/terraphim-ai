@@ -109,7 +109,7 @@ describe('Autocomplete with Logical Operators', () => {
 		});
 
 		it('should handle mixed case in operator detection', async () => {
-			mockInvoke.mockResolvedValueOnce([
+			mockInvoke.mockResolvedValue([
 				{ term: 'async', type: 'term', description: 'Asynchronous programming' },
 			]);
 
