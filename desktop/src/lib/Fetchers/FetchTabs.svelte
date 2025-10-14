@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
+import { Route } from 'tinro';
+import { Field, Input, Button, Switch } from 'svelma';
 
 let _content = {
 	json: $configStore,
@@ -35,11 +37,11 @@ function _handleChange(updatedContent) {
 	_content = updatedContent;
 	_content;
 }
-const isWiki = false;
-const fetchUrl =
+let isWiki = false;
+let fetchUrl =
 	'https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json';
-const postUrl = 'http://localhost:8000/documents/';
-const atomicServerUrl = 'http://localhost:9883/';
+let postUrl = 'http://localhost:8000/documents/';
+let atomicServerUrl = 'http://localhost:9883/';
 let agentSecret: string | undefined;
 const _setAtomicServer = async () => {
 	console.log('Updating atomic server configuration');
@@ -122,8 +124,8 @@ $: console.log('Print roles', $roles);
         class="is-right"
         iconPack="fa"
         iconLeft="check"
-        on:click={setAtomicServer}
-        on:submit={setAtomicServer}>Save</Button
+        on:click={_setAtomicServer}
+        on:submit={_setAtomicServer}>Save</Button
       >
     </Field>
   </Route>
