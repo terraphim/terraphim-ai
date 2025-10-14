@@ -1,11 +1,11 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 
-export const fallbackPath: string = '/';
-export const showText: boolean = true;
-export const customClass: string = '';
+export let fallbackPath: string = '/';
+export let showText: boolean = true;
+export let customClass: string = '';
 // Hide button on these paths (home by default)
-export const hideOnPaths: string[] = ['/'];
+export let hideOnPaths: string[] = ['/'];
 
 let _isVisible = true;
 
@@ -27,13 +27,25 @@ function _goBack() {
 	}
 }
 
+// Initialize visibility immediately
+updateVisibility();
+
 onMount(() => {
+	// Update visibility again on mount in case window object is ready
 	updateVisibility();
-	window.addEventListener('popstate', updateVisibility);
-	window.addEventListener('hashchange', updateVisibility);
+
+	const handleVisibilityUpdate = () => {
+		updateVisibility();
+		// Force Svelte to re-render by updating a reactive variable
+		_isVisible = _isVisible; // This triggers reactivity
+	};
+
+	window.addEventListener('popstate', handleVisibilityUpdate);
+	window.addEventListener('hashchange', handleVisibilityUpdate);
+
 	return () => {
-		window.removeEventListener('popstate', updateVisibility);
-		window.removeEventListener('hashchange', updateVisibility);
+		window.removeEventListener('popstate', handleVisibilityUpdate);
+		window.removeEventListener('hashchange', handleVisibilityUpdate);
 	};
 });
 </script>
