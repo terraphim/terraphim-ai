@@ -5,6 +5,7 @@ import { get } from 'svelte/store';
 // @ts-expect-error local store defined elsewhere
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../config';
+import { JSONEditor } from 'svelte-jsoneditor';
 
 let _content = {
 	json: $configStore,
@@ -50,6 +51,6 @@ onMount(() => {
     <i>The best editing experience is to configure Atomic Server, in the meantime use editor below. You will need to refresh page via Command R or Ctrl-R to see changes</i>
   </p>
   <div class="editor">
-    <JSONEditor {content} onChange={handleChange} />
+    <JSONEditor content={_content} onChange={_handleChange} />
   </div>
 </div>

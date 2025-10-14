@@ -135,7 +135,7 @@ async function initializeConfig() {
 initializeConfig();
 console.log('Using Terraphim Server URL:', CONFIG.ServerURL);
 
-function _updateRole(event: Event) {
+function __updateRole(event: Event) {
 	const target = event.currentTarget as HTMLSelectElement;
 	const newRoleName = target.value;
 	console.log('Role change requested:', newRoleName);
@@ -221,9 +221,9 @@ function _updateRole(event: Event) {
 <div class="field is-grouped is-grouped-right">
   <div class="control">
     <div class="select">
-      <!-- We set the current value explicitly and handle updates via `updateRole`.
+      <!-- We set the current value explicitly and handle updates via `_updateRole`.
            Direct store binding with `$role` is avoided because `$role` is read-only. -->
-      <select value={$role} on:change={updateRole}>
+      <select value={$role} on:change={_updateRole}>
         {#each $roles as r}
           {@const roleName = typeof r.name === 'string' ? r.name : r.name.original}
           <option value={roleName}>{roleName}</option>
