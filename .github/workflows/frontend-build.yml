@@ -45,7 +45,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: desktop
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --legacy-peer-deps
 
       - name: Run frontend linting
         working-directory: desktop
