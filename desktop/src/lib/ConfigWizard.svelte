@@ -86,7 +86,7 @@ async function _selectHaystackPath(roleIdx: number, hsIdx: number) {
 	}
 }
 
-async function _selectKnowledgeGraphPath(roleIdx: number) {
+async function __selectKnowledgeGraphPath(roleIdx: number) {
 	if (!get(is_tauri)) return;
 
 	try {
@@ -206,7 +206,7 @@ onMount(async () => {
 	}
 });
 
-// Handle ESC to close wizard and return to previous screen
+// Handle ESC to close wizard and return to _previous screen
 onMount(() => {
 	const onKeyDown = (e: KeyboardEvent) => {
 		if (e.key === 'Escape') {
@@ -257,15 +257,15 @@ async function _fetchLlmModels(roleIdx: number) {
 
 let currentStep = 1;
 const totalSteps = 3;
-let _saveStatus = ''; // 'success' or 'error'
-function _next() {
+let __saveStatus = ''; // 'success' or 'error'
+function __next() {
 	if (currentStep < totalSteps) currentStep += 1;
 }
-function _prev() {
+function __prev() {
 	if (currentStep > 1) currentStep -= 1;
 }
 
-function _addRole() {
+function __addRole() {
 	draft.update((d) => ({
 		...d,
 		roles: [
@@ -293,7 +293,7 @@ function _addRole() {
 		],
 	}));
 }
-function _removeRole(idx: number) {
+function __removeRole(idx: number) {
 	draft.update((d) => ({ ...d, roles: d.roles.filter((_, i) => i !== idx) }));
 }
 
@@ -352,7 +352,7 @@ function _handleParameterKeyChange(roleIdx: number, hsIdx: number, oldKey: strin
 	updateExtraParameterKey(roleIdx, hsIdx, oldKey, newKey);
 }
 
-async function _save() {
+async function __save() {
 	const data = get(draft);
 	const existing = get(configStore) as any;
 	const updated = { ...existing } as any;
@@ -438,15 +438,15 @@ async function _save() {
 			}
 		}
 		configStore.set(updated);
-		_saveStatus = 'success';
+		__saveStatus = 'success';
 		setTimeout(() => {
-			_saveStatus = '';
+			__saveStatus = '';
 		}, 3000); // Clear status after 3 seconds
 	} catch (e) {
 		console.error(e);
-		_saveStatus = 'error';
+		__saveStatus = 'error';
 		setTimeout(() => {
-			_saveStatus = '';
+			__saveStatus = '';
 		}, 3000); // Clear status after 3 seconds
 	}
 }
@@ -464,17 +464,17 @@ function _closeWizard() {
     <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
   </div>
 
-  {#if saveStatus === 'success'}
+  {#if _saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
-      <button class="delete" on:click={() => saveStatus = ''}></button>
-      Configuration saved successfully!
+      <button class="delete" on:click={() => _saveStatus = ''}></button>
+      Configuration _saved successfully!
     </div>
   {/if}
 
-  {#if saveStatus === 'error'}
+  {#if _saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
-      <button class="delete" on:click={() => saveStatus = ''}></button>
-      Failed to save configuration. Please try again.
+      <button class="delete" on:click={() => _saveStatus = ''}></button>
+      Failed to _save configuration. Please try again.
     </div>
   {/if}
   {#if currentStep === 1}
@@ -922,7 +922,7 @@ function _closeWizard() {
               placeholder="/path/to/markdown"
               bind:value={$draft.roles[idx].kg.local_path}
               readonly={$is_tauri}
-              on:click={$is_tauri ? () => selectKnowledgeGraphPath(idx) : undefined}
+              on:click={$is_tauri ? () => _selectKnowledgeGraphPath(idx) : undefined}
             />
             {#if $is_tauri}
               <p class="help">Click to select directory</p>
@@ -951,10 +951,10 @@ function _closeWizard() {
           </label>
         </div>
         <hr />
-        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => removeRole(idx)}>Remove Role</button>
+        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => _removeRole(idx)}>Remove Role</button>
       </div>
     {/each}
-    <button class="button is-link is-light" data-testid="add-role" on:click={addRole}>Add Role</button>
+    <button class="button is-link is-light" data-testid="add-role" on:click={_addRole}>Add Role</button>
   {:else}
     <h4 class="title is-5">Review</h4>
     <div class="content">
@@ -983,14 +983,14 @@ function _closeWizard() {
   <nav class="level">
     <div class="level-left">
       {#if currentStep > 1}
-        <button class="button" data-testid="wizard-back" on:click={prev}>Back</button>
+        <button class="button" data-testid="wizard-back" on:click={_prev}>Back</button>
       {/if}
     </div>
     <div class="level-right">
       {#if currentStep < totalSteps}
-        <button class="button is-primary" data-testid="wizard-next" on:click={next}>Next</button>
+        <button class="button is-primary" data-testid="wizard-_next" on:click={_next}>Next</button>
       {:else}
-        <button class="button is-success" data-testid="wizard-save" on:click={save}>Save</button>
+        <button class="button is-success" data-testid="wizard-_save" on:click={_save}>Save</button>
       {/if}
     </div>
   </nav>
