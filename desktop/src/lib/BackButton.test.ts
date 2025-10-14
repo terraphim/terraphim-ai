@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Button } from 'svelma';
 import BackButton from './BackButton.svelte';
 
 // Mock window.history and window.location

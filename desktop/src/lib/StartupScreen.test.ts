@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import { theme } from '../stores';
 import StartupScreen from './StartupScreen.svelte';
 
 // Mock Tauri APIs
