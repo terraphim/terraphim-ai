@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom';
+import { Modal } from 'svelma';
 
 import { createTestConfig } from '../../../__test-utils__/testConfig';
 // Test utilities for real API testing
