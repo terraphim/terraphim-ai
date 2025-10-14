@@ -38,7 +38,7 @@ onMount(() => {
 });
 </script>
 
-{#if isVisible}
+{#if _isVisible}
 	<button
 		class="button is-light back-button {customClass}"
 		on:click={goBack}
