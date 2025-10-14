@@ -1,109 +1,104 @@
 <script lang="ts">
-  import { Route } from "tinro";
-  import { Button, Field, Input, Switch, Select } from "svelma";
-  import FetchRole from "./FetchRole.svelte";
-  import { Agent } from "@tomic/lib";
-  import { JSONEditor } from "svelte-jsoneditor";
-  import { CONFIG } from "../../config";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { configStore, is_tauri } from "$lib/stores";
-  let content = {
-    json: $configStore,
-  };
-  function handleChange(updatedContent) {
-    console.log("contents changed:", updatedContent);
-    console.log("is tauri", $is_tauri);
-    configStore.update((config) => {
-      config = updatedContent.json;
-      return config;
-    });
-    if (is_tauri) {
-      console.log("Updating config on server");
-      invoke("update_config", { configNew: updatedContent.json })
-        .then((res) => {
-          console.log(`Message: ${res}`);
-        })
-        .catch((e) => console.error(e));
-    } else {
-      // post to server using /api/config
-      let configURL = `${CONFIG.ServerURL}/config/`;
-      fetch(configURL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedContent.json),
-      });
-    }
-    content = updatedContent;
-    content;
-  }
-  let isWiki = false;
-  let fetchUrl =
-    "https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json";
-  let postUrl = "http://localhost:8000/documents/";
-  let atomicServerUrl = "http://localhost:9883/";
-  let agentSecret;
-  const setAtomicServer = async () => {
-    console.log("Updating atomic server configuration");
-    const agent = Agent.fromSecret(agentSecret);
-    $store.setServerUrl(atomicServerUrl);
-    console.log("Server set.Setting agent");
-    // Type assertion needed due to different @tomic/lib versions between dependencies
-    $store.setAgent(agent as any);
-  };
+import { invoke } from '@tauri-apps/api/tauri';
+import { Agent } from '@tomic/lib';
+import { configStore, is_tauri } from '$lib/stores';
+import { CONFIG } from '../../config';
 
-  const handleClickUrl = async () => {
-    loadWorker();
-  };
-  // import fetchStore from './fetch.js';
-  // const [data, loading, error, get] = fetchStore(url)
-  import type {
-    PostMessage,
-    PostMessageDataRequest,
-    PostMessageDataResponse,
-  } from "$workers/postmessage.ts";
+let _content = {
+	json: $configStore,
+};
+function _handleChange(updatedContent) {
+	console.log('contents changed:', updatedContent);
+	console.log('is tauri', $is_tauri);
+	configStore.update((config) => {
+		config = updatedContent.json;
+		return config;
+	});
+	if (is_tauri) {
+		console.log('Updating config on server');
+		invoke('update_config', { configNew: updatedContent.json })
+			.then((res) => {
+				console.log(`Message: ${res}`);
+			})
+			.catch((e) => console.error(e));
+	} else {
+		// post to server using /api/config
+		const configURL = `${CONFIG.ServerURL}/config/`;
+		fetch(configURL, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(updatedContent.json),
+		});
+	}
+	_content = updatedContent;
+	_content;
+}
+const isWiki = false;
+const fetchUrl =
+	'https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json';
+const postUrl = 'http://localhost:8000/documents/';
+const atomicServerUrl = 'http://localhost:9883/';
+let agentSecret: string | undefined;
+const _setAtomicServer = async () => {
+	console.log('Updating atomic server configuration');
+	const agent = Agent.fromSecret(agentSecret);
+	$store.setServerUrl(atomicServerUrl);
+	console.log('Server set.Setting agent');
+	// Type assertion needed due to different @tomic/lib versions between dependencies
+	$store.setAgent(agent as any);
+};
 
-  const onWorkerMessage = ({
-    data: { msg, data },
-  }: MessageEvent<PostMessage<PostMessageDataResponse>>) => {
-    console.log(msg, data);
-  };
+const _handleClickUrl = async () => {
+	loadWorker();
+};
 
-  let syncWorker: Worker | undefined = undefined;
+// import fetchStore from './fetch.js';
+// const [data, loading, error, get] = fetchStore(url)
+import type {
+	PostMessage,
+	PostMessageDataRequest,
+	PostMessageDataResponse,
+} from '$workers/postmessage.ts';
 
-  const loadWorker = async () => {
-    const SyncWorker = await import("$workers/fetcher.worker?worker");
-    syncWorker = new SyncWorker.default();
+const onWorkerMessage = ({
+	data: { msg, data },
+}: MessageEvent<PostMessage<PostMessageDataResponse>>) => {
+	console.log(msg, data);
+};
 
-    syncWorker.onmessage = onWorkerMessage;
+let syncWorker: Worker | undefined;
 
-    const message: PostMessage<PostMessageDataRequest> = {
-      msg: "fetcher",
-      data: {
-        url: fetchUrl,
-        postUrl: postUrl,
-        isWiki: isWiki,
-      },
-    };
-    syncWorker.postMessage(message);
-  };
-  // This functiolity related to atomic server
-  import { store } from "@tomic/svelte";
-  import { getResource, getValue } from "@tomic/svelte";
-  import { urls } from "@tomic/lib";
+const loadWorker = async () => {
+	const SyncWorker = await import('$workers/fetcher.worker?worker');
+	syncWorker = new SyncWorker.default();
 
-  // const resource = $store.getResourceLoading('http://localhost:9883/config/y3zx5wtm0bq');
-  const resource1 = getResource("http://localhost:9883/config/y3zx5wtm0bq");
+	syncWorker.onmessage = onWorkerMessage;
 
-  const name = getValue<string>(resource1, urls.properties.name);
-  const roles = getValue<string[]>(
-    resource1,
-    "http://localhost:9883/property/role"
-  );
-  // FIXME: update roles to configStore
-  $: console.log("Print name", $name);
-  $: console.log("Print roles", $roles);
+	const message: PostMessage<PostMessageDataRequest> = {
+		msg: 'fetcher',
+		data: {
+			url: fetchUrl,
+			postUrl: postUrl,
+			isWiki: isWiki,
+		},
+	};
+	syncWorker.postMessage(message);
+};
+
+import { urls } from '@tomic/lib';
+// This functiolity related to atomic server
+import { getResource, getValue } from '@tomic/svelte';
+
+// const resource = $store.getResourceLoading('http://localhost:9883/config/y3zx5wtm0bq');
+const resource1 = getResource('http://localhost:9883/config/y3zx5wtm0bq');
+
+const _name = getValue<string>(resource1, urls.properties.name);
+const _roles = getValue<string[]>(resource1, 'http://localhost:9883/property/role');
+// FIXME: update roles to configStore
+$: console.log('Print name', $name);
+$: console.log('Print roles', $roles);
 </script>
 
 <div class="box">
