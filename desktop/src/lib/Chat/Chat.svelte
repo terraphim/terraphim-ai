@@ -10,6 +10,8 @@ import {
 	role,
 	showSessionList,
 } from '../stores';
+import SessionList from './SessionList.svelte';
+import { Markdown } from 'svelte-markdown';
 
 // Tauri APIs for saving files (only used in desktop)
 let tauriDialog: any = null;
@@ -62,8 +64,8 @@ let renderMarkdown: boolean = false;
 let _debugMode: boolean = false;
 let _lastRequest: any = null;
 let _lastResponse: any = null;
-const _showDebugRequest: boolean = false;
-const _showDebugResponse: boolean = false;
+let __showDebugRequest: boolean = false;
+let __showDebugResponse: boolean = false;
 
 // Conversation and context management
 let conversationId: string | null = null;
@@ -943,8 +945,8 @@ function _toggleSessionList() {
         <div class="session-list-column">
           <SessionList
             currentConversationId={$currentPersistentConversationId}
-            onSelectConversation={handleSessionSelect}
-            onNewConversation={handleNewConversation}
+            onSelectConversation={_handleSessionSelect}
+            onNewConversation={_handleNewConversation}
           />
         </div>
       {/if}
@@ -962,7 +964,7 @@ function _toggleSessionList() {
           <div class="chat-header-actions">
             <button
               class="button is-small"
-              on:click={toggleSessionList}
+              on:click={_toggleSessionList}
               title={$showSessionList ? 'Hide session list' : 'Show session list'}
             >
               <span class="icon is-small">
@@ -973,7 +975,7 @@ function _toggleSessionList() {
             {#if conversationId && !$currentPersistentConversationId}
               <button
                 class="button is-small is-success"
-                on:click={savePersistentConversation}
+                on:click={_savePersistentConversation}
                 title="Save this conversation"
               >
                 <span class="icon is-small">
@@ -990,7 +992,7 @@ function _toggleSessionList() {
         <div class="field is-grouped">
           <div class="control">
             <label class="checkbox is-size-7">
-              <input type="checkbox" bind:checked={renderMarkdown} on:change={saveMdPref} />
+              <input type="checkbox" bind:checked={renderMarkdown} on:change={_saveMdPref} />
               Render markdown
             </label>
           </div>
@@ -1014,10 +1016,10 @@ function _toggleSessionList() {
               {/if}
               <!-- Always show action buttons for assistant messages -->
               <div class="msg-actions">
-                <button class="button is-small is-light" title="Copy as markdown" on:click={() => copyAsMarkdown(m.content)}>
+                <button class="button is-small is-light" title="Copy as markdown" on:click={() => _copyAsMarkdown(m.content)}>
                   <span class="icon is-small"><i class="fas fa-copy"></i></span>
                 </button>
-                <button class="button is-small is-light" title="Save as markdown" on:click={() => saveAsMarkdown(m.content)}>
+                <button class="button is-small is-light" title="Save as markdown" on:click={() => _saveAsMarkdown(m.content)}>
                   <span class="icon is-small"><i class="fas fa-save"></i></span>
                 </button>
                 {#if _debugMode && i === messages.length - 1}
@@ -1025,7 +1027,7 @@ function _toggleSessionList() {
                   <button
                     class="button is-small is-warning"
                     title="Show debug request (sent to LLM)"
-                    on:click={() => showDebugRequest = true}
+                    on:click={() => __showDebugRequest = true}
                     disabled={!lastRequest}
                   >
                     <span class="icon is-small"><i class="fas fa-bug"></i></span>
@@ -1034,7 +1036,7 @@ function _toggleSessionList() {
                   <button
                     class="button is-small is-info"
                     title="Show debug response (from LLM)"
-                    on:click={() => showDebugResponse = true}
+                    on:click={() => __showDebugResponse = true}
                     disabled={!lastResponse}
                   >
                     <span class="icon is-small"><i class="fas fa-code"></i></span>
@@ -1294,16 +1296,16 @@ function _toggleSessionList() {
 </section>
 
 <!-- Debug Request Modal -->
-{#if showDebugRequest}
+{#if _showDebugRequest}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => showDebugRequest = false}></div>
+    <div class="modal-background" on:click={() => _showDebugRequest = false}></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">
           <span class="icon"><i class="fas fa-bug"></i></span>
           Debug Request (Sent to LLM)
         </p>
-        <button class="delete" aria-label="close" on:click={() => showDebugRequest = false}></button>
+        <button class="delete" aria-label="close" on:click={() => _showDebugRequest = false}></button>
       </header>
       <section class="modal-card-body">
         {#if lastRequest}
@@ -1322,9 +1324,9 @@ function _toggleSessionList() {
         {/if}
       </section>
       <footer class="modal-card-foot">
-        <button class="button" on:click={() => showDebugRequest = false}>Close</button>
+        <button class="button" on:click={() => _showDebugRequest = false}>Close</button>
         {#if lastRequest}
-          <button class="button is-primary" on:click={() => copyAsMarkdown(JSON.stringify(lastRequest, null, 2))}>
+          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(lastRequest, null, 2))}>
             <span class="icon"><i class="fas fa-copy"></i></span>
             <span>Copy JSON</span>
           </button>
@@ -1335,16 +1337,16 @@ function _toggleSessionList() {
 {/if}
 
 <!-- Debug Response Modal -->
-{#if showDebugResponse}
+{#if _showDebugResponse}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => showDebugResponse = false}></div>
+    <div class="modal-background" on:click={() => _showDebugResponse = false}></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">
           <span class="icon"><i class="fas fa-code"></i></span>
           Debug Response (From LLM)
         </p>
-        <button class="delete" aria-label="close" on:click={() => showDebugResponse = false}></button>
+        <button class="delete" aria-label="close" on:click={() => _showDebugResponse = false}></button>
       </header>
       <section class="modal-card-body">
         {#if lastResponse}
@@ -1368,9 +1370,9 @@ function _toggleSessionList() {
         {/if}
       </section>
       <footer class="modal-card-foot">
-        <button class="button" on:click={() => showDebugResponse = false}>Close</button>
+        <button class="button" on:click={() => _showDebugResponse = false}>Close</button>
         {#if lastResponse}
-          <button class="button is-primary" on:click={() => copyAsMarkdown(JSON.stringify(lastResponse, null, 2))}>
+          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(lastResponse, null, 2))}>
             <span class="icon"><i class="fas fa-copy"></i></span>
             <span>Copy JSON</span>
           </button>
