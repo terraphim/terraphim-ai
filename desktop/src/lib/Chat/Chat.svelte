@@ -59,7 +59,7 @@ let _providerHint: string = '';
 let renderMarkdown: boolean = false;
 
 // Debug state
-const _debugMode: boolean = false;
+let _debugMode: boolean = false;
 let _lastRequest: any = null;
 let _lastResponse: any = null;
 const _showDebugRequest: boolean = false;
@@ -996,7 +996,7 @@ function _toggleSessionList() {
           </div>
           <div class="control">
             <label class="checkbox is-size-7">
-              <input type="checkbox" bind:checked={debugMode} />
+              <input type="checkbox" bind:checked={_debugMode} />
               Debug mode
             </label>
           </div>
@@ -1020,7 +1020,7 @@ function _toggleSessionList() {
                 <button class="button is-small is-light" title="Save as markdown" on:click={() => saveAsMarkdown(m.content)}>
                   <span class="icon is-small"><i class="fas fa-save"></i></span>
                 </button>
-                {#if debugMode && i === messages.length - 1}
+                {#if _debugMode && i === messages.length - 1}
                   <!-- Debug buttons only for the latest assistant message -->
                   <button
                     class="button is-small is-warning"
@@ -1382,20 +1382,20 @@ function _toggleSessionList() {
 
 <!-- Context Edit Modal -->
 <ContextEditModal
-  bind:active={showContextEditModal}
+  bind:active={_showContextEditModal}
   context={editingContext}
   mode={contextEditMode}
   on:update={e => updateContext(e.detail)}
   on:delete={e => deleteContext(e.detail)}
   on:close={() => {
-    showContextEditModal = false;
+    _showContextEditModal = false;
     editingContext = null;
   }}
 />
 
 <!-- KG Search Modal -->
 <KGSearchModal
-  bind:active={showKGSearchModal}
+  bind:active={_showKGSearchModal}
   conversationId={conversationId}
   on:termAdded={handleKGTermAdded}
   on:kgIndexAdded={handleKGIndexAdded}
@@ -1404,7 +1404,7 @@ function _toggleSessionList() {
 <!-- KG Document Modal -->
 {#if kgDocument}
   <ArticleModal
-    bind:active={showKgModal}
+    bind:active={_showKgModal}
     item={kgDocument}
     kgTerm={kgTerm}
     kgRank={kgRank}

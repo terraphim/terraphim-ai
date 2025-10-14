@@ -1,7 +1,7 @@
 <script lang="ts">
 import { router } from 'tinro';
 import { theme } from './lib/stores';
-import { Route } from 'tinro';
+import { Route, active } from 'tinro';
 import Search from './lib/Search/Search.svelte';
 import Chat from './lib/Chat/Chat.svelte';
 import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
@@ -9,7 +9,7 @@ import FetchTabs from './lib/Fetchers/FetchTabs.svelte';
 import ConfigWizard from './lib/ConfigWizard.svelte';
 import ConfigJsonEditor from './lib/ConfigJsonEditor.svelte';
 import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
-import logo from './assets/terraphim.png';
+import logo from '/assets/terraphim.png';
 
 let _visible = 'is-hidden';
 function _toggleVissible() {

@@ -4,6 +4,8 @@ import * as d3 from 'd3';
 import { onMount } from 'svelte';
 import type { RoleGraphResponse } from './generated/types';
 import type { Document } from './Search/SearchResult';
+import { is_tauri, role } from './stores';
+import ArticleModal from './Search/ArticleModal.svelte';
 
 export const apiUrl: string = '/rolegraph';
 export const fullscreen: boolean = true;
@@ -16,7 +18,7 @@ let edges: any[] = [];
 let selectedNode: Document | null = null;
 let _showModal = false;
 let _startInEditMode = false;
-let _debugMessage = '';
+let debugMessage = '';
 
 // Dimensions
 let width = window.innerWidth;
@@ -98,13 +100,13 @@ function handleNodeRightClick(event: any, nodeData: any) {
 	}, 2000);
 }
 
-function _handleModalClose() {
+function handleModalClose() {
 	_showModal = false;
 	selectedNode = null;
 	_startInEditMode = false;
 }
 
-async function _handleModalSave() {
+async function handleModalSave() {
 	if (!selectedNode) return;
 
 	try {
@@ -351,9 +353,9 @@ onMount(() => {
 {#if selectedNode}
   {#key selectedNode.id}
     <ArticleModal
-      bind:active={showModal}
+      bind:active={_showModal}
       item={selectedNode}
-      initialEdit={startInEditMode}
+      initialEdit={_startInEditMode}
       on:close={handleModalClose}
       on:save={handleModalSave}
     />

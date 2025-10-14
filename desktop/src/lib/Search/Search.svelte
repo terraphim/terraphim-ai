@@ -4,7 +4,9 @@ import { onDestroy, onMount } from 'svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
 import { Field, Input, Tag, Taglist } from 'svelma';
-import { input, typeahead, role, serverUrl, is_tauri } from '$lib/stores';
+import { input, typeahead, role, serverUrl, is_tauri, thesaurus } from '$lib/stores';
+import ResultItem from './ResultItem.svelte';
+import logo from '/assets/terraphim.png';
 
 let results: Document[] = [];
 let _error: string | null = null;
@@ -622,8 +624,8 @@ async function handleSearchInputEvent() {
           autofocus
           on:click={handleSearchInputEvent}
           on:submit={handleSearchInputEvent}
-          on:keydown={handleKeydown}
-          on:input={updateSuggestions}
+          on:keydown={_handleKeydown}
+          on:input={() => {}}
         />
       {#if suggestions.length > 0}
         <ul class="suggestions">
@@ -657,13 +659,13 @@ async function handleSearchInputEvent() {
               <div class="term-tag-wrapper" class:from-kg={term.isFromKG}>
                 <Tag
                   rounded
-                  on:click={() => removeSelectedTerm(term.value)}
+                  on:click={() => _removeSelectedTerm(term.value)}
                   title="Click to remove term"
                 >
                   {term.value}
                   <button
                     class="remove-tag-btn"
-                    on:click|stopPropagation={() => removeSelectedTerm(term.value)}
+                    on:click|stopPropagation={() => _removeSelectedTerm(term.value)}
                     aria-label={`Remove term: ${term.value}`}
                   >
                     ×
@@ -679,7 +681,7 @@ async function handleSearchInputEvent() {
               {/if}
             {/each}
           </Taglist>
-          <button type="button" class="clear-terms-btn" on:click={clearSelectedTerms}>
+          <button type="button" class="clear-terms-btn" on:click={_clearSelectedTerms}>
             Clear all
           </button>
         </div>
@@ -697,8 +699,8 @@ async function handleSearchInputEvent() {
   </Field>
 </form>
 
-{#if error}
-  <p class="error">{error}</p>
+{#if _error}
+  <p class="error">{_error}</p>
 {:else if results.length}
   {#each results as item}
     <ResultItem {item} />
