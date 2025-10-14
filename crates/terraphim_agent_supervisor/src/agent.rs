@@ -114,6 +114,7 @@ impl SupervisedAgentInfo {
 
     /// Record a restart
     pub fn record_restart(&mut self) {
+        self.restart_count += 1;
         self.last_restart = Some(Utc::now());
     }
 
