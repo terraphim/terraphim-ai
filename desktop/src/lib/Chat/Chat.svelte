@@ -1059,8 +1059,8 @@ function _toggleSessionList() {
       {/if}
     </div>
 
-    {#if providerHint}
-      <p class="is-size-7 has-text-grey">{providerHint}</p>
+    {#if _providerHint}
+      <p class="is-size-7 has-text-grey">{_providerHint}</p>
     {/if}
     {#if error}
       <p class="has-text-danger is-size-7">{error}</p>
