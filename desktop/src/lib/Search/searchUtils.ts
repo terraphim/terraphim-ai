@@ -222,25 +222,33 @@ export interface AutocompleteSuggestion {
  */
 export async function getSuggestions(
 	query: string,
-	_role: string
+	role: string
 ): Promise<AutocompleteSuggestion[]> {
-	// This is a placeholder implementation for the test
-	// In a real implementation, this would call the Tauri backend
+	const { invoke } = await import('@tauri-apps/api/tauri');
 	const suggestions: AutocompleteSuggestion[] = [];
 
 	// Parse the input to see if it contains operators
 	const parsed = parseSearchInput(query);
 
-	// For now, return mock suggestions that match the test expectations
-	if (query.includes('rust')) {
-		suggestions.push(
-			{ term: 'rust', type: 'term', description: 'Rust programming language' },
-			{ term: 'rust-lang', type: 'term', description: 'Rust language documentation' }
-		);
+	try {
+		// Call the Tauri backend for autocomplete suggestions
+		const backendSuggestions = await invoke('get_autocomplete_suggestions', {
+			query: query.trim(),
+			role: role
+		});
+
+		// Handle undefined or null responses
+		if (Array.isArray(backendSuggestions)) {
+			suggestions.push(...backendSuggestions);
+		}
+	} catch (error) {
+		// Fallback to empty suggestions if backend call fails
+		console.warn('Failed to get autocomplete suggestions:', error);
 	}
 
 	// Add operator suggestions for complete terms (length >= 3)
-	if (query.length >= 3 && !query.includes(' AND ') && !query.includes(' OR ')) {
+	// Only add operator suggestions if there's no operator in the query
+	if (query.length >= 3 && !parsed.hasOperator) {
 		const lastTerm = parsed.terms[parsed.terms.length - 1];
 		if (lastTerm && lastTerm.length >= 3) {
 			suggestions.push(
@@ -258,5 +266,6 @@ export async function getSuggestions(
 		}
 	}
 
-	return suggestions;
+	// Limit suggestions to reasonable number for UX (max 10)
+	return suggestions.slice(0, 10);
 }
