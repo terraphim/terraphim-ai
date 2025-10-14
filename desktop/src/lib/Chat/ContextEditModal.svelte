@@ -1,5 +1,6 @@
 <script lang="ts">
 import { createEventDispatcher } from 'svelte';
+import { Modal } from 'svelma';
 import type { ContextItem } from './Chat.svelte';
 
 export let active: boolean = false;
