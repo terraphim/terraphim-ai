@@ -219,7 +219,7 @@ describe('Ripgrep Tag Validation', () => {
 			for (const tag of invalidTags) {
 				const result = validateRipgrepTag(tag);
 				expect(result.isValid).toBe(false);
-				expect(result.errors.some((e) => e.includes('invalid characters'))).toBe(true);
+				expect(result.errors.some((e) => e.includes('contains invalid characters'))).toBe(true);
 			}
 		});
 
