@@ -70,13 +70,13 @@ async fn test_queue_based_architecture_proof() {
 
     #[derive(Clone)]
     struct MockAgent {
-        id: uuid::Uuid,
+        _id: uuid::Uuid,
         status: Arc<RwLock<String>>,
         last_active: Arc<RwLock<DateTime<Utc>>>,
     }
 
     let mock_agent = MockAgent {
-        id: uuid::Uuid::new_v4(),
+        _id: uuid::Uuid::new_v4(),
         status: Arc::new(RwLock::new("Ready".to_string())),
         last_active: Arc::new(RwLock::new(Utc::now())),
     };

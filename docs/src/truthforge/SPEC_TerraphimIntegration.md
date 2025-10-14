@@ -1,9 +1,9 @@
 # Technical Specification: TruthForge Terraphim-AI Integration
 
-**Version**: 1.0  
-**Date**: 2025-10-07  
-**Status**: Draft  
-**Owner**: Zestic AI Engineering Team  
+**Version**: 1.0
+**Date**: 2025-10-07
+**Status**: Draft
+**Owner**: Zestic AI Engineering Team
 **Related**: PRD_TwoPassDebateArena.md, ARCHITECTURE_TerraphimPatterns.md
 
 ---
@@ -101,7 +101,7 @@
   - `agents/`: Specialized agent implementations
   - `taxonomy/`: RoleGraph migration and SCCT mapping
   - `persistence/`: Redis backend integration
-  
+
 #### terraphim_truthforge_server (WebSocket Server)
 - **Purpose**: API gateway and real-time communication
 - **Framework**: Axum (web) + tokio-tungstenite (WebSocket)
@@ -110,7 +110,7 @@
   - Stream agent progress via WebSocket
   - Manage session lifecycle
   - Serve static UI assets
-  
+
 #### Client UI (Agent-Workflows Pattern)
 - **Purpose**: User interface for narrative analysis
 - **Technology**: Vanilla JS + HTML5 + CSS Grid
@@ -675,21 +675,21 @@ pub enum ToneGuidance {
 pub struct TruthForgeAnalysisResult {
     pub session_id: Uuid,
     pub narrative: NarrativeInput,
-    
+
     // Phase 2: Analysis
     pub bias_analysis: BiasAnalysis,
     pub narrative_mapping: NarrativeMapping,
     pub taxonomy_linking: TaxonomyLinking,
     pub omission_catalog: OmissionCatalog,
-    
+
     // Phase 3: Debate
     pub pass_one_debate: DebateResult,
     pub pass_two_debate: DebateResult,
     pub cumulative_analysis: CumulativeAnalysis,
-    
+
     // Phase 4: Response
     pub response_strategies: Vec<ResponseStrategy>,
-    
+
     // Metadata
     pub executive_summary: String,
     pub processing_time_ms: u64,
@@ -1109,10 +1109,10 @@ pub async fn websocket_handler(
 
 async fn handle_socket(socket: WebSocket, session_id: Uuid, app_state: Arc<AppState>) {
     let (mut sender, mut receiver) = socket.split();
-    
+
     // Create progress channel
     let (progress_tx, mut progress_rx) = mpsc::channel::<ServerMessage>(100);
-    
+
     // Spawn task to send progress updates to client
     let send_task = tokio::spawn(async move {
         while let Some(msg) = progress_rx.recv().await {
@@ -1122,7 +1122,7 @@ async fn handle_socket(socket: WebSocket, session_id: Uuid, app_state: Arc<AppSt
             }
         }
     });
-    
+
     // Handle incoming messages
     while let Some(msg) = receiver.next().await {
         let msg = match msg {
@@ -1132,7 +1132,7 @@ async fn handle_socket(socket: WebSocket, session_id: Uuid, app_state: Arc<AppSt
                 break;
             }
         };
-        
+
         match msg {
             Message::Text(text) => {
                 match serde_json::from_str::<ClientMessage>(&text) {
@@ -1140,11 +1140,11 @@ async fn handle_socket(socket: WebSocket, session_id: Uuid, app_state: Arc<AppSt
                         // Start analysis workflow
                         let app_state = app_state.clone();
                         let progress_tx = progress_tx.clone();
-                        
+
                         tokio::spawn(async move {
                             if let Err(e) = run_analysis_workflow(
-                                session_id, 
-                                app_state, 
+                                session_id,
+                                app_state,
                                 progress_tx
                             ).await {
                                 tracing::error!("Analysis workflow error: {}", e);
@@ -1152,8 +1152,8 @@ async fn handle_socket(socket: WebSocket, session_id: Uuid, app_state: Arc<AppSt
                         });
                     }
                     Ok(ClientMessage::Ping { timestamp }) => {
-                        let pong = ServerMessage::Pong { 
-                            timestamp: chrono::Utc::now() 
+                        let pong = ServerMessage::Pong {
+                            timestamp: chrono::Utc::now()
                         };
                         progress_tx.send(pong).await.ok();
                     }
@@ -1166,7 +1166,7 @@ async fn handle_socket(socket: WebSocket, session_id: Uuid, app_state: Arc<AppSt
             _ => {}
         }
     }
-    
+
     send_task.abort();
 }
 
@@ -1176,12 +1176,12 @@ async fn run_analysis_workflow(
     progress_tx: mpsc::Sender<ServerMessage>,
 ) -> anyhow::Result<()> {
     use terraphim_truthforge::workflows::TwoPassDebateWorkflow;
-    
+
     // Load narrative from Redis
     let narrative = app_state.redis_manager
         .get_session(session_id)
         .await?;
-    
+
     // Create workflow with progress callback
     let workflow = TwoPassDebateWorkflow::new(
         app_state.agent_pool.clone(),
@@ -1192,15 +1192,15 @@ async fn run_analysis_workflow(
             });
         }
     );
-    
+
     // Execute workflow
     let results = workflow.execute(&narrative).await?;
-    
+
     // Save results to Redis
     app_state.redis_manager
         .save_results(session_id, &results)
         .await?;
-    
+
     // Send completion message
     progress_tx.send(ServerMessage::AnalysisComplete {
         session_id,
@@ -1208,7 +1208,7 @@ async fn run_analysis_workflow(
         total_duration_ms: results.processing_time_ms,
         timestamp: chrono::Utc::now(),
     }).await?;
-    
+
     Ok(())
 }
 ```
@@ -1219,8 +1219,8 @@ async fn run_analysis_workflow(
 
 ### 5.1 OpenRouter Configuration (Production)
 
-**Provider**: OpenRouter (https://openrouter.ai)  
-**Primary Model**: `anthropic/claude-3.5-sonnet`  
+**Provider**: OpenRouter (https://openrouter.ai)
+**Primary Model**: `anthropic/claude-3.5-sonnet`
 **Fallback Model**: `anthropic/claude-3.5-haiku`
 
 **Cost Structure**:
@@ -1260,19 +1260,19 @@ pub async fn create_omission_detector_agent(
     // Initialize OpenRouter client
     let client = OpenRouterClient::new(&openrouter_api_key);
     let model = CompletionModel::Claude3_5Sonnet;
-    
+
     // Load role configuration
     let role_config = terraphim_config::Role::from_json(
         include_str!("../../config/roles/omission_detector_role.json")
     )?;
-    
+
     // Create GenAiLlmClient wrapper
     let llm_client = terraphim_multi_agent::GenAiLlmClient::new(
         "openrouter".to_string(),
         model.to_string(),
         openrouter_api_key,
     )?;
-    
+
     // Create TerraphimAgent
     let agent_config = AgentConfig {
         max_context_tokens: 32000,
@@ -1281,21 +1281,21 @@ pub async fn create_omission_detector_agent(
         default_timeout_ms: 30000,
         ..Default::default()
     };
-    
+
     let agent = TerraphimAgent::new(
         role_config,
         Arc::new(llm_client),
         Some(agent_config),
     ).await?;
-    
+
     Ok(agent)
 }
 ```
 
 ### 5.2 Ollama Configuration (Testing)
 
-**Provider**: Ollama (local)  
-**Model**: `gemma3:270m`  
+**Provider**: Ollama (local)
+**Model**: `gemma3:270m`
 **Purpose**: Fast integration tests, no cost
 
 ```rust
@@ -1305,16 +1305,16 @@ pub async fn create_omission_detector_agent(
 #[tokio::test]
 async fn test_omission_detector_with_ollama() {
     use terraphim_multi_agent::test_utils::create_test_agent_simple;
-    
+
     // Uses Ollama gemma3:270m by default
     let agent = create_test_agent_simple().await.unwrap();
-    
+
     let narrative = "We reduced costs by 40%. This benefited shareholders.";
     let result = agent.process_narrative(narrative).await.unwrap();
-    
+
     // Verify omissions detected
     assert!(result.omissions.len() >= 3);
-    assert!(result.omissions.iter().any(|o| 
+    assert!(result.omissions.iter().any(|o|
         matches!(o.category, OmissionCategory::MissingEvidence)
     ));
 }
@@ -1377,13 +1377,13 @@ pub fn build_omission_detector_prompt(
         UrgencyLevel::High => "\nIMPORTANT: This is a high-urgency crisis scenario. Prioritize omissions that opponents could exploit in next 24-48 hours.",
         UrgencyLevel::Low => "\nThis is strategic planning. Focus on systemic omissions that would emerge in sustained scrutiny.",
     };
-    
+
     let stakes_modifier = if context.stakes.contains(&StakeType::Legal) {
         "\nPay special attention to missing legal context, regulatory compliance information, and unstated legal assumptions."
     } else {
         ""
     };
-    
+
     format!(
         "{}\n{}{}\n\nNarrative to analyze:\n\n{}",
         SYSTEM_PROMPT,
@@ -1400,7 +1400,7 @@ pub fn build_omission_detector_prompt(
 
 ### 6.1 TruthForge → RoleGraph Schema Mapping
 
-**Source**: `/home/alex/projects/zestic-at/trueforge/truthforge-ai/assets/trueforge_taxonomy.json`  
+**Source**: `/home/alex/projects/zestic-at/trueforge/truthforge-ai/assets/trueforge_taxonomy.json`
 **Target**: `/home/alex/projects/terraphim/terraphim_truthforge/taxonomy/truthforge_rolegraph.json`
 
 #### Migration Strategy
@@ -1415,9 +1415,9 @@ pub async fn migrate_truthforge_taxonomy() -> Result<RoleGraph, anyhow::Error> {
     // Load original taxonomy
     let taxonomy_json = include_str!("../../../taxonomy/source/trueforge_taxonomy.json");
     let taxonomy: Vec<Value> = serde_json::from_str(taxonomy_json)?;
-    
+
     let mut rolegraph = RoleGraph::new("TruthForge Strategic Communication Taxonomy");
-    
+
     for function in taxonomy {
         // Create function node
         let function_id = function["id"].as_str().unwrap();
@@ -1426,61 +1426,61 @@ pub async fn migrate_truthforge_taxonomy() -> Result<RoleGraph, anyhow::Error> {
             function["name"].as_str().unwrap().to_string(),
             NodeType::Function,
         ).with_attributes(extract_attributes(&function));
-        
+
         rolegraph.add_node(function_node)?;
-        
+
         // Create subfunction nodes
         if let Some(subfunctions) = function["subfunctions"].as_array() {
             for subfunction in subfunctions {
                 let subfunction_id = format!(
-                    "{}_{}", 
-                    function_id, 
+                    "{}_{}",
+                    function_id,
                     subfunction["name"].as_str().unwrap()
                 );
-                
+
                 let subfunction_node = Node::new(
                     subfunction_id.clone(),
                     subfunction["name"].as_str().unwrap().to_string(),
                     NodeType::Subfunction,
                 ).with_attributes(extract_subfunction_attributes(subfunction));
-                
+
                 rolegraph.add_node(subfunction_node)?;
-                
+
                 // Create edge: function → subfunction
                 let edge = Edge::new(
                     function_id.to_string(),
                     subfunction_id,
                     EdgeType::HasSubfunction,
                 ).with_weight(1.0);
-                
+
                 rolegraph.add_edge(edge)?;
             }
         }
-        
+
         // Create lifecycle stage nodes
         if let Some(lifecycle) = function["lifecycle"].as_array() {
             for stage in lifecycle {
                 let stage_id = format!("{}_{}", function_id, stage.as_str().unwrap());
-                
+
                 let stage_node = Node::new(
                     stage_id.clone(),
                     stage.as_str().unwrap().to_string(),
                     NodeType::LifecycleStage,
                 );
-                
+
                 rolegraph.add_node(stage_node)?;
-                
+
                 // Edge: function → lifecycle_stage
                 let edge = Edge::new(
                     function_id.to_string(),
                     stage_id,
                     EdgeType::HasLifecycleStage,
                 ).with_weight(1.0);
-                
+
                 rolegraph.add_edge(edge)?;
             }
         }
-        
+
         // SCCT classifications (for issue_crisis_management)
         if function_id == "issue_crisis_management" {
             if let Some(classification) = function["classification"].as_object() {
@@ -1488,7 +1488,7 @@ pub async fn migrate_truthforge_taxonomy() -> Result<RoleGraph, anyhow::Error> {
             }
         }
     }
-    
+
     Ok(rolegraph)
 }
 
@@ -1501,26 +1501,26 @@ fn create_scct_nodes(
     if let Some(responsibility_types) = classification["responsibilityAttribution"].as_array() {
         for resp_type in responsibility_types {
             let node_id = format!("scct_{}", resp_type.as_str().unwrap());
-            
+
             let node = Node::new(
                 node_id.clone(),
                 resp_type.as_str().unwrap().to_string(),
                 NodeType::SCCTClassification,
             );
-            
+
             rolegraph.add_node(node)?;
-            
+
             // Edge: issue_crisis_management → SCCT type
             let edge = Edge::new(
                 function_id.to_string(),
                 node_id,
                 EdgeType::HasSCCTClassification,
             ).with_weight(1.0);
-            
+
             rolegraph.add_edge(edge)?;
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -1630,12 +1630,12 @@ impl TaxonomyLinkerAgent {
     ) -> Result<TaxonomyLinking, anyhow::Error> {
         // Use SCCT classification to determine primary function
         let primary_function = match narrative_mapping.scct_classification {
-            SCCTClassification::Victim | 
-            SCCTClassification::Accidental | 
+            SCCTClassification::Victim |
+            SCCTClassification::Accidental |
             SCCTClassification::Preventable => "issue_crisis_management",
             _ => "relationship_management",  // Fallback
         };
-        
+
         // Query rolegraph for applicable subfunctions
         let subfunctions = self.rolegraph
             .get_subfunctions(primary_function)?
@@ -1643,17 +1643,17 @@ impl TaxonomyLinkerAgent {
             .filter(|sf| self.is_applicable(sf, narrative, bias_analysis))
             .map(|sf| sf.label)
             .collect();
-        
+
         // Determine lifecycle stage based on context
         let lifecycle_stage = self.infer_lifecycle_stage(narrative_mapping)?;
-        
+
         // Select recommended playbooks based on SCCT + subfunctions
         let recommended_playbooks = self.select_playbooks(
             primary_function,
             &narrative_mapping.scct_classification,
             &subfunctions,
         )?;
-        
+
         Ok(TaxonomyLinking {
             primary_function: primary_function.to_string(),
             secondary_functions: vec![],  // Could add based on complexity
@@ -1662,7 +1662,7 @@ impl TaxonomyLinkerAgent {
             recommended_playbooks,
         })
     }
-    
+
     fn select_playbooks(
         &self,
         function: &str,
@@ -1671,7 +1671,7 @@ impl TaxonomyLinkerAgent {
     ) -> Result<Vec<String>, anyhow::Error> {
         let scct_node_id = format!("scct_{}", scct.to_string().to_lowercase());
         let scct_node = self.rolegraph.get_node(&scct_node_id)?;
-        
+
         // Get recommended strategies from SCCT node attributes
         let strategies = scct_node.attributes
             .get("recommended_strategies")
@@ -1680,7 +1680,7 @@ impl TaxonomyLinkerAgent {
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect())
             .unwrap_or_default();
-        
+
         // Combine with subfunction-specific playbooks
         let mut playbooks = strategies;
         for subfunction in subfunctions {
@@ -1695,7 +1695,7 @@ impl TaxonomyLinkerAgent {
                 }
             }
         }
-        
+
         Ok(playbooks)
     }
 }
@@ -1729,14 +1729,14 @@ impl TwoPassDebateWorkflow {
         progress_callback: impl Fn(ServerMessage) + Send + Sync + 'static,
     ) -> Self {
         let (progress_tx, mut progress_rx) = mpsc::channel(100);
-        
+
         // Spawn progress forwarder
         tokio::spawn(async move {
             while let Some(msg) = progress_rx.recv().await {
                 progress_callback(msg);
             }
         });
-        
+
         Self {
             pass_one: PassOneOrchestrator::new(agent_pool.clone()),
             pass_two: PassTwoOptimizer::new(agent_pool.clone()),
@@ -1744,17 +1744,17 @@ impl TwoPassDebateWorkflow {
             progress_tx,
         }
     }
-    
+
     pub async fn execute(
         &self,
         narrative: &NarrativeInput,
     ) -> Result<TruthForgeAnalysisResult, anyhow::Error> {
         let start_time = std::time::Instant::now();
-        
+
         // Phase 1: Pass One (Orchestrator-Workers)
         self.send_progress("analysis", "BiasDetectorAgent", 0.0).await;
         let pass_one_result = self.pass_one.execute(narrative, self.progress_tx.clone()).await?;
-        
+
         // Phase 2: Pass Two (Evaluator-Optimizer)
         self.send_progress("debate_pass2", "ExploitationDebater", 0.0).await;
         let pass_two_result = self.pass_two.execute(
@@ -1762,7 +1762,7 @@ impl TwoPassDebateWorkflow {
             &pass_one_result.omission_catalog,
             self.progress_tx.clone(),
         ).await?;
-        
+
         // Phase 3: Response Generation (Parallelization)
         self.send_progress("response", "ReframeAgent", 0.0).await;
         let response_strategies = self.response_generator.execute(
@@ -1770,14 +1770,14 @@ impl TwoPassDebateWorkflow {
             &pass_two_result.cumulative_analysis,
             self.progress_tx.clone(),
         ).await?;
-        
+
         // Generate executive summary
         let executive_summary = self.generate_executive_summary(
             &pass_one_result,
             &pass_two_result,
             &response_strategies,
         );
-        
+
         Ok(TruthForgeAnalysisResult {
             session_id: narrative.session_id,
             narrative: narrative.clone(),
@@ -1794,7 +1794,7 @@ impl TwoPassDebateWorkflow {
             created_at: chrono::Utc::now(),
         })
     }
-    
+
     async fn send_progress(&self, phase: &str, agent: &str, progress: f64) {
         let msg = ServerMessage::AgentProgress {
             session_id: Uuid::new_v4(),  // Set by caller
@@ -1805,7 +1805,7 @@ impl TwoPassDebateWorkflow {
             estimated_remaining_ms: 0,  // Calculated dynamically
             timestamp: chrono::Utc::now(),
         };
-        
+
         self.progress_tx.send(msg).await.ok();
     }
 }
@@ -1839,12 +1839,12 @@ impl PassOneOrchestrator {
             self.taxonomy_linker.analyze(&narrative.text),
             self.omission_detector.analyze(&narrative.text),
         );
-        
+
         let bias_analysis = bias?;
         let narrative_mapping = narrative_map?;
         let taxonomy_linking = taxonomy?;
         let omission_catalog = omissions?;
-        
+
         // Send progress
         progress_tx.send(ServerMessage::PhaseComplete {
             session_id: narrative.session_id,
@@ -1858,7 +1858,7 @@ impl PassOneOrchestrator {
             duration_ms: 0,  // Calculate
             timestamp: chrono::Utc::now(),
         }).await?;
-        
+
         // Step 2: Debate with omission awareness
         let debate_context = DebateContext {
             narrative: narrative.text.clone(),
@@ -1866,22 +1866,22 @@ impl PassOneOrchestrator {
             narrative_mapping: narrative_mapping.clone(),
             omission_catalog: omission_catalog.clone(),
         };
-        
+
         let (supporting_arg, opposing_arg) = tokio::join!(
             self.debater_supporting.debate(&debate_context),
             self.debater_opposing.debate(&debate_context),
         );
-        
+
         let supporting_argument = supporting_arg?;
         let opposing_argument = opposing_arg?;
-        
+
         // Step 3: Evaluate debate
         let evaluation = self.evaluator.evaluate(
             &supporting_argument,
             &opposing_argument,
             &omission_catalog,
         ).await?;
-        
+
         // Create prioritized omission list for Pass 2
         let prioritized_omissions = omission_catalog.omissions
             .iter()
@@ -1889,7 +1889,7 @@ impl PassOneOrchestrator {
             .take(10)
             .map(|o| o.id)
             .collect();
-        
+
         Ok(PassOneResult {
             bias_analysis,
             narrative_mapping,
@@ -1933,30 +1933,30 @@ impl PassTwoOptimizer {
             .filter(|o| omission_catalog.prioritized.contains(&o.id))
             .cloned()
             .collect();
-        
+
         // Create exploitation context
         let exploitation_context = ExploitationContext {
             narrative: narrative.text.clone(),
             target_omissions: top_omissions,
             directive: "Maximize vulnerability exploitation using identified gaps".to_string(),
         };
-        
+
         // Run exploitation debate (Evaluator-Optimizer pattern)
         let (supporting_arg, opposing_arg) = tokio::join!(
             self.exploitation_debater_supporting.exploit(&exploitation_context),
             self.exploitation_debater_opposing.exploit(&exploitation_context),
         );
-        
+
         let supporting_argument = supporting_arg?;
         let opposing_argument = opposing_arg?;
-        
+
         // Cumulative evaluation (tracks amplification vs Pass 1)
         let cumulative_analysis = self.cumulative_evaluator.evaluate_cumulative(
             &pass_one_debate,  // Need to pass from workflow
             &supporting_argument,
             &opposing_argument,
         ).await?;
-        
+
         Ok(PassTwoResult {
             debate_result: DebateResult {
                 pass: DebatePass::PassTwo,
@@ -1983,33 +1983,33 @@ impl PassTwoOptimizer {
 mod ollama_tests {
     use terraphim_truthforge::*;
     use terraphim_multi_agent::test_utils::*;
-    
+
     #[tokio::test]
     async fn test_omission_detector_finds_gaps() {
         let agent = create_omission_detector_test_agent().await.unwrap();
-        
+
         let narrative = "We reduced costs by 40%. Shareholders benefited greatly.";
         let result = agent.analyze(narrative).await.unwrap();
-        
+
         // Should detect missing evidence
         assert!(result.omissions.len() >= 2);
-        
-        let has_evidence_gap = result.omissions.iter().any(|o| 
+
+        let has_evidence_gap = result.omissions.iter().any(|o|
             matches!(o.category, OmissionCategory::MissingEvidence)
         );
         assert!(has_evidence_gap, "Should detect missing evidence for '40%' claim");
-        
+
         // Should have high exploitability
         let max_exploitability = result.omissions.iter()
             .map(|o| o.exploitability)
             .fold(0.0, f64::max);
         assert!(max_exploitability > 0.7, "Cost claim should be highly exploitable");
     }
-    
+
     #[tokio::test]
     async fn test_pass_two_references_pass_one_omissions() {
         let workflow = create_test_workflow_with_ollama().await.unwrap();
-        
+
         let narrative = NarrativeInput {
             session_id: Uuid::new_v4(),
             text: "Our company achieved record profits while maintaining our commitment to sustainability.".to_string(),
@@ -2020,18 +2020,18 @@ mod ollama_tests {
             },
             submitted_at: chrono::Utc::now(),
         };
-        
+
         let result = workflow.execute(&narrative).await.unwrap();
-        
+
         // Pass 1 should identify omissions
         assert!(result.omission_catalog.omissions.len() >= 5);
-        
+
         // Pass 2 should reference Pass 1 omissions
         let pass2_omission_refs = result.pass_two_debate.opposing_argument.omissions_referenced.len();
         let pass1_top_10 = result.omission_catalog.prioritized.len();
-        
+
         let reference_percentage = pass2_omission_refs as f64 / pass1_top_10 as f64;
-        assert!(reference_percentage >= 0.8, 
+        assert!(reference_percentage >= 0.8,
             "Pass 2 should reference ≥80% of top 10 omissions, got {:.1%}",
             reference_percentage
         );
@@ -2049,14 +2049,14 @@ async fn test_end_to_end_workflow_with_persistence() {
     // Start Redis test container
     let redis_container = start_redis_test_container().await;
     let redis_url = redis_container.url();
-    
+
     // Create server with test config
     let server = TruthForgeServer::new(TestConfig {
         redis_url,
         llm_provider: "ollama".to_string(),
         ..Default::default()
     }).await.unwrap();
-    
+
     // Submit narrative via REST API
     let client = reqwest::Client::new();
     let response = client.post("http://localhost:8080/api/v1/analysis")
@@ -2073,13 +2073,13 @@ async fn test_end_to_end_workflow_with_persistence() {
         .send()
         .await
         .unwrap();
-    
+
     assert_eq!(response.status(), 202);
     let session: SessionResponse = response.json().await.unwrap();
-    
+
     // Wait for completion (or use WebSocket in real scenario)
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
-    
+
     // Retrieve results
     let results_response = client.get(format!(
         "http://localhost:8080/api/v1/session/{}",
@@ -2088,16 +2088,16 @@ async fn test_end_to_end_workflow_with_persistence() {
     .send()
     .await
     .unwrap();
-    
+
     assert_eq!(results_response.status(), 200);
     let results: TruthForgeAnalysisResult = results_response.json().await.unwrap();
-    
+
     // Verify results persisted in Redis
     let mut redis_conn = redis::Client::open(redis_url).unwrap().get_connection().unwrap();
     let key = format!("results:{}", session.session_id);
     let exists: bool = redis::cmd("EXISTS").arg(&key).query(&mut redis_conn).unwrap();
     assert!(exists, "Results should be persisted in Redis");
-    
+
     // Cleanup
     redis_container.stop().await;
 }
@@ -2110,24 +2110,24 @@ async fn test_end_to_end_workflow_with_persistence() {
 #[ignore]  // Run with --ignored flag
 async fn test_workflow_performance_target() {
     let workflow = create_production_workflow().await.unwrap();  // Uses OpenRouter
-    
+
     let narrative = create_realistic_test_narrative();
-    
+
     let start = std::time::Instant::now();
     let result = workflow.execute(&narrative).await.unwrap();
     let duration = start.elapsed();
-    
+
     // Performance targets
-    assert!(duration.as_secs() < 60, 
+    assert!(duration.as_secs() < 60,
         "Workflow should complete in <60s, took {:?}",
         duration
     );
-    
+
     assert!(result.processing_time_ms < 45000,
         "Target is <45s, actual: {}ms",
         result.processing_time_ms
     );
-    
+
     // Check individual phase timings
     println!("Performance breakdown:");
     println!("  Total: {}ms", result.processing_time_ms);
@@ -2281,19 +2281,19 @@ use terraphim_multi_agent::sanitize_system_prompt;
 pub fn prepare_narrative_for_analysis(raw_narrative: &str) -> Result<String, anyhow::Error> {
     // Sanitize to prevent prompt injection
     let sanitized = sanitize_system_prompt(raw_narrative);
-    
+
     if sanitized.was_modified {
         tracing::warn!(
             "Narrative sanitized for security: {:?}",
             sanitized.patterns_detected
         );
     }
-    
+
     // Additional TruthForge-specific checks
     if sanitized.output.len() > 10_000 {
         return Err(anyhow::anyhow!("Narrative exceeds 10,000 character limit"));
     }
-    
+
     Ok(sanitized.output)
 }
 ```
@@ -2305,11 +2305,11 @@ pub fn redact_pii_before_vault_storage(result: &TruthForgeAnalysisResult) -> Red
     // Use regex to detect common PII patterns
     let email_pattern = regex::Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap();
     let phone_pattern = regex::Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b").unwrap();
-    
+
     let mut redacted_narrative = result.narrative.text.clone();
     redacted_narrative = email_pattern.replace_all(&redacted_narrative, "[EMAIL_REDACTED]").to_string();
     redacted_narrative = phone_pattern.replace_all(&redacted_narrative, "[PHONE_REDACTED]").to_string();
-    
+
     RedactedResult {
         narrative: redacted_narrative,
         omissions: result.omission_catalog.clone(),  // Safe - no PII
@@ -2352,27 +2352,27 @@ impl RateLimiter {
             requests_per_hour,
         }
     }
-    
+
     pub async fn check_rate_limit(&self, user_id: &str) -> Result<(), StatusCode> {
         let mut limits = self.limits.write().await;
         let now = chrono::Utc::now();
-        
+
         let limit = limits.entry(user_id.to_string())
             .or_insert(RateLimit {
                 count: 0,
                 window_start: now,
             });
-        
+
         // Reset if window expired
         if (now - limit.window_start).num_hours() >= 1 {
             limit.count = 0;
             limit.window_start = now;
         }
-        
+
         if limit.count >= self.requests_per_hour {
             return Err(StatusCode::TOO_MANY_REQUESTS);
         }
-        
+
         limit.count += 1;
         Ok(())
     }
@@ -2385,9 +2385,9 @@ pub async fn rate_limit_middleware<B>(
 ) -> Result<Response, StatusCode> {
     // Extract user ID from auth header
     let user_id = extract_user_id(&request)?;
-    
+
     rate_limiter.check_rate_limit(&user_id).await?;
-    
+
     Ok(next.run(request).await)
 }
 ```
@@ -2408,17 +2408,17 @@ pub async fn execute_workflow(narrative: &NarrativeInput) -> Result<TruthForgeAn
         urgency = ?narrative.context.urgency,
         "Starting two-pass debate workflow"
     );
-    
+
     let start = std::time::Instant::now();
-    
+
     // ... workflow execution ...
-    
+
     info!(
         session_id = %narrative.session_id,
         duration_ms = start.elapsed().as_millis(),
         "Workflow completed successfully"
     );
-    
+
     Ok(result)
 }
 ```
@@ -2435,12 +2435,12 @@ lazy_static! {
             "Time to complete full workflow"
         )
     ).unwrap();
-    
+
     static ref OMISSIONS_DETECTED: IntCounter = IntCounter::new(
         "truthforge_omissions_detected_total",
         "Total omissions detected across all analyses"
     ).unwrap();
-    
+
     static ref PASS2_EXPLOITATION_RATE: Histogram = Histogram::with_opts(
         HistogramOpts::new(
             "truthforge_pass2_exploitation_rate",
@@ -2523,8 +2523,8 @@ ENABLE_TRACING=true
 
 ---
 
-**Document Control**  
-**Created**: 2025-10-07  
-**Last Modified**: 2025-10-07  
-**Version**: 1.0  
+**Document Control**
+**Created**: 2025-10-07
+**Last Modified**: 2025-10-07
+**Version**: 1.0
 **Classification**: Internal - Zestic AI Confidential

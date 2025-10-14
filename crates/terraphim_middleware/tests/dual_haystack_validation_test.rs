@@ -152,21 +152,13 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: AHashMap::new(),
             },
@@ -199,21 +191,13 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: AHashMap::new(),
             },
@@ -235,21 +219,13 @@ async fn test_dual_haystack_comprehensive_validation() {
                 kg: None,
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: AHashMap::new(),
             },
@@ -273,21 +249,13 @@ async fn test_dual_haystack_comprehensive_validation() {
                     ServiceType::Ripgrep,
                     true,
                 )],
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: AHashMap::new(),
             },
@@ -774,21 +742,13 @@ async fn test_source_differentiation_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                #[cfg(feature = "openrouter")]
                 llm_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_api_key: None,
-                #[cfg(feature = "openrouter")]
                 llm_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_auto_summarize: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_enabled: false,
-                #[cfg(feature = "openrouter")]
                 llm_chat_system_prompt: None,
-                #[cfg(feature = "openrouter")]
                 llm_chat_model: None,
-                #[cfg(feature = "openrouter")]
                 llm_context_window: None,
                 extra: AHashMap::new(),
             },

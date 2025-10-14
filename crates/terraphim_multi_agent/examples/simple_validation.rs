@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use terraphim_multi_agent::{
-    CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
+    CommandInput, CommandType, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 
@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create agent
     println!("\n3️⃣ Creating TerraphimAgent...");
-    let mut agent = TerraphimAgent::new(role, persistence, None).await?;
+    let agent = TerraphimAgent::new(role, persistence, None).await?;
     println!("✅ Agent created with ID: {}", agent.agent_id);
     println!("   Status: {:?}", agent.status);
     println!("   Capabilities: {:?}", agent.get_capabilities());

@@ -11,7 +11,7 @@ class TerraphimSettingsUI {
     this.isOpen = false;
     this.discoveryInProgress = false;
     this.connectionTestInProgress = false;
-    
+
     this.init();
   }
 
@@ -20,7 +20,7 @@ class TerraphimSettingsUI {
     this.bindEvents();
     this.updateUI();
     this.setupKeyboardShortcuts();
-    
+
     // Listen for settings changes
     this.settingsManager.on('settingsUpdated', () => this.updateUI());
     this.settingsManager.on('connectionSuccess', (result) => this.updateConnectionStatus('connected', `Connected to ${result.url}`));
@@ -34,18 +34,18 @@ class TerraphimSettingsUI {
     try {
       const response = await fetch('../shared/settings-modal.html');
       const html = await response.text();
-      
+
       // Create container and insert HTML
       const container = document.createElement('div');
       container.innerHTML = html;
-      
+
       // Add to page
       document.body.appendChild(container);
-      
+
       // Get references to modal elements
       this.overlayElement = document.getElementById('settings-overlay');
       this.modalElement = this.overlayElement.querySelector('.settings-modal');
-      
+
       return true;
     } catch (error) {
       console.error('Failed to load settings modal:', error);
@@ -58,11 +58,11 @@ class TerraphimSettingsUI {
     const toggleButton = document.getElementById('settings-toggle');
     const closeButton = document.getElementById('settings-close');
     const saveButton = document.getElementById('save-settings');
-    
+
     toggleButton?.addEventListener('click', () => this.toggle());
     closeButton?.addEventListener('click', () => this.close());
     saveButton?.addEventListener('click', () => this.saveSettings());
-    
+
     // Click outside to close
     this.overlayElement?.addEventListener('click', (e) => {
       if (e.target === this.overlayElement) {
@@ -74,20 +74,20 @@ class TerraphimSettingsUI {
     const testButton = document.getElementById('test-connection');
     const discoverButton = document.getElementById('discover-servers');
     const serverUrlInput = document.getElementById('server-url');
-    
+
     testButton?.addEventListener('click', () => this.testConnection());
     discoverButton?.addEventListener('click', () => this.discoverServers());
     serverUrlInput?.addEventListener('change', () => this.onServerUrlChange());
 
     // Settings inputs
     this.bindSettingsInputs();
-    
+
     // Profile management
     this.bindProfileEvents();
-    
+
     // Import/Export
     this.bindImportExportEvents();
-    
+
     // Reset
     document.getElementById('reset-settings')?.addEventListener('click', () => this.resetSettings());
   }
@@ -110,7 +110,7 @@ class TerraphimSettingsUI {
   bindProfileEvents() {
     const saveProfileButton = document.getElementById('save-profile');
     const profileNameInput = document.getElementById('profile-name');
-    
+
     saveProfileButton?.addEventListener('click', () => this.saveCurrentProfile());
     profileNameInput?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -123,7 +123,7 @@ class TerraphimSettingsUI {
     const exportButton = document.getElementById('export-settings');
     const importButton = document.getElementById('import-settings');
     const importFile = document.getElementById('import-file');
-    
+
     exportButton?.addEventListener('click', () => this.exportSettings());
     importButton?.addEventListener('click', () => importFile?.click());
     importFile?.addEventListener('change', (e) => this.importSettings(e));
@@ -145,21 +145,21 @@ class TerraphimSettingsUI {
   // Modal control methods
   open() {
     if (!this.overlayElement) return;
-    
+
     this.isOpen = true;
     this.overlayElement.classList.add('active');
     document.body.style.overflow = 'hidden';
-    
+
     // Focus first input
     const firstInput = this.modalElement?.querySelector('input, select, button');
     firstInput?.focus();
-    
+
     this.updateUI();
   }
 
   close() {
     if (!this.overlayElement) return;
-    
+
     this.isOpen = false;
     this.overlayElement.classList.remove('active');
     document.body.style.overflow = '';
@@ -201,7 +201,7 @@ class TerraphimSettingsUI {
     const statusElement = document.getElementById('connection-status');
     const messageElement = document.getElementById('connection-message');
     const indicatorElement = statusElement?.querySelector('.connection-indicator');
-    
+
     if (statusElement && messageElement && indicatorElement) {
       statusElement.className = `connection-status ${status}`;
       indicatorElement.className = `connection-indicator ${status}`;
@@ -212,9 +212,9 @@ class TerraphimSettingsUI {
   updateConnectionToggle() {
     const toggleButton = document.getElementById('settings-toggle');
     if (!toggleButton) return;
-    
+
     toggleButton.className = 'settings-toggle';
-    
+
     // Test connection status asynchronously
     if (this.settingsManager.get('serverUrl')) {
       this.settingsManager.testConnection().then(result => {
@@ -235,13 +235,13 @@ class TerraphimSettingsUI {
   updateDiscoveredServers(servers) {
     const container = document.getElementById('discovered-servers-container');
     const serversElement = document.getElementById('discovered-servers');
-    
+
     if (!container || !serversElement) return;
-    
+
     if (servers && servers.length > 0) {
       container.style.display = 'block';
       serversElement.innerHTML = '';
-      
+
       servers.forEach(server => {
         const serverItem = this.createServerItem(server);
         serversElement.appendChild(serverItem);
@@ -257,23 +257,23 @@ class TerraphimSettingsUI {
     if (server.url === this.settingsManager.get('serverUrl')) {
       item.classList.add('selected');
     }
-    
+
     item.innerHTML = `
       <div class="server-info">
         <div class="server-url">${server.url}</div>
         <div class="server-meta">
-          ${server.wsAvailable ? '🟢' : '🔴'} WebSocket 
+          ${server.wsAvailable ? '🟢' : '🔴'} WebSocket
           | ${server.workflowEndpoints.length} endpoints
           | v${server.version}
         </div>
       </div>
       <div class="server-response-time">${server.responseTime}ms</div>
     `;
-    
+
     item.addEventListener('click', () => {
       this.selectServer(server);
     });
-    
+
     return item;
   }
 
@@ -285,9 +285,9 @@ class TerraphimSettingsUI {
   updateProfilesList(profiles) {
     const profilesList = document.getElementById('profiles-list');
     if (!profilesList) return;
-    
+
     profilesList.innerHTML = '';
-    
+
     if (profiles && profiles.length > 0) {
       profiles.forEach(profile => {
         const profileItem = this.createProfileItem(profile);
@@ -301,9 +301,9 @@ class TerraphimSettingsUI {
   createProfileItem(profile) {
     const item = document.createElement('div');
     item.className = 'profile-item';
-    
+
     const createdDate = new Date(profile.createdAt).toLocaleDateString();
-    
+
     item.innerHTML = `
       <div class="profile-info">
         <div class="profile-name">${profile.name}</div>
@@ -323,12 +323,12 @@ class TerraphimSettingsUI {
         </button>
       </div>
     `;
-    
+
     // Bind profile actions
     item.addEventListener('click', (e) => {
       const action = e.target.closest('[data-action]')?.dataset.action;
       const profileId = e.target.closest('[data-action]')?.dataset.profile;
-      
+
       if (action && profileId) {
         if (action === 'load') {
           this.loadProfile(profileId);
@@ -337,7 +337,7 @@ class TerraphimSettingsUI {
         }
       }
     });
-    
+
     return item;
   }
 
@@ -357,20 +357,20 @@ class TerraphimSettingsUI {
 
   async testConnection() {
     if (this.connectionTestInProgress) return;
-    
+
     const testButton = document.getElementById('test-connection');
     const serverUrl = document.getElementById('server-url')?.value;
-    
+
     if (!serverUrl) {
       this.updateConnectionStatus('error', 'Please enter a server URL');
       return;
     }
-    
+
     this.connectionTestInProgress = true;
     if (testButton) testButton.disabled = true;
-    
+
     this.updateConnectionStatus('connecting', 'Testing connection...');
-    
+
     try {
       const result = await this.settingsManager.testConnection(serverUrl);
       // Status will be updated via event listener
@@ -382,12 +382,12 @@ class TerraphimSettingsUI {
 
   async discoverServers() {
     if (this.discoveryInProgress) return;
-    
+
     const discoverButton = document.getElementById('discover-servers');
-    
+
     this.discoveryInProgress = true;
     if (discoverButton) discoverButton.disabled = true;
-    
+
     try {
       await this.settingsManager.discoverServers((progress) => {
         this.updateDiscoveryProgress(progress);
@@ -401,7 +401,7 @@ class TerraphimSettingsUI {
   onDiscoveryStarted() {
     const progressElement = document.getElementById('discovery-progress');
     const statusElement = document.getElementById('discovery-status');
-    
+
     if (progressElement) progressElement.style.display = 'block';
     if (statusElement) {
       statusElement.style.display = 'block';
@@ -412,7 +412,7 @@ class TerraphimSettingsUI {
   onDiscoveryCompleted(data) {
     const progressElement = document.getElementById('discovery-progress');
     const statusElement = document.getElementById('discovery-status');
-    
+
     if (progressElement) progressElement.style.display = 'none';
     if (statusElement) {
       statusElement.textContent = `Discovery complete. Found ${data.count} server(s).`;
@@ -425,7 +425,7 @@ class TerraphimSettingsUI {
   onDiscoveryError(data) {
     const progressElement = document.getElementById('discovery-progress');
     const statusElement = document.getElementById('discovery-status');
-    
+
     if (progressElement) progressElement.style.display = 'none';
     if (statusElement) {
       statusElement.textContent = `Discovery failed: ${data.error}`;
@@ -442,11 +442,11 @@ class TerraphimSettingsUI {
   updateDiscoveryProgress(progress) {
     const progressBar = document.getElementById('discovery-progress-bar');
     const statusElement = document.getElementById('discovery-status');
-    
+
     if (progressBar) {
       progressBar.style.width = `${progress.percentage}%`;
     }
-    
+
     if (statusElement) {
       statusElement.textContent = `Scanning ${progress.currentUrl} (${progress.completed}/${progress.total})`;
     }
@@ -460,12 +460,12 @@ class TerraphimSettingsUI {
   saveCurrentProfile() {
     const profileNameInput = document.getElementById('profile-name');
     const name = profileNameInput?.value?.trim();
-    
+
     if (!name) {
       alert('Please enter a profile name');
       return;
     }
-    
+
     try {
       this.settingsManager.saveProfile(name);
       if (profileNameInput) profileNameInput.value = '';
@@ -499,21 +499,21 @@ class TerraphimSettingsUI {
     const data = this.settingsManager.exportSettings();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `terraphim-settings-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    
+
     URL.revokeObjectURL(url);
   }
 
   importSettings(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -526,7 +526,7 @@ class TerraphimSettingsUI {
       }
     };
     reader.readAsText(file);
-    
+
     // Reset file input
     event.target.value = '';
   }
@@ -564,7 +564,7 @@ class TerraphimSettingsUI {
   setInputValue(id, value) {
     const element = document.getElementById(id);
     if (!element) return;
-    
+
     if (element.type === 'checkbox') {
       element.checked = Boolean(value);
     } else {

@@ -251,8 +251,7 @@ mod tests {
 
         let _enricher = TruthForgeContextEnricher::new(config_state, persistence);
 
-        // Just verify it can be created
-        assert!(true);
+        // Just verify it can be created without panicking
     }
 
     #[tokio::test]

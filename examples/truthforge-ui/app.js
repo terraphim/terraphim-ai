@@ -10,7 +10,7 @@ class TruthForgeClient {
     this.analysisResult = null;
     this.wsClient = null;
     this.startTime = null;
-    
+
     this.initializeWebSocket();
   }
 
@@ -21,7 +21,7 @@ class TruthForgeClient {
     }
 
     const wsUrl = this.baseUrl.replace(/^http/, 'ws') + '/ws';
-    
+
     try {
       this.wsClient = new TerraphimWebSocketClient({
         url: wsUrl,
@@ -51,11 +51,11 @@ class TruthForgeClient {
   updateServerStatus(status) {
     const indicator = document.getElementById('serverStatus');
     const text = document.querySelector('.status-text');
-    
+
     if (!indicator || !text) return;
 
     indicator.className = 'status-indicator';
-    
+
     switch (status) {
       case 'connected':
         indicator.classList.add('connected');
@@ -92,7 +92,7 @@ class TruthForgeClient {
 
   async getAnalysis(sessionId) {
     const response = await fetch(`${this.baseUrl}/api/v1/truthforge/${sessionId}`);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -103,33 +103,33 @@ class TruthForgeClient {
   async pollForResults(sessionId, maxWaitSeconds = 120) {
     const pollInterval = 2000; // 2 seconds
     const maxAttempts = (maxWaitSeconds * 1000) / pollInterval;
-    
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
-      
+
       const response = await this.getAnalysis(sessionId);
-      
+
       if (response.result) {
         return response.result;
       }
-      
+
       if (response.error) {
         throw new Error(`Analysis failed: ${response.error}`);
       }
     }
-    
+
     throw new Error('Analysis timeout - results not ready after ' + maxWaitSeconds + ' seconds');
   }
 
   handleProgressUpdate(data) {
     const { stage, details } = data;
-    
+
     switch (stage) {
       case 'started':
         this.updatePipelineStage('pass_one', 'omissions', 'running');
         this.updateProgressText(`Analysis started (${details.narrative_length} characters)`);
         break;
-        
+
       case 'completed':
         this.markAllStagesComplete();
         this.updateProgressText(
@@ -137,7 +137,7 @@ class TruthForgeClient {
           `generated ${details.strategies_count} strategies (${details.processing_time_ms}ms)`
         );
         break;
-        
+
       case 'failed':
         this.markAllStagesFailed();
         this.updateProgressText(`Analysis failed: ${details.error}`, 'error');
@@ -149,11 +149,11 @@ class TruthForgeClient {
     const stepElement = document.querySelector(
       `.pipeline-stage[data-stage="${stage}"] .step[data-step="${step}"] .step-status`
     );
-    
+
     if (!stepElement) return;
 
     stepElement.className = 'step-status';
-    
+
     switch (status) {
       case 'running':
         stepElement.classList.add('running');
@@ -209,7 +209,7 @@ class TruthForgeUI {
   constructor() {
     this.client = new TruthForgeClient();
     this.currentDebateView = 'pass1';
-    
+
     this.initializeEventListeners();
     this.updateCharCount();
   }
@@ -247,7 +247,7 @@ class TruthForgeUI {
   updateCharCount() {
     const textarea = document.getElementById('narrativeText');
     const charCount = document.getElementById('charCount');
-    
+
     if (textarea && charCount) {
       charCount.textContent = textarea.value.length;
     }
@@ -280,7 +280,7 @@ class TruthForgeUI {
       // Show pipeline section
       this.showSection('pipelineSection');
       this.hideSection('inputSection');
-      
+
       // Disable analyze button
       const analyzeBtn = document.getElementById('analyzeBtn');
       if (analyzeBtn) {
@@ -291,18 +291,18 @@ class TruthForgeUI {
       // Submit narrative
       this.client.startTime = Date.now();
       const response = await this.client.submitNarrative(narrativeInput);
-      
+
       this.client.currentSessionId = response.session_id;
-      
+
       // Update session info
       document.getElementById('sessionId').textContent = response.session_id;
 
       // Wait for results (either from WebSocket updates or polling)
       const result = await this.client.pollForResults(response.session_id);
-      
+
       this.client.analysisResult = result;
       this.displayResults(result);
-      
+
     } catch (error) {
       console.error('Analysis failed:', error);
       alert(`Analysis failed: ${error.message}`);
@@ -313,7 +313,7 @@ class TruthForgeUI {
   displayResults(result) {
     // Show results section
     this.showSection('resultsSection');
-    
+
     // Update session info
     const processingTime = document.getElementById('processingTime');
     if (processingTime && result.processing_time_ms) {
@@ -351,7 +351,7 @@ class TruthForgeUI {
     if (!omissionsList || !catalog) return;
 
     const omissions = catalog.omissions || [];
-    
+
     if (omissions.length === 0) {
       omissionsList.innerHTML = '<p class="empty-state">No omissions detected</p>';
       return;
@@ -389,7 +389,7 @@ class TruthForgeUI {
 
   switchDebateView(debateType) {
     this.currentDebateView = debateType;
-    
+
     // Update active toggle
     document.querySelectorAll('.debate-toggle').forEach(toggle => {
       toggle.classList.toggle('active', toggle.dataset.debate === debateType);
@@ -474,7 +474,7 @@ class TruthForgeUI {
       <div class="recommended-actions">
         <h4>Recommended Actions</h4>
         <ul>
-          ${(analysis.recommended_actions || []).map(action => 
+          ${(analysis.recommended_actions || []).map(action =>
             `<li>${action}</li>`
           ).join('')}
         </ul>
@@ -545,7 +545,7 @@ class TruthForgeUI {
   // Utility methods
   formatMarkdown(text) {
     if (!text) return '';
-    
+
     // Simple markdown rendering
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -624,14 +624,14 @@ class TruthForgeUI {
     this.hideSection('pipelineSection');
     this.hideSection('resultsSection');
     this.showSection('inputSection');
-    
+
     // Reset analyze button
     const analyzeBtn = document.getElementById('analyzeBtn');
     if (analyzeBtn) {
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = '<span class="btn-icon">🚀</span> Analyze Narrative';
     }
-    
+
     // Clear form
     const textarea = document.getElementById('narrativeText');
     if (textarea) {
@@ -649,12 +649,12 @@ class TruthForgeUI {
     const data = JSON.stringify(this.client.analysisResult, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `truthforge-${this.client.currentSessionId}.json`;
     a.click();
-    
+
     URL.revokeObjectURL(url);
   }
 }

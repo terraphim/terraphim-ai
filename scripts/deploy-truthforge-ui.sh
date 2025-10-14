@@ -17,17 +17,17 @@ log_error() {
 
 phase1_copy_files() {
     log_info "Phase 1: Copy TruthForge UI files to bigbox"
-    
+
     rsync -avz --delete \
         "$PROJECT_ROOT/examples/truthforge-ui/" \
         "$BIGBOX_USER@$BIGBOX_HOST:$DEPLOY_PATH/truthforge-ui/"
-    
+
     log_info "Phase 1 complete"
 }
 
 phase2_caddy_integration() {
     log_info "Phase 2: Add Caddy configuration for TruthForge UI"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -66,13 +66,13 @@ sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 
 ENDSSH
-    
+
     log_info "Phase 2 complete"
 }
 
 phase3_update_endpoints() {
     log_info "Phase 3: Update API endpoints in UI files"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -85,13 +85,13 @@ find . -type f \( -name "*.js" -o -name "*.html" \) -exec sed -i \
 chmod -R 755 /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/
 
 ENDSSH
-    
+
     log_info "Phase 3 complete"
 }
 
 phase4_start_backend() {
     log_info "Phase 4: Start TruthForge backend with 1Password secrets"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -125,13 +125,13 @@ sudo systemctl enable truthforge-backend
 sudo systemctl restart truthforge-backend
 
 ENDSSH
-    
+
     log_info "Phase 4 complete"
 }
 
 phase5_verify_deployment() {
     log_info "Phase 5: Verify deployment"
-    
+
     ssh "$BIGBOX_USER@$BIGBOX_HOST" bash << 'ENDSSH'
 set -e
 
@@ -159,19 +159,19 @@ else
 fi
 
 ENDSSH
-    
+
     log_info "Phase 5 complete"
 }
 
 main() {
     log_info "Starting TruthForge UI deployment to bigbox"
-    
+
     phase1_copy_files
     phase2_caddy_integration
     phase3_update_endpoints
     phase4_start_backend
     phase5_verify_deployment
-    
+
     log_info "Deployment complete! TruthForge UI available at: https://alpha.truthforge.terraphim.cloud"
 }
 

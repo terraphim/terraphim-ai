@@ -155,12 +155,12 @@ alpha.truthforge.terraphim.cloud {
     authorize with mypolicy
     root * /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui
     file_server
-    
+
     # Proxy API requests to backend
     handle /api/* {
         reverse_proxy 127.0.0.1:8090
     }
-    
+
     # WebSocket support
     @ws {
         path /ws
@@ -170,7 +170,7 @@ alpha.truthforge.terraphim.cloud {
     handle @ws {
         reverse_proxy 127.0.0.1:8090
     }
-    
+
     log {
         output file /home/alex/infrastructure/terraphim-private-cloud-new/logs/truthforge-alpha.log {
             roll_size 10MiB
@@ -255,7 +255,7 @@ curl -s https://alpha.truthforge.terraphim.cloud/api/health
 
 **Narrative**:
 ```
-We achieved a 40% cost reduction this quarter through process optimization. 
+We achieved a 40% cost reduction this quarter through process optimization.
 This will improve our operational efficiency and deliver value to shareholders.
 ```
 
@@ -273,7 +273,7 @@ This will improve our operational efficiency and deliver value to shareholders.
 
 **Narrative**:
 ```
-Company announces layoffs affecting 500 employees. This strategic restructuring 
+Company announces layoffs affecting 500 employees. This strategic restructuring
 positions us for long-term growth and competitiveness.
 ```
 
@@ -486,7 +486,7 @@ add_header Content-Security-Policy "default-src 'self'; \
 
 ## License
 
-Proprietary - Zestic AI  
+Proprietary - Zestic AI
 Not for public distribution or use
 
 ## Support
@@ -497,5 +497,5 @@ Not for public distribution or use
 
 ---
 
-**Built with ❤️ by the Terraphim AI Team**  
+**Built with ❤️ by the Terraphim AI Team**
 **Powered by Claude 3.5 Sonnet & Haiku via OpenRouter**

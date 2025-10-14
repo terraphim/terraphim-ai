@@ -1,10 +1,10 @@
 # Architecture Decision Records: TruthForge Terraphim Patterns
 
-**Version**: 1.0  
-**Date**: 2025-10-07  
-**Status**: Draft  
-**Owner**: Zestic AI / K-Partners  
-**Related Documents**: 
+**Version**: 1.0
+**Date**: 2025-10-07
+**Status**: Draft
+**Owner**: Zestic AI / K-Partners
+**Related Documents**:
 - [PRD_TwoPassDebateArena.md](./PRD_TwoPassDebateArena.md)
 - [SPEC_TerraphimIntegration.md](./SPEC_TerraphimIntegration.md)
 - [REQUIREMENTS_AgentRoles.md](./REQUIREMENTS_AgentRoles.md)
@@ -20,9 +20,9 @@ This document contains Architecture Decision Records (ADRs) for the TruthForge T
 
 ## ADR-001: Private Repository Strategy
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Technical Lead, Product Owner  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Technical Lead, Product Owner
 **Context**: TruthForge contains proprietary strategic communication taxonomy and business logic that should not be open-sourced, but relies on the public terraphim-ai framework.
 
 ### Decision
@@ -86,9 +86,9 @@ terraphim-multi-agent = { git = "https://github.com/terraphim/terraphim-ai", bra
 
 ## ADR-002: Workflow Pattern Combination
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Technical Lead, AI Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Technical Lead, AI Engineer
 **Context**: TruthForge requires a novel two-pass debate workflow that doesn't match any single terraphim-ai pattern exactly. Need to decide how to combine existing patterns.
 
 ### Decision
@@ -177,9 +177,9 @@ Input Text
 
 ## ADR-003: Taxonomy Migration Strategy
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Technical Lead, Backend Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Technical Lead, Backend Engineer
 **Context**: TruthForge has existing JSON taxonomy (3 functions, 15 subfunctions) that must be migrated to terraphim-ai's RoleGraph format for knowledge graph integration.
 
 ### Decision
@@ -202,16 +202,16 @@ Implement a **one-time migration function** that converts `trueforge_taxonomy.js
 pub async fn migrate_truthforge_taxonomy(json_path: &Path) -> Result<RoleGraph> {
     let functions: Vec<TaxonomyFunction> = parse_json(json_path)?;
     let mut graph = RoleGraph::new();
-    
+
     for func in functions {
         let func_node = create_node(&func.id);
         graph.add_node(func_node.clone());
-        
+
         for subf in func.subfunctions {
             let subf_node = create_node(&format!("{}.{}", func.id, subf.name));
             graph.add_node(subf_node.clone());
             graph.add_edge(&func_node, &subf_node, 1.0)?;
-            
+
             for output in subf.outputs {
                 let output_node = create_node(&output);
                 graph.add_node(output_node.clone());
@@ -219,7 +219,7 @@ pub async fn migrate_truthforge_taxonomy(json_path: &Path) -> Result<RoleGraph> 
             }
         }
     }
-    
+
     Ok(graph)
 }
 ```
@@ -265,9 +265,9 @@ pub async fn migrate_truthforge_taxonomy(json_path: &Path) -> Result<RoleGraph> 
 
 ## ADR-004: WebSocket vs. REST for Real-Time Updates
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Backend Engineer, Frontend Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Backend Engineer, Frontend Engineer
 **Context**: TruthForge workflow takes 60-90 seconds. Users need real-time progress updates for good UX. Must decide communication protocol.
 
 ### Decision
@@ -299,7 +299,7 @@ Server
 
 **WebSocket Message Protocol**:
 ```typescript
-type WsMessage = 
+type WsMessage =
   | { type: 'AgentProgress', agent: string, progress: number, message: string }
   | { type: 'AgentResult', agent: string, result: any }
   | { type: 'PhaseComplete', phase: string, results: any }
@@ -351,9 +351,9 @@ type WsMessage =
 
 ## ADR-005: Redis Persistence Design
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Backend Engineer, SRE Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Backend Engineer, SRE Engineer
 **Context**: TruthForge needs session management, results caching, and learning vault. Must choose persistence strategy balancing speed, cost, and complexity.
 
 ### Decision
@@ -430,9 +430,9 @@ progress:{session_id} → { agent_name: progress_percent }
 
 ## ADR-006: LLM Provider Strategy (OpenRouter vs. Ollama)
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: AI Engineer, Technical Lead  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: AI Engineer, Technical Lead
 **Context**: TruthForge needs production-quality LLM responses for accurate analysis but also requires fast, cost-free testing. Must decide LLM provider strategy.
 
 ### Decision
@@ -542,9 +542,9 @@ Implement **dual-provider strategy**:
 
 ## ADR-007: Agent Configuration Management
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: AI Engineer, Backend Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: AI Engineer, Backend Engineer
 **Context**: TruthForge has 13 agent roles with different LLM providers, prompts, quality criteria. Need configuration management strategy.
 
 ### Decision
@@ -644,9 +644,9 @@ impl TerraphimAgent {
 
 ## ADR-008: Error Handling Strategy
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Backend Engineer, Technical Lead  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Backend Engineer, Technical Lead
 **Context**: TruthForge workflow has 13 agents in sequence. Single agent failure could crash entire analysis. Need error handling strategy.
 
 ### Decision
@@ -727,9 +727,9 @@ pub enum AnalysisStatus {
 
 ## ADR-009: Testing Strategy
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Technical Lead, QA Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Technical Lead, QA Engineer
 **Context**: TruthForge has complex multi-agent workflows with LLM integration. Traditional testing approaches may be insufficient.
 
 ### Decision
@@ -773,7 +773,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - cargo test --lib
-  
+
   integration-tests:
     runs-on: ubuntu-latest
     services:
@@ -783,13 +783,13 @@ jobs:
         image: ollama/ollama
     steps:
       - cargo test --test integration_*
-  
+
   contract-tests:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
       - cargo test --ignored
-  
+
   e2e-tests:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -839,9 +839,9 @@ jobs:
 
 ## ADR-010: Security Architecture
 
-**Date**: 2025-10-07  
-**Status**: Accepted  
-**Deciders**: Security Engineer, Backend Engineer  
+**Date**: 2025-10-07
+**Status**: Accepted
+**Deciders**: Security Engineer, Backend Engineer
 **Context**: TruthForge processes sensitive crisis communication text that may contain PII, confidential strategy. Must ensure security.
 
 ### Decision
@@ -885,14 +885,14 @@ use regex::Regex;
 pub fn sanitize_input(text: &str) -> Result<String> {
     // Step 1: Terraphim prompt injection prevention
     let sanitized = sanitize_system_prompt(text);
-    
+
     if sanitized.was_modified {
         warn!("Prompt injection detected: {:?}", sanitized.modifications);
     }
-    
+
     // Step 2: TruthForge PII redaction
     let redacted = redact_pii(&sanitized.sanitized_prompt);
-    
+
     Ok(redacted)
 }
 
@@ -901,7 +901,7 @@ fn redact_pii(text: &str) -> String {
         static ref EMAIL: Regex = Regex::new(r"\b[\w\.-]+@[\w\.-]+\.\w+\b").unwrap();
         static ref PHONE: Regex = Regex::new(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b").unwrap();
     }
-    
+
     let mut result = text.to_string();
     result = EMAIL.replace_all(&result, "[EMAIL]").to_string();
     result = PHONE.replace_all(&result, "[PHONE]").to_string();
@@ -975,6 +975,6 @@ fn redact_pii(text: &str) -> String {
 
 ---
 
-**Document Status**: Draft v1.0  
-**Next Review**: After Phase 1 implementation (Week 2)  
+**Document Status**: Draft v1.0
+**Next Review**: After Phase 1 implementation (Week 2)
 **Approval Required**: Technical Lead, Security Engineer, Product Owner

@@ -10,7 +10,7 @@ class ConnectionStatusComponent {
     this.isVisible = false;
     this.statusElement = null;
     this.reconnectAttempts = 0;
-    
+
     this.init();
   }
 
@@ -401,7 +401,7 @@ class ConnectionStatusComponent {
   toggleDetails() {
     this.isVisible = !this.isVisible;
     this.statusElement.classList.toggle('expanded', this.isVisible);
-    
+
     const toggleIcon = this.statusElement.querySelector('.toggle-icon');
     toggleIcon.textContent = this.isVisible ? '▼' : 'ℹ️';
   }

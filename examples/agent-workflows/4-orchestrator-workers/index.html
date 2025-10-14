@@ -12,7 +12,7 @@
             gap: 2rem;
             margin-top: 2rem;
         }
-        
+
         .orchestrator-panel {
             background: var(--surface);
             border-radius: var(--radius-lg);
@@ -20,7 +20,7 @@
             box-shadow: var(--shadow-md);
             height: fit-content;
         }
-        
+
         .pipeline-workspace {
             background: var(--surface);
             border-radius: var(--radius-lg);
@@ -28,21 +28,21 @@
             box-shadow: var(--shadow-md);
             min-height: 700px;
         }
-        
+
         .research-input {
             margin-bottom: 2rem;
         }
-        
+
         .data-sources {
             margin-bottom: 2rem;
         }
-        
+
         .source-grid {
             display: grid;
             gap: 0.75rem;
             margin-top: 0.5rem;
         }
-        
+
         .source-card {
             padding: 0.75rem;
             border: 2px solid var(--border);
@@ -53,46 +53,46 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .source-card:hover {
             border-color: var(--primary);
             background: #f8faff;
         }
-        
+
         .source-card.selected {
             border-color: var(--primary);
             background: #dbeafe;
         }
-        
+
         .source-icon {
             font-size: 1.2rem;
         }
-        
+
         .source-details {
             flex: 1;
         }
-        
+
         .source-name {
             font-weight: 600;
             color: var(--text);
             font-size: 0.875rem;
         }
-        
+
         .source-description {
             font-size: 0.75rem;
             color: var(--text-muted);
         }
-        
+
         .worker-pool {
             margin-bottom: 2rem;
         }
-        
+
         .worker-grid {
             display: grid;
             gap: 0.75rem;
             margin-top: 0.5rem;
         }
-        
+
         .worker-card {
             padding: 1rem;
             background: var(--surface-2);
@@ -100,39 +100,39 @@
             border-radius: var(--radius-md);
             transition: var(--transition);
         }
-        
+
         .worker-card.active {
             border-color: var(--warning);
             background: #fef3c7;
         }
-        
+
         .worker-card.completed {
             border-color: var(--success);
             background: #d1fae5;
         }
-        
+
         .worker-header {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             margin-bottom: 0.5rem;
         }
-        
+
         .worker-icon {
             font-size: 1rem;
         }
-        
+
         .worker-name {
             font-weight: 600;
             color: var(--text);
             font-size: 0.875rem;
         }
-        
+
         .worker-status {
             font-size: 0.75rem;
             color: var(--text-muted);
         }
-        
+
         .worker-progress {
             width: 100%;
             height: 4px;
@@ -141,31 +141,31 @@
             overflow: hidden;
             margin-top: 0.5rem;
         }
-        
+
         .worker-progress-fill {
             height: 100%;
             background: var(--primary);
             width: 0%;
             transition: width 0.3s ease;
         }
-        
+
         .orchestration-controls {
             display: flex;
             gap: 1rem;
             margin-bottom: 2rem;
         }
-        
+
         .pipeline-stages {
             display: grid;
             gap: 1.5rem;
         }
-        
+
         .pipeline-stage {
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             overflow: hidden;
         }
-        
+
         .stage-header {
             padding: 1rem 1.5rem;
             background: var(--surface-2);
@@ -174,7 +174,7 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .stage-title {
             font-weight: 600;
             color: var(--text);
@@ -182,50 +182,50 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .stage-icon {
             font-size: 1.2rem;
         }
-        
+
         .stage-status {
             font-size: 0.875rem;
             padding: 0.25rem 0.75rem;
             border-radius: var(--radius-full);
             font-weight: 600;
         }
-        
+
         .stage-status.pending {
             background: #f3f4f6;
             color: #6b7280;
         }
-        
+
         .stage-status.active {
             background: #fef3c7;
             color: #92400e;
         }
-        
+
         .stage-status.completed {
             background: #d1fae5;
             color: #065f46;
         }
-        
+
         .stage-content {
             padding: 1.5rem;
         }
-        
+
         .stage-description {
             color: var(--text-muted);
             margin-bottom: 1rem;
             line-height: 1.5;
         }
-        
+
         .stage-workers {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        
+
         .assigned-worker {
             padding: 0.75rem;
             background: #f8faff;
@@ -233,17 +233,17 @@
             border-radius: var(--radius-md);
             font-size: 0.875rem;
         }
-        
+
         .worker-task {
             font-weight: 600;
             color: var(--primary);
             margin-bottom: 0.25rem;
         }
-        
+
         .worker-role {
             color: var(--text-muted);
         }
-        
+
         .stage-results {
             background: #f9fafb;
             border-radius: var(--radius-md);
@@ -251,23 +251,23 @@
             margin-top: 1rem;
             display: none;
         }
-        
+
         .stage-results.visible {
             display: block;
         }
-        
+
         .results-summary {
             font-weight: 600;
             color: var(--text);
             margin-bottom: 0.5rem;
         }
-        
+
         .results-details {
             color: var(--text-muted);
             font-size: 0.875rem;
             line-height: 1.5;
         }
-        
+
         .knowledge-graph {
             margin-top: 2rem;
             padding: 1.5rem;
@@ -275,20 +275,20 @@
             border-radius: var(--radius-lg);
             border: 1px solid var(--primary);
         }
-        
+
         .graph-header {
             display: flex;
             align-items: center;
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
-        
+
         .graph-title {
             font-size: 1.25rem;
             font-weight: 600;
             color: var(--text);
         }
-        
+
         .graph-visualization {
             background: white;
             border-radius: var(--radius-md);
@@ -301,7 +301,7 @@
             align-items: center;
             border: 2px dashed var(--border);
         }
-        
+
         .graph-nodes {
             display: flex;
             flex-wrap: wrap;
@@ -309,7 +309,7 @@
             justify-content: center;
             margin-bottom: 2rem;
         }
-        
+
         .graph-node {
             padding: 0.75rem 1rem;
             background: var(--primary);
@@ -319,14 +319,14 @@
             font-weight: 600;
             position: relative;
         }
-        
+
         .graph-connections {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }
-        
+
         .connection-item {
             padding: 0.75rem;
             background: white;
@@ -334,22 +334,22 @@
             border: 1px solid rgba(59, 130, 246, 0.2);
             font-size: 0.875rem;
         }
-        
+
         .connection-type {
             font-weight: 600;
             color: var(--primary);
             margin-bottom: 0.25rem;
         }
-        
+
         .connection-description {
             color: var(--text-muted);
         }
-        
+
         @media (max-width: 968px) {
             .pipeline-environment {
                 grid-template-columns: 1fr;
             }
-            
+
             .orchestrator-panel {
                 order: 2;
             }
@@ -371,10 +371,10 @@
                 <h2 class="workflow-title">Data Science Orchestration Pipeline</h2>
                 <span id="workflow-status" class="workflow-status idle">Ready to Process</span>
             </div>
-            
+
             <!-- Pipeline Visualization -->
             <div id="pipeline-container"></div>
-            
+
             <!-- Progress Bar -->
             <div id="progress-container"></div>
         </div>
@@ -384,13 +384,13 @@
             <!-- Orchestrator Panel -->
             <div class="orchestrator-panel">
                 <h3>🎯 Research Orchestrator</h3>
-                
+
                 <!-- Research Input -->
                 <div class="research-input">
                     <label class="form-label" for="research-query">Research Query:</label>
-                    <textarea 
-                        id="research-query" 
-                        class="form-input form-textarea" 
+                    <textarea
+                        id="research-query"
+                        class="form-input form-textarea"
                         placeholder="Example: Analyze the impact of machine learning on healthcare outcomes, including recent research papers, methodologies, and clinical applications"
                         rows="4"
                     ></textarea>
@@ -420,9 +420,9 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="system-prompt">System Prompt:</label>
-                        <textarea 
-                            id="system-prompt" 
-                            class="form-input form-textarea" 
+                        <textarea
+                            id="system-prompt"
+                            class="form-input form-textarea"
                             rows="5"
                             placeholder="The orchestrator's system prompt will appear here. You can edit it."
                             data-testid="system-prompt"
@@ -443,7 +443,7 @@
             <!-- Pipeline Workspace -->
             <div class="pipeline-workspace">
                 <h3 id="workspace-title">Data Science Pipeline Stages</h3>
-                
+
                 <!-- Initial State -->
                 <div id="initial-state" class="text-center" style="padding: 3rem;">
                     <div style="color: var(--text-muted);">
@@ -467,7 +467,7 @@
                             <div style="color: var(--text-muted); font-size: 0.875rem;">Semantic relationships and concept mapping</div>
                         </div>
                     </div>
-                    
+
                     <div class="graph-visualization" id="graph-visualization">
                         <div style="color: var(--text-muted);">
                             <h4>🔗 Concept Relationships</h4>

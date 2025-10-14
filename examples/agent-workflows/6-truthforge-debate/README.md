@@ -1,7 +1,7 @@
 # 🔥 TruthForge - Two-Pass Debate Arena
 
-**Pattern**: Two-pass adversarial debate for crisis communication vulnerability analysis  
-**Use Case**: Identify narrative weaknesses through systematic omission detection and exploitation  
+**Pattern**: Two-pass adversarial debate for crisis communication vulnerability analysis
+**Use Case**: Identify narrative weaknesses through systematic omission detection and exploitation
 **Key Features**: BiasDetector, NarrativeMapper, OmissionDetector, TaxonomyLinker, Exploitation Debate
 
 ## 🎯 Overview
@@ -88,10 +88,10 @@ TruthForge implements a sophisticated two-pass debate system designed to stress-
 ### Example Crisis Narrative
 
 ```
-Our company experienced a data breach affecting 10,000 customer records. 
-We discovered unauthorized access to our customer database on March 15th 
-due to an unpatched security vulnerability in our legacy system. We have 
-notified affected customers and are offering free credit monitoring services 
+Our company experienced a data breach affecting 10,000 customer records.
+We discovered unauthorized access to our customer database on March 15th
+due to an unpatched security vulnerability in our legacy system. We have
+notified affected customers and are offering free credit monitoring services
 for 12 months.
 ```
 
@@ -107,14 +107,14 @@ for 12 months.
 
 ### Pass 1 Metrics
 
-**Supporting Confidence (%)**: How well the narrative supports its claims with evidence  
-**Opposing Confidence (%)**: How strongly the narrative can be challenged  
+**Supporting Confidence (%)**: How well the narrative supports its claims with evidence
+**Opposing Confidence (%)**: How strongly the narrative can be challenged
 **Omissions Count**: Number of critical information gaps detected
 
 ### Pass 2 Metrics
 
-**Defensive Strength (%)**: Effectiveness of justifications for omissions  
-**Attack Effectiveness (%)**: Impact of exploitation attempts  
+**Defensive Strength (%)**: Effectiveness of justifications for omissions
+**Attack Effectiveness (%)**: Impact of exploitation attempts
 **Vulnerability Level**: Overall narrative robustness assessment
 
 ### Vulnerability Levels
@@ -199,10 +199,10 @@ for 12 months.
 
 ### Color Scheme
 
-**Pass 1**: Blue gradient (`#dbeafe` to `#e0e7ff`) - Analytical, balanced  
-**Pass 2**: Orange gradient (`#fef3c7` to `#fed7aa`) - Adversarial, high-stakes  
-**Vulnerability HIGH**: Red (`#dc2626`) - Critical attention needed  
-**Vulnerability MEDIUM**: Orange (`#f59e0b`) - Moderate concern  
+**Pass 1**: Blue gradient (`#dbeafe` to `#e0e7ff`) - Analytical, balanced
+**Pass 2**: Orange gradient (`#fef3c7` to `#fed7aa`) - Adversarial, high-stakes
+**Vulnerability HIGH**: Red (`#dc2626`) - Critical attention needed
+**Vulnerability MEDIUM**: Orange (`#f59e0b`) - Moderate concern
 **Vulnerability LOW**: Green (`#10b981`) - Narrative robust
 
 ## 💡 Best Practices
@@ -237,8 +237,8 @@ for 12 months.
 
 ### Analysis Depth Settings
 
-**Standard** (Default): Balanced speed and thoroughness  
-**Deep Analysis**: Comprehensive examination, slower processing  
+**Standard** (Default): Balanced speed and thoroughness
+**Deep Analysis**: Comprehensive examination, slower processing
 **Rapid Assessment**: Quick vulnerability scan, reduced detail
 
 ### Taxonomy Linking

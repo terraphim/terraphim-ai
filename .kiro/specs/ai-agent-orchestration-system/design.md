@@ -108,10 +108,10 @@ pub trait GenAgent: Send + Sync {
     type State: Send + Sync + Clone;
     type Message: Send + Sync;
     type Reply: Send + Sync;
-    
+
     /// Initialize agent state (gen_server:init)
     async fn init(&mut self, args: InitArgs) -> Result<Self::State>;
-    
+
     /// Handle synchronous calls (gen_server:handle_call)
     async fn handle_call(
         &mut self,
@@ -119,21 +119,21 @@ pub trait GenAgent: Send + Sync {
         from: AgentPid,
         state: Self::State
     ) -> Result<(Self::Reply, Self::State)>;
-    
+
     /// Handle asynchronous casts (gen_server:handle_cast)
     async fn handle_cast(
         &mut self,
         message: Self::Message,
         state: Self::State
     ) -> Result<Self::State>;
-    
+
     /// Handle system messages (gen_server:handle_info)
     async fn handle_info(
         &mut self,
         info: SystemMessage,
         state: Self::State
     ) -> Result<Self::State>;
-    
+
     /// Cleanup on termination (gen_server:terminate)
     async fn terminate(&mut self, reason: TerminateReason, state: Self::State) -> Result<()>;
 }
@@ -152,7 +152,7 @@ pub struct AgentSupervisor {
 
 pub enum RestartStrategy {
     OneForOne,      // Restart only failed agent
-    OneForAll,      // Restart all agents if one fails  
+    OneForAll,      // Restart all agents if one fails
     RestForOne,     // Restart failed agent and all started after it
 }
 
@@ -161,20 +161,20 @@ impl AgentSupervisor {
     pub async fn spawn_agent(&mut self, spec: AgentSpec) -> Result<AgentPid> {
         // Extract knowledge context using existing tools
         let knowledge_context = self.extract_knowledge_context(&spec.role).await?;
-        
+
         let agent = self.create_agent_with_context(spec, knowledge_context).await?;
         let pid = AgentPid::new();
-        
+
         self.children.push(SupervisedAgent {
             pid: pid.clone(),
             agent: Box::new(agent),
             restart_count: 0,
             last_restart: None,
         });
-        
+
         Ok(pid)
     }
-    
+
     /// Handle agent failure with restart strategy
     pub async fn handle_agent_exit(&mut self, pid: AgentPid, reason: ExitReason) -> Result<()> {
         match self.restart_strategy {
@@ -205,17 +205,17 @@ impl KnowledgeGraphTaskDecomposer {
             self.thesaurus.clone(),
             true
         )?;
-        
+
         // Check connectivity using existing is_all_terms_connected_by_path
         let is_connected = self.role_graph.is_all_terms_connected_by_path(task_description);
-        
+
         // Create subtasks based on knowledge graph structure
         let subtasks = if is_connected {
             self.create_connected_subtasks(&relevant_paragraphs).await?
         } else {
             self.create_independent_subtasks(&relevant_paragraphs).await?
         };
-        
+
         Ok(subtasks)
     }
 }
@@ -234,20 +234,20 @@ impl KnowledgeGraphAgentMatcher {
         // Find agents with relevant knowledge using existing tools
         let matching_agents = self.agent_registry
             .find_agents_by_knowledge(&task.description).await?;
-        
+
         let mut best_match = None;
         let mut best_connectivity_score = 0.0;
-        
+
         for agent_pid in matching_agents {
             let agent_info = self.agent_registry.get_agent_info(&agent_pid).await?;
-            
+
             if let Some(role_graph) = self.role_graphs.get(&agent_info.role) {
                 // Calculate connectivity score using existing infrastructure
                 let combined_text = format!("{} {}", task.description, agent_info.capabilities.description);
-                
+
                 if role_graph.is_all_terms_connected_by_path(&combined_text) {
                     let score = self.calculate_connectivity_strength(&combined_text, role_graph).await?;
-                    
+
                     if score > best_connectivity_score {
                         best_connectivity_score = score;
                         best_match = Some(agent_pid);
@@ -255,7 +255,7 @@ impl KnowledgeGraphAgentMatcher {
                 }
             }
         }
-        
+
         best_match.ok_or_else(|| AgentError::NoSuitableAgent)
     }
 }
@@ -275,14 +275,14 @@ impl SupervisionTreeOrchestrator {
     pub async fn execute_workflow(&mut self, complex_task: ComplexTask) -> Result<WorkflowResult> {
         // 1. Decompose task using knowledge graph
         let subtasks = self.task_decomposer.decompose_task(&complex_task.description).await?;
-        
+
         // 2. Match subtasks to agents using knowledge connectivity
         let mut agent_assignments = Vec::new();
         for subtask in subtasks {
             let agent_pid = self.agent_matcher.match_task_to_agent(&subtask).await?;
             agent_assignments.push((agent_pid, subtask));
         }
-        
+
         // 3. Execute tasks with supervision
         let mut results = Vec::new();
         for (agent_pid, subtask) in agent_assignments {
@@ -292,10 +292,10 @@ impl SupervisionTreeOrchestrator {
                 AgentMessage::ExecuteTask(subtask),
                 Duration::from_secs(30)
             ).await?;
-            
+
             results.push(result);
         }
-        
+
         // 4. Consolidate results using knowledge graph connectivity
         self.consolidate_results_with_knowledge_graph(results).await
     }
@@ -317,7 +317,7 @@ impl GenAgent for KnowledgeGraphPlanningAgent {
     type State = PlanningState;
     type Message = PlanningMessage;
     type Reply = PlanningReply;
-    
+
     async fn handle_call(
         &mut self,
         message: PlanningMessage,
@@ -332,13 +332,13 @@ impl GenAgent for KnowledgeGraphPlanningAgent {
                     self.thesaurus.clone(),
                     true
                 )?;
-                
+
                 let analysis = TaskAnalysis {
                     relevant_concepts: relevant_paragraphs,
                     complexity_score: self.calculate_complexity(&task).await?,
                     required_capabilities: self.identify_required_capabilities(&task).await?,
                 };
-                
+
                 Ok((PlanningReply::TaskAnalysis(analysis), state))
             },
             PlanningMessage::CreateExecutionPlan(analysis) => {
@@ -364,7 +364,7 @@ impl GenAgent for KnowledgeGraphWorkerAgent {
     type State = WorkerState;
     type Message = WorkerMessage;
     type Reply = WorkerReply;
-    
+
     async fn handle_cast(
         &mut self,
         message: WorkerMessage,
@@ -374,32 +374,32 @@ impl GenAgent for KnowledgeGraphWorkerAgent {
             WorkerMessage::ExecuteTask(task) => {
                 // Validate task compatibility using knowledge graph
                 let compatibility = self.validate_task_compatibility(&task).await?;
-                
+
                 if compatibility.is_compatible {
                     // Execute task with knowledge graph context
                     let result = self.execute_with_knowledge_context(task).await?;
-                    
+
                     // Report completion to supervisor
                     self.report_task_completion(result).await?;
                 }
-                
+
                 Ok(state.with_current_task(Some(task)))
             }
         }
     }
-    
+
     async fn validate_task_compatibility(&self, task: &Task) -> Result<CompatibilityReport> {
         // Use is_all_terms_connected_by_path to check compatibility
         let combined_text = format!("{} {}", task.description, self.specialization_domain.description);
         let is_compatible = self.role_graph.is_all_terms_connected_by_path(&combined_text);
-        
+
         Ok(CompatibilityReport {
             is_compatible,
             confidence_score: if is_compatible { 0.9 } else { 0.1 },
-            missing_capabilities: if is_compatible { 
-                Vec::new() 
-            } else { 
-                self.identify_missing_capabilities(task).await? 
+            missing_capabilities: if is_compatible {
+                Vec::new()
+            } else {
+                self.identify_missing_capabilities(task).await?
             },
         })
     }
@@ -419,7 +419,7 @@ impl GenAgent for KnowledgeGraphCoordinationAgent {
     type State = CoordinationState;
     type Message = CoordinationMessage;
     type Reply = CoordinationReply;
-    
+
     async fn handle_info(
         &mut self,
         info: SystemMessage,
@@ -453,23 +453,23 @@ pub struct AgentMailbox {
 
 pub enum AgentMessage {
     // Synchronous call (gen_server:call)
-    Call { 
-        message: Box<dyn Any + Send>, 
+    Call {
+        message: Box<dyn Any + Send>,
         reply_to: oneshot::Sender<Box<dyn Any + Send>>,
         timeout: Duration,
     },
     // Asynchronous cast (gen_server:cast)
-    Cast { 
-        message: Box<dyn Any + Send> 
+    Cast {
+        message: Box<dyn Any + Send>
     },
     // System info message (gen_server:info)
-    Info { 
-        info: SystemMessage 
+    Info {
+        info: SystemMessage
     },
     // Knowledge graph update
-    KnowledgeUpdate { 
-        role: RoleName, 
-        updated_graph: RoleGraph 
+    KnowledgeUpdate {
+        role: RoleName,
+        updated_graph: RoleGraph
     },
 }
 
@@ -486,25 +486,25 @@ impl AgentMessageSystem {
         pid: AgentPid,
         message: T,
         timeout: Duration
-    ) -> Result<R> 
+    ) -> Result<R>
     where
         T: Send + 'static,
         R: Send + 'static,
     {
         let (reply_tx, reply_rx) = oneshot::channel();
-        
+
         let agent_message = AgentMessage::Call {
             message: Box::new(message),
             reply_to: reply_tx,
             timeout,
         };
-        
+
         self.send_message(pid, agent_message).await?;
-        
+
         let reply = tokio::time::timeout(timeout, reply_rx).await??;
         Ok(*reply.downcast::<R>().map_err(|_| AgentError::InvalidReply)?)
     }
-    
+
     /// Send asynchronous cast to agent (Erlang: gen_server:cast)
     pub async fn cast_agent<T>(&self, pid: AgentPid, message: T) -> Result<()>
     where
@@ -513,7 +513,7 @@ impl AgentMessageSystem {
         let agent_message = AgentMessage::Cast {
             message: Box::new(message),
         };
-        
+
         self.send_message(pid, agent_message).await
     }
 }
@@ -545,7 +545,7 @@ impl KnowledgeGraphAgentRegistry {
                 role_graph.thesaurus.clone(),
                 true
             )?;
-            
+
             KnowledgeGraphContext {
                 role_graph: role_graph.clone(),
                 relevant_concepts: capability_paragraphs,
@@ -554,7 +554,7 @@ impl KnowledgeGraphAgentRegistry {
         } else {
             return Err(AgentError::UnknownRole(role));
         };
-        
+
         self.agents.insert(pid.clone(), RegisteredAgent {
             name,
             pid,
@@ -564,14 +564,14 @@ impl KnowledgeGraphAgentRegistry {
             supervisor: self.find_supervisor(&pid)?,
             mailbox: self.create_mailbox(pid.clone()).await?,
         });
-        
+
         Ok(())
     }
-    
+
     /// Find agents by knowledge graph connectivity
     pub async fn find_agents_by_knowledge(&self, query: &str) -> Result<Vec<AgentPid>> {
         let mut matching_agents = Vec::new();
-        
+
         for (pid, agent) in &self.agents {
             if let Some(role_graph) = self.knowledge_graphs.get(&agent.role) {
                 // Use existing extract_paragraphs_from_automata
@@ -580,7 +580,7 @@ impl KnowledgeGraphAgentRegistry {
                     role_graph.thesaurus.clone(),
                     true
                 )?;
-                
+
                 if !relevant_paragraphs.is_empty() {
                     // Check connectivity using existing is_all_terms_connected_by_path
                     let combined_text = format!("{} {}", query, agent.capabilities.description);
@@ -590,7 +590,7 @@ impl KnowledgeGraphAgentRegistry {
                 }
             }
         }
-        
+
         Ok(matching_agents)
     }
 }
@@ -687,22 +687,22 @@ pub struct KnowledgeAugmentedTask {
 pub enum AgentOrchestrationError {
     #[error("Agent runtime error: {0}")]
     Runtime(#[from] AgentRuntimeError),
-    
+
     #[error("Orchestration pattern error: {0}")]
     Orchestration(#[from] OrchestrationError),
-    
+
     #[error("Communication error: {0}")]
     Communication(#[from] CommunicationError),
-    
+
     #[error("State management error: {0}")]
     StateManagement(#[from] StateManagementError),
-    
+
     #[error("Knowledge graph integration error: {0}")]
     KnowledgeGraph(#[from] KnowledgeGraphError),
-    
+
     #[error("Configuration error: {0}")]
     Configuration(String),
-    
+
     #[error("Resource exhaustion: {0}")]
     ResourceExhaustion(String),
 }

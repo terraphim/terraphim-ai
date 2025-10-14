@@ -11,6 +11,7 @@ use super::{
 use crate::AppState;
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(dead_code)]
 struct RouteOption {
     id: String,
     name: String,
@@ -114,6 +115,7 @@ pub async fn execute_routing(
     }
 }
 
+#[allow(dead_code)]
 async fn execute_routing_workflow(
     state: &AppState,
     workflow_id: &str,
@@ -199,6 +201,7 @@ async fn execute_routing_workflow(
     }))
 }
 
+#[allow(dead_code)]
 fn analyze_task_complexity(prompt: &str, role: &str) -> serde_json::Value {
     let mut complexity_score = 0.3; // Base complexity
     let word_count = prompt.split_whitespace().count();
@@ -256,7 +259,7 @@ fn analyze_task_complexity(prompt: &str, role: &str) -> serde_json::Value {
         _ => {}
     }
 
-    complexity_score = complexity_score.min(1.0).max(0.1);
+    complexity_score = complexity_score.clamp(0.1, 1.0);
 
     let level = if complexity_score > 0.7 {
         "high"
@@ -287,6 +290,7 @@ fn analyze_task_complexity(prompt: &str, role: &str) -> serde_json::Value {
     })
 }
 
+#[allow(dead_code)]
 fn get_available_routes(role: &str) -> Vec<RouteOption> {
     let mut base_routes = vec![
         RouteOption {
@@ -343,6 +347,7 @@ fn get_available_routes(role: &str) -> Vec<RouteOption> {
     base_routes
 }
 
+#[allow(dead_code)]
 fn select_optimal_route(routes: &[RouteOption], complexity: &serde_json::Value) -> RouteOption {
     let complexity_score = complexity["score"].as_f64().unwrap_or(0.5);
     let level = complexity["level"].as_str().unwrap_or("medium");
@@ -394,6 +399,7 @@ fn select_optimal_route(routes: &[RouteOption], complexity: &serde_json::Value) 
     }
 }
 
+#[allow(dead_code)]
 async fn execute_with_route(
     route: &RouteOption,
     prompt: &str,
@@ -445,6 +451,7 @@ async fn execute_with_route(
     }))
 }
 
+#[allow(dead_code)]
 fn generate_route_output(
     route: &RouteOption,
     prompt: &str,
@@ -487,27 +494,28 @@ fn generate_route_output(
                 _ => "capable and reliable",
             };
 
-            format!("# {} Solution for {}\n\nUsing {} processing capabilities, this solution addresses {} with a focus on quality and efficiency.\n\n## Key Features\n- Optimized for {} complexity level\n- Role-specific customization for {}\n- Performance-tuned execution\n\n## Delivery\n- High-quality output meeting all requirements\n- Cost-effective approach with optimal resource utilization\n- Scalable solution architecture", 
+            format!("# {} Solution for {}\n\nUsing {} processing capabilities, this solution addresses {} with a focus on quality and efficiency.\n\n## Key Features\n- Optimized for {} complexity level\n- Role-specific customization for {}\n- Performance-tuned execution\n\n## Delivery\n- High-quality output meeting all requirements\n- Cost-effective approach with optimal resource utilization\n- Scalable solution architecture",
                     route.capability, topic, capability_desc, topic, complexity_level, role)
         }
     }
 }
 
+#[allow(dead_code)]
 fn calculate_route_confidence(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
     let complexity_score = complexity["score"].as_f64().unwrap_or(0.5);
 
-    if complexity_score <= route.max_complexity {
+    (if complexity_score <= route.max_complexity {
         // Route can handle the complexity well
         let headroom = route.max_complexity - complexity_score;
         0.8 + (headroom * 0.2) // 80% base + up to 20% bonus for headroom
     } else {
         // Route is over capacity
         0.6 - ((complexity_score - route.max_complexity) * 0.5)
-    }
-    .max(0.1)
-    .min(1.0)
+    })
+    .clamp(0.1, 1.0)
 }
 
+#[allow(dead_code)]
 fn calculate_estimated_cost(route: &RouteOption, prompt: &str) -> f64 {
     let estimated_tokens = (prompt.split_whitespace().count() * 4 / 3) as f64;
     let output_tokens = estimated_tokens * 2.0; // Assume 2x output tokens
@@ -515,6 +523,7 @@ fn calculate_estimated_cost(route: &RouteOption, prompt: &str) -> f64 {
     route.cost_per_token * (estimated_tokens + output_tokens)
 }
 
+#[allow(dead_code)]
 fn calculate_expected_quality(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
     let complexity_score = complexity["score"].as_f64().unwrap_or(0.5);
     let capability_match = (route.max_complexity - (route.max_complexity - complexity_score).abs())
@@ -530,13 +539,15 @@ fn calculate_expected_quality(route: &RouteOption, complexity: &serde_json::Valu
     .min(1.0)
 }
 
+#[allow(dead_code)]
 fn calculate_output_quality(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
     let expected_quality = calculate_expected_quality(route, complexity);
     // Add some realistic variance
     let variance = (rand::random::<f64>() - 0.5) * 0.1; // ±5% variance
-    (expected_quality + variance).max(0.5).min(1.0)
+    (expected_quality + variance).clamp(0.5, 1.0)
 }
 
+#[allow(dead_code)]
 fn calculate_cost_efficiency(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
     let quality = calculate_expected_quality(route, complexity);
 
@@ -544,6 +555,7 @@ fn calculate_cost_efficiency(route: &RouteOption, complexity: &serde_json::Value
     quality / (route.cost_per_token * 1000.0) // Normalize cost
 }
 
+#[allow(dead_code)]
 fn get_role_specific_features(role: &str, route_id: &str) -> Vec<String> {
     match (role, route_id) {
         ("technical_writer", id) if id.contains("gpt4") => vec![

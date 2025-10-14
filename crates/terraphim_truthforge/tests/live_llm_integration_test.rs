@@ -7,7 +7,7 @@ use chrono::Utc;
 use std::sync::Arc;
 use terraphim_multi_agent::GenAiLlmClient;
 use terraphim_truthforge::{
-    AnalysisCostTracker, AudienceType, ModelPricing, NarrativeContext, NarrativeInput, StakeType,
+    AnalysisCostTracker, AudienceType, NarrativeContext, NarrativeInput, StakeType,
     TwoPassDebateWorkflow, UrgencyLevel,
 };
 use uuid::Uuid;
@@ -17,7 +17,7 @@ use uuid::Uuid;
 #[ignore] // Run only when OPENROUTER_API_KEY is set
 async fn test_full_workflow_with_free_model() {
     // Check for API key
-    let api_key = std::env::var("OPENROUTER_API_KEY").expect(
+    let _api_key = std::env::var("OPENROUTER_API_KEY").expect(
         "OPENROUTER_API_KEY environment variable must be set for live tests. \
          Get a free key at https://openrouter.ai/",
     );

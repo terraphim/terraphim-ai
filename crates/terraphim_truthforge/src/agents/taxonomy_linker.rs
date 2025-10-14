@@ -35,11 +35,11 @@ Map the narrative to the TruthForge Taxonomy:
 **Taxonomy Domains**:
 1. **relationship_management**: Stakeholder engagement, dialogue
    - Subfunctions: stakeholder_mapping, engagement_design, community_building
-   
+
 2. **issue_crisis_management**: Crisis anticipation and response
    - Subfunctions: horizon_scanning, risk_assessment, war_room_operations, recovery_and_learning
    - Issue types: operational, product_safety, ethics_compliance, cybersecurity, leadership
-   
+
 3. **strategic_management_function**: Communication as strategic capability
    - Subfunctions: strategy_alignment, executive_advisory, policy_standards, enterprise_listening
 
