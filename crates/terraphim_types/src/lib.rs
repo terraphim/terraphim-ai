@@ -6,6 +6,7 @@ use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 
+use chrono;
 use schemars::JsonSchema;
 use std::str::FromStr;
 #[cfg(feature = "typescript")]
@@ -1273,6 +1274,390 @@ pub enum ContextUsageType {
     DocumentReference,
 }
 
+// Routing and Priority Types
+
+/// Priority level for routing rules and decisions
+/// Higher numeric values indicate higher priority
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, JsonSchema, Default)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct Priority(pub u8);
+
+impl Priority {
+    /// Create a new priority with the given value
+    pub fn new(value: u8) -> Self {
+        Self(value.clamp(0, 100))
+    }
+
+    /// Get the priority value
+    pub fn value(&self) -> u8 {
+        self.0
+    }
+
+    /// Check if this is high priority (>= 80)
+    pub fn is_high(&self) -> bool {
+        self.0 >= 80
+    }
+
+    /// Check if this is medium priority (>= 40 && < 80)
+    pub fn is_medium(&self) -> bool {
+        self.0 >= 40 && self.0 < 80
+    }
+
+    /// Check if this is low priority (< 40)
+    pub fn is_low(&self) -> bool {
+        self.0 < 40
+    }
+
+    /// Maximum priority value
+    pub const MAX: Self = Self(100);
+    
+    /// High priority (default for fast/expensive rules)
+    pub const HIGH: Self = Self(80);
+    
+    /// Medium priority (default for standard rules)
+    pub const MEDIUM: Self = Self(50);
+    
+    /// Low priority (default for fallback rules)
+    pub const LOW: Self = Self(20);
+    
+    /// Minimum priority value
+    pub const MIN: Self = Self(0);
+}
+
+impl fmt::Display for Priority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<u8> for Priority {
+    fn from(value: u8) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<i32> for Priority {
+    fn from(value: i32) -> Self {
+        Self::new(value as u8)
+    }
+}
+
+/// A routing rule with pattern matching and priority
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct RoutingRule {
+    /// Unique identifier for this rule
+    pub id: String,
+    
+    /// Name of the rule (human-readable)
+    pub name: String,
+    
+    /// Pattern to match (can be regex, exact string, or concept name)
+    pub pattern: String,
+    
+    /// Priority of this rule (higher = more important)
+    pub priority: Priority,
+    
+    /// Provider to route to when this rule matches
+    pub provider: String,
+    
+    /// Model to use when this rule matches
+    pub model: String,
+    
+    /// Optional description of when this rule applies
+    pub description: Option<String>,
+    
+    /// Tags for categorizing rules
+    pub tags: Vec<String>,
+    
+    /// Whether this rule is enabled
+    pub enabled: bool,
+    
+    /// When this rule was created
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    
+    /// When this rule was last updated
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl RoutingRule {
+    /// Create a new routing rule
+    pub fn new(
+        id: String,
+        name: String,
+        pattern: String,
+        priority: Priority,
+        provider: String,
+        model: String,
+    ) -> Self {
+        let now = chrono::Utc::now();
+        Self {
+            id,
+            name,
+            pattern,
+            priority,
+            provider,
+            model,
+            description: None,
+            tags: Vec::new(),
+            enabled: true,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    /// Create a rule with default medium priority
+    pub fn with_defaults(
+        id: String,
+        name: String,
+        pattern: String,
+        provider: String,
+        model: String,
+    ) -> Self {
+        Self::new(id, name, pattern, Priority::MEDIUM, provider, model)
+    }
+
+    /// Set the description
+    pub fn with_description(mut self, description: String) -> Self {
+        self.description = Some(description);
+        self
+    }
+
+    /// Add a tag
+    pub fn with_tag(mut self, tag: String) -> Self {
+        self.tags.push(tag);
+        self
+    }
+
+    /// Set enabled status
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Update the rule's timestamp
+    pub fn touch(&mut self) {
+        self.updated_at = chrono::Utc::now();
+    }
+}
+
+/// Result of pattern matching with priority scoring
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct PatternMatch {
+    /// The concept that was matched
+    pub concept: String,
+    
+    /// Provider to route to
+    pub provider: String,
+    
+    /// Model to use
+    pub model: String,
+    
+    /// Match score (0.0 to 1.0)
+    pub score: f64,
+    
+    /// Priority of the matched rule
+    pub priority: Priority,
+    
+    /// Combined weighted score (score * priority_factor)
+    pub weighted_score: f64,
+    
+    /// The rule that was matched
+    pub rule_id: String,
+}
+
+impl PatternMatch {
+    /// Create a new pattern match
+    pub fn new(
+        concept: String,
+        provider: String,
+        model: String,
+        score: f64,
+        priority: Priority,
+        rule_id: String,
+    ) -> Self {
+        let priority_factor = priority.value() as f64 / 100.0;
+        let weighted_score = score * priority_factor;
+        
+        Self {
+            concept,
+            provider,
+            model,
+            score,
+            priority,
+            weighted_score,
+            rule_id,
+        }
+    }
+
+    /// Create a simple pattern match with default priority
+    pub fn simple(
+        concept: String,
+        provider: String,
+        model: String,
+        score: f64,
+    ) -> Self {
+        Self::new(
+            concept,
+            provider,
+            model,
+            score,
+            Priority::MEDIUM,
+            "default".to_string(),
+        )
+    }
+}
+
+/// Routing decision with priority information
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct RoutingDecision {
+    /// Provider to route to
+    pub provider: String,
+    
+    /// Model to use
+    pub model: String,
+    
+    /// The scenario that was matched
+    pub scenario: RoutingScenario,
+    
+    /// Priority of this decision
+    pub priority: Priority,
+    
+    /// Confidence score (0.0 to 1.0)
+    pub confidence: f64,
+    
+    /// The rule that led to this decision (if any)
+    pub rule_id: Option<String>,
+    
+    /// Reason for this decision
+    pub reason: String,
+}
+
+impl RoutingDecision {
+    /// Create a new routing decision
+    pub fn new(
+        provider: String,
+        model: String,
+        scenario: RoutingScenario,
+        priority: Priority,
+        confidence: f64,
+        reason: String,
+    ) -> Self {
+        Self {
+            provider,
+            model,
+            scenario,
+            priority,
+            confidence,
+            rule_id: None,
+            reason,
+        }
+    }
+
+    /// Create a decision with a specific rule
+    pub fn with_rule(
+        provider: String,
+        model: String,
+        scenario: RoutingScenario,
+        priority: Priority,
+        confidence: f64,
+        rule_id: String,
+        reason: String,
+    ) -> Self {
+        Self {
+            provider,
+            model,
+            scenario,
+            priority,
+            confidence,
+            rule_id: Some(rule_id),
+            reason,
+        }
+    }
+
+    /// Create a simple default decision
+    pub fn default(provider: String, model: String) -> Self {
+        Self::new(
+            provider,
+            model,
+            RoutingScenario::Default,
+            Priority::LOW,
+            0.5,
+            "Default routing".to_string(),
+        )
+    }
+}
+
+/// Routing scenario types
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum RoutingScenario {
+    /// Default routing scenario
+    #[serde(rename = "default")]
+    Default,
+    
+    /// Background processing (low priority, cost-optimized)
+    #[serde(rename = "background")]
+    Background,
+    
+    /// Thinking/reasoning tasks (high quality)
+    #[serde(rename = "think")]
+    Think,
+    
+    /// Long context tasks
+    #[serde(rename = "long_context")]
+    LongContext,
+    
+    /// Web search required
+    #[serde(rename = "web_search")]
+    WebSearch,
+    
+    /// Image processing required
+    #[serde(rename = "image")]
+    Image,
+    
+    /// Pattern-based routing with concept name
+    #[serde(rename = "pattern")]
+    Pattern(String),
+    
+    /// Priority-based routing
+    #[serde(rename = "priority")]
+    Priority,
+    
+    /// Custom scenario
+    #[serde(rename = "custom")]
+    Custom(String),
+}
+
+impl Default for RoutingScenario {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl fmt::Display for RoutingScenario {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Default => write!(f, "default"),
+            Self::Background => write!(f, "background"),
+            Self::Think => write!(f, "think"),
+            Self::LongContext => write!(f, "long_context"),
+            Self::WebSearch => write!(f, "web_search"),
+            Self::Image => write!(f, "image"),
+            Self::Pattern(concept) => write!(f, "pattern:{}", concept),
+            Self::Priority => write!(f, "priority"),
+            Self::Custom(name) => write!(f, "custom:{}", name),
+        }
+    }
+}
+
 /// Multi-agent context for coordinating between different AI agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
@@ -1467,5 +1852,218 @@ mod tests {
         assert_eq!(query.skip, deserialized.skip);
         assert_eq!(query.limit, deserialized.limit);
         assert_eq!(query.role, deserialized.role);
+    }
+
+    #[test]
+    fn test_priority_creation_and_comparison() {
+        let high = Priority::HIGH;
+        let medium = Priority::MEDIUM;
+        let low = Priority::LOW;
+        let custom = Priority::new(75);
+
+        assert_eq!(high.value(), 80);
+        assert_eq!(medium.value(), 50);
+        assert_eq!(low.value(), 20);
+        assert_eq!(custom.value(), 75);
+
+        assert!(high.is_high());
+        assert!(!medium.is_high());
+        assert!(medium.is_medium());
+        assert!(low.is_low());
+
+        // Test ordering
+        assert!(high > medium);
+        assert!(medium > low);
+        assert!(custom > medium);
+        assert!(custom < high);
+
+        // Test bounds
+        let max = Priority::new(150);
+        assert_eq!(max.value(), 100);
+        let min = Priority::new(0);
+        assert_eq!(min.value(), 0);
+    }
+
+    #[test]
+    fn test_routing_rule_creation() {
+        let rule = RoutingRule::new(
+            "test-rule".to_string(),
+            "Test Rule".to_string(),
+            "test.*pattern".to_string(),
+            Priority::HIGH,
+            "openai".to_string(),
+            "gpt-4".to_string(),
+        )
+        .with_description("A test rule for unit testing".to_string())
+        .with_tag("test".to_string())
+        .with_tag("example".to_string());
+
+        assert_eq!(rule.id, "test-rule");
+        assert_eq!(rule.name, "Test Rule");
+        assert_eq!(rule.pattern, "test.*pattern");
+        assert_eq!(rule.priority, Priority::HIGH);
+        assert_eq!(rule.provider, "openai");
+        assert_eq!(rule.model, "gpt-4");
+        assert_eq!(rule.description, Some("A test rule for unit testing".to_string()));
+        assert_eq!(rule.tags, vec!["test", "example"]);
+        assert!(rule.enabled);
+    }
+
+    #[test]
+    fn test_routing_rule_defaults() {
+        let rule = RoutingRule::with_defaults(
+            "default-rule".to_string(),
+            "Default Rule".to_string(),
+            "default".to_string(),
+            "anthropic".to_string(),
+            "claude-3-sonnet".to_string(),
+        );
+
+        assert_eq!(rule.priority, Priority::MEDIUM);
+        assert!(rule.enabled);
+        assert!(rule.tags.is_empty());
+        assert!(rule.description.is_none());
+    }
+
+    #[test]
+    fn test_pattern_match() {
+        let pattern_match = PatternMatch::new(
+            "machine-learning".to_string(),
+            "openai".to_string(),
+            "gpt-4".to_string(),
+            0.95,
+            Priority::HIGH,
+            "ml-rule".to_string(),
+        );
+
+        assert_eq!(pattern_match.concept, "machine-learning");
+        assert_eq!(pattern_match.provider, "openai");
+        assert_eq!(pattern_match.model, "gpt-4");
+        assert_eq!(pattern_match.score, 0.95);
+        assert_eq!(pattern_match.priority, Priority::HIGH);
+        assert_eq!(pattern_match.rule_id, "ml-rule");
+        
+        // Weighted score should be score * priority_factor
+        assert_eq!(pattern_match.weighted_score, 0.95 * 0.8);
+    }
+
+    #[test]
+    fn test_pattern_match_simple() {
+        let simple = PatternMatch::simple(
+            "test".to_string(),
+            "anthropic".to_string(),
+            "claude-3-haiku".to_string(),
+            0.8,
+        );
+
+        assert_eq!(simple.priority, Priority::MEDIUM);
+        assert_eq!(simple.rule_id, "default");
+        assert_eq!(simple.weighted_score, 0.8 * 0.5);
+    }
+
+    #[test]
+    fn test_routing_decision() {
+        let decision = RoutingDecision::new(
+            "openai".to_string(),
+            "gpt-4".to_string(),
+            RoutingScenario::Think,
+            Priority::HIGH,
+            0.9,
+            "High priority thinking task".to_string(),
+        );
+
+        assert_eq!(decision.provider, "openai");
+        assert_eq!(decision.model, "gpt-4");
+        assert_eq!(decision.scenario, RoutingScenario::Think);
+        assert_eq!(decision.priority, Priority::HIGH);
+        assert_eq!(decision.confidence, 0.9);
+        assert_eq!(decision.reason, "High priority thinking task");
+        assert!(decision.rule_id.is_none());
+    }
+
+    #[test]
+    fn test_routing_decision_with_rule() {
+        let decision = RoutingDecision::with_rule(
+            "anthropic".to_string(),
+            "claude-3-sonnet".to_string(),
+            RoutingScenario::Pattern("web-search".to_string()),
+            Priority::MEDIUM,
+            0.85,
+            "web-rule".to_string(),
+            "Web search pattern matched".to_string(),
+        );
+
+        assert_eq!(decision.rule_id, Some("web-rule".to_string()));
+        assert_eq!(decision.scenario, RoutingScenario::Pattern("web-search".to_string()));
+    }
+
+    #[test]
+    fn test_routing_decision_default() {
+        let default = RoutingDecision::default("openai".to_string(), "gpt-3.5-turbo".to_string());
+
+        assert_eq!(default.provider, "openai");
+        assert_eq!(default.model, "gpt-3.5-turbo");
+        assert_eq!(default.scenario, RoutingScenario::Default);
+        assert_eq!(default.priority, Priority::LOW);
+        assert_eq!(default.confidence, 0.5);
+        assert_eq!(default.reason, "Default routing");
+    }
+
+    #[test]
+    fn test_routing_scenario_serialization() {
+        let scenarios = vec![
+            RoutingScenario::Default,
+            RoutingScenario::Background,
+            RoutingScenario::Think,
+            RoutingScenario::LongContext,
+            RoutingScenario::WebSearch,
+            RoutingScenario::Image,
+            RoutingScenario::Pattern("test".to_string()),
+            RoutingScenario::Priority,
+            RoutingScenario::Custom("special".to_string()),
+        ];
+
+        for scenario in scenarios {
+            let json = serde_json::to_string(&scenario).unwrap();
+            let deserialized: RoutingScenario = serde_json::from_str(&json).unwrap();
+            assert_eq!(scenario, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_routing_scenario_display() {
+        assert_eq!(format!("{}", RoutingScenario::Default), "default");
+        assert_eq!(format!("{}", RoutingScenario::Think), "think");
+        assert_eq!(format!("{}", RoutingScenario::Pattern("ml".to_string())), "pattern:ml");
+        assert_eq!(format!("{}", RoutingScenario::Custom("test".to_string())), "custom:test");
+    }
+
+    #[test]
+    fn test_priority_serialization() {
+        let priority = Priority::new(75);
+        let json = serde_json::to_string(&priority).unwrap();
+        let deserialized: Priority = serde_json::from_str(&json).unwrap();
+        assert_eq!(priority, deserialized);
+        assert_eq!(deserialized.value(), 75);
+    }
+
+    #[test]
+    fn test_routing_rule_serialization() {
+        let rule = RoutingRule::new(
+            "serialize-test".to_string(),
+            "Serialize Test".to_string(),
+            "test-pattern".to_string(),
+            Priority::MEDIUM,
+            "provider".to_string(),
+            "model".to_string(),
+        );
+
+        let json = serde_json::to_string(&rule).unwrap();
+        let deserialized: RoutingRule = serde_json::from_str(&json).unwrap();
+        assert_eq!(rule.id, deserialized.id);
+        assert_eq!(rule.name, deserialized.name);
+        assert_eq!(rule.priority, deserialized.priority);
+        assert_eq!(rule.provider, deserialized.provider);
+        assert_eq!(rule.model, deserialized.model);
     }
 }
