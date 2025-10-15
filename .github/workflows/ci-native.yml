@@ -90,11 +90,8 @@ jobs:
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-cargo-lint-
 
-      - name: Run cargo fmt check
-        run: cargo fmt --all -- --check
-
-      - name: Run cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run format and linting checks
+        run: ./scripts/ci-check-format.sh
 
   build-frontend:
     needs: setup
@@ -218,16 +215,9 @@ jobs:
 
       - name: Build Rust project
         run: |
-          # Build all main binaries
-          cargo build --release --target ${{ matrix.target }} \
-            --package terraphim_server \
-            --package terraphim_mcp_server \
-            --package terraphim_tui
-
-          # Test binaries exist and can run version command
-          ./target/${{ matrix.target }}/release/terraphim_server --version
-          ./target/${{ matrix.target }}/release/terraphim_mcp_server --version
-          ./target/${{ matrix.target }}/release/terraphim-tui --version
+          # Set target for CI script
+          export TARGET="${{ matrix.target }}"
+          ./scripts/ci-check-rust.sh "$TARGET"
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
@@ -316,14 +306,8 @@ jobs:
           name: frontend-dist
           path: terraphim_server/dist
 
-      - name: Run unit tests
-        run: cargo test --workspace --lib
-
-      - name: Run integration tests
-        run: cargo test --workspace --test '*'
-
-      - name: Run doc tests
-        run: cargo test --workspace --doc
+      - name: Run test suite
+        run: ./scripts/ci-check-tests.sh
 
   test-desktop:
     runs-on: ubuntu-latest
@@ -367,17 +351,8 @@ jobs:
         working-directory: ./desktop
         run: npx playwright install --with-deps
 
-      - name: Run unit tests
-        working-directory: ./desktop
-        run: yarn test --reporter=verbose --run
-
-      - name: Run E2E tests
-        working-directory: ./desktop
-        run: CI=true yarn e2e --reporter=line --bail=1
-
-      - name: Run config wizard tests
-        working-directory: ./desktop
-        run: CI=true npx playwright test tests/e2e/config-wizard.spec.ts --reporter=line
+      - name: Run desktop tests
+        run: ./scripts/ci-check-desktop.sh
 
   build-docker:
     needs: [setup, build-rust]
