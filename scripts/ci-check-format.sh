@@ -35,9 +35,9 @@ sudo apt-get install -yqq --no-install-recommends \
     libssl-dev \
     libglib2.0-dev \
     libgtk-3-dev \
-    libwebkit2gtk-4.0-dev \
+    libwebkit2gtk-4.1-dev \
     libsoup2.4-dev \
-    libjavascriptcoregtk-4.0-dev \
+    libjavascriptcoregtk-4.1-dev \
     libayatana-appindicator3-dev \
     librsvg2-dev
 
