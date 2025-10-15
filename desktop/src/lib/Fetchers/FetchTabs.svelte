@@ -1,10 +1,10 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
+import { Button, Field, Input, Switch } from 'svelma';
+import { Route } from 'tinro';
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
-import { Route } from 'tinro';
-import { Field, Input, Button, Switch } from 'svelma';
 
 let _content = {
 	json: $configStore,
@@ -37,11 +37,11 @@ function _handleChange(updatedContent) {
 	_content = updatedContent;
 	_content;
 }
-let isWiki = false;
-let fetchUrl =
+const isWiki = false;
+const fetchUrl =
 	'https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json';
-let postUrl = 'http://localhost:8000/documents/';
-let atomicServerUrl = 'http://localhost:9883/';
+const postUrl = 'http://localhost:8000/documents/';
+const atomicServerUrl = 'http://localhost:9883/';
 let agentSecret: string | undefined;
 const _setAtomicServer = async () => {
 	console.log('Updating atomic server configuration');

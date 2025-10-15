@@ -3,9 +3,9 @@ import { invoke } from '@tauri-apps/api/tauri';
 import * as d3 from 'd3';
 import { onMount } from 'svelte';
 import type { RoleGraphResponse } from './generated/types';
+import ArticleModal from './Search/ArticleModal.svelte';
 import type { Document } from './Search/SearchResult';
 import { is_tauri, role } from './stores';
-import ArticleModal from './Search/ArticleModal.svelte';
 
 export const apiUrl: string = '/rolegraph';
 export const fullscreen: boolean = true;
@@ -18,7 +18,7 @@ let edges: any[] = [];
 let selectedNode: Document | null = null;
 let _showModal = false;
 let _startInEditMode = false;
-let debugMessage = '';
+const debugMessage = '';
 
 // Dimensions
 let width = window.innerWidth;
