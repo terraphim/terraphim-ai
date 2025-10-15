@@ -47,6 +47,10 @@ jobs:
       - name: Install dependencies
         working-directory: desktop
         run: |
+          # Set Node.js options for compatibility
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          export npm_config_legacy_peer_deps=true
+
           if [ -f yarn.lock ]; then
             yarn install --frozen-lockfile --legacy-peer-deps
           else
@@ -68,6 +72,10 @@ jobs:
         id: build
         working-directory: desktop
         run: |
+          # Set Node.js options for compatibility during build
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          export npm_config_legacy_peer_deps=true
+
           yarn run build
           echo "dist-path=desktop/dist" >> $GITHUB_OUTPUT
 
