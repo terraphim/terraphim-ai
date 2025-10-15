@@ -1,28 +1,25 @@
-# Simple Dockerfile for Terraphim Server
-FROM ubuntu:22.04
+# Multi-stage Dockerfile for better multi-architecture support
+FROM rust:1.87.0 as builder
 
-ARG RUST_VERSION=1.87.0
+ARG TARGETARCH
+ARG TARGETPLATFORM
 
-# Install system dependencies
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
     build-essential \
-    bison \
-    flex \
-    ca-certificates \
-    openssl \
-    libssl-dev \
     pkg-config \
-    git \
-    curl \
-    cmake \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${RUST_VERSION}
-ENV PATH="/root/.cargo/bin:$PATH"
-
 WORKDIR /app
+
+# Copy Cargo files first for better caching
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates/
+COPY terraphim_server ./terraphim_server/
+
+# Build dependencies first (cache layer)
+RUN cargo build --release --package terraphim_server
 
 # Copy the source code
 COPY . .
@@ -30,12 +27,21 @@ COPY . .
 # Build the application
 RUN cargo build --release --package terraphim_server
 
-# Copy the binary to a location in PATH
-RUN cp target/release/terraphim_server /usr/local/bin/
+# Final runtime image
+FROM ubuntu:22.04
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash terraphim
-RUN chown -R terraphim:terraphim /home/terraphim
+
+# Copy binary from builder stage
+COPY --from=builder /app/target/release/terraphim_server /usr/local/bin/terraphim_server
 
 # Switch to non-root user
 USER terraphim
