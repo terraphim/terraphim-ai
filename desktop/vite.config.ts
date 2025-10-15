@@ -5,7 +5,11 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  const isMinimal = mode === 'minimal';
+  const isCI = process.env.CI === 'true';
+
+  return {
   plugins: [
     svelte(),
     {
@@ -127,7 +131,11 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      output: {
+      output: isMinimal ? {
+        // Minimal chunks for CI builds
+        manualChunks: undefined
+      } : {
+        // Full chunks for development
         manualChunks: {
           // Vendor libraries
           'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
@@ -140,6 +148,11 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 1000 // Increase limit to 1MB
+    chunkSizeWarningLimit: isMinimal ? 500 : 1000, // Lower limit for minimal builds
+    target: 'esnext',
+    minify: isMinimal ? 'esbuild' : 'terser',
+    sourcemap: isCI ? false : true // Disable sourcemaps in CI for faster builds
   }
+  };
+});
 })
