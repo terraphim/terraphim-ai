@@ -51,6 +51,18 @@ jobs:
           export NODE_OPTIONS="--max-old-space-size=4096"
           export npm_config_legacy_peer_deps=true
 
+          # Install system dependencies for Node.js modules
+          sudo apt-get update -qq
+          sudo apt-get install -yqq --no-install-recommends \
+            python3 \
+            make \
+            g++ \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libjpeg-dev \
+            libgif-dev \
+            librsvg2-dev
+
           if [ -f yarn.lock ]; then
             yarn install --frozen-lockfile --legacy-peer-deps
           else
