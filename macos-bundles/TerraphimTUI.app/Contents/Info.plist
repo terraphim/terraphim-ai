@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>terraphim-tui</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>ai.terraphim.tui</string>
+    <key>CFBundleName</key>
+    <string>Terraphim TUI</string>
+    <key>CFBundleDisplayName</key>
+    <string>Terraphim AI TUI</string>
+    <key>CFBundleVersion</key>
+    <string>0.2.3</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.2.3</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
+    <key>NSAppTransportSecure</key>
+    <true/>
+    <key>LSBackgroundOnly</key>
+    <false/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>json</string>
+                <string>md</string>
+                <string>txt</string>
+                <string>rst</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+        </dict>
+    </array>
+</dict>
+</plist>
