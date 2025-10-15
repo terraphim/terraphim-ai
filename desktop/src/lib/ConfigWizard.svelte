@@ -797,7 +797,7 @@ function _closeWizard() {
             <div class="control">
               <input class="input" id={`llm-model-${idx}`} type="text" placeholder="llama3.1" bind:value={$draft.roles[idx].llm_model} />
             </div>
-            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            <button class="button is-small" on:click={() => _fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
                                         <select on:change={(e)=>{$draft.roles[idx].llm_model=e.currentTarget.value}}>
@@ -852,7 +852,7 @@ function _closeWizard() {
             <div class="control">
               <input class="input" id={`openrouter-model-${idx}`} type="text" placeholder="openai/gpt-4-turbo" bind:value={$draft.roles[idx].openrouter_model} />
             </div>
-            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            <button class="button is-small" on:click={() => _fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
                                         <select on:change={(e)=>{$draft.roles[idx].openrouter_model=e.currentTarget.value}}>
@@ -922,7 +922,7 @@ function _closeWizard() {
               placeholder="/path/to/markdown"
               bind:value={$draft.roles[idx].kg.local_path}
               readonly={$is_tauri}
-              on:click={$is_tauri ? () => _selectKnowledgeGraphPath(idx) : undefined}
+              on:click={$is_tauri ? () => __selectKnowledgeGraphPath(idx) : undefined}
             />
             {#if $is_tauri}
               <p class="help">Click to select directory</p>
@@ -951,10 +951,10 @@ function _closeWizard() {
           </label>
         </div>
         <hr />
-        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => _removeRole(idx)}>Remove Role</button>
+        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => __removeRole(idx)}>Remove Role</button>
       </div>
     {/each}
-    <button class="button is-link is-light" data-testid="add-role" on:click={_addRole}>Add Role</button>
+    <button class="button is-link is-light" data-testid="add-role" on:click={__addRole}>Add Role</button>
   {:else}
     <h4 class="title is-5">Review</h4>
     <div class="content">
@@ -983,14 +983,14 @@ function _closeWizard() {
   <nav class="level">
     <div class="level-left">
       {#if currentStep > 1}
-        <button class="button" data-testid="wizard-back" on:click={_prev}>Back</button>
+        <button class="button" data-testid="wizard-back" on:click={__prev}>Back</button>
       {/if}
     </div>
     <div class="level-right">
       {#if currentStep < totalSteps}
-        <button class="button is-primary" data-testid="wizard-_next" on:click={_next}>Next</button>
+        <button class="button is-primary" data-testid="wizard-_next" on:click={__next}>Next</button>
       {:else}
-        <button class="button is-success" data-testid="wizard-_save" on:click={_save}>Save</button>
+        <button class="button is-success" data-testid="wizard-_save" on:click={__save}>Save</button>
       {/if}
     </div>
   </nav>

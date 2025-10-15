@@ -1028,7 +1028,7 @@ function _toggleSessionList() {
                     class="button is-small is-warning"
                     title="Show debug request (sent to LLM)"
                     on:click={() => __showDebugRequest = true}
-                    disabled={!lastRequest}
+                    disabled={!_lastRequest}
                   >
                     <span class="icon is-small"><i class="fas fa-bug"></i></span>
                     <span class="is-size-7">REQ</span>
@@ -1037,7 +1037,7 @@ function _toggleSessionList() {
                     class="button is-small is-info"
                     title="Show debug response (from LLM)"
                     on:click={() => __showDebugResponse = true}
-                    disabled={!lastResponse}
+                    disabled={!_lastResponse}
                   >
                     <span class="icon is-small"><i class="fas fa-code"></i></span>
                     <span class="is-size-7">RES</span>
@@ -1070,7 +1070,7 @@ function _toggleSessionList() {
 
         <div class="field has-addons chat-input">
           <div class="control is-expanded">
-            <textarea class="textarea" rows="3" bind:value={input} on:keydown={handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
+            <textarea class="textarea" rows="3" bind:value={input} on:keydown={_handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
           </div>
           <div class="control">
             <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button">
@@ -1088,7 +1088,7 @@ function _toggleSessionList() {
             <div class="level-left">
               <div class="level-item">
                 <div class="buttons has-addons">
-                  <button class="button is-small is-info" data-testid="kg-search-button" on:click={openKGSearch}>
+                  <button class="button is-small is-info" data-testid="kg-search-button" on:click={_openKGSearch}>
                     <span class="icon is-small">
                       <i class="fas fa-sitemap"></i>
                     </span>
@@ -1102,10 +1102,10 @@ function _toggleSessionList() {
                 <button
                   class="button is-small is-light"
                   on:click={loadConversationContext}
-                  disabled={loadingContext}
+                  disabled={_loadingContext}
                   data-testid="refresh-context-button"
                 >
-                  {#if loadingContext}
+                  {#if _loadingContext}
                     <span class="icon is-small">
                       <i class="fas fa-spinner fa-spin"></i>
                     </span>
@@ -1308,16 +1308,16 @@ function _toggleSessionList() {
         <button class="delete" aria-label="close" on:click={() => _showDebugRequest = false}></button>
       </header>
       <section class="modal-card-body">
-        {#if lastRequest}
+        {#if _lastRequest}
           <div class="content">
             <p class="has-text-weight-semibold">Request Details:</p>
             <div class="tags are-medium">
-              <span class="tag is-info">Method: {lastRequest.method}</span>
-              <span class="tag is-primary">Time: {new Date(lastRequest.timestamp).toLocaleTimeString()}</span>
-              <span class="tag is-success">Context Items: {lastRequest.context_items_count}</span>
+              <span class="tag is-info">Method: {_lastRequest.method}</span>
+              <span class="tag is-primary">Time: {new Date(_lastRequest.timestamp).toLocaleTimeString()}</span>
+              <span class="tag is-success">Context Items: {_lastRequest.context_items_count}</span>
             </div>
             <p class="has-text-weight-semibold mt-4">Full Request JSON:</p>
-            <pre class="debug-json"><code>{JSON.stringify(lastRequest, null, 2)}</code></pre>
+            <pre class="debug-json"><code>{JSON.stringify(_lastRequest, null, 2)}</code></pre>
           </div>
         {:else}
           <p class="has-text-grey">No request data available</p>
@@ -1325,8 +1325,8 @@ function _toggleSessionList() {
       </section>
       <footer class="modal-card-foot">
         <button class="button" on:click={() => _showDebugRequest = false}>Close</button>
-        {#if lastRequest}
-          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(lastRequest, null, 2))}>
+        {#if _lastRequest}
+          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(_lastRequest, null, 2))}>
             <span class="icon"><i class="fas fa-copy"></i></span>
             <span>Copy JSON</span>
           </button>
@@ -1349,21 +1349,21 @@ function _toggleSessionList() {
         <button class="delete" aria-label="close" on:click={() => _showDebugResponse = false}></button>
       </header>
       <section class="modal-card-body">
-        {#if lastResponse}
+        {#if _lastResponse}
           <div class="content">
             <p class="has-text-weight-semibold">Response Details:</p>
             <div class="tags are-medium">
-              <span class="tag is-info">Status: {lastResponse.status}</span>
-              <span class="tag is-primary">Time: {new Date(lastResponse.timestamp).toLocaleTimeString()}</span>
-              {#if lastResponse.model_used}
-                <span class="tag is-success">Model: {lastResponse.model_used}</span>
+              <span class="tag is-info">Status: {_lastResponse.status}</span>
+              <span class="tag is-primary">Time: {new Date(_lastResponse.timestamp).toLocaleTimeString()}</span>
+              {#if _lastResponse.model_used}
+                <span class="tag is-success">Model: {_lastResponse.model_used}</span>
               {/if}
-              {#if lastResponse.message_length}
-                <span class="tag is-warning">Length: {lastResponse.message_length} chars</span>
+              {#if _lastResponse.message_length}
+                <span class="tag is-warning">Length: {_lastResponse.message_length} chars</span>
               {/if}
             </div>
             <p class="has-text-weight-semibold mt-4">Full Response JSON:</p>
-            <pre class="debug-json"><code>{JSON.stringify(lastResponse, null, 2)}</code></pre>
+            <pre class="debug-json"><code>{JSON.stringify(_lastResponse, null, 2)}</code></pre>
           </div>
         {:else}
           <p class="has-text-grey">No response data available</p>
@@ -1371,8 +1371,8 @@ function _toggleSessionList() {
       </section>
       <footer class="modal-card-foot">
         <button class="button" on:click={() => _showDebugResponse = false}>Close</button>
-        {#if lastResponse}
-          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(lastResponse, null, 2))}>
+        {#if _lastResponse}
+          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(_lastResponse, null, 2))}>
             <span class="icon"><i class="fas fa-copy"></i></span>
             <span>Copy JSON</span>
           </button>
