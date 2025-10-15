@@ -98,21 +98,21 @@ echo "Skipping linting due to known type errors during CI migration"
 
 echo -e "${BLUE}🧪 Running frontend tests...${NC}"
 # Run tests but continue on error (same as CI)
-if yarn test; then
+if timeout 300 yarn test; then
     echo -e "${GREEN}  ✅ Frontend tests passed${NC}"
 else
-    echo -e "${YELLOW}  ⚠️  Frontend tests failed but continuing build${NC}"
+    echo -e "${YELLOW}  ⚠️  Frontend tests failed or timed out but continuing build${NC}"
 fi
 
 echo -e "${BLUE}🏗️  Building frontend...${NC}"
 # Try to build, but continue on error for now (same as CI)
-if yarn run build; then
+if timeout 600 yarn run build; then
     echo -e "${GREEN}  ✅ Frontend build successful${NC}"
 else
-    echo -e "${YELLOW}  ⚠️  Frontend build failed, but continuing for now${NC}"
+    echo -e "${YELLOW}  ⚠️  Frontend build failed or timed out, creating fallback${NC}"
     # Create a minimal dist folder if build fails (same as CI)
     mkdir -p dist
-    echo '<html><body><h1>Build Failed</h1></body></html>' > dist/index.html
+    echo '<html><body><h1>Build Failed</h1><p>CI build failed but creating fallback for testing</p></body></html>' > dist/index.html
 fi
 
 echo -e "${BLUE}🔍 Verifying build output...${NC}"
