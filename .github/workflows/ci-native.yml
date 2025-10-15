@@ -125,7 +125,7 @@ jobs:
     needs: setup
     uses: ./.github/workflows/frontend-build.yml
     with:
-      node-version: '20'
+      node-version: '18'
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
@@ -362,7 +362,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '18'
           cache: yarn
           cache-dependency-path: desktop/yarn.lock
 

@@ -7,7 +7,7 @@ on:
         description: 'Node.js version'
         required: false
         type: string
-        default: '20'
+        default: '18'
       cache-key:
         description: 'Cache key for dependencies'
         required: false
