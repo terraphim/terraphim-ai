@@ -32,7 +32,14 @@ sudo apt-get install -yqq --no-install-recommends \
     libclang-dev \
     llvm-dev \
     pkg-config \
-    libssl-dev
+    libssl-dev \
+    libglib2.0-dev \
+    libgtk-3-dev \
+    libwebkit2gtk-4.0-dev \
+    libsoup2.4-dev \
+    libjavascriptcoregtk-4.0-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev
 
 # Install Rust toolchain (same version as CI)
 echo -e "${BLUE}🦀 Installing Rust toolchain...${NC}"
@@ -68,11 +75,11 @@ else
 fi
 
 echo -e "${BLUE}🔍 Running cargo clippy...${NC}"
-# Run clippy with same flags as CI
-if cargo clippy --workspace --all-targets --all-features -- -D warnings; then
+# Run clippy with same flags as CI, with timeout for CI environment
+if timeout 600 cargo clippy --workspace --all-targets --all-features -- -D warnings; then
     echo -e "${GREEN}  ✅ cargo clippy check passed${NC}"
 else
-    echo -e "${RED}  ❌ cargo clippy check failed${NC}"
+    echo -e "${RED}  ❌ cargo clippy check failed or timed out${NC}"
     echo -e "${YELLOW}  Fix clippy warnings and try again${NC}"
     exit 1
 fi
