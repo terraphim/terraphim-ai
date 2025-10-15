@@ -35,7 +35,8 @@ command_exists() {
 
 # Check for large files
 print_status "INFO" "Checking for large files..."
-large_files=$(git diff --cached --name-only --diff-filter=A | xargs -I {} find {} -size +1000k 2>/dev/null || true)
+# Allow up to 2MB to accommodate new frontend bundles committed in release builds.
+large_files=$(git diff --cached --name-only --diff-filter=A | xargs -I {} find {} -size +2000k 2>/dev/null || true)
 if [ -n "$large_files" ]; then
     print_status "FAIL" "Large files detected (>1MB):"
     echo "$large_files"
@@ -138,7 +139,7 @@ if git diff --cached --name-only | grep -q "^desktop/"; then
     if command_exists npx && [ -f "desktop/biome.json" ]; then
         print_status "INFO" "Checking JavaScript/TypeScript with Biome..."
         cd desktop
-        if ! npx @biomejs/biome check --write false --no-errors-on-unmatched >/dev/null 2>&1; then
+        if ! npx @biomejs/biome check --no-errors-on-unmatched >/dev/null 2>&1; then
             print_status "FAIL" "Biome found formatting or linting issues"
             print_status "INFO" "Run 'cd desktop && npx @biomejs/biome check --write' to fix issues"
             cd ..

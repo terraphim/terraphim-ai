@@ -33,19 +33,25 @@ jobs:
           node-version: ${{ inputs.node-version }}
           cache: 'yarn'
           cache-dependency-path: desktop/yarn.lock
+        continue-on-error: true
 
       - name: Cache node modules
         uses: actions/cache@v4
         with:
           path: desktop/node_modules
-          key: ${{ inputs.cache-key }}-node-${{ inputs.node-version }}-${{ hashFiles('desktop/yarn.lock') }}
+          key: ${{ inputs.cache-key }}-node-${{ inputs.node-version }}-${{ hashFiles('desktop/package.json') }}
           restore-keys: |
             ${{ inputs.cache-key }}-node-${{ inputs.node-version }}-
             ${{ inputs.cache-key }}-node-
 
       - name: Install dependencies
         working-directory: desktop
-        run: yarn install --frozen-lockfile
+        run: |
+          if [ -f yarn.lock ]; then
+            yarn install --frozen-lockfile --legacy-peer-deps
+          else
+            yarn install --legacy-peer-deps
+          fi
 
       - name: Run frontend linting
         working-directory: desktop

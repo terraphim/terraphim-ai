@@ -268,7 +268,8 @@ mod tests {
         assert!(client.is_ok());
         assert_eq!(client.unwrap().model(), "gpt-3.5-turbo");
 
-        let client = GenAiLlmClient::from_config("openrouter", Some("deepseek/deepseek-chat".to_string()));
+        let client =
+            GenAiLlmClient::from_config("openrouter", Some("deepseek/deepseek-chat".to_string()));
         assert!(client.is_ok());
         let client = client.unwrap();
         assert_eq!(client.model(), "deepseek/deepseek-chat");
