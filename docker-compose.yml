@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  terraphim:
+    image: ghcr.io/terraphim/terraphim-server:v0.2.3
+    container_name: terraphim-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config:/home/terraphim/.config/terraphim
+      - ./data:/home/terraphim/data
+      - ./logs:/home/terraphim/logs
+    environment:
+      - RUST_LOG=info
+      - LOG_LEVEL=info
+      - TERRAPHIM_SERVER_HOSTNAME=0.0.0.0:8000
+      - TERRAPHIM_SERVER_API_ENDPOINT=http://localhost:8000/api
+      - RUST_BACKTRACE=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - terraphim-network
+
+  # Optional: Ollama for local AI inference
+  ollama:
+    image: ollama/ollama:latest
+    container_name: terraphim-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - terraphim-network
+    profiles:
+      - ai
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: terraphim-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    networks:
+      - terraphim-network
+    profiles:
+      - cache
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: terraphim-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - terraphim
+    networks:
+      - terraphim-network
+    profiles:
+      - proxy
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  terraphim-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
