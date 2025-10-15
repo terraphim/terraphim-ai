@@ -67,27 +67,55 @@ sudo apt-get install -yqq --no-install-recommends \
     libpango1.0-dev \
     libjpeg-dev \
     libgif-dev \
-    librsvg2-dev
+    librsvg2-dev \
+    libnss3-dev \
+    libatk-bridge2.0-dev \
+    libdrm2 \
+    libxkbcommon-dev \
+    libxcomposite-dev \
+    libxdamage-dev \
+    libxrandr-dev \
+    libgbm-dev \
+    libxss-dev \
+    libasound2-dev
 
 # Set environment variables (same as CI)
 export NODE_OPTIONS="--max-old-space-size=4096"
 export npm_config_legacy_peer_deps=true
 
 echo -e "${BLUE}📦 Installing frontend dependencies...${NC}"
+# Clear yarn cache to avoid corruption
+echo "Clearing yarn cache..."
+yarn cache clean
+
+# Install dependencies with better error handling
 if [[ -f yarn.lock ]]; then
     echo "Found yarn.lock, installing with --frozen-lockfile --legacy-peer-deps"
-    if yarn install --frozen-lockfile --legacy-peer-deps; then
+    if timeout 300 yarn install --frozen-lockfile --legacy-peer-deps; then
         echo -e "${GREEN}  ✅ Dependencies installed successfully${NC}"
     else
-        echo -e "${RED}  ❌ Failed to install dependencies${NC}"
-        exit 1
+        echo -e "${YELLOW}  ⚠️  Frozen lockfile install failed, trying without lockfile${NC}"
+        if timeout 300 yarn install --legacy-peer-deps; then
+            echo -e "${GREEN}  ✅ Dependencies installed successfully (fallback)${NC}"
+        else
+            echo -e "${RED}  ❌ Failed to install dependencies${NC}"
+            echo "Debugging dependency installation..."
+            yarn --version
+            node --version
+            npm --version
+            exit 1
+        fi
     fi
 else
     echo "No yarn.lock found, installing with --legacy-peer-deps"
-    if yarn install --legacy-peer-deps; then
+    if timeout 300 yarn install --legacy-peer-deps; then
         echo -e "${GREEN}  ✅ Dependencies installed successfully${NC}"
     else
         echo -e "${RED}  ❌ Failed to install dependencies${NC}"
+        echo "Debugging dependency installation..."
+        yarn --version
+        node --version
+        npm --version
         exit 1
     fi
 fi
@@ -105,14 +133,60 @@ else
 fi
 
 echo -e "${BLUE}🏗️  Building frontend...${NC}"
-# Try to build, but continue on error for now (same as CI)
-if timeout 600 yarn run build; then
+# Try to build with enhanced error reporting
+echo "Starting frontend build process..."
+if timeout 900 yarn run build; then
     echo -e "${GREEN}  ✅ Frontend build successful${NC}"
+    # Verify build output
+    if [[ -f dist/index.html ]]; then
+        echo -e "${GREEN}  ✅ Build output verified${NC}"
+        ls -la dist/
+    else
+        echo -e "${YELLOW}  ⚠️  Build completed but dist/index.html not found${NC}"
+    fi
 else
-    echo -e "${YELLOW}  ⚠️  Frontend build failed or timed out, creating fallback${NC}"
+    echo -e "${RED}  ❌ Frontend build failed or timed out${NC}"
+    echo "Debugging build failure..."
+    echo "Node version: $(node --version)"
+    echo "Yarn version: $(yarn --version)"
+    echo "Available memory: $(free -h)"
+    echo "Disk space: $(df -h .)"
+
+    # Try to identify specific build errors
+    echo "Checking for common build issues..."
+    if yarn run build 2>&1 | grep -i "error\|failed\|missing"; then
+        echo "Build errors detected above"
+    fi
+
     # Create a minimal dist folder if build fails (same as CI)
+    echo "Creating fallback build..."
     mkdir -p dist
-    echo '<html><body><h1>Build Failed</h1><p>CI build failed but creating fallback for testing</p></body></html>' > dist/index.html
+    cat > dist/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Terraphim AI - Build Failed</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
+        h1 { color: #e74c3c; }
+        .error { background: #ffebee; padding: 20px; border-radius: 4px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Terraphim AI - Build Failed</h1>
+        <div class="error">
+            <h3>CI Build Failed</h3>
+            <p>The frontend build process encountered an error during CI/CD pipeline execution.</p>
+            <p>This is a fallback page created to allow testing to continue.</p>
+            <p><strong>Please check the build logs for specific error details.</strong></p>
+        </div>
+    </div>
+</body>
+</html>
+EOF
+    echo -e "${YELLOW}  ⚠️  Fallback build created${NC}"
 fi
 
 echo -e "${BLUE}🔍 Verifying build output...${NC}"

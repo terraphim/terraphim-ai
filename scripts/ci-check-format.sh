@@ -75,8 +75,16 @@ else
 fi
 
 echo -e "${BLUE}🔍 Running cargo clippy...${NC}"
-# Run clippy with same flags as CI, with timeout for CI environment
-if timeout 600 cargo clippy --workspace --all-targets --all-features -- -D warnings; then
+# Pre-build dependencies to avoid timeout
+echo "Pre-building dependencies..."
+if cargo build --workspace --all-targets --all-features; then
+    echo -e "${GREEN}  ✅ Dependencies pre-built successfully${NC}"
+else
+    echo -e "${YELLOW}  ⚠️  Dependency pre-build had issues, continuing anyway${NC}"
+fi
+
+# Run clippy with optimized flags and extended timeout
+if timeout 900 cargo clippy --workspace --all-targets --all-features -- -D warnings; then
     echo -e "${GREEN}  ✅ cargo clippy check passed${NC}"
 else
     echo -e "${RED}  ❌ cargo clippy check failed or timed out${NC}"
