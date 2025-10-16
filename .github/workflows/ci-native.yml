@@ -57,6 +57,7 @@ jobs:
   lint-and-format:
     runs-on: ubuntu-latest
     needs: [setup]
+    timeout-minutes: 20  # Increased timeout for clippy
 
     steps:
       - name: Checkout code
