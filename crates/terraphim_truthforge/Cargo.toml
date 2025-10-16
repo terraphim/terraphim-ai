@@ -37,7 +37,7 @@ chrono = { version = "0.4", features = ["serde"] }
 terraphim_multi_agent = { path = "../terraphim_multi_agent", features = ["test-utils"] }
 tokio-test = "0.4"
 mockall = "0.12"
-tempfile = "3.8"
+tempfile = "3.23"
 
 [features]
 default = ["redis-persistence"]

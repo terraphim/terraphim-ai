@@ -21,7 +21,7 @@ tokio = { version = "1.35.1", features = ["process", "rt", "macros", "time"] }
 async-trait = "0.1.74"
 
 [dev-dependencies]
-tempfile = "3.2.0"
+tempfile = "3.23.0"
 test-log = "0.2.14"
 tokio-test = "0.4"
 
