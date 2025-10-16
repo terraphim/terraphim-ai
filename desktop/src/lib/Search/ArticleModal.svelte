@@ -12,10 +12,10 @@ export const kgTerm: string | null = null;
 export const kgRank: number | null = null;
 
 let editing = false;
-let _contentElement: HTMLElement;
+let contentElement: HTMLElement;
 
 // KG modal state (similar to ResultItem.svelte)
-let _showKgModal = false;
+let showKgModal = false;
 let kgDocument: Document | null = null;
 let _kgTermForModal: string | null = null;
 let kgRankForModal: number | null = null;
@@ -107,7 +107,7 @@ async function handleKgClick(term: string) {
 				console.log('    Title:', kgDocument.title);
 				console.log('    Rank:', kgRankForModal);
 				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-				_showKgModal = true;
+				showKgModal = true;
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
 				console.warn('    This could indicate:');
@@ -156,7 +156,7 @@ async function handleKgClick(term: string) {
 				console.log('    Title:', kgDocument.title);
 				console.log('    Rank:', kgRankForModal);
 				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-				_showKgModal = true;
+				showKgModal = true;
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
 				console.warn('    This could indicate:');

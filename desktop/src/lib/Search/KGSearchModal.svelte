@@ -391,6 +391,14 @@ onDestroy(() => {
 		clearTimeout(searchTimeout);
 	}
 });
+
+// Create aliases without underscores for template usage
+$: searchError = _searchError;
+$: isSearching = _isSearching;
+const handleInput = _handleInput;
+const handleKeydown = _handleKeydown;
+const selectSuggestion = _selectSuggestion;
+const addKGIndexToContext = _addKGIndexToContext;
 </script>
 
 <style lang="scss">
