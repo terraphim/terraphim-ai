@@ -456,6 +456,26 @@ function _closeWizard() {
 		window.history.back();
 	}
 }
+
+// Create reactive aliases without underscores for template usage
+$: saveStatus = __saveStatus;
+$: availableThemes = _availableThemes;
+
+// Create function aliases without underscores for template usage
+const selectHaystackPath = _selectHaystackPath;
+const selectKnowledgeGraphPath = __selectKnowledgeGraphPath;
+const addHaystack = _addHaystack;
+const removeHaystack = _removeHaystack;
+const addExtraParameter = _addExtraParameter;
+const removeExtraParameter = _removeExtraParameter;
+const handleParameterKeyChange = _handleParameterKeyChange;
+const save = __save;
+const next = __next;
+const prev = __prev;
+const addRole = __addRole;
+const removeRole = __removeRole;
+const closeWizard = _closeWizard;
+const fetchLlmModels = _fetchLlmModels;
 </script>
 
 <div class="box" data-testid="config-wizard">
@@ -464,17 +484,17 @@ function _closeWizard() {
     <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
   </div>
 
-  {#if _saveStatus === 'success'}
+  {#if saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
-      <button class="delete" on:click={() => _saveStatus = ''}></button>
-      Configuration _saved successfully!
+      <button class="delete" on:click={() => __saveStatus = ''}></button>
+      Configuration saved successfully!
     </div>
   {/if}
 
-  {#if _saveStatus === 'error'}
+  {#if saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
-      <button class="delete" on:click={() => _saveStatus = ''}></button>
-      Failed to _save configuration. Please try again.
+      <button class="delete" on:click={() => __saveStatus = ''}></button>
+      Failed to save configuration. Please try again.
     </div>
   {/if}
   {#if currentStep === 1}
@@ -922,7 +942,7 @@ function _closeWizard() {
               placeholder="/path/to/markdown"
               bind:value={$draft.roles[idx].kg.local_path}
               readonly={$is_tauri}
-              on:click={$is_tauri ? () => __selectKnowledgeGraphPath(idx) : undefined}
+              on:click={$is_tauri ? () => selectKnowledgeGraphPath(idx) : undefined}
             />
             {#if $is_tauri}
               <p class="help">Click to select directory</p>
@@ -951,10 +971,10 @@ function _closeWizard() {
           </label>
         </div>
         <hr />
-        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => __removeRole(idx)}>Remove Role</button>
+        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => removeRole(idx)}>Remove Role</button>
       </div>
     {/each}
-    <button class="button is-link is-light" data-testid="add-role" on:click={__addRole}>Add Role</button>
+    <button class="button is-link is-light" data-testid="add-role" on:click={addRole}>Add Role</button>
   {:else}
     <h4 class="title is-5">Review</h4>
     <div class="content">
@@ -983,14 +1003,14 @@ function _closeWizard() {
   <nav class="level">
     <div class="level-left">
       {#if currentStep > 1}
-        <button class="button" data-testid="wizard-back" on:click={__prev}>Back</button>
+        <button class="button" data-testid="wizard-back" on:click={prev}>Back</button>
       {/if}
     </div>
     <div class="level-right">
       {#if currentStep < totalSteps}
-        <button class="button is-primary" data-testid="wizard-_next" on:click={__next}>Next</button>
+        <button class="button is-primary" data-testid="wizard-next" on:click={next}>Next</button>
       {:else}
-        <button class="button is-success" data-testid="wizard-_save" on:click={__save}>Save</button>
+        <button class="button is-success" data-testid="wizard-save" on:click={save}>Save</button>
       {/if}
     </div>
   </nav>
