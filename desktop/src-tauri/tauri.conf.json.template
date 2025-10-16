@@ -43,7 +43,7 @@
         "https://github.com/terraphim/terraphim-ai/releases/latest/download/latest.json"
       ],
       "dialog": true,
-      "pubkey": "op://Terraphim-Deployment/Tauri Update Signing/TAURI_PUBLIC_KEY"
+      "pubkey": "op://TerraphimPlatform/tauri.update.signing/TAURI_PUBLIC_KEY"
     },
     "windows": [
       {
