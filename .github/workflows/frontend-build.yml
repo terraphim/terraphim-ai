@@ -19,8 +19,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45  # Further increased timeout for frontend builds
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 20  # Reduced timeout with faster runner
     outputs:
       dist-path: ${{ steps.build.outputs.dist-path }}
 
