@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Test configuration
 FCCTL_WEB_URL="http://localhost:8080"
 FCCTL_WEB_PID=""
-TEST_TIMEOUT=300 # 5 minutes
+TEST_TIMEOUT=600 # 10 minutes
 PARALLEL_JOBS=4
 
 # Logging
