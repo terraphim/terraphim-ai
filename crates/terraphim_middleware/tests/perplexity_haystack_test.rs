@@ -28,6 +28,7 @@ async fn test_perplexity_config_parsing() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: extra_params,
+        fetch_content: false,
     };
 
     println!("✅ Haystack configuration created successfully");
@@ -78,6 +79,7 @@ async fn test_perplexity_service_type_integration() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: extra_params,
+        fetch_content: false,
     };
 
     assert_eq!(haystack.service, ServiceType::Perplexity);
@@ -95,21 +97,14 @@ async fn test_perplexity_service_type_integration() {
         theme: "superhero".to_string(),
         kg: None,
         haystacks: vec![haystack],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: ahash::AHashMap::new(),
     };
 
@@ -159,6 +154,7 @@ async fn test_perplexity_document_format() {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: extra_params,
+            fetch_content: false,
         };
 
         // Verify the configuration is valid
@@ -184,6 +180,7 @@ async fn test_perplexity_missing_api_key() {
         read_only: true,
         atomic_server_secret: None,
         extra_parameters: HashMap::new(), // No API key
+        fetch_content: false,
     };
 
     let role = Role {
@@ -194,21 +191,14 @@ async fn test_perplexity_missing_api_key() {
         theme: "superhero".to_string(),
         kg: None,
         haystacks: vec![haystack],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: ahash::AHashMap::new(),
     };
 
@@ -295,22 +285,16 @@ async fn perplexity_live_api_test() {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: extra_params,
+            fetch_content: false,
         }],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: ahash::AHashMap::new(),
     };
 

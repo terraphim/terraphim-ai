@@ -31,7 +31,24 @@ Terraphim aims to bridge this gap by providing a privacy-first AI assistant that
 
 ## Getting Started
 
-### Quick Start
+### 🚀 Quick Install (Recommended)
+
+#### Option 1: Docker (Easiest)
+```bash
+# Automated Docker installation
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/v0.2.3/docker-run.sh | bash
+```
+
+#### Option 2: Binary Installation
+```bash
+# Automated source installation
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/v0.2.3/install.sh | bash
+```
+
+### 📚 Detailed Installation
+For detailed installation instructions, see our [Installation Guide](https://github.com/terraphim/terraphim-ai/blob/main/release/v0.2.3/README.md).
+
+### 🛠️ Development Setup
 
 1. **Clone the repository**:
    ```bash

@@ -1,12 +1,12 @@
 <script>
-    import { getMatches } from "@tauri-apps/api/cli";
+import { getMatches } from '@tauri-apps/api/cli';
 
-    export let onMessage;
+export let onMessage;
 
-    function cliMatches() {
-      getMatches().then(onMessage).catch(onMessage);
-    }
-  </script>
+function _cliMatches() {
+	getMatches().then(onMessage).catch(onMessage);
+}
+</script>
 
   <div>
     This binary can be run on the terminal and takes the following arguments:

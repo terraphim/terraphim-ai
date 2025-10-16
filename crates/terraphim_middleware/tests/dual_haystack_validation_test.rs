@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -151,7 +152,15 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                ..Default::default()
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
+                extra: AHashMap::new(),
             },
         )
         .build()
@@ -182,7 +191,15 @@ async fn test_dual_haystack_comprehensive_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                ..Default::default()
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
+                extra: AHashMap::new(),
             },
         )
         .build()
@@ -202,7 +219,15 @@ async fn test_dual_haystack_comprehensive_validation() {
                 kg: None,
                 haystacks: vec![Haystack::new(server_url.clone(), ServiceType::Atomic, true)
                     .with_atomic_secret(atomic_secret.clone())],
-                ..Default::default()
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
+                extra: AHashMap::new(),
             },
         )
         .build()
@@ -224,7 +249,15 @@ async fn test_dual_haystack_comprehensive_validation() {
                     ServiceType::Ripgrep,
                     true,
                 )],
-                ..Default::default()
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
+                extra: AHashMap::new(),
             },
         )
         .build()
@@ -709,7 +742,15 @@ async fn test_source_differentiation_validation() {
                         .with_atomic_secret(atomic_secret.clone()),
                     Haystack::new("../../docs/src".to_string(), ServiceType::Ripgrep, true),
                 ],
-                ..Default::default()
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: None,
+                extra: AHashMap::new(),
             },
         )
         .build()

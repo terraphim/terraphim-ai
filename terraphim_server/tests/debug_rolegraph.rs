@@ -46,25 +46,19 @@ mod tests {
                         location: haystack.to_string_lossy().to_string(),
                         service: ServiceType::Ripgrep,
                         read_only: false,
+                        fetch_content: false,
                         atomic_server_secret: None,
                         extra_parameters: std::collections::HashMap::new(),
                     }],
-                    #[cfg(feature = "openrouter")]
-                    openrouter_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_api_key: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_model: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_auto_summarize: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_enabled: false,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_system_prompt: None,
-                    #[cfg(feature = "openrouter")]
-                    openrouter_chat_model: None,
+                    llm_enabled: false,
+                    llm_api_key: None,
+                    llm_model: None,
+                    llm_auto_summarize: false,
+                    llm_chat_enabled: false,
+                    llm_chat_system_prompt: None,
+                    llm_chat_model: None,
+                    llm_context_window: None,
                     extra: AHashMap::new(),
-                    llm_system_prompt: None,
                 },
             )
             .default_role("Engineer")

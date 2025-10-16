@@ -307,6 +307,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
             Document {
                 id: "2".to_string(),
@@ -318,6 +319,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
         ];
 
@@ -352,6 +354,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
             Document {
                 id: "2".to_string(),
@@ -363,6 +366,7 @@ mod tests {
                 stub: None,
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
+                source_haystack: None,
             },
         ];
 

@@ -19,21 +19,15 @@ async fn atlassian_ripgrep_haystack_smoke() {
     }
 
     // Create a role with a ripgrep haystack pointing to the Atlassian directory
-    let role = Role {
-        shortname: Some("Atlassian".to_string()),
-        name: "Atlassian".into(),
-        relevance_function: RelevanceFunction::TitleScorer,
-        terraphim_it: false,
-        theme: "lumen".to_string(),
-        kg: None,
-        haystacks: vec![Haystack::new(
-            path.to_string_lossy().to_string(),
-            ServiceType::Ripgrep,
-            true,
-        )],
-        extra: ahash::AHashMap::new(),
-        ..Default::default()
-    };
+    let mut role = Role::new("Atlassian");
+    role.shortname = Some("Atlassian".to_string());
+    role.relevance_function = RelevanceFunction::TitleScorer;
+    role.theme = "lumen".to_string();
+    role.haystacks = vec![Haystack::new(
+        path.to_string_lossy().to_string(),
+        ServiceType::Ripgrep,
+        true,
+    )];
 
     let mut config = ConfigBuilder::new()
         .add_role("Atlassian", role)

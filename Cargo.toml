@@ -1,9 +1,23 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_server", "desktop/src-tauri", "crates/terraphim_onepassword_cli", "crates/terraphim_tui", "crates/haystack_jmap", "crates/haystack_atlassian", "crates/haystack_core"]
+members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
+exclude = ["crates/terraphim_agent_application"]  # Experimental crate with incomplete API implementations
 default-members = ["terraphim_server"]
+
+[workspace.package]
+edition = "2024"
 
 [workspace.dependencies]
 # OpenRouter AI integration dependencies
 tokio = { version = "1.0", features = ["full"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Direct HTTP LLM client approach (removed rig-core)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+log = "0.4"

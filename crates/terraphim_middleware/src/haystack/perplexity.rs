@@ -278,6 +278,7 @@ impl PerplexityHaystackIndexer {
                     "real-time".to_string(),
                 ]),
                 rank: Some(1000), // High rank for AI-curated results
+                source_haystack: None,
             };
 
             documents.push(document);
@@ -305,6 +306,7 @@ impl PerplexityHaystackIndexer {
                             "citation".to_string(),
                         ]),
                         rank: Some(500), // Lower rank than main result
+                        source_haystack: None,
                     };
                     documents.push(source_doc);
                 }
@@ -424,6 +426,7 @@ impl PerplexityHaystackIndexer {
                     stub: None,
                     tags: Some(vec!["perplexity".to_string(), "cache".to_string()]),
                     rank: None,
+                    source_haystack: None,
                 };
 
                 if let Err(e) = cache_doc.save().await {
@@ -621,6 +624,7 @@ mod tests {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: extra_params,
+            fetch_content: false,
         };
 
         let indexer = PerplexityHaystackIndexer::from_haystack_config(&haystack).unwrap();

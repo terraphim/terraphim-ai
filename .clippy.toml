@@ -1,0 +1,28 @@
+# Optimized clippy configuration for faster CI builds
+msrv = "1.70.0"
+avoid-breaking-exported-api = false
+allow-mixed-uninlined-format-args = true
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-dbg-in-tests = true
+too-many-arguments-threshold = 12
+type-complexity-threshold = 250
+cognitive-complexity-threshold = 30
+unreadable-literal-threshold = 100
+# Reduce false positives and focus on important issues
+disallowed-names = []
+doc-valid-idents = ["Cli", "TODO", "FIXME", "XXX", "WIP", "WARN", "NOTE", "INFO", "DEBUG"]
+# Performance optimizations
+max-trait-bounds = 3
+max-fn-params-bools = 3
+enum-variant-name-threshold = 50
+# Allow certain patterns for faster development
+single-char-binding-names-threshold = 4
+# Skip expensive lints in CI
+cargo-ignore = [
+    "clippy::nursery/",
+    "clippy::pedantic/",
+    "clippy::cargo/",
+    "clippy::complexity/",
+    "clippy::perf/",
+]

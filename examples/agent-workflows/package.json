@@ -1,0 +1,34 @@
+{
+  "name": "terraphim-ai-workflow-tests",
+  "version": "1.0.0",
+  "description": "Browser automation tests for Terraphim AI multi-agent workflow integration",
+  "main": "browser-automation-tests.js",
+  "scripts": {
+    "test": "node browser-automation-tests.js",
+    "test:headful": "HEADLESS=false node browser-automation-tests.js",
+    "test:debug": "HEADLESS=false SCREENSHOT_ON_FAILURE=true node browser-automation-tests.js",
+    "install-playwright": "npx playwright install chromium",
+    "setup": "npm install && npm run install-playwright"
+  },
+  "keywords": [
+    "terraphim",
+    "ai",
+    "multi-agent",
+    "workflow",
+    "automation",
+    "testing",
+    "playwright"
+  ],
+  "author": "Terraphim AI",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terraphim/terraphim-ai"
+  }
+}

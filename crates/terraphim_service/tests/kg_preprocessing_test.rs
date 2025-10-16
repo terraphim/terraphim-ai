@@ -24,6 +24,7 @@ async fn test_kg_preprocessing_basic_functionality() {
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            fetch_content: false,
         }],
         kg: Some(KnowledgeGraph {
             automata_path: None,
@@ -37,21 +38,14 @@ async fn test_kg_preprocessing_basic_functionality() {
         terraphim_it: true,
         theme: "default".to_string(),
         relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
     config.roles.insert(role_name.clone(), role);
@@ -71,6 +65,7 @@ async fn test_kg_preprocessing_basic_functionality() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     // Basic test: just verify the service can be created and document is preserved
@@ -106,21 +101,14 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         terraphim_it: true, // KG preprocessing enabled
         theme: "default".to_string(),
         relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
 
@@ -134,21 +122,14 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         terraphim_it: false, // KG preprocessing disabled
         theme: "default".to_string(),
         relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
 
@@ -169,6 +150,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     // Basic test: just verify we can create services with different terraphim_it settings
@@ -209,21 +191,14 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         terraphim_it: true,
         theme: "default".to_string(),
         relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: AHashMap::new(),
     };
     config.roles.insert(role_name.clone(), role);
@@ -244,6 +219,7 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let original_body = pre_processed_document.body.clone();

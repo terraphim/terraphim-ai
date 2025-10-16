@@ -57,6 +57,7 @@ async fn test_kg_lookup_functionality_basic() {
             "agent".to_string(),
         ]),
         rank: None,
+        source_haystack: None,
     };
 
     // Test persistence layer

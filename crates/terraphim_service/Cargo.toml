@@ -21,7 +21,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.2.0" }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 thiserror = "1.0.58"
-opendal = { version = "0.44.2" }
+opendal = { version = "0.54" }
 serde_json = "1.0.116"
 serde = { version = "1.0.198", features = ["serde_derive"] }
 log = "0.4.21"
@@ -54,7 +54,6 @@ tracing = ["dep:tracing", "dep:tracing-subscriber"]
 tokio = { version = "1.35.0", features = ["full"] }
 terraphim_settings = { path = "../terraphim_settings", version = "0.2.0" }
 anyhow = "1.0.82"
-wiremock = "0.6.4"
 serial_test = "3.0"
 tempfile = "3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

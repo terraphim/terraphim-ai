@@ -1,185 +1,184 @@
 <script lang="ts">
-  import { Editor as NovelEditor } from '@paralect/novel-svelte';
-  import { Markdown } from 'tiptap-markdown';
-  import { onMount, onDestroy } from 'svelte';
-  import { novelAutocompleteService } from '../services/novelAutocompleteService';
-  import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
-  import { is_tauri, role } from '../stores';
+import { onDestroy, onMount } from 'svelte';
+import { novelAutocompleteService } from '../services/novelAutocompleteService';
+import { terraphimSuggestionStyles } from './TerraphimSuggestion';
 
-  export let html: any = '';          // initial content in HTML/JSON
-  export let readOnly: boolean = false;
-  export let outputFormat: 'html' | 'markdown' = 'html';  // New prop to control output format
-  export let enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
-  export let showSnippets: boolean = true; // New prop to show snippets in autocomplete
-  export let suggestionTrigger: string = '++'; // Character that triggers autocomplete
-  export let maxSuggestions: number = 8; // Maximum number of suggestions to show
-  export let minQueryLength: number = 1; // Minimum query length before showing suggestions
-  export let debounceDelay: number = 300; // Debounce delay in milliseconds
+export let html: string = ''; // initial content in HTML/JSON
+export const readOnly: boolean = false;
+export const outputFormat: 'html' | 'markdown' = 'html'; // New prop to control output format
+export const enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
+export const showSnippets: boolean = true; // New prop to show snippets in autocomplete
+export const suggestionTrigger: string = '++'; // Character that triggers autocomplete
+export const maxSuggestions: number = 8; // Maximum number of suggestions to show
+export const minQueryLength: number = 1; // Minimum query length before showing suggestions
+export const debounceDelay: number = 300; // Debounce delay in milliseconds
 
-  let editor: any = null;
-  let autocompleteStatus = '⏳ Initializing...';
-  let autocompleteReady = false;
-  let connectionTested = false;
-  let styleElement: HTMLStyleElement | null = null;
+let editor: unknown = null;
+let _autocompleteStatus = '⏳ Initializing...';
+let autocompleteReady = false;
+let connectionTested = false;
+let styleElement: HTMLStyleElement | null = null;
 
-  onMount(async () => {
-    if (enableAutocomplete) {
-      await initializeAutocomplete();
-    }
+onMount(async () => {
+	if (enableAutocomplete) {
+		await initializeAutocomplete();
+	}
 
-    // Inject CSS styles for suggestions
-    if (typeof document !== 'undefined') {
-      styleElement = document.createElement('style');
-      styleElement.textContent = terraphimSuggestionStyles;
-      document.head.appendChild(styleElement);
-    }
-  });
+	// Inject CSS styles for suggestions
+	if (typeof document !== 'undefined') {
+		styleElement = document.createElement('style');
+		styleElement.textContent = terraphimSuggestionStyles;
+		document.head.appendChild(styleElement);
+	}
+});
 
-  onDestroy(() => {
-    // Cleanup styles
-    if (styleElement && styleElement.parentNode) {
-      styleElement.parentNode.removeChild(styleElement);
-    }
-  });
+onDestroy(() => {
+	// Cleanup styles
+	if (styleElement?.parentNode) {
+		styleElement.parentNode.removeChild(styleElement);
+	}
+});
 
-  // Watch for role changes and reinitialize
-  $: if ($role && enableAutocomplete && autocompleteReady) {
-    novelAutocompleteService.setRole($role);
-    initializeAutocomplete();
-  }
+// Watch for role changes and reinitialize
+$: if ($role && enableAutocomplete && autocompleteReady) {
+	novelAutocompleteService.setRole($role);
+	initializeAutocomplete();
+}
 
-  async function initializeAutocomplete() {
-    autocompleteStatus = '⏳ Initializing autocomplete...';
-    autocompleteReady = false;
-    connectionTested = false;
+async function initializeAutocomplete() {
+	_autocompleteStatus = '⏳ Initializing autocomplete...';
+	autocompleteReady = false;
+	connectionTested = false;
 
-    try {
-      // Set the current role in the autocomplete service
-      novelAutocompleteService.setRole($role);
+	try {
+		// Set the current role in the autocomplete service
+		novelAutocompleteService.setRole($role);
 
-      // Test connection first
-      autocompleteStatus = '🔗 Testing connection...';
-      const connectionOk = await novelAutocompleteService.testConnection();
-      connectionTested = true;
+		// Test connection first
+		_autocompleteStatus = '🔗 Testing connection...';
+		const connectionOk = await novelAutocompleteService.testConnection();
+		connectionTested = true;
 
-      if (connectionOk) {
-        // Build the autocomplete index
-        autocompleteStatus = '🔨 Building autocomplete index...';
-        const success = await novelAutocompleteService.buildAutocompleteIndex();
+		if (connectionOk) {
+			// Build the autocomplete index
+			_autocompleteStatus = '🔨 Building autocomplete index...';
+			const success = await novelAutocompleteService.buildAutocompleteIndex();
 
-        if (success) {
-          if ($is_tauri) {
-            autocompleteStatus = '✅ Ready - Using Tauri backend';
-          } else {
-            autocompleteStatus = '✅ Ready - Using MCP server backend';
-          }
-          autocompleteReady = true;
-        } else {
-          autocompleteStatus = '❌ Failed to build autocomplete index';
-        }
-      } else {
-        if ($is_tauri) {
-          autocompleteStatus = '❌ Tauri backend not available';
-        } else {
-          autocompleteStatus = '❌ MCP server not responding';
-        }
-      }
-    } catch (error) {
-      console.error('Error initializing autocomplete:', error);
-      autocompleteStatus = '❌ Autocomplete initialization error';
-    }
-  }
+			if (success) {
+				if ($is_tauri) {
+					_autocompleteStatus = '✅ Ready - Using Tauri backend';
+				} else {
+					_autocompleteStatus = '✅ Ready - Using MCP server backend';
+				}
+				autocompleteReady = true;
+			} else {
+				_autocompleteStatus = '❌ Failed to build autocomplete index';
+			}
+		} else {
+			if ($is_tauri) {
+				_autocompleteStatus = '❌ Tauri backend not available';
+			} else {
+				_autocompleteStatus = '❌ MCP server not responding';
+			}
+		}
+	} catch (error) {
+		console.error('Error initializing autocomplete:', error);
+		_autocompleteStatus = '❌ Autocomplete initialization error';
+	}
+}
 
-  /** Handler called by Novel editor on every update; we translate it to the
-   *  wrapper's `html` variable so the parent can bind to it. */
-  const handleUpdate = (editorInstance: any) => {
-    editor = editorInstance;
+/** Handler called by Novel editor on every update; we translate it to the
+ *  wrapper's `html` variable so the parent can bind to it. */
+const _handleUpdate = (editorInstance: unknown) => {
+	editor = editorInstance;
 
-    // Choose output format based on the outputFormat prop
-    // For markdown content, use getMarkdown() to preserve markdown syntax
-    // For HTML content, use getHTML() to preserve rich formatting
-    if (outputFormat === 'markdown') {
-      html = editorInstance.storage.markdown.getMarkdown();
-    } else {
-      html = editorInstance.getHTML();
-    }
-  };
+	// Choose output format based on the outputFormat prop
+	// For markdown content, use getMarkdown() to preserve markdown syntax
+	// For HTML content, use getHTML() to preserve rich formatting
+	if (outputFormat === 'markdown') {
+		html = editorInstance.storage.markdown.getMarkdown();
+	} else {
+		html = editorInstance.getHTML();
+	}
+};
 
-  // Function to manually test autocomplete
-  const testAutocomplete = async () => {
-    if (!connectionTested) {
-      alert('Please wait for connection test to complete');
-      return;
-    }
+// Function to manually test autocomplete
+const _testAutocomplete = async () => {
+	if (!connectionTested) {
+		alert('Please wait for connection test to complete');
+		return;
+	}
 
-    if (!autocompleteReady) {
-      alert('Autocomplete service not ready. Check the status above.');
-      return;
-    }
+	if (!autocompleteReady) {
+		alert('Autocomplete service not ready. Check the status above.');
+		return;
+	}
 
-    try {
-      autocompleteStatus = '🧪 Testing autocomplete...';
+	try {
+		_autocompleteStatus = '🧪 Testing autocomplete...';
 
-      const testQuery = 'terraphim';
-      const suggestions = await novelAutocompleteService.getSuggestions(testQuery, 5);
+		const testQuery = 'terraphim';
+		const suggestions = await novelAutocompleteService.getSuggestions(testQuery, 5);
 
-      console.log('Autocomplete test results:', suggestions);
+		console.log('Autocomplete test results:', suggestions);
 
-      if (suggestions.length > 0) {
-        const suggestionText = suggestions
-          .map((s, i) => `${i + 1}. ${s.text}${s.snippet ? ` (${s.snippet})` : ''}`)
-          .join('\n');
+		if (suggestions.length > 0) {
+			const suggestionText = suggestions
+				.map((s, i) => `${i + 1}. ${s.text}${s.snippet ? ` (${s.snippet})` : ''}`)
+				.join('\n');
 
-        alert(`✅ Found ${suggestions.length} suggestions for '${testQuery}':\n\n${suggestionText}`);
+			alert(`✅ Found ${suggestions.length} suggestions for '${testQuery}':\n\n${suggestionText}`);
 
-        if ($is_tauri) {
-          autocompleteStatus = '✅ Ready - Using Tauri backend';
-        } else {
-          autocompleteStatus = '✅ Ready - Using MCP server backend';
-        }
-      } else {
-        alert(`⚠️ No suggestions found for '${testQuery}'. This might be normal if the term isn't in your knowledge graph.`);
-      }
-    } catch (error) {
-      console.error('Autocomplete test failed:', error);
-      alert(`❌ Autocomplete test failed: ${error.message}`);
-      autocompleteStatus = '❌ Test failed - check console for details';
-    }
-  };
+			if ($is_tauri) {
+				_autocompleteStatus = '✅ Ready - Using Tauri backend';
+			} else {
+				_autocompleteStatus = '✅ Ready - Using MCP server backend';
+			}
+		} else {
+			alert(
+				`⚠️ No suggestions found for '${testQuery}'. This might be normal if the term isn't in your knowledge graph.`
+			);
+		}
+	} catch (error) {
+		console.error('Autocomplete test failed:', error);
+		alert(`❌ Autocomplete test failed: ${error.message}`);
+		_autocompleteStatus = '❌ Test failed - check console for details';
+	}
+};
 
-  // Function to rebuild autocomplete index
-  const rebuildIndex = async () => {
-    autocompleteStatus = '⏳ Rebuilding index...';
-    autocompleteReady = false;
+// Function to rebuild autocomplete index
+const _rebuildIndex = async () => {
+	_autocompleteStatus = '⏳ Rebuilding index...';
+	autocompleteReady = false;
 
-    try {
-      const success = await novelAutocompleteService.refreshIndex();
+	try {
+		const success = await novelAutocompleteService.refreshIndex();
 
-      if (success) {
-        if ($is_tauri) {
-          autocompleteStatus = '✅ Ready - Tauri index rebuilt successfully';
-        } else {
-          autocompleteStatus = '✅ Ready - MCP server index rebuilt successfully';
-        }
-        autocompleteReady = true;
-      } else {
-        autocompleteStatus = '❌ Failed to rebuild index';
-      }
-    } catch (error) {
-      console.error('Error rebuilding index:', error);
-      autocompleteStatus = '❌ Index rebuild failed - check console for details';
-    }
-  };
+		if (success) {
+			if ($is_tauri) {
+				_autocompleteStatus = '✅ Ready - Tauri index rebuilt successfully';
+			} else {
+				_autocompleteStatus = '✅ Ready - MCP server index rebuilt successfully';
+			}
+			autocompleteReady = true;
+		} else {
+			_autocompleteStatus = '❌ Failed to rebuild index';
+		}
+	} catch (error) {
+		console.error('Error rebuilding index:', error);
+		_autocompleteStatus = '❌ Index rebuild failed - check console for details';
+	}
+};
 
-  // Function to demonstrate autocomplete in action
-  const demonstrateAutocomplete = () => {
-    if (!editor) {
-      alert('Editor not ready yet');
-      return;
-    }
+// Function to demonstrate autocomplete in action
+const _demonstrateAutocomplete = () => {
+	if (!editor) {
+		alert('Editor not ready yet');
+		return;
+	}
 
-    // Insert demo text that explains the new autocomplete system
-    const demoText = `# Terraphim Autocomplete Demo
+	// Insert demo text that explains the new autocomplete system
+	const demoText = `# Terraphim Autocomplete Demo
 
 This is a demonstration of the integrated Terraphim autocomplete system.
 
@@ -203,15 +202,17 @@ The autocomplete system uses your local knowledge graph to provide intelligent s
 
 Start typing below:`;
 
-    editor.commands.setContent(demoText);
+	editor.commands.setContent(demoText);
 
-    // Focus the editor and position cursor at the end
-    setTimeout(() => {
-      editor.commands.focus('end');
-    }, 100);
+	// Focus the editor and position cursor at the end
+	setTimeout(() => {
+		editor.commands.focus('end');
+	}, 100);
 
-    alert(`Demo content inserted!\n\nType "${suggestionTrigger}" followed by any term to see autocomplete suggestions.\n\nExample: "${suggestionTrigger}terraphim"`);
-  };
+	alert(
+		`Demo content inserted!\n\nType "${suggestionTrigger}" followed by any term to see autocomplete suggestions.\n\nExample: "${suggestionTrigger}terraphim"`
+	);
+};
 </script>
 
 <NovelEditor

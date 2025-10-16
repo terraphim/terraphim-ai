@@ -88,22 +88,16 @@ async fn create_autocomplete_test_config() -> Result<String> {
             read_only: true,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            fetch_content: false,
         }],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
     };
 
@@ -572,21 +566,14 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         theme: "spacelab".to_string(),
         kg: None, // No knowledge graph
         haystacks: vec![],
-        #[cfg(feature = "openrouter")]
-        openrouter_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_api_key: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_model: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_auto_summarize: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_enabled: false,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_system_prompt: None,
-        #[cfg(feature = "openrouter")]
-        openrouter_chat_model: None,
-        llm_system_prompt: None,
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
     };
 

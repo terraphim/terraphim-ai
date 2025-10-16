@@ -1,388 +1,396 @@
 <script lang="ts">
-  import { Modal, Field, Input, Button, Message } from "svelma";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { is_tauri, role, serverUrl } from "../stores";
-  import { CONFIG } from "../../config";
-  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+import { invoke } from '@tauri-apps/api/tauri';
+import { createEventDispatcher, onDestroy } from 'svelte';
+import { CONFIG } from '../../config';
 
-  export let active: boolean = false;
-  export let initialQuery: string = "";
-  export let conversationId: string | null = null;
+export let active: boolean = false;
+export const initialQuery: string = '';
+export const conversationId: string | null = null;
 
-  const dispatch = createEventDispatcher();
+const dispatch = createEventDispatcher();
 
-  // Search state
-  let query: string = "";
-  let suggestions: KGSuggestion[] = [];
-  let isSearching = false;
-  let searchError: string | null = null;
-  let selectedSuggestion: KGSuggestion | null = null;
-  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+// Search state
+let query: string = '';
+let suggestions: KGSuggestion[] = [];
+let _isSearching = false;
+let _searchError: string | null = null;
+let selectedSuggestion: KGSuggestion | null = null;
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Autocomplete state (matches Search.svelte pattern)
-  let autocompleteSuggestions: string[] = [];
-  let suggestionIndex: number = -1;
+// Autocomplete state (matches Search.svelte pattern)
+let autocompleteSuggestions: string[] = [];
+let suggestionIndex: number = -1;
 
-  // Input element reference for focus management
-  let searchInput: HTMLInputElement;
+// Input element reference for focus management
+let searchInput: HTMLInputElement;
 
-  interface KGSuggestion {
-    term: string;
-    text?: string;
-    normalized_term?: string;
-    url?: string;
-    snippet?: string;
-    score: number;
-    suggestion_type?: string;
-    icon?: string;
-  }
+interface KGSuggestion {
+	term: string;
+	text?: string;
+	normalized_term?: string;
+	url?: string;
+	snippet?: string;
+	score: number;
+	suggestion_type?: string;
+	icon?: string;
+}
 
-  interface KGSearchResponse {
-    status: string;
-    suggestions: KGSuggestion[];
-    error?: string;
-  }
+interface KGSearchResponse {
+	status: string;
+	suggestions: KGSuggestion[];
+	error?: string;
+}
 
-  // Initialize query when modal opens (only once)
-  let modalInitialized = false;
-  $: if (active && !modalInitialized) {
-    query = initialQuery;
-    modalInitialized = true;
-    if (query.trim()) {
-      searchKGTerms();
-    }
-  }
+// Initialize query when modal opens (only once)
+let modalInitialized = false;
+$: if (active && !modalInitialized) {
+	query = initialQuery;
+	modalInitialized = true;
+	if (query.trim()) {
+		searchKGTerms();
+	}
+}
 
-  // Reset when modal closes
-  $: if (!active) {
-    modalInitialized = false;
-  }
+// Reset when modal closes
+$: if (!active) {
+	modalInitialized = false;
+}
 
-  // Focus input when modal opens and clear any errors
-  $: if (active && searchInput) {
-    setTimeout(() => {
-      searchInput?.focus();
-      searchError = null; // Clear any previous errors when modal opens
-    }, 100);
-  }
+// Focus input when modal opens and clear any errors
+$: if (active && searchInput) {
+	setTimeout(() => {
+		searchInput?.focus();
+		_searchError = null; // Clear any previous errors when modal opens
+	}, 100);
+}
 
-  // Debounced search function
-  function handleQueryChange() {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
+// Debounced search function
+function handleQueryChange() {
+	if (searchTimeout) {
+		clearTimeout(searchTimeout);
+	}
 
-    searchTimeout = setTimeout(() => {
-      if (query.trim().length >= 2) {
-        searchKGTerms();
-      } else {
-        suggestions = [];
-        selectedSuggestion = null;
-      }
-    }, 300);
-  }
+	searchTimeout = setTimeout(() => {
+		if (query.trim().length >= 2) {
+			searchKGTerms();
+		} else {
+			suggestions = [];
+			selectedSuggestion = null;
+		}
+	}, 300);
+}
 
-  // Get KG term suggestions (autocomplete) - matches Search.svelte pattern
-  async function getTermSuggestions(q: string): Promise<string[]> {
-    const trimmed = q.trim();
-    if (!trimmed || trimmed.length < 2) return [];
-    try {
-      if ($is_tauri) {
-        const resp: any = await invoke("get_autocomplete_suggestions", {
-          query: trimmed,
-          roleName: $role,
-          limit: 8
-        });
-        if (resp?.status === 'success' && Array.isArray(resp.suggestions)) {
-          return resp.suggestions.map((s: any) => s.term);
-        }
-      } else {
-        const resp = await fetch(`${CONFIG.ServerURL}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(trimmed)}`);
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data?.status === 'success' && Array.isArray(data.suggestions)) {
-            return data.suggestions.map((s: any) => s.term);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('KG autocomplete failed', e);
-    }
-    return [];
-  }
+// Get KG term suggestions (autocomplete) - matches Search.svelte pattern
+async function getTermSuggestions(q: string): Promise<string[]> {
+	const trimmed = q.trim();
+	if (!trimmed || trimmed.length < 2) return [];
+	try {
+		if ($is_tauri) {
+			const resp: any = await invoke('get_autocomplete_suggestions', {
+				query: trimmed,
+				roleName: $role,
+				limit: 8,
+			});
+			if (resp?.status === 'success' && Array.isArray(resp.suggestions)) {
+				return resp.suggestions.map((s: any) => s.term);
+			}
+		} else {
+			const resp = await fetch(
+				`${CONFIG.ServerURL}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(trimmed)}`
+			);
+			if (resp.ok) {
+				const data = await resp.json();
+				if (data?.status === 'success' && Array.isArray(data.suggestions)) {
+					return data.suggestions.map((s: any) => s.term);
+				}
+			}
+		}
+	} catch (e) {
+		console.warn('KG autocomplete failed', e);
+	}
+	return [];
+}
 
-  // Update autocomplete suggestions - matches Search.svelte pattern
-  async function updateAutocompleteSuggestions() {
-    const inputValue = query.trim();
-    if (inputValue.length < 2) {
-      autocompleteSuggestions = [];
-      suggestionIndex = -1;
-      return;
-    }
+// Update autocomplete suggestions - matches Search.svelte pattern
+async function updateAutocompleteSuggestions() {
+	const inputValue = query.trim();
+	if (inputValue.length < 2) {
+		autocompleteSuggestions = [];
+		suggestionIndex = -1;
+		return;
+	}
 
-    try {
-      const suggestions = await getTermSuggestions(inputValue);
-      autocompleteSuggestions = suggestions;
-      suggestionIndex = -1;
-    } catch (error) {
-      console.warn('Failed to get autocomplete suggestions:', error);
-      autocompleteSuggestions = [];
-      suggestionIndex = -1;
-    }
-  }
+	try {
+		const suggestions = await getTermSuggestions(inputValue);
+		autocompleteSuggestions = suggestions;
+		suggestionIndex = -1;
+	} catch (error) {
+		console.warn('Failed to get autocomplete suggestions:', error);
+		autocompleteSuggestions = [];
+		suggestionIndex = -1;
+	}
+}
 
-  // Apply autocomplete suggestion
-  function applySuggestion(suggestion: string) {
-    query = suggestion;
-    autocompleteSuggestions = [];
-    suggestionIndex = -1;
+// Apply autocomplete suggestion
+function applySuggestion(suggestion: string) {
+	query = suggestion;
+	autocompleteSuggestions = [];
+	suggestionIndex = -1;
 
-    // Trigger search for the selected term
-    if (query.trim().length >= 2) {
-      searchKGTerms();
-    }
-  }
+	// Trigger search for the selected term
+	if (query.trim().length >= 2) {
+		searchKGTerms();
+	}
+}
 
-  // Handle input changes - matches Search.svelte pattern
-  async function handleInput(event: Event) {
-    // Don't interfere with normal text input
-    handleQueryChange(); // For debounced KG search
-    await updateAutocompleteSuggestions(); // For autocomplete
-  }
+// Handle input changes - matches Search.svelte pattern
+async function _handleInput(_event: Event) {
+	// Don't interfere with normal text input
+	handleQueryChange(); // For debounced KG search
+	await updateAutocompleteSuggestions(); // For autocomplete
+}
 
-  // Handle keyboard navigation - matches Search.svelte pattern
-  function handleKeydown(event: KeyboardEvent) {
-    if (autocompleteSuggestions.length > 0) {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        suggestionIndex = (suggestionIndex + 1) % autocompleteSuggestions.length;
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        suggestionIndex = (suggestionIndex - 1 + autocompleteSuggestions.length) % autocompleteSuggestions.length;
-      } else if ((event.key === 'Enter' || event.key === 'Tab') && suggestionIndex !== -1) {
-        event.preventDefault();
-        applySuggestion(autocompleteSuggestions[suggestionIndex]);
-      } else if (event.key === 'Escape') {
-        event.preventDefault();
-        autocompleteSuggestions = [];
-        suggestionIndex = -1;
-      }
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      if (selectedSuggestion) {
-        addTermToContext();
-      }
-    } else if (event.key === 'Escape') {
-      handleClose();
-    }
-  }
+// Handle keyboard navigation - matches Search.svelte pattern
+function _handleKeydown(event: KeyboardEvent) {
+	if (autocompleteSuggestions.length > 0) {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			suggestionIndex = (suggestionIndex + 1) % autocompleteSuggestions.length;
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			suggestionIndex =
+				(suggestionIndex - 1 + autocompleteSuggestions.length) % autocompleteSuggestions.length;
+		} else if ((event.key === 'Enter' || event.key === 'Tab') && suggestionIndex !== -1) {
+			event.preventDefault();
+			applySuggestion(autocompleteSuggestions[suggestionIndex]);
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			autocompleteSuggestions = [];
+			suggestionIndex = -1;
+		}
+	} else if (event.key === 'Enter') {
+		event.preventDefault();
+		if (selectedSuggestion) {
+			addTermToContext();
+		}
+	} else if (event.key === 'Escape') {
+		handleClose();
+	}
+}
 
-  // Search KG terms using the new Tauri command
-  async function searchKGTerms() {
-    if (!query.trim() || query.trim().length < 2) {
-      suggestions = [];
-      return;
-    }
+// Search KG terms using the new Tauri command
+async function searchKGTerms() {
+	if (!query.trim() || query.trim().length < 2) {
+		suggestions = [];
+		return;
+	}
 
-    isSearching = true;
-    searchError = null;
+	_isSearching = true;
+	_searchError = null;
 
-    try {
-      if ($is_tauri) {
-        const response: KGSearchResponse = await invoke("search_kg_terms", {
-          request: {
-            query: query.trim(),
-            role_name: $role,
-            limit: 20,
-            min_similarity: 0.6
-          }
-        });
+	try {
+		if ($is_tauri) {
+			const response: KGSearchResponse = await invoke('search_kg_terms', {
+				request: {
+					query: query.trim(),
+					role_name: $role,
+					limit: 20,
+					min_similarity: 0.6,
+				},
+			});
 
-        if (response.status === 'success') {
-          suggestions = response.suggestions || [];
-          // Auto-select first suggestion if available
-          if (suggestions.length > 0 && !selectedSuggestion) {
-            selectedSuggestion = suggestions[0];
-          }
-        } else {
-          searchError = response.error || 'Search failed';
-          suggestions = [];
-        }
-      } else {
-        // Web mode - HTTP API
-        if (!conversationId) {
-          searchError = 'No active conversation. Please start a conversation first.';
-          suggestions = [];
-          return;
-        }
+			if (response.status === 'success') {
+				suggestions = response.suggestions || [];
+				// Auto-select first suggestion if available
+				if (suggestions.length > 0 && !selectedSuggestion) {
+					selectedSuggestion = suggestions[0];
+				}
+			} else {
+				_searchError = response.error || 'Search failed';
+				suggestions = [];
+			}
+		} else {
+			// Web mode - HTTP API
+			if (!conversationId) {
+				_searchError = 'No active conversation. Please start a conversation first.';
+				suggestions = [];
+				return;
+			}
 
-        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($role)}`);
+			const response = await fetch(
+				`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($role)}`
+			);
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'success') {
-            suggestions = data.suggestions || [];
-            // Auto-select first suggestion if available
-            if (suggestions.length > 0 && !selectedSuggestion) {
-              selectedSuggestion = suggestions[0];
-            }
-          } else {
-            searchError = data.error || 'Search failed';
-            suggestions = [];
-          }
-        } else {
-          searchError = `HTTP ${response.status}: ${response.statusText}`;
-          suggestions = [];
-        }
-      }
-    } catch (error) {
-      console.error('KG search error:', error);
-      searchError = `Search failed: ${error}`;
-      suggestions = [];
-    } finally {
-      isSearching = false;
-    }
-  }
+			if (response.ok) {
+				const data = await response.json();
+				if (data.status === 'success') {
+					suggestions = data.suggestions || [];
+					// Auto-select first suggestion if available
+					if (suggestions.length > 0 && !selectedSuggestion) {
+						selectedSuggestion = suggestions[0];
+					}
+				} else {
+					_searchError = data.error || 'Search failed';
+					suggestions = [];
+				}
+			} else {
+				_searchError = `HTTP ${response.status}: ${response.statusText}`;
+				suggestions = [];
+			}
+		}
+	} catch (error) {
+		console.error('KG search error:', error);
+		_searchError = `Search failed: ${error}`;
+		suggestions = [];
+	} finally {
+		_isSearching = false;
+	}
+}
 
-  // Handle suggestion selection
-  function selectSuggestion(suggestion: KGSuggestion) {
-    selectedSuggestion = suggestion;
-  }
+// Handle suggestion selection
+function _selectSuggestion(suggestion: KGSuggestion) {
+	selectedSuggestion = suggestion;
+}
 
-  // Add selected term to context
-  async function addTermToContext() {
-    if (!selectedSuggestion) return;
+// Add selected term to context
+async function addTermToContext() {
+	if (!selectedSuggestion) return;
 
-    if (!conversationId) {
-      searchError = 'No active conversation. Please start a conversation first.';
-      return;
-    }
+	if (!conversationId) {
+		_searchError = 'No active conversation. Please start a conversation first.';
+		return;
+	}
 
-    try {
-      if ($is_tauri) {
-        await invoke("add_kg_term_context", {
-          request: {
-            conversation_id: conversationId,
-            term: selectedSuggestion.term,
-            role_name: $role
-          }
-        });
+	try {
+		if ($is_tauri) {
+			await invoke('add_kg_term_context', {
+				request: {
+					conversation_id: conversationId,
+					term: selectedSuggestion.term,
+					role_name: $role,
+				},
+			});
 
-        dispatch("termAdded", {
-          term: selectedSuggestion.term,
-          suggestion: selectedSuggestion
-        });
+			dispatch('termAdded', {
+				term: selectedSuggestion.term,
+				suggestion: selectedSuggestion,
+			});
 
-        // Close modal after successful addition
-        handleClose();
-      } else {
-        // Web mode - HTTP API
-        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/term`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            term: selectedSuggestion.term,
-            role: $role
-          })
-        });
+			// Close modal after successful addition
+			handleClose();
+		} else {
+			// Web mode - HTTP API
+			const response = await fetch(
+				`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/term`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						term: selectedSuggestion.term,
+						role: $role,
+					}),
+				}
+			);
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'success') {
-            dispatch("termAdded", {
-              term: selectedSuggestion.term,
-              suggestion: selectedSuggestion
-            });
+			if (response.ok) {
+				const data = await response.json();
+				if (data.status === 'success') {
+					dispatch('termAdded', {
+						term: selectedSuggestion.term,
+						suggestion: selectedSuggestion,
+					});
 
-            // Close modal after successful addition
-            handleClose();
-          } else {
-            searchError = data.error || 'Failed to add term to context';
-          }
-        } else {
-          searchError = `HTTP ${response.status}: ${response.statusText}`;
-        }
-      }
-    } catch (error) {
-      console.error('Error adding term to context:', error);
-      searchError = `Failed to add term to context: ${error}`;
-    }
-  }
+					// Close modal after successful addition
+					handleClose();
+				} else {
+					_searchError = data.error || 'Failed to add term to context';
+				}
+			} else {
+				_searchError = `HTTP ${response.status}: ${response.statusText}`;
+			}
+		}
+	} catch (error) {
+		console.error('Error adding term to context:', error);
+		_searchError = `Failed to add term to context: ${error}`;
+	}
+}
 
-  // Add entire KG index to context
-  async function addKGIndexToContext() {
-    if (!conversationId) {
-      searchError = 'No active conversation. Please start a conversation first.';
-      return;
-    }
+// Add entire KG index to context
+async function _addKGIndexToContext() {
+	if (!conversationId) {
+		_searchError = 'No active conversation. Please start a conversation first.';
+		return;
+	}
 
-    try {
-      if ($is_tauri) {
-        await invoke("add_kg_index_context", {
-          request: {
-            conversation_id: conversationId,
-            role_name: $role
-          }
-        });
+	try {
+		if ($is_tauri) {
+			await invoke('add_kg_index_context', {
+				request: {
+					conversation_id: conversationId,
+					role_name: $role,
+				},
+			});
 
-        dispatch("kgIndexAdded", { role: $role });
+			dispatch('kgIndexAdded', { role: $role });
 
-        // Close modal after successful addition
-        handleClose();
-      } else {
-        // Web mode - HTTP API
-        const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/index`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            role: $role
-          })
-        });
+			// Close modal after successful addition
+			handleClose();
+		} else {
+			// Web mode - HTTP API
+			const response = await fetch(
+				`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/index`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						role: $role,
+					}),
+				}
+			);
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'success') {
-            dispatch("kgIndexAdded", { role: $role });
+			if (response.ok) {
+				const data = await response.json();
+				if (data.status === 'success') {
+					dispatch('kgIndexAdded', { role: $role });
 
-            // Close modal after successful addition
-            handleClose();
-          } else {
-            searchError = data.error || 'Failed to add KG index to context';
-          }
-        } else {
-          searchError = `HTTP ${response.status}: ${response.statusText}`;
-        }
-      }
-    } catch (error) {
-      console.error('Error adding KG index to context:', error);
-      searchError = `Failed to add KG index to context: ${error}`;
-    }
-  }
+					// Close modal after successful addition
+					handleClose();
+				} else {
+					_searchError = data.error || 'Failed to add KG index to context';
+				}
+			} else {
+				_searchError = `HTTP ${response.status}: ${response.statusText}`;
+			}
+		}
+	} catch (error) {
+		console.error('Error adding KG index to context:', error);
+		_searchError = `Failed to add KG index to context: ${error}`;
+	}
+}
 
-  // Handle modal close
-  function handleClose() {
-    active = false;
-    query = "";
-    suggestions = [];
-    selectedSuggestion = null;
-    searchError = null;
-    isSearching = false;
-    autocompleteSuggestions = [];
-    suggestionIndex = -1;
+// Handle modal close
+function handleClose() {
+	active = false;
+	query = '';
+	suggestions = [];
+	selectedSuggestion = null;
+	_searchError = null;
+	_isSearching = false;
+	autocompleteSuggestions = [];
+	suggestionIndex = -1;
 
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-      searchTimeout = null;
-    }
-  }
+	if (searchTimeout) {
+		clearTimeout(searchTimeout);
+		searchTimeout = null;
+	}
+}
 
-
-  // Clean up timeout on component destruction
-  onDestroy(() => {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-  });
+// Clean up timeout on component destruction
+onDestroy(() => {
+	if (searchTimeout) {
+		clearTimeout(searchTimeout);
+	}
+});
 </script>
 
 <style lang="scss">

@@ -436,6 +436,7 @@ mod tests {
             stub: None,
             tags: Some(vec!["test".to_string(), "document".to_string()]),
             rank: Some(10),
+            source_haystack: None,
         };
 
         let context = context_manager.create_document_context(&document);
@@ -462,6 +463,7 @@ mod tests {
                 stub: None,
                 tags: None,
                 rank: Some(5),
+                source_haystack: None,
             },
             Document {
                 id: "doc2".to_string(),
@@ -473,6 +475,7 @@ mod tests {
                 stub: None,
                 tags: None,
                 rank: Some(3),
+                source_haystack: None,
             },
         ];
 
@@ -710,6 +713,7 @@ mod tests {
             stub: None,
             tags: Some(vec!["test".to_string(), "summary".to_string()]),
             rank: Some(88),
+            source_haystack: None,
         };
 
         let context_item = context_manager.create_document_context(&document);

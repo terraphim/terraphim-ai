@@ -1,0 +1,1155 @@
+warning: unused import: `ahash::AHashMap`
+  --> crates/terraphim_multi_agent/src/lib.rs:65:9
+   |
+65 |     use ahash::AHashMap;
+   |         ^^^^^^^^^^^^^^^
+   |
+help: if this is a test module, consider adding a `#[cfg(test)]` to the containing module
+  --> crates/terraphim_multi_agent/src/lib.rs:63:1
+   |
+63 | pub mod test_utils {
+   | ^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: field `done` is never read
+  --> crates/terraphim_multi_agent/src/genai_llm_client.rs:75:5
+   |
+73 | struct OllamaResponse {
+   |        -------------- field in this struct
+74 |     message: OllamaResponseMessage,
+75 |     done: bool,
+   |     ^^^^
+   |
+   = note: `OllamaResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field `usage` is never read
+   --> crates/terraphim_multi_agent/src/genai_llm_client.rs:102:5
+    |
+100 | struct OpenAiResponse {
+    |        -------------- field in this struct
+101 |     choices: Vec<OpenAiChoice>,
+102 |     usage: Option<OpenAiUsage>,
+    |     ^^^^^
+    |
+    = note: `OpenAiResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `prompt_tokens`, `completion_tokens`, and `total_tokens` are never read
+   --> crates/terraphim_multi_agent/src/genai_llm_client.rs:112:5
+    |
+111 | struct OpenAiUsage {
+    |        ----------- fields in this struct
+112 |     prompt_tokens: u64,
+    |     ^^^^^^^^^^^^^
+113 |     completion_tokens: u64,
+    |     ^^^^^^^^^^^^^^^^^
+114 |     total_tokens: u64,
+    |     ^^^^^^^^^^^^
+    |
+    = note: `OpenAiUsage` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `terraphim_multi_agent` (lib) generated 4 warnings (run `cargo fix --lib -p terraphim_multi_agent` to apply 1 suggestion)
+warning: terraphim_server@0.1.0: No changes in JS source files, skipping JS build.
+warning: terraphim_server@0.1.0: Found ./dist, skipping copy
+warning: multiple lines skipped by escaped newline
+   --> terraphim_server/src/workflows/orchestration.rs:746:89
+    |
+746 |               high-quality results across all task domains. Average quality score: {:.2}. \
+    |  _________________________________________________________________________________________^
+747 | |
+748 | |             Key achievements: Successful task decomposition, efficient resource utilization \
+    | |____________^ skipping everything up to and including this point
+
+warning: multiple lines skipped by escaped newline
+   --> terraphim_server/src/workflows/orchestration.rs:749:92
+    |
+749 |               ({:.1}% worker utilization), and effective coordination with minimal overhead. \
+    |  ____________________________________________________________________________________________^
+750 | |
+751 | |             The hierarchical coordination model proved effective for this type of complex task, \
+    | |____________^ skipping everything up to and including this point
+
+warning: multiple lines skipped by escaped newline
+   --> terraphim_server/src/workflows/parallel.rs:488:95
+    |
+488 |           Average confidence level: {:.1}%, consensus achieved: {:.1}%, diversity score: {:.2}. \
+    |  _______________________________________________________________________________________________^
+489 | |
+490 | |         The analysis reveals strong alignment on fundamental approaches while highlighting \
+    | |________^ skipping everything up to and including this point
+
+warning: multiple lines skipped by escaped newline
+   --> terraphim_server/src/workflows/parallel.rs:491:84
+    |
+491 |           strategic differences in implementation timelines and resource allocation. \
+    |  ____________________________________________________________________________________^
+492 | |
+493 | |         Key recommendations emerge from cross-agent consensus: prioritize scalable architecture, \
+    | |________^ skipping everything up to and including this point
+
+warning: multiple lines skipped by escaped newline
+   --> terraphim_server/src/workflows/parallel.rs:494:90
+    |
+494 |           implement robust security measures, and adopt iterative development methodology. \
+    |  __________________________________________________________________________________________^
+495 | |
+496 | |         Conflicting perspectives on timeline and approach provide valuable decision-making context, \
+    | |________^ skipping everything up to and including this point
+
+warning: unused import: `WebSocketUpgrade`
+ --> terraphim_server/src/workflows/mod.rs:2:28
+  |
+2 |     extract::{Path, State, WebSocketUpgrade},
+  |                            ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `WorkflowMetadata`
+  --> terraphim_server/src/workflows/multi_agent_handlers.rs:19:68
+   |
+19 |     update_workflow_status, ExecutionStatus, WebSocketBroadcaster, WorkflowMetadata,
+   |                                                                    ^^^^^^^^^^^^^^^^
+
+warning: unused import: `Deserialize`
+ --> terraphim_server/src/workflows/optimization.rs:2:13
+  |
+2 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^
+
+warning: unused import: `Deserialize`
+ --> terraphim_server/src/workflows/orchestration.rs:2:13
+  |
+2 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^
+
+warning: unused imports: `ExecutionStatus` and `update_workflow_status`
+ --> terraphim_server/src/workflows/orchestration.rs:8:77
+  |
+8 |     generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+  |                                                                             ^^^^^^^^^^^^^^^^^^^^^^
+9 |     ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `Deserialize`
+ --> terraphim_server/src/workflows/parallel.rs:2:13
+  |
+2 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^
+
+warning: unused imports: `ExecutionStatus` and `update_workflow_status`
+ --> terraphim_server/src/workflows/parallel.rs:8:77
+  |
+8 |     generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
+  |                                                                             ^^^^^^^^^^^^^^^^^^^^^^
+9 |     ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused imports: `Duration` and `sleep`
+  --> terraphim_server/src/workflows/websocket.rs:13:12
+   |
+13 |     time::{sleep, Duration},
+   |            ^^^^^  ^^^^^^^^
+
+warning: unused variable: `role_ref`
+   --> terraphim_server/src/api.rs:822:14
+    |
+822 |     let Some(role_ref) = config.roles.get(&role_name) else {
+    |              ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_role_ref`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `role`
+   --> terraphim_server/src/api.rs:994:14
+    |
+994 |     let Some(role) = config.roles.get(&role_name) else {
+    |              ^^^^ help: if this is intentional, prefix it with an underscore: `_role`
+
+warning: unused variable: `role`
+   --> terraphim_server/src/api.rs:735:14
+    |
+735 |     let Some(role) = config.roles.get(&role_name) else {
+    |              ^^^^ help: if this is intentional, prefix it with an underscore: `_role`
+
+warning: variable does not need to be mutable
+  --> terraphim_server/src/workflows/multi_agent_handlers.rs:66:13
+   |
+66 |         let mut dev_agent = TerraphimAgent::new(dev_role, self.persistence.clone(), None).await?;
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:200:14
+    |
+200 |         let (mut selected_agent, route_id) = if complexity > 0.7 {
+    |              ----^^^^^^^^^^^^^^
+    |              |
+    |              help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:284:17
+    |
+284 |             let mut agent =
+    |                 ----^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:398:13
+    |
+398 |         let mut orchestrator =
+    |             ----^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:425:17
+    |
+425 |             let mut worker =
+    |                 ----^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:562:13
+    |
+562 |         let mut generator =
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:567:13
+    |
+567 |         let mut evaluator =
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:739:13
+    |
+739 |         let mut agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> terraphim_server/src/workflows/multi_agent_handlers.rs:768:13
+    |
+768 |         let mut agent = TerraphimAgent::new(role, self.persistence.clone(), None).await?;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `iteration_start`
+   --> terraphim_server/src/workflows/optimization.rs:392:13
+    |
+392 |         let iteration_start = Instant::now();
+    |             ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_iteration_start`
+
+warning: unused variable: `optimizer`
+   --> terraphim_server/src/workflows/optimization.rs:661:5
+    |
+661 |     optimizer: &OptimizerAgent,
+    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_optimizer`
+
+warning: unused variable: `orchestrator`
+   --> terraphim_server/src/workflows/orchestration.rs:313:5
+    |
+313 |     orchestrator: &OrchestratorAgent,
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_orchestrator`
+
+warning: unused variable: `prompt`
+   --> terraphim_server/src/workflows/orchestration.rs:326:39
+    |
+326 | async fn create_data_science_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+    |                                       ^^^^^^ help: if this is intentional, prefix it with an underscore: `_prompt`
+
+warning: unused variable: `prompt`
+   --> terraphim_server/src/workflows/orchestration.rs:433:5
+    |
+433 |     prompt: &str,
+    |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_prompt`
+
+warning: unused variable: `prompt`
+   --> terraphim_server/src/workflows/orchestration.rs:507:35
+    |
+507 | async fn create_research_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+    |                                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_prompt`
+
+warning: unused variable: `prompt`
+   --> terraphim_server/src/workflows/orchestration.rs:560:34
+    |
+560 | async fn create_general_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+    |                                  ^^^^^^ help: if this is intentional, prefix it with an underscore: `_prompt`
+
+warning: unused variable: `orchestrator`
+   --> terraphim_server/src/workflows/orchestration.rs:613:5
+    |
+613 |     orchestrator: &OrchestratorAgent,
+    |     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_orchestrator`
+
+warning: unused variable: `prompt`
+   --> terraphim_server/src/workflows/orchestration.rs:702:5
+    |
+702 |     prompt: &str,
+    |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_prompt`
+
+warning: unused variable: `msg`
+   --> terraphim_server/src/workflows/websocket.rs:137:35
+    |
+137 |                         if let Ok(msg) = serde_json::to_string(&response) {
+    |                                   ^^^ help: if this is intentional, prefix it with an underscore: `_msg`
+
+warning: type `WebSocketSession` is more private than the item `get_websocket_stats`
+   --> terraphim_server/src/workflows/websocket.rs:577:1
+    |
+577 | pub fn get_websocket_stats(sessions: &HashMap<String, WebSocketSession>) -> serde_json::Value {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ function `get_websocket_stats` is reachable at visibility `pub`
+    |
+note: but type `WebSocketSession` is only usable at visibility `pub(self)`
+   --> terraphim_server/src/workflows/websocket.rs:39:1
+    |
+39  | struct WebSocketSession {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: field `agent_registry` is never read
+  --> terraphim_server/src/workflows/multi_agent_handlers.rs:25:5
+   |
+24 | pub struct MultiAgentWorkflowExecutor {
+   |            -------------------------- field in this struct
+25 |     agent_registry: AgentRegistry,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: struct `EvaluatorAgent` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:14:8
+   |
+14 | struct EvaluatorAgent {
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `OptimizerAgent` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:23:8
+   |
+23 | struct OptimizerAgent {
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `ContentVariant` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:32:8
+   |
+32 | struct ContentVariant {
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `VariantMetadata` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:41:8
+   |
+41 | struct VariantMetadata {
+   |        ^^^^^^^^^^^^^^^
+
+warning: struct `EvaluationResult` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:49:8
+   |
+49 | struct EvaluationResult {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: struct `CriterionScore` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:61:8
+   |
+61 | struct CriterionScore {
+   |        ^^^^^^^^^^^^^^
+
+warning: struct `OptimizationIteration` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:69:8
+   |
+69 | struct OptimizationIteration {
+   |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `OptimizationDecision` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:79:8
+   |
+79 | struct OptimizationDecision {
+   |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `OptimizationResult` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:87:8
+   |
+87 | struct OptimizationResult {
+   |        ^^^^^^^^^^^^^^^^^^
+
+warning: struct `OptimizationSummary` is never constructed
+  --> terraphim_server/src/workflows/optimization.rs:96:8
+   |
+96 | struct OptimizationSummary {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `FinalOptimizedContent` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:106:8
+    |
+106 | struct FinalOptimizedContent {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `QualityMetrics` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:114:8
+    |
+114 | struct QualityMetrics {
+    |        ^^^^^^^^^^^^^^
+
+warning: struct `PerformanceAnalytics` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:124:8
+    |
+124 | struct PerformanceAnalytics {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `EfficiencyMetrics` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:132:8
+    |
+132 | struct EfficiencyMetrics {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `ResourceUtilization` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:140:8
+    |
+140 | struct ResourceUtilization {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ConvergenceAnalysis` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:148:8
+    |
+148 | struct ConvergenceAnalysis {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `PlateauAnalysis` is never constructed
+   --> terraphim_server/src/workflows/optimization.rs:156:8
+    |
+156 | struct PlateauAnalysis {
+    |        ^^^^^^^^^^^^^^^
+
+warning: function `create_evaluator_agent` is never used
+   --> terraphim_server/src/workflows/optimization.rs:256:10
+    |
+256 | async fn create_evaluator_agent(prompt: &str) -> EvaluatorAgent {
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `create_optimizer_agent` is never used
+   --> terraphim_server/src/workflows/optimization.rs:319:10
+    |
+319 | async fn create_optimizer_agent(prompt: &str) -> OptimizerAgent {
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_iterative_optimization` is never used
+   --> terraphim_server/src/workflows/optimization.rs:378:10
+    |
+378 | async fn execute_iterative_optimization(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_content_variants` is never used
+   --> terraphim_server/src/workflows/optimization.rs:490:10
+    |
+490 | async fn generate_content_variants(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_conservative_variant` is never used
+   --> terraphim_server/src/workflows/optimization.rs:548:10
+    |
+548 | async fn generate_conservative_variant(prompt: &str, current_best: &f64) -> String {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_aggressive_variant` is never used
+   --> terraphim_server/src/workflows/optimization.rs:560:10
+    |
+560 | async fn generate_aggressive_variant(prompt: &str, current_best: &f64) -> String {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_balanced_variant` is never used
+   --> terraphim_server/src/workflows/optimization.rs:572:10
+    |
+572 | async fn generate_balanced_variant(prompt: &str, current_best: &f64) -> String {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_creative_variant` is never used
+   --> terraphim_server/src/workflows/optimization.rs:584:10
+    |
+584 | async fn generate_creative_variant(prompt: &str, current_best: &f64) -> String {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_adaptive_variant` is never used
+   --> terraphim_server/src/workflows/optimization.rs:596:10
+    |
+596 | async fn generate_adaptive_variant(prompt: &str, current_best: &f64, iteration: usize) -> String {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `evaluate_variant` is never used
+   --> terraphim_server/src/workflows/optimization.rs:609:10
+    |
+609 | async fn evaluate_variant(
+    |          ^^^^^^^^^^^^^^^^
+
+warning: function `generate_optimization_decisions` is never used
+   --> terraphim_server/src/workflows/optimization.rs:660:10
+    |
+660 | async fn generate_optimization_decisions(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_final_optimized_content` is never used
+   --> terraphim_server/src/workflows/optimization.rs:709:10
+    |
+709 | async fn generate_final_optimized_content(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `analyze_content_type` is never used
+   --> terraphim_server/src/workflows/optimization.rs:790:4
+    |
+790 | fn analyze_content_type(prompt: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `analyze_optimization_focus` is never used
+   --> terraphim_server/src/workflows/optimization.rs:812:4
+    |
+812 | fn analyze_optimization_focus(prompt: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_complexity_score` is never used
+   --> terraphim_server/src/workflows/optimization.rs:829:4
+    |
+829 | fn calculate_complexity_score(content: &str) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_novelty_index` is never used
+   --> terraphim_server/src/workflows/optimization.rs:838:4
+    |
+838 | fn calculate_novelty_index(content: &str, iteration: usize) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `estimate_effectiveness` is never used
+   --> terraphim_server/src/workflows/optimization.rs:845:4
+    |
+845 | fn estimate_effectiveness(content: &str, current_best: &f64) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_criterion_score` is never used
+   --> terraphim_server/src/workflows/optimization.rs:854:4
+    |
+854 | fn calculate_criterion_score(criterion: &str, variant: &ContentVariant) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_evaluation_rationale` is never used
+   --> terraphim_server/src/workflows/optimization.rs:868:4
+    |
+868 | fn generate_evaluation_rationale(criterion: &str, score: f64) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `identify_strengths` is never used
+   --> terraphim_server/src/workflows/optimization.rs:884:4
+    |
+884 | fn identify_strengths(_variant: &ContentVariant, scores: &[CriterionScore]) -> Vec<String> {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `identify_weaknesses` is never used
+   --> terraphim_server/src/workflows/optimization.rs:892:4
+    |
+892 | fn identify_weaknesses(_variant: &ContentVariant, scores: &[CriterionScore]) -> Vec<String> {
+    |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_improvement_suggestions` is never used
+   --> terraphim_server/src/workflows/optimization.rs:900:4
+    |
+900 | fn generate_improvement_suggestions(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_evaluation_confidence` is never used
+   --> terraphim_server/src/workflows/optimization.rs:922:4
+    |
+922 | fn calculate_evaluation_confidence(scores: &[CriterionScore]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_score_variance` is never used
+   --> terraphim_server/src/workflows/optimization.rs:934:4
+    |
+934 | fn calculate_score_variance(results: &[EvaluationResult]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_performance_analytics` is never used
+   --> terraphim_server/src/workflows/optimization.rs:950:4
+    |
+950 | fn calculate_performance_analytics(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_evaluation_consistency` is never used
+   --> terraphim_server/src/workflows/optimization.rs:977:4
+    |
+977 | fn calculate_evaluation_consistency(iterations: &[OptimizationIteration]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `analyze_convergence` is never used
+   --> terraphim_server/src/workflows/optimization.rs:999:4
+    |
+999 | fn analyze_convergence(improvement_history: &[f64]) -> ConvergenceAnalysis {
+    |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_optimization_efficiency` is never used
+    --> terraphim_server/src/workflows/optimization.rs:1054:4
+     |
+1054 | fn calculate_optimization_efficiency(result: &OptimizationResult) -> f64 {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `OrchestratorAgent` is never constructed
+  --> terraphim_server/src/workflows/orchestration.rs:14:8
+   |
+14 | struct OrchestratorAgent {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `WorkerAgent` is never constructed
+  --> terraphim_server/src/workflows/orchestration.rs:23:8
+   |
+23 | struct WorkerAgent {
+   |        ^^^^^^^^^^^
+
+warning: enum `WorkerStatus` is never used
+  --> terraphim_server/src/workflows/orchestration.rs:34:6
+   |
+34 | enum WorkerStatus {
+   |      ^^^^^^^^^^^^
+
+warning: struct `TaskAssignment` is never constructed
+  --> terraphim_server/src/workflows/orchestration.rs:43:8
+   |
+43 | struct TaskAssignment {
+   |        ^^^^^^^^^^^^^^
+
+warning: enum `TaskPriority` is never used
+  --> terraphim_server/src/workflows/orchestration.rs:55:6
+   |
+55 | enum TaskPriority {
+   |      ^^^^^^^^^^^^
+
+warning: struct `WorkerResult` is never constructed
+  --> terraphim_server/src/workflows/orchestration.rs:63:8
+   |
+63 | struct WorkerResult {
+   |        ^^^^^^^^^^^^
+
+warning: struct `ResourceUsage` is never constructed
+  --> terraphim_server/src/workflows/orchestration.rs:74:8
+   |
+74 | struct ResourceUsage {
+   |        ^^^^^^^^^^^^^
+
+warning: enum `CompletionStatus` is never used
+  --> terraphim_server/src/workflows/orchestration.rs:83:6
+   |
+83 | enum CompletionStatus {
+   |      ^^^^^^^^^^^^^^^^
+
+warning: struct `OrchestrationResult` is never constructed
+  --> terraphim_server/src/workflows/orchestration.rs:91:8
+   |
+91 | struct OrchestrationResult {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `OrchestratorSummary` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:100:8
+    |
+100 | struct OrchestratorSummary {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `DecisionPoint` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:110:8
+    |
+110 | struct DecisionPoint {
+    |        ^^^^^^^^^^^^^
+
+warning: struct `CoordinationMetrics` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:119:8
+    |
+119 | struct CoordinationMetrics {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `Bottleneck` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:128:8
+    |
+128 | struct Bottleneck {
+    |        ^^^^^^^^^^
+
+warning: struct `FinalSynthesis` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:136:8
+    |
+136 | struct FinalSynthesis {
+    |        ^^^^^^^^^^^^^^
+
+warning: struct `QualityAssessment` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:144:8
+    |
+144 | struct QualityAssessment {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `ExecutionEvent` is never constructed
+   --> terraphim_server/src/workflows/orchestration.rs:152:8
+    |
+152 | struct ExecutionEvent {
+    |        ^^^^^^^^^^^^^^
+
+warning: function `create_orchestrator` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:253:10
+    |
+253 | async fn create_orchestrator(prompt: &str) -> OrchestratorAgent {
+    |          ^^^^^^^^^^^^^^^^^^^
+
+warning: function `decompose_and_assign_tasks` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:312:10
+    |
+312 | async fn decompose_and_assign_tasks(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `create_data_science_workflow` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:326:10
+    |
+326 | async fn create_data_science_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `create_software_development_workflow` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:432:10
+    |
+432 | async fn create_software_development_workflow(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `create_research_workflow` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:507:10
+    |
+507 | async fn create_research_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `create_general_workflow` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:560:10
+    |
+560 | async fn create_general_workflow(prompt: &str) -> (Vec<TaskAssignment>, Vec<WorkerAgent>) {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_coordinated_work` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:612:10
+    |
+612 | async fn execute_coordinated_work(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_worker_result` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:650:10
+    |
+650 | async fn generate_worker_result(
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `synthesize_orchestration_result` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:698:10
+    |
+698 | async fn synthesize_orchestration_result(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `analyze_task_complexity` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:824:4
+    |
+824 | fn analyze_task_complexity(prompt: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_task_quality_score` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:848:4
+    |
+848 | fn calculate_task_quality_score(assignment: &TaskAssignment) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_resource_efficiency` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:865:4
+    |
+865 | fn calculate_resource_efficiency(results: &[WorkerResult]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_consistency_score` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:880:4
+    |
+880 | fn calculate_consistency_score(results: &[WorkerResult]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_orchestrator_efficiency` is never used
+   --> terraphim_server/src/workflows/orchestration.rs:893:4
+    |
+893 | fn calculate_orchestrator_efficiency(result: &OrchestrationResult) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ParallelAgent` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:14:8
+   |
+14 | struct ParallelAgent {
+   |        ^^^^^^^^^^^^^
+
+warning: struct `ParallelAnalysis` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:23:8
+   |
+23 | struct ParallelAnalysis {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: struct `ConsolidatedResult` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:34:8
+   |
+34 | struct ConsolidatedResult {
+   |        ^^^^^^^^^^^^^^^^^^
+
+warning: struct `ConflictingView` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:43:8
+   |
+43 | struct ConflictingView {
+   |        ^^^^^^^^^^^^^^^
+
+warning: struct `AgentPerspective` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:49:8
+   |
+49 | struct AgentPerspective {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: struct `AgentConfidence` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:56:8
+   |
+56 | struct AgentConfidence {
+   |        ^^^^^^^^^^^^^^^
+
+warning: struct `ExecutionSummary` is never constructed
+  --> terraphim_server/src/workflows/parallel.rs:63:8
+   |
+63 | struct ExecutionSummary {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `create_specialized_agents` is never used
+   --> terraphim_server/src/workflows/parallel.rs:163:10
+    |
+163 | async fn create_specialized_agents(prompt: &str) -> Vec<ParallelAgent> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_parallel_analysis` is never used
+   --> terraphim_server/src/workflows/parallel.rs:283:10
+    |
+283 | async fn execute_parallel_analysis(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_agent_analysis` is never used
+   --> terraphim_server/src/workflows/parallel.rs:327:10
+    |
+327 | async fn generate_agent_analysis(agent: &ParallelAgent, prompt: &str) -> String {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_key_insights` is never used
+   --> terraphim_server/src/workflows/parallel.rs:376:10
+    |
+376 | async fn generate_key_insights(agent: &ParallelAgent, prompt: &str) -> Vec<String> {
+    |          ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_agent_confidence` is never used
+   --> terraphim_server/src/workflows/parallel.rs:408:10
+    |
+408 | async fn calculate_agent_confidence(agent: &ParallelAgent, prompt: &str) -> f64 {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `consolidate_analyses` is never used
+   --> terraphim_server/src/workflows/parallel.rs:432:10
+    |
+432 | async fn consolidate_analyses(
+    |          ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `analyze_task_type` is never used
+   --> terraphim_server/src/workflows/parallel.rs:518:4
+    |
+518 | fn analyze_task_type(prompt: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `extract_main_topic` is never used
+   --> terraphim_server/src/workflows/parallel.rs:544:4
+    |
+544 | fn extract_main_topic(prompt: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_consensus_level` is never used
+   --> terraphim_server/src/workflows/parallel.rs:554:4
+    |
+554 | fn calculate_consensus_level(analyses: &[ParallelAnalysis]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_diversity_score` is never used
+   --> terraphim_server/src/workflows/parallel.rs:568:4
+    |
+568 | fn calculate_diversity_score(analyses: &[ParallelAnalysis]) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_efficiency_score` is never used
+   --> terraphim_server/src/workflows/parallel.rs:576:4
+    |
+576 | fn calculate_efficiency_score(result: &ConsolidatedResult) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ChainStep` is never constructed
+  --> terraphim_server/src/workflows/prompt_chain.rs:13:8
+   |
+13 | struct ChainStep {
+   |        ^^^^^^^^^
+
+warning: function `execute_chain_workflow` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:115:10
+    |
+115 | async fn execute_chain_workflow(
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_chain_step` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:171:10
+    |
+171 | async fn execute_chain_step(
+    |          ^^^^^^^^^^^^^^^^^^
+
+warning: function `get_chain_steps` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:200:4
+    |
+200 | fn get_chain_steps(_prompt: &str, role: &str) -> Vec<ChainStep> {
+    |    ^^^^^^^^^^^^^^^
+
+warning: function `generate_specification_output` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:322:4
+    |
+322 | fn generate_specification_output(context: &str, role: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_architecture_output` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:341:4
+    |
+341 | fn generate_architecture_output(_context: &str, role: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_planning_output` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:349:4
+    |
+349 | fn generate_planning_output(_context: &str, role: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_implementation_output` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:357:4
+    |
+357 | fn generate_implementation_output(_context: &str, role: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_testing_output` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:365:4
+    |
+365 | fn generate_testing_output(_context: &str, role: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_deployment_output` is never used
+   --> terraphim_server/src/workflows/prompt_chain.rs:373:4
+    |
+373 | fn generate_deployment_output(_context: &str, role: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `RouteOption` is never constructed
+  --> terraphim_server/src/workflows/routing.rs:14:8
+   |
+14 | struct RouteOption {
+   |        ^^^^^^^^^^^
+
+warning: function `execute_routing_workflow` is never used
+   --> terraphim_server/src/workflows/routing.rs:116:10
+    |
+116 | async fn execute_routing_workflow(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `analyze_task_complexity` is never used
+   --> terraphim_server/src/workflows/routing.rs:201:4
+    |
+201 | fn analyze_task_complexity(prompt: &str, role: &str) -> serde_json::Value {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_available_routes` is never used
+   --> terraphim_server/src/workflows/routing.rs:289:4
+    |
+289 | fn get_available_routes(role: &str) -> Vec<RouteOption> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `select_optimal_route` is never used
+   --> terraphim_server/src/workflows/routing.rs:345:4
+    |
+345 | fn select_optimal_route(routes: &[RouteOption], complexity: &serde_json::Value) -> RouteOption {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_with_route` is never used
+   --> terraphim_server/src/workflows/routing.rs:396:10
+    |
+396 | async fn execute_with_route(
+    |          ^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_route_output` is never used
+   --> terraphim_server/src/workflows/routing.rs:447:4
+    |
+447 | fn generate_route_output(
+    |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_route_confidence` is never used
+   --> terraphim_server/src/workflows/routing.rs:495:4
+    |
+495 | fn calculate_route_confidence(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_estimated_cost` is never used
+   --> terraphim_server/src/workflows/routing.rs:510:4
+    |
+510 | fn calculate_estimated_cost(route: &RouteOption, prompt: &str) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_expected_quality` is never used
+   --> terraphim_server/src/workflows/routing.rs:517:4
+    |
+517 | fn calculate_expected_quality(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_output_quality` is never used
+   --> terraphim_server/src/workflows/routing.rs:532:4
+    |
+532 | fn calculate_output_quality(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `calculate_cost_efficiency` is never used
+   --> terraphim_server/src/workflows/routing.rs:539:4
+    |
+539 | fn calculate_cost_efficiency(route: &RouteOption, complexity: &serde_json::Value) -> f64 {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_role_specific_features` is never used
+   --> terraphim_server/src/workflows/routing.rs:546:4
+    |
+546 | fn get_role_specific_features(role: &str, route_id: &str) -> Vec<String> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `terraphim_server` (lib) generated 153 warnings (run `cargo fix --lib -p terraphim_server` to apply 17 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.17s
+     Running `/home/alex/projects/terraphim/terraphim-ai/target/debug/terraphim_server --config terraphim_server/default/ollama_llama_config.json`
+[2025-09-17T08:29:57Z INFO  terraphim_settings] Loading device settings...
+[2025-09-17T08:29:57Z INFO  terraphim_server] Device settings hostname: "127.0.0.1:8000"
+[2025-09-17T08:29:57Z INFO  terraphim_server] 🔧 Pre-creating storage directories...
+[2025-09-17T08:29:57Z INFO  terraphim_server] Found 1 profiles: ["dash"]
+[2025-09-17T08:29:57Z INFO  terraphim_server] Processing profile 'dash' of type 'dashmap'
+[2025-09-17T08:29:57Z INFO  terraphim_server] 🔧 Creating DashMap directory: /tmp/dashmaptest
+[2025-09-17T08:29:57Z INFO  terraphim_server] ✅ Created DashMap directory: /tmp/dashmaptest
+[2025-09-17T08:29:57Z INFO  terraphim_server] ✅ Storage directory pre-creation completed
+[2025-09-17T08:29:57Z INFO  terraphim_server] Loading configuration from terraphim_server/default/ollama_llama_config.json (role: TerraphimEngineer)
+[2025-09-17T08:29:57Z INFO  terraphim_server] TerraphimEngineer role config not found at terraphim_server/default/ollama_llama_config.json
+[2025-09-17T08:29:57Z INFO  terraphim_server] Using default server configuration
+[2025-09-17T08:29:57Z INFO  terraphim_settings] Loading device settings...
+[2025-09-17T08:29:57Z INFO  terraphim_config] Current working directory: /home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows
+[2025-09-17T08:29:57Z INFO  terraphim_config] Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2025-09-17T08:29:57Z INFO  terraphim_settings] Loading device settings...
+[2025-09-17T08:29:57Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: false, default_data_path: "${HOME/.terraphim}", profiles: {"memory": {"type": "memory"}, "sqlite": {"table": "terraphim_kv", "datadir": "/tmp/terraphim_sqlite", "type": "sqlite", "connection_string": "/tmp/terraphim_sqlite/terraphim.db"}, "dashmap": {"type": "dashmap", "root": "/tmp/terraphim_dashmap"}} }
+[2025-09-17T08:29:57Z INFO  terraphim_persistence] 🔧 Pre-creating SQLite directory: /tmp/terraphim_sqlite
+[2025-09-17T08:29:57Z INFO  terraphim_persistence] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-09-17T08:29:57Z INFO  terraphim_persistence] 🔧 Pre-creating DashMap directory: /tmp/terraphim_dashmap
+[2025-09-17T08:29:57Z INFO  terraphim_persistence] ✅ Created DashMap directory: /tmp/terraphim_dashmap
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] 📁 Parsing profile: memory
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] 🔧 Profile 'memory' using scheme: Memory
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] Got request for memory operator; initializing in-memory operator.
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] 📁 Parsing profile: sqlite
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] 🔧 Profile 'sqlite' using scheme: Sqlite
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] Got request for sqlite operator; initializing in-memory operator.
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] 📁 Parsing profile: dashmap
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] 🔧 Profile 'dashmap' using scheme: Dashmap
+[2025-09-17T08:29:57Z INFO  terraphim_persistence::settings] Got request for dashmap operator; initializing in-memory operator.
+[2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-17T08:29:57Z WARN  opendal::services] service=memory operation=stat path=server_config.json -> NotFound (permanent) at stat, context: { service: memory, path: server_config.json } => kv doesn't have this path
+[2025-09-17T08:29:57Z INFO  terraphim_server] Failed to load saved config, using default: OpenDal(NotFound (permanent) at stat => kv doesn't have this path
+
+    Context:
+       service: memory
+       path: server_config.json
+    )
+[2025-09-17T08:29:57Z INFO  terraphim_settings] Loading device settings...
+[2025-09-17T08:29:57Z INFO  terraphim_config] Current working directory: /home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows
+[2025-09-17T08:29:57Z INFO  terraphim_config] Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2025-09-17T08:29:57Z INFO  terraphim_config] Creating role Engineer
+[2025-09-17T08:29:57Z INFO  terraphim_config] Role Engineer is configured correctly with automata_path
+[2025-09-17T08:29:57Z INFO  terraphim_config] Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2025-09-17T08:29:57Z INFO  terraphim_config] Successfully loaded thesaurus from automata path
+[2025-09-17T08:29:57Z INFO  terraphim_config] Creating role Default
+[2025-09-17T08:29:57Z INFO  terraphim_config] Creating role System Operator
+[2025-09-17T08:29:57Z INFO  terraphim_config] Role System Operator is configured correctly with automata_path
+[2025-09-17T08:29:57Z INFO  terraphim_config] Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2025-09-17T08:29:58Z INFO  terraphim_config] Successfully loaded thesaurus from automata path
+[2025-09-17T08:29:58Z INFO  terraphim_server] Server started with 3 roles:
+[2025-09-17T08:29:58Z INFO  terraphim_server]   - Role: Engineer (relevance: TerraphimGraph, kg: true)
+[2025-09-17T08:29:58Z INFO  terraphim_server]   - Role: Default (relevance: TitleScorer, kg: false)
+[2025-09-17T08:29:58Z INFO  terraphim_server]   - Role: System Operator (relevance: TerraphimGraph, kg: true)
+[2025-09-17T08:29:58Z INFO  terraphim_server] Starting axum server
+[2025-09-17T08:29:58Z INFO  terraphim_server] Initialized summarization manager with default configuration
+[2025-09-17T08:29:58Z INFO  terraphim_service::summarization_worker] Starting summarization worker with 3 max concurrent workers
+[2025-09-17T08:29:58Z INFO  terraphim_server] Initialized workflow management system with WebSocket support
+[2025-09-17T08:29:58Z INFO  terraphim_service::summarization_worker] Worker 2 started
+[2025-09-17T08:29:58Z INFO  terraphim_service::summarization_worker] Worker 0 started
+[2025-09-17T08:29:58Z INFO  terraphim_service::summarization_worker] Worker 1 started
+listening on http://127.0.0.1:8000
+[2025-09-17T08:34:09Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:34:09Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:34:15Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:34:15Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:34:20Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:34:20Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:49:41Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:49:41Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:49:55Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:49:55Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:49:58Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:49:58Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:49:59Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/",
+        service: Ripgrep,
+        read_only: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-09-17T08:49:59Z WARN  terraphim_middleware::indexer::ripgrep] Haystack path does not exist: "/home/alex/projects/terraphim/terraphim-ai/examples/agent-workflows/terraphim_server/fixtures/haystack/"
+[2025-09-17T08:50:09Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing routing workflow with multi-agent intelligence
+[2025-09-17T08:50:09Z INFO  terraphim_multi_agent::agent] Agent e3d4325c-001f-4495-a121-8ee9d4361b6a (SimpleTaskAgent) initialized successfully
+[2025-09-17T08:50:26Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing parallelization workflow with multiple agents
+[2025-09-17T08:50:26Z INFO  terraphim_multi_agent::agent] Agent db163cf1-b4ca-45e4-8572-d38f6fbfd34b (analyticalPerspectiveAgent) initialized successfully
+[2025-09-17T08:50:26Z INFO  terraphim_multi_agent::agent] Agent 9b8ab9c6-0f06-4b72-9811-504a5b39d109 (creativePerspectiveAgent) initialized successfully
+[2025-09-17T08:50:27Z INFO  terraphim_multi_agent::agent] Agent 36c70a5a-3337-45b8-8178-29d129bbb3e5 (practicalPerspectiveAgent) initialized successfully
+double free or corruption (!prev)

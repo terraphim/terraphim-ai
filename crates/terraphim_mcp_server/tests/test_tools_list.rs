@@ -57,7 +57,21 @@ fn test_tools_list_only() {
         .expect("Failed to read response");
     println!("Init Response: {}", response.trim());
 
-    // Step 2: List available tools
+    // Step 2: Send initialized notification (required by MCP protocol)
+    let initialized_notification = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+    });
+
+    println!("2. Sending initialized notification...");
+    writeln!(stdin, "{}", initialized_notification)
+        .expect("Failed to write initialized notification");
+    stdin.flush().expect("Failed to flush stdin");
+
+    // Small delay to ensure notification is processed
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Step 3: List available tools
     let tools_request = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 2,
@@ -65,7 +79,7 @@ fn test_tools_list_only() {
         "params": {}
     });
 
-    println!("2. Listing available tools...");
+    println!("3. Listing available tools...");
     writeln!(stdin, "{}", tools_request).expect("Failed to write to stdin");
     stdin.flush().expect("Failed to flush stdin");
 
