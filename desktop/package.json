@@ -12,7 +12,7 @@
 		"build": "vite build",
 		"build:ci": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
 		"build:minimal": "vite build --mode minimal",
-	"build:ultra-minimal": "vite build --mode ultra-minimal",
+		"build:ultra-minimal": "vite build --mode ultra-minimal",
 		"preview": "vite preview",
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
@@ -84,6 +84,7 @@
 		"vitest": "^1.6.0"
 	},
 	"dependencies": {
+		"@fortawesome/fontawesome-free": "^7.1.0",
 		"@tauri-apps/api": "^1.6.0",
 		"bulma": "^0.9.4",
 		"comlink-fetch": "^0.1.2",
@@ -110,21 +111,53 @@
 		"tiptap-markdown": "^0.8.10"
 	},
 	"peerDependenciesMeta": {
-		"@fortawesome/fontawesome-free": { "optional": true },
-		"@tiptap/core": { "optional": true },
-		"@tiptap/extension-mention": { "optional": true },
-		"@tiptap/starter-kit": { "optional": true },
-		"@tiptap/suggestion": { "optional": true },
-		"@tomic/lib": { "optional": true },
-		"@tomic/svelte": { "optional": true },
-		"biome": { "optional": true },
-		"bulmaswatch": { "optional": true },
-		"d3": { "optional": true },
-		"rollup-plugin-css-only": { "optional": true },
-		"rollup-plugin-terser": { "optional": true },
-		"svelma": { "optional": true },
-		"svelte-jsoneditor": { "optional": true },
-		"svelte-markdown": { "optional": true },
-		"tiptap-markdown": { "optional": true }
+		"@fortawesome/fontawesome-free": {
+			"optional": true
+		},
+		"@tiptap/core": {
+			"optional": true
+		},
+		"@tiptap/extension-mention": {
+			"optional": true
+		},
+		"@tiptap/starter-kit": {
+			"optional": true
+		},
+		"@tiptap/suggestion": {
+			"optional": true
+		},
+		"@tomic/lib": {
+			"optional": true
+		},
+		"@tomic/svelte": {
+			"optional": true
+		},
+		"biome": {
+			"optional": true
+		},
+		"bulmaswatch": {
+			"optional": true
+		},
+		"d3": {
+			"optional": true
+		},
+		"rollup-plugin-css-only": {
+			"optional": true
+		},
+		"rollup-plugin-terser": {
+			"optional": true
+		},
+		"svelma": {
+			"optional": true
+		},
+		"svelte-jsoneditor": {
+			"optional": true
+		},
+		"svelte-markdown": {
+			"optional": true
+		},
+		"tiptap-markdown": {
+			"optional": true
+		}
 	}
 }

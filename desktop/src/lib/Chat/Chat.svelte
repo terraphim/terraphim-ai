@@ -11,6 +11,10 @@ import {
 	showSessionList,
 } from '../stores';
 import SessionList from './SessionList.svelte';
+import ContextEditModal from './ContextEditModal.svelte';
+import ArticleModal from '../Search/ArticleModal.svelte';
+import KGSearchModal from '../Search/KGSearchModal.svelte';
+import KGContextItem from '../Search/KGContextItem.svelte';
 import { Markdown } from 'svelte-markdown';
 
 // Tauri APIs for saving files (only used in desktop)
@@ -94,6 +98,14 @@ let _showKgModal = false;
 let kgDocument: any = null;
 let _kgTerm: string | null = null;
 let _kgRank: number | null = null;
+
+// Create reactive aliases without underscores for template usage
+$: savingContext = _savingContext;
+$: editingContext = _editingContext;
+$: contextEditMode = _contextEditMode;
+$: kgTerm = _kgTerm;
+$: kgRank = _kgRank;
+$: _showDebugRequest = __showDebugRequest;
 
 // --- Persistence helpers ---
 function chatStateKey(): string {
@@ -935,6 +947,14 @@ function _handleNewConversation() {
 function _toggleSessionList() {
 	showSessionList.update((v) => !v);
 }
+
+// Create function aliases without underscores for template usage
+const addManualContext = _addManualContext;
+const editContext = _editContext;
+const confirmDeleteContext = _confirmDeleteContext;
+const updateContext = _updateContext;
+const handleKGTermAdded = _handleKGTermAdded;
+const handleKGIndexAdded = _handleKGIndexAdded;
 </script>
 
 <section class="section" data-testid="chat-interface">
