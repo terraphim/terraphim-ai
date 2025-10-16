@@ -1,25 +1,25 @@
 {
-  "id": "Server",
-  "global_shortcut": "Ctrl+Shift+F",
-  "roles": {
-    "Atomic Debug Fixed": {
-      "shortname": "AtomicDebugFixed",
-      "name": "Atomic Debug Fixed",
-      "relevance_function": "title-scorer",
-      "terraphim_it": false,
-      "theme": "spacelab",
-      "kg": null,
-      "haystacks": [
-        {
-          "location": "http://localhost:9883/",
-          "service": "Atomic",
-          "read_only": true,
-          "atomic_server_secret": "eyJwcml2YXRlS2V5IjoiUnlndmxLR1VERzkvbG9DWTVLQ0hyUURybkpFRzdQN1A5SEtiK0JFOE5TMD0iLCJwdWJsaWNLZXkiOiJseG95Z0xmVU52VGZPZHdHRTlCZDhwakFtM3RFWHloSlpMWENDbDNVblZjPSIsInN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMvYWdlbnRzL2x4b3lnTGZVTnZUZk9kd0dFOUJkOHBqQW0zdEVYeWhKWkxYQ0NsM1VuVmM9IiwiY2xpZW50Ijp7fX0="
-        }
-      ],
-      "extra": {}
-    }
-  },
-  "default_role": "Atomic Debug Fixed",
-  "selected_role": "Atomic Debug Fixed"
+	"id": "Server",
+	"global_shortcut": "Ctrl+Shift+F",
+	"roles": {
+		"Atomic Debug Fixed": {
+			"shortname": "AtomicDebugFixed",
+			"name": "Atomic Debug Fixed",
+			"relevance_function": "title-scorer",
+			"terraphim_it": false,
+			"theme": "spacelab",
+			"kg": null,
+			"haystacks": [
+				{
+					"location": "http://localhost:9883/",
+					"service": "Atomic",
+					"read_only": true,
+					"atomic_server_secret": "eyJwcml2YXRlS2V5IjoiUnlndmxLR1VERzkvbG9DWTVLQ0hyUURybkpFRzdQN1A5SEtiK0JFOE5TMD0iLCJwdWJsaWNLZXkiOiJseG95Z0xmVU52VGZPZHdHRTlCZDhwakFtM3RFWHloSlpMWENDbDNVblZjPSIsInN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMvYWdlbnRzL2x4b3lnTGZVTnZUZk9kd0dFOUJkOHBqQW0zdEVYeWhKWkxYQ0NsM1VuVmM9IiwiY2xpZW50Ijp7fX0="
+				}
+			],
+			"extra": {}
+		}
+	},
+	"default_role": "Atomic Debug Fixed",
+	"selected_role": "Atomic Debug Fixed"
 }

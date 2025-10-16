@@ -5,7 +5,12 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  const isMinimal = mode === 'minimal';
+  const isUltraMinimal = mode === 'ultra-minimal';
+  const isCI = process.env.CI === 'true';
+
+  return {
   plugins: [
     svelte(),
     {
@@ -127,7 +132,15 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      output: {
+      output: isUltraMinimal ? {
+        // Ultra-minimal - single chunk for fastest CI builds
+        manualChunks: undefined,
+        inlineDynamicImports: true
+      } : isMinimal ? {
+        // Minimal chunks for CI builds
+        manualChunks: undefined
+      } : {
+        // Full chunks for development
         manualChunks: {
           // Vendor libraries
           'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
@@ -140,6 +153,14 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 1000 // Increase limit to 1MB
+    chunkSizeWarningLimit: isUltraMinimal ? 200 : (isMinimal ? 500 : 1000), // Progressive limits
+    target: 'esnext',
+    minify: isUltraMinimal ? false : (isMinimal ? 'esbuild' : 'terser'),
+    sourcemap: false, // Always disable for CI speed
+    emptyOutDir: true, // Ensure clean builds
+    reportCompressedSize: false, // Faster builds
+    assetsInline: isUltraMinimal ? 'always' : 'size' // Inline assets in ultra-minimal mode
   }
+  };
+});
 })

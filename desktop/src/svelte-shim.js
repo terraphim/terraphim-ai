@@ -18,15 +18,15 @@ export * from 'svelte-original';
  * Mirrors the helper available in newer Svelte builds.
  */
 export function mount(Component, options) {
-  // Allow calling with Component default export object
-  return new Component(options);
+	// Allow calling with Component default export object
+	return new Component(options);
 }
 
 /**
  * Destroy a Svelte component that was previously mounted with `mount`.
  */
 export function unmount(component) {
-  if (component && typeof component.$destroy === 'function') {
-    component.$destroy();
-  }
+	if (component && typeof component.$destroy === 'function') {
+		component.$destroy();
+	}
 }

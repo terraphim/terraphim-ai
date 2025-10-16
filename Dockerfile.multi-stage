@@ -1,0 +1,68 @@
+# Multi-stage Dockerfile for better multi-architecture support
+FROM rust:1.87.0 as builder
+
+ARG TARGETARCH
+ARG TARGETPLATFORM
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy Cargo files first for better caching
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates/
+COPY terraphim_server ./terraphim_server/
+
+# Build dependencies first (cache layer)
+RUN cargo build --release --package terraphim_server
+
+# Copy the source code
+COPY . .
+
+# Build the application
+RUN cargo build --release --package terraphim_server
+
+# Final runtime image
+FROM ubuntu:22.04
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash terraphim
+
+# Copy binary from builder stage
+COPY --from=builder /app/target/release/terraphim_server /usr/local/bin/terraphim_server
+
+# Switch to non-root user
+USER terraphim
+WORKDIR /home/terraphim
+
+# Create config directory
+RUN mkdir -p .config/terraphim
+
+# Environment variables
+ENV TERRAPHIM_SERVER_HOSTNAME="0.0.0.0:8000"
+ENV TERRAPHIM_SERVER_API_ENDPOINT="http://localhost:8000/api"
+ENV RUST_LOG="info"
+ENV RUST_BACKTRACE="1"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Default command
+ENTRYPOINT ["terraphim_server"]
+CMD ["--config", "/home/terraphim/.config/terraphim/config.json"]
