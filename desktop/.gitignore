@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Package manager lock files (use yarn.lock only)
+pnpm-lock.yaml
+bun.lockb
+
 node_modules
 dist
 dist-ssr
