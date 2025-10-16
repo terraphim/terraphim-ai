@@ -34,8 +34,8 @@ export const onNewConversation: () => void = () => {};
 let conversations: ConversationSummary[] = [];
 let _loading = false;
 let _error: string | null = null;
-const searchQuery = '';
-const filterRole: string | null = null;
+let searchQuery = '';
+let filterRole: string | null = null;
 let _showDeleteConfirm: string | null = null;
 let _deleting = false;
 
@@ -171,6 +171,16 @@ function _handleSearchInput() {
 function _handleRoleFilterChange() {
 	loadConversations();
 }
+
+// Create aliases without underscores for template usage
+const handleSearchInput = _handleSearchInput;
+const handleRoleFilterChange = _handleRoleFilterChange;
+const deleteConversation = _deleteConversation;
+const formatDate = _formatDate;
+$: loading = _loading;
+$: error = _error;
+$: showDeleteConfirm = _showDeleteConfirm;
+$: deleting = _deleting;
 </script>
 
 <div class="session-list">

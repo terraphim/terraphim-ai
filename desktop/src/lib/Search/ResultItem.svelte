@@ -7,9 +7,9 @@ import configStore from '../ThemeSwitcher.svelte';
 import type { Document } from './SearchResult';
 
 export let item: Document;
-let _showModal = false;
-let _showKgModal = false;
-let _showAtomicSaveModal = false;
+let showModal = false;
+let showKgModal = false;
+let showAtomicSaveModal = false;
 let kgDocument: Document | null = null;
 let _kgTerm: string | null = null;
 let kgRank: number | null = null;
@@ -19,7 +19,7 @@ let _loadingKg = false;
 let aiSummary: string | null = null;
 let summaryLoading = false;
 let summaryError: string | null = null;
-let _showAiSummary = false;
+let showAiSummary = false;
 let summaryFromCache = false;
 
 // Context addition state
@@ -170,12 +170,12 @@ function checkAtomicServerAvailable(): boolean {
 }
 
 const onTitleClick = () => {
-	_showModal = true;
+	showModal = true;
 };
 
 const onAtomicSaveClick = () => {
 	console.log('🔄 Opening atomic save modal for document:', item.title);
-	_showAtomicSaveModal = true;
+	showAtomicSaveModal = true;
 };
 
 async function _handleTagClick(tag: string) {
@@ -214,7 +214,7 @@ async function _handleTagClick(tag: string) {
 				console.log('    Title:', kgDocument.title);
 				console.log('    Rank:', kgRank);
 				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-				_showKgModal = true;
+				showKgModal = true;
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
 				console.warn('    This could indicate:');
@@ -263,7 +263,7 @@ async function _handleTagClick(tag: string) {
 				console.log('    Title:', kgDocument.title);
 				console.log('    Rank:', kgRank);
 				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-				_showKgModal = true;
+				showKgModal = true;
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
 				console.warn('    This could indicate:');
@@ -362,7 +362,7 @@ async function _generateSummary() {
 		if (data.status === 'success' && data.summary) {
 			aiSummary = data.summary;
 			summaryFromCache = data.from_cache || false;
-			_showAiSummary = true;
+			showAiSummary = true;
 			console.log('  ✅ Summary generated successfully');
 			console.log('    Summary length:', aiSummary.length, 'characters');
 			console.log('    From cache:', summaryFromCache);
@@ -901,6 +901,12 @@ if (configStore[$role] !== undefined) {
 		console.log("Didn't make it");
 	}
 }
+
+// Create aliases without underscores for template usage
+$: loadingKg = _loadingKg;
+$: kgTerm = _kgTerm;
+const handleTagClick = _handleTagClick;
+const generateSummary = _generateSummary;
 </script>
 
 <div class="box">

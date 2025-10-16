@@ -15,7 +15,7 @@ import ContextEditModal from './ContextEditModal.svelte';
 import ArticleModal from '../Search/ArticleModal.svelte';
 import KGSearchModal from '../Search/KGSearchModal.svelte';
 import KGContextItem from '../Search/KGContextItem.svelte';
-import { Markdown } from 'svelte-markdown';
+import Markdown from 'svelte-markdown';
 
 // Tauri APIs for saving files (only used in desktop)
 let tauriDialog: any = null;
