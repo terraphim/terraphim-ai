@@ -352,9 +352,9 @@ impl AgentSupervisor {
 
         // If this is a restart, record it
         if restart_count > 0 {
+            // Set restart_count to the passed value before recording the restart
+            agent_info.restart_count = restart_count - 1;
             agent_info.record_restart();
-            // Set the restart count explicitly since record_restart doesn't increment it anymore
-            agent_info.restart_count = restart_count;
         }
 
         // Create and initialize agent
