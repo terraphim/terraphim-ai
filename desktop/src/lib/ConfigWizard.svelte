@@ -1,458 +1,480 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { open } from "@tauri-apps/api/dialog";
-  // @ts-ignore
-  import { is_tauri } from "$lib/stores";
-  import { writable, get } from "svelte/store";
-  // @ts-ignore
-  import { configStore } from "$lib/stores";
-  // Import generated types
-  import type {
-    Config,
-    Role,
-    Haystack,
-    KnowledgeGraph,
-    ServiceType,
-    ConfigId,
-    RelevanceFunction,
-    KnowledgeGraphInputType
-  } from "./generated/types";
+import { open } from '@tauri-apps/api/dialog';
+import { invoke } from '@tauri-apps/api/tauri';
+import { onMount } from 'svelte';
+import { get, writable } from 'svelte/store';
+// @ts-expect-error
+// @ts-expect-error
+import { configStore, is_tauri } from '$lib/stores';
+// Import generated types
+import type {
+	ConfigId,
+	KnowledgeGraphInputType,
+	RelevanceFunction,
+	ServiceType,
+} from './generated/types';
 
-  const schema = writable<any>(null);
+const schema = writable<any>(null);
 
-  // Form types derived from generated types
-  type ConfigDraft = {
-    id: ConfigId;
-    global_shortcut: string;
-    default_theme: string;
-    default_role: string;
-  };
+// Form types derived from generated types
+type ConfigDraft = {
+	id: ConfigId;
+	global_shortcut: string;
+	default_theme: string;
+	default_role: string;
+};
 
-  // HaystackForm now matches the generated Haystack type
-  type HaystackForm = {
-    path: string;
-    read_only: boolean;
-    service: ServiceType;
-    atomic_server_secret?: string;
-    extra_parameters: { [key: string]: string };
-  };
+// HaystackForm now matches the generated Haystack type
+type HaystackForm = {
+	path: string;
+	read_only: boolean;
+	service: ServiceType;
+	atomic_server_secret?: string;
+	extra_parameters: { [key: string]: string };
+	weight: number;
+};
 
-  type KnowledgeGraphForm = {
-    url: string;
-    local_path: string;
-    local_type: KnowledgeGraphInputType;
-    public: boolean;
-    publish: boolean
-  };
+type KnowledgeGraphForm = {
+	url: string;
+	local_path: string;
+	local_type: KnowledgeGraphInputType;
+	public: boolean;
+	publish: boolean;
+};
 
-  type RoleForm = {
-    name: string;
-    shortname: string;
-    relevance_function: RelevanceFunction;
-    terraphim_it: boolean;
-    theme: string;
-    haystacks: HaystackForm[];
-    kg: KnowledgeGraphForm;
-    openrouter_enabled?: boolean;
-    openrouter_api_key?: string;
-    openrouter_model?: string;
-    // Auto-summarize and Chat settings
-    openrouter_auto_summarize?: boolean;
-    openrouter_chat_enabled?: boolean;
-    openrouter_chat_model?: string;
-    openrouter_chat_system_prompt?: string;
-    // Generic LLM abstraction settings (stored in Role.extra)
-    llm_provider?: string; // openrouter | ollama
-    llm_model?: string;
-    llm_base_url?: string;
-    llm_auto_summarize?: boolean;
-  };
+type RoleForm = {
+	name: string;
+	shortname: string;
+	relevance_function: RelevanceFunction;
+	terraphim_it: boolean;
+	theme: string;
+	haystacks: HaystackForm[];
+	kg: KnowledgeGraphForm;
+	openrouter_enabled?: boolean;
+	openrouter_api_key?: string;
+	openrouter_model?: string;
+	// Auto-summarize and Chat settings
+	openrouter_auto_summarize?: boolean;
+	openrouter_chat_enabled?: boolean;
+	openrouter_chat_model?: string;
+	openrouter_chat_system_prompt?: string;
+	// Generic LLM abstraction settings (stored in Role.extra)
+	llm_provider?: string; // openrouter | ollama
+	llm_model?: string;
+	llm_base_url?: string;
+	llm_auto_summarize?: boolean;
+};
 
-  // File selection functions for Tauri
-  async function selectHaystackPath(roleIdx: number, hsIdx: number) {
-    if (!get(is_tauri)) return;
+// File selection functions for Tauri
+async function _selectHaystackPath(roleIdx: number, hsIdx: number) {
+	if (!get(is_tauri)) return;
 
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false
-      });
+	try {
+		const selected = await open({
+			directory: true,
+			multiple: false,
+		});
 
-      if (selected && typeof selected === "string") {
-        draft.update(d => {
-          d.roles[roleIdx].haystacks[hsIdx].path = selected;
-          return d;
-        });
-      }
-    } catch (err) {
-      console.error("Failed to open folder selector:", err);
-    }
-  }
+		if (selected && typeof selected === 'string') {
+			draft.update((d) => {
+				d.roles[roleIdx].haystacks[hsIdx].path = selected;
+				return d;
+			});
+		}
+	} catch (err) {
+		console.error('Failed to open folder selector:', err);
+	}
+}
 
-  async function selectKnowledgeGraphPath(roleIdx: number) {
-    if (!get(is_tauri)) return;
+async function __selectKnowledgeGraphPath(roleIdx: number) {
+	if (!get(is_tauri)) return;
 
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false
-      });
+	try {
+		const selected = await open({
+			directory: true,
+			multiple: false,
+		});
 
-      if (selected && typeof selected === "string") {
-        draft.update(d => {
-          d.roles[roleIdx].kg.local_path = selected;
-          return d;
-        });
-      }
-    } catch (err) {
-      console.error("Failed to open folder selector:", err);
-    }
-  }
+		if (selected && typeof selected === 'string') {
+			draft.update((d) => {
+				d.roles[roleIdx].kg.local_path = selected;
+				return d;
+			});
+		}
+	} catch (err) {
+		console.error('Failed to open folder selector:', err);
+	}
+}
 
-  const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
-    id: "Desktop",
-    global_shortcut: "Ctrl+X",
-    default_theme: "spacelab",
-    default_role: "Default",
-    roles: []
-  });
+const draft = writable<ConfigDraft & { roles: RoleForm[] }>({
+	id: 'Desktop',
+	global_shortcut: 'Ctrl+X',
+	default_theme: 'spacelab',
+	default_role: 'Default',
+	roles: [],
+});
 
-  // Available Bootstrap themes
-  const availableThemes = [
-    'default',
-    'darkly',
-    'cerulean',
-    'cosmo',
-    'cyborg',
-    'flatly',
-    'journal',
-    'litera',
-    'lumen',
-    'lux',
-    'materia',
-    'minty',
-    'nuclear',
-    'pulse',
-    'sandstone',
-    'simplex',
-    'slate',
-    'solar',
-    'spacelab',
-    'superhero',
-    'united',
-    'yeti'
-  ];
+// Available Bootstrap themes
+const _availableThemes = [
+	'default',
+	'darkly',
+	'cerulean',
+	'cosmo',
+	'cyborg',
+	'flatly',
+	'journal',
+	'litera',
+	'lumen',
+	'lux',
+	'materia',
+	'minty',
+	'nuclear',
+	'pulse',
+	'sandstone',
+	'simplex',
+	'slate',
+	'solar',
+	'spacelab',
+	'superhero',
+	'united',
+	'yeti',
+];
 
-  onMount(async () => {
-    try {
-      let schemaJson;
-      if (get(is_tauri)) {
-        schemaJson = await invoke("get_config_schema");
-      } else {
-        const res = await fetch("/config/schema");
-        schemaJson = await res.json();
-      }
-      schema.set(schemaJson);
-      // initialize draft from existing config
-      const current: any = get(configStore);
-      if (current && current.id) {
-        draft.update((d) => ({
-          ...d,
-          id: current.id,
-          global_shortcut: current.global_shortcut,
-          default_theme: current.roles[current.default_role]?.theme ?? "spacelab",
-          default_role: current.default_role,
-          roles: Object.values(current.roles).map((r:any)=>{
-            const autoPath = r.kg?.automata_path;
-            const url = autoPath?.Remote ?? "";
-            const localPath = r.kg?.knowledge_graph_local?.path ?? "";
-          return {
-              name: r.name,
-              shortname: r.shortname,
-              relevance_function: r.relevance_function,
-              terraphim_it: r.terraphim_it ?? false,
-              theme: r.theme,
-              haystacks: (r.haystacks ?? []).map((h:any)=>({
-                path: h.location || h.path || "", // Handle both old and new field names
-                read_only: h.read_only ?? false,
-                service: h.service || "Ripgrep",
-                atomic_server_secret: h.atomic_server_secret || "",
-                extra_parameters: h.extra_parameters || {}
-              })),
-              kg: { url, local_path: localPath, local_type: r.kg?.knowledge_graph_local?.input_type ?? "markdown", public: r.kg?.public ?? false, publish: r.kg?.publish ?? false },
-              openrouter_enabled: r.openrouter_enabled ?? false,
-              openrouter_api_key: r.openrouter_api_key ?? "",
-            openrouter_model: r.openrouter_model ?? "openai/gpt-3.5-turbo",
-            openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
-            openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
-            openrouter_chat_model: r.openrouter_chat_model ?? (r.openrouter_model ?? "openai/gpt-3.5-turbo"),
-            openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? "",
-            // Pull generic LLM settings from Role.extra if present
-            llm_provider: r.extra?.llm_provider ?? "",
-            llm_model: r.extra?.llm_model ?? "",
-            llm_base_url: r.extra?.llm_base_url ?? "",
-            llm_auto_summarize: r.extra?.llm_auto_summarize ?? false
-            };
-          })
-        }));
-      }
-    } catch (e) {
-      console.error("Failed to load schema", e);
-    }
-  });
+onMount(async () => {
+	try {
+		let schemaJson;
+		if (get(is_tauri)) {
+			schemaJson = await invoke('get_config_schema');
+		} else {
+			const res = await fetch('/config/schema');
+			schemaJson = await res.json();
+		}
+		schema.set(schemaJson);
+		// initialize draft from existing config
+		const current: any = get(configStore);
+		if (current?.id) {
+			draft.update((d) => ({
+				...d,
+				id: current.id,
+				global_shortcut: current.global_shortcut,
+				default_theme: current.roles[current.default_role]?.theme ?? 'spacelab',
+				default_role: current.default_role,
+				roles: Object.values(current.roles).map((r: any) => {
+					const autoPath = r.kg?.automata_path;
+					const url = autoPath?.Remote ?? '';
+					const localPath = r.kg?.knowledge_graph_local?.path ?? '';
+					return {
+						name: r.name,
+						shortname: r.shortname,
+						relevance_function: r.relevance_function,
+						terraphim_it: r.terraphim_it ?? false,
+						theme: r.theme,
+						haystacks: (r.haystacks ?? []).map((h: any) => ({
+							path: h.location || h.path || '', // Handle both old and new field names
+							read_only: h.read_only ?? false,
+							service: h.service || 'Ripgrep',
+							atomic_server_secret: h.atomic_server_secret || '',
+							extra_parameters: h.extra_parameters || {},
+							weight: h.weight ?? 1.0,
+						})),
+						kg: {
+							url,
+							local_path: localPath,
+							local_type: r.kg?.knowledge_graph_local?.input_type ?? 'markdown',
+							public: r.kg?.public ?? false,
+							publish: r.kg?.publish ?? false,
+						},
+						openrouter_enabled: r.openrouter_enabled ?? false,
+						openrouter_api_key: r.openrouter_api_key ?? '',
+						openrouter_model: r.openrouter_model ?? 'openai/gpt-3.5-turbo',
+						openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
+						openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
+						openrouter_chat_model:
+							r.openrouter_chat_model ?? r.openrouter_model ?? 'openai/gpt-3.5-turbo',
+						openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? '',
+						// Pull generic LLM settings from Role.extra if present
+						llm_provider: r.extra?.llm_provider ?? '',
+						llm_model: r.extra?.llm_model ?? '',
+						llm_base_url: r.extra?.llm_base_url ?? '',
+						llm_auto_summarize: r.extra?.llm_auto_summarize ?? false,
+					};
+				}),
+			}));
+		}
+	} catch (e) {
+		console.error('Failed to load schema', e);
+	}
+});
 
-// Handle ESC to close wizard and return to previous screen
+// Handle ESC to close wizard and return to _previous screen
 onMount(() => {
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      if (typeof window !== 'undefined') {
-        // Navigate back to main search screen
-        window.history.back();
-      }
-    }
-  };
-  window.addEventListener('keydown', onKeyDown);
-  return () => window.removeEventListener('keydown', onKeyDown);
+	const onKeyDown = (e: KeyboardEvent) => {
+		if (e.key === 'Escape') {
+			if (typeof window !== 'undefined') {
+				// Navigate back to main search screen
+				window.history.back();
+			}
+		}
+	};
+	window.addEventListener('keydown', onKeyDown);
+	return () => window.removeEventListener('keydown', onKeyDown);
 });
 
 // Cache of fetched LLM models per role index (UI-only)
 let roleModels: Record<number, string[]> = {};
-async function fetchLlmModels(roleIdx: number) {
-  const d = get(draft);
-  const role = d.roles[roleIdx];
-  const provider = role.llm_provider || (role.openrouter_enabled ? 'openrouter' : '');
-  const models: string[] = [];
-  try {
-    if (provider === 'ollama') {
-      const base = (role.llm_base_url || 'http://127.0.0.1:11434').replace(/\/$/, '');
-      const res = await fetch(`${base}/api/tags`);
-      const json = await res.json();
-      if (Array.isArray(json?.models)) {
-        for (const m of json.models) if (m?.name) models.push(m.name);
-      }
-    } else if (provider === 'openrouter') {
-      const apiKey = role.openrouter_api_key?.trim();
-      if (!apiKey) throw new Error('OpenRouter API key required');
-      const res = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://terraphim.ai',
-          'X-Title': 'Terraphim Desktop'
-        }
-      });
-      const json = await res.json();
-      const data = Array.isArray(json?.data) ? json.data : [];
-      for (const m of data) if (m?.id) models.push(m.id);
-    }
-  } catch (e) {
-    console.error('Failed to fetch models', e);
-  }
-  roleModels = { ...roleModels, [roleIdx]: models };
+async function _fetchLlmModels(roleIdx: number) {
+	const d = get(draft);
+	const role = d.roles[roleIdx];
+	const provider = role.llm_provider || (role.openrouter_enabled ? 'openrouter' : '');
+	const models: string[] = [];
+	try {
+		if (provider === 'ollama') {
+			const base = (role.llm_base_url || 'http://127.0.0.1:11434').replace(/\/$/, '');
+			const res = await fetch(`${base}/api/tags`);
+			const json = await res.json();
+			if (Array.isArray(json?.models)) {
+				for (const m of json.models) if (m?.name) models.push(m.name);
+			}
+		} else if (provider === 'openrouter') {
+			const apiKey = role.openrouter_api_key?.trim();
+			if (!apiKey) throw new Error('OpenRouter API key required');
+			const res = await fetch('https://openrouter.ai/api/v1/models', {
+				headers: {
+					Authorization: `Bearer ${apiKey}`,
+					'HTTP-Referer': 'https://terraphim.ai',
+					'X-Title': 'Terraphim Desktop',
+				},
+			});
+			const json = await res.json();
+			const data = Array.isArray(json?.data) ? json.data : [];
+			for (const m of data) if (m?.id) models.push(m.id);
+		}
+	} catch (e) {
+		console.error('Failed to fetch models', e);
+	}
+	roleModels = { ...roleModels, [roleIdx]: models };
 }
 
-  let currentStep = 1;
-  const totalSteps = 3;
-  let saveStatus = ''; // 'success' or 'error'
-  function next() {
-    if (currentStep < totalSteps) currentStep += 1;
-  }
-  function prev() {
-    if (currentStep > 1) currentStep -= 1;
-  }
+let currentStep = 1;
+const totalSteps = 3;
+let __saveStatus = ''; // 'success' or 'error'
+function __next() {
+	if (currentStep < totalSteps) currentStep += 1;
+}
+function __prev() {
+	if (currentStep > 1) currentStep -= 1;
+}
 
-  function addRole() {
-    draft.update((d) => ({ ...d, roles: [...d.roles, {
-      name: "New Role",
-      shortname:"new",
-      relevance_function: "title-scorer",
-      terraphim_it: false,
-      theme: "spacelab",
-      haystacks: [],
-      kg:{url:"", local_path:"", local_type:"markdown", public:false, publish:false},
-      openrouter_enabled: false,
-      openrouter_api_key: "",
-      openrouter_model: "openai/gpt-3.5-turbo",
-      openrouter_auto_summarize: false,
-      openrouter_chat_enabled: false,
-      openrouter_chat_model: "openai/gpt-3.5-turbo",
-      openrouter_chat_system_prompt: "",
-      llm_provider: "",
-      llm_model: "",
-      llm_base_url: "",
-      llm_auto_summarize: false
-    }] }));
-  }
-  function removeRole(idx: number) {
-    draft.update((d) => ({ ...d, roles: d.roles.filter((_, i) => i !== idx) }));
-  }
+function __addRole() {
+	draft.update((d) => ({
+		...d,
+		roles: [
+			...d.roles,
+			{
+				name: 'New Role',
+				shortname: 'new',
+				relevance_function: 'title-scorer',
+				terraphim_it: false,
+				theme: 'spacelab',
+				haystacks: [],
+				kg: { url: '', local_path: '', local_type: 'markdown', public: false, publish: false },
+				openrouter_enabled: false,
+				openrouter_api_key: '',
+				openrouter_model: 'openai/gpt-3.5-turbo',
+				openrouter_auto_summarize: false,
+				openrouter_chat_enabled: false,
+				openrouter_chat_model: 'openai/gpt-3.5-turbo',
+				openrouter_chat_system_prompt: '',
+				llm_provider: '',
+				llm_model: '',
+				llm_base_url: '',
+				llm_auto_summarize: false,
+			},
+		],
+	}));
+}
+function __removeRole(idx: number) {
+	draft.update((d) => ({ ...d, roles: d.roles.filter((_, i) => i !== idx) }));
+}
 
-  function addHaystack(roleIdx:number){
-    draft.update(d=>{
-      d.roles[roleIdx].haystacks.push({
-        path:"",
-        read_only:false,
-        service: "Ripgrep",
-        atomic_server_secret: "",
-        extra_parameters: {}
-      });
-      return d;
-    });
-  }
-  function removeHaystack(roleIdx:number, hsIdx:number){
-    draft.update(d=>{
-      d.roles[roleIdx].haystacks=d.roles[roleIdx].haystacks.filter((_,i)=>i!==hsIdx);
-      return d;
-    })
-  }
+function _addHaystack(roleIdx: number) {
+	draft.update((d) => {
+		d.roles[roleIdx].haystacks.push({
+			path: '',
+			read_only: false,
+			service: 'Ripgrep',
+			atomic_server_secret: '',
+			extra_parameters: {},
+			weight: 1.0,
+		});
+		return d;
+	});
+}
+function _removeHaystack(roleIdx: number, hsIdx: number) {
+	draft.update((d) => {
+		d.roles[roleIdx].haystacks = d.roles[roleIdx].haystacks.filter((_, i) => i !== hsIdx);
+		return d;
+	});
+}
 
-  // Add/remove extra parameter functions
-  function addExtraParameter(roleIdx: number, hsIdx: number, key: string = "", value: string = "") {
-    draft.update(d => {
-      if (!d.roles[roleIdx].haystacks[hsIdx].extra_parameters) {
-        d.roles[roleIdx].haystacks[hsIdx].extra_parameters = {};
-      }
-      const newKey = key || `param_${Date.now()}`;
-      d.roles[roleIdx].haystacks[hsIdx].extra_parameters[newKey] = value;
-      return d;
-    });
-  }
+// Add/remove extra parameter functions
+function _addExtraParameter(roleIdx: number, hsIdx: number, key: string = '', value: string = '') {
+	draft.update((d) => {
+		if (!d.roles[roleIdx].haystacks[hsIdx].extra_parameters) {
+			d.roles[roleIdx].haystacks[hsIdx].extra_parameters = {};
+		}
+		const newKey = key || `param_${Date.now()}`;
+		d.roles[roleIdx].haystacks[hsIdx].extra_parameters[newKey] = value;
+		return d;
+	});
+}
 
-  function removeExtraParameter(roleIdx: number, hsIdx: number, paramKey: string) {
-    draft.update(d => {
-      delete d.roles[roleIdx].haystacks[hsIdx].extra_parameters[paramKey];
-      return d;
-    });
-  }
+function _removeExtraParameter(roleIdx: number, hsIdx: number, paramKey: string) {
+	draft.update((d) => {
+		delete d.roles[roleIdx].haystacks[hsIdx].extra_parameters[paramKey];
+		return d;
+	});
+}
 
-  function updateExtraParameterKey(roleIdx: number, hsIdx: number, oldKey: string, newKey: string) {
-    draft.update(d => {
-      const params = d.roles[roleIdx].haystacks[hsIdx].extra_parameters;
-      if (params[oldKey] !== undefined && oldKey !== newKey) {
-        params[newKey] = params[oldKey];
-        delete params[oldKey];
-      }
-      return d;
-    });
-  }
+function updateExtraParameterKey(roleIdx: number, hsIdx: number, oldKey: string, newKey: string) {
+	draft.update((d) => {
+		const params = d.roles[roleIdx].haystacks[hsIdx].extra_parameters;
+		if (params[oldKey] !== undefined && oldKey !== newKey) {
+			params[newKey] = params[oldKey];
+			delete params[oldKey];
+		}
+		return d;
+	});
+}
 
-  function handleParameterKeyChange(roleIdx: number, hsIdx: number, oldKey: string, event: any) {
-    const newKey = event.target.value;
-    updateExtraParameterKey(roleIdx, hsIdx, oldKey, newKey);
-  }
+function _handleParameterKeyChange(roleIdx: number, hsIdx: number, oldKey: string, event: any) {
+	const newKey = event.target.value;
+	updateExtraParameterKey(roleIdx, hsIdx, oldKey, newKey);
+}
 
-  async function save() {
-    const data = get(draft);
-    const existing = get(configStore) as any;
-    let updated = { ...existing } as any;
-    updated.id = data.id;
-    updated.global_shortcut = data.global_shortcut;
-    updated.default_role = data.default_role;
+async function __save() {
+	const data = get(draft);
+	const existing = get(configStore) as any;
+	const updated = { ...existing } as any;
+	updated.id = data.id;
+	updated.global_shortcut = data.global_shortcut;
+	updated.default_role = data.default_role;
 
-    // rebuild roles map
-    const rolesMap: Record<string, any> = {};
-    data.roles.forEach((r) => {
-      const key = r.name;
-      // clean key by removing potential wrapping quotes
-      const cleanKey = key.replace(/^"|"$/g, "");
-      rolesMap[cleanKey] = {
-        // Preserve `extra` from existing config, or default for new roles.
-        extra: existing.roles?.[key]?.extra ?? {},
+	// rebuild roles map
+	const rolesMap: Record<string, any> = {};
+	data.roles.forEach((r) => {
+		const key = r.name;
+		// clean key by removing potential wrapping quotes
+		const cleanKey = key.replace(/^"|"$/g, '');
+		rolesMap[cleanKey] = {
+			// Preserve `extra` from existing config, or default for new roles.
+			extra: existing.roles?.[key]?.extra ?? {},
 
-        // Overwrite all other fields from the form
-        name: r.name,
-        shortname: r.shortname,
-        theme: r.theme,
-        relevance_function: r.relevance_function,
-        terraphim_it: r.terraphim_it ?? false,
-        haystacks: r.haystacks.map((h)=>({
-          location: h.path, // Use location field as expected by backend
-          service: h.service,
-          read_only: h.read_only,
-          atomic_server_secret: h.service === "Atomic" ? h.atomic_server_secret : undefined,
-          extra_parameters: h.extra_parameters || {}
-        })),
-        kg: r.kg.url || r.kg.local_path ? {
-          automata_path: r.kg.url ? { Remote: r.kg.url } : null,
-          knowledge_graph_local: r.kg.local_path ? { input_type: r.kg.local_type, path: r.kg.local_path } : null,
-          public: r.kg.public,
-          publish: r.kg.publish
-        } : null,
-        // Include OpenRouter fields if enabled
-        ...(r.openrouter_enabled && {
-          openrouter_enabled: r.openrouter_enabled,
-          openrouter_api_key: r.openrouter_api_key,
-          openrouter_model: r.openrouter_model,
-          openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
-          openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
-          openrouter_chat_model: r.openrouter_chat_model ?? r.openrouter_model,
-          openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? ""
-        })
-      };
+			// Overwrite all other fields from the form
+			name: r.name,
+			shortname: r.shortname,
+			theme: r.theme,
+			relevance_function: r.relevance_function,
+			terraphim_it: r.terraphim_it ?? false,
+			haystacks: r.haystacks.map((h) => ({
+				location: h.path, // Use location field as expected by backend
+				service: h.service,
+				read_only: h.read_only,
+				atomic_server_secret: h.service === 'Atomic' ? h.atomic_server_secret : undefined,
+				extra_parameters: h.extra_parameters || {},
+				weight: h.weight ?? 1.0,
+			})),
+			kg:
+				r.kg.url || r.kg.local_path
+					? {
+							automata_path: r.kg.url ? { Remote: r.kg.url } : null,
+							knowledge_graph_local: r.kg.local_path
+								? { input_type: r.kg.local_type, path: r.kg.local_path }
+								: null,
+							public: r.kg.public,
+							publish: r.kg.publish,
+						}
+					: null,
+			// Include OpenRouter fields if enabled
+			...(r.openrouter_enabled && {
+				openrouter_enabled: r.openrouter_enabled,
+				openrouter_api_key: r.openrouter_api_key,
+				openrouter_model: r.openrouter_model,
+				openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
+				openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
+				openrouter_chat_model: r.openrouter_chat_model ?? r.openrouter_model,
+				openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? '',
+			}),
+		};
 
-      // Merge generic LLM settings into Role.extra
-      const extraUpdates: Record<string, any> = {};
-      if (r.llm_provider) extraUpdates.llm_provider = r.llm_provider;
-      if (r.llm_model) extraUpdates.llm_model = r.llm_model;
-      if (r.llm_base_url) extraUpdates.llm_base_url = r.llm_base_url;
-      if (typeof r.llm_auto_summarize === 'boolean') extraUpdates.llm_auto_summarize = r.llm_auto_summarize;
-      rolesMap[cleanKey].extra = { ...(rolesMap[cleanKey].extra || {}), ...extraUpdates };
-    });
-    updated.roles = rolesMap;
+		// Merge generic LLM settings into Role.extra
+		const extraUpdates: Record<string, any> = {};
+		if (r.llm_provider) extraUpdates.llm_provider = r.llm_provider;
+		if (r.llm_model) extraUpdates.llm_model = r.llm_model;
+		if (r.llm_base_url) extraUpdates.llm_base_url = r.llm_base_url;
+		if (typeof r.llm_auto_summarize === 'boolean')
+			extraUpdates.llm_auto_summarize = r.llm_auto_summarize;
+		rolesMap[cleanKey].extra = { ...(rolesMap[cleanKey].extra || {}), ...extraUpdates };
+	});
+	updated.roles = rolesMap;
 
-    // ensure default role exists
-    if (!updated.default_role || !rolesMap[updated.default_role]) {
-      updated.default_role = data.roles[0]?.name ?? "Default";
-    }
-    updated.selected_role = updated.default_role;
+	// ensure default role exists
+	if (!updated.default_role || !rolesMap[updated.default_role]) {
+		updated.default_role = data.roles[0]?.name ?? 'Default';
+	}
+	updated.selected_role = updated.default_role;
 
-    try {
-      if (get(is_tauri)) {
-        await invoke("update_config", { configNew: updated });
-      } else {
-        const response = await fetch("/config", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updated),
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-      }
-      configStore.set(updated);
-      saveStatus = 'success';
-      setTimeout(() => { saveStatus = ''; }, 3000); // Clear status after 3 seconds
-    } catch (e) {
-      console.error(e);
-      saveStatus = 'error';
-      setTimeout(() => { saveStatus = ''; }, 3000); // Clear status after 3 seconds
-    }
-  }
+	try {
+		if (get(is_tauri)) {
+			await invoke('update_config', { configNew: updated });
+		} else {
+			const response = await fetch('/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(updated),
+			});
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			}
+		}
+		configStore.set(updated);
+		__saveStatus = 'success';
+		setTimeout(() => {
+			__saveStatus = '';
+		}, 3000); // Clear status after 3 seconds
+	} catch (e) {
+		console.error(e);
+		__saveStatus = 'error';
+		setTimeout(() => {
+			__saveStatus = '';
+		}, 3000); // Clear status after 3 seconds
+	}
+}
 
-  function closeWizard() {
-    if (typeof window !== 'undefined') {
-      window.history.back();
-    }
-  }
+function _closeWizard() {
+	if (typeof window !== 'undefined') {
+		window.history.back();
+	}
+}
 </script>
 
-<div class="box">
+<div class="box" data-testid="config-wizard">
   <div class="is-flex is-justify-content-space-between is-align-items-center" style="gap: .5rem;">
     <h3 class="title is-4" style="margin-bottom: 0;">Configuration Wizard</h3>
     <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
   </div>
 
-  {#if saveStatus === 'success'}
+  {#if _saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
-      <button class="delete" on:click={() => saveStatus = ''}></button>
-      Configuration saved successfully!
+      <button class="delete" on:click={() => _saveStatus = ''}></button>
+      Configuration _saved successfully!
     </div>
   {/if}
 
-  {#if saveStatus === 'error'}
+  {#if _saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
-      <button class="delete" on:click={() => saveStatus = ''}></button>
-      Failed to save configuration. Please try again.
+      <button class="delete" on:click={() => _saveStatus = ''}></button>
+      Failed to _save configuration. Please try again.
     </div>
   {/if}
   {#if currentStep === 1}
@@ -724,6 +746,24 @@ async function fetchLlmModels(roleIdx: number) {
               </label>
             </div>
 
+            <!-- Weight field -->
+            <div class="field">
+              <label class="label" for={`haystack-weight-${idx}-${hIdx}`}>Ranking Weight</label>
+              <div class="control">
+                <input
+                  class="input"
+                  id={`haystack-weight-${idx}-${hIdx}`}
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  placeholder="1.0"
+                  bind:value={$draft.roles[idx].haystacks[hIdx].weight}
+                />
+              </div>
+              <p class="help">Weight for ranking results (1.0 = normal, &gt;1.0 = higher priority, &lt;1.0 = lower priority)</p>
+            </div>
+
             <!-- Remove haystack button -->
             <div class="field">
               <button class="button is-small is-danger" data-testid="remove-haystack-{idx}-{hIdx}" on:click={() => removeHaystack(idx, hIdx)}>
@@ -757,7 +797,7 @@ async function fetchLlmModels(roleIdx: number) {
             <div class="control">
               <input class="input" id={`llm-model-${idx}`} type="text" placeholder="llama3.1" bind:value={$draft.roles[idx].llm_model} />
             </div>
-            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            <button class="button is-small" on:click={() => _fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
                                         <select on:change={(e)=>{$draft.roles[idx].llm_model=e.currentTarget.value}}>
@@ -812,7 +852,7 @@ async function fetchLlmModels(roleIdx: number) {
             <div class="control">
               <input class="input" id={`openrouter-model-${idx}`} type="text" placeholder="openai/gpt-4-turbo" bind:value={$draft.roles[idx].openrouter_model} />
             </div>
-            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            <button class="button is-small" on:click={() => _fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
                                         <select on:change={(e)=>{$draft.roles[idx].openrouter_model=e.currentTarget.value}}>
@@ -882,7 +922,7 @@ async function fetchLlmModels(roleIdx: number) {
               placeholder="/path/to/markdown"
               bind:value={$draft.roles[idx].kg.local_path}
               readonly={$is_tauri}
-              on:click={$is_tauri ? () => selectKnowledgeGraphPath(idx) : undefined}
+              on:click={$is_tauri ? () => __selectKnowledgeGraphPath(idx) : undefined}
             />
             {#if $is_tauri}
               <p class="help">Click to select directory</p>
@@ -911,10 +951,10 @@ async function fetchLlmModels(roleIdx: number) {
           </label>
         </div>
         <hr />
-        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => removeRole(idx)}>Remove Role</button>
+        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => __removeRole(idx)}>Remove Role</button>
       </div>
     {/each}
-    <button class="button is-link is-light" data-testid="add-role" on:click={addRole}>Add Role</button>
+    <button class="button is-link is-light" data-testid="add-role" on:click={__addRole}>Add Role</button>
   {:else}
     <h4 class="title is-5">Review</h4>
     <div class="content">
@@ -943,14 +983,14 @@ async function fetchLlmModels(roleIdx: number) {
   <nav class="level">
     <div class="level-left">
       {#if currentStep > 1}
-        <button class="button" data-testid="wizard-back" on:click={prev}>Back</button>
+        <button class="button" data-testid="wizard-back" on:click={__prev}>Back</button>
       {/if}
     </div>
     <div class="level-right">
       {#if currentStep < totalSteps}
-        <button class="button is-primary" data-testid="wizard-next" on:click={next}>Next</button>
+        <button class="button is-primary" data-testid="wizard-_next" on:click={__next}>Next</button>
       {:else}
-        <button class="button is-success" data-testid="wizard-save" on:click={save}>Save</button>
+        <button class="button is-success" data-testid="wizard-_save" on:click={__save}>Save</button>
       {/if}
     </div>
   </nav>

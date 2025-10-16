@@ -1,600 +1,614 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { Field, Input, Taglist, Tag } from "svelma";
-  import { input, is_tauri, role, roles, serverUrl } from "../stores";
-  import ResultItem from "./ResultItem.svelte";
-  import type { Document, SearchResponse } from "./SearchResult";
-  import logo from "/assets/terraphim_gray.png";
-  import { thesaurus,typeahead } from "../stores";
-  import { parseSearchInput, buildSearchQuery } from "./searchUtils";
-  import TermChip from "./TermChip.svelte";
-
-  let results: Document[] = [];
-  let error: string | null = null;
-  let suggestions: string[] = [];
-  let suggestionIndex = -1;
-
-  // SSE streaming for summarization updates
-  let sseConnection: EventSource | null = null;
-  let summarizationTaskIds: string[] = [];
-  let taskStatuses: Map<string, any> = new Map();
-
-  // Term chips state
-  interface SelectedTerm {
-    value: string;
-    isFromKG: boolean;
-  }
-  let selectedTerms: SelectedTerm[] = [];
-  let currentLogicalOperator: 'AND' | 'OR' | null = null;
-
-  $: thesaurusEntries = Object.entries($thesaurus);
-
-  // State to prevent circular updates
-  let isUpdatingFromChips = false;
-
-  // --- Persistence helpers ---
-  function searchStateKey(): string {
-    return `terraphim:searchState:${$role}`;
-  }
-
-  function loadSearchState() {
-    try {
-      if (typeof window === 'undefined') return;
-      const raw = localStorage.getItem(searchStateKey());
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (typeof data.input === 'string') {
-        $input = data.input;
-      }
-      if (Array.isArray(data.results)) {
-        results = data.results;
-      }
-    } catch (e) {
-      console.warn('Failed to load search state:', e);
-    }
-  }
-
-  function saveSearchState() {
-    try {
-      if (typeof window === 'undefined') return;
-      const data = { input: $input, results };
-      localStorage.setItem(searchStateKey(), JSON.stringify(data));
-    } catch (e) {
-      console.warn('Failed to save search state:', e);
-    }
-  }
-
-  // Reactive statement to parse input and update chips when user types
-  // Only parse when input contains operators to avoid constant parsing
-  // Add a small delay to prevent aggressive parsing during autocomplete
-  let parseTimeout: number | null = null;
-  $: if ($input && !isUpdatingFromChips && ($input.includes(' AND ') || $input.includes(' OR ') || $input.includes(' and ') || $input.includes(' or '))) {
-    if (parseTimeout) {
-      clearTimeout(parseTimeout);
-    }
-    parseTimeout = setTimeout(() => {
-      parseAndUpdateChips($input);
-      parseTimeout = null;
-    }, 300); // 300ms delay to allow for multiple autocomplete selections
-  }
-
-  // Hydrate previous state on mount
-  onMount(() => {
-    loadSearchState();
-  });
-
-  // Clean up timeout, SSE connection, and polling on component destruction
-  onDestroy(() => {
-    if (parseTimeout) {
-      clearTimeout(parseTimeout);
-    }
-    if (sseConnection) {
-      sseConnection.close();
-      sseConnection = null;
-    }
-    stopPollingForSummaries();
-  });
-
-
-  // SSE connection management
-  function startSummarizationStreaming() {
-    if ($is_tauri) {
-      // For Tauri, use polling instead of SSE
-      startPollingForSummaries();
-      return;
-    }
-
-    if (sseConnection) {
-      sseConnection.close();
-    }
-
-    const baseUrl = $serverUrl.replace('/documents/search', '');
-    const sseUrl = `${baseUrl}/summarization/stream`;
-
-    try {
-      sseConnection = new EventSource(sseUrl);
-
-      sseConnection.onopen = () => {
-        console.log('SSE connection opened for summarization updates');
-      };
-
-      sseConnection.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('SSE received:', data);
-
-          if (data.task_id && data.status === 'completed' && data.summary) {
-            // Update the corresponding document with the completed summary
-            updateDocumentSummary(data.task_id, data.summary);
-          }
-        } catch (error) {
-          console.warn('Failed to parse SSE message:', error);
-        }
-      };
-
-      sseConnection.onerror = (error) => {
-        console.warn('SSE connection error:', error);
-        // Auto-reconnect after a delay
-        setTimeout(() => {
-          if (sseConnection) {
-            startSummarizationStreaming();
-          }
-        }, 5000);
-      };
-    } catch (error) {
-      console.error('Failed to create SSE connection:', error);
-    }
-  }
-
-  // Polling fallback for Tauri (since EventSource isn't supported)
-  let pollingInterval: number | null = null;
-
-  function startPollingForSummaries() {
-    console.log('Starting polling for summary updates (Tauri mode)');
-
-    // Stop any existing polling
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-    }
-
-    // Poll every 2 seconds for summary updates
-    pollingInterval = setInterval(async () => {
-      if (results.length === 0) return;
-
-      try {
-        // Re-search to get updated documents with summaries
-        const searchQuery = buildSearchQueryFromInput();
-        if (!searchQuery) return;
-
-        const response: SearchResponse = await invoke("search", {
-          searchQuery,
-        });
-
-        if (response.status === "success") {
-          // Update results with any new summaries
-          const updatedResults = response.results;
-
-          // Check if any documents now have summaries that didn't before
-          let hasUpdates = false;
-          for (let i = 0; i < Math.min(results.length, updatedResults.length); i++) {
-            if (!results[i].summarization && updatedResults[i].summarization) {
-              hasUpdates = true;
-              console.log(`New AI summary found for document: ${updatedResults[i].title}`);
-            }
-          }
-
-          if (hasUpdates) {
-            results = updatedResults;
-            console.log('Updated results with new AI summaries');
-            saveSearchState();
-          }
-
-          // Stop polling if all documents that need summaries have them
-          const documentsNeedingSummaries = results.filter(doc =>
-            !doc.summarization && doc.body && doc.body.length > 500
-          );
-
-          if (documentsNeedingSummaries.length === 0) {
-            console.log('All summaries complete, stopping polling');
-            stopPollingForSummaries();
-          }
-        }
-      } catch (error) {
-        console.error('Error during summary polling:', error);
-      }
-    }, 2000); // Poll every 2 seconds
-
-    // Auto-stop polling after 30 seconds to prevent infinite polling
-    setTimeout(() => {
-      if (pollingInterval) {
-        console.log('Stopping summary polling after timeout');
-        stopPollingForSummaries();
-      }
-    }, 30000);
-  }
-
-  function stopPollingForSummaries() {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
-    }
-  }
-
-  function updateDocumentSummary(taskId: string, summary: string) {
-    // Find and update the document with the completed summary
-    results = results.map(doc => {
-      // Update document that doesn't have a summarization yet
-      if (!doc.summarization && doc.body && doc.body.length > 500) {
-        return { ...doc, summarization: summary };
-      }
-      return doc;
-    });
-    console.log(`Updated document summary for task ${taskId}:`, summary);
-    saveSearchState();
-  }
-
-  // Function to parse input and update chips
-  function parseAndUpdateChips(inputText: string) {
-    const parsed = parseSearchInput(inputText);
-
-    if (parsed.hasOperator && parsed.terms.length > 1) {
-      const newSelectedTerms = parsed.terms.map(term => {
-        const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
-        return { value: term, isFromKG };
-      });
-
-      // Only update if the terms have actually changed
-      const currentTermValues = selectedTerms.map(t => t.value);
-      const newTermValues = newSelectedTerms.map(t => t.value);
-
-      if (JSON.stringify(currentTermValues) !== JSON.stringify(newTermValues) ||
-          currentLogicalOperator !== parsed.operator) {
-        selectedTerms = newSelectedTerms;
-        currentLogicalOperator = parsed.operator;
-      }
-    } else if (parsed.terms.length === 1 && selectedTerms.length > 0) {
-      // Single term - clear chips if they exist
-      selectedTerms = [];
-      currentLogicalOperator = null;
-    } else if (parsed.terms.length === 0) {
-      // Empty input - clear everything
-      selectedTerms = [];
-      currentLogicalOperator = null;
-    }
-  }
-
-  // Helper function to get term suggestions for autocomplete
-  async function getTermSuggestions(query: string): Promise<string[]> {
-    try {
-      if ($is_tauri) {
-        const response: any = await invoke("get_autocomplete_suggestions", {
-          query: query,
-          roleName: $role,
-          limit: 8
-        });
-
-        if (response.status === 'success' && response.suggestions) {
-          return response.suggestions.map((suggestion: any) => suggestion.term);
-        }
-      } else {
-        const response = await fetch(`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(query)}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'success' && data.suggestions) {
-            return data.suggestions.map((suggestion: any) => suggestion.term);
-          }
-        }
-      }
-
-      // Fallback to thesaurus matching
-      return thesaurusEntries
-        .filter(([key]) => key.toLowerCase().includes(query.toLowerCase()))
-        .map(([key]) => key)
-        .slice(0, 8);
-    } catch (error) {
-      console.warn('Error fetching term suggestions:', error);
-      return [];
-    }
-  }
-
-  async function getSuggestions(value: string): Promise<string[]> {
-    const inputValue = value.trim();
-    const inputLength = inputValue.length;
-
-    // Return empty suggestions for very short inputs
-    if (inputLength === 0) {
-      return [];
-    }
-
-    // Parse the input to detect operators and terms
-    const parsed = parseSearchInput(inputValue);
-    const words = inputValue.split(/\s+/);
-    const lastWord = words[words.length - 1].toLowerCase();
-
-
-    // If we have operators in the input, prioritize term suggestions after operators
-    if (parsed.hasOperator && parsed.terms.length > 0) {
-      // Get the last term (what user is currently typing)
-      const currentTerm = parsed.terms[parsed.terms.length - 1];
-      if (currentTerm && currentTerm.length >= 2) {
-        return getTermSuggestions(currentTerm);
-      }
-      return [];
-    }
-
-    // If the last word is a partial "and" or "or", suggest these operators
-    if (words.length > 1) {
-      const operatorSuggestions = [];
-      if ("and".startsWith(lastWord)) {
-        operatorSuggestions.push("AND");
-      }
-      if ("or".startsWith(lastWord)) {
-        operatorSuggestions.push("OR");
-      }
-      if (operatorSuggestions.length > 0) {
-        return operatorSuggestions;
-      }
-    }
-
-    // If the input ends with "AND" or "OR", suggest terms but don't include operators
-    const inputLower = inputValue.toLowerCase();
-    if (inputLower.includes(" and ") || inputLower.includes(" or ") ||
-        inputLower.includes(" AND ") || inputLower.includes(" OR ")) {
-      // For multi-term queries, only suggest terms after the operator
-      const termAfterOperator = lastWord;
-      if (termAfterOperator.length < 2) {
-        return [];
-      }
-      return getTermSuggestions(termAfterOperator);
-    }
-
-    // Regular single-term autocomplete with enhanced operator suggestions
-    try {
-      const termSuggestions = await getTermSuggestions(inputValue);
-
-      // Return only term suggestions (no operators in autocomplete)
-      return termSuggestions.slice(0, 7);
-    } catch (error) {
-      console.warn('Error fetching autocomplete suggestions:', error);
-      // Fall back to thesaurus-based matching
-      const termSuggestions = thesaurusEntries
-        .filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
-        .map(([key]) => key)
-        .slice(0, 5);
-
-      // Return only term suggestions (no operators in autocomplete)
-      return termSuggestions.slice(0, 7);
-    }
-  }
-
-  async function updateSuggestions(event: Event) {
-    const inputElement = event.target as HTMLInputElement | null;
-    if (!inputElement || inputElement.selectionStart == null) {
-      return;
-    }
-    const cursorPosition = inputElement.selectionStart;
-    const textBeforeCursor = $input.slice(0, cursorPosition);
-    const words = textBeforeCursor.split(/\s+/);
-    const currentWord = words[words.length - 1];
-
-    // Check if user is typing an operator
-    if (currentWord.toLowerCase() === 'a' || currentWord.toLowerCase() === 'an') {
-      suggestions = ['AND'];
-    } else if (currentWord.toLowerCase() === 'o' || currentWord.toLowerCase() === 'or') {
-      suggestions = ['OR'];
-    } else if (currentWord.length >= 2) {
-      // Get term suggestions for longer words
-      try {
-        const termSuggestions = await getSuggestions(currentWord);
-
-        // Return only term suggestions (no operators in autocomplete)
-        suggestions = termSuggestions;
-      } catch (error) {
-        console.warn('Failed to get suggestions:', error);
-        suggestions = [];
-      }
-    } else {
-      suggestions = [];
-    }
-    suggestionIndex = -1;
-  }
-
-  function handleKeydown(event: KeyboardEvent) {
-    if (suggestions.length > 0) {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        suggestionIndex = (suggestionIndex + 1) % suggestions.length;
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
-      } else if ((event.key === "Enter" || event.key === "Tab") && suggestionIndex !== -1) {
-        event.preventDefault();
-        applySuggestion(suggestions[suggestionIndex]);
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        suggestions = [];
-        suggestionIndex = -1;
-      }
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      parseAndSearch();
-    }
-  }
-
-  // Combined function to parse input into chips and then search
-  function parseAndSearch() {
-    // Force parsing of the current input
-    parseAndUpdateChips($input);
-    // Then perform search
-    handleSearchInputEvent();
-  }
-
-  function applySuggestion(suggestion: string) {
-    if (suggestion === 'AND' || suggestion === 'OR') {
-      // If it's an operator, set it for the next term
-      currentLogicalOperator = suggestion as 'AND' | 'OR';
-
-      // Parse current input to add current term if not already added
-      const parsed = parseSearchInput($input);
-      if (parsed.terms.length > 0 && !selectedTerms.some(t => t.value === parsed.terms[parsed.terms.length - 1])) {
-        addSelectedTerm(parsed.terms[parsed.terms.length - 1]);
-      }
-
-      $input = $input + ` ${suggestion} `;
-    } else {
-      // It's a term suggestion - replace the current partial term
-      const words = $input.trim().split(/\s+/);
-      const lastWord = words[words.length - 1];
-
-      // If the last word is a partial match for the suggestion, replace it
-      if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
-        // Replace the last word with the full suggestion
-        words[words.length - 1] = suggestion;
-        $input = words.join(' ');
-
-        // Don't immediately parse - let the user continue typing
-        // The reactive statement will handle parsing with a delay when operators are present
-      } else {
-        // If no partial match, add as new term
-        addSelectedTerm(suggestion, currentLogicalOperator);
-      }
-    }
-
-    suggestions = [];
-    suggestionIndex = -1;
-  }
-
-  // Create SearchQuery using shared utilities
-  function buildSearchQueryFromInput(): any {
-    const inputText = $input.trim();
-    if (!inputText) return null;
-
-    // Use parseSearchInput to detect operators in text
-    const parsed = parseSearchInput(inputText);
-    const searchQuery = buildSearchQuery(parsed, $role);
-
-    return {
-      ...searchQuery,
-      skip: 0,
-      limit: 10,
-    };
-  }
-
-  // Term chips management
-  function addSelectedTerm(term: string, operator: 'AND' | 'OR' | null = null) {
-    // Check if term is from thesaurus (KG)
-    const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
-
-    // Don't add if already selected
-    if (selectedTerms.some(t => t.value.toLowerCase() === term.toLowerCase())) {
-      return;
-    }
-
-    selectedTerms = [...selectedTerms, { value: term, isFromKG }];
-
-    if (operator && selectedTerms.length > 1) {
-      currentLogicalOperator = operator;
-    }
-
-    // Update the input to show the structured query
-    updateInputFromSelectedTerms();
-    saveSearchState();
-  }
-
-  function removeSelectedTerm(term: string) {
-    selectedTerms = selectedTerms.filter(t => t.value !== term);
-    updateInputFromSelectedTerms();
-    saveSearchState();
-  }
-
-  function updateInputFromSelectedTerms() {
-    isUpdatingFromChips = true;
-
-    if (selectedTerms.length === 0) {
-      $input = '';
-      currentLogicalOperator = null;
-    } else if (selectedTerms.length === 1) {
-      $input = selectedTerms[0].value;
-      currentLogicalOperator = null;
-    } else {
-      const operator = currentLogicalOperator || 'AND';
-      $input = selectedTerms.map(t => t.value).join(` ${operator} `);
-    }
-
-    // Reset the flag after a brief delay to allow reactivity to settle
-    setTimeout(() => {
-      isUpdatingFromChips = false;
-    }, 10);
-  }
-
-  function clearSelectedTerms() {
-    selectedTerms = [];
-    currentLogicalOperator = null;
-    $input = '';
-    saveSearchState();
-  }
-
-  async function handleSearchInputEvent() {
-    error = null; // Clear previous errors
-
-    if ($is_tauri) {
-      if (!$input.trim()) return; // Skip if input is empty
-
-      try {
-        const searchQuery = buildSearchQueryFromInput();
-        if (!searchQuery) return;
-
-        const response: SearchResponse = await invoke("search", {
-          searchQuery,
-        });
-        if (response.status === "success") {
-          results = response.results;
-          console.log("Response results");
-          console.log(results);
-          saveSearchState();
-          // Start SSE streaming for summarization updates (Tauri doesn't support SSE)
-          // SSE will be available when using web interface
-        } else {
-          error = `Search failed: ${response.status}`;
-          console.error("Search failed:", response);
-        }
-      } catch (e) {
-        error = `Error in Tauri search: ${e}`;
-        console.error("Error in Tauri search:", e);
-      }
-    } else {
-      if (!$input.trim()) return; // Skip if input is empty
-
-      const searchQuery = buildSearchQueryFromInput();
-      if (!searchQuery) return;
-
-      const json_body = JSON.stringify(searchQuery);
-
-      try {
-        const response = await fetch($serverUrl, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: json_body,
-        });
-        const data: SearchResponse = await response.json();
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        results = data.results;
-        saveSearchState();
-
-        // Start SSE streaming for real-time summarization updates
-        startSummarizationStreaming();
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        error = `Error fetching data: ${err}`;
-      }
-    }
-  }
+import { invoke } from '@tauri-apps/api/tauri';
+import { onDestroy, onMount } from 'svelte';
+import type { Document, SearchResponse } from './SearchResult';
+import { buildSearchQuery, parseSearchInput } from './searchUtils';
+import { Field, Input, Tag, Taglist } from 'svelma';
+import { input, typeahead, role, serverUrl, is_tauri, thesaurus } from '$lib/stores';
+import ResultItem from './ResultItem.svelte';
+import logo from '/assets/terraphim.png';
+
+let results: Document[] = [];
+let _error: string | null = null;
+let suggestions: string[] = [];
+let suggestionIndex = -1;
+
+// SSE streaming for summarization updates
+let sseConnection: EventSource | null = null;
+const _summarizationTaskIds: string[] = [];
+const _taskStatuses: Map<string, any> = new Map();
+
+// Term chips state
+interface SelectedTerm {
+	value: string;
+	isFromKG: boolean;
+}
+let selectedTerms: SelectedTerm[] = [];
+let currentLogicalOperator: 'AND' | 'OR' | null = null;
+
+$: thesaurusEntries = Object.entries($thesaurus);
+
+// State to prevent circular updates
+let isUpdatingFromChips = false;
+
+// --- Persistence helpers ---
+function searchStateKey(): string {
+	return `terraphim:searchState:${$role}`;
+}
+
+function loadSearchState() {
+	try {
+		if (typeof window === 'undefined') return;
+		const raw = localStorage.getItem(searchStateKey());
+		if (!raw) return;
+		const data = JSON.parse(raw);
+		if (typeof data.input === 'string') {
+			$input = data.input;
+		}
+		if (Array.isArray(data.results)) {
+			results = data.results;
+		}
+	} catch (e) {
+		console.warn('Failed to load search state:', e);
+	}
+}
+
+function saveSearchState() {
+	try {
+		if (typeof window === 'undefined') return;
+		const data = { input: $input, results };
+		localStorage.setItem(searchStateKey(), JSON.stringify(data));
+	} catch (e) {
+		console.warn('Failed to save search state:', e);
+	}
+}
+
+// Reactive statement to parse input and update chips when user types
+// Only parse when input contains operators to avoid constant parsing
+// Add a small delay to prevent aggressive parsing during autocomplete
+let parseTimeout: ReturnType<typeof setTimeout> | null = null;
+$: if (
+	$input &&
+	!isUpdatingFromChips &&
+	($input.includes(' AND ') ||
+		$input.includes(' OR ') ||
+		$input.includes(' and ') ||
+		$input.includes(' or '))
+) {
+	if (parseTimeout) {
+		clearTimeout(parseTimeout);
+	}
+	parseTimeout = setTimeout(() => {
+		parseAndUpdateChips($input);
+		parseTimeout = null;
+	}, 300); // 300ms delay to allow for multiple autocomplete selections
+}
+
+// Hydrate previous state on mount
+onMount(() => {
+	loadSearchState();
+});
+
+// Clean up timeout, SSE connection, and polling on component destruction
+onDestroy(() => {
+	if (parseTimeout) {
+		clearTimeout(parseTimeout);
+	}
+	if (sseConnection) {
+		sseConnection.close();
+		sseConnection = null;
+	}
+	stopPollingForSummaries();
+});
+
+// SSE connection management
+function startSummarizationStreaming() {
+	if ($is_tauri) {
+		// For Tauri, use polling instead of SSE
+		startPollingForSummaries();
+		return;
+	}
+
+	if (sseConnection) {
+		sseConnection.close();
+	}
+
+	const baseUrl = $serverUrl.replace('/documents/search', '');
+	const sseUrl = `${baseUrl}/summarization/stream`;
+
+	try {
+		sseConnection = new EventSource(sseUrl);
+
+		sseConnection.onopen = () => {
+			console.log('SSE connection opened for summarization updates');
+		};
+
+		sseConnection.onmessage = (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				console.log('SSE received:', data);
+
+				if (data.task_id && data.status === 'completed' && data.summary) {
+					// Update the corresponding document with the completed summary
+					updateDocumentSummary(data.task_id, data.summary);
+				}
+			} catch (error) {
+				console.warn('Failed to parse SSE message:', error);
+			}
+		};
+
+		sseConnection.onerror = (error) => {
+			console.warn('SSE connection error:', error);
+			// Auto-reconnect after a delay
+			setTimeout(() => {
+				if (sseConnection) {
+					startSummarizationStreaming();
+				}
+			}, 5000);
+		};
+	} catch (error) {
+		console.error('Failed to create SSE connection:', error);
+	}
+}
+
+// Polling fallback for Tauri (since EventSource isn't supported)
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
+function startPollingForSummaries() {
+	console.log('Starting polling for summary updates (Tauri mode)');
+
+	// Stop any existing polling
+	if (pollingInterval) {
+		clearInterval(pollingInterval);
+	}
+
+	// Poll every 2 seconds for summary updates
+	pollingInterval = setInterval(async () => {
+		if (results.length === 0) return;
+
+		try {
+			// Re-search to get updated documents with summaries
+			const searchQuery = buildSearchQueryFromInput();
+			if (!searchQuery) return;
+
+			const response: SearchResponse = await invoke('search', {
+				searchQuery,
+			});
+
+			if (response.status === 'success') {
+				// Update results with any new summaries
+				const updatedResults = response.results;
+
+				// Check if any documents now have summaries that didn't before
+				let hasUpdates = false;
+				for (let i = 0; i < Math.min(results.length, updatedResults.length); i++) {
+					if (!results[i].summarization && updatedResults[i].summarization) {
+						hasUpdates = true;
+						console.log(`New AI summary found for document: ${updatedResults[i].title}`);
+					}
+				}
+
+				if (hasUpdates) {
+					results = updatedResults;
+					console.log('Updated results with new AI summaries');
+					saveSearchState();
+				}
+
+				// Stop polling if all documents that need summaries have them
+				const documentsNeedingSummaries = results.filter(
+					(doc) => !doc.summarization && doc.body && doc.body.length > 500
+				);
+
+				if (documentsNeedingSummaries.length === 0) {
+					console.log('All summaries complete, stopping polling');
+					stopPollingForSummaries();
+				}
+			}
+		} catch (error) {
+			console.error('Error during summary polling:', error);
+		}
+	}, 2000); // Poll every 2 seconds
+
+	// Auto-stop polling after 30 seconds to prevent infinite polling
+	setTimeout(() => {
+		if (pollingInterval) {
+			console.log('Stopping summary polling after timeout');
+			stopPollingForSummaries();
+		}
+	}, 30000);
+}
+
+function stopPollingForSummaries() {
+	if (pollingInterval) {
+		clearInterval(pollingInterval);
+		pollingInterval = null;
+	}
+}
+
+function updateDocumentSummary(taskId: string, summary: string) {
+	// Find and update the document with the completed summary
+	results = results.map((doc) => {
+		// Update document that doesn't have a summarization yet
+		if (!doc.summarization && doc.body && doc.body.length > 500) {
+			return { ...doc, summarization: summary };
+		}
+		return doc;
+	});
+	console.log(`Updated document summary for task ${taskId}:`, summary);
+	saveSearchState();
+}
+
+// Function to parse input and update chips
+function parseAndUpdateChips(inputText: string) {
+	const parsed = parseSearchInput(inputText);
+
+	if (parsed.hasOperator && parsed.terms.length > 1) {
+		const newSelectedTerms = parsed.terms.map((term) => {
+			const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
+			return { value: term, isFromKG };
+		});
+
+		// Only update if the terms have actually changed
+		const currentTermValues = selectedTerms.map((t) => t.value);
+		const newTermValues = newSelectedTerms.map((t) => t.value);
+
+		if (
+			JSON.stringify(currentTermValues) !== JSON.stringify(newTermValues) ||
+			currentLogicalOperator !== parsed.operator
+		) {
+			selectedTerms = newSelectedTerms;
+			currentLogicalOperator = parsed.operator;
+		}
+	} else if (parsed.terms.length === 1 && selectedTerms.length > 0) {
+		// Single term - clear chips if they exist
+		selectedTerms = [];
+		currentLogicalOperator = null;
+	} else if (parsed.terms.length === 0) {
+		// Empty input - clear everything
+		selectedTerms = [];
+		currentLogicalOperator = null;
+	}
+}
+
+// Helper function to get term suggestions for autocomplete
+async function getTermSuggestions(query: string): Promise<string[]> {
+	try {
+		if ($is_tauri) {
+			const response: any = await invoke('get_autocomplete_suggestions', {
+				query: query,
+				roleName: $role,
+				limit: 8,
+			});
+
+			if (response.status === 'success' && response.suggestions) {
+				return response.suggestions.map((suggestion: any) => suggestion.term);
+			}
+		} else {
+			const response = await fetch(
+				`${$serverUrl.replace('/documents/search', '')}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(query)}`
+			);
+			if (response.ok) {
+				const data = await response.json();
+				if (data.status === 'success' && data.suggestions) {
+					return data.suggestions.map((suggestion: any) => suggestion.term);
+				}
+			}
+		}
+
+		// Fallback to thesaurus matching
+		return thesaurusEntries
+			.filter(([key]) => key.toLowerCase().includes(query.toLowerCase()))
+			.map(([key]) => key)
+			.slice(0, 8);
+	} catch (error) {
+		console.warn('Error fetching term suggestions:', error);
+		return [];
+	}
+}
+
+async function getSuggestions(value: string): Promise<string[]> {
+	const inputValue = value.trim();
+	const inputLength = inputValue.length;
+
+	// Return empty suggestions for very short inputs
+	if (inputLength === 0) {
+		return [];
+	}
+
+	// Parse the input to detect operators and terms
+	const parsed = parseSearchInput(inputValue);
+	const words = inputValue.split(/\s+/);
+	const lastWord = words[words.length - 1].toLowerCase();
+
+	// If we have operators in the input, prioritize term suggestions after operators
+	if (parsed.hasOperator && parsed.terms.length > 0) {
+		// Get the last term (what user is currently typing)
+		const currentTerm = parsed.terms[parsed.terms.length - 1];
+		if (currentTerm && currentTerm.length >= 2) {
+			return getTermSuggestions(currentTerm);
+		}
+		return [];
+	}
+
+	// If the last word is a partial "and" or "or", suggest these operators
+	if (words.length > 1) {
+		const operatorSuggestions = [];
+		if ('and'.startsWith(lastWord)) {
+			operatorSuggestions.push('AND');
+		}
+		if ('or'.startsWith(lastWord)) {
+			operatorSuggestions.push('OR');
+		}
+		if (operatorSuggestions.length > 0) {
+			return operatorSuggestions;
+		}
+	}
+
+	// If the input ends with "AND" or "OR", suggest terms but don't include operators
+	const inputLower = inputValue.toLowerCase();
+	if (
+		inputLower.includes(' and ') ||
+		inputLower.includes(' or ') ||
+		inputLower.includes(' AND ') ||
+		inputLower.includes(' OR ')
+	) {
+		// For multi-term queries, only suggest terms after the operator
+		const termAfterOperator = lastWord;
+		if (termAfterOperator.length < 2) {
+			return [];
+		}
+		return getTermSuggestions(termAfterOperator);
+	}
+
+	// Regular single-term autocomplete with enhanced operator suggestions
+	try {
+		const termSuggestions = await getTermSuggestions(inputValue);
+
+		// Return only term suggestions (no operators in autocomplete)
+		return termSuggestions.slice(0, 7);
+	} catch (error) {
+		console.warn('Error fetching autocomplete suggestions:', error);
+		// Fall back to thesaurus-based matching
+		const termSuggestions = thesaurusEntries
+			.filter(([key]) => key.toLowerCase().includes(inputValue.toLowerCase()))
+			.map(([key]) => key)
+			.slice(0, 5);
+
+		// Return only term suggestions (no operators in autocomplete)
+		return termSuggestions.slice(0, 7);
+	}
+}
+
+async function _updateSuggestions(event: Event) {
+	const inputElement = event.target as HTMLInputElement | null;
+	if (!inputElement || inputElement.selectionStart == null) {
+		return;
+	}
+	const cursorPosition = inputElement.selectionStart;
+	const textBeforeCursor = $input.slice(0, cursorPosition);
+	const words = textBeforeCursor.split(/\s+/);
+	const currentWord = words[words.length - 1];
+
+	// Check if user is typing an operator
+	if (currentWord.toLowerCase() === 'a' || currentWord.toLowerCase() === 'an') {
+		suggestions = ['AND'];
+	} else if (currentWord.toLowerCase() === 'o' || currentWord.toLowerCase() === 'or') {
+		suggestions = ['OR'];
+	} else if (currentWord.length >= 2) {
+		// Get term suggestions for longer words
+		try {
+			const termSuggestions = await getSuggestions(currentWord);
+
+			// Return only term suggestions (no operators in autocomplete)
+			suggestions = termSuggestions;
+		} catch (error) {
+			console.warn('Failed to get suggestions:', error);
+			suggestions = [];
+		}
+	} else {
+		suggestions = [];
+	}
+	suggestionIndex = -1;
+}
+
+function _handleKeydown(event: KeyboardEvent) {
+	if (suggestions.length > 0) {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			suggestionIndex = (suggestionIndex - 1 + suggestions.length) % suggestions.length;
+		} else if ((event.key === 'Enter' || event.key === 'Tab') && suggestionIndex !== -1) {
+			event.preventDefault();
+			applySuggestion(suggestions[suggestionIndex]);
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			suggestions = [];
+			suggestionIndex = -1;
+		}
+	} else if (event.key === 'Enter') {
+		event.preventDefault();
+		parseAndSearch();
+	}
+}
+
+// Combined function to parse input into chips and then search
+function parseAndSearch() {
+	// Force parsing of the current input
+	parseAndUpdateChips($input);
+	// Then perform search
+	handleSearchInputEvent();
+}
+
+function applySuggestion(suggestion: string) {
+	if (suggestion === 'AND' || suggestion === 'OR') {
+		// If it's an operator, set it for the next term
+		currentLogicalOperator = suggestion as 'AND' | 'OR';
+
+		// Parse current input to add current term if not already added
+		const parsed = parseSearchInput($input);
+		if (
+			parsed.terms.length > 0 &&
+			!selectedTerms.some((t) => t.value === parsed.terms[parsed.terms.length - 1])
+		) {
+			addSelectedTerm(parsed.terms[parsed.terms.length - 1]);
+		}
+
+		$input = `${$input} ${suggestion} `;
+	} else {
+		// It's a term suggestion - replace the current partial term
+		const words = $input.trim().split(/\s+/);
+		const lastWord = words[words.length - 1];
+
+		// If the last word is a partial match for the suggestion, replace it
+		if (suggestion.toLowerCase().startsWith(lastWord.toLowerCase())) {
+			// Replace the last word with the full suggestion
+			words[words.length - 1] = suggestion;
+			$input = words.join(' ');
+
+			// Don't immediately parse - let the user continue typing
+			// The reactive statement will handle parsing with a delay when operators are present
+		} else {
+			// If no partial match, add as new term
+			addSelectedTerm(suggestion, currentLogicalOperator);
+		}
+	}
+
+	suggestions = [];
+	suggestionIndex = -1;
+}
+
+// Create SearchQuery using shared utilities
+function buildSearchQueryFromInput(): any {
+	const inputText = $input.trim();
+	if (!inputText) return null;
+
+	// Use parseSearchInput to detect operators in text
+	const parsed = parseSearchInput(inputText);
+	const searchQuery = buildSearchQuery(parsed, $role);
+
+	return {
+		...searchQuery,
+		skip: 0,
+		limit: 10,
+	};
+}
+
+// Term chips management
+function addSelectedTerm(term: string, operator: 'AND' | 'OR' | null = null) {
+	// Check if term is from thesaurus (KG)
+	const isFromKG = thesaurusEntries.some(([key]) => key.toLowerCase() === term.toLowerCase());
+
+	// Don't add if already selected
+	if (selectedTerms.some((t) => t.value.toLowerCase() === term.toLowerCase())) {
+		return;
+	}
+
+	selectedTerms = [...selectedTerms, { value: term, isFromKG }];
+
+	if (operator && selectedTerms.length > 1) {
+		currentLogicalOperator = operator;
+	}
+
+	// Update the input to show the structured query
+	updateInputFromSelectedTerms();
+	saveSearchState();
+}
+
+function _removeSelectedTerm(term: string) {
+	selectedTerms = selectedTerms.filter((t) => t.value !== term);
+	updateInputFromSelectedTerms();
+	saveSearchState();
+}
+
+function updateInputFromSelectedTerms() {
+	isUpdatingFromChips = true;
+
+	if (selectedTerms.length === 0) {
+		$input = '';
+		currentLogicalOperator = null;
+	} else if (selectedTerms.length === 1) {
+		$input = selectedTerms[0].value;
+		currentLogicalOperator = null;
+	} else {
+		const operator = currentLogicalOperator || 'AND';
+		$input = selectedTerms.map((t) => t.value).join(` ${operator} `);
+	}
+
+	// Reset the flag after a brief delay to allow reactivity to settle
+	setTimeout(() => {
+		isUpdatingFromChips = false;
+	}, 10);
+}
+
+function _clearSelectedTerms() {
+	selectedTerms = [];
+	currentLogicalOperator = null;
+	$input = '';
+	saveSearchState();
+}
+
+async function handleSearchInputEvent() {
+	_error = null; // Clear previous errors
+
+	if ($is_tauri) {
+		if (!$input.trim()) return; // Skip if input is empty
+
+		try {
+			const searchQuery = buildSearchQueryFromInput();
+			if (!searchQuery) return;
+
+			const response: SearchResponse = await invoke('search', {
+				searchQuery,
+			});
+			if (response.status === 'success') {
+				results = response.results;
+				console.log('Response results');
+				console.log(results);
+				saveSearchState();
+				// Start SSE streaming for summarization updates (Tauri doesn't support SSE)
+				// SSE will be available when using web interface
+			} else {
+				_error = `Search failed: ${response.status}`;
+				console.error('Search failed:', response);
+			}
+		} catch (e) {
+			_error = `Error in Tauri search: ${e}`;
+			console.error('Error in Tauri search:', e);
+		}
+	} else {
+		if (!$input.trim()) return; // Skip if input is empty
+
+		const searchQuery = buildSearchQueryFromInput();
+		if (!searchQuery) return;
+
+		const json_body = JSON.stringify(searchQuery);
+
+		try {
+			const response = await fetch($serverUrl, {
+				method: 'POST',
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+				},
+				body: json_body,
+			});
+			const data: SearchResponse = await response.json();
+			if (!response.ok) {
+				throw new Error(`HTTP error! Status: ${response.status}`);
+			}
+			results = data.results;
+			saveSearchState();
+
+			// Start SSE streaming for real-time summarization updates
+			startSummarizationStreaming();
+		} catch (err) {
+			console.error('Error fetching data:', err);
+			_error = `Error fetching data: ${err}`;
+		}
+	}
+}
 </script>
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
@@ -610,8 +624,8 @@
           autofocus
           on:click={handleSearchInputEvent}
           on:submit={handleSearchInputEvent}
-          on:keydown={handleKeydown}
-          on:input={updateSuggestions}
+          on:keydown={_handleKeydown}
+          on:input={() => {}}
         />
       {#if suggestions.length > 0}
         <ul class="suggestions">
@@ -645,13 +659,13 @@
               <div class="term-tag-wrapper" class:from-kg={term.isFromKG}>
                 <Tag
                   rounded
-                  on:click={() => removeSelectedTerm(term.value)}
+                  on:click={() => _removeSelectedTerm(term.value)}
                   title="Click to remove term"
                 >
                   {term.value}
                   <button
                     class="remove-tag-btn"
-                    on:click|stopPropagation={() => removeSelectedTerm(term.value)}
+                    on:click|stopPropagation={() => _removeSelectedTerm(term.value)}
                     aria-label={`Remove term: ${term.value}`}
                   >
                     ×
@@ -667,7 +681,7 @@
               {/if}
             {/each}
           </Taglist>
-          <button type="button" class="clear-terms-btn" on:click={clearSelectedTerms}>
+          <button type="button" class="clear-terms-btn" on:click={_clearSelectedTerms}>
             Clear all
           </button>
         </div>
@@ -685,11 +699,11 @@
   </Field>
 </form>
 
-{#if error}
-  <p class="error">{error}</p>
+{#if _error}
+  <p class="error">{_error}</p>
 {:else if results.length}
   {#each results as item}
-    <ResultItem document={item} />
+    <ResultItem {item} />
   {/each}
 {:else}
   <section class="section">

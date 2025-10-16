@@ -258,6 +258,7 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
             read_only: false,
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
+            fetch_content: false,
         }],
         extra: AHashMap::new(),
         ..Default::default()
@@ -298,13 +299,13 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
         .await
         .expect("Search should succeed");
 
-    if results.documents.is_empty() {
+    if results.is_empty() {
         println!("⚠️  No search results found - this may indicate an indexing issue");
         return;
     }
 
     // Verify that at least one result has an AI-generated description
-    let has_ai_description = results.documents.iter().any(|result| {
+    let has_ai_description = results.iter().any(|result| {
         result
             .description
             .as_ref()
@@ -320,7 +321,6 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
     println!(
         "✅ End-to-end search test passed - Found {} results with AI descriptions",
         results
-            .documents
             .iter()
             .filter(|r| r
                 .description

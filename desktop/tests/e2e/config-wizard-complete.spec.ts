@@ -447,39 +447,31 @@ test.describe('Configuration Wizard Complete E2E Tests', () => {
     });
 
     test('should handle environment variable integration', async ({ page }) => {
-      // Check if there's an option to use environment variables
-      const envVarOption = page.locator('input[type="checkbox"]:near(text("environment")), [data-testid="use-env-vars"]');
+      // Environment variables are supported via twelf in the backend
+      // Users can enter ${VAR_NAME} or ${VAR_NAME:-default} in configuration fields
+      // The UI doesn't have a special toggle - env vars are automatically resolved by the backend
 
-      if (await envVarOption.isVisible()) {
-        console.log('Environment variable option found');
+      // Test that users can enter environment variable placeholders in secret fields
+      const secretInputs = page.locator('input[type="password"], input[name*="secret"], input[name*="token"]');
+      const secretCount = await secretInputs.count();
 
-        // Toggle environment variable usage
-        await envVarOption.click();
-        await ciWait(page, 'small');
+      if (secretCount > 0) {
+        const firstSecret = secretInputs.first();
 
-        // Check if input fields are disabled/hidden when using env vars
-        const secretInputs = page.locator('input[type="password"], input[name*="secret"], input[name*="token"]');
-        const secretCount = await secretInputs.count();
+        // Users should be able to enter environment variable syntax
+        await firstSecret.fill('${ATOMIC_SERVER_SECRET}');
+        const value = await firstSecret.inputValue();
 
-        for (let i = 0; i < secretCount; i++) {
-          const input = secretInputs.nth(i);
-          const isDisabled = await input.isDisabled();
-          const isHidden = !(await input.isVisible());
-
-          if (isDisabled || isHidden) {
-            console.log('Secret input properly disabled/hidden when using env vars');
-          }
-        }
-
-        // Check for environment variable documentation
-        const envVarHelp = page.locator('.env-var-help, [data-testid="env-var-info"], .help-text:has-text("environment")');
-        if (await envVarHelp.isVisible()) {
-          const helpText = await envVarHelp.textContent();
-          console.log('Environment variable help text:', helpText?.substring(0, 100));
-        }
+        // Verify the placeholder was accepted
+        expect(value).toBe('${ATOMIC_SERVER_SECRET}');
+        console.log('✅ Environment variable placeholder accepted in secret field');
       } else {
-        console.log('Environment variable integration not available in UI');
+        console.log('ℹ️ No secret fields available in current wizard state');
       }
+
+      // Note: Actual environment variable resolution happens on the backend via twelf
+      // See: crates/terraphim_settings/src/lib.rs (DeviceSettings uses twelf)
+      // Example: ${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}
     });
   });
 
