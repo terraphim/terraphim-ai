@@ -69,7 +69,7 @@
 	},
 	"optionalDependencies": {
 		"@playwright/test": "^1.44.1",
-		"@tauri-apps/cli": "^1.5.11",
+		"@tauri-apps/cli": "^1.6.3",
 		"@testing-library/jest-dom": "^6.8.0",
 		"@testing-library/svelte": "^5.2.8",
 		"@testing-library/user-event": "^14.5.2",
@@ -84,7 +84,7 @@
 		"vitest": "^1.6.0"
 	},
 	"dependencies": {
-		"@tauri-apps/api": "^1.2.0",
+		"@tauri-apps/api": "^1.6.0",
 		"bulma": "^0.9.4",
 		"comlink-fetch": "^0.1.2",
 		"svelte-routing": "^2.13.0",
