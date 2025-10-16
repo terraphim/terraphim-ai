@@ -60,7 +60,6 @@ jobs:
           # Create environment file for signing
           cat > .env.ci << 'EOF'
           TAURI_PRIVATE_KEY="op://TerraphimPlatform/tauri.update.signing/TAURI_PRIVATE_KEY"
-          TAURI_KEY_PASSWORD="op://TerraphimPlatform/tauri.update.signing/password"
           EOF
 
           # Build with injected signing keys
