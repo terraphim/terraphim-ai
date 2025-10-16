@@ -12,6 +12,7 @@
 		"build": "vite build",
 		"build:ci": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
 		"build:minimal": "vite build --mode minimal",
+	"build:ultra-minimal": "vite build --mode ultra-minimal",
 		"preview": "vite preview",
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
