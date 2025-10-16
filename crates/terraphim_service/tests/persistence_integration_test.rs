@@ -55,6 +55,7 @@ async fn test_service_document_persistence_integration() {
         stub: None,
         tags: Some(vec!["service".to_string(), "persistence".to_string(), "integration".to_string()]),
         rank: Some(95),
+        source_haystack: None,
     };
 
     let created_doc = service
@@ -148,6 +149,7 @@ async fn test_service_document_persistence_integration() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     let _created_special_doc = new_service
@@ -331,10 +333,7 @@ async fn test_service_search_with_persisted_data() {
         .expect("Search timed out")
         .expect("Search failed");
 
-    println!(
-        "  📊 Search returned {} results",
-        search_results.documents.len()
-    );
+    println!("  📊 Search returned {} results", search_results.len());
 
     // Step 4: Create new service instance and perform same search
     println!("🔄 Step 4: Testing search with new service instance");
@@ -348,13 +347,13 @@ async fn test_service_search_with_persisted_data() {
 
     println!(
         "  📊 New instance search returned {} results",
-        search_results_new_instance.documents.len()
+        search_results_new_instance.len()
     );
 
     // Results should be consistent (though may vary slightly due to timing/caching)
     // The key point is that both searches should work and return reasonable results
     assert!(
-        !search_results_new_instance.documents.is_empty() || search_results.documents.is_empty(),
+        !search_results_new_instance.is_empty() || search_results.is_empty(),
         "Search results should be consistent across service instances"
     );
 
@@ -475,6 +474,7 @@ async fn test_unicode_persistence_in_service() {
         stub: None,
         tags: Some(vec!["unicode".to_string(), "测试".to_string(), "тест".to_string()]),
         rank: Some(100),
+        source_haystack: None,
     };
 
     // Create document through service
@@ -566,6 +566,7 @@ async fn test_large_content_persistence_in_service() {
         stub: None,
         tags: Some(vec!["large".to_string(), "performance".to_string()]),
         rank: Some(50),
+        source_haystack: None,
     };
 
     println!(

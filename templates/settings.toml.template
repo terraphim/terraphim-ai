@@ -1,0 +1,35 @@
+# Terraphim Settings Configuration Template with 1Password Integration
+# Usage: op inject -i settings.toml.template -o settings.toml
+# pragma: allowlist secret
+
+server_hostname = "127.0.0.1:8000"
+api_endpoint = "http://localhost:8000/api"
+initialized = true
+default_data_path = "./data"
+
+[profiles.s3]
+type = "s3"
+bucket = "op://Terraphim-Dev/AWS_S3/BUCKET_NAME"
+region = "op://Terraphim-Dev/AWS_S3/REGION"
+access_key_id = "op://Terraphim-Dev/AWS_S3/ACCESS_KEY_ID"
+secret_access_key = "op://Terraphim-Dev/AWS_S3/SECRET_ACCESS_KEY"
+enable_virtual_host_style = "off"
+
+[profiles.memory]
+type = "memory"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "./data/sqlite"
+connection_string = "./data/sqlite/terraphim.db"
+table = "terraphim_kv"
+
+[profiles.redis]
+type = "redis"
+url = "op://Terraphim-Dev/Redis/URL"
+password = "op://Terraphim-Dev/Redis/PASSWORD"
+
+[profiles.postgresql]
+type = "postgresql"
+connection_string = "op://Terraphim-Dev/PostgreSQL/CONNECTION_STRING"
+table = "terraphim_kv"

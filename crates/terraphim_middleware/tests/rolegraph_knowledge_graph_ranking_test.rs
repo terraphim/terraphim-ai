@@ -103,6 +103,7 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         stub: None,
         tags: None,
         rank: None,
+        source_haystack: None,
     };
 
     rolegraph.insert_document(&document.id, document.clone());

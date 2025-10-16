@@ -634,6 +634,7 @@ impl ReplHandler {
                     stub: None,
                     tags: Some(vec![]),
                     rank: None,
+                    source_haystack: None,
                 };
 
                 match api_client
@@ -886,7 +887,8 @@ impl ReplHandler {
                 Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
                 Some("html") => terraphim_automata::LinkType::HTMLLinks,
                 Some("wiki") => terraphim_automata::LinkType::WikiLinks,
-                _ => terraphim_automata::LinkType::MarkdownLinks, // Default
+                Some("plain") => terraphim_automata::LinkType::PlainText,
+                _ => terraphim_automata::LinkType::PlainText, // Default to plain text
             };
 
             if let Some(service) = &self.service {
