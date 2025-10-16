@@ -63,9 +63,9 @@ pub struct ComponentSpec {
     pub config: serde_json::Value,
 }
 
-/// Types of components that can be hot reloaded
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum ComponentType {
+ /// Types of components that can be hot reloaded
+ #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+ pub enum ComponentType {
     /// Agent behavior
     AgentBehavior,
     /// Configuration
@@ -223,15 +223,13 @@ impl HotReloadManager {
                 component_name, component.component_type
             );
 
-            // Reload dependencies first
-            for dependency in &component.dependencies {
-                if let Err(e) = self
-                    .perform_reload(dependency, ReloadType::Dependency)
-                    .await
-                {
-                    warn!("Failed to reload dependency {}: {}", dependency, e);
-                }
-            }
+             // Reload dependencies first
+             for dependency in &component.dependencies {
+                 if let Err(e) = Box::pin(self.perform_reload(dependency, ReloadType::Dependency)).await
+                 {
+                     warn!("Failed to reload dependency {}: {}", dependency, e);
+                 }
+             }
 
             // Perform the actual reload based on component type and strategy
             match self.reload_component_impl(&component).await {

@@ -524,7 +524,7 @@ impl SupervisionTreeOrchestrator {
     }
 
     /// Shutdown the orchestrator
-    async fn shutdown(&self) -> OrchestrationResult<()> {
+    pub async fn shutdown(&self) -> OrchestrationResult<()> {
         info!("Shutting down supervision tree orchestrator");
 
         // Terminate all active workflows

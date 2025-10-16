@@ -13,10 +13,10 @@ use crate::{ApplicationConfig, ApplicationError, ApplicationResult};
 #[async_trait]
 pub trait LifecycleManagement: Send + Sync {
     /// Start lifecycle management
-    async fn start(&self) -> ApplicationResult<()>;
+    async fn start(&mut self) -> ApplicationResult<()>;
 
     /// Stop lifecycle management
-    async fn stop(&self) -> ApplicationResult<()>;
+    async fn stop(&mut self) -> ApplicationResult<()>;
 
     /// Perform health check
     async fn health_check(&self) -> ApplicationResult<bool>;
@@ -56,19 +56,21 @@ impl LifecycleManager {
     }
 }
 
-#[async_trait]
-impl LifecycleManagement for LifecycleManager {
-    async fn start(&self) -> ApplicationResult<()> {
-        info!("Starting lifecycle manager");
-        // In a real implementation, this would initialize lifecycle components
-        Ok(())
-    }
+ #[async_trait]
+ impl LifecycleManagement for LifecycleManager {
+     async fn start(&mut self) -> ApplicationResult<()> {
+         info!("Starting lifecycle manager");
+         self.start_time = Some(SystemTime::now());
+         // In a real implementation, this would initialize lifecycle components
+         Ok(())
+     }
 
-    async fn stop(&self) -> ApplicationResult<()> {
-        info!("Stopping lifecycle manager");
-        // In a real implementation, this would cleanup lifecycle components
-        Ok(())
-    }
+     async fn stop(&mut self) -> ApplicationResult<()> {
+         info!("Stopping lifecycle manager");
+         self.start_time = None;
+         // In a real implementation, this would cleanup lifecycle components
+         Ok(())
+     }
 
     async fn health_check(&self) -> ApplicationResult<bool> {
         debug!("Lifecycle manager health check");

@@ -262,19 +262,19 @@ impl Default for ApplicationConfig {
     }
 }
 
-/// Configuration manager with hot reloading capabilities
-pub struct ConfigurationManager {
-    /// Current configuration
-    config: Arc<RwLock<ApplicationConfig>>,
-    /// Configuration file path
-    config_path: PathBuf,
-    /// File watcher for hot reloading
-    _watcher: Option<RecommendedWatcher>,
-    /// Configuration change notifications
-    change_tx: mpsc::UnboundedSender<ConfigurationChange>,
-    /// Configuration change receiver
-    change_rx: Arc<RwLock<Option<mpsc::UnboundedReceiver<ConfigurationChange>>>>,
-}
+ /// Configuration manager with hot reloading capabilities
+ pub struct ConfigurationManager {
+     /// Current configuration
+     config: Arc<RwLock<ApplicationConfig>>,
+     /// Configuration file path
+     config_path: PathBuf,
+     /// File watcher for hot reloading
+     _watcher: Option<RecommendedWatcher>,
+     /// Configuration change notifications
+     change_tx: mpsc::UnboundedSender<ConfigurationChange>,
+     /// Configuration change receiver
+     change_rx: Arc<RwLock<Option<mpsc::UnboundedReceiver<ConfigurationChange>>>>,
+ }
 
 /// Configuration change notification
 #[derive(Debug, Clone)]
@@ -322,21 +322,20 @@ impl ConfigurationManager {
         })
     }
 
-    /// Load configuration from file
-    async fn load_config(config_path: &Path) -> ApplicationResult<ApplicationConfig> {
-        let mut config_builder = Config::builder()
-            .add_source(File::from(config_path).required(false))
-            .add_source(Environment::with_prefix("TERRAPHIM"));
+     /// Load configuration from file
+     async fn load_config(config_path: &Path) -> ApplicationResult<ApplicationConfig> {
+         // Add default configuration first (base layer)
+         let default_config = ApplicationConfig::default();
+         let default_toml = toml::to_string(&default_config)
+             .map_err(|e| ApplicationError::ConfigurationError(e.to_string()))?;
 
-        // Add default configuration
-        let default_config = ApplicationConfig::default();
-        let default_toml = toml::to_string(&default_config)
-            .map_err(|e| ApplicationError::ConfigurationError(e.to_string()))?;
-
-        config_builder = config_builder.add_source(config::File::from_str(
-            &default_toml,
-            config::FileFormat::Toml,
-        ));
+         let config_builder = Config::builder()
+             .add_source(config::File::from_str(
+                 &default_toml,
+                 config::FileFormat::Toml,
+             ))
+             .add_source(File::from(config_path).required(false))
+             .add_source(Environment::with_prefix("TERRAPHIM"));
 
         let config = config_builder
             .build()

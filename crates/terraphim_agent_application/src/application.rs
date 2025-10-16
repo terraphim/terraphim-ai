@@ -47,8 +47,8 @@ pub struct TerraphimAgentApplication {
     state: Arc<RwLock<ApplicationState>>,
     /// Configuration manager
     config_manager: Arc<ConfigurationManager>,
-    /// Lifecycle manager
-    lifecycle_manager: Arc<LifecycleManager>,
+     /// Lifecycle manager
+     lifecycle_manager: Arc<RwLock<LifecycleManager>>,
     /// Deployment manager
     deployment_manager: Arc<DeploymentManager>,
     /// Hot reload manager
@@ -262,7 +262,7 @@ impl TerraphimAgentApplication {
         let config_manager = Arc::new(ConfigurationManager::new(config_path).await?);
         let config = config_manager.get_config().await;
 
-        let lifecycle_manager = Arc::new(LifecycleManager::new(config.clone()).await?);
+        let lifecycle_manager = LifecycleManager::new(config.clone()).await?;
         let deployment_manager = Arc::new(DeploymentManager::new(config.clone()).await?);
         let hot_reload_manager = Arc::new(HotReloadManager::new(config.clone()).await?);
         let diagnostics_manager = Arc::new(DiagnosticsManager::new(config.clone()).await?);
@@ -272,7 +272,7 @@ impl TerraphimAgentApplication {
         Ok(Self {
             state: Arc::new(RwLock::new(ApplicationState::default())),
             config_manager,
-            lifecycle_manager,
+             lifecycle_manager: Arc::new(RwLock::new(lifecycle_manager)),
             deployment_manager,
             hot_reload_manager,
             diagnostics_manager,
@@ -483,7 +483,7 @@ impl Application for TerraphimAgentApplication {
         self.start_message_handler().await?;
 
         // Start lifecycle manager
-        self.lifecycle_manager.start().await?;
+        self.lifecycle_manager.write().await.start().await?;
 
         // Start deployment manager
         self.deployment_manager.start().await?;
@@ -568,7 +568,7 @@ impl Application for TerraphimAgentApplication {
             warn!("Error stopping deployment manager: {}", e);
         }
 
-        if let Err(e) = self.lifecycle_manager.stop().await {
+        if let Err(e) = self.lifecycle_manager.write().await.stop().await {
             warn!("Error stopping lifecycle manager: {}", e);
         }
 
