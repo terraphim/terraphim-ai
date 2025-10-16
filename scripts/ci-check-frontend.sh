@@ -158,16 +158,20 @@ else
     echo "Available memory: $(free -h)"
     echo "Disk space: $(df -h .)"
 
-    # Try minimal build as fallback
+      # Try minimal build as fallback
     echo "Attempting minimal build..."
     if timeout 600 npm run build:minimal; then
         echo -e "${GREEN}  ✅ Minimal build successful${NC}"
     else
-        # Try to identify specific build errors
-        echo "Checking for common build issues..."
-        if npm run build 2>&1 | grep -i "error\|failed\|missing"; then
-            echo "Build errors detected above"
-        fi
+        echo -e "${YELLOW}  ⚠️  Minimal build failed, trying ultra-minimal build...${NC}"
+        if timeout 300 npm run build:ultra-minimal; then
+            echo -e "${GREEN}  ✅ Ultra-minimal build successful${NC}"
+        else
+            # Try to identify specific build errors
+            echo "Checking for common build issues..."
+            if npm run build 2>&1 | grep -i "error\|failed\|missing"; then
+                echo "Build errors detected above"
+            fi
 
     # Create a minimal dist folder if build fails (same as CI)
     echo "Creating fallback build..."

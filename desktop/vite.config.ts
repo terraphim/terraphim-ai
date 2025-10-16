@@ -7,6 +7,7 @@ import { resolve } from 'path';
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
   const isMinimal = mode === 'minimal';
+  const isUltraMinimal = mode === 'ultra-minimal';
   const isCI = process.env.CI === 'true';
 
   return {
@@ -131,7 +132,11 @@ export default defineConfig(({ command, mode }) => {
   },
   build: {
     rollupOptions: {
-      output: isMinimal ? {
+      output: isUltraMinimal ? {
+        // Ultra-minimal - single chunk for fastest CI builds
+        manualChunks: undefined,
+        inlineDynamicImports: true
+      } : isMinimal ? {
         // Minimal chunks for CI builds
         manualChunks: undefined
       } : {
@@ -148,10 +153,13 @@ export default defineConfig(({ command, mode }) => {
         }
       }
     },
-    chunkSizeWarningLimit: isMinimal ? 500 : 1000, // Lower limit for minimal builds
+    chunkSizeWarningLimit: isUltraMinimal ? 200 : (isMinimal ? 500 : 1000), // Progressive limits
     target: 'esnext',
-    minify: isMinimal ? 'esbuild' : 'terser',
-    sourcemap: isCI ? false : true // Disable sourcemaps in CI for faster builds
+    minify: isUltraMinimal ? false : (isMinimal ? 'esbuild' : 'terser'),
+    sourcemap: false, // Always disable for CI speed
+    emptyOutDir: true, // Ensure clean builds
+    reportCompressedSize: false, // Faster builds
+    assetsInline: isUltraMinimal ? 'always' : 'size' // Inline assets in ultra-minimal mode
   }
   };
 });
