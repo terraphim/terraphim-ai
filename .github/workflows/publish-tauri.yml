@@ -54,7 +54,7 @@ jobs:
         working-directory: ${{env.working-directory}}
         run: |
           # Inject secrets into Tauri configuration
-          op inject -i src-tauri/tauri.conf.json.template -o src-tauri/tauri.conf.json
+          op inject --force -i src-tauri/tauri.conf.json.template -o src-tauri/tauri.conf.json
           chmod 600 src-tauri/tauri.conf.json
 
           # Create environment file for signing
