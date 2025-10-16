@@ -106,6 +106,7 @@ $: contextEditMode = _contextEditMode;
 $: kgTerm = _kgTerm;
 $: kgRank = _kgRank;
 $: _showDebugRequest = __showDebugRequest;
+$: _showDebugResponse = __showDebugResponse;
 
 // --- Persistence helpers ---
 function chatStateKey(): string {

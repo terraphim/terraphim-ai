@@ -4,7 +4,10 @@ import { Agent } from '@tomic/lib';
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
 import { Route } from 'tinro';
-import { Field, Input, Button, Switch } from 'svelma';
+import { Field, Input, Button, Switch, Select } from 'svelma';
+import { JSONEditor } from 'svelte-jsoneditor';
+import FetchRole from './FetchRole.svelte';
+import { store } from '@tomic/svelte';
 
 let _content = {
 	json: $configStore,
@@ -98,6 +101,14 @@ const resource1 = getResource('http://localhost:9883/config/y3zx5wtm0bq');
 
 const _name = getValue<string>(resource1, urls.properties.name);
 const _roles = getValue<string[]>(resource1, 'http://localhost:9883/property/role');
+
+// Create aliases without underscores for template usage
+const handleClickUrl = _handleClickUrl;
+const handleChange = _handleChange;
+const content = _content;
+$: name = _name;
+$: roles = _roles;
+
 // FIXME: update roles to configStore
 $: console.log('Print name', $name);
 $: console.log('Print roles', $roles);
