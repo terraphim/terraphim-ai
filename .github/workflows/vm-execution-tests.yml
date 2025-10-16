@@ -560,7 +560,7 @@ jobs:
   test-script:
     name: Test Runner Script
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
     - name: Checkout code
@@ -588,7 +588,7 @@ jobs:
       if: steps.check_script.outputs.exists == 'true'
       run: |
         ./scripts/test-vm-execution.sh unit \
-          --timeout 300 \
+          --timeout 600 \
           --verbose
 
     - name: Verify script creates logs

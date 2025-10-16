@@ -20,7 +20,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Increased timeout for frontend builds
+    timeout-minutes: 45  # Further increased timeout for frontend builds
     outputs:
       dist-path: ${{ steps.build.outputs.dist-path }}
 
