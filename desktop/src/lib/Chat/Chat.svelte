@@ -11,7 +11,12 @@ import {
 	showSessionList,
 } from '../stores';
 import SessionList from './SessionList.svelte';
-import { Markdown } from 'svelte-markdown';
+import ContextEditModal from './ContextEditModal.svelte';
+import KGContextItem from '../Search/KGContextItem.svelte';
+import KGSearchModal from '../Search/KGSearchModal.svelte';
+import ArticleModal from '../Search/ArticleModal.svelte';
+// @ts-ignore
+import Markdown from 'svelte-markdown';
 
 // Tauri APIs for saving files (only used in desktop)
 let tauriDialog: any = null;
@@ -64,8 +69,8 @@ let renderMarkdown: boolean = false;
 let _debugMode: boolean = false;
 let _lastRequest: any = null;
 let _lastResponse: any = null;
-let __showDebugRequest: boolean = false;
-let __showDebugResponse: boolean = false;
+let _showDebugRequest: boolean = false;
+let _showDebugResponse: boolean = false;
 
 // Conversation and context management
 let conversationId: string | null = null;
@@ -1027,7 +1032,7 @@ function _toggleSessionList() {
                   <button
                     class="button is-small is-warning"
                     title="Show debug request (sent to LLM)"
-                    on:click={() => __showDebugRequest = true}
+                    on:click={() => _showDebugRequest = true}
                     disabled={!_lastRequest}
                   >
                     <span class="icon is-small"><i class="fas fa-bug"></i></span>
@@ -1036,7 +1041,7 @@ function _toggleSessionList() {
                   <button
                     class="button is-small is-info"
                     title="Show debug response (from LLM)"
-                    on:click={() => __showDebugResponse = true}
+                    on:click={() => _showDebugResponse = true}
                     disabled={!_lastResponse}
                   >
                     <span class="icon is-small"><i class="fas fa-code"></i></span>
@@ -1152,17 +1157,16 @@ function _toggleSessionList() {
 
               <div class="field is-grouped">
                 <div class="control">
-                  <button class="button is-primary is-small" on:click={addManualContext} disabled={savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
-                    {#if savingContext}
+                  <button class="button is-primary is-small" on:click={_addManualContext} disabled={_savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
+                    {#if _savingContext}
                       <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
                     {:else}
-                      <span class="icon is-small"><i class="fas fa-save"></i></span>
+                      <span class="icon is-small"><i class="fas fa-plus"></i></span>
                     {/if}
-                    <span>Save Context</span>
                   </button>
                 </div>
                 <div class="control">
-                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={savingContext}>
+                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={_savingContext}>
                     <span class="icon is-small"><i class="fas fa-times"></i></span>
                     <span>Cancel</span>
                   </button>
@@ -1188,7 +1192,7 @@ function _toggleSessionList() {
                     contextItem={item}
                     compact={true}
                     on:remove={e => deleteContext(e.detail.contextId)}
-                    on:viewDetails={e => editContext(e.detail.contextItem, e.detail.term)}
+                    on:viewDetails={e => _editContext(e.detail.contextItem, e.detail.term)}
                   />
                 {:else}
                   <!-- Use default context item rendering for non-KG items -->
@@ -1218,7 +1222,7 @@ function _toggleSessionList() {
                             <div class="control">
                               <button
                                 class="button is-small is-light"
-                                on:click={() => editContext(item)}
+                                on:click={() => _editContext(item)}
                                 data-testid={`edit-context-${index}`}
                                 title="Edit context"
                               >
@@ -1230,7 +1234,7 @@ function _toggleSessionList() {
                             <div class="control">
                               <button
                                 class="button is-small is-light is-danger"
-                                on:click={() => confirmDeleteContext(item)}
+                                on:click={() => _confirmDeleteContext(item)}
                                 data-testid={`delete-context-${index}`}
                                 title="Delete context"
                               >
@@ -1385,13 +1389,13 @@ function _toggleSessionList() {
 <!-- Context Edit Modal -->
 <ContextEditModal
   bind:active={_showContextEditModal}
-  context={editingContext}
-  mode={contextEditMode}
-  on:update={e => updateContext(e.detail)}
+  context={_editingContext}
+  mode={_contextEditMode}
+  on:update={e => _updateContext(e.detail)}
   on:delete={e => deleteContext(e.detail)}
   on:close={() => {
     _showContextEditModal = false;
-    editingContext = null;
+    _editingContext = null;
   }}
 />
 
@@ -1399,8 +1403,8 @@ function _toggleSessionList() {
 <KGSearchModal
   bind:active={_showKGSearchModal}
   conversationId={conversationId}
-  on:termAdded={handleKGTermAdded}
-  on:kgIndexAdded={handleKGIndexAdded}
+  on:termAdded={_handleKGTermAdded}
+  on:kgIndexAdded={_handleKGIndexAdded}
 />
 
 <!-- KG Document Modal -->
@@ -1408,8 +1412,8 @@ function _toggleSessionList() {
   <ArticleModal
     bind:active={_showKgModal}
     item={kgDocument}
-    kgTerm={kgTerm}
-    kgRank={kgRank}
+    kgTerm={_kgTerm}
+    kgRank={_kgRank}
   />
 {/if}
 

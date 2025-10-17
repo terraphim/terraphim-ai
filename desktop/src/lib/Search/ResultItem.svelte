@@ -5,6 +5,13 @@ import { CONFIG } from '../../config';
 import type { DocumentListResponse, Role } from '../generated/types';
 import configStore from '../ThemeSwitcher.svelte';
 import type { Document } from './SearchResult';
+import { role, configStore as roleConfigStore, is_tauri } from '$lib/stores';
+import { Tag, Taglist } from 'svelma';
+import { fade } from 'svelte/transition';
+// @ts-ignore
+import SvelteMarkdown from 'svelte-markdown';
+import ArticleModal from './ArticleModal.svelte';
+import AtomicSaveModal from './AtomicSaveModal.svelte';
 
 export let item: Document;
 let _showModal = false;
@@ -913,8 +920,8 @@ if (configStore[$role] !== undefined) {
               {#each item.tags as tag}
                 <button
                   class="tag-button"
-                  on:click={() => handleTagClick(tag)}
-                  disabled={loadingKg}
+                  on:click={() => _handleTagClick(tag)}
+                  disabled={_loadingKg}
                   title="Click to view knowledge graph document"
                 >
                   <Tag rounded>{tag}</Tag>
@@ -947,10 +954,10 @@ if (configStore[$role] !== undefined) {
 
           <!-- AI Summary Section -->
           <div class="ai-summary-section">
-            {#if !showAiSummary && !summaryLoading && !summaryError}
+            {#if !_showAiSummary && !summaryLoading && !summaryError}
               <button
                 class="button is-small is-info is-outlined ai-summary-button"
-                on:click={generateSummary}
+                on:click={_generateSummary}
                 disabled={summaryLoading}
                 title="Generate AI-powered summary using OpenRouter"
               >
@@ -978,7 +985,7 @@ if (configStore[$role] !== undefined) {
                 <small class="has-text-danger">Summary error: {summaryError}</small>
                 <button
                   class="button is-small is-text"
-                  on:click={() => { summaryError = null; generateSummary(); }}
+                  on:click={() => { summaryError = null; _generateSummary(); }}
                   title="Retry generating summary"
                 >
                   Retry
@@ -986,7 +993,7 @@ if (configStore[$role] !== undefined) {
               </div>
             {/if}
 
-            {#if showAiSummary && aiSummary}
+            {#if _showAiSummary && aiSummary}
               <div class="ai-summary" transition:fade>
                 <div class="ai-summary-header">
                   <small class="ai-summary-label">
@@ -1002,7 +1009,7 @@ if (configStore[$role] !== undefined) {
                   </small>
                   <button
                     class="button is-small is-text"
-                    on:click={() => showAiSummary = false}
+                    on:click={() => _showAiSummary = false}
                     title="Hide AI summary"
                   >
                     <span class="icon is-small">
@@ -1016,7 +1023,7 @@ if (configStore[$role] !== undefined) {
                 <div class="ai-summary-actions">
                   <button
                     class="button is-small is-text"
-                    on:click={() => { generateSummary(); }}
+                    on:click={() => { _generateSummary(); }}
                     disabled={summaryLoading}
                     title="Regenerate summary"
                   >
@@ -1094,14 +1101,14 @@ if (configStore[$role] !== undefined) {
 </div>
 
 <!-- Original document modal -->
-<ArticleModal bind:active={showModal} item={item} />
+<ArticleModal bind:active={_showModal} item={item} />
 
 <!-- KG document modal -->
 {#if kgDocument}
   <ArticleModal
-    bind:active={showKgModal}
+    bind:active={_showKgModal}
     item={kgDocument}
-    kgTerm={kgTerm}
+    kgTerm={_kgTerm}
     kgRank={kgRank}
   />
 {/if}
@@ -1109,7 +1116,7 @@ if (configStore[$role] !== undefined) {
 <!-- Atomic Save Modal -->
 {#if hasAtomicServer}
   <AtomicSaveModal
-    bind:active={showAtomicSaveModal}
+    bind:active={_showAtomicSaveModal}
     document={item}
   />
 {/if}
