@@ -808,7 +808,12 @@ impl Conversation {
 
     /// Get the number of context items (global + per-message)
     pub fn context_count(&self) -> usize {
-        self.global_context.len() + self.messages.iter().map(|m| m.context_items.len()).sum::<usize>()
+        self.global_context.len()
+            + self
+                .messages
+                .iter()
+                .map(|m| m.context_items.len())
+                .sum::<usize>()
     }
 }
 
