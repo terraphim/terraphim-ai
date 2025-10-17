@@ -286,7 +286,7 @@ mod tests {
 
         let conversation =
             Conversation::new("Test Conversation".to_string(), RoleName::new("Test Role"));
-        let summary = ConversationSummary::from(&conversation);
+        let summary = ConversationSummary::from_conversation(&conversation);
 
         index.add(summary.clone());
         assert_eq!(index.conversations.len(), 1);
@@ -307,7 +307,7 @@ mod tests {
             Conversation::new("Test Conversation".to_string(), RoleName::new("Test Role"));
 
         // Add a test message
-        conversation.add_message(ChatMessage::user("Hello, world!".to_string()));
+        conversation.add_message(ChatMessage::new("user", "Hello, world!"));
 
         // Save
         persistence.save(&conversation).await.unwrap();
