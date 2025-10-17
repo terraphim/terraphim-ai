@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/*"]
-exclude = ["crates/terraphim_agent_application", "terraphim_server", "desktop/src-tauri"]  # Experimental crate with incomplete API implementations and server/desktop with compilation issues
-default-members = ["crates/terraphim_service"]
+members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
+exclude = ["crates/terraphim_agent_application"]  # Experimental crate with incomplete API implementations
+default-members = ["terraphim_server"]
 
 [workspace.package]
 edition = "2024"
