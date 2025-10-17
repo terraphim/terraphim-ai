@@ -74,6 +74,17 @@ jobs:
             pkg-config \
             libssl-dev
 
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -yqq --no-install-recommends \
+            build-essential \
+            clang \
+            libclang-dev \
+            llvm-dev \
+            pkg-config \
+            libssl-dev
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -102,7 +113,7 @@ jobs:
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
-    needs: [setup, build-frontend]
+    needs: [setup, build-frontend, lint-and-format]
     runs-on: [self-hosted, linux, bigbox]
     strategy:
       fail-fast: false
@@ -113,6 +124,7 @@ jobs:
         exclude:
           - ubuntu-version: "24.04"
             target: "x86_64-unknown-linux-musl"
+
 
     container: ubuntu:${{ matrix.ubuntu-version }}
 
@@ -354,6 +366,8 @@ jobs:
 
       - name: Run desktop tests
         run: ./scripts/ci-check-desktop.sh
+
+
 
   build-docker:
     needs: [setup, build-rust]
