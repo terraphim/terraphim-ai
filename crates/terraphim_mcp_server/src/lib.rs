@@ -8,7 +8,7 @@ use rmcp::{
         ListToolsResult, ReadResourceRequestParam, ReadResourceResult, ServerInfo, Tool,
     },
     service::RequestContext,
-    RoleServer, ServerHandler,
+    ErrorData as McpError, RoleServer, ServerHandler,
 };
 use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{
@@ -32,7 +32,7 @@ pub enum TerraphimMcpError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
     #[error("MCP error: {0}")]
-    Mcp(#[from] ErrorData),
+    Mcp(#[from] McpError),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Anyhow error: {0}")]
@@ -107,7 +107,7 @@ impl McpService {
         role: Option<String>,
         limit: Option<i32>,
         skip: Option<i32>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let mut service = self
             .terraphim_service()
             .await
@@ -159,10 +159,7 @@ impl McpService {
     }
 
     /// Update the Terraphim configuration
-    pub async fn update_config_tool(
-        &self,
-        config_str: String,
-    ) -> Result<CallToolResult, ErrorData> {
+    pub async fn update_config_tool(&self, config_str: String) -> Result<CallToolResult, McpError> {
         match serde_json::from_str::<Config>(&config_str) {
             Ok(new_config) => match self.update_config(new_config).await {
                 Ok(()) => {
@@ -188,7 +185,7 @@ impl McpService {
     pub async fn build_autocomplete_index(
         &self,
         role: Option<String>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let mut service = self
             .terraphim_service()
             .await
@@ -295,7 +292,7 @@ impl McpService {
         query: String,
         limit: Option<usize>,
         role: Option<String>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         // Determine which role to use (provided role or selected role)
         let _role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
@@ -387,7 +384,7 @@ impl McpService {
         query: String,
         limit: Option<usize>,
         role: Option<String>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         // Determine which role to use (provided role or selected role)
         let _role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
@@ -439,8 +436,8 @@ impl McpService {
                     skip: Some(0),
                 };
                 let snippet = match service.search(&sq).await {
-                    Ok(documents) if !documents.is_empty() => {
-                        let d = &documents[0];
+                    Ok(docs) if !docs.is_empty() => {
+                        let d = &docs[0];
                         if let Some(stub) = &d.stub {
                             stub.clone()
                         } else if let Some(desc) = &d.description {
@@ -475,7 +472,7 @@ impl McpService {
         query: String,
         similarity: Option<f64>,
         limit: Option<usize>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -525,7 +522,7 @@ impl McpService {
         query: String,
         max_edit_distance: Option<usize>,
         limit: Option<usize>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -576,7 +573,7 @@ impl McpService {
         query: String,
         similarity: Option<f64>,
         limit: Option<usize>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -622,7 +619,7 @@ impl McpService {
     }
 
     /// Serialize autocomplete index to bytes for storage/transmission
-    pub async fn serialize_autocomplete_index(&self) -> Result<CallToolResult, ErrorData> {
+    pub async fn serialize_autocomplete_index(&self) -> Result<CallToolResult, McpError> {
         let autocomplete_lock = self.autocomplete_index.read().await;
 
         if let Some(ref index) = *autocomplete_lock {
@@ -661,7 +658,7 @@ impl McpService {
     pub async fn deserialize_autocomplete_index(
         &self,
         base64_data: String,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         // Decode base64 data
         let bytes = match base64::engine::general_purpose::STANDARD.decode(&base64_data) {
             Ok(data) => data,
@@ -700,7 +697,7 @@ impl McpService {
         text: String,
         role: Option<String>,
         return_positions: Option<bool>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let mut service = self
             .terraphim_service()
             .await
@@ -775,7 +772,7 @@ impl McpService {
         text: String,
         role: Option<String>,
         link_type: String,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let mut service = self
             .terraphim_service()
             .await
@@ -852,7 +849,7 @@ impl McpService {
         text: String,
         role: Option<String>,
         include_term: Option<bool>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let mut service = self
             .terraphim_service()
             .await
@@ -917,7 +914,7 @@ impl McpService {
     }
 
     /// Parse Logseq JSON output using terraphim_automata
-    pub async fn json_decode(&self, jsonlines: String) -> Result<CallToolResult, ErrorData> {
+    pub async fn json_decode(&self, jsonlines: String) -> Result<CallToolResult, McpError> {
         match json_decode(&jsonlines) {
             Ok(messages) => {
                 let mut contents = Vec::new();
@@ -940,7 +937,7 @@ impl McpService {
     }
 
     /// Load thesaurus from automata path (local file or remote URL)
-    pub async fn load_thesaurus(&self, automata_path: String) -> Result<CallToolResult, ErrorData> {
+    pub async fn load_thesaurus(&self, automata_path: String) -> Result<CallToolResult, McpError> {
         // Parse the automata path
         let path = if automata_path.starts_with("http://") || automata_path.starts_with("https://")
         {
@@ -991,7 +988,7 @@ impl McpService {
     pub async fn load_thesaurus_from_json(
         &self,
         json_str: String,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         match terraphim_automata::load_thesaurus_from_json(&json_str) {
             Ok(thesaurus) => {
                 let mut contents = Vec::new();
@@ -1034,7 +1031,7 @@ impl McpService {
         &self,
         text: String,
         role: Option<String>,
-    ) -> Result<CallToolResult, ErrorData> {
+    ) -> Result<CallToolResult, McpError> {
         let mut service = self
             .terraphim_service()
             .await
@@ -1348,79 +1345,62 @@ impl ServerHandler for McpService {
         let tools = vec![
             Tool {
                 name: "search".into(),
-                title: Some("Search Knowledge Graph".into()),
                 description: Some("Search for documents in the Terraphim knowledge graph".into()),
                 input_schema: Arc::new(search_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "update_config_tool".into(),
-                title: Some("Update Configuration".into()),
                 description: Some("Update the Terraphim configuration".into()),
                 input_schema: Arc::new(config_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "build_autocomplete_index".into(),
-                title: Some("Build Autocomplete Index".into()),
                 description: Some("Build FST-based autocomplete index from role's knowledge graph. Only available for roles with TerraphimGraph relevance function and configured knowledge graph.".into()),
                 input_schema: Arc::new(build_autocomplete_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "fuzzy_autocomplete_search".into(),
-                title: Some("Fuzzy Autocomplete Search".into()),
                 description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (default, faster and higher quality)".into()),
                 input_schema: Arc::new(fuzzy_autocomplete_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "autocomplete_terms".into(),
-                title: Some("Autocomplete Terms".into()),
                 description: Some("Autocomplete terms using FST prefix + fuzzy fallback".into()),
                 input_schema: Arc::new(autocomplete_terms_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "autocomplete_with_snippets".into(),
-                title: Some("Autocomplete With Snippets".into()),
                 description: Some("Autocomplete and return short snippets from matching documents".into()),
                 input_schema: Arc::new(autocomplete_snippets_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "fuzzy_autocomplete_search_levenshtein".into(),
-                title: Some("Fuzzy Search (Levenshtein)".into()),
                 description: Some("Perform fuzzy autocomplete search using Levenshtein distance (baseline comparison algorithm)".into()),
                 input_schema: Arc::new(levenshtein_autocomplete_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "fuzzy_autocomplete_search_jaro_winkler".into(),
-                title: Some("Fuzzy Search (Jaro-Winkler)".into()),
                 description: Some("Perform fuzzy autocomplete search using Jaro-Winkler similarity (explicit)".into()),
                 input_schema: Arc::new(fuzzy_autocomplete_schema.as_object().unwrap().clone()),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "serialize_autocomplete_index".into(),
-                title: Some("Serialize Index".into()),
                 description: Some("Serialize the current autocomplete index to a base64-encoded string for storage/transmission".into()),
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
@@ -1429,11 +1409,9 @@ impl ServerHandler for McpService {
                 }).as_object().unwrap().clone()),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "deserialize_autocomplete_index".into(),
-                title: Some("Deserialize Index".into()),
                 description: Some("Deserialize an autocomplete index from a base64-encoded string".into()),
                 input_schema: Arc::new(serde_json::json!({
                     "type": "object",
@@ -1444,70 +1422,55 @@ impl ServerHandler for McpService {
                 }).as_object().unwrap().clone()),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "find_matches".into(),
-                title: Some("Find Matches".into()),
                 description: Some("Find all term matches in text using Aho-Corasick algorithm".into()),
                 input_schema: Arc::new(find_matches_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "replace_matches".into(),
-                title: Some("Replace Matches".into()),
                 description: Some("Replace matched terms in text with links using specified format".into()),
                 input_schema: Arc::new(replace_matches_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "extract_paragraphs_from_automata".into(),
-                title: Some("Extract Paragraphs".into()),
                 description: Some("Extract paragraphs containing matched terms from text".into()),
                 input_schema: Arc::new(extract_paragraphs_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "json_decode".into(),
-                title: Some("JSON Decode".into()),
                 description: Some("Parse Logseq JSON output using terraphim_automata".into()),
                 input_schema: Arc::new(json_decode_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "load_thesaurus".into(),
-                title: Some("Load Thesaurus".into()),
                 description: Some("Load thesaurus from a local file or remote URL".into()),
                 input_schema: Arc::new(load_thesaurus_map.clone()),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "load_thesaurus_from_json".into(),
-                title: Some("Load Thesaurus from JSON".into()),
                 description: Some("Load thesaurus from a JSON string".into()),
                 input_schema: Arc::new(load_thesaurus_json_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             },
             Tool {
                 name: "is_all_terms_connected_by_path".into(),
-                title: Some("Check Terms Connectivity".into()),
                 description: Some("Check if all matched terms in text can be connected by a single path in the knowledge graph".into()),
                 input_schema: Arc::new(is_all_terms_connected_map),
                 output_schema: None,
                 annotations: None,
-                icons: None,
             }
         ];
 
@@ -1999,9 +1962,6 @@ impl ServerHandler for McpService {
             server_info: rmcp::model::Implementation {
                 name: "terraphim-mcp".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
-                title: Some("Terraphim MCP Server".to_string()),
-                icons: None,
-                website_url: None,
             },
             instructions: Some("This server provides Terraphim knowledge graph search capabilities through the Model Context Protocol. You can search for documents using the search tool and access resources that represent Terraphim documents.".to_string()),
             ..Default::default()

@@ -29,6 +29,42 @@ Terraphim aims to bridge this gap by providing a privacy-first AI assistant that
 [3]: https://www.forbes.com/sites/forbestechcouncil/2019/12/17/reality-check-still-spending-more-time-gathering-instead-of-analyzing/
 [4]: https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/
 
+## Key Features
+
+### 🔍 Advanced Search Capabilities
+- **Semantic Search**: Intelligent search across multiple knowledge repositories
+- **Multi-term Search**: Use logical operators (AND/OR) for complex queries
+- **Knowledge Graph**: Custom graph-based search using automata for fast text matching
+- **Role-based Search**: Personalized search experiences based on user roles and contexts
+
+### 🤖 Privacy-First AI Integration
+- **Local AI with Ollama**: Run AI models completely locally with no data leaving your machine
+  - Chat completion with open-source models (Llama, Qwen, etc.)
+  - Document summarization using local models
+  - Privacy-first approach with zero cloud dependencies
+- **Cloud AI with OpenRouter**: Optional integration with cloud AI models
+  - Support for GPT, Claude, and other premium models
+  - Configurable per role and use case
+- **Hybrid Approach**: Choose between local and cloud AI based on your privacy needs
+
+### 📚 Knowledge Management
+- **Multiple Data Sources**: Connect to personal (Obsidian, Notion), team (Jira, Confluence), and public (StackOverflow, GitHub) repositories
+- **Extract Paragraphs**: Intelligent extraction of relevant text sections from documents
+- **Thesaurus Integration**: Advanced synonym and concept mapping for better search results
+- **Document Preprocessing**: Automatic enhancement of search results with knowledge graph links
+
+### 🖥️ Multiple Interfaces
+- **Desktop App**: Svelte-based frontend with Tauri integration for native performance
+- **Web Interface**: Browser-based access for any platform
+- **Terminal UI (TUI)**: Command-line interface for developers and power users
+- **HTTP API**: RESTful API for integrations and custom applications
+
+### 🔒 Privacy & Security
+- **Local-First**: All processing can happen entirely on your machine
+- **No Telemetry**: No data collection or tracking
+- **Open Source**: Full transparency with auditable code
+- **Configurable Storage**: Multiple backend options from memory to cloud storage
+
 ## Getting Started
 
 ### 🚀 Quick Install (Recommended)
@@ -63,10 +99,27 @@ For detailed installation instructions, see our [Installation Guide](https://git
    ```
 
 3. **Start the backend server**:
+
+   **Standard version:**
    ```bash
    cargo run
    ```
-   This starts an API endpoint for indexing and querying documents.
+
+   **With Ollama support (for local AI):**
+   ```bash
+   # First, start Ollama (if you want local AI)
+   ollama serve
+
+   # Then run Terraphim with Ollama support
+   cargo run --features ollama -- --config ollama_llama_config.json
+   ```
+
+   **With OpenRouter support (for cloud AI):**
+   ```bash
+   cargo run --features openrouter
+   ```
+
+   This starts an API endpoint for indexing, querying documents, and AI operations.
 
 4. **Run the frontend** (choose one):
 

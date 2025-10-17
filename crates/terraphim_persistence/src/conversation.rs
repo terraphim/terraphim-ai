@@ -157,7 +157,7 @@ impl OpenDALConversationPersistence {
     /// Update the index with a conversation summary
     async fn update_index(&self, conversation: &Conversation) -> Result<()> {
         let mut index = self.load_index().await?;
-        let summary = ConversationSummary::from(conversation);
+        let summary = ConversationSummary::from_conversation(conversation);
         index.add(summary);
         self.save_index(&index).await
     }

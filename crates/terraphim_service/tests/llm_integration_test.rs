@@ -1,6 +1,6 @@
 use ahash::AHashMap;
 use serial_test::serial;
-use terraphim_service::llm::{build_llm_from_role, ChatOptions, SummarizeOptions};
+use terraphim_service::llm::{build_llm_from_role, ChatMessage, ChatOptions, SummarizeOptions};
 
 /// Test LLM client integration with real Ollama
 #[tokio::test]
@@ -63,8 +63,14 @@ async fn test_llm_client_integration() {
 
     // Test chat completion
     let messages = vec![
-        serde_json::json!({"role": "system", "content": "You are a helpful assistant."}),
-        serde_json::json!({"role": "user", "content": "What is 2+2?"}),
+        ChatMessage {
+            role: "system".to_string(),
+            content: "You are a helpful assistant.".to_string(),
+        },
+        ChatMessage {
+            role: "user".to_string(),
+            content: "What is 2+2?".to_string(),
+        },
     ];
 
     let chat_response = tokio::time::timeout(
