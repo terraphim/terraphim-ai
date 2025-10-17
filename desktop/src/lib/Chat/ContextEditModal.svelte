@@ -102,7 +102,7 @@ function _handleKeydown(event: KeyboardEvent) {
                 bind:value={editingContext.context_type}
                 data-testid="context-type-select"
               >
-                {#each contextTypeOptions as option}
+                {#each _contextTypeOptions as option}
                   <option value={option.value}>{option.label}</option>
                 {/each}
               </select>
@@ -282,7 +282,7 @@ function _handleKeydown(event: KeyboardEvent) {
             <div class="control">
               <button
                 class="button is-danger is-outlined"
-                on:click={handleDelete}
+                on:click={_handleDelete}
                 data-testid="delete-context-button"
               >
                 <span class="icon">
