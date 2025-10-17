@@ -10,11 +10,16 @@ pub struct SummarizeOptions {
     pub max_length: usize,
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct ChatOptions {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ChatMessage {
+    pub role: String, // "system", "user", "assistant"
+    pub content: String,
 }
 
 #[async_trait::async_trait]
@@ -23,21 +28,16 @@ pub trait LlmClient: Send + Sync {
 
     async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String>;
 
+    async fn chat_completion(
+        &self,
+        messages: Vec<ChatMessage>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String>;
+
     /// List available models for this provider (best-effort)
     async fn list_models(&self) -> ServiceResult<Vec<String>> {
         Err(crate::ServiceError::Config(
             "Listing models not supported by this provider".to_string(),
-        ))
-    }
-
-    /// Perform a chat completion with messages
-    async fn chat_completion(
-        &self,
-        _messages: Vec<serde_json::Value>,
-        _opts: ChatOptions,
-    ) -> ServiceResult<String> {
-        Err(crate::ServiceError::Config(
-            "Chat completion not supported by this provider".to_string(),
         ))
     }
 
@@ -183,6 +183,23 @@ impl LlmClient for OpenRouterClient {
             .generate_summary(content, opts.max_length)
             .await?;
         Ok(summary)
+    }
+
+    async fn chat_completion(
+        &self,
+        messages: Vec<ChatMessage>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        let messages_json: Vec<serde_json::Value> = messages
+            .into_iter()
+            .map(|msg| serde_json::json!({"role": msg.role, "content": msg.content}))
+            .collect();
+
+        let response = self
+            .inner
+            .chat_completion(messages_json, opts.max_tokens, opts.temperature)
+            .await?;
+        Ok(response)
     }
 
     async fn list_models(&self) -> ServiceResult<Vec<String>> {
@@ -334,6 +351,99 @@ impl LlmClient for OllamaClient {
         }
         Err(last_err.unwrap_or_else(|| {
             crate::ServiceError::Config("Ollama request failed (unknown)".to_string())
+        }))
+    }
+
+    async fn chat_completion(
+        &self,
+        messages: Vec<ChatMessage>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        let max_attempts = 3;
+        let url = format!("{}/api/chat", self.base_url.trim_end_matches('/'));
+        let mut last_err: Option<crate::ServiceError> = None;
+
+        // Convert ChatMessage to Ollama format
+        let ollama_messages: Vec<serde_json::Value> = messages
+            .into_iter()
+            .map(|msg| {
+                serde_json::json!({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            })
+            .collect();
+
+        for attempt in 1..=max_attempts {
+            let body = serde_json::json!({
+                "model": self.model,
+                "messages": ollama_messages,
+                "stream": false,
+                "options": {
+                    "num_predict": opts.max_tokens.unwrap_or(1024),
+                    "temperature": opts.temperature.unwrap_or(0.7)
+                }
+            });
+
+            let req = self
+                .http
+                .post(url.clone())
+                .timeout(std::time::Duration::from_secs(60)) // Longer timeout for chat
+                .json(&body);
+
+            match req.send().await {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        let status = resp.status();
+                        let text = resp.text().await.unwrap_or_default();
+                        last_err = Some(crate::ServiceError::Config(format!(
+                            "Ollama chat error {}: {}",
+                            status, text
+                        )));
+                        // Retry on 5xx; break on 4xx
+                        if status.is_server_error() && attempt < max_attempts {
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    match resp.json::<serde_json::Value>().await {
+                        Ok(json) => {
+                            let content = json
+                                .get("message")
+                                .and_then(|m| m.get("content"))
+                                .and_then(|c| c.as_str())
+                                .unwrap_or("")
+                                .trim()
+                                .to_string();
+
+                            return Ok(content);
+                        }
+                        Err(e) => {
+                            last_err = Some(crate::ServiceError::Config(format!(
+                                "Invalid Ollama chat response: {}",
+                                e
+                            )));
+                            if attempt < max_attempts {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(crate::ServiceError::Config(format!(
+                        "Ollama chat request failed: {}",
+                        e
+                    )));
+                    if attempt < max_attempts {
+                        continue;
+                    }
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| {
+            crate::ServiceError::Config("Ollama chat request failed (unknown)".to_string())
         }))
     }
 

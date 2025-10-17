@@ -2,6 +2,10 @@ server_hostname = '127.0.0.1:8000'
 api_endpoint = 'http://localhost:8000/api'
 initialized = true
 default_data_path = '/tmp/terraphim_test'
+[profiles.rock]
+datadir = '/tmp/opendal/rocksdb'
+type = 'rocksdb'
+
 [profiles.sled]
 datadir = '/tmp/opendal/sled'
 type = 'sled'
@@ -10,14 +14,10 @@ type = 'sled'
 root = '/tmp/dashmaptest'
 type = 'dashmap'
 
-[profiles.rock]
-datadir = '/tmp/opendal/rocksdb'
-type = 'rocksdb'
-
 [profiles.s3]
 secret_access_key = 'test_secret'
-region = 'us-west-1'
 type = 's3'
+region = 'us-west-1'
+endpoint = 'http://rpi4node3:8333/'
 access_key_id = 'test_key'
 bucket = 'test'
-endpoint = 'http://rpi4node3:8333/'

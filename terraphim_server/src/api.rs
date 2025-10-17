@@ -11,8 +11,8 @@ use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
 
-use crate::AppState;
 use terraphim_config::Config;
+use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::magic_unpair;
 use terraphim_rolegraph::RoleGraph;
@@ -39,11 +39,11 @@ pub struct CreateDocumentResponse {
 
 /// Creates index of the document for each rolegraph
 pub(crate) async fn create_document(
-    State(app_state): State<AppState>,
+    State(config): State<ConfigState>,
     Json(document): Json<Document>,
 ) -> Result<Json<CreateDocumentResponse>> {
     log::debug!("create_document");
-    let mut terraphim_service = TerraphimService::new(app_state.config_state.clone());
+    let mut terraphim_service = TerraphimService::new(config.clone());
     let document = terraphim_service.create_document(document).await?;
     Ok(Json(CreateDocumentResponse {
         status: Status::Success,
@@ -74,12 +74,12 @@ pub struct SearchResponse {
 /// Search for documents in all Terraphim graphs defined in the config via GET params
 pub(crate) async fn search_documents(
     Extension(_tx): Extension<SearchResultsStream>,
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     search_query: Query<SearchQuery>,
 ) -> Result<Json<SearchResponse>> {
     log::debug!("search_document called with {:?}", search_query);
 
-    let mut terraphim_service = TerraphimService::new(app_state.config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
     let results = terraphim_service.search(&search_query.0).await?;
     let total = results.len();
 
@@ -93,12 +93,12 @@ pub(crate) async fn search_documents(
 /// Search for documents in all Terraphim graphs defined in the config via POST body
 pub(crate) async fn search_documents_post(
     Extension(_tx): Extension<SearchResultsStream>,
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     search_query: Json<SearchQuery>,
 ) -> Result<Json<SearchResponse>> {
     log::debug!("POST Searching documents with query: {search_query:?}");
 
-    let mut terraphim_service = TerraphimService::new(app_state.config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
     let results = terraphim_service.search(&search_query).await?;
     let total = results.len();
 
@@ -127,9 +127,9 @@ pub struct ConfigResponse {
 }
 
 /// API handler for Terraphim Config
-pub(crate) async fn get_config(State(app_state): State<AppState>) -> Result<Json<ConfigResponse>> {
+pub(crate) async fn get_config(State(config): State<ConfigState>) -> Result<Json<ConfigResponse>> {
     log::debug!("Called API endpoint get_config");
-    let terraphim_service = TerraphimService::new(app_state.config_state);
+    let terraphim_service = TerraphimService::new(config);
     let config = terraphim_service.fetch_config().await;
     Ok(Json(ConfigResponse {
         status: Status::Success,
@@ -142,13 +142,13 @@ pub(crate) async fn get_config(State(app_state): State<AppState>) -> Result<Json
 /// This function updates the configuration both in-memory and persists it to disk
 /// so that the changes survive server restarts.
 pub(crate) async fn update_config(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Json(config_new): Json<Config>,
 ) -> Result<Json<ConfigResponse>> {
     log::info!("Updating configuration and persisting to disk");
 
     // Update in-memory configuration
-    let mut config = app_state.config_state.config.lock().await;
+    let mut config = config_state.config.lock().await;
     *config = config_new.clone();
     drop(config); // Release the lock before async save operation
 
@@ -188,10 +188,10 @@ pub struct SelectedRoleRequest {
 
 /// Update only the selected role without replacing the whole config
 pub(crate) async fn update_selected_role(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Json(payload): Json<SelectedRoleRequest>,
 ) -> Result<Json<ConfigResponse>> {
-    let terraphim_service = TerraphimService::new(app_state.config_state.clone());
+    let terraphim_service = TerraphimService::new(config_state.clone());
     let config = terraphim_service
         .update_selected_role(payload.selected_role)
         .await?;
@@ -231,18 +231,18 @@ pub struct RoleGraphQuery {
 
 /// Return nodes and edges for the RoleGraph of the requested role (or currently selected role if omitted)
 pub(crate) async fn get_rolegraph(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Query(query): Query<RoleGraphQuery>,
 ) -> Result<Json<RoleGraphResponseDto>> {
     // Determine which role we should use
     let role_name: RoleName = if let Some(role_str) = query.role {
         RoleName::new(&role_str)
     } else {
-        app_state.config_state.get_selected_role().await
+        config_state.get_selected_role().await
     };
 
     // Retrieve the rolegraph for the role
-    let Some(rolegraph_sync) = app_state.config_state.roles.get(&role_name) else {
+    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
             StatusCode::NOT_FOUND,
             anyhow::anyhow!(format!("Rolegraph not found for role: {role_name}")),
@@ -303,7 +303,7 @@ pub struct KgSearchQuery {
 /// For example, given "haystack", it will find documents like "haystack.md" that contain
 /// this term or its synonyms ("datasource", "service", "agent").
 pub(crate) async fn find_documents_by_kg_term(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     axum::extract::Path(role_name): axum::extract::Path<String>,
     Query(query): Query<KgSearchQuery>,
 ) -> Result<Json<SearchResponse>> {
@@ -314,7 +314,7 @@ pub(crate) async fn find_documents_by_kg_term(
     );
 
     let role_name = RoleName::new(&role_name);
-    let mut terraphim_service = TerraphimService::new(app_state.config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
 
     let results = terraphim_service
         .find_documents_for_kg_term(&role_name, &query.term)
@@ -510,10 +510,10 @@ pub struct SummarizationStatusQuery {
 pub struct SummarizationStatusResponse {
     /// Status of the request
     pub status: Status,
-    /// Whether LLM is enabled for this role
-    pub llm_enabled: bool,
-    /// Whether LLM is properly configured for this role
-    pub llm_configured: bool,
+    /// Whether OpenRouter is enabled for this role
+    pub openrouter_enabled: bool,
+    /// Whether OpenRouter is properly configured for this role
+    pub openrouter_configured: bool,
     /// The model that would be used for summarization
     pub model: Option<String>,
     /// Number of documents with existing summaries for this role
@@ -530,18 +530,12 @@ pub struct ChatMessage {
 /// Chat request payload
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatRequest {
-    /// Role to use for chat (determines LLM configuration)
+    /// Role to use for chat (determines OpenRouter configuration)
     pub role: String,
     /// Conversation so far
     pub messages: Vec<ChatMessage>,
     /// Optional model override
     pub model: Option<String>,
-    /// Optional conversation ID to include context from
-    pub conversation_id: Option<String>,
-    /// Optional maximum tokens for the response
-    pub max_tokens: Option<u32>,
-    /// Optional temperature for response randomness (0.0-1.0)
-    pub temperature: Option<f32>,
 }
 
 /// Chat response payload
@@ -553,13 +547,13 @@ pub struct ChatResponse {
     pub error: Option<String>,
 }
 
-/// Handle chat completion via generic LLM client (OpenRouter, Ollama, etc.)
+/// Handle chat completion via generic LLM interface (OpenRouter or Ollama)
 pub(crate) async fn chat_completion(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Json(request): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>> {
     let role_name = RoleName::new(&request.role);
-    let config = app_state.config_state.config.lock().await;
+    let config = config_state.config.lock().await;
 
     let Some(role_ref) = config.roles.get(&role_name) else {
         return Ok(Json(ChatResponse {
@@ -573,241 +567,64 @@ pub(crate) async fn chat_completion(
     // Clone role data to use after releasing the lock
     let role = role_ref.clone();
 
-    // Check if VM execution is enabled BEFORE role is consumed
-    log::info!(
-        "Checking VM execution for role: {}, extra keys: {:?}",
-        role.name,
-        role.extra.keys().collect::<Vec<_>>()
-    );
-    let has_vm_execution = role
-        .extra
-        .get("vm_execution")
-        .or_else(|| {
-            // Handle nested extra field (serialization quirk similar to llm.rs)
-            role.extra
-                .get("extra")
-                .and_then(|nested| nested.get("vm_execution"))
-        })
-        .and_then(|vm_config| {
-            log::info!("Found vm_execution config: {:?}", vm_config);
-            vm_config.get("enabled")
-        })
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    log::info!("VM execution enabled: {}", has_vm_execution);
-
-    // Clone role again for VM execution if needed
-    let role_for_vm = if has_vm_execution {
-        Some(role.clone())
-    } else {
-        None
-    };
-
     drop(config);
 
-    // Try to build an LLM client from the role configuration
-    use terraphim_service::llm;
-    let Some(llm_client) = llm::build_llm_from_role(&role) else {
-        return Ok(Json(ChatResponse {
-            status: Status::Error,
-            message: None,
-            model_used: None,
-            error: Some("No LLM provider configured for this role. Please configure OpenRouter or Ollama in the role's 'extra' settings.".to_string()),
-        }));
-    };
-
-    // Build messages array; optionally inject system prompt and context
-    let mut messages_json: Vec<serde_json::Value> = Vec::new();
-
-    // Start with system prompt if available (support both OpenRouter and generic formats)
-    let system_prompt = {
-        #[cfg(feature = "openrouter")]
-        {
-            role.llm_chat_system_prompt.or_else(|| {
-                // Try generic system prompt from extra
-                role.extra
-                    .get("system_prompt")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-            })
-        }
-        #[cfg(not(feature = "openrouter"))]
-        {
-            // Try generic system prompt from extra
-            role.extra
-                .get("system_prompt")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
+    // Try to build LLM client from role configuration
+    let llm_client = match terraphim_service::llm::build_llm_from_role(&role) {
+        Some(client) => client,
+        None => {
+            return Ok(Json(ChatResponse {
+                status: Status::Error,
+                message: None,
+                model_used: None,
+                error: Some("No LLM provider configured for this role. Please configure either OpenRouter or Ollama.".to_string()),
+            }));
         }
     };
 
-    if let Some(system) = &system_prompt {
-        messages_json.push(serde_json::json!({"role":"system","content":system}));
-    }
+    let model_name = llm_client.name();
 
-    // Inject context from conversation if provided
-    if let Some(conversation_id) = &request.conversation_id {
-        let conv_id = ConversationId::from_string(conversation_id.clone());
-        let manager = CONTEXT_MANAGER.lock().await;
+    // Convert API messages to LLM client format
+    let mut messages: Vec<terraphim_service::llm::ChatMessage> = Vec::new();
 
-        if let Some(conversation) = manager.get_conversation(&conv_id) {
-            // Build context content from all context items
-            let mut context_content = String::new();
-
-            if !conversation.global_context.is_empty() {
-                context_content.push_str("=== CONTEXT INFORMATION ===\n");
-                context_content.push_str("The following information provides relevant context for this conversation:\n\n");
-
-                for (index, context_item) in conversation.global_context.iter().enumerate() {
-                    context_content.push_str(&format!(
-                        "Context Item {}: {}\n",
-                        index + 1,
-                        context_item.title
-                    ));
-                    if let Some(score) = context_item.relevance_score {
-                        context_content.push_str(&format!("Relevance Score: {:.2}\n", score));
-                    }
-                    context_content.push_str(&format!("Content: {}\n", context_item.content));
-                    if !context_item.metadata.is_empty() {
-                        context_content
-                            .push_str(&format!("Metadata: {:?}\n", context_item.metadata));
-                    }
-                    context_content.push_str("\n---\n\n");
-                }
-
-                context_content.push_str("=== END CONTEXT ===\n\n");
-                context_content.push_str("Please use this context information to inform your responses. You can reference specific context items when relevant.\n\n");
-
-                // Add context as a system message after the main system prompt
-                messages_json
-                    .push(serde_json::json!({"role": "system", "content": context_content}));
-            }
+    // Add system prompt if configured (for OpenRouter compatibility)
+    #[cfg(feature = "openrouter")]
+    {
+        if let Some(system) = &role.openrouter_chat_system_prompt {
+            messages.push(terraphim_service::llm::ChatMessage {
+                role: "system".to_string(),
+                content: system.clone(),
+            });
         }
     }
 
-    // Add user messages from the request
+    // Add request messages
     for m in request.messages.iter() {
-        messages_json.push(serde_json::json!({"role": m.role, "content": m.content}));
+        messages.push(terraphim_service::llm::ChatMessage {
+            role: m.role.clone(),
+            content: m.content.clone(),
+        });
     }
 
-    // Determine model name for response
-    let model_name = request
-        .model
-        .or({
-            #[cfg(feature = "openrouter")]
-            {
-                role.llm_chat_model
-                    .clone()
-                    .or_else(|| role.llm_model.clone())
-            }
-            #[cfg(not(feature = "openrouter"))]
-            {
-                None
-            }
-        })
-        .or_else(|| {
-            role.extra
-                .get("llm_model")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
-        .or_else(|| {
-            role.extra
-                .get("ollama_model")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| format!("{} (default)", llm_client.name()));
-
-    // Configure chat options
-    let chat_opts = llm::ChatOptions {
-        max_tokens: request.max_tokens.or(Some(1024)),
-        temperature: request.temperature.or(Some(0.7)),
+    // Set up chat options
+    let chat_opts = terraphim_service::llm::ChatOptions {
+        max_tokens: Some(1024),
+        temperature: Some(0.7),
     };
 
-    // Call the LLM client FIRST
-    match llm_client.chat_completion(messages_json, chat_opts).await {
-        Ok(mut reply) => {
-            // Check for code blocks in LLM response AFTER getting the reply
-            let vm_execution_result = if let Some(role_for_vm) = role_for_vm.clone() {
-                if reply.contains("```") {
-                    use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
-                    use terraphim_persistence::DeviceStorage;
-
-                    log::info!("Detected code blocks in LLM response, attempting VM execution");
-                    log::info!(
-                        "LLM response length: {}, contains backticks: {}",
-                        reply.len(),
-                        reply.matches("```").count()
-                    );
-
-                    // Create in-memory persistence for this chat session
-                    match DeviceStorage::arc_memory_only().await {
-                        Ok(persistence) => {
-                            match TerraphimAgent::new(role_for_vm, persistence, None).await {
-                                Ok(agent) => {
-                                    if let Ok(()) = agent.initialize().await {
-                                        // Execute code blocks from LLM response
-                                        let execute_input =
-                                            CommandInput::new(reply.clone(), CommandType::Execute);
-
-                                        match agent.process_command(execute_input).await {
-                                            Ok(vm_result) => {
-                                                log::info!("VM execution completed successfully");
-                                                // Return execution results, not "no code found" messages
-                                                if !vm_result
-                                                    .text
-                                                    .contains("No executable code found")
-                                                {
-                                                    Some(vm_result.text)
-                                                } else {
-                                                    None
-                                                }
-                                            }
-                                            Err(e) => {
-                                                log::warn!("VM execution failed: {}", e);
-                                                Some(format!("VM Execution Error: {}", e))
-                                            }
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                }
-                                Err(e) => {
-                                    log::warn!("Failed to create agent for VM execution: {}", e);
-                                    None
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to create persistence for VM execution: {}", e);
-                            None
-                        }
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            // Append VM execution results if available
-            if let Some(vm_output) = vm_execution_result {
-                reply = format!("{}\n\n--- VM Execution Results ---\n{}", reply, vm_output);
-            }
-
-            Ok(Json(ChatResponse {
-                status: Status::Success,
-                message: Some(reply),
-                model_used: Some(model_name),
-                error: None,
-            }))
-        }
+    // Call the generic LLM client
+    match llm_client.chat_completion(messages, chat_opts).await {
+        Ok(reply) => Ok(Json(ChatResponse {
+            status: Status::Success,
+            message: Some(reply),
+            model_used: Some(model_name.to_string()),
+            error: None,
+        })),
         Err(e) => Ok(Json(ChatResponse {
             status: Status::Error,
             message: None,
-            model_used: Some(model_name),
-            error: Some(format!("Chat failed: {}", e)),
+            model_used: Some(model_name.to_string()),
+            error: Some(format!("Chat completion failed: {}", e)),
         })),
     }
 }
@@ -827,13 +644,12 @@ pub struct OpenRouterModelsResponse {
 }
 
 #[allow(dead_code)]
-#[cfg_attr(not(feature = "openrouter"), allow(unused_variables))]
 pub(crate) async fn list_openrouter_models(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Json(req): Json<OpenRouterModelsRequest>,
 ) -> Result<Json<OpenRouterModelsResponse>> {
     let role_name = RoleName::new(&req.role);
-    let config = app_state.config_state.config.lock().await;
+    let config = config_state.config.lock().await;
     let Some(role) = config.roles.get(&role_name) else {
         return Ok(Json(OpenRouterModelsResponse {
             status: Status::Error,
@@ -847,7 +663,7 @@ pub(crate) async fn list_openrouter_models(
         // Determine API key preference: request -> role -> env
         let api_key = if let Some(k) = &req.api_key {
             k.clone()
-        } else if let Some(k) = &role.llm_api_key {
+        } else if let Some(k) = &role.openrouter_api_key {
             k.clone()
         } else {
             match std::env::var("OPENROUTER_KEY") {
@@ -864,7 +680,7 @@ pub(crate) async fn list_openrouter_models(
 
         // Any valid model string works for constructing the client
         let seed_model = role
-            .llm_model
+            .openrouter_model
             .clone()
             .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
 
@@ -907,9 +723,8 @@ pub(crate) async fn list_openrouter_models(
 /// This endpoint generates AI-powered summaries for documents using the OpenRouter service.
 /// It requires the role to have OpenRouter properly configured (enabled, API key, model).
 /// Summaries are cached in the persistence layer to avoid redundant API calls.
-#[cfg_attr(not(feature = "openrouter"), allow(unused_variables))]
 pub(crate) async fn summarize_document(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Json(request): Json<SummarizeDocumentRequest>,
 ) -> Result<Json<SummarizeDocumentResponse>> {
     log::debug!(
@@ -919,7 +734,7 @@ pub(crate) async fn summarize_document(
     );
 
     let role_name = RoleName::new(&request.role);
-    let config = app_state.config_state.config.lock().await;
+    let config = config_state.config.lock().await;
 
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
@@ -933,164 +748,142 @@ pub(crate) async fn summarize_document(
         }));
     };
 
-    // Check if OpenRouter is enabled and configured for this role
-    #[cfg(feature = "openrouter")]
-    {
-        if !role_ref.has_llm_config() {
+    // Clone role to use after dropping lock
+    let role = role_ref.clone();
+    let max_length = request.max_length.unwrap_or(250);
+    let force_regenerate = request.force_regenerate.unwrap_or(false);
+
+    drop(config); // Release the lock before async operations
+
+    // Try to build LLM client from role configuration
+    let llm_client = match terraphim_service::llm::build_llm_from_role(&role) {
+        Some(client) => client,
+        None => {
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
                 summary: None,
                 model_used: None,
                 from_cache: false,
-                error: Some("OpenRouter not properly configured for this role".to_string()),
+                error: Some("No LLM provider configured for this role. Please configure either OpenRouter or Ollama.".to_string()),
             }));
         }
+    };
 
-        // Clone role to use after dropping lock
-        let role = role_ref.clone();
+    let model_name = llm_client.name();
 
-        // Get the API key from environment variable if not set in role
-        let api_key = if let Some(key) = &role.llm_api_key {
-            key.clone()
-        } else {
-            std::env::var("OPENROUTER_KEY").map_err(|_| {
-                crate::error::ApiError(
-                    StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("OpenRouter API key not found in role configuration or OPENROUTER_KEY environment variable"),
-                )
-            })?
-        };
+    let mut terraphim_service = TerraphimService::new(config_state);
 
-        let model = role.llm_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
-        let max_length = request.max_length.unwrap_or(250);
-        let force_regenerate = request.force_regenerate.unwrap_or(false);
-
-        drop(config); // Release the lock before async operations
-
-        let mut terraphim_service = TerraphimService::new(app_state.config_state);
-
-        // Try to load existing document first
-        let document_opt = match terraphim_service
-            .get_document_by_id(&request.document_id)
-            .await
-        {
-            Ok(doc_opt) => doc_opt,
-            Err(e) => {
-                log::error!("Failed to load document '{}': {:?}", request.document_id, e);
-                return Ok(Json(SummarizeDocumentResponse {
-                    status: Status::Error,
-                    document_id: request.document_id,
-                    summary: None,
-                    model_used: None,
-                    from_cache: false,
-                    error: Some(format!("Document not found: {}", e)),
-                }));
-            }
-        };
-        let Some(document) = document_opt else {
+    // Try to load existing document first
+    let document_opt = match terraphim_service
+        .get_document_by_id(&request.document_id)
+        .await
+    {
+        Ok(doc_opt) => doc_opt,
+        Err(e) => {
+            log::error!("Failed to load document '{}': {:?}", request.document_id, e);
             return Ok(Json(SummarizeDocumentResponse {
                 status: Status::Error,
                 document_id: request.document_id,
                 summary: None,
                 model_used: None,
                 from_cache: false,
-                error: Some("Document not found".to_string()),
+                error: Some(format!("Document not found: {}", e)),
             }));
-        };
-
-        // Check if we already have a summary and don't need to regenerate
-        if !force_regenerate {
-            if let Some(existing_summary) = &document.description {
-                if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
-                    log::debug!(
-                        "Using cached summary for document '{}'",
-                        request.document_id
-                    );
-                    return Ok(Json(SummarizeDocumentResponse {
-                        status: Status::Success,
-                        document_id: request.document_id,
-                        summary: Some(existing_summary.clone()),
-                        model_used: Some(model.to_string()),
-                        from_cache: true,
-                        error: None,
-                    }));
-                }
-            }
         }
-
-        // Generate new summary using OpenRouter
-        match terraphim_service
-            .generate_document_summary(&document, &api_key, model, max_length)
-            .await
-        {
-            Ok(summary) => {
-                log::info!(
-                    "Generated summary for document '{}' using model '{}'",
-                    request.document_id,
-                    model
-                );
-
-                // Save the updated document with the new summary
-                let mut updated_doc = document.clone();
-                updated_doc.description = Some(summary.clone());
-
-                if let Err(e) = updated_doc.save().await {
-                    log::error!(
-                        "Failed to save summary for document '{}': {:?}",
-                        request.document_id,
-                        e
-                    );
-                }
-
-                Ok(Json(SummarizeDocumentResponse {
-                    status: Status::Success,
-                    document_id: request.document_id,
-                    summary: Some(summary),
-                    model_used: Some(model.to_string()),
-                    from_cache: false,
-                    error: None,
-                }))
-            }
-            Err(e) => {
-                log::error!(
-                    "Failed to generate summary for document '{}': {:?}",
-                    request.document_id,
-                    e
-                );
-                Ok(Json(SummarizeDocumentResponse {
-                    status: Status::Error,
-                    document_id: request.document_id,
-                    summary: None,
-                    model_used: Some(model.to_string()),
-                    from_cache: false,
-                    error: Some(format!("Summarization failed: {}", e)),
-                }))
-            }
-        }
-    }
-
-    #[cfg(not(feature = "openrouter"))]
-    {
-        Ok(Json(SummarizeDocumentResponse {
+    };
+    let Some(document) = document_opt else {
+        return Ok(Json(SummarizeDocumentResponse {
             status: Status::Error,
             document_id: request.document_id,
             summary: None,
             model_used: None,
             from_cache: false,
-            error: Some("OpenRouter feature not enabled during compilation".to_string()),
-        }))
+            error: Some("Document not found".to_string()),
+        }));
+    };
+
+    // Check if we already have a summary and don't need to regenerate
+    if !force_regenerate {
+        if let Some(existing_summary) = &document.description {
+            if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
+                log::debug!(
+                    "Using cached summary for document '{}'",
+                    request.document_id
+                );
+                return Ok(Json(SummarizeDocumentResponse {
+                    status: Status::Success,
+                    document_id: request.document_id,
+                    summary: Some(existing_summary.clone()),
+                    model_used: Some(model_name.to_string()),
+                    from_cache: true,
+                    error: None,
+                }));
+            }
+        }
+    }
+
+    // Generate new summary using the generic LLM client
+    match llm_client
+        .summarize(
+            &document.body,
+            terraphim_service::llm::SummarizeOptions { max_length },
+        )
+        .await
+    {
+        Ok(summary) => {
+            log::info!(
+                "Generated summary for document '{}' using provider '{}'",
+                request.document_id,
+                model_name
+            );
+
+            // Save the updated document with the new summary
+            let mut updated_doc = document.clone();
+            updated_doc.description = Some(summary.clone());
+
+            if let Err(e) = updated_doc.save().await {
+                log::error!(
+                    "Failed to save summary for document '{}': {:?}",
+                    request.document_id,
+                    e
+                );
+            }
+
+            Ok(Json(SummarizeDocumentResponse {
+                status: Status::Success,
+                document_id: request.document_id,
+                summary: Some(summary),
+                model_used: Some(model_name.to_string()),
+                from_cache: false,
+                error: None,
+            }))
+        }
+        Err(e) => {
+            log::error!(
+                "Failed to generate summary for document '{}': {:?}",
+                request.document_id,
+                e
+            );
+            Ok(Json(SummarizeDocumentResponse {
+                status: Status::Error,
+                document_id: request.document_id,
+                summary: None,
+                model_used: Some(model_name.to_string()),
+                from_cache: false,
+                error: Some(format!("Summarization failed: {}", e)),
+            }))
+        }
     }
 }
 
 /// Check summarization status and capabilities for a role
-#[cfg_attr(not(feature = "openrouter"), allow(unused_variables))]
 pub(crate) async fn get_summarization_status(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Query(query): Query<SummarizationStatusQuery>,
 ) -> Result<Json<SummarizationStatusResponse>> {
     let role_name = RoleName::new(&query.role);
-    let config = app_state.config_state.config.lock().await;
+    let config = config_state.config.lock().await;
 
     let Some(role) = config.roles.get(&role_name) else {
         return Err(crate::error::ApiError(
@@ -1101,9 +894,10 @@ pub(crate) async fn get_summarization_status(
 
     #[cfg(feature = "openrouter")]
     {
-        let llm_enabled = role.llm_enabled;
-        let llm_configured = role.has_llm_config() || std::env::var("OPENROUTER_KEY").is_ok();
-        let model = role.get_llm_model().map(|s| s.to_string());
+        let openrouter_enabled = role.openrouter_enabled;
+        let openrouter_configured =
+            role.has_openrouter_config() || std::env::var("OPENROUTER_KEY").is_ok();
+        let model = role.get_openrouter_model().map(|s| s.to_string());
 
         // Note: For now, we'll set cached_summaries_count to 0
         // In the future, this could query the persistence layer for documents with summaries
@@ -1111,8 +905,8 @@ pub(crate) async fn get_summarization_status(
 
         Ok(Json(SummarizationStatusResponse {
             status: Status::Success,
-            llm_enabled,
-            llm_configured,
+            openrouter_enabled,
+            openrouter_configured,
             model,
             cached_summaries_count,
         }))
@@ -1122,8 +916,8 @@ pub(crate) async fn get_summarization_status(
     {
         Ok(Json(SummarizationStatusResponse {
             status: Status::Success,
-            llm_enabled: false,
-            llm_configured: false,
+            openrouter_enabled: false,
+            openrouter_configured: false,
             model: None,
             cached_summaries_count: 0,
         }))
@@ -1134,7 +928,7 @@ pub(crate) async fn get_summarization_status(
 
 /// Submit a document for async summarization
 pub(crate) async fn async_summarize_document(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Extension(summarization_manager): Extension<
         Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
     >,
@@ -1147,7 +941,7 @@ pub(crate) async fn async_summarize_document(
     );
 
     let role_name = RoleName::new(&request.role);
-    let config = app_state.config_state.config.lock().await;
+    let config = config_state.config.lock().await;
 
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
@@ -1164,7 +958,7 @@ pub(crate) async fn async_summarize_document(
     drop(config); // Release the lock
 
     // Load the document
-    let mut terraphim_service = TerraphimService::new(app_state.config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
     let document = match terraphim_service
         .get_document_by_id(&request.document_id)
         .await
@@ -1466,7 +1260,7 @@ pub(crate) async fn get_queue_stats(
 
 /// Submit multiple documents for batch summarization
 pub(crate) async fn batch_summarize_documents(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Extension(summarization_manager): Extension<
         Arc<Mutex<terraphim_service::summarization_manager::SummarizationManager>>,
     >,
@@ -1479,7 +1273,7 @@ pub(crate) async fn batch_summarize_documents(
     );
 
     let role_name = RoleName::new(&request.role);
-    let config = app_state.config_state.config.lock().await;
+    let config = config_state.config.lock().await;
 
     // Get the role configuration
     let Some(role_ref) = config.roles.get(&role_name) else {
@@ -1516,7 +1310,7 @@ pub(crate) async fn batch_summarize_documents(
         }
     };
 
-    let mut terraphim_service = TerraphimService::new(app_state.config_state);
+    let mut terraphim_service = TerraphimService::new(config_state);
     let manager = summarization_manager.lock().await;
 
     let mut task_ids = Vec::new();
@@ -1665,7 +1459,7 @@ pub struct AutocompleteSuggestion {
 /// This endpoint returns the thesaurus (concept mappings) for a given role,
 /// which is used for search bar autocomplete functionality in the UI.
 pub(crate) async fn get_thesaurus(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Path(role_name): Path<String>,
 ) -> Result<Json<ThesaurusResponse>> {
     log::debug!("Getting thesaurus for role '{}'", role_name);
@@ -1673,7 +1467,7 @@ pub(crate) async fn get_thesaurus(
     let role_name = RoleName::new(&role_name);
 
     // Get the role graph for the specified role
-    let Some(rolegraph_sync) = app_state.config_state.roles.get(&role_name) else {
+    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
         return Ok(Json(ThesaurusResponse {
             status: Status::Error,
             thesaurus: None,
@@ -1709,7 +1503,7 @@ pub(crate) async fn get_thesaurus(
 /// This endpoint uses the Finite State Transducer (FST) from terraphim_automata
 /// to provide fast, intelligent autocomplete suggestions with fuzzy matching.
 pub(crate) async fn get_autocomplete(
-    State(app_state): State<AppState>,
+    State(config_state): State<ConfigState>,
     Path((role_name, query)): Path<(String, String)>,
 ) -> Result<Json<AutocompleteResponse>> {
     use terraphim_automata::{
@@ -1725,7 +1519,7 @@ pub(crate) async fn get_autocomplete(
     let role_name = RoleName::new(&role_name);
 
     // Get the role graph for the specified role
-    let Some(rolegraph_sync) = app_state.config_state.roles.get(&role_name) else {
+    let Some(rolegraph_sync) = config_state.roles.get(&role_name) else {
         return Ok(Json(AutocompleteResponse {
             status: Status::Error,
             suggestions: vec![],
@@ -1815,381 +1609,4 @@ pub(crate) async fn get_autocomplete(
         suggestions,
         error: None,
     }))
-}
-
-// =================== CONVERSATION MANAGEMENT API ===================
-
-use terraphim_service::context::{ContextConfig, ContextManager};
-use terraphim_types::{ConversationId, ConversationSummary};
-
-/// Global context manager instance
-pub static CONTEXT_MANAGER: std::sync::LazyLock<tokio::sync::Mutex<ContextManager>> =
-    std::sync::LazyLock::new(|| {
-        tokio::sync::Mutex::new(ContextManager::new(ContextConfig::default()))
-    });
-
-/// Request to create a new conversation
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CreateConversationRequest {
-    pub title: String,
-    pub role: String,
-}
-
-/// Response for conversation creation
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CreateConversationResponse {
-    pub status: Status,
-    pub conversation_id: Option<String>,
-    pub error: Option<String>,
-}
-
-/// Request to list conversations
-#[derive(Debug, Deserialize)]
-pub struct ListConversationsQuery {
-    pub limit: Option<usize>,
-}
-
-/// Response for listing conversations
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ListConversationsResponse {
-    pub status: Status,
-    pub conversations: Vec<ConversationSummary>,
-    pub error: Option<String>,
-}
-
-/// Response for getting a single conversation
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GetConversationResponse {
-    pub status: Status,
-    pub conversation: Option<terraphim_types::Conversation>,
-    pub error: Option<String>,
-}
-
-/// Request to add a message to a conversation
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AddMessageRequest {
-    pub content: String,
-    pub role: Option<String>, // Default to "user"
-}
-
-/// Response for adding a message
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AddMessageResponse {
-    pub status: Status,
-    pub message_id: Option<String>,
-    pub error: Option<String>,
-}
-
-/// Request to add context to a conversation
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AddContextRequest {
-    pub context_type: String, // "document" | "search_result" | "user_input"
-    pub title: String,
-    pub summary: Option<String>,
-    pub content: String,
-    pub metadata: Option<std::collections::HashMap<String, String>>,
-}
-
-/// Response for adding context
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AddContextResponse {
-    pub status: Status,
-    pub error: Option<String>,
-}
-
-/// Request to add search results as context
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AddSearchContextRequest {
-    pub query: String,
-    pub documents: Vec<Document>,
-    pub limit: Option<usize>,
-}
-
-/// Request to update context in a conversation
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UpdateContextRequest {
-    pub context_type: Option<String>,
-    pub title: Option<String>,
-    pub summary: Option<String>,
-    pub content: Option<String>,
-    pub metadata: Option<std::collections::HashMap<String, String>>,
-}
-
-/// Response for updating context
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UpdateContextResponse {
-    pub status: Status,
-    pub context: Option<terraphim_types::ContextItem>,
-    pub error: Option<String>,
-}
-
-/// Response for deleting context
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DeleteContextResponse {
-    pub status: Status,
-    pub error: Option<String>,
-}
-
-/// Create a new conversation
-pub(crate) async fn create_conversation(
-    Json(request): Json<CreateConversationRequest>,
-) -> Result<Json<CreateConversationResponse>> {
-    let role_name = RoleName::new(&request.role);
-
-    let mut manager = CONTEXT_MANAGER.lock().await;
-    match manager.create_conversation(request.title, role_name).await {
-        Ok(conversation_id) => Ok(Json(CreateConversationResponse {
-            status: Status::Success,
-            conversation_id: Some(conversation_id.as_str().to_string()),
-            error: None,
-        })),
-        Err(e) => Ok(Json(CreateConversationResponse {
-            status: Status::Error,
-            conversation_id: None,
-            error: Some(format!("Failed to create conversation: {}", e)),
-        })),
-    }
-}
-
-/// List conversations
-pub(crate) async fn list_conversations(
-    Query(params): Query<ListConversationsQuery>,
-) -> Result<Json<ListConversationsResponse>> {
-    let manager = CONTEXT_MANAGER.lock().await;
-    let conversations = manager.list_conversations(params.limit);
-    Ok(Json(ListConversationsResponse {
-        status: Status::Success,
-        conversations,
-        error: None,
-    }))
-}
-
-/// Get a specific conversation
-pub(crate) async fn get_conversation(
-    Path(conversation_id): Path<String>,
-) -> Result<Json<GetConversationResponse>> {
-    let conv_id = ConversationId::from_string(conversation_id);
-
-    let manager = CONTEXT_MANAGER.lock().await;
-    match manager.get_conversation(&conv_id) {
-        Some(conversation) => Ok(Json(GetConversationResponse {
-            status: Status::Success,
-            conversation: Some((*conversation).clone()),
-            error: None,
-        })),
-        None => Ok(Json(GetConversationResponse {
-            status: Status::Error,
-            conversation: None,
-            error: Some("Conversation not found".to_string()),
-        })),
-    }
-}
-
-/// Add a message to a conversation
-pub(crate) async fn add_message_to_conversation(
-    Path(conversation_id): Path<String>,
-    Json(request): Json<AddMessageRequest>,
-) -> Result<Json<AddMessageResponse>> {
-    let conv_id = ConversationId::from_string(conversation_id);
-    let role = request.role.unwrap_or_else(|| "user".to_string());
-
-    let message = if role == "user" {
-        terraphim_types::ChatMessage::user(request.content)
-    } else if role == "assistant" {
-        terraphim_types::ChatMessage::assistant(request.content, None)
-    } else if role == "system" {
-        terraphim_types::ChatMessage::system(request.content)
-    } else {
-        return Ok(Json(AddMessageResponse {
-            status: Status::Error,
-            message_id: None,
-            error: Some(format!("Invalid role: {}", role)),
-        }));
-    };
-
-    let mut manager = CONTEXT_MANAGER.lock().await;
-    match manager.add_message(&conv_id, message) {
-        Ok(message_id) => Ok(Json(AddMessageResponse {
-            status: Status::Success,
-            message_id: Some(message_id.as_str().to_string()),
-            error: None,
-        })),
-        Err(e) => Ok(Json(AddMessageResponse {
-            status: Status::Error,
-            message_id: None,
-            error: Some(format!("Failed to add message: {}", e)),
-        })),
-    }
-}
-
-/// Add context to a conversation
-pub(crate) async fn add_context_to_conversation(
-    Path(conversation_id): Path<String>,
-    Json(request): Json<AddContextRequest>,
-) -> Result<Json<AddContextResponse>> {
-    let conv_id = ConversationId::from_string(conversation_id);
-
-    let context_type = match request.context_type.as_str() {
-        "document" => terraphim_types::ContextType::Document,
-        "search_result" => terraphim_types::ContextType::SearchResult,
-        "user_input" => terraphim_types::ContextType::UserInput,
-        "system" => terraphim_types::ContextType::System,
-        "external" => terraphim_types::ContextType::External,
-        _ => {
-            return Ok(Json(AddContextResponse {
-                status: Status::Error,
-                error: Some(format!("Invalid context type: {}", request.context_type)),
-            }))
-        }
-    };
-
-    let context_item = terraphim_types::ContextItem {
-        id: ulid::Ulid::new().to_string(),
-        context_type,
-        title: request.title,
-        summary: request.summary,
-        content: request.content,
-        metadata: request.metadata.unwrap_or_default().into_iter().collect(),
-        created_at: chrono::Utc::now(),
-        relevance_score: None,
-    };
-
-    let mut manager = CONTEXT_MANAGER.lock().await;
-    match manager.add_context(&conv_id, context_item) {
-        Ok(()) => Ok(Json(AddContextResponse {
-            status: Status::Success,
-            error: None,
-        })),
-        Err(e) => Ok(Json(AddContextResponse {
-            status: Status::Error,
-            error: Some(format!("Failed to add context: {}", e)),
-        })),
-    }
-}
-
-/// Add search results as context to a conversation
-pub(crate) async fn add_search_context_to_conversation(
-    Path(conversation_id): Path<String>,
-    Json(request): Json<AddSearchContextRequest>,
-) -> Result<Json<AddContextResponse>> {
-    let conv_id = ConversationId::from_string(conversation_id);
-
-    let mut manager = CONTEXT_MANAGER.lock().await;
-    let context_item =
-        manager.create_search_context(&request.query, &request.documents, request.limit);
-
-    match manager.add_context(&conv_id, context_item) {
-        Ok(()) => Ok(Json(AddContextResponse {
-            status: Status::Success,
-            error: None,
-        })),
-        Err(e) => Ok(Json(AddContextResponse {
-            status: Status::Error,
-            error: Some(format!("Failed to add search context: {}", e)),
-        })),
-    }
-}
-
-/// Delete context from a conversation
-pub(crate) async fn delete_context_from_conversation(
-    Path((conversation_id, context_id)): Path<(String, String)>,
-) -> Result<Json<DeleteContextResponse>> {
-    let conv_id = ConversationId::from_string(conversation_id);
-
-    let mut manager = CONTEXT_MANAGER.lock().await;
-    match manager.delete_context(&conv_id, &context_id) {
-        Ok(()) => Ok(Json(DeleteContextResponse {
-            status: Status::Success,
-            error: None,
-        })),
-        Err(e) => Ok(Json(DeleteContextResponse {
-            status: Status::Error,
-            error: Some(format!("Failed to delete context: {}", e)),
-        })),
-    }
-}
-
-/// Update context in a conversation
-pub(crate) async fn update_context_in_conversation(
-    Path((conversation_id, context_id)): Path<(String, String)>,
-    Json(request): Json<UpdateContextRequest>,
-) -> Result<Json<UpdateContextResponse>> {
-    let conv_id = ConversationId::from_string(conversation_id.clone());
-
-    // Get the existing context item first
-    let manager = CONTEXT_MANAGER.lock().await;
-    let conversation = match manager.get_conversation(&conv_id) {
-        Some(conv) => conv,
-        None => {
-            return Ok(Json(UpdateContextResponse {
-                status: Status::Error,
-                context: None,
-                error: Some(format!("Conversation {} not found", conversation_id)),
-            }))
-        }
-    };
-
-    // Find the existing context item
-    let existing_context = conversation
-        .global_context
-        .iter()
-        .find(|item| item.id == context_id);
-
-    let existing_context = match existing_context {
-        Some(ctx) => ctx,
-        None => {
-            return Ok(Json(UpdateContextResponse {
-                status: Status::Error,
-                context: None,
-                error: Some(format!("Context item {} not found", context_id)),
-            }))
-        }
-    };
-
-    // Build the updated context item
-    let context_type = if let Some(ref type_str) = request.context_type {
-        match type_str.as_str() {
-            "document" => terraphim_types::ContextType::Document,
-            "search_result" => terraphim_types::ContextType::SearchResult,
-            "user_input" => terraphim_types::ContextType::UserInput,
-            "system" => terraphim_types::ContextType::System,
-            "external" => terraphim_types::ContextType::External,
-            _ => existing_context.context_type.clone(),
-        }
-    } else {
-        existing_context.context_type.clone()
-    };
-
-    let updated_context = terraphim_types::ContextItem {
-        id: context_id.clone(),
-        context_type,
-        title: request
-            .title
-            .unwrap_or_else(|| existing_context.title.clone()),
-        summary: request.summary.or_else(|| existing_context.summary.clone()),
-        content: request
-            .content
-            .unwrap_or_else(|| existing_context.content.clone()),
-        metadata: request
-            .metadata
-            .map(|m| m.into_iter().collect())
-            .unwrap_or_else(|| existing_context.metadata.clone()),
-        created_at: existing_context.created_at,
-        relevance_score: existing_context.relevance_score,
-    };
-
-    drop(manager); // Release the lock before re-acquiring it
-    let mut manager = CONTEXT_MANAGER.lock().await;
-    match manager.update_context(&conv_id, &context_id, updated_context.clone()) {
-        Ok(context) => Ok(Json(UpdateContextResponse {
-            status: Status::Success,
-            context: Some(context),
-            error: None,
-        })),
-        Err(e) => Ok(Json(UpdateContextResponse {
-            status: Status::Error,
-            context: None,
-            error: Some(format!("Failed to update context: {}", e)),
-        })),
-    }
 }

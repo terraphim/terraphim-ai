@@ -243,19 +243,6 @@ impl fmt::Display for Document {
     }
 }
 
-impl Document {
-    /// Set the source haystack for this document
-    pub fn with_source_haystack(mut self, haystack_location: String) -> Self {
-        self.source_haystack = Some(haystack_location);
-        self
-    }
-
-    /// Get the source haystack location
-    pub fn get_source_haystack(&self) -> Option<&String> {
-        self.source_haystack.as_ref()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
     /// ID of the edge
@@ -358,9 +345,7 @@ impl Thesaurus {
         self.data.get(key)
     }
 
-    pub fn keys(
-        &self,
-    ) -> std::collections::hash_map::Keys<'_, NormalizedTermValue, NormalizedTerm> {
+    pub fn keys(&self) -> std::collections::hash_map::Keys<NormalizedTermValue, NormalizedTerm> {
         self.data.keys()
     }
 }
@@ -515,7 +500,6 @@ pub enum LogicalOperator {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SearchQuery {
     /// Primary search term for backward compatibility
-    #[serde(alias = "query")]
     pub search_term: NormalizedTermValue,
     /// Multiple search terms for logical operations
     pub search_terms: Option<Vec<NormalizedTermValue>>,
@@ -530,7 +514,7 @@ impl SearchQuery {
     /// Get all search terms (both single and multiple)
     pub fn get_all_terms(&self) -> Vec<&NormalizedTermValue> {
         if let Some(ref multiple_terms) = self.search_terms {
-            // For multi-term queries, include primary term + additional terms
+            // For multi-term queries, include both search_term and search_terms
             let mut all_terms = vec![&self.search_term];
             all_terms.extend(multiple_terms.iter());
             all_terms
@@ -615,10 +599,10 @@ pub enum KnowledgeGraphInputType {
     Json,
 }
 
-// Context Management Types for LLM Conversations
+// =================== CONVERSATION TYPES ===================
 
-/// Unique identifier for conversations
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Unique identifier for a conversation
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ConversationId(pub String);
@@ -643,35 +627,14 @@ impl Default for ConversationId {
     }
 }
 
-impl Display for ConversationId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Display for ConversationId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-/// Types of context that can be added to conversations
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub enum ContextType {
-    /// System-level context
-    System,
-    /// User-provided context
-    UserInput,
-    /// Document-based context
-    Document,
-    /// Search result context
-    SearchResult,
-    /// External data or API context
-    External,
-    /// Context from KG term definition with synonyms and metadata
-    KGTermDefinition,
-    /// Context from complete knowledge graph index
-    KGIndex,
-}
-
-/// Unique identifier for messages within conversations
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Unique identifier for a message
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct MessageId(pub String);
@@ -696,14 +659,31 @@ impl Default for MessageId {
     }
 }
 
-impl Display for MessageId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl fmt::Display for MessageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-/// Context item that can be added to LLM conversations
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Type of context item
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum ContextType {
+    /// System-level context
+    System,
+    /// User-provided context
+    UserInput,
+    /// Document-based context
+    Document,
+    /// Search result context
+    SearchResult,
+    /// External data or API context
+    External,
+}
+
+/// A context item for LLM conversations
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ContextItem {
@@ -722,263 +702,11 @@ pub struct ContextItem {
     /// Timestamp when this context was added
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// Relevance score for ordering context items
-    pub relevance_score: Option<f64>,
+    pub relevance_score: Option<f32>,
 }
 
-impl ContextItem {
-    /// Create a new context item from a document
-    pub fn from_document(document: &Document) -> Self {
-        let mut metadata = AHashMap::new();
-        metadata.insert("source_type".to_string(), "document".to_string());
-        metadata.insert("document_id".to_string(), document.id.clone());
-        if !document.url.is_empty() {
-            metadata.insert("url".to_string(), document.url.clone());
-        }
-        if let Some(ref tags) = &document.tags {
-            metadata.insert("tags".to_string(), tags.join(", "));
-        }
-        if let Some(rank) = document.rank {
-            metadata.insert("rank".to_string(), rank.to_string());
-        }
-
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            context_type: ContextType::Document,
-            title: if document.title.is_empty() {
-                document.id.clone()
-            } else {
-                document.title.clone()
-            },
-            summary: document.description.clone(),
-            content: format!(
-                "Title: {}\n\n{}\n\n{}",
-                document.title,
-                document.description.as_deref().unwrap_or(""),
-                document.body
-            ),
-            metadata,
-            created_at: chrono::Utc::now(),
-            relevance_score: document.rank.map(|r| r as f64),
-        }
-    }
-
-    /// Create a new context item from search results
-    pub fn from_search_result(query: &str, documents: &[Document]) -> Self {
-        let mut metadata = AHashMap::new();
-        metadata.insert("source_type".to_string(), "search_result".to_string());
-        metadata.insert("query".to_string(), query.to_string());
-        metadata.insert("result_count".to_string(), documents.len().to_string());
-
-        let content = if documents.is_empty() {
-            format!("Search query: '{}'\nNo results found.", query)
-        } else {
-            let mut content = format!("Search query: '{}'\nResults:\n\n", query);
-            for (i, doc) in documents.iter().take(5).enumerate() {
-                content.push_str(&format!(
-                    "{}. {}\n   {}\n   Rank: {}\n\n",
-                    i + 1,
-                    doc.title,
-                    doc.description.as_deref().unwrap_or("No description"),
-                    doc.rank.unwrap_or(0)
-                ));
-            }
-            if documents.len() > 5 {
-                content.push_str(&format!("... and {} more results\n", documents.len() - 5));
-            }
-            content
-        };
-
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            context_type: ContextType::Document, // Changed from SearchResult to Document
-            title: format!("Search: {}", query),
-            summary: Some(format!(
-                "Search results for '{}' - {} documents found",
-                query,
-                documents.len()
-            )),
-            content,
-            metadata,
-            created_at: chrono::Utc::now(),
-            relevance_score: documents.first().and_then(|d| d.rank.map(|r| r as f64)),
-        }
-    }
-
-    /// Create a new context item from a KG term definition
-    pub fn from_kg_term_definition(kg_term: &KGTermDefinition) -> Self {
-        let mut metadata = AHashMap::new();
-        metadata.insert("source_type".to_string(), "kg_term".to_string());
-        metadata.insert("term_id".to_string(), kg_term.id.to_string());
-        metadata.insert(
-            "normalized_term".to_string(),
-            kg_term.normalized_term.to_string(),
-        );
-        metadata.insert(
-            "synonyms_count".to_string(),
-            kg_term.synonyms.len().to_string(),
-        );
-        metadata.insert(
-            "related_terms_count".to_string(),
-            kg_term.related_terms.len().to_string(),
-        );
-        metadata.insert(
-            "usage_examples_count".to_string(),
-            kg_term.usage_examples.len().to_string(),
-        );
-
-        if let Some(ref url) = kg_term.url {
-            metadata.insert("url".to_string(), url.clone());
-        }
-
-        // Add KG-specific metadata
-        for (key, value) in &kg_term.metadata {
-            metadata.insert(format!("kg_{}", key), value.clone());
-        }
-
-        let mut content = format!("**Term:** {}\n", kg_term.term);
-
-        if let Some(ref definition) = kg_term.definition {
-            content.push_str(&format!("**Definition:** {}\n", definition));
-        }
-
-        if !kg_term.synonyms.is_empty() {
-            content.push_str(&format!("**Synonyms:** {}\n", kg_term.synonyms.join(", ")));
-        }
-
-        if !kg_term.related_terms.is_empty() {
-            content.push_str(&format!(
-                "**Related Terms:** {}\n",
-                kg_term.related_terms.join(", ")
-            ));
-        }
-
-        if !kg_term.usage_examples.is_empty() {
-            content.push_str("**Usage Examples:**\n");
-            for (i, example) in kg_term.usage_examples.iter().enumerate() {
-                content.push_str(&format!("{}. {}\n", i + 1, example));
-            }
-        }
-
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            context_type: ContextType::KGTermDefinition,
-            title: format!("KG Term: {}", kg_term.term),
-            summary: Some(format!(
-                "Knowledge Graph term '{}' with {} synonyms and {} related terms",
-                kg_term.term,
-                kg_term.synonyms.len(),
-                kg_term.related_terms.len()
-            )),
-            content,
-            metadata,
-            created_at: chrono::Utc::now(),
-            relevance_score: kg_term.relevance_score,
-        }
-    }
-
-    /// Create a new context item from a complete KG index
-    pub fn from_kg_index(kg_index: &KGIndexInfo) -> Self {
-        let mut metadata = AHashMap::new();
-        metadata.insert("source_type".to_string(), "kg_index".to_string());
-        metadata.insert("kg_name".to_string(), kg_index.name.clone());
-        metadata.insert("total_terms".to_string(), kg_index.total_terms.to_string());
-        metadata.insert("total_nodes".to_string(), kg_index.total_nodes.to_string());
-        metadata.insert("total_edges".to_string(), kg_index.total_edges.to_string());
-        metadata.insert("source".to_string(), kg_index.source.clone());
-        metadata.insert(
-            "last_updated".to_string(),
-            kg_index.last_updated.to_rfc3339(),
-        );
-
-        if let Some(ref version) = kg_index.version {
-            metadata.insert("version".to_string(), version.clone());
-        }
-
-        let content = format!(
-            "**Knowledge Graph Index: {}**\n\n\
-            **Statistics:**\n\
-            - Total Terms: {}\n\
-            - Total Nodes: {}\n\
-            - Total Edges: {}\n\
-            - Source: {}\n\
-            - Last Updated: {}\n\
-            - Version: {}\n\n\
-            This context includes the complete knowledge graph index with all terms, \
-            relationships, and metadata available for reference.",
-            kg_index.name,
-            kg_index.total_terms,
-            kg_index.total_nodes,
-            kg_index.total_edges,
-            kg_index.source,
-            kg_index.last_updated.format("%Y-%m-%d %H:%M:%S UTC"),
-            kg_index.version.as_deref().unwrap_or("N/A")
-        );
-
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            context_type: ContextType::KGIndex,
-            title: format!("KG Index: {}", kg_index.name),
-            summary: Some(format!(
-                "Complete knowledge graph index with {} terms, {} nodes, and {} edges",
-                kg_index.total_terms, kg_index.total_nodes, kg_index.total_edges
-            )),
-            content,
-            metadata,
-            created_at: chrono::Utc::now(),
-            relevance_score: Some(1.0), // High relevance for complete index
-        }
-    }
-}
-
-/// Knowledge Graph term definition with comprehensive metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct KGTermDefinition {
-    /// The primary term
-    pub term: String,
-    /// Normalized term value
-    pub normalized_term: NormalizedTermValue,
-    /// Unique identifier for the term
-    pub id: u64,
-    /// Definition of the term
-    pub definition: Option<String>,
-    /// Synonyms for the term
-    pub synonyms: Vec<String>,
-    /// Related terms
-    pub related_terms: Vec<String>,
-    /// Usage examples
-    pub usage_examples: Vec<String>,
-    /// URL reference if available
-    pub url: Option<String>,
-    /// Additional metadata
-    pub metadata: AHashMap<String, String>,
-    /// Relevance score for ranking
-    pub relevance_score: Option<f64>,
-}
-
-/// Knowledge Graph index information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct KGIndexInfo {
-    /// Name of the knowledge graph
-    pub name: String,
-    /// Total number of terms in the index
-    pub total_terms: usize,
-    /// Number of nodes in the graph
-    pub total_nodes: usize,
-    /// Number of edges in the graph
-    pub total_edges: usize,
-    /// Last updated timestamp
-    pub last_updated: chrono::DateTime<chrono::Utc>,
-    /// Source of the knowledge graph
-    pub source: String,
-    /// Version of the knowledge graph
-    pub version: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A chat message in a conversation
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ChatMessage {
@@ -999,12 +727,11 @@ pub struct ChatMessage {
 }
 
 impl ChatMessage {
-    /// Create a new user message
-    pub fn user(content: String) -> Self {
+    pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             id: MessageId::new(),
-            role: "user".to_string(),
-            content,
+            role: role.into(),
+            content: content.into(),
             context_items: Vec::new(),
             created_at: chrono::Utc::now(),
             token_count: None,
@@ -1012,45 +739,19 @@ impl ChatMessage {
         }
     }
 
-    /// Create a new assistant message
-    pub fn assistant(content: String, model: Option<String>) -> Self {
-        Self {
-            id: MessageId::new(),
-            role: "assistant".to_string(),
-            content,
-            context_items: Vec::new(),
-            created_at: chrono::Utc::now(),
-            token_count: None,
-            model,
-        }
+    pub fn with_context(mut self, context_items: Vec<ContextItem>) -> Self {
+        self.context_items = context_items;
+        self
     }
 
-    /// Create a new system message
-    pub fn system(content: String) -> Self {
-        Self {
-            id: MessageId::new(),
-            role: "system".to_string(),
-            content,
-            context_items: Vec::new(),
-            created_at: chrono::Utc::now(),
-            token_count: None,
-            model: None,
-        }
-    }
-
-    /// Add context item to this message
-    pub fn add_context(&mut self, context: ContextItem) {
-        self.context_items.push(context);
-    }
-
-    /// Add multiple context items to this message
-    pub fn add_contexts(&mut self, contexts: Vec<ContextItem>) {
-        self.context_items.extend(contexts);
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
     }
 }
 
-/// A conversation containing multiple messages and context
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A conversation with multiple messages and context
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Conversation {
@@ -1074,11 +775,11 @@ pub struct Conversation {
 
 impl Conversation {
     /// Create a new conversation
-    pub fn new(title: String, role: RoleName) -> Self {
+    pub fn new(title: impl Into<String>, role: RoleName) -> Self {
         let now = chrono::Utc::now();
         Self {
             id: ConversationId::new(),
-            title,
+            title: title.into(),
             messages: Vec::new(),
             global_context: Vec::new(),
             role,
@@ -1090,37 +791,29 @@ impl Conversation {
 
     /// Add a message to the conversation
     pub fn add_message(&mut self, message: ChatMessage) {
+        self.updated_at = chrono::Utc::now();
         self.messages.push(message);
-        self.updated_at = chrono::Utc::now();
     }
 
-    /// Add global context to the conversation
+    /// Add a global context item
     pub fn add_global_context(&mut self, context: ContextItem) {
-        self.global_context.push(context);
         self.updated_at = chrono::Utc::now();
+        self.global_context.push(context);
     }
 
-    /// Get the total context length (approximation)
-    pub fn estimated_context_length(&self) -> usize {
-        let message_length: usize = self
-            .messages
-            .iter()
-            .map(|m| {
-                m.content.len()
-                    + m.context_items
-                        .iter()
-                        .map(|c| c.content.len())
-                        .sum::<usize>()
-            })
-            .sum();
-        let global_context_length: usize =
-            self.global_context.iter().map(|c| c.content.len()).sum();
-        message_length + global_context_length
+    /// Get the number of messages
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Get the number of context items (global + per-message)
+    pub fn context_count(&self) -> usize {
+        self.global_context.len() + self.messages.iter().map(|m| m.context_items.len()).sum::<usize>()
     }
 }
 
-/// Summary of a conversation for listing purposes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A summary of a conversation for listing purposes
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ConversationSummary {
@@ -1142,27 +835,19 @@ pub struct ConversationSummary {
     pub preview: Option<String>,
 }
 
-// Note: Persistable implementation for Conversation will be added in the service layer
-// to avoid circular dependencies
-
-impl From<&Conversation> for ConversationSummary {
-    fn from(conversation: &Conversation) -> Self {
-        let context_count = conversation.global_context.len()
-            + conversation
-                .messages
-                .iter()
-                .map(|m| m.context_items.len())
-                .sum::<usize>();
-
+impl ConversationSummary {
+    /// Create a summary from a conversation
+    pub fn from_conversation(conversation: &Conversation) -> Self {
         let preview = conversation
             .messages
             .iter()
-            .find(|m| m.role == "user")
-            .map(|m| {
-                if m.content.len() > 100 {
-                    format!("{}...", &m.content[..100])
+            .find(|msg| msg.role == "user")
+            .map(|msg| {
+                let content = msg.content.trim();
+                if content.len() > 100 {
+                    format!("{}...", &content[..100])
                 } else {
-                    m.content.clone()
+                    content.to_string()
                 }
             });
 
@@ -1170,213 +855,13 @@ impl From<&Conversation> for ConversationSummary {
             id: conversation.id.clone(),
             title: conversation.title.clone(),
             role: conversation.role.clone(),
-            message_count: conversation.messages.len(),
-            context_count,
+            message_count: conversation.message_count(),
+            context_count: conversation.context_count(),
             created_at: conversation.created_at,
             updated_at: conversation.updated_at,
             preview,
         }
     }
-}
-
-/// Context history that tracks what context has been used across conversations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct ContextHistory {
-    /// Items that have been used in conversations
-    pub used_contexts: Vec<ContextHistoryEntry>,
-    /// Maximum number of history entries to keep
-    pub max_entries: usize,
-}
-
-impl ContextHistory {
-    pub fn new(max_entries: usize) -> Self {
-        Self {
-            used_contexts: Vec::new(),
-            max_entries,
-        }
-    }
-
-    /// Record that a context item was used
-    pub fn record_usage(
-        &mut self,
-        context_id: &str,
-        conversation_id: &ConversationId,
-        usage_type: ContextUsageType,
-    ) {
-        let entry = ContextHistoryEntry {
-            context_id: context_id.to_string(),
-            conversation_id: conversation_id.clone(),
-            usage_type,
-            used_at: chrono::Utc::now(),
-            usage_count: 1,
-        };
-
-        // Check if we already have this context for this conversation
-        if let Some(existing) = self
-            .used_contexts
-            .iter_mut()
-            .find(|e| e.context_id == context_id && e.conversation_id == *conversation_id)
-        {
-            existing.usage_count += 1;
-            existing.used_at = chrono::Utc::now();
-        } else {
-            self.used_contexts.push(entry);
-        }
-
-        // Trim to max entries if needed
-        if self.used_contexts.len() > self.max_entries {
-            self.used_contexts.sort_by_key(|e| e.used_at);
-            self.used_contexts
-                .drain(0..self.used_contexts.len() - self.max_entries);
-        }
-    }
-
-    /// Get frequently used contexts
-    pub fn get_frequent_contexts(&self, limit: usize) -> Vec<&ContextHistoryEntry> {
-        let mut entries = self.used_contexts.iter().collect::<Vec<_>>();
-        entries.sort_by_key(|e| std::cmp::Reverse(e.usage_count));
-        entries.into_iter().take(limit).collect()
-    }
-}
-
-/// Entry in context usage history
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct ContextHistoryEntry {
-    /// ID of the context item that was used
-    pub context_id: String,
-    /// Conversation where it was used
-    pub conversation_id: ConversationId,
-    /// How the context was used
-    pub usage_type: ContextUsageType,
-    /// When it was used
-    pub used_at: chrono::DateTime<chrono::Utc>,
-    /// How many times it's been used in this conversation
-    pub usage_count: usize,
-}
-
-/// How a context item was used
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub enum ContextUsageType {
-    /// Added manually by user
-    Manual,
-    /// Added automatically by system
-    Automatic,
-    /// Added from search results
-    SearchResult,
-    /// Added from document reference
-    DocumentReference,
-}
-
-/// Multi-agent context for coordinating between different AI agents
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct MultiAgentContext {
-    /// Unique identifier for the multi-agent session
-    pub session_id: String,
-    /// Agents participating in this context
-    pub agents: Vec<AgentInfo>,
-    /// Shared context items available to all agents
-    pub shared_context: Vec<ContextItem>,
-    /// Agent-specific context
-    pub agent_contexts: AHashMap<String, Vec<ContextItem>>,
-    /// Communication log between agents
-    pub agent_communications: Vec<AgentCommunication>,
-    /// When this session was created
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// When this session was last updated
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-impl MultiAgentContext {
-    pub fn new() -> Self {
-        let now = chrono::Utc::now();
-        Self {
-            session_id: uuid::Uuid::new_v4().to_string(),
-            agents: Vec::new(),
-            shared_context: Vec::new(),
-            agent_contexts: AHashMap::new(),
-            agent_communications: Vec::new(),
-            created_at: now,
-            updated_at: now,
-        }
-    }
-
-    /// Add an agent to the session
-    pub fn add_agent(&mut self, agent: AgentInfo) {
-        self.agents.push(agent.clone());
-        self.agent_contexts.insert(agent.id, Vec::new());
-        self.updated_at = chrono::Utc::now();
-    }
-
-    /// Add context for a specific agent
-    pub fn add_agent_context(&mut self, agent_id: &str, context: ContextItem) {
-        if let Some(contexts) = self.agent_contexts.get_mut(agent_id) {
-            contexts.push(context);
-            self.updated_at = chrono::Utc::now();
-        }
-    }
-
-    /// Record communication between agents
-    pub fn record_communication(
-        &mut self,
-        from_agent: &str,
-        to_agent: Option<&str>,
-        message: String,
-    ) {
-        let communication = AgentCommunication {
-            from_agent: from_agent.to_string(),
-            to_agent: to_agent.map(|s| s.to_string()),
-            message,
-            timestamp: chrono::Utc::now(),
-        };
-        self.agent_communications.push(communication);
-        self.updated_at = chrono::Utc::now();
-    }
-}
-
-impl Default for MultiAgentContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Information about an AI agent in a multi-agent context
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct AgentInfo {
-    /// Unique identifier for the agent
-    pub id: String,
-    /// Human-readable name of the agent
-    pub name: String,
-    /// Role/specialty of the agent
-    pub role: String,
-    /// Capabilities or description of what this agent does
-    pub capabilities: Vec<String>,
-    /// Model or provider powering this agent
-    pub model: Option<String>,
-}
-
-/// Communication between agents in a multi-agent context
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct AgentCommunication {
-    /// ID of the agent sending the message
-    pub from_agent: String,
-    /// ID of the agent receiving the message (None for broadcast)
-    pub to_agent: Option<String>,
-    /// The communication message
-    pub message: String,
-    /// When this communication occurred
-    pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 #[cfg(test)]

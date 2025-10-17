@@ -181,11 +181,23 @@ Terraphim AI is a privacy-first AI assistant that operates locally, providing se
 # Build all components
 cargo build
 
+# Build with Ollama support (for local AI)
+cargo build --features ollama
+
+# Build with OpenRouter support (for cloud AI)
+cargo build --features openrouter
+
+# Build with both AI providers
+cargo build --features "ollama,openrouter"
+
 # Run the backend server
 cargo run
 
 # Run with specific config
 cargo run -- --config terraphim_engineer_config.json
+
+# Run with Ollama config for local AI
+cargo run --features ollama -- --config ollama_llama_config.json
 
 # Run desktop frontend (requires backend running)
 cd desktop
@@ -278,14 +290,23 @@ The system uses role-based configuration with multiple backends:
 ## AI Integration
 
 ### Supported Providers
-- OpenRouter (with feature flag `openrouter`)
-- Generic LLM interface for multiple providers
-- Ollama support for local models
+- **OpenRouter** (with feature flag `openrouter`)
+  - Cloud-based AI models with API key authentication
+  - Supports multiple models (GPT, Claude, etc.)
+  - Chat completion and document summarization
+- **Ollama** (with feature flag `ollama`)
+  - Local AI inference without external dependencies
+  - Privacy-first approach with no data leaving your machine
+  - Support for chat completion and document summarization
+  - Compatible with qwen, llama, and other open-source models
+- **Generic LLM interface** for easy provider switching
 
 ### AI Features
-- Document summarization
-- Intelligent descriptions for search results
-- Context-aware content processing
+- **Document Summarization**: Generate concise summaries with configurable length constraints
+- **Interactive Chat**: Multi-turn conversations with context awareness
+- **Intelligent Descriptions**: Auto-generated descriptions for search results
+- **Context-aware Processing**: Role-based AI behavior customization
+- **Model Management**: Automatic model detection and validation
 
 ## Common Development Patterns
 
@@ -453,14 +474,28 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
 
 ### Configuration Examples
 ```json
-// Role with Ollama configuration
+// Role with Ollama configuration for local AI
 {
   "name": "Llama Engineer",
   "extra": {
     "llm_provider": "ollama",
-    "ollama_base_url": "http://127.0.0.1:11434",
-    "ollama_model": "llama3.2:3b"
+    "llm_model": "llama3.2:3b",
+    "llm_base_url": "http://127.0.0.1:11434",
+    "llm_auto_summarize": true,
+    "llm_description": "Local Ollama instance for privacy-first AI features"
   }
+}
+
+// Role with OpenRouter configuration for cloud AI
+{
+  "name": "Cloud Engineer",
+  "extra": {
+    "llm_provider": "openrouter"
+  },
+  "openrouter_api_key": "your-api-key", // pragma: allowlist secret
+  "openrouter_model": "openai/gpt-4",
+  "openrouter_enabled": true,
+  "openrouter_chat_enabled": true
 }
 ```
 
@@ -522,8 +557,11 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
 - `GET /health` - Server health check
 - `POST /config` - Update configuration
 - `POST /documents/search` - Search documents
-- `POST /documents/summarize` - AI summarization
-- `POST /chat` - Chat completion
+- `POST /documents/summarize` - AI summarization (supports both Ollama and OpenRouter)
+- `POST /documents/async_summarize` - Async AI summarization with queue
+- `POST /chat` - Chat completion (supports both Ollama and OpenRouter)
+- `POST /summarization/batch` - Batch document summarization
+- `GET /summarization/status` - Check summarization capabilities for a role
 - `GET /config` - Get current configuration
 - `GET /roles` - List available roles
 
