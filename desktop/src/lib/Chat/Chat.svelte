@@ -1,3 +1,29 @@
+<script context="module" lang="ts">
+export type ContextItem = {
+	id: string;
+	title: string;
+	summary?: string;
+	content: string;
+	context_type: string;
+	created_at: string;
+	relevance_score?: number;
+	metadata?: { [key: string]: string };
+	// KG-specific fields
+	kg_term_definition?: {
+		term: string;
+		normalized_term: string;
+		id: number;
+		definition?: string;
+		synonyms: string[];
+		related_terms: string[];
+		usage_examples: string[];
+		url?: string;
+		metadata: Record<string, string>;
+		relevance_score?: number;
+	};
+};
+</script>
+
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { onMount } from 'svelte';
@@ -24,28 +50,22 @@ let tauriFs: any = null;
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
-type ContextItem = {
-	id: string;
-	title: string;
-	summary?: string;
-	content: string;
-	context_type: string;
-	created_at: string;
-	relevance_score?: number;
-	metadata?: { [key: string]: string };
-	// KG-specific fields
-	kg_term_definition?: {
-		term: string;
-		normalized_term: string;
-		id: number;
-		definition?: string;
-		synonyms: string[];
-		related_terms: string[];
-		usage_examples: string[];
-		url?: string;
-		metadata: Record<string, string>;
-		relevance_score?: number;
+
+// API response types
+type ConversationsResponse = {
+	conversations: Array<{ id: string; created_at: string; title?: string }>;
+};
+type CreateConversationResponse = {
+	status: string;
+	conversation_id?: string;
+	error?: string;
+};
+type ConversationResponse = {
+	status: string;
+	conversation?: {
+		global_context: ContextItem[];
 	};
+	error?: string;
 };
 type Conversation = {
 	id: string;
@@ -123,6 +143,14 @@ function loadChatState() {
 	}
 }
 
+function getRoleDisplay() {
+	const currentRole = get(role);
+	if (typeof currentRole === 'object' && currentRole && 'original' in currentRole) {
+		return (currentRole as any).original;
+	}
+	return String(currentRole);
+}
+
 function saveChatState() {
 	try {
 		if (typeof window === 'undefined') return;
@@ -159,7 +187,7 @@ async function initializeConversation() {
 	try {
 		if ($is_tauri) {
 			// Try to get existing conversations
-			const result = await invoke('list_conversations');
+			const result = await invoke('list_conversations') as ConversationsResponse;
 			if (result?.conversations && result.conversations.length > 0) {
 				// Use the most recent conversation
 				conversationId = result.conversations[0].id;
@@ -199,7 +227,7 @@ async function createNewConversation() {
 			const result = await invoke('create_conversation', {
 				title: 'Chat Conversation',
 				role: currentRole,
-			});
+			}) as CreateConversationResponse;
 			if (result.status === 'success' && result.conversation_id) {
 				conversationId = result.conversation_id;
 				console.log('🆕 Created new conversation:', conversationId);
@@ -250,7 +278,7 @@ async function loadConversationContext() {
 
 			const result = await invoke(command, {
 				conversationId: isPersistent ? conversationId : conversationId,
-			});
+			}) as ConversationResponse;
 
 			console.log('📥 Tauri response:', result);
 
@@ -292,7 +320,7 @@ async function loadConversationContext() {
 		}
 	} catch (error) {
 		console.error('❌ Error loading conversation context:', {
-			error: error.message || error,
+			error: error instanceof Error ? error.message : String(error),
 			conversationId,
 			isTauri: $is_tauri,
 			timestamp: new Date().toISOString(),
@@ -332,7 +360,7 @@ async function _addManualContext() {
 			const result = await invoke('add_context_to_conversation', {
 				conversationId,
 				contextData,
-			});
+			}) as { status: string; error?: string };
 			if (result.status === 'success') {
 				await loadConversationContext();
 				toggleAddContextForm();
@@ -492,7 +520,7 @@ async function deleteContext(contextId: string) {
 			const result = await invoke('delete_context', {
 				conversationId,
 				contextId,
-			});
+			}) as { status?: string; error?: string };
 			if (result?.status === 'success') {
 				console.log('✅ Context deleted successfully via Tauri');
 				await loadConversationContext();
@@ -546,7 +574,7 @@ async function _updateContext(updatedContext: ContextItem) {
 				conversationId,
 				contextId: updatedContext.id,
 				request: updatePayload,
-			});
+			}) as { status?: string; error?: string };
 			if (result?.status === 'success') {
 				console.log('✅ Context updated successfully via Tauri');
 				await loadConversationContext();
@@ -840,7 +868,7 @@ async function loadPersistentConversation(conversationIdToLoad: string) {
 		if ($is_tauri) {
 			const result = await invoke('get_persistent_conversation', {
 				conversationId: conversationIdToLoad,
-			});
+			}) as { status: string; conversation?: any; error?: string };
 
 			if (result.status === 'success' && result.conversation) {
 				const conv = result.conversation;
@@ -881,7 +909,7 @@ async function _savePersistentConversation() {
 	try {
 		if ($is_tauri) {
 			// Get the current conversation
-			const result = await invoke('get_conversation', { conversationId });
+			const result = await invoke('get_conversation', { conversationId }) as { status: string; conversation?: any; error?: string };
 
 			if (result.status === 'success' && result.conversation) {
 				const conv = result.conversation;
@@ -890,7 +918,7 @@ async function _savePersistentConversation() {
 				const saveResult = await invoke('create_persistent_conversation', {
 					title: conv.title || 'Chat Conversation',
 					role: conv.role,
-				});
+				}) as { status: string; conversation?: any; error?: string };
 
 				if (saveResult.status === 'success' && saveResult.conversation) {
 					const persistentConv = saveResult.conversation;
@@ -902,7 +930,7 @@ async function _savePersistentConversation() {
 							messages: conv.messages,
 							global_context: conv.global_context,
 						},
-					});
+					}) as { status: string; error?: string };
 
 					if (updateResult.status === 'success') {
 						currentPersistentConversationId.set(persistentConv.id);
@@ -961,7 +989,7 @@ function _toggleSessionList() {
         <div class="chat-header">
           <div>
             <h2 class="title is-4">Chat</h2>
-            <p class="subtitle is-6">Role: {typeof get(role) === 'object' ? get(role).original : get(role)}</p>
+            <p class="subtitle is-6">Role: {getRoleDisplay()}</p>
             {#if conversationId}
               <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
             {/if}
