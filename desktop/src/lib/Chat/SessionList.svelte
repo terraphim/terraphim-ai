@@ -1,6 +1,7 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { onMount } from 'svelte';
+import { role } from '../stores';
 
 // Types
 type ConversationSummary = {
@@ -34,8 +35,8 @@ export const onNewConversation: () => void = () => {};
 let conversations: ConversationSummary[] = [];
 let _loading = false;
 let _error: string | null = null;
-const searchQuery = '';
-const filterRole: string | null = null;
+let searchQuery = '';
+let filterRole: string | null = null;
 let _showDeleteConfirm: string | null = null;
 let _deleting = false;
 
@@ -194,7 +195,7 @@ function _handleRoleFilterChange() {
         class="form-control form-control-sm"
         placeholder="Search conversations..."
         bind:value={searchQuery}
-        on:input={handleSearchInput}
+        on:input={_handleSearchInput}
       />
       <i class="bi bi-search search-icon"></i>
     </div>
@@ -203,7 +204,7 @@ function _handleRoleFilterChange() {
       <select
         class="form-select form-select-sm"
         bind:value={filterRole}
-        on:change={handleRoleFilterChange}
+        on:change={_handleRoleFilterChange}
       >
         <option value={null}>All Roles</option>
         <option value={$role}>{$role}</option>
@@ -212,19 +213,19 @@ function _handleRoleFilterChange() {
   </div>
 
   <!-- Error Display -->
-  {#if error}
+  {#if _error}
     <div class="alert alert-danger alert-sm" role="alert">
-      {error}
+      {_error}
       <button
         type="button"
         class="btn-close btn-close-sm"
-        on:click={() => error = null}
+        on:click={() => _error = null}
       ></button>
     </div>
   {/if}
 
   <!-- Loading State -->
-  {#if loading}
+  {#if _loading}
     <div class="loading-state">
       <div class="spinner-border spinner-border-sm" role="status">
         <span class="visually-hidden">Loading...</span>
@@ -235,7 +236,7 @@ function _handleRoleFilterChange() {
 
   <!-- Conversation List -->
   <div class="conversation-list">
-    {#if !loading && filteredConversations.length === 0}
+    {#if !_loading && filteredConversations.length === 0}
       <div class="empty-state">
         <i class="bi bi-chat-dots"></i>
         <p>No conversations yet</p>
@@ -256,19 +257,19 @@ function _handleRoleFilterChange() {
           <div class="conversation-header">
             <h4 class="conversation-title">{conversation.title}</h4>
             <div class="conversation-actions">
-              {#if showDeleteConfirm === conversation.id}
+              {#if _showDeleteConfirm === conversation.id}
                 <button
                   class="btn btn-sm btn-danger"
-                  on:click|stopPropagation={() => deleteConversation(conversation.id)}
-                  disabled={deleting}
+                  on:click|stopPropagation={() => _deleteConversation(conversation.id)}
+                  disabled={_deleting}
                   title="Confirm delete"
                 >
                   <i class="bi bi-check-lg"></i>
                 </button>
                 <button
                   class="btn btn-sm btn-secondary"
-                  on:click|stopPropagation={() => showDeleteConfirm = null}
-                  disabled={deleting}
+                  on:click|stopPropagation={() => _showDeleteConfirm = null}
+                  disabled={_deleting}
                   title="Cancel"
                 >
                   <i class="bi bi-x-lg"></i>
@@ -276,7 +277,7 @@ function _handleRoleFilterChange() {
               {:else}
                 <button
                   class="btn btn-sm btn-ghost"
-                  on:click|stopPropagation={() => showDeleteConfirm = conversation.id}
+                  on:click|stopPropagation={() => _showDeleteConfirm = conversation.id}
                   title="Delete conversation"
                 >
                   <i class="bi bi-trash"></i>
@@ -290,7 +291,7 @@ function _handleRoleFilterChange() {
             <span class="message-count">
               <i class="bi bi-chat-left-text"></i> {conversation.message_count}
             </span>
-            <span class="timestamp">{formatDate(conversation.updated_at)}</span>
+            <span class="timestamp">{_formatDate(conversation.updated_at)}</span>
           </div>
 
           {#if conversation.preview}

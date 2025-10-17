@@ -2,9 +2,12 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
 import { configStore, is_tauri } from '$lib/stores';
+import { store } from '@tomic/svelte';
 import { CONFIG } from '../../config';
 import { Route } from 'tinro';
-import { Field, Input, Button, Switch } from 'svelma';
+import { Field, Input, Button, Switch, Select } from 'svelma';
+import { JSONEditor } from 'svelte-jsoneditor';
+import FetchRole from './FetchRole.svelte';
 
 let _content = {
 	json: $configStore,
@@ -46,10 +49,10 @@ let agentSecret: string | undefined;
 const _setAtomicServer = async () => {
 	console.log('Updating atomic server configuration');
 	const agent = Agent.fromSecret(agentSecret);
-	$store.setServerUrl(atomicServerUrl);
+	store.setServerUrl(atomicServerUrl);
 	console.log('Server set.Setting agent');
 	// Type assertion needed due to different @tomic/lib versions between dependencies
-	$store.setAgent(agent as any);
+	store.setAgent(agent as any);
 };
 
 const _handleClickUrl = async () => {
@@ -99,8 +102,8 @@ const resource1 = getResource('http://localhost:9883/config/y3zx5wtm0bq');
 const _name = getValue<string>(resource1, urls.properties.name);
 const _roles = getValue<string[]>(resource1, 'http://localhost:9883/property/role');
 // FIXME: update roles to configStore
-$: console.log('Print name', $name);
-$: console.log('Print roles', $roles);
+$: console.log('Print name', $_name);
+$: console.log('Print roles', $_roles);
 </script>
 
 <div class="box">
@@ -151,8 +154,8 @@ $: console.log('Print roles', $roles);
     <Field grouped>
       <Button
         type="is-primary"
-        on:click={handleClickUrl}
-        on:submit={handleClickUrl}>Fetch</Button
+        on:click={_handleClickUrl}
+        on:submit={_handleClickUrl}>Fetch</Button
       >
     </Field>
   </Route>
@@ -165,14 +168,14 @@ $: console.log('Print roles', $roles);
       >
     </p>
     <div class="editor">
-      <JSONEditor {content} onChange={handleChange} />
+      <JSONEditor content={_content} onChange={_handleChange} />
     </div>
   </Route>
 </div>
 <hr />
 <Field grouped position="is-right">
   <Select>
-    {#each $roles ?? [] as role_value}
+    {#each $_roles ?? [] as role_value}
       <FetchRole subject={role_value} />
     {/each}
   </Select>
