@@ -20,13 +20,13 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
     outputs:
       should-build: ${{ steps.changes.outputs.should-build }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -49,11 +49,11 @@ jobs:
   lint-and-format:
     needs: setup
     if: needs.setup.outputs.should-build == 'true'
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -66,17 +66,17 @@ jobs:
   build-frontend:
     needs: setup
     if: needs.setup.outputs.should-build == 'true'
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
 
       - name: Build frontend with Earthly
-        run: earthly --ci ./desktop+build
+        run: earthly --ci desktop+build
 
       - name: Upload frontend artifacts
         uses: actions/upload-artifact@v4
@@ -88,11 +88,11 @@ jobs:
   build-native:
     needs: [setup, lint-and-format, build-frontend]
     if: needs.setup.outputs.should-build == 'true'
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -112,11 +112,11 @@ jobs:
   test:
     needs: [setup, build-native]
     if: needs.setup.outputs.should-build == 'true'
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -128,7 +128,7 @@ jobs:
   build-cross:
     needs: [setup, build-native]
     if: needs.setup.outputs.should-build == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -138,7 +138,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -159,7 +159,7 @@ jobs:
   earthly-success:
     needs: [lint-and-format, build-frontend, build-native, test]
     if: always()
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: ubuntu-latest
     steps:
       - name: Check all jobs succeeded
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
