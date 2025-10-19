@@ -12,13 +12,13 @@ mod tests {
     use std::path::PathBuf;
 
     // Import all the types we need for tests
+    use crate::commands::hooks::{HookContext, LoggingHook};
+    use crate::commands::RateLimit;
     use crate::commands::{
         CommandDefinition, CommandParameter, ExecutionMode, HookManager, ParsedCommand, RiskLevel,
     };
     use crate::registry::CommandRegistry;
     use crate::validator::CommandValidator;
-    use crate::commands::hooks::{LoggingHook, HookContext};
-    use crate::commands::RateLimit;
 
     // Test data and helper functions
     fn create_test_command_definition() -> CommandDefinition {
