@@ -232,6 +232,121 @@ pub struct BatchSummarizeResponse {
     pub error: Option<String>,
 }
 
+// VM Management Types
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmWithIp {
+    pub vm_id: String,
+    pub ip_address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmPoolListResponse {
+    pub vms: Vec<VmWithIp>,
+    pub stats: VmPoolStatsResponse,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmPoolStatsResponse {
+    pub total_ips: usize,
+    pub allocated_ips: usize,
+    pub available_ips: usize,
+    pub utilization_percent: u8,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmStatusResponse {
+    pub vm_id: String,
+    pub status: String,
+    pub ip_address: String,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmExecuteRequest {
+    pub code: String,
+    pub language: String,
+    pub agent_id: String,
+    pub vm_id: Option<String>,
+    pub timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmExecuteResponse {
+    pub execution_id: String,
+    pub vm_id: String,
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: u64,
+    pub started_at: String,
+    pub completed_at: String,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmTask {
+    pub id: String,
+    pub vm_id: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmTasksResponse {
+    pub tasks: Vec<VmTask>,
+    pub vm_id: String,
+    pub total: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmAllocateRequest {
+    pub vm_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmAllocateResponse {
+    pub vm_id: String,
+    pub ip_address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmMetricsResponse {
+    pub vm_id: String,
+    pub status: String,
+    pub cpu_usage_percent: f64,
+    pub memory_usage_mb: u32,
+    pub disk_usage_percent: f64,
+    pub network_io_mbps: f64,
+    pub uptime_seconds: u64,
+    pub process_count: u32,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmAgentRequest {
+    pub agent_id: String,
+    pub task: String,
+    pub vm_id: Option<String>,
+    pub timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VmAgentResponse {
+    pub task_id: String,
+    pub agent_id: String,
+    pub vm_id: Option<String>,
+    pub status: String,
+    pub result: String,
+    pub duration_ms: u64,
+    pub started_at: String,
+    pub completed_at: String,
+    pub snapshot_id: Option<String>,
+    pub error: Option<String>,
+}
+
 impl ApiClient {
     pub async fn chat(
         &self,
@@ -361,6 +476,118 @@ impl ApiClient {
             .error_for_status()?
             .json::<BatchSummarizeResponse>()
             .await?;
+        Ok(body)
+    }
+
+    // VM Management APIs
+
+    pub async fn list_vms(&self) -> Result<VmPoolListResponse> {
+        let url = format!("{}/api/vm-pool", self.base);
+        let res = self.http.get(url).send().await?;
+        let body = res.error_for_status()?.json::<VmPoolListResponse>().await?;
+        Ok(body)
+    }
+
+    pub async fn get_vm_pool_stats(&self) -> Result<VmPoolStatsResponse> {
+        let url = format!("{}/api/vm-pool/stats", self.base);
+        let res = self.http.get(url).send().await?;
+        let body = res
+            .error_for_status()?
+            .json::<VmPoolStatsResponse>()
+            .await?;
+        Ok(body)
+    }
+
+    pub async fn get_vm_status(&self, vm_id: &str) -> Result<VmStatusResponse> {
+        let url = format!("{}/api/vms/{}", self.base, urlencoding::encode(vm_id));
+        let res = self.http.get(url).send().await?;
+        let body = res.error_for_status()?.json::<VmStatusResponse>().await?;
+        Ok(body)
+    }
+
+    pub async fn execute_vm_code(
+        &self,
+        code: &str,
+        language: &str,
+        vm_id: Option<&str>,
+    ) -> Result<VmExecuteResponse> {
+        let url = format!("{}/api/llm/execute", self.base);
+        let req = VmExecuteRequest {
+            code: code.to_string(),
+            language: language.to_string(),
+            agent_id: "tui-user".to_string(),
+            vm_id: vm_id.map(|s| s.to_string()),
+            timeout_ms: Some(30000), // 30 second default timeout
+        };
+        let res = self.http.post(url).json(&req).send().await?;
+        let body = res.error_for_status()?.json::<VmExecuteResponse>().await?;
+        Ok(body)
+    }
+
+    pub async fn list_vm_tasks(&self, vm_id: &str) -> Result<VmTasksResponse> {
+        let url = format!("{}/api/vms/{}/tasks", self.base, urlencoding::encode(vm_id));
+        let res = self.http.get(url).send().await?;
+        let body = res.error_for_status()?.json::<VmTasksResponse>().await?;
+        Ok(body)
+    }
+
+    pub async fn allocate_vm_ip(&self, vm_id: &str) -> Result<VmAllocateResponse> {
+        let url = format!("{}/api/vm-pool/allocate", self.base);
+        let req = VmAllocateRequest {
+            vm_id: vm_id.to_string(),
+        };
+        let res = self.http.post(url).json(&req).send().await?;
+        let body = res.error_for_status()?.json::<VmAllocateResponse>().await?;
+        Ok(body)
+    }
+
+    pub async fn release_vm_ip(&self, vm_id: &str) -> Result<()> {
+        let url = format!(
+            "{}/api/vm-pool/release/{}",
+            self.base,
+            urlencoding::encode(vm_id)
+        );
+        let res = self.http.post(url).send().await?;
+        res.error_for_status()?;
+        Ok(())
+    }
+
+    pub async fn get_vm_metrics(&self, vm_id: &str) -> Result<VmMetricsResponse> {
+        let url = format!(
+            "{}/api/vms/{}/metrics",
+            self.base,
+            urlencoding::encode(vm_id)
+        );
+        let res = self.http.get(url).send().await?;
+        let body = res.error_for_status()?.json::<VmMetricsResponse>().await?;
+        Ok(body)
+    }
+
+    pub async fn get_all_vm_metrics(&self) -> Result<Vec<VmMetricsResponse>> {
+        let url = format!("{}/api/vms/metrics", self.base);
+        let res = self.http.get(url).send().await?;
+        let body = res
+            .error_for_status()?
+            .json::<Vec<VmMetricsResponse>>()
+            .await?;
+        Ok(body)
+    }
+
+    pub async fn execute_agent_task(
+        &self,
+        agent_id: &str,
+        task: &str,
+        vm_id: Option<&str>,
+    ) -> Result<VmAgentResponse> {
+        let url = format!("{}/api/vm/agent/execute", self.base);
+        let req = VmAgentRequest {
+            agent_id: agent_id.to_string(),
+            task: task.to_string(),
+            vm_id: vm_id.map(|s| s.to_string()),
+            timeout_ms: Some(60000), // 60 second default timeout for agent tasks
+        };
+        let res = self.http.post(url).json(&req).send().await?;
+        let body = res.error_for_status()?.json::<VmAgentResponse>().await?;
         Ok(body)
     }
 }
