@@ -10,8 +10,8 @@ pub use cost_tracking::{AgentCost, AnalysisCostTracker, ModelPricing};
 pub use error::{Result, TruthForgeError};
 pub use types::*;
 pub use workflows::{
-    PassOneOrchestrator, PassOneResult, PassTwoOptimizer, PassTwoResult, ResponseGenerator,
-    TwoPassDebateWorkflow,
+    PassOneOrchestrator, PassOneResult, PassTwoOptimizer, PassTwoResult, ProgressUpdate,
+    ResponseGenerator, TwoPassDebateWorkflow,
 };
 
 use terraphim_multi_agent::sanitize_system_prompt;
