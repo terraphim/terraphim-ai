@@ -93,9 +93,9 @@ impl ReplHandler {
 
         // Initialize command validator with API client if available
         if let Some(ref api_client) = self.api_client {
-            let validator = crate::commands::validator::CommandValidator::with_api_client(Arc::new(
-                api_client.clone(),
-            ));
+            let validator = crate::commands::validator::CommandValidator::with_api_client(
+                Arc::new(api_client.clone()),
+            );
             self.command_validator = Some(validator);
         } else {
             self.command_validator = Some(crate::commands::validator::CommandValidator::new());
@@ -3256,7 +3256,9 @@ impl ReplHandler {
 
                         // Convert ExecutionMode from commands to repl::commands
                         let repl_mode = match validated_mode {
-                            crate::commands::ExecutionMode::Local => super::commands::ExecutionMode::Local,
+                            crate::commands::ExecutionMode::Local => {
+                                super::commands::ExecutionMode::Local
+                            }
                             crate::commands::ExecutionMode::Firecracker => {
                                 super::commands::ExecutionMode::Firecracker
                             }
@@ -3402,7 +3404,10 @@ impl ReplHandler {
     #[cfg(feature = "repl-custom")]
     async fn display_command_result(
         &self,
-        result: &Result<crate::commands::CommandExecutionResult, crate::commands::CommandExecutionError>,
+        result: &Result<
+            crate::commands::CommandExecutionResult,
+            crate::commands::CommandExecutionError,
+        >,
     ) -> Result<()> {
         use colored::Colorize;
 
