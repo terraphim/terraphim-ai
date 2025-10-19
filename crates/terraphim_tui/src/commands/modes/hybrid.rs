@@ -472,8 +472,8 @@ impl Default for HybridExecutor {
 mod tests {
     use super::super::CommandDefinition;
     use super::super::ExecutionMode;
-    use crate::RiskLevel;
     use super::*;
+    use crate::RiskLevel;
 
     #[test]
     fn test_risk_assessment_safe_commands() {
