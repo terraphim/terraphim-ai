@@ -5,12 +5,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command, mode }) => {
-  const isMinimal = mode === 'minimal';
-  const isUltraMinimal = mode === 'ultra-minimal';
-  const isCI = process.env.CI === 'true';
-
-  return {
+export default defineConfig({
   plugins: [
     svelte(),
     {
@@ -97,15 +92,17 @@ export default defineConfig(({ command, mode }) => {
 
       // Map specific Svelte sub-paths back to the real runtime so they are **not** redirected to
       // our shim (which would cause ENOTDIR errors like svelte-shim.js/store).
-      'svelte/internal': resolve(__dirname, 'node_modules/svelte/internal'),
-      'svelte/store': resolve(__dirname, 'node_modules/svelte/store'),
-      'svelte/transition': resolve(__dirname, 'node_modules/svelte/transition'),
-      'svelte/animate': resolve(__dirname, 'node_modules/svelte/animate'),
-      'svelte/easing': resolve(__dirname, 'node_modules/svelte/easing'),
-      'svelte/motion': resolve(__dirname, 'node_modules/svelte/motion'),
+      // Note: Order matters! More specific paths must come first.
+      'svelte/internal/disclose-version': resolve(__dirname, 'node_modules/svelte/src/runtime/internal/disclose-version/index.js'),
+      'svelte/internal': resolve(__dirname, 'node_modules/svelte/src/runtime/internal/index.js'),
+      'svelte/store': resolve(__dirname, 'node_modules/svelte/src/runtime/store/index.js'),
+      'svelte/transition': resolve(__dirname, 'node_modules/svelte/src/runtime/transition/index.js'),
+      'svelte/animate': resolve(__dirname, 'node_modules/svelte/src/runtime/animate/index.js'),
+      'svelte/easing': resolve(__dirname, 'node_modules/svelte/src/runtime/easing/index.js'),
+      'svelte/motion': resolve(__dirname, 'node_modules/svelte/src/runtime/motion/index.js'),
 
       // Real runtime entry alias so the shim can import without causing an alias loop.
-      'svelte-original': resolve(__dirname, 'node_modules/svelte/index.mjs'),
+      'svelte-original': resolve(__dirname, 'node_modules/svelte/src/runtime/index.js'),
 
       // Any other bare `import "svelte"` should go to our shim that adds mount/unmount.
       'svelte': fileURLToPath(new URL('./src/svelte-shim.js', import.meta.url)),
@@ -132,34 +129,17 @@ export default defineConfig(({ command, mode }) => {
   },
   build: {
     rollupOptions: {
-      output: isUltraMinimal ? {
-        // Ultra-minimal - single chunk for fastest CI builds
-        manualChunks: undefined,
-        inlineDynamicImports: true
-      } : isMinimal ? {
-        // Minimal chunks for CI builds
-        manualChunks: undefined
-      } : {
-        // Full chunks for development
+      output: {
         manualChunks: {
           // Vendor libraries
           'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
           'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
           'vendor-charts': ['d3'],
           'vendor-atomic': ['@tomic/lib', '@tomic/svelte'],
-          'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
-          // Large components
-          'novel-editor': ['@paralect/novel-svelte']
+          'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown']
         }
       }
     },
-    chunkSizeWarningLimit: isUltraMinimal ? 200 : (isMinimal ? 500 : 1000), // Progressive limits
-    target: 'esnext',
-    minify: isUltraMinimal ? false : (isMinimal ? 'esbuild' : 'terser'),
-    sourcemap: false, // Always disable for CI speed
-    emptyOutDir: true, // Ensure clean builds
-    reportCompressedSize: false, // Faster builds
-    assetsInline: isUltraMinimal ? 'always' : 'size' // Inline assets in ultra-minimal mode
+    chunkSizeWarningLimit: 1000 // Increase limit to 1MB
   }
-  };
-});
+})

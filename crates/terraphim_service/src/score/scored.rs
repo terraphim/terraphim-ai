@@ -17,7 +17,7 @@ impl<T> SearchResults<T> {
     /// The score provided must be less than or equal to every other score in
     /// this collection, otherwise this method will panic.
     pub fn push(&mut self, scored: Scored<T>) {
-        assert!(self.0.last().is_none_or(|smallest| &scored <= smallest));
+        assert!(self.0.last().map_or(true, |smallest| &scored <= smallest));
         self.0.push(scored);
     }
 

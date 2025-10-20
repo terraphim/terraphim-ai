@@ -990,6 +990,11 @@
     "@tiptap/extensions" "^3.7.2"
     "@tiptap/pm" "^3.7.2"
 
+"@tiptap/suggestion@^2.22.1":
+  version "2.26.3"
+  resolved "https://registry.yarnpkg.com/@tiptap/suggestion/-/suggestion-2.26.3.tgz#a25523625603d9f4bfc0457a92457f524f15056c"
+  integrity sha512-kcyiyKEEDnqFImGQQEEuRa6N/N+/vU/OrI99wRfJnDnN8c3dP6UHJ4wr2qX6bUpx3Z0QTu6GGCpMpaqwtHTtJg==
+
 "@tomic/lib@0.40.0", "@tomic/lib@^0.40.0":
   version "0.40.0"
   resolved "https://registry.yarnpkg.com/@tomic/lib/-/lib-0.40.0.tgz#58d3c870b00ca4040fc0acc7b87e57da360bcb76"
