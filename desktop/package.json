@@ -90,6 +90,7 @@
 		"@tiptap/core": "^3.7.2",
 		"@tiptap/extension-mention": "^3.7.2",
 		"@tiptap/starter-kit": "^3.7.2",
+		"@tiptap/suggestion": "^2.22.1",
 		"@tomic/lib": "^0.40.0",
 		"@tomic/svelte": "^0.40.0",
 		"bulma": "^0.9.4",
